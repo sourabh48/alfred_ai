@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Behavioral AI{% endblock %}
+
+{% block content %}
+
+<h2 class="section-title fade-in">Emotional & Behavioral Patterns</h2>
+
+<div class="row g-3">
+
+    <div class="col-lg-6 fade-in">
+        <div class="glass-card p-3">
+            <h5 class="fw-bold">Stress Trend</h5>
+            <canvas id="stressChart"></canvas>
+        </div>
+    </div>
+
+    <div class="col-lg-6 fade-in">
+        <div class="glass-card p-3">
+            <h5 class="fw-bold">Behavioral Fingerprint</h5>
+            <canvas id="behaviorChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<script src="/static/js/behavioral.js?v=1.0"></script>
+
+{% endblock %}

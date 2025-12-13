@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Expenses{% endblock %}
+
+{% block content %}
+
+<h2 class="section-title fade-in">Your Expenses</h2>
+
+<div class="d-flex justify-content-between mb-3">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">+ Add Expense</button>
+</div>
+
+<!-- Animated Expense Cards -->
+<div class="row g-3 fade-in" id="expenseCards"></div>
+
+<hr class="my-4">
+
+<h3 class="fw-bold">Monthly Trend</h3>
+<div class="glass-card p-3 fade-in">
+    <canvas id="expenseTrend"></canvas>
+</div>
+
+{% include "expenses/modal_add.html" %}
+<script src="/static/js/expenses.js?v=1.1"></script>
+
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Loans{% endblock %}
+
+{% block content %}
+<h2 class="section-title fade-in">Loan Planner</h2>
+
+<div class="glass-card p-4 fade-in">
+    <form id="loanForm">
+        <div class="row">
+            <div class="col-md-4">
+                <label>Principal</label>
+                <input name="p" class="form-control mb-2" required>
+            </div>
+            <div class="col-md-4">
+                <label>Rate (%)</label>
+                <input name="r" class="form-control mb-2" required>
+            </div>
+            <div class="col-md-4">
+                <label>Tenure (months)</label>
+                <input name="n" class="form-control mb-2" required>
+            </div>
+        </div>
+
+        <button class="btn btn-primary mt-2">Calculate</button>
+    </form>
+</div>
+
+<hr>
+
+<h3>Results</h3>
+
+<div class="row mt-3">
+    <div class="col-lg-6 fade-in">
+        <div class="glass-card p-3">
+            <h5>EMI</h5>
+            <h2 id="emi" class="text-success">--</h2>
+        </div>
+    </div>
+
+    <div class="col-lg-6 fade-in">
+        <div class="glass-card p-3">
+            <h5>Total Interest</h5>
+            <h2 id="interest" class="text-danger">--</h2>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/loans.js?v=1.0"></script>
+{% endblock %}

@@ -1,0 +1,88 @@
+/* -----------------------
+   GLOBAL THEME
+------------------------ */
+
+body {
+    background: linear-gradient(135deg, #f4f6ff, #eef2f7);
+    min-height: 100vh;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Smooth fade animations */
+.fade-in {
+    animation: fadeIn 0.6s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Card Glass Effect */
+.glass-card {
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(12px);
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.glass-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px rgba(0,0,0,0.15);
+}
+
+/* Section titles */
+.section-title {
+    font-weight: 700;
+    font-size: 28px;
+    margin-bottom: 20px;
+}
+
+/* Animated Stats Card */
+.stats-card {
+    padding: 20px;
+    border-radius: 14px;
+    background: linear-gradient(to bottom right, #ffffff, #f0f3fa);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+    transition: transform 0.2s ease-in-out;
+}
+
+.stats-card:hover {
+    transform: scale(1.03);
+}
+
+/* Category Tag Style */
+.badge-category {
+    padding: 6px 12px;
+    font-weight: 600;
+    border-radius: 13px;
+    color: white;
+}
+
+/* Progress Bar */
+.progress-bar-custom {
+    height: 10px;
+    border-radius: 5px;
+    background-color: #e0e0e0;
+}
+
+.progress-bar-custom span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #209cff, #68e0cf);
+    border-radius: 5px;
+}
+
+/* Buttons */
+.btn-soft-primary {
+    background: #e8f1ff;
+    color: #0066ff;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.btn-soft-primary:hover {
+    background: #dbe8ff;
+    color: #004ecc;
+}

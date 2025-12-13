@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Investments{% endblock %}
+
+{% block content %}
+<h2 class="section-title fade-in">Your Investment Portfolio</h2>
+
+<div class="row g-3 mb-4">
+
+    <!-- Total Portfolio Card -->
+    <div class="col-lg-4 fade-in">
+        <div class="stats-card">
+            <h6 class="text-muted">Total Portfolio Value</h6>
+            <h2 class="fw-bold text-primary" id="totalValue">₹0</h2>
+        </div>
+    </div>
+
+    <!-- Return Card -->
+    <div class="col-lg-4 fade-in">
+        <div class="stats-card">
+            <h6 class="text-muted">Annual Return</h6>
+            <h2 class="fw-bold text-success" id="annualReturn">0%</h2>
+        </div>
+    </div>
+
+    <!-- Risk Rating -->
+    <div class="col-lg-4 fade-in">
+        <div class="stats-card">
+            <h6 class="text-muted">Risk Score</h6>
+            <h2 class="fw-bold text-danger" id="riskRating">Moderate</h2>
+        </div>
+    </div>
+
+</div>
+
+<!-- Allocation & Growth -->
+<div class="row g-3">
+
+    <div class="col-lg-4 fade-in">
+        <div class="glass-card p-3">
+            <h5 class="fw-bold">Asset Allocation</h5>
+            <canvas id="allocationChart"></canvas>
+        </div>
+    </div>
+
+    <div class="col-lg-8 fade-in">
+        <div class="glass-card p-3">
+            <h5 class="fw-bold">Portfolio Growth</h5>
+            <canvas id="growthChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<script src="/static/js/investments.js?v=1.0"></script>
+{% endblock %}

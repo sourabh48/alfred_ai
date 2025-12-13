@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Career{% endblock %}
+
+{% block content %}
+
+<h2 class="section-title fade-in">Career Intelligence</h2>
+
+<div class="row g-3">
+
+    <div class="col-lg-4 fade-in">
+        <div class="stats-card">
+            <h6 class="text-muted">Current Salary</h6>
+            <h2 class="text-primary fw-bold">₹{{ career.salary }}</h2>
+        </div>
+    </div>
+
+    <div class="col-lg-4 fade-in">
+        <div class="stats-card">
+            <h6 class="text-muted">Skill Score</h6>
+            <h2 class="text-success fw-bold">{{ career.skill_score }}%</h2>
+        </div>
+    </div>
+
+    <div class="col-lg-4 fade-in">
+        <div class="stats-card">
+            <h6 class="text-muted">Growth Potential</h6>
+            <h2 class="text-warning fw-bold">{{ career.potential }}%</h2>
+        </div>
+    </div>
+
+</div>
+
+<hr>
+
+<h3 class="fw-bold">Salary Projection</h3>
+<div class="glass-card p-3 fade-in">
+    <canvas id="salaryChart"></canvas>
+</div>
+
+<script src="/static/js/career.js?v=1.0"></script>
+
+{% endblock %}

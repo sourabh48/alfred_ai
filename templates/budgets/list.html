@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Budgets{% endblock %}
+{% block content %}
+
+<h2 class="section-title fade-in">Your Budgets</h2>
+
+<div class="row g-3">
+    {% for b in budgets %}
+    <div class="col-lg-4 fade-in">
+        <div class="glass-card p-3">
+            <h5 class="fw-bold">{{ b.category }}</h5>
+
+            <p class="text-muted">Limit: ₹{{ b.limit }}</p>
+
+            <div class="progress-bar-custom">
+                <span style="width: {{ b.percent_used }}%"></span>
+            </div>
+
+            <p class="mt-2">
+                Used: <strong>{{ b.percent_used }}%</strong>
+                {% if b.percent_used > 90 %}
+                <span class="text-danger">⚠ Near Limit</span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}

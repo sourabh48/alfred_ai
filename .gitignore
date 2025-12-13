@@ -1,0 +1,69 @@
+# =========================
+# Python / Django
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+db.sqlite3
+
+# Django media & static build
+/media/
+/staticfiles/
+
+# =========================
+# Virtual Environments
+# =========================
+alfred_env/
+venv/
+.env
+
+# =========================
+# ML Models & Artifacts
+# =========================
+ml_models/**/model.pt
+ml_models/**/model.bin
+ml_models/**/model.pkl
+ml_models/**/weights/
+ml_models/**/checkpoints/
+
+# Embeddings & memory (generated, sensitive)
+ml_models/alfred/memory/embeddings_store/
+ml_models/alfred/memory/users/
+
+# =========================
+# Logs & Reports
+# =========================
+*.log
+logs/
+reports/generated/
+
+# =========================
+# Celery / Redis
+# =========================
+celerybeat-schedule
+celerybeat.pid
+
+# =========================
+# IDE / OS
+# =========================
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# =========================
+# Node / PWA / Mobile (later)
+# =========================
+node_modules/
+dist/
+android/
+ios/
+
+# =========================
+# Secrets
+# =========================
+.env
+*.key
+*.pem

@@ -1,0 +1,32 @@
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" id="addExpenseForm">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Add Expense</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <label>Date</label>
+        <input type="date" class="form-control mb-2" name="date" required>
+
+        <label>Category</label>
+        <input type="text" class="form-control mb-2" name="category" required>
+
+        <label>Amount (₹)</label>
+        <input type="number" class="form-control mb-2" name="amount" required>
+
+        <label>Notes</label>
+        <input type="text" class="form-control" name="notes">
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-success" type="submit">Save</button>
+      </div>
+
+    </form>
+  </div>
+</div>

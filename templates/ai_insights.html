@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h3 class="fw-bold">Alfred – Behavioral Intelligence</h3>
+
+<div class="card shadow-sm p-3">
+
+    <form id="insightForm">
+        <label class="fw-bold mb-1">Enter last 10 expenses:</label>
+        <input type="text" name="expenses" class="form-control mb-2" placeholder="250, 299, 120, 540">
+
+        <label class="fw-bold mb-1">Stress levels:</label>
+        <input type="text" name="stress" class="form-control mb-2" placeholder="3, 5, 6, 4">
+
+        <button class="btn btn-primary mt-2" type="submit">Generate Insights</button>
+    </form>
+
+    <hr>
+
+    <h5>Insights:</h5>
+    <div id="aiOutput" class="p-2"></div>
+
+</div>
+
+<script>
+document.getElementById("insightForm").addEventListener("submit", function(e){
+    e.preventDefault();
+
+    const data = {
+        expenses: this.expenses.value.split(",").map(Number),
+        stress: this.stress.value.split(",").map(Number),
+    };
+
+    fetch("/api/ai/explain/", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        let out = document.getElementById("aiOutput");
+        out.innerHTML = `
+            <p><strong>Stress Avg:</strong> ${res.signature.stress_avg}</p>
+            <p><strong>Expense Volatility:</strong> ${res.signature.expense_volatility}</p>
+            <p><strong>Anomalies:</strong> ${JSON.stringify(res.anomalies)}</p>
+            <p><strong>Insights:</strong></p>
+        `;
+        res.insights.forEach(i => out.innerHTML += `<p>• ${i}</p>`);
+    });
+});
+</script>
+
+{% endblock %}

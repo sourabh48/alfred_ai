@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<h2 class="fw-bold mb-4">Your Financial Overview</h2>
+
+<div class="row g-3">
+
+    <div class="col-lg-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h5 class="fw-bold">Total Monthly Expenses</h5>
+                <h2 id="total-expense" class="text-danger">₹0</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h5 class="fw-bold">AI Stress Estimate</h5>
+                <h2 id="stress-score" class="text-warning">0%</h2>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="row mt-4">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                Monthly Expense Trend
+            </div>
+            <div class="card-body">
+                <canvas id="expenseChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                Alfred Insights
+            </div>
+            <div class="card-body" id="insightBox">
+                <p>Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

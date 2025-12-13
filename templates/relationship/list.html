@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Relationship Intelligence{% endblock %}
+
+{% block content %}
+
+<h2 class="section-title fade-in">Relationship Compatibility</h2>
+
+<div class="row g-3">
+
+    <div class="col-lg-4 fade-in">
+        <div class="stats-card">
+            <h6 class="text-muted">Compatibility Score</h6>
+            <h2 class="fw-bold text-primary">{{ score }}%</h2>
+        </div>
+    </div>
+
+    <div class="col-lg-8 fade-in">
+        <div class="glass-card p-3">
+            <h5 class="fw-bold">Behavior Alignment</h5>
+            <canvas id="relationshipRadar"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<script src="/static/js/relationship.js?v=1.0"></script>
+
+{% endblock %}
