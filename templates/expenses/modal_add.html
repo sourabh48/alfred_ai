@@ -1,32 +1,96 @@
-<div class="modal fade" id="addModal" tabindex="-1">
-  <div class="modal-dialog">
-    <form class="modal-content" id="addExpenseForm">
+<div class="modal fade" id="expenseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form class="modal-content" id="expenseForm">
+            <input type="hidden" name="id" id="expenseId">
 
-      <div class="modal-header">
-        <h5 class="modal-title">Add Expense</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
+            <div class="modal-header">
+                <h5 class="modal-title" id="expenseModalTitle">Add Expense</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
 
-      <div class="modal-body">
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Transaction Date</label>
+                        <input type="date" class="form-control" name="transaction_date" required>
+                    </div>
 
-        <label>Date</label>
-        <input type="date" class="form-control mb-2" name="date" required>
+                    <div class="col-md-4">
+                        <label class="form-label">Classification</label>
+                        <select class="form-select" name="classification" required>
+                            <option value="expense">Expense</option>
+                            <option value="loan">Loan</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
 
-        <label>Category</label>
-        <input type="text" class="form-control mb-2" name="category" required>
+                    <div class="col-md-4">
+                        <label class="form-label">Category</label>
+                        <select class="form-select" name="category" required>
+                            <option value="food">Food</option>
+                            <option value="groceries">Groceries</option>
+                            <option value="shopping">Shopping</option>
+                            <option value="bills">Bills</option>
+                            <option value="utilities">Utilities</option>
+                            <option value="travel">Travel</option>
+                            <option value="fuel">Fuel</option>
+                            <option value="health">Health</option>
+                            <option value="subscription">Subscription</option>
+                            <option value="entertainment">Entertainment</option>
+                            <option value="rent">Rent</option>
+                            <option value="loan">Loan / EMI</option>
+                            <option value="credit_card">Credit Card Payment</option>
+                            <option value="investment">Investment</option>
+                            <option value="transfer">Transfer</option>
+                            <option value="income">Income / Refund</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
 
-        <label>Amount (₹)</label>
-        <input type="number" class="form-control mb-2" name="amount" required>
+                    <div class="col-md-4">
+                        <label class="form-label">Amount (INR)</label>
+                        <input type="number" class="form-control" step="0.01" min="0.01" name="amount" required>
+                    </div>
 
-        <label>Notes</label>
-        <input type="text" class="form-control" name="notes">
+                    <div class="col-md-4">
+                        <label class="form-label">Payment Mode</label>
+                        <input type="text" class="form-control" name="payment_mode" placeholder="UPI, CARD, ACH">
+                    </div>
 
-      </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Direction</label>
+                        <select class="form-select" name="direction" required>
+                            <option value="debit">Debit</option>
+                            <option value="credit">Credit</option>
+                        </select>
+                    </div>
 
-      <div class="modal-footer">
-        <button class="btn btn-success" type="submit">Save</button>
-      </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Merchant</label>
+                        <input type="text" class="form-control" name="merchant" placeholder="Merchant or payee">
+                    </div>
 
-    </form>
-  </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Source</label>
+                        <select class="form-select" name="source">
+                            <option value="manual">Manual</option>
+                            <option value="bank_statement">Bank Statement</option>
+                            <option value="email">Email</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="3" placeholder="Add notes or adjust the imported narration"></textarea>
+                    </div>
+                </div>
+                <div id="expenseFormError" class="alert alert-danger mt-3 d-none mb-0"></div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success" type="submit" id="expenseSubmitBtn">Save Expense</button>
+            </div>
+        </form>
+    </div>
 </div>

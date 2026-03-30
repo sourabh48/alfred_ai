@@ -1,8 +1,23 @@
-<nav class="navbar navbar-dark bg-dark sticky-top flex-md-nowrap p-0 shadow">
-    <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fw-bold" href="/">Alfred AI</a>
-    <div class="navbar-nav">
-        <div class="nav-item text-nowrap">
-            <a class="nav-link px-3" href="/logout/">Sign out</a>
+<nav class="navbar alfred-navbar sticky-top">
+    <div class="container-fluid px-3 px-lg-4">
+        <a class="alfred-brand" href="{% url 'dashboard' %}">
+            <span class="alfred-brand-mark">A</span>
+            <span>
+                <strong>ALFRED</strong>
+                <small>Personal Finance & Life Intelligence</small>
+            </span>
+        </a>
+
+        <div class="d-flex align-items-center gap-3">
+            {% if request.user.is_authenticated %}
+            <div class="alfred-nav-chip">Signed in as {{ request.user.username }}</div>
+            <form action="{% url 'logout' %}" method="post" class="m-0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-light btn-sm rounded-pill px-3">Sign out</button>
+            </form>
+            {% else %}
+            <a class="btn btn-outline-light btn-sm rounded-pill px-3" href="{% url 'login' %}">Sign in</a>
+            {% endif %}
         </div>
     </div>
 </nav>

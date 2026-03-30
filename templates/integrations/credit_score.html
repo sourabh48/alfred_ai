@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Credit Score{% endblock %}
+
+{% block content %}
+<section class="alfred-hero fade-in" id="creditScoreRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Credit bureau monitoring</div>
+            <h1 class="alfred-hero-title">Track your bureau score, factor breakdown, 12-month trend, and improvement actions in one screen.</h1>
+            <p class="alfred-hero-copy">Credit factors, improvement steps, and alerts are derived from your own ALFRED data. Official bureau scores require a bureau-approved integration and are not faked when that integration is absent.</p>
+        </div>
+        <div class="surface-card" style="min-width: 280px;">
+            <p class="metric-kicker">Current Bureau Score</p>
+            <div class="metric-value" id="creditScoreValue">0</div>
+            <p class="metric-caption mb-1"><span id="creditScoreRating">Unknown</span> on <span id="creditScoreBureau">CIBIL</span></p>
+            <p class="metric-caption mb-0" id="creditScoreMeta">Select a bureau to load the latest score.</p>
+        </div>
+    </div>
+</section>
+
+<section class="d-flex flex-wrap align-items-center gap-3 mb-4">
+    <select id="bureauSelect" class="form-select" style="max-width: 220px;">
+        <option value="CIBIL">TransUnion CIBIL</option>
+        <option value="EXPERIAN">Experian</option>
+        <option value="EQUIFAX">Equifax</option>
+        <option value="CRIF">CRIF High Mark</option>
+    </select>
+    <button id="creditRefreshBtn" class="btn btn-soft-primary" type="button">Refresh Score</button>
+</section>
+
+<section class="soft-grid four-up mb-4" id="creditSummaryCards"></section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Factor Breakdown</h2>
+            <p class="page-section-copy mb-3">How each major factor is contributing to the current credit profile.</p>
+            <canvas id="creditFactorChart" height="170"></canvas>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">12-Month Trend</h2>
+            <p class="page-section-copy mb-3">Bureau score trend and direction over the last twelve months.</p>
+            <canvas id="creditTrendChart" height="170"></canvas>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4">
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Strengths and Risks</h2>
+            <p class="page-section-copy mb-3">Detailed factor analysis from the credit engine.</p>
+            <div id="creditFactorList" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Improvement Plan</h2>
+            <p class="page-section-copy mb-3">Priority actions that can improve the score over time.</p>
+            <ul class="insight-list" id="creditImprovementList"></ul>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Peer Comparison</h2>
+            <p class="page-section-copy mb-3">How this score stacks up against the modeled peer group.</p>
+            <div id="creditPeerPanel" class="data-stack mb-4"></div>
+            <div>
+                <h3 class="h6 fw-bold mb-3">Alerts</h3>
+                <ul class="insight-list" id="creditAlertList"></ul>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/credit_score.js?v=2.1"></script>
+{% endblock %}

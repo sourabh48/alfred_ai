@@ -2,48 +2,238 @@
 {% block title %}Loans{% endblock %}
 
 {% block content %}
-<h2 class="section-title fade-in">Loan Planner</h2>
-
-<div class="glass-card p-4 fade-in">
-    <form id="loanForm">
-        <div class="row">
-            <div class="col-md-4">
-                <label>Principal</label>
-                <input name="p" class="form-control mb-2" required>
-            </div>
-            <div class="col-md-4">
-                <label>Rate (%)</label>
-                <input name="r" class="form-control mb-2" required>
-            </div>
-            <div class="col-md-4">
-                <label>Tenure (months)</label>
-                <input name="n" class="form-control mb-2" required>
-            </div>
+<section class="alfred-hero fade-in" id="loanPlannerRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Debt service intelligence</div>
+            <h1 class="alfred-hero-title">Track manual loans, detect repayment pressure from bank statements, and plan payoff strategy.</h1>
+            <p class="alfred-hero-copy">The loan engine now combines your registered loans with detected repayment transactions from imported statements so ALFRED can estimate payoff pressure and prepayment opportunities.</p>
         </div>
-
-        <button class="btn btn-primary mt-2">Calculate</button>
-    </form>
-</div>
-
-<hr>
-
-<h3>Results</h3>
-
-<div class="row mt-3">
-    <div class="col-lg-6 fade-in">
-        <div class="glass-card p-3">
-            <h5>EMI</h5>
-            <h2 id="emi" class="text-success">--</h2>
+        <div class="surface-card" style="min-width: 260px;">
+            <p class="metric-kicker">Debt Service Ratio</p>
+            <div class="metric-value" id="loanDebtRatio">0%</div>
+            <p class="metric-caption mb-0">Share of cash-in currently consumed by loan and debt repayments.</p>
         </div>
     </div>
+</section>
 
-    <div class="col-lg-6 fade-in">
-        <div class="glass-card p-3">
-            <h5>Total Interest</h5>
-            <h2 id="interest" class="text-danger">--</h2>
+<section class="soft-grid four-up mb-4" id="loanSummaryCards"></section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Register Loan</h2>
+            <p class="page-section-copy mb-3">Add manual loans so ALFRED can estimate outstanding balance and payoff timing.</p>
+            <form id="loanForm" class="soft-grid">
+                <input type="hidden" name="id" id="loanId">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Loan Type</label>
+                        <select name="loan_type" class="form-select" required>
+                            <option value="home">Home Loan</option>
+                            <option value="personal">Personal Loan</option>
+                            <option value="car">Car Loan</option>
+                            <option value="education">Education Loan</option>
+                            <option value="business">Business Loan</option>
+                            <option value="credit_card">Credit Card Debt</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Lender</label>
+                        <input name="lender" class="form-control" placeholder="Bank or NBFC">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Loan Account Number</label>
+                        <input name="loan_account_number" class="form-control" placeholder="Optional account reference">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Principal</label>
+                        <input type="number" step="0.01" name="principal" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Interest Rate (%)</label>
+                        <input type="number" step="0.01" name="interest_rate" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">EMI</label>
+                        <input type="number" step="0.01" name="emi" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Tenure (months)</label>
+                        <input type="number" name="tenure_months" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Remaining Balance</label>
+                        <input type="number" step="0.01" name="remaining_balance" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" name="start_date" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" rows="3" class="form-control" placeholder="Prepayment options, floating rate notes, etc."></textarea>
+                    </div>
+                </div>
+                <div id="loanFormError" class="alert alert-danger d-none mb-0"></div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" id="loanSubmitButton">Save Loan</button>
+                    <button type="button" class="btn btn-outline-secondary" id="loanCancelButton">Reset</button>
+                </div>
+            </form>
         </div>
     </div>
-</div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <div class="row g-4">
+                <div class="col-lg-6">
+                    <h2 class="page-section-title">Loan Document Import</h2>
+                    <p class="page-section-copy mb-3">Upload lender PDFs so ALFRED can extract lender, principal, EMI, tenure, rate, and outstanding balance.</p>
+                    <div class="soft-grid">
+                        <div class="chip-row">
+                            <span class="chip-neutral">Lender</span>
+                            <span class="chip-neutral">Account Ref</span>
+                            <span class="chip-neutral">Principal</span>
+                            <span class="chip-neutral">Rate</span>
+                            <span class="chip-neutral">EMI</span>
+                            <span class="chip-neutral">Outstanding</span>
+                        </div>
+                        <div>
+                            <label class="form-label" for="loanPdfFile">Loan PDF</label>
+                            <input id="loanPdfFile" type="file" class="form-control" accept=".pdf,application/pdf">
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button id="loanImportBtn" class="btn btn-primary" type="button">Import Loan PDF</button>
+                            <button id="loanDetectBtn" class="btn btn-soft-primary" type="button">Detect From Expenses</button>
+                        </div>
+                        <div id="loanImportStatus" class="empty-state">Import a lender statement or repayment schedule PDF to auto-fill the manual loan book.</div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <h2 class="page-section-title">Consolidate Loans</h2>
+                    <p class="page-section-copy mb-3">Select active loans below and roll them into one new consolidated loan record.</p>
+                    <form id="loanConsolidationForm" class="soft-grid">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="consolidationLender">New Lender</label>
+                                <input id="consolidationLender" name="lender" class="form-control" placeholder="Consolidating bank or NBFC" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="consolidationLoanType">Loan Type</label>
+                                <select id="consolidationLoanType" name="loan_type" class="form-select">
+                                    <option value="personal">Personal Loan</option>
+                                    <option value="home">Home Loan</option>
+                                    <option value="car">Car Loan</option>
+                                    <option value="education">Education Loan</option>
+                                    <option value="business">Business Loan</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="consolidationAccountNumber">New Loan Account Number</label>
+                                <input id="consolidationAccountNumber" name="loan_account_number" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="consolidationPrincipal">New Principal</label>
+                                <input id="consolidationPrincipal" name="principal" type="number" step="0.01" class="form-control" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="consolidationRate">Interest Rate (%)</label>
+                                <input id="consolidationRate" name="interest_rate" type="number" step="0.01" class="form-control" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="consolidationEmi">EMI</label>
+                                <input id="consolidationEmi" name="emi" type="number" step="0.01" class="form-control" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="consolidationTenure">Tenure (months)</label>
+                                <input id="consolidationTenure" name="tenure_months" type="number" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="consolidationStartDate">Start Date</label>
+                                <input id="consolidationStartDate" name="start_date" type="date" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Selected Loan IDs</label>
+                                <div id="loanConsolidationSelection" class="detail-item">Select at least two active loans from the table below.</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="consolidationNotes">Notes</label>
+                                <textarea id="consolidationNotes" name="notes" rows="3" class="form-control"></textarea>
+                            </div>
+                        </div>
+                        <div id="loanConsolidationFeedback" class="d-none alert mb-0"></div>
+                        <button class="btn btn-primary" type="submit">Consolidate Selected Loans</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
-<script src="/static/js/loans.js?v=1.0"></script>
+<section class="row g-4">
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h2 class="page-section-title">Manual Loan Book</h2>
+                    <p class="page-section-copy">Registered loans with estimated outstanding balance, consolidation status, and foreclosure workflow.</p>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-alfred align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Select</th>
+                            <th>Loan</th>
+                            <th class="text-end">EMI</th>
+                            <th class="text-end">Balance</th>
+                            <th class="text-end">Months Left</th>
+                            <th>Prepay Hint</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loanTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <div class="mb-4">
+                <h2 class="page-section-title">Repayment Trend</h2>
+                <p class="page-section-copy mb-3">Detected loan repayments from your imported transaction history.</p>
+                <canvas id="loanTrendChart" height="180"></canvas>
+            </div>
+            <div>
+                <h2 class="page-section-title">Foreclosure Upload</h2>
+                <p class="page-section-copy mb-3">Close a loan only after uploading the lender's foreclosure or no-due document.</p>
+                <form id="loanForeclosureForm" class="soft-grid" enctype="multipart/form-data">
+                    <input type="hidden" id="foreclosureLoanId" name="loan_id">
+                    <div class="detail-item" id="foreclosureLoanMeta">Pick an active loan from the table below to start foreclosure.</div>
+                    <div>
+                        <label class="form-label" for="foreclosureFile">Foreclosure Document</label>
+                        <input id="foreclosureFile" name="file" type="file" class="form-control" accept=".pdf,.txt" required>
+                    </div>
+                    <div>
+                        <label class="form-label" for="foreclosureAmount">Final Payment Amount</label>
+                        <input id="foreclosureAmount" name="final_payment_amount" type="number" step="0.01" class="form-control" placeholder="Optional if the document already contains the amount">
+                    </div>
+                    <div id="loanForeclosureFeedback" class="d-none alert mb-0"></div>
+                    <button class="btn btn-primary" type="submit">Upload and Close Loan</button>
+                </form>
+            </div>
+            <div class="mt-4">
+                <h2 class="page-section-title">Detected Repayments</h2>
+                <p class="page-section-copy mb-3">Loan and debt repayments inferred directly from your statement imports.</p>
+                <div id="loanDetectedRepayments"></div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/loans.js?v=2.1"></script>
 {% endblock %}

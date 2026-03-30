@@ -1,28 +1,83 @@
 {% extends "base.html" %}
-{% block title %}Behavioral AI{% endblock %}
+{% block title %}Behavioral Signals{% endblock %}
 
 {% block content %}
-
-<h2 class="section-title fade-in">Emotional & Behavioral Patterns</h2>
-
-<div class="row g-3">
-
-    <div class="col-lg-6 fade-in">
-        <div class="glass-card p-3">
-            <h5 class="fw-bold">Stress Trend</h5>
-            <canvas id="stressChart"></canvas>
+<section class="alfred-hero fade-in" id="behavioralRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Stress, sleep, and work balance</div>
+            <h1 class="alfred-hero-title">Log your behavioral signals and map how pressure is moving beneath the financial surface.</h1>
+            <p class="alfred-hero-copy">The behavioral layer lets ALFRED connect stress, sleep, and work intensity with spending behavior and decision quality.</p>
+        </div>
+        <div class="surface-card" style="min-width: 260px;">
+            <p class="metric-kicker">Current Fingerprint</p>
+            <div class="metric-value" id="behavioralFingerprintValue">No data</div>
+            <p class="metric-caption mb-1">Current stress: <span id="behavioralStressValue">0</span></p>
+            <p class="metric-caption mb-0" id="behavioralHeroCopy">Start logging signals to build a pattern baseline.</p>
         </div>
     </div>
+</section>
 
-    <div class="col-lg-6 fade-in">
-        <div class="glass-card p-3">
-            <h5 class="fw-bold">Behavioral Fingerprint</h5>
-            <canvas id="behaviorChart"></canvas>
+<section class="soft-grid four-up mb-4" id="behavioralSummaryCards"></section>
+<div id="behavioralPageAlert" class="d-none mb-4"></div>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Log Signal</h2>
+            <p class="page-section-copy mb-3">Capture a daily snapshot of stress, sleep, and work intensity.</p>
+            <form id="behavioralForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="behaviorStress">Stress</label>
+                        <input id="behaviorStress" name="stress_score" type="number" min="0" max="10" step="0.1" class="form-control" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="behaviorSleep">Sleep Hours</label>
+                        <input id="behaviorSleep" name="sleep_hours" type="number" min="0" max="24" step="0.1" class="form-control" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="behaviorWork">Work Hours</label>
+                        <input id="behaviorWork" name="work_hours" type="number" min="0" max="24" step="0.1" class="form-control" required>
+                    </div>
+                </div>
+                <div id="behavioralFormFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Save Signal</button>
+            </form>
+
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">Behavioral Insights</h3>
+                <ul class="insight-list" id="behavioralInsightList"></ul>
+            </div>
         </div>
     </div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Weekly Stress Pattern</h2>
+            <p class="page-section-copy mb-3">Recent stress readings tracked by the behavioral engine.</p>
+            <canvas id="stressChart" height="150"></canvas>
+        </div>
+    </div>
+</section>
 
-</div>
+<section class="row g-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Fingerprint Breakdown</h2>
+            <p class="page-section-copy mb-3">Derived personality, spending style, and current trend signals.</p>
+            <div id="behavioralFingerprintPanel" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recent Logs</h2>
+            <p class="page-section-copy mb-3">Last recorded behavioral snapshots.</p>
+            <div id="behavioralHistory" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
 
-<script src="/static/js/behavioral.js?v=1.0"></script>
-
+{% block extra_js %}
+<script src="/static/js/behavioral.js?v=2.3"></script>
 {% endblock %}

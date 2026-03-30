@@ -2,7 +2,6 @@ import os
 from celery import Celery
 
 from celery import shared_task
-from apps.ml_engine.memory.memory_engine import alfred_memory
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alfred_ai.settings")
 
@@ -20,4 +19,6 @@ def debug_task(self):
 
 @shared_task
 def cleanup_memory_task():
+    from apps.ml_engine.memory.memory_engine import alfred_memory
+
     return alfred_memory.cleanup()

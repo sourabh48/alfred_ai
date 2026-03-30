@@ -3,24 +3,99 @@
 {% block title %}Expenses{% endblock %}
 
 {% block content %}
-
-<h2 class="section-title fade-in">Your Expenses</h2>
-
-<div class="d-flex justify-content-between mb-3">
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">+ Add Expense</button>
+<div id="expenseRoot">
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Expense Timeline</h2>
+        <p class="text-muted mb-0">Upload a bank statement, auto-classify it into expenses, loans, and other outflows, then edit any transaction if needed.</p>
+    </div>
+    <button class="btn btn-primary" type="button" onclick="openCreateModal()">+ Add Expense</button>
 </div>
 
-<!-- Animated Expense Cards -->
-<div class="row g-3 fade-in" id="expenseCards"></div>
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-lg-4">
+                <label for="statementFile" class="form-label fw-semibold">Upload statement (PDF)</label>
+                <input id="statementFile" class="form-control" type="file" accept=".pdf,application/pdf">
+            </div>
+            <div class="col-lg-3">
+                <label for="statementKind" class="form-label fw-semibold">Statement Type</label>
+                <select id="statementKind" class="form-select">
+                    <option value="">Auto detect</option>
+                    <option value="bank_statement">Bank Statement</option>
+                    <option value="credit_card_statement">Credit Card Statement</option>
+                    <option value="loan_statement">Loan Statement</option>
+                    <option value="investment_statement">Investment Statement</option>
+                    <option value="other_statement">Other Statement</option>
+                </select>
+            </div>
+            <div class="col-lg-3">
+                <div class="small text-muted" id="lastUploadMeta">Email-based expense capture can plug into the same classifier later.</div>
+            </div>
+            <div class="col-lg-2 d-grid">
+                <button id="uploadStatementBtn" class="btn btn-dark" type="button">Import statement</button>
+            </div>
+        </div>
+        <div id="statementUploadStatus" class="mt-3"></div>
+    </div>
+</div>
 
-<hr class="my-4">
+<div class="row g-3 mb-4" id="summaryCards"></div>
 
-<h3 class="fw-bold">Monthly Trend</h3>
-<div class="glass-card p-3 fade-in">
-    <canvas id="expenseTrend"></canvas>
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-0 pb-0">
+        <h5 class="fw-bold mb-0">Assets vs Liabilities</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-xl-5">
+                <div id="balanceSheetCards" class="row g-3"></div>
+            </div>
+            <div class="col-xl-7">
+                <div id="balanceSheetPanel" class="data-stack"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-0 pb-0">
+        <h5 class="fw-bold mb-0">Monthly Breakdown</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="expenseTrend" height="110"></canvas>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="fw-bold mb-0">Timeline</h5>
+            <small class="text-muted">Every imported transaction stays editable after classification.</small>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Merchant</th>
+                    <th>Class</th>
+                    <th>Type</th>
+                    <th>Mode</th>
+                    <th class="text-end">Amount</th>
+                    <th>Source</th>
+                    <th>Description</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="timelineBody"></tbody>
+        </table>
+    </div>
 </div>
 
 {% include "expenses/modal_add.html" %}
-<script src="/static/js/expenses.js?v=1.1"></script>
-
+<script src="/static/js/expenses.js?v=2.1"></script>
+</div>
 {% endblock %}

@@ -2,27 +2,69 @@
 {% block title %}Reports{% endblock %}
 
 {% block content %}
-
-<h2 class="section-title fade-in">Reports & Exports</h2>
-
-<div class="row g-3">
-
-    <div class="col-lg-4 fade-in">
-        <div class="glass-card p-3">
-            <h5 class="fw-bold">Full Financial Report</h5>
-            <p class="text-muted">All expenses, budgets, loans & AI insights.</p>
-            <a href="/api/reports/pdf/" class="btn btn-soft-primary">Download PDF</a>
+<section class="alfred-hero fade-in" id="reportsRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Superuser report library</div>
+            <h1 class="alfred-hero-title">Inspect generated artifacts, developer escalations, and automated issue-routing output without exposing operational noise to end users.</h1>
+            <p class="alfred-hero-copy">This page is now a superuser-only detail view. Normal users no longer create support tickets manually because ALFRED routes low and medium issues automatically and escalates high-severity items to developers.</p>
+        </div>
+        <div class="surface-card" style="min-width: 260px;">
+            <p class="metric-kicker">Report Library</p>
+            <div class="metric-value" id="reportCountValue">0</div>
+            <p class="metric-caption mb-1">Health score: <span id="reportHealthValue">0</span></p>
+            <p class="metric-caption mb-0" id="reportHeroCopy">Run generators to populate downloadable artifacts.</p>
         </div>
     </div>
+</section>
 
-    <div class="col-lg-4 fade-in">
-        <div class="glass-card p-3">
-            <h5 class="fw-bold">Raw Data Export</h5>
-            <p class="text-muted">CSV of all financial entries.</p>
-            <a href="/api/reports/export/csv/" class="btn btn-soft-primary">Download CSV</a>
+<section class="soft-grid four-up mb-4" id="reportSummaryCards"></section>
+
+<section class="row g-4">
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Generated Reports</h2>
+            <p class="page-section-copy mb-3">Files already recorded by the backend reporting pipeline.</p>
+            <div class="table-responsive">
+                <table class="table table-alfred align-middle mb-0 metric-table">
+                    <thead>
+                        <tr>
+                            <th>Created</th>
+                            <th>File Path</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportsTableBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Live Coverage</h2>
+            <p class="page-section-copy mb-3">Core modules currently supplying data that a downstream report can use.</p>
+            <div id="reportCoveragePanel" class="data-stack"></div>
+        </div>
+    </div>
+</section>
 
-</div>
+<section class="row g-4 mt-1">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Developer Queue</h2>
+            <p class="page-section-copy mb-3">High-severity tickets that ALFRED did not auto-close.</p>
+            <div id="reportTicketQueue" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Auto-Handled Activity</h2>
+            <p class="page-section-copy mb-3">Recent low and medium severity issues resolved by ALFRED.</p>
+            <div id="reportTicketActivity" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
 
+{% block extra_js %}
+<script src="/static/js/reports.js?v=2.4"></script>
 {% endblock %}

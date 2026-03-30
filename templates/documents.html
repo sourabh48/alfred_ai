@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Documents{% endblock %}
+
+{% block content %}
+<section class="alfred-hero fade-in" id="documentCenterRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Central upload hub</div>
+            <h1 class="alfred-hero-title">Upload statements, vehicle files, resumes, and loan documents from one place.</h1>
+            <p class="alfred-hero-copy">The document center keeps uploads together, exposes parser confidence where available, and routes each file into the right workflow without forcing you to hunt across multiple dashboards.</p>
+        </div>
+        <div class="surface-card" style="min-width: 280px;">
+            <p class="metric-kicker">Document Principles</p>
+            <div class="metric-value" id="documentConfidenceValue">0</div>
+            <p class="metric-caption mb-1">Average parser confidence across recent uploads</p>
+            <p class="metric-caption mb-0" id="documentCenterMeta">No recent uploads yet.</p>
+        </div>
+    </div>
+</section>
+
+<section class="soft-grid four-up mb-4" id="documentCenterCards"></section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Statements</h2>
+            <p class="page-section-copy mb-3">Upload bank, credit-card, loan, investment, or other statements. ALFRED will classify the document, import transactions when possible, and still retain the statement metadata when parsing is partial.</p>
+            <form id="documentStatementForm" class="soft-grid" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label" for="documentStatementKind">Statement Type</label>
+                        <select id="documentStatementKind" name="statement_kind" class="form-select">
+                            <option value="">Auto detect</option>
+                            <option value="bank_statement">Bank Statement</option>
+                            <option value="credit_card_statement">Credit Card Statement</option>
+                            <option value="loan_statement">Loan Statement</option>
+                            <option value="investment_statement">Investment Statement</option>
+                            <option value="other_statement">Other Statement</option>
+                        </select>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label" for="documentStatementFile">Statement PDF</label>
+                        <input id="documentStatementFile" name="statement" type="file" class="form-control" accept=".pdf,application/pdf" required>
+                    </div>
+                </div>
+                <div id="documentStatementFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Upload Statement</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Loan Documents</h2>
+            <p class="page-section-copy mb-3">Upload sanction letters, loan statements, repayment schedules, or loan books. ALFRED will detect the document type, infer loan type where possible, and update the loan registry.</p>
+            <form id="documentLoanForm" class="soft-grid" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="documentLoanFile">Loan PDF</label>
+                        <input id="documentLoanFile" name="file" type="file" class="form-control" accept=".pdf,application/pdf" required>
+                    </div>
+                </div>
+                <div id="documentLoanFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Import Loan Document</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Vehicle Documents</h2>
+            <p class="page-section-copy mb-3">Upload insurance, PUC, RC, and related vehicle documents from the same place.</p>
+            <form id="documentVehicleForm" class="soft-grid" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label" for="documentVehicleProfile">Vehicle Profile</label>
+                        <select id="documentVehicleProfile" name="bike_profile_id" class="form-select" required></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="documentVehicleType">Type Override</label>
+                        <select id="documentVehicleType" name="document_type_override" class="form-select">
+                            <option value="">Auto detect</option>
+                            <option value="insurance">Insurance</option>
+                            <option value="puc">PUC</option>
+                            <option value="registration">Registration / RC</option>
+                            <option value="invoice">Invoice</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="documentVehicleFile">Document File</label>
+                        <input id="documentVehicleFile" name="document_file" type="file" class="form-control" accept=".pdf,image/*" required>
+                    </div>
+                </div>
+                <div id="documentVehicleFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Upload Vehicle Document</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Service Bills and Notes</h2>
+            <p class="page-section-copy mb-3">Import a workshop bill or work note and let ALFRED derive the service log automatically.</p>
+            <form id="documentServiceForm" class="soft-grid" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label" for="documentServiceProfile">Vehicle Profile</label>
+                        <select id="documentServiceProfile" name="bike_profile_id" class="form-select" required></select>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label" for="documentServiceFile">Bill / Work Note</label>
+                        <input id="documentServiceFile" name="service_file" type="file" class="form-control" accept=".pdf,image/*" required>
+                    </div>
+                </div>
+                <div id="documentServiceFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Import Service File</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Career Files</h2>
+            <p class="page-section-copy mb-3">Resume uploads stay available here too, so document intake remains centralized even though the career module keeps its own page.</p>
+            <form id="documentResumeForm" class="soft-grid" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="documentResumeFile">Resume</label>
+                        <input id="documentResumeFile" name="resume" type="file" class="form-control" accept=".pdf,.doc,.docx,.txt,.md,.rtf,.html,.htm,.odt,image/*,application/pdf,text/plain,text/markdown,text/html,application/rtf,application/vnd.oasis.opendocument.text" required>
+                    </div>
+                </div>
+                <div id="documentResumeFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Upload Resume</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Upload Principles</h2>
+            <p class="page-section-copy mb-3">The intake layer should stay consistent across modules even when the downstream dashboards differ.</p>
+            <ul class="insight-list mb-0">
+                <li class="insight-item">Every important external signal should show proof.</li>
+                <li class="insight-item">Every parser should expose confidence and allow review.</li>
+                <li class="insight-item">Every long-lived cache should carry a freshness contract.</li>
+                <li class="insight-item">Recommendations should be grounded in user history, verified external evidence, or both.</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4">
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recent Statements</h2>
+            <div id="documentStatementList" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recent Vehicle Docs</h2>
+            <div id="documentVehicleList" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recent Career Files</h2>
+            <div id="documentResumeList" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/documents.js?v=1.0"></script>
+{% endblock %}

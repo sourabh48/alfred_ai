@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}Project Details{% endblock %}
+
+{% block content %}
+<section class="alfred-hero fade-in">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">System planning and guardrails</div>
+            <h1 class="alfred-hero-title">Track in-progress work, adaptive-system maturity, reports, and operational risks outside the main user dashboard.</h1>
+            <p class="alfred-hero-copy">This superuser console now acts as the live operations surface for ALFRED. It shows what is still in progress, how the adaptive pipeline is learning from stored data, and which tickets or report artifacts still need developer attention.</p>
+        </div>
+        <div class="surface-card" style="min-width: 280px;">
+            <p class="metric-kicker">Internal Clock</p>
+            <div class="metric-value">{{ clock.local_time }}</div>
+            <p class="metric-caption mb-1">{{ clock.local_date }} | {{ clock.timezone }}</p>
+            <p class="metric-caption mb-0">UTC: {{ clock.generated_at_utc }}</p>
+        </div>
+    </div>
+</section>
+
+<section class="soft-grid four-up mb-4">
+    {% for card in summary_cards %}
+    <article class="metric-card">
+        <p class="metric-kicker">{{ card.label }}</p>
+        <h2 class="metric-value">{{ card.value }}</h2>
+        <p class="metric-caption">{{ card.copy }}</p>
+    </article>
+    {% endfor %}
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Operational Snapshot</h2>
+            <p class="page-section-copy mb-3">Live counts from the current dataset, developer queue, and verification pipelines.</p>
+            <div class="data-stack">
+                {% for item in operational_metrics %}
+                <div class="data-row">
+                    <div class="data-label">{{ item.label }}</div>
+                    <div class="data-value">{{ item.value }} <span class="muted small">{{ item.copy }}</span></div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">AI Learning Progress</h2>
+            <p class="page-section-copy mb-3">{{ learning_snapshot.summary }}</p>
+            <div class="learning-progress-shell mb-4">
+                <div class="d-flex justify-content-between align-items-center gap-3 mb-2">
+                    <div class="fw-semibold">Overall adaptive progress</div>
+                    <div class="metric-value" style="font-size: 1.8rem;">{{ learning_snapshot.overall_progress }}%</div>
+                </div>
+                <div class="progress alfred-progress">
+                    <div class="progress-bar" role="progressbar" style="width: {{ learning_snapshot.overall_progress }}%;" aria-valuenow="{{ learning_snapshot.overall_progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+            <div class="learning-track-grid">
+                {% for track in learning_snapshot.tracks %}
+                <div class="learning-track-card">
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                        <div class="fw-semibold">{{ track.title }}</div>
+                        <span class="status-pill status-guarded">{{ track.progress }}%</span>
+                    </div>
+                    <div class="progress alfred-progress mb-2">
+                        <div class="progress-bar" role="progressbar" style="width: {{ track.progress }}%;" aria-valuenow="{{ track.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <p class="muted small mb-2">{{ track.detail }}</p>
+                    <div class="chip-row mb-2">
+                        {% for signal in track.signals %}
+                        <span class="chip-neutral">{{ signal }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="muted small"><strong>Still blocked by:</strong> {{ track.blocker }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">In Progress Tracks</h2>
+            <p class="page-section-copy mb-3">Only active workstreams are shown here. Completed areas have been removed from this view.</p>
+            <div class="data-stack">
+                {% for item in in_progress_tracks %}
+                <div class="mini-card">
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                        <div class="fw-semibold">{{ item.title }}</div>
+                        <span class="status-pill status-guarded">{{ item.progress }}%</span>
+                    </div>
+                    <div class="progress alfred-progress mb-2">
+                        <div class="progress-bar" role="progressbar" style="width: {{ item.progress }}%;" aria-valuenow="{{ item.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <div class="muted small mb-2">{{ item.detail }}</div>
+                    <div class="muted small"><strong>Next focus:</strong> {{ item.next_focus }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Reports And Queue</h2>
+            <p class="page-section-copy mb-3">Generated reports and operational issue-routing now live only in superuser surfaces.</p>
+            <div class="mini-card mb-3">
+                <div class="fw-semibold mb-2">Recent report artifacts</div>
+                {% if report_library %}
+                <div class="data-stack">
+                    {% for item in report_library %}
+                    <div class="data-row">
+                        <div class="data-label">{{ item.created_at|date:"d M Y H:i" }}</div>
+                        <div class="data-value">{{ item.file_path }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">No generated report artifacts are stored yet.</div>
+                {% endif %}
+            </div>
+            <div class="mini-card">
+                <div class="fw-semibold mb-2">Developer escalation queue</div>
+                {% if developer_queue %}
+                <div class="data-stack">
+                    {% for item in developer_queue %}
+                    <div class="data-row">
+                        <div class="data-label">{{ item.username }} | {{ item.module }} | {{ item.severity }}</div>
+                        <div class="data-value">{{ item.title }} <span class="muted small">{{ item.created_at|date:"d M Y H:i" }}</span></div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">No open developer escalations are waiting right now.</div>
+                {% endif %}
+            </div>
+            <div class="mini-card mt-3">
+                <div class="fw-semibold mb-2">Recent ALFRED auto-resolutions</div>
+                {% if auto_ticket_activity %}
+                <div class="data-stack">
+                    {% for item in auto_ticket_activity %}
+                    <div class="data-row">
+                        <div class="data-label">{{ item.module }} | {{ item.created_at|date:"d M Y H:i" }}</div>
+                        <div class="data-value">{{ item.title }} <span class="muted small">{{ item.resolution_summary }}</span></div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">No ALFRED auto-resolutions are stored yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Adaptive System State</h2>
+            <p class="page-section-copy mb-3">A truthful split between what is actually model-backed today and what is still heuristic or partially learned.</p>
+            <div class="mini-card mb-3">
+                <div class="fw-semibold mb-2">ML-Backed Today</div>
+                <ul class="insight-list mb-0">
+                    {% for item in learning_snapshot.implementation_state.ml_backed %}
+                    <li class="insight-item">{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="mini-card mb-3">
+                <div class="fw-semibold mb-2">Adaptive And Evidence-Blended</div>
+                <ul class="insight-list mb-0">
+                    {% for item in learning_snapshot.implementation_state.adaptive_blended %}
+                    <li class="insight-item">{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="mini-card">
+                <div class="fw-semibold mb-2">Not Yet Fully Learned</div>
+                <ul class="insight-list mb-0">
+                    {% for item in learning_snapshot.implementation_state.not_yet_fully_learned %}
+                    <li class="insight-item">{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Risks Remaining</h2>
+            <p class="page-section-copy mb-3">Known residual risks that still need QA, source replacement, or architecture work.</p>
+            <ul class="insight-list">
+                {% for item in risks %}
+                <li class="insight-item">{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Highest-Value Next Steps</h2>
+            <p class="page-section-copy mb-3">The next changes that move reliability or capability the furthest.</p>
+            <ul class="insight-list">
+                {% for item in next_steps %}
+                <li class="insight-item">{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Operational Guardrails</h2>
+            <p class="page-section-copy mb-3">Fault tolerance and rate-limiting rules currently protecting external intelligence and operational workflows.</p>
+            <div class="data-stack">
+                <div class="data-row">
+                    <div class="data-label">Circuit threshold</div>
+                    <div class="data-value">{{ guardrails.circuit_failure_threshold }} failures</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">Breaker window</div>
+                    <div class="data-value">{{ guardrails.circuit_open_minutes }} minutes</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">Refresh batch size</div>
+                    <div class="data-value">{{ guardrails.refresh_batch_size }} records</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">Refresh lookahead</div>
+                    <div class="data-value">{{ guardrails.stale_lookahead_hours }} hours</div>
+                </div>
+            </div>
+            <ul class="insight-list mt-4 mb-0">
+                {% for item in guardrails.fault_tolerance %}
+                <li class="insight-item">{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Hardening Decisions</h2>
+            <p class="page-section-copy mb-3">Policy choices currently shaping issue routing, timestamps, safety boundaries, and chart/report visibility.</p>
+            <ul class="insight-list">
+                {% for item in hardening_decisions %}
+                <li class="insight-item">{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Improvements Worth Considering</h2>
+            <p class="page-section-copy mb-3">Extensions that can raise quality or depth once the current hardening work settles.</p>
+            <ul class="insight-list">
+                {% for item in improvements %}
+                <li class="insight-item">{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">What Should Be Avoided</h2>
+            <p class="page-section-copy mb-3">Guardrails on product direction and automation claims.</p>
+            <ul class="insight-list">
+                {% for item in avoid_items %}
+                <li class="insight-item">{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Suggested Product Direction</h2>
+            <p class="page-section-copy mb-3">The program should get tighter around evidence and feedback, not wider through more disconnected screens.</p>
+            <ul class="insight-list">
+                {% for item in direction %}
+                <li class="insight-item">{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</section>
+{% endblock %}

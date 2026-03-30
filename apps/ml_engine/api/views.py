@@ -1,4 +1,5 @@
 from apps.ml_engine.core.alfred_router import alfred_router
+from apps.expenses.services.financial_intelligence import build_financial_intelligence
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,8 +8,6 @@ from apps.ml_engine.behavior.behavior_signature import behavior_signature
 from apps.ml_engine.behavior.anomaly_detector import anomaly_detector
 from apps.ml_engine.behavior.personalizer import personalizer
 from apps.ml_engine.behavior.insight_generator import insight_generator
-
-from apps.ml_engine.self_improve.advanced_engine import self_improve_engine
 
 class EmotionalSpendAPI(APIView):
     permission_classes = [IsAuthenticated]
@@ -45,6 +44,15 @@ class AlfredExplainAPI(APIView):
             "insights": insights,
             "recommended_tone": tone
         })
+
+
+class AlfredPersonalInsightsAPI(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        intelligence = build_financial_intelligence(request.user)
+        return Response(intelligence)
+
 
 class SelfImproveAPI(APIView):
     def get(self, request):

@@ -2,54 +2,128 @@
 {% block title %}Investments{% endblock %}
 
 {% block content %}
-<h2 class="section-title fade-in">Your Investment Portfolio</h2>
-
-<div class="row g-3 mb-4">
-
-    <!-- Total Portfolio Card -->
-    <div class="col-lg-4 fade-in">
-        <div class="stats-card">
-            <h6 class="text-muted">Total Portfolio Value</h6>
-            <h2 class="fw-bold text-primary" id="totalValue">₹0</h2>
+<section class="alfred-hero fade-in" id="investmentRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Portfolio health and allocation control</div>
+            <h1 class="alfred-hero-title">Track each holding, measure diversification, and understand how the portfolio compounds from here.</h1>
+            <p class="alfred-hero-copy">ALFRED combines your registered positions with allocation and growth projections so you can see return, risk, and balance in one place.</p>
+        </div>
+        <div class="surface-card" style="min-width: 260px;">
+            <p class="metric-kicker">Portfolio Value</p>
+            <div class="metric-value" id="investmentHeroValue">INR 0</div>
+            <p class="metric-caption mb-1">Risk state: <span id="investmentHeroRisk">No data</span></p>
+            <p class="metric-caption mb-0" id="investmentHeroCopy">Add your holdings to unlock allocation and growth analysis.</p>
         </div>
     </div>
+</section>
 
-    <!-- Return Card -->
-    <div class="col-lg-4 fade-in">
-        <div class="stats-card">
-            <h6 class="text-muted">Annual Return</h6>
-            <h2 class="fw-bold text-success" id="annualReturn">0%</h2>
+<section class="soft-grid four-up mb-4" id="investmentSummaryCards"></section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Add Position</h2>
+            <p class="page-section-copy mb-3">Register each investment so ALFRED can calculate allocation, SIP exposure, and risk concentration.</p>
+            <form id="investmentForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="investmentType">Asset Type</label>
+                        <select id="investmentType" name="asset_type" class="form-select" required>
+                            <option value="equity">Equity</option>
+                            <option value="mutual_fund">Mutual Fund</option>
+                            <option value="debt">Debt</option>
+                            <option value="gold">Gold</option>
+                            <option value="reit">REIT</option>
+                            <option value="crypto">Crypto</option>
+                            <option value="cash">Cash / Liquid</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="investmentName">Asset Name</label>
+                        <input id="investmentName" name="asset_name" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="investmentInstitution">Institution</label>
+                        <input id="investmentInstitution" name="institution" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="investmentRisk">Risk Level</label>
+                        <input id="investmentRisk" name="risk_level" class="form-control" placeholder="Low, Moderate, High">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="investmentInvested">Invested Amount</label>
+                        <input id="investmentInvested" name="invested_amount" type="number" step="0.01" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="investmentCurrent">Current Value</label>
+                        <input id="investmentCurrent" name="current_value" type="number" step="0.01" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="investmentSip">Monthly SIP</label>
+                        <input id="investmentSip" name="monthly_sip" type="number" step="0.01" class="form-control" value="0">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="investmentReturn">Annual Return %</label>
+                        <input id="investmentReturn" name="annual_return_rate" type="number" step="0.01" class="form-control" value="0">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="investmentNotes">Notes</label>
+                        <textarea id="investmentNotes" name="notes" rows="3" class="form-control"></textarea>
+                    </div>
+                </div>
+                <div id="investmentFormFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Save Position</button>
+            </form>
         </div>
     </div>
-
-    <!-- Risk Rating -->
-    <div class="col-lg-4 fade-in">
-        <div class="stats-card">
-            <h6 class="text-muted">Risk Score</h6>
-            <h2 class="fw-bold text-danger" id="riskRating">Moderate</h2>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <div class="row g-4">
+                <div class="col-lg-5">
+                    <h2 class="page-section-title">Allocation</h2>
+                    <p class="page-section-copy mb-3">Current asset mix by market value.</p>
+                    <canvas id="allocationChart" height="210"></canvas>
+                </div>
+                <div class="col-lg-7">
+                    <h2 class="page-section-title">Growth Outlook</h2>
+                    <p class="page-section-copy mb-3">Projected portfolio value over the next twelve months.</p>
+                    <canvas id="growthChart" height="210"></canvas>
+                </div>
+            </div>
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">Portfolio Guidance</h3>
+                <ul class="insight-list" id="investmentRecommendationList"></ul>
+            </div>
         </div>
     </div>
+</section>
 
-</div>
-
-<!-- Allocation & Growth -->
-<div class="row g-3">
-
-    <div class="col-lg-4 fade-in">
-        <div class="glass-card p-3">
-            <h5 class="fw-bold">Asset Allocation</h5>
-            <canvas id="allocationChart"></canvas>
+<section class="surface-card">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h2 class="page-section-title">Registered Positions</h2>
+            <p class="page-section-copy">Every holding ALFRED is using for valuation, allocation, and risk analysis.</p>
         </div>
     </div>
-
-    <div class="col-lg-8 fade-in">
-        <div class="glass-card p-3">
-            <h5 class="fw-bold">Portfolio Growth</h5>
-            <canvas id="growthChart"></canvas>
-        </div>
+    <div class="table-responsive">
+        <table class="table table-alfred align-middle mb-0 metric-table">
+            <thead>
+                <tr>
+                    <th>Position</th>
+                    <th class="text-end">Invested</th>
+                    <th class="text-end">Current</th>
+                    <th class="text-end">Gain / Loss</th>
+                    <th class="text-end">SIP</th>
+                    <th>Risk</th>
+                </tr>
+            </thead>
+            <tbody id="investmentPositionsBody"></tbody>
+        </table>
     </div>
+</section>
+{% endblock %}
 
-</div>
-
-<script src="/static/js/investments.js?v=1.0"></script>
+{% block extra_js %}
+<script src="/static/js/investments.js?v=2.1"></script>
 {% endblock %}

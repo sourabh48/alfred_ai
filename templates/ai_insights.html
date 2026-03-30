@@ -1,53 +1,84 @@
 {% extends "base.html" %}
+{% block title %}AI Insights{% endblock %}
 
 {% block content %}
-<h3 class="fw-bold">Alfred – Behavioral Intelligence</h3>
+<section class="alfred-hero fade-in" id="aiInsightsRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Behavioral finance engine</div>
+            <h1 class="alfred-hero-title">ALFRED is now learning how you earn, spend, service debt, and react under pressure.</h1>
+            <p class="alfred-hero-copy">This page uses your imported transaction history to build a behavioral profile, stress drivers, recurring commitments, anomaly review, and optimization strategy.</p>
+        </div>
+        <div class="surface-card" style="min-width: 260px;">
+            <p class="metric-kicker">Dominant Profile</p>
+            <div class="metric-value" id="aiPersonality">Awaiting data</div>
+            <p class="metric-caption mb-1">Coach tone: <span id="aiCoachTone">energetic</span></p>
+            <p class="metric-caption mb-0" id="aiStrategy">Import richer history so ALFRED can adapt guidance.</p>
+        </div>
+    </div>
+</section>
 
-<div class="card shadow-sm p-3">
+<section class="soft-grid four-up mb-4" id="aiInsightSummary"></section>
 
-    <form id="insightForm">
-        <label class="fw-bold mb-1">Enter last 10 expenses:</label>
-        <input type="text" name="expenses" class="form-control mb-2" placeholder="250, 299, 120, 540">
+<section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">AI Recommendations</h2>
+            <p class="page-section-copy mb-3">Behavior-sensitive guidance generated from your current profile.</p>
+            <ul class="insight-list" id="aiRecommendationList"></ul>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Signal Breakdown</h2>
+            <p class="page-section-copy mb-3">Core metrics ALFRED uses to detect changing behavior patterns.</p>
+            <canvas id="aiSignalChart" height="130"></canvas>
+        </div>
+    </div>
+</section>
 
-        <label class="fw-bold mb-1">Stress levels:</label>
-        <input type="text" name="stress" class="form-control mb-2" placeholder="3, 5, 6, 4">
+<section class="row g-4 mb-4">
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Pattern Flags</h2>
+            <p class="page-section-copy mb-3">Where ALFRED sees leverage or fragility.</p>
+            <ul class="insight-list" id="aiPatternFlags"></ul>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Stress Drivers</h2>
+            <p class="page-section-copy mb-3">Signals contributing to burnout and cash-flow pressure.</p>
+            <ul class="insight-list" id="aiStressDrivers"></ul>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Minute Details</h2>
+            <p class="page-section-copy mb-3">Small but actionable observations extracted from your ledger.</p>
+            <ul class="detail-list" id="aiMinuteDetails"></ul>
+        </div>
+    </div>
+</section>
 
-        <button class="btn btn-primary mt-2" type="submit">Generate Insights</button>
-    </form>
+<section class="row g-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recurring Commitments</h2>
+            <p class="page-section-copy mb-3">ALFRED's current map of recurring outflows and obligations.</p>
+            <div id="aiRecurringCommitments"></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recent Alerts</h2>
+            <p class="page-section-copy mb-3">Largest detected spend spikes and notable timing effects.</p>
+            <div id="aiSpikeDays"></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
 
-    <hr>
-
-    <h5>Insights:</h5>
-    <div id="aiOutput" class="p-2"></div>
-
-</div>
-
-<script>
-document.getElementById("insightForm").addEventListener("submit", function(e){
-    e.preventDefault();
-
-    const data = {
-        expenses: this.expenses.value.split(",").map(Number),
-        stress: this.stress.value.split(",").map(Number),
-    };
-
-    fetch("/api/ai/explain/", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(data)
-    })
-    .then(r => r.json())
-    .then(res => {
-        let out = document.getElementById("aiOutput");
-        out.innerHTML = `
-            <p><strong>Stress Avg:</strong> ${res.signature.stress_avg}</p>
-            <p><strong>Expense Volatility:</strong> ${res.signature.expense_volatility}</p>
-            <p><strong>Anomalies:</strong> ${JSON.stringify(res.anomalies)}</p>
-            <p><strong>Insights:</strong></p>
-        `;
-        res.insights.forEach(i => out.innerHTML += `<p>• ${i}</p>`);
-    });
-});
-</script>
-
+{% block extra_js %}
+<script src="/static/js/ai_insights.js?v=2.0"></script>
 {% endblock %}

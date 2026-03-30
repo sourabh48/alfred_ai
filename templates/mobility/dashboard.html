@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}Mobility{% endblock %}
+
+{% block content %}
+<section class="alfred-hero fade-in" id="mobilityRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Travel planning and trip memory system</div>
+            <h1 class="alfred-hero-title">Keep your route plans, trip logs, ride spending, heat map, and travel photo trail in one focused mobility workspace.</h1>
+            <p class="alfred-hero-copy">Bike maintenance and documents now live in the dedicated Bike Service dashboard. Mobility stays focused on trip planning, movement logs, and media history.</p>
+        </div>
+        <div class="surface-card" style="min-width: 280px;">
+            <p class="metric-kicker">Travel Snapshot</p>
+            <div class="metric-value" id="mobilityTripHero">Upcoming trips: 0</div>
+            <p class="metric-caption mb-1" id="mobilityConditionMeta">Bike service status lives in the dedicated maintenance dashboard.</p>
+            <p class="metric-caption mb-0" id="mobilityDocumentMeta">Expiring documents: 0</p>
+        </div>
+    </div>
+</section>
+
+<section class="soft-grid four-up mb-4" id="mobilitySummaryCards"></section>
+<div id="mobilityPageAlert" class="d-none mb-4"></div>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-12">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Travel Plan</h2>
+            <p class="page-section-copy mb-3">Register each upcoming or completed trip with timing, budget, and movement mode.</p>
+            <form id="travelPlanForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="tripTitle">Trip Title</label>
+                        <input id="tripTitle" name="title" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="destination">Destination</label>
+                        <input id="destination" name="destination" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="tripStartDate">Start Date</label>
+                        <input id="tripStartDate" name="start_date" type="date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="tripEndDate">End Date</label>
+                        <input id="tripEndDate" name="end_date" type="date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="tripBudget">Budget</label>
+                        <input id="tripBudget" name="budget" type="number" step="0.01" class="form-control" value="0">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="transportMode">Transport Mode</label>
+                        <select id="transportMode" name="transport_mode" class="form-select">
+                            <option value="ride">Bike Ride</option>
+                            <option value="roadtrip">Road Trip</option>
+                            <option value="train">Train</option>
+                            <option value="flight">Flight</option>
+                            <option value="mixed">Mixed Mode</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="travelVehicleProfile">Vehicle Profile</label>
+                        <select id="travelVehicleProfile" name="vehicle_profile" class="form-select">
+                            <option value="">Optional vehicle link</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="tripStatus">Status</label>
+                        <select id="tripStatus" name="status" class="form-select">
+                            <option value="planned">Planned</option>
+                            <option value="booked">Booked</option>
+                            <option value="on_trip">On Trip</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="stayDetails">Stay Details</label>
+                        <input id="stayDetails" name="stay_details" class="form-control" placeholder="Hotel, campsite, homestay">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="tripNotes">Notes</label>
+                        <textarea id="tripNotes" name="notes" rows="3" class="form-control"></textarea>
+                    </div>
+                </div>
+                <div id="travelPlanFeedback" class="d-none alert mb-0"></div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-primary" type="submit">Save Travel Plan</button>
+                    <button class="btn btn-outline-primary" type="button" id="travelAdviceButton">Generate AI Travel Advice</button>
+                </div>
+            </form>
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">AI Travel Advisor</h3>
+                <div id="travelAdvisorPanel" class="data-stack">
+                    <div class="empty-state">Enter a destination, dates, and budget to preview weather, offbeat stops, stay budget, and bike-readiness guidance.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Trip Log Entry</h2>
+            <p class="page-section-copy mb-3">Log movement, spend, mood, and coordinates throughout the journey.</p>
+            <form id="tripLogForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="tripLogPlan">Travel Plan</label>
+                        <select id="tripLogPlan" name="travel_plan" class="form-select" required></select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="logDate">Log Date</label>
+                        <input id="logDate" name="log_date" type="date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="logTitle">Title</label>
+                        <input id="logTitle" name="title" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="logLocation">Location Name</label>
+                        <input id="logLocation" name="location_name" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="logLatitude">Latitude</label>
+                        <input id="logLatitude" name="latitude" type="number" step="0.000001" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="logLongitude">Longitude</label>
+                        <input id="logLongitude" name="longitude" type="number" step="0.000001" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="logMood">Mood</label>
+                        <input id="logMood" name="mood" class="form-control" placeholder="Calm, pumped, tired">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="logDistance">Distance (km)</label>
+                        <input id="logDistance" name="distance_km" type="number" step="0.01" class="form-control" value="0">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="logSpend">Spend</label>
+                        <input id="logSpend" name="spend_amount" type="number" step="0.01" class="form-control" value="0">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="logNotes">Notes</label>
+                        <textarea id="logNotes" name="notes" rows="3" class="form-control"></textarea>
+                    </div>
+                </div>
+                <div id="tripLogFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Save Trip Log</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Trip Photo Upload</h2>
+            <p class="page-section-copy mb-3">Attach photos to the plan or a specific log entry so the gallery and heat map can reflect your route.</p>
+            <form id="tripPhotoForm" class="soft-grid" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="photoPlan">Travel Plan</label>
+                        <select id="photoPlan" name="travel_plan" class="form-select" required></select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="photoLog">Trip Log</label>
+                        <select id="photoLog" name="trip_log" class="form-select"></select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="photoFile">Photo</label>
+                        <input id="photoFile" name="image" type="file" accept="image/*" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="photoCaption">Caption</label>
+                        <input id="photoCaption" name="caption" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="photoLocation">Location Name</label>
+                        <input id="photoLocation" name="location_name" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="photoLatitude">Latitude</label>
+                        <input id="photoLatitude" name="latitude" type="number" step="0.000001" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="photoLongitude">Longitude</label>
+                        <input id="photoLongitude" name="longitude" type="number" step="0.000001" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="photoTakenAt">Taken At</label>
+                        <input id="photoTakenAt" name="taken_at" type="datetime-local" class="form-control">
+                    </div>
+                </div>
+                <div id="tripPhotoFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Upload Photo</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-12">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Travel Plan Board</h2>
+            <p class="page-section-copy mb-3">Upcoming and completed trips with budget and media coverage.</p>
+            <div id="travelPlanList" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Trip Heat Map</h2>
+            <p class="page-section-copy mb-3">Coordinates from your logs and photo captures, rendered as a relative route-intensity board.</p>
+            <div id="tripHeatmap" class="heatmap-board">
+                <div class="empty-state">Add log or photo coordinates to generate the travel heat map.</div>
+            </div>
+            <div class="heatmap-legend">
+                <span><span class="heatmap-legend-dot log"></span>Trip log</span>
+                <span><span class="heatmap-legend-dot photo"></span>Photo capture</span>
+                <span>Spot size scales with logged trip intensity.</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Trip Logs</h2>
+            <p class="page-section-copy mb-3">Latest journal and movement entries from your plans.</p>
+            <div id="tripLogList" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+
+<section class="surface-card">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h2 class="page-section-title">Trip Photo Gallery</h2>
+            <p class="page-section-copy">A visual gallery for the uploaded photo trail across your plans.</p>
+        </div>
+    </div>
+    <div id="tripPhotoGallery" class="photo-gallery"></div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/mobility.js?v=2.5"></script>
+{% endblock %}

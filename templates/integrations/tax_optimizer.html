@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Tax Optimizer{% endblock %}
+
+{% block content %}
+<section class="alfred-hero fade-in" id="taxRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Regime comparison and deduction strategy</div>
+            <h1 class="alfred-hero-title">Compare old versus new tax regime, identify deduction gaps, and convert them into a concrete action plan.</h1>
+            <p class="alfred-hero-copy">The tax optimizer now exposes the backend engine directly, including regime comparison, HRA, home-loan benefits, and tax-saving investment suggestions.</p>
+        </div>
+        <div class="surface-card" style="min-width: 280px;">
+            <p class="metric-kicker">Recommended Regime</p>
+            <div class="metric-value" id="taxRegimeValue">Unknown</div>
+            <p class="metric-caption mb-1">Estimated annual tax: <span id="taxAnnualValue">INR 0</span></p>
+            <p class="metric-caption mb-0" id="taxHeroCopy">Adjust income and rent assumptions to recompute.</p>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Tax Inputs</h2>
+            <p class="page-section-copy mb-3">Edit assumptions to re-run the optimizer.</p>
+            <form id="taxInputForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="taxAnnualIncome">Annual Income</label>
+                        <input id="taxAnnualIncome" name="annual_income" type="number" step="0.01" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="taxBasicSalary">Monthly Basic</label>
+                        <input id="taxBasicSalary" name="basic_salary" type="number" step="0.01" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="taxHraReceived">Monthly HRA</label>
+                        <input id="taxHraReceived" name="hra_received" type="number" step="0.01" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="taxRentPaid">Monthly Rent</label>
+                        <input id="taxRentPaid" name="rent_paid" type="number" step="0.01" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="taxMetro">Metro City</label>
+                        <select id="taxMetro" name="metro" class="form-select">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-primary" type="submit">Recalculate Tax Plan</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-8">
+        <section class="soft-grid four-up" id="taxSummaryCards"></section>
+        <div class="surface-card h-100 mt-4">
+            <h2 class="page-section-title">Regime Comparison</h2>
+            <p class="page-section-copy mb-3">Tax outgo comparison between old and new regime under the current assumptions.</p>
+            <canvas id="taxComparisonChart" height="150"></canvas>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4">
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Action Plan</h2>
+            <p class="page-section-copy mb-3">Priority tax-saving moves produced by the optimizer.</p>
+            <ul class="insight-list" id="taxActionList"></ul>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">HRA and Home Loan</h2>
+            <p class="page-section-copy mb-3">Calculated HRA exemption and any detected home-loan tax benefit.</p>
+            <div id="taxBenefitPanel" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Deduction Catalog</h2>
+            <p class="page-section-copy mb-3">Major deduction sections and the eligible instruments behind them.</p>
+            <div id="taxDeductionList" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/tax_optimizer.js?v=2.1"></script>
+{% endblock %}

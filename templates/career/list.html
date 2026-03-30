@@ -2,41 +2,181 @@
 {% block title %}Career{% endblock %}
 
 {% block content %}
-
-<h2 class="section-title fade-in">Career Intelligence</h2>
-
-<div class="row g-3">
-
-    <div class="col-lg-4 fade-in">
-        <div class="stats-card">
-            <h6 class="text-muted">Current Salary</h6>
-            <h2 class="text-primary fw-bold">₹{{ career.salary }}</h2>
+<section class="alfred-hero fade-in" id="careerRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Career progression and income runway</div>
+            <h1 class="alfred-hero-title">Translate your current role, skills, and income into a five-year growth path.</h1>
+            <p class="alfred-hero-copy">The career module keeps your profile editable and projects income growth so ALFRED can connect work decisions with your financial plan.</p>
+        </div>
+        <div class="surface-card" style="min-width: 260px;">
+            <p class="metric-kicker">Current Role</p>
+            <div class="metric-value" id="careerRoleValue">Profile pending</div>
+            <p class="metric-caption mb-1">Current income: <span id="careerIncomeValue">INR 0</span></p>
+            <p class="metric-caption mb-0" id="careerGrowthCopy">Update your profile to sharpen projections.</p>
         </div>
     </div>
+</section>
 
-    <div class="col-lg-4 fade-in">
-        <div class="stats-card">
-            <h6 class="text-muted">Skill Score</h6>
-            <h2 class="text-success fw-bold">{{ career.skill_score }}%</h2>
+<section class="soft-grid four-up mb-4" id="careerSummaryCards"></section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Macro Context</h2>
+            <p class="page-section-copy mb-3">External demand and inflation signals feeding the current projection.</p>
+            <div id="careerMacroContext" class="data-stack"></div>
         </div>
     </div>
-
-    <div class="col-lg-4 fade-in">
-        <div class="stats-card">
-            <h6 class="text-muted">Growth Potential</h6>
-            <h2 class="text-warning fw-bold">{{ career.potential }}%</h2>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Evidence Log</h2>
+            <p class="page-section-copy mb-3">Source-backed records used to adjust growth and confidence.</p>
+            <div id="careerEvidenceList" class="data-stack"></div>
         </div>
     </div>
+</section>
 
-</div>
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Career Risk Timing</h2>
+            <p class="page-section-copy mb-3">When Alfred believes you can take a larger career risk, and what should happen first.</p>
+            <div id="careerTimingPanel" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Collection and Processing</h2>
+            <p class="page-section-copy mb-3">How career data is collected, verified, processed, and turned into the current guidance.</p>
+            <div id="careerDataPipeline" class="data-stack"></div>
+        </div>
+    </div>
+</section>
 
-<hr>
+<section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Career Profile</h2>
+            <p class="page-section-copy mb-3">Keep the profile fresh so projected income and recommendations stay relevant.</p>
+            <form id="careerProfileForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="careerRole">Role</label>
+                        <input id="careerRole" name="role" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="careerExperience">Experience (Years)</label>
+                        <input id="careerExperience" name="experience_years" type="number" step="0.1" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="careerSkills">Skills</label>
+                        <textarea id="careerSkills" name="skills" rows="4" class="form-control" placeholder="Python, Finance, Strategy"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="careerSalary">Current Income</label>
+                        <input id="careerSalary" name="last_salary" type="number" step="0.01" class="form-control" required>
+                    </div>
+                </div>
+                <div id="careerFormFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Update Career Profile</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Resume Intelligence</h2>
+            <p class="page-section-copy mb-3">Upload a resume so ALFRED can extract skills, strengths, weaknesses, and improve job-fit analysis. PDF, DOCX, TXT, HTML, RTF, ODT, and image-based CV files are accepted; scanned files move to review if OCR is not available on the server.</p>
+            <form id="careerResumeForm" class="soft-grid" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label" for="careerResumeFile">Resume File</label>
+                        <input id="careerResumeFile" name="resume" type="file" class="form-control" accept=".pdf,.doc,.docx,.txt,.md,.rtf,.html,.htm,.odt,image/*,application/pdf,text/plain,text/markdown,text/html,application/rtf,application/vnd.oasis.opendocument.text" required>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" type="submit">Upload Resume</button>
+                    </div>
+                </div>
+                <div id="careerResumeFeedback" class="d-none alert mb-0"></div>
+            </form>
+            <div class="mt-4" id="careerResumePanel"></div>
+        </div>
+    </div>
+</section>
 
-<h3 class="fw-bold">Salary Projection</h3>
-<div class="glass-card p-3 fade-in">
-    <canvas id="salaryChart"></canvas>
-</div>
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Profile Snapshot</h2>
+            <p class="page-section-copy mb-3">The fields ALFRED is currently using to model growth.</p>
+            <div id="careerProfileSnapshot" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Projected Path</h2>
+            <p class="page-section-copy mb-3">Year-by-year view of the current projection.</p>
+            <div id="careerProjectionTable" class="data-stack"></div>
+        </div>
+    </div>
+</section>
 
-<script src="/static/js/career.js?v=1.0"></script>
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Five-Year Projection</h2>
+            <p class="page-section-copy mb-3">Projected income curve using the current profile, resume signals, and current macro context.</p>
+            <canvas id="salaryChart" height="150"></canvas>
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">Career Insights</h3>
+                <ul class="insight-list" id="careerInsightList"></ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Job Match</h2>
+            <p class="page-section-copy mb-3">Paste a job link from a career portal. ALFRED will parse the role, compare it against your resume, and show the fit score.</p>
+            <form id="careerJobMatchForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="careerJobUrl">Job URL</label>
+                        <input id="careerJobUrl" name="job_url" type="url" class="form-control" placeholder="https://company.jobs/... or career portal link" required>
+                    </div>
+                </div>
+                <div id="careerJobFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Analyze Job Link</button>
+            </form>
+            <div class="mt-4" id="careerJobMatchPanel"></div>
+        </div>
+    </div>
+</section>
 
+<section class="row g-4 mb-4">
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">What To Study Next</h2>
+            <p class="page-section-copy mb-3">Study suggestions grounded in your experience stage, latest skill gaps, and current opening signals.</p>
+            <div id="careerStudyPlan" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Layoff and Risk News</h2>
+            <p class="page-section-copy mb-3">Recent layoff and market-risk signals relevant to your role or the matched job.</p>
+            <div id="careerLayoffNews" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Suggested Openings</h2>
+            <p class="page-section-copy mb-3">Live openings with application links based on your current role and skills.</p>
+            <div id="careerOpenings" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/career.js?v=2.4"></script>
 {% endblock %}

@@ -20,7 +20,7 @@ env.read_env(os.path.join(BASE_DIR, ".env"))
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="CHANGEME")
 DEBUG = env.bool("DEBUG", default=True)
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "192.168.0.108", "[::1]"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "192.168.0.108", "[::1]", "testserver"]
 
 # ---------------------------------------------------------
 # INSTALLED APPS
@@ -49,12 +49,18 @@ INSTALLED_APPS = [
     "apps.relationship",
     "apps.risk",
     "apps.reports",
+    "apps.mobility",
     "apps.ml_engine",
+    "apps.integrations",
 ]
 
 AUTH_USER_MODEL = "users.User"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/dashboard/"
+LOGOUT_REDIRECT_URL = "/login/"
 
 
 # ---------------------------------------------------------
@@ -153,6 +159,18 @@ REST_FRAMEWORK = {
 
 
 # ---------------------------------------------------------
+# CACHE
+# ---------------------------------------------------------
+
+CACHES = {
+    "default": {
+        "BACKEND": env("CACHE_BACKEND", default="django.core.cache.backends.locmem.LocMemCache"),
+        "LOCATION": env("CACHE_LOCATION", default="alfred-local-cache"),
+    }
+}
+
+
+# ---------------------------------------------------------
 # CELERY FOR CONTINUOUS LEARNING
 # ---------------------------------------------------------
 
@@ -172,7 +190,17 @@ CELERY_BEAT_SCHEDULE = {
     "alfred-nightly-training": {
         "task": "apps.ml_engine.continual.tasks.run_global_training_cycle",
         "schedule": timedelta(hours=24),
-    }
+    },
+    "verified-intelligence-refresh": {
+        "task": "apps.integrations.tasks.refresh_verified_external_intelligence",
+        "schedule": timedelta(hours=6),
+        "args": (25,),
+    },
+    "verified-intelligence-cleanup": {
+        "task": "apps.integrations.tasks.cleanup_verified_external_intelligence",
+        "schedule": timedelta(hours=24),
+        "args": (90,),
+    },
 }
 
 

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Recommendations{% endblock %}
+
+{% block content %}
+<section class="alfred-hero fade-in" id="recommendationsRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Personalized product and strategy engine</div>
+            <h1 class="alfred-hero-title">Turn your financial behavior into concrete credit card, loan, investment, and insurance recommendations.</h1>
+            <p class="alfred-hero-copy">These recommendations are now wired to the hidden recommendation engine in the backend, using your income, savings rate, debt load, and profile signals.</p>
+        </div>
+        <div class="surface-card" style="min-width: 280px;">
+            <p class="metric-kicker">Dominant Persona</p>
+            <div class="metric-value" id="recommendationPersonaValue">Unknown</div>
+            <p class="metric-caption mb-1">Risk appetite: <span id="recommendationRiskValue">Unknown</span></p>
+            <p class="metric-caption mb-0" id="recommendationHeroCopy">Adjust the assumptions to refresh the recommendation stack.</p>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Assumptions</h2>
+            <p class="page-section-copy mb-3">Tune optional inputs before regenerating the recommendation stack.</p>
+            <form id="recommendationFilters" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="loanAmountInput">Loan Amount</label>
+                        <input id="loanAmountInput" name="loan_amount" type="number" step="0.01" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="investmentAmountInput">Investment Amount</label>
+                        <input id="investmentAmountInput" name="investment_amount" type="number" step="0.01" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="timeHorizonInput">Time Horizon</label>
+                        <select id="timeHorizonInput" name="time_horizon" class="form-select">
+                            <option value="long_term">Long Term</option>
+                            <option value="medium_term">Medium Term</option>
+                            <option value="short_term">Short Term</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-primary" type="submit">Refresh Recommendations</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-8">
+        <section class="soft-grid four-up" id="recommendationSummaryCards"></section>
+    </div>
+</section>
+
+<section class="row g-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Credit Cards</h2>
+            <p class="page-section-copy mb-3">Cards matched against your spending personas and income bracket.</p>
+            <div id="recommendationCardsList" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Loan Options</h2>
+            <p class="page-section-copy mb-3">Eligible personal loan products and affordability view.</p>
+            <div id="recommendationLoansList" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mt-1">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Investment Stack</h2>
+            <p class="page-section-copy mb-3">Products and diversified portfolio suggestions for your risk profile.</p>
+            <div id="recommendationInvestmentsList" class="data-stack mb-4"></div>
+            <div>
+                <h3 class="h6 fw-bold mb-3">Suggested Portfolio</h3>
+                <div id="recommendationPortfolioList" class="data-stack"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Insurance Coverage</h2>
+            <p class="page-section-copy mb-3">Protection recommendations matched to life stage and household needs.</p>
+            <div id="recommendationInsuranceList" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/recommendations.js?v=2.1"></script>
+{% endblock %}

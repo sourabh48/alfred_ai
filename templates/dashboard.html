@@ -1,53 +1,115 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
+
 {% block content %}
+<section class="alfred-hero fade-in" id="dashboardRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">AI-powered personal finance and life intelligence</div>
+            <h1 class="alfred-hero-title">ALFRED turns your transactions into a living operating system for money, debt, and behavior.</h1>
+            <p class="alfred-hero-copy">Your dashboard now uses imported expense history to measure cash flow, debt pressure, recurring commitments, and behavioral stability instead of showing static placeholders.</p>
+        </div>
+        <div class="surface-card text-center" style="min-width: 220px;">
+            <p class="metric-kicker">Financial Health</p>
+            <div class="score-ring" id="healthScoreRing" style="--score: 0;">
+                <div class="score-ring-inner">
+                    <div>
+                        <div class="metric-value mb-0" id="healthScoreValue">0</div>
+                        <small class="muted">/100</small>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <span id="healthRiskPill" class="status-pill status-stable">No data</span>
+            </div>
+            <p class="metric-caption mt-3 mb-0" id="dashboardPersonality">Awaiting behavior profile</p>
+        </div>
+    </div>
+</section>
 
-<h2 class="fw-bold mb-4">Your Financial Overview</h2>
+<section class="soft-grid four-up mb-4" id="dashboardSummaryCards"></section>
 
-<div class="row g-3">
+<section class="row g-4 mb-4">
+    <div class="col-xl-8">
+        <div class="surface-card h-100">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h2 class="page-section-title">Monthly Financial Flow</h2>
+                    <p class="page-section-copy">Income, expenses, loan repayments, and other outflows by month.</p>
+                </div>
+                <div class="alfred-chip" id="dashboardReferenceMonth">Latest month</div>
+            </div>
+            <canvas id="dashboardMonthlyChart" height="120"></canvas>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Category Distribution</h2>
+            <p class="page-section-copy mb-3">Where your money is actually going.</p>
+            <canvas id="dashboardCategoryChart" height="200"></canvas>
+            <div class="mt-4" id="dashboardCategoryList"></div>
+        </div>
+    </div>
+</section>
 
-    <div class="col-lg-4">
-        <div class="card shadow">
-            <div class="card-body">
-                <h5 class="fw-bold">Total Monthly Expenses</h5>
-                <h2 id="total-expense" class="text-danger">₹0</h2>
+<section class="row g-4 mb-4">
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Behavior Fingerprint</h2>
+            <p class="page-section-copy mb-3">ALFRED's current reading of your expenditure pattern.</p>
+            <div class="soft-grid" id="dashboardBehaviorCards"></div>
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">Pattern Flags</h3>
+                <ul class="insight-list" id="dashboardPatternFlags"></ul>
             </div>
         </div>
     </div>
-
-    <div class="col-lg-4">
-        <div class="card shadow">
-            <div class="card-body">
-                <h5 class="fw-bold">AI Stress Estimate</h5>
-                <h2 id="stress-score" class="text-warning">0%</h2>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recurring Commitments</h2>
+            <p class="page-section-copy mb-3">Commitments ALFRED believes are structurally shaping your month.</p>
+            <div id="dashboardRecurring"></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Stress & Alerts</h2>
+            <p class="page-section-copy mb-3">Drivers behind the current pressure score and spike detection.</p>
+            <ul class="insight-list mb-4" id="dashboardStressDrivers"></ul>
+            <div>
+                <h3 class="h6 fw-bold mb-3">Spike Days</h3>
+                <div id="dashboardSpikeDays"></div>
             </div>
         </div>
     </div>
+</section>
 
-</div>
-
-<div class="row mt-4">
-    <div class="col-lg-8">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                Monthly Expense Trend
-            </div>
-            <div class="card-body">
-                <canvas id="expenseChart"></canvas>
-            </div>
+<section class="surface-card">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h2 class="page-section-title">Recent Transactions</h2>
+            <p class="page-section-copy">Latest classified transactions flowing into ALFRED's decision engine.</p>
         </div>
+        <a class="btn btn-soft-primary" href="/expenses/">Open expense timeline</a>
     </div>
-
-    <div class="col-lg-4">
-        <div class="card shadow">
-            <div class="card-header bg-success text-white">
-                Alfred Insights
-            </div>
-            <div class="card-body" id="insightBox">
-                <p>Loading...</p>
-            </div>
-        </div>
+    <div class="table-responsive">
+        <table class="table table-alfred align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Merchant</th>
+                    <th>Class</th>
+                    <th>Category</th>
+                    <th class="text-end">Amount</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody id="dashboardRecentTransactions"></tbody>
+        </table>
     </div>
-</div>
+</section>
+{% endblock %}
 
+{% block extra_js %}
+<script src="/static/js/dashboard.js?v=2.0"></script>
 {% endblock %}

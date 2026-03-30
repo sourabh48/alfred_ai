@@ -2,37 +2,81 @@
 {% block title %}Family{% endblock %}
 
 {% block content %}
-<h2 class="section-title fade-in">Family Overview</h2>
-
-<div class="row g-3">
-
-    {% for member in family %}
-    <div class="col-lg-4 fade-in">
-        <div class="glass-card p-3">
-            <h5 class="fw-bold">{{ member.name }}</h5>
-            <p class="text-muted">Age: {{ member.age }}</p>
-
-            <div class="mt-3">
-                <p>Net Worth:</p>
-                <h3 class="text-primary fw-bold">₹{{ member.net_worth }}</h3>
-            </div>
-
-            <div class="progress-bar-custom mt-3">
-                <span style="width: {{ member.life_progress }}%"></span>
-            </div>
-            <small>Life Stage: {{ member.life_stage }}</small>
+<section class="alfred-hero fade-in" id="familyRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Family obligations and long-horizon net worth</div>
+            <h1 class="alfred-hero-title">Track dependents, see the household growth path, and keep family planning tied to your balance sheet.</h1>
+            <p class="alfred-hero-copy">ALFRED combines registered dependents with your assets and liabilities to show how the family financial base is expected to evolve.</p>
+        </div>
+        <div class="surface-card" style="min-width: 260px;">
+            <p class="metric-kicker">Household Net Worth</p>
+            <div class="metric-value" id="familyNetWorthValue">INR 0</div>
+            <p class="metric-caption mb-1">Dependents tracked: <span id="familyDependentCount">0</span></p>
+            <p class="metric-caption mb-0" id="familyHeroCopy">Add dependents to improve family planning signals.</p>
         </div>
     </div>
-    {% endfor %}
+</section>
 
-</div>
+<section class="soft-grid four-up mb-4" id="familySummaryCards"></section>
 
-<hr>
+<section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Add Dependent</h2>
+            <p class="page-section-copy mb-3">Keep the dependent roster current so future planning reflects real household commitments.</p>
+            <form id="dependentForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="dependentName">Name</label>
+                        <input id="dependentName" name="name" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="dependentAge">Age</label>
+                        <input id="dependentAge" name="age" type="number" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="dependentRelation">Relation</label>
+                        <input id="dependentRelation" name="relation" class="form-control" required>
+                    </div>
+                </div>
+                <div id="dependentFormFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Add Dependent</button>
+            </form>
 
-<h3 class="fw-bold mt-4">Family Net-Worth Growth</h3>
-<div class="glass-card p-3 fade-in">
-    <canvas id="familyNetChart"></canvas>
-</div>
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">Planner Notes</h3>
+                <ul class="insight-list" id="familyInsightList"></ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">10-Year Family Growth</h2>
+            <p class="page-section-copy mb-3">Projected household net worth if the current trajectory holds.</p>
+            <canvas id="familyNetChart" height="150"></canvas>
+        </div>
+    </div>
+</section>
 
-<script src="/static/js/family.js?v=1.0"></script>
+<section class="surface-card">
+    <h2 class="page-section-title">Dependent Roster</h2>
+    <p class="page-section-copy mb-3">The household members ALFRED is currently using in family planning views.</p>
+    <div class="table-responsive">
+        <table class="table table-alfred align-middle mb-0 metric-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Relation</th>
+                    <th class="text-end">Age</th>
+                </tr>
+            </thead>
+            <tbody id="familyTableBody"></tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/family.js?v=2.1"></script>
 {% endblock %}

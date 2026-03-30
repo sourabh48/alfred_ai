@@ -15,8 +15,14 @@ class AlfredModelRegistry:
         self.registry = self._load()
 
     def _load(self):
-        with open(self.registry_path, "r") as f:
-            return json.load(f)
+        try:
+            with open(self.registry_path, "r") as f:
+                content = f.read().strip()
+                if not content:
+                    return {}
+                return json.loads(content)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return {}
 
     def get(self, model_name):
         return self.registry.get(model_name)

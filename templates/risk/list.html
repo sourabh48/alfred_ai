@@ -2,13 +2,129 @@
 {% block title %}Risk Radar{% endblock %}
 
 {% block content %}
+<section class="alfred-hero fade-in" id="riskRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Personal risk monitoring</div>
+            <h1 class="alfred-hero-title">Track consolidated career, finance, health, relocation, and mobility risk so ALFRED can keep scenario planning visible.</h1>
+            <p class="alfred-hero-copy">Risk Radar now combines your manual signals with live market context, behavioral pressure, financial load, vehicle readiness, and related news in one place.</p>
+        </div>
+        <div class="surface-card" style="min-width: 260px;">
+            <p class="metric-kicker">Highest Current Risk</p>
+            <div class="metric-value" id="riskHighestValue">0</div>
+            <p class="metric-caption mb-1">Category: <span id="riskHighestLabel">No data</span></p>
+            <p class="metric-caption mb-0" id="riskHeroCopy">Capture a risk snapshot to start trend monitoring.</p>
+        </div>
+    </div>
+</section>
 
-<h2 class="section-title fade-in">Life Event Risk Radar</h2>
+<section class="soft-grid four-up mb-4" id="riskSummaryCards"></section>
 
-<div class="glass-card p-3 fade-in">
-    <canvas id="riskRadar"></canvas>
-</div>
+<section class="surface-card mb-4">
+    <h2 class="page-section-title">Consolidated Risk Board</h2>
+    <p class="page-section-copy mb-3">Each category blends your own signals with the relevant system data and current internet-backed context.</p>
+    <div id="riskBoard" class="data-stack"></div>
+</section>
 
-<script src="/static/js/risk.js?v=1.0"></script>
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Verified Macro Context</h2>
+            <p class="page-section-copy mb-3">External trend signals that are currently influencing Alfred's risk outlook.</p>
+            <div id="riskMacroContext" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Evidence Log</h2>
+            <p class="page-section-copy mb-3">Freshness and proof for the external signals used in the risk outlook.</p>
+            <div id="riskEvidenceList" class="data-stack"></div>
+        </div>
+    </div>
+</section>
 
+<section class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Module Signals</h2>
+            <p class="page-section-copy mb-3">The live inputs pushing the overall risk stack.</p>
+            <div id="riskSignalBoard" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Action Queue</h2>
+            <p class="page-section-copy mb-3">Practical actions ordered by current risk pressure.</p>
+            <div id="riskActionList" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Capture Snapshot</h2>
+            <p class="page-section-copy mb-3">Add your current manual snapshot for the three life-event signals that still anchor the broader consolidated model.</p>
+            <form id="riskForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="riskLayoff">Layoff Risk</label>
+                        <input id="riskLayoff" name="layoff_risk" type="number" min="0" max="100" step="0.1" class="form-control" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="riskIllness">Illness Risk</label>
+                        <input id="riskIllness" name="illness_risk" type="number" min="0" max="100" step="0.1" class="form-control" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="riskRelocation">Relocation Risk</label>
+                        <input id="riskRelocation" name="relocation_risk" type="number" min="0" max="100" step="0.1" class="form-control" required>
+                    </div>
+                </div>
+                <div id="riskFormFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Save Snapshot</button>
+            </form>
+
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">Mitigation Notes</h3>
+                <ul class="insight-list" id="riskInsightList"></ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Current Risk Radar</h2>
+            <p class="page-section-copy mb-3">Current category spread across the full consolidated risk stack.</p>
+            <canvas id="riskRadar" height="150"></canvas>
+            <p id="riskRadarMeta" class="page-section-copy mt-3 mb-0">Current category spread from live consolidated risk items.</p>
+        </div>
+    </div>
+</section>
+
+<section class="surface-card">
+    <h2 class="page-section-title">Risk History</h2>
+    <p class="page-section-copy mb-3">A chronological record of the snapshots ALFRED is tracking.</p>
+    <div class="table-responsive">
+        <table class="table table-alfred align-middle mb-0 metric-table">
+            <thead>
+                <tr>
+                    <th>Captured</th>
+                    <th class="text-end">Layoff</th>
+                    <th class="text-end">Illness</th>
+                    <th class="text-end">Relocation</th>
+                </tr>
+            </thead>
+            <tbody id="riskTableBody"></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="surface-card mt-4">
+    <h2 class="page-section-title">Related News</h2>
+    <p class="page-section-copy mb-3">Live layoff and hiring-market news relevant to the current consolidated risk view.</p>
+    <div id="riskNewsList" class="data-stack"></div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/risk.js?v=2.4"></script>
 {% endblock %}

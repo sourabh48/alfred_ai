@@ -1,28 +1,86 @@
 {% extends "base.html" %}
-{% block title %}Relationship Intelligence{% endblock %}
+{% block title %}Relationship{% endblock %}
 
 {% block content %}
-
-<h2 class="section-title fade-in">Relationship Compatibility</h2>
-
-<div class="row g-3">
-
-    <div class="col-lg-4 fade-in">
-        <div class="stats-card">
-            <h6 class="text-muted">Compatibility Score</h6>
-            <h2 class="fw-bold text-primary">{{ score }}%</h2>
+<section class="alfred-hero fade-in" id="relationshipRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Relationship alignment and financial compatibility</div>
+            <h1 class="alfred-hero-title">Capture partner context, score alignment, and keep shared financial planning grounded in real signals.</h1>
+            <p class="alfred-hero-copy">This workspace links partner financial traits with ALFRED's compatibility model so future planning is explicit, not implied.</p>
+        </div>
+        <div class="surface-card" style="min-width: 260px;">
+            <p class="metric-kicker">Alignment Score</p>
+            <div class="metric-value" id="relationshipScoreValue">0%</div>
+            <p class="metric-caption mb-1">Compatibility: <span id="relationshipCompatibilityValue">Unknown</span></p>
+            <p class="metric-caption mb-0" id="relationshipHeroCopy">Add a relationship profile to unlock alignment signals.</p>
         </div>
     </div>
+</section>
 
-    <div class="col-lg-8 fade-in">
-        <div class="glass-card p-3">
-            <h5 class="fw-bold">Behavior Alignment</h5>
-            <canvas id="relationshipRadar"></canvas>
+<section class="soft-grid four-up mb-4" id="relationshipSummaryCards"></section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Partner Profile</h2>
+            <p class="page-section-copy mb-3">Record the partner profile ALFRED should use for compatibility analysis.</p>
+            <form id="relationshipForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="partnerName">Partner Name</label>
+                        <input id="partnerName" name="partner_name" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="partnerFinancialScore">Financial Score</label>
+                        <input id="partnerFinancialScore" name="partner_financial_score" type="number" step="0.1" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="partnerSavingsHabits">Savings Habit Score</label>
+                        <input id="partnerSavingsHabits" name="partner_savings_habits" type="number" min="1" max="5" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="relationshipCompatibility">Compatibility Score</label>
+                        <input id="relationshipCompatibility" name="compatibility_score" type="number" step="0.1" class="form-control" required>
+                    </div>
+                </div>
+                <div id="relationshipFormFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Save Relationship Profile</button>
+            </form>
         </div>
     </div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Alignment Radar</h2>
+            <p class="page-section-copy mb-3">Comparison between your stored profile baseline and the partner profile you registered.</p>
+            <canvas id="relationshipRadar" height="150"></canvas>
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">Relationship Insights</h3>
+                <ul class="insight-list" id="relationshipInsightList"></ul>
+            </div>
+        </div>
+    </div>
+</section>
 
-</div>
+<section class="surface-card">
+    <h2 class="page-section-title">Saved Profiles</h2>
+    <p class="page-section-copy mb-3">Partner profiles currently stored for this account.</p>
+    <div class="table-responsive">
+        <table class="table table-alfred align-middle mb-0 metric-table">
+            <thead>
+                <tr>
+                    <th>Partner</th>
+                    <th class="text-end">Financial Score</th>
+                    <th class="text-end">Savings Habit</th>
+                    <th class="text-end">Compatibility</th>
+                </tr>
+            </thead>
+            <tbody id="relationshipTableBody"></tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
 
-<script src="/static/js/relationship.js?v=1.0"></script>
-
+{% block extra_js %}
+<script src="/static/js/relationship.js?v=2.1"></script>
 {% endblock %}
