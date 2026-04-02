@@ -1,4 +1,7 @@
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+import json
+
+from django.core.serializers.json import DjangoJSONEncoder
+from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,12 +14,68 @@ from django.db.models import Sum
 from datetime import date
 
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
+from alfred_ai.services import record_parser_learning
+from apps.reports.services import operational_logging_service
 from apps.loans.services.loan_pdf_parser import loan_pdf_parser
-from apps.loans.services import loan_closure_parser, loan_intelligence_service
+from apps.loans.services import loan_closure_parser, loan_foreclosure_service, loan_intelligence_service
 from apps.reports.services import reporting_service
 
-from .models import Loan, LoanClosureDocument, LoanPaymentHistory
-from .serializers import LoanClosureDocumentSerializer, LoanSerializer
+from .models import Loan, LoanClosureDocument, LoanImportDocument
+from .serializers import LoanClosureDocumentSerializer, LoanImportDocumentSerializer, LoanSerializer
+
+
+def _json_safe(payload):
+    return json.loads(json.dumps(payload, cls=DjangoJSONEncoder))
+
+
+def _loan_import_parser_status(parsed: dict) -> str:
+    loans_data = parsed.get("loans") or []
+    confidence = float(parsed.get("confidence") or 0)
+    extracted_text = (parsed.get("extracted_text") or "").strip()
+    document_type = (parsed.get("document_type") or "").strip().lower()
+
+    if loans_data:
+        return "parsed"
+    if extracted_text or confidence >= 0.2 or document_type not in {"", "other"}:
+        return "needs_review"
+    return "failed"
+
+
+def _loan_import_summary(parsed: dict, created_loans: list[Loan]) -> str:
+    document_type = (parsed.get("document_type") or "loan document").replace("_", " ").strip()
+    if created_loans:
+        return f"{len(created_loans)} loan record(s) created or updated from the uploaded {document_type}."
+    if parsed.get("extracted_text"):
+        return f"The {document_type} was saved, but Alfred could not extract enough structured loan rows yet."
+    return f"The uploaded file was saved for review because Alfred could not read enough loan data from it."
+
+
+def _create_loan_import_document(*, request, upload_file, parsed: dict, created_loans: list[Loan]):
+    upload_file.seek(0)
+    document = LoanImportDocument.objects.create(
+        user=request.user,
+        uploaded_file=upload_file,
+        file_name=upload_file.name,
+        document_type=(parsed.get("document_type") or "")[:40],
+        parser_status=_loan_import_parser_status(parsed),
+        parse_confidence=float(parsed.get("confidence") or 0),
+        extracted_text=parsed.get("extracted_text") or "",
+        extracted_payload=_json_safe(
+            {
+                "document_type": parsed.get("document_type") or "",
+                "confidence": float(parsed.get("confidence") or 0),
+                "loans": parsed.get("loans") or [],
+            }
+        ),
+        summary=_loan_import_summary(parsed, created_loans),
+    )
+    if created_loans:
+        document.linked_loans.set(created_loans)
+    return document
+
+
+def _closure_parser_status(parsed: dict) -> str:
+    return str(parsed.get("parser_status") or ("parsed" if parsed.get("payload", {}).get("matched_keyword") else "needs_review"))
 
 
 class LoanListCreateView(ListCreateAPIView):
@@ -46,6 +105,11 @@ class LoanSummaryView(APIView):
         return Response(
             {
                 "summary": intelligence["loan_portfolio"],
+                "balance_sheet": {
+                    "total_liabilities": intelligence["balance_sheet"]["total_liabilities"],
+                    "pending_foreclosure_excluded_balance": intelligence["balance_sheet"]["pending_foreclosure_excluded_balance"],
+                    "summary": intelligence["balance_sheet"]["summary"],
+                },
                 "behavior": {
                     "stress_score": intelligence["summary"]["stress_score"],
                     "debt_service_ratio": intelligence["summary"]["debt_service_ratio"],
@@ -55,8 +119,26 @@ class LoanSummaryView(APIView):
                     "labels": intelligence["charts"]["debt_labels"],
                     "values": intelligence["charts"]["debt_values"],
                 },
+                "recent_imports": LoanImportDocumentSerializer(
+                    LoanImportDocument.objects.filter(user=request.user).prefetch_related("linked_loans")[:8],
+                    many=True,
+                    context={"request": request},
+                ).data,
+                "recent_closures": LoanClosureDocumentSerializer(
+                    LoanClosureDocument.objects.filter(loan__user=request.user).select_related("loan", "foreclosure_snapshot")[:6],
+                    many=True,
+                    context={"request": request},
+                ).data,
             }
         )
+
+
+class LoanImportDocumentListView(ListAPIView):
+    serializer_class = LoanImportDocumentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return LoanImportDocument.objects.filter(user=self.request.user).prefetch_related("linked_loans")
 
 
 class LoanConsolidationView(APIView):
@@ -133,63 +215,134 @@ def import_loan_pdf(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        parsed = loan_pdf_parser.parse_document(pdf_file)
+        parsed = loan_pdf_parser.parse_document(pdf_file, user=request.user, filename=pdf_file.name)
         loans_data = parsed["loans"]
 
-        if not loans_data:
-            return Response(
-                {
-                    "error": "No loan data found in PDF",
-                    "document_type": parsed["document_type"],
-                    "parse_confidence": parsed["confidence"],
-                },
-                status=status.HTTP_400_BAD_REQUEST
+        with transaction.atomic():
+            created_loans = []
+            for loan_data in loans_data:
+                loan_account_number = (loan_data.get("loan_account_number") or "").strip()
+                lender = (loan_data.get("lender") or "").strip()
+                principal = loan_data.get("principal", 0)
+
+                existing = None
+                if loan_account_number:
+                    existing = Loan.objects.filter(
+                        user=request.user,
+                        loan_account_number=loan_account_number,
+                    ).first()
+                elif lender and principal:
+                    existing = Loan.objects.filter(
+                        user=request.user,
+                        lender__iexact=lender,
+                        principal=principal,
+                    ).first()
+
+                if existing:
+                    for key, value in loan_data.items():
+                        if value:
+                            setattr(existing, key, value)
+                    existing.save()
+                    created_loans.append(existing)
+                else:
+                    loan = Loan.objects.create(
+                        user=request.user,
+                        **loan_data
+                    )
+                    created_loans.append(loan)
+
+            upload_record = _create_loan_import_document(
+                request=request,
+                upload_file=pdf_file,
+                parsed=parsed,
+                created_loans=created_loans,
             )
-
-        # Create loans
-        created_loans = []
-        for loan_data in loans_data:
-            loan_account_number = (loan_data.get("loan_account_number") or "").strip()
-            lender = (loan_data.get("lender") or "").strip()
-            principal = loan_data.get("principal", 0)
-
-            existing = None
-            if loan_account_number:
-                existing = Loan.objects.filter(
+            record_parser_learning(
+                user=request.user,
+                scope="loan_document",
+                filename=pdf_file.name,
+                detected_type=parsed.get("document_type") or "other",
+                text=parsed.get("extracted_text") or "",
+                field_names=sorted({key for loan in loans_data for key, value in loan.items() if value not in ("", None, 0)}),
+                parser_status=upload_record.parser_status,
+                confidence=parsed.get("confidence") or 0,
+            )
+            if not created_loans or upload_record.parser_status != "parsed":
+                operational_logging_service.log(
                     user=request.user,
-                    loan_account_number=loan_account_number,
-                ).first()
-            elif lender and principal:
-                existing = Loan.objects.filter(
-                    user=request.user,
-                    lender__iexact=lender,
-                    principal=principal,
-                ).first()
-
-            if existing:
-                # Update existing loan
-                for key, value in loan_data.items():
-                    if value:
-                        setattr(existing, key, value)
-                existing.save()
-                created_loans.append(existing)
-            else:
-                # Create new loan
-                loan = Loan.objects.create(
-                    user=request.user,
-                    **loan_data
+                    module="loans",
+                    category="document",
+                    scope="loan_document",
+                    event_type="loan_document_needs_review",
+                    severity="warning",
+                    document_id=upload_record.id,
+                    file_name=upload_record.file_name,
+                    message="Loan document upload was saved, but Alfred could not populate fully trusted structured loan rows yet.",
+                    payload={
+                        "parser_status": upload_record.parser_status,
+                        "parse_confidence": upload_record.parse_confidence,
+                        "document_type": upload_record.document_type,
+                        "linked_loans": len(created_loans),
+                    },
                 )
-                created_loans.append(loan)
 
         return Response({
             "success": True,
-            "message": f"Successfully imported {len(created_loans)} loan(s)",
+            "message": upload_record.summary,
             "document_type": parsed["document_type"],
             "parse_confidence": parsed["confidence"],
-            "loans": LoanSerializer(created_loans, many=True).data
-        })
+            "loans": LoanSerializer(created_loans, many=True).data,
+            "upload": LoanImportDocumentSerializer(upload_record, context={"request": request}).data,
+        }, status=status.HTTP_201_CREATED)
 
     except Exception as e:
+        if "pdf_file" in locals() and getattr(pdf_file, "name", "").lower().endswith(".pdf"):
+            parsed = {
+                "document_type": "other",
+                "confidence": 0.0,
+                "extracted_text": "",
+                "loans": [],
+            }
+            try:
+                with transaction.atomic():
+                    upload_record = _create_loan_import_document(
+                        request=request,
+                        upload_file=pdf_file,
+                        parsed=parsed,
+                        created_loans=[],
+                    )
+                    upload_record.parser_status = "failed"
+                    upload_record.summary = f"The uploaded loan PDF was saved for review after a parser failure: {e}"
+                    upload_record.extracted_payload = {
+                        **(upload_record.extracted_payload or {}),
+                        "error": str(e),
+                    }
+                    upload_record.save(update_fields=["parser_status", "summary", "extracted_payload"])
+                    operational_logging_service.log(
+                        user=request.user,
+                        module="loans",
+                        category="document",
+                        scope="loan_document",
+                        event_type="loan_document_failed",
+                        severity="error",
+                        document_id=upload_record.id,
+                        file_name=upload_record.file_name,
+                        message="Loan document upload hit a parser failure and was kept for review.",
+                        payload={"error": str(e)},
+                    )
+                return Response(
+                    {
+                        "success": False,
+                        "message": upload_record.summary,
+                        "document_type": "other",
+                        "parse_confidence": 0,
+                        "loans": [],
+                        "upload": LoanImportDocumentSerializer(upload_record, context={"request": request}).data,
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
+            except Exception:
+                pass
         return Response(
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -214,29 +367,32 @@ def payoff_loan(request, pk):
         if closure_file is None:
             return Response({"detail": "Upload the foreclosure or no-due document to close this loan."}, status=status.HTTP_400_BAD_REQUEST)
 
-        parsed = loan_closure_parser.parse_document(closure_file, closure_file.name)
-        closure_file.seek(0)
-        verified, notes = loan_closure_parser.verify_document(loan, parsed)
-
-        closure_amount = float(parsed["payload"].get("closure_amount") or request.data.get("final_payment_amount") or loan.remaining_balance or 0)
-        closure_date_raw = parsed["payload"].get("closure_date") or request.data.get("closure_date") or timezone.localdate().isoformat()
+        parsed = loan_closure_parser.parse_document(closure_file, closure_file.name, user=request.user)
         try:
-            closure_date = date.fromisoformat(closure_date_raw)
-        except ValueError:
-            return Response({"detail": "Closure date could not be read from the document or request."}, status=status.HTTP_400_BAD_REQUEST)
-        closure_document = LoanClosureDocument.objects.create(
-            loan=loan,
-            uploaded_file=closure_file,
-            file_name=closure_file.name,
-            extracted_text=parsed["extracted_text"],
-            extracted_payload=parsed["payload"],
-            verification_status="verified" if verified else "rejected",
-            verification_notes=notes,
-            closure_amount=closure_amount,
-            closure_date=closure_date,
+            result = loan_foreclosure_service.process_document(
+                user=request.user,
+                selected_loan=loan,
+                closure_file=closure_file,
+                parsed=parsed,
+                requested_closure_amount=float(request.data.get("final_payment_amount") or 0) or None,
+                requested_closure_date=(request.data.get("closure_date") or "").strip() or None,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        closure_document = result.closure_document
+        record_parser_learning(
+            user=request.user,
+            scope="loan_closure_document",
+            filename=closure_file.name,
+            detected_type="loan_closure_document",
+            text=parsed.get("extracted_text") or "",
+            field_names=[key for key, value in parsed.get("payload", {}).items() if value not in ("", None, 0)],
+            parser_status=closure_document.parser_status,
+            confidence=closure_document.parse_confidence,
         )
 
-        if not verified:
+        if closure_document.verification_status != "verified":
             reporting_service.create_system_ticket(
                 user=request.user,
                 module="loans",
@@ -245,58 +401,29 @@ def payoff_loan(request, pk):
                 context_payload={
                     "loan_id": loan.id,
                     "document_id": closure_document.id,
-                    "reason": notes,
+                    "reason": closure_document.verification_notes,
                 },
             )
             return Response(
                 {
-                    "detail": notes,
+                    "detail": closure_document.verification_notes,
                     "document": LoanClosureDocumentSerializer(closure_document, context={"request": request}).data,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        with transaction.atomic():
-            loan.is_active = False
-            loan.status = "prepaid"
-            loan.closed_on = closure_date
-            loan.remaining_balance = 0
-            loan.closure_reason = "foreclosed"
-            loan.last_payment_date = closure_date
-            loan.total_paid = (loan.total_paid or 0) + closure_amount
-            loan.save(
-                update_fields=[
-                    "is_active",
-                    "status",
-                    "closed_on",
-                    "remaining_balance",
-                    "closure_reason",
-                    "last_payment_date",
-                    "total_paid",
-                    "updated_at",
-                ]
-            )
-
-            if closure_amount:
-                LoanPaymentHistory.objects.create(
-                    loan=loan,
-                    payment_date=closure_date,
-                    amount=closure_amount,
-                    principal_component=closure_amount,
-                    interest_component=0,
-                    remaining_balance=0,
-                    is_auto_detected=False,
-                    detection_confidence=100,
-                    detection_reason="Verified foreclosure document uploaded by the user.",
-                    match_status="matched",
-                )
-
         return Response({
             "success": True,
-            "message": f"Loan from {loan.lender} has been closed using the uploaded foreclosure document.",
-            "loan": LoanSerializer(loan).data,
+            "message": result.message,
+            "loan": LoanSerializer(result.loan).data,
             "document": LoanClosureDocumentSerializer(closure_document, context={"request": request}).data,
-        })
+            "reconciliation": {
+                "status": getattr(result.snapshot, "reconciliation_status", "unmatched"),
+                "matched_payment_total": getattr(result.snapshot, "matched_payment_total", 0),
+                "notes": getattr(result.snapshot, "reconciliation_notes", ""),
+                "settlement_allocation": dict((getattr(result.snapshot, "audit_payload", {}) or {}).get("settlement_allocation") or {}),
+            },
+        }, status=status.HTTP_200_OK if result.confirmed else status.HTTP_202_ACCEPTED)
 
     except Loan.DoesNotExist:
         return Response(
@@ -354,6 +481,8 @@ def loan_metrics(request):
 def calculate_networth(request):
     """Calculate user's net worth across all financial assets."""
     try:
+        intelligence = build_financial_intelligence(request.user)
+        balance_sheet = intelligence["balance_sheet"]
         from apps.investments.models import Investment
         from apps.expenses.models import BankAccount
 
@@ -373,11 +502,7 @@ def calculate_networth(request):
         total_assets = total_cash + total_investments
 
         # Liabilities
-        # 1. Active loans
-        total_debt = Loan.objects.filter(
-            user=request.user,
-            is_active=True
-        ).aggregate(total=Sum('remaining_balance'))['total'] or 0
+        total_debt = balance_sheet["total_liabilities"]
 
         # Net Worth = Assets - Liabilities
         net_worth = total_assets - total_debt
@@ -391,6 +516,7 @@ def calculate_networth(request):
 
         liabilities_breakdown = {
             "loans": round(total_debt, 2),
+            "pending_foreclosure_excluded_balance": round(balance_sheet["pending_foreclosure_excluded_balance"], 2),
             "total": round(total_debt, 2)
         }
 
@@ -404,7 +530,7 @@ def calculate_networth(request):
 
         # Get loan breakdown by type
         loan_by_type = {}
-        for loan in Loan.objects.filter(user=request.user, is_active=True):
+        for loan in Loan.objects.filter(user=request.user).exclude(status__in=["foreclosed", "closed", "prepaid"]):
             loan_type = loan.get_loan_type_display()
             if loan_type not in loan_by_type:
                 loan_by_type[loan_type] = 0

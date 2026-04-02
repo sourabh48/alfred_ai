@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error | Alfred{% endblock %}
+
+{% block content %}
+<section class="status-shell alfred-fade-up">
+    <div class="status-card">
+        <div class="status-code">500</div>
+        <div class="auth-eyebrow">{{ ui_config.errors.500.eyebrow }}</div>
+        <h1 class="status-title">{{ ui_config.errors.500.title }}</h1>
+        <p class="status-copy">{{ ui_config.errors.500.description }}</p>
+        <div class="d-flex flex-wrap gap-3 justify-content-center mt-4">
+            <a class="btn btn-dark rounded-pill px-4" href="{% if request.user.is_authenticated %}{{ ui_config.brand.home_path }}{% else %}{% url 'login' %}{% endif %}">
+                {{ ui_config.errors.500.home_label }}
+            </a>
+            {% if not request.user.is_authenticated %}
+            <a class="btn btn-outline-dark rounded-pill px-4" href="{% url 'login' %}">{{ ui_config.errors.500.login_label }}</a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

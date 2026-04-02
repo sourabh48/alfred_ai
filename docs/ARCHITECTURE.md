@@ -10,6 +10,7 @@ ALFRED is a Django monolith with module-oriented apps and template-driven dashbo
 - user-facing scripts live in `static/js/`
 - cross-module operational timestamps are generated through `alfred_ai/internal_clock.py`
 - superuser-only operational state is centralized through `alfred_ai/project_details.py`
+- cache-aware heavy-read materialization is centralized through `alfred_ai/services/materialized_cache.py`
 
 ## Main Domains
 
@@ -34,6 +35,9 @@ Career now includes:
 
 - resume ingestion and parsing
 - job-link parsing and fit scoring
+- recruiter-mail and JD ingestion into the same fit pipeline
+- public job parsing adapters for generic JSON-LD pages plus Greenhouse and Lever style openings
+- compensation benchmark summaries when salary-bearing evidence exists
 - market/news/openings enrichment through verified external intelligence
 
 ### Mobility
@@ -56,6 +60,7 @@ Current consumers:
 - `apps/mobility/services/travel_advisor.py`
 - `apps/career/views.py`
 - `apps/risk/views.py`
+- `apps/integrations/views.py`
 
 Operational hardening now also includes:
 
@@ -123,3 +128,29 @@ Recent schema changes added indexes on high-growth paths such as:
 - user + bank account + external reference + transaction date
 
 The current approach is now a hybrid: request/response dashboard reads plus scheduled refresh/cleanup for verified external intelligence. Broader async orchestration across more modules remains future work.
+
+## Materialized Dashboard Reads
+
+To keep dashboard cost stable as history grows, the heavier read paths now use revision-keyed materialized payloads.
+
+Current materialized paths include:
+
+- financial intelligence in `apps/expenses/services/financial_intelligence.py`
+- investment summary, allocation, and growth reads in `apps/investments/views.py`
+- mobility dashboard reads in `apps/mobility/views.py`
+- bike-service dashboard reads in `apps/mobility/services/bike_service_intelligence.py`
+- career dashboard reads in `apps/career/views.py`
+- relationship alignment reads in `apps/relationship/views.py`
+
+These payloads expose `_materialized` metadata for debugging and regression tests.
+
+## Parser Learning
+
+Cross-document parser adaptation now lives in `alfred_ai/services/parser_learning.py` and `apps/ml_engine/models/parser_memory.py`.
+
+Current learning inputs include:
+
+- repeated upload outcomes
+- accepted correction fields from the document-review queue
+- retry success and retry failure outcomes
+- trained parser-confidence calibration when enough parser-memory history exists

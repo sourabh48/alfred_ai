@@ -1,22 +1,37 @@
-<nav class="navbar alfred-navbar sticky-top">
+<nav class="navbar alfred-navbar">
     <div class="container-fluid px-3 px-lg-4">
         <a class="alfred-brand" href="{% url 'dashboard' %}">
             <span class="alfred-brand-mark">A</span>
             <span>
-                <strong>ALFRED</strong>
-                <small>Personal Finance & Life Intelligence</small>
+                <strong>{{ ui_config.brand.name }}</strong>
+                <small>{{ ui_config.brand.tagline }}</small>
             </span>
         </a>
 
         <div class="d-flex align-items-center gap-3">
             {% if request.user.is_authenticated %}
-            <div class="alfred-nav-chip">Signed in as {{ request.user.username }}</div>
+            <button
+                class="btn btn-outline-light btn-sm rounded-pill px-3 d-md-none"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#sidebarMenu"
+                aria-controls="sidebarMenu"
+                aria-expanded="false"
+                aria-label="{{ ui_config.navigation.menu_label }}"
+            >
+                {{ ui_config.navigation.menu_label }}
+            </button>
+            <div class="alfred-nav-chip d-none d-sm-inline-flex">{{ ui_config.navigation.signed_in_prefix }} {{ request.user.username }}</div>
+            <button id="navbarClearDataBtn" type="button" class="btn btn-outline-warning btn-sm rounded-pill px-3">{{ ui_config.navigation.remove_data_label }}</button>
             <form action="{% url 'logout' %}" method="post" class="m-0">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-outline-light btn-sm rounded-pill px-3">Sign out</button>
+                <button type="submit" class="btn btn-outline-light btn-sm rounded-pill px-3">{{ ui_config.navigation.sign_out_label }}</button>
             </form>
+            {% elif not hide_nav_auth_actions %}
+            <a class="btn btn-outline-light btn-sm rounded-pill px-3" href="{% url 'signup' %}">{{ ui_config.navigation.create_account_label }}</a>
+            <a class="btn btn-light btn-sm rounded-pill px-3 text-dark" href="{% url 'login' %}">{{ ui_config.navigation.sign_in_label }}</a>
             {% else %}
-            <a class="btn btn-outline-light btn-sm rounded-pill px-3" href="{% url 'login' %}">Sign in</a>
+            <div class="alfred-nav-chip d-none d-sm-inline-flex">Secure workspace access</div>
             {% endif %}
         </div>
     </div>

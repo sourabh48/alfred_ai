@@ -5,10 +5,13 @@ from datetime import datetime, timedelta
 import re
 from statistics import mean
 
-from django.db.models import Q
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 
-from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, TripLog
+from alfred_ai.services.materialized_cache import materialize_payload
+from apps.ml_engine.inference_adapters.service_cost_predictor import service_cost_predictor, service_type_score, vehicle_type_score
+from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TripLog
+from .bike_catalog import build_maintenance_guidance
 
 
 SERVICE_RULES = [
@@ -172,6 +175,15 @@ VEHICLE_NUMBER_PATTERNS = (
 
 class BikeServiceIntelligenceService:
     def build_dashboard(self, user) -> dict:
+        return materialize_payload(
+            namespace="bike-service-dashboard",
+            user_id=user.id,
+            revision=self._dashboard_revision(user),
+            ttl_seconds=45,
+            builder=lambda: self._build_dashboard_uncached(user),
+        )
+
+    def _build_dashboard_uncached(self, user) -> dict:
         today = timezone.localdate()
         now = timezone.now()
         bike_profiles = list(BikeProfile.objects.filter(user=user).order_by("-is_primary", "-updated_at"))
@@ -191,6 +203,11 @@ class BikeServiceIntelligenceService:
             .select_related("travel_plan", "travel_plan__vehicle_profile")
             .order_by("-log_date", "-id")
         )
+        refill_logs = list(
+            FuelRefillLog.objects.filter(user=user)
+            .select_related("bike_profile")
+            .order_by("-refill_date", "-id")
+        )
         documents = list(BikeDocument.objects.filter(user=user).select_related("bike_profile").order_by("expiry_date", "-id"))
         condition_snapshots = list(BikeConditionSnapshot.objects.filter(user=user).select_related("bike_profile").order_by("-captured_at", "-id"))
 
@@ -206,12 +223,14 @@ class BikeServiceIntelligenceService:
                 item for item in trip_logs
                 if getattr(item.travel_plan, "vehicle_profile_id", None) in {None, primary_profile.id}
             ]
+            scoped_refill_logs = [item for item in refill_logs if item.bike_profile_id == primary_profile.id or not item.bike_profile_id]
             scoped_documents = [item for item in documents if item.bike_profile_id == primary_profile.id or not item.bike_profile_id]
             scoped_condition_snapshots = [item for item in condition_snapshots if item.bike_profile_id == primary_profile.id or not item.bike_profile_id]
         else:
             scoped_service_records = service_records
             scoped_issues = issues
             scoped_trip_logs = trip_logs
+            scoped_refill_logs = refill_logs
             scoped_documents = documents
             scoped_condition_snapshots = condition_snapshots
 
@@ -226,16 +245,30 @@ class BikeServiceIntelligenceService:
         trip_cost_total = round(sum(item.spend_amount or 0 for item in scoped_trip_logs), 2)
         trip_distance_total = round(sum(item.distance_km or 0 for item in scoped_trip_logs), 1)
         cost_per_km = round(trip_cost_total / trip_distance_total, 2) if trip_distance_total else 0
-        projected_next_service_cost = round(self._routine_service_baseline(scoped_service_records) + sum(self._issue_cost(issue, scoped_issues) for issue in open_issues[:3]), 2)
+        projected_next_service_cost = round(self._routine_service_baseline(scoped_service_records, profile=primary_profile) + sum(self._issue_cost(issue, scoped_issues) for issue in open_issues[:3]), 2)
         document_summary = self._document_summary(current_documents, today)
         modification_summary = self._detect_modifications(scoped_service_records, scoped_issues)
         expected_mileage = primary_profile.expected_mileage_kmpl if primary_profile and primary_profile.expected_mileage_kmpl else 0
         estimated_range = round(expected_mileage * (primary_profile.fuel_tank_capacity_l or 0), 1) if primary_profile else 0
-        service_history_summary = self._build_service_history_summary(scoped_service_records, scoped_documents, scoped_condition_snapshots)
+        valid_refill_logs = [item for item in scoped_refill_logs if self._refill_actual_mileage(item) is not None]
+        latest_actual_mileage = self._refill_actual_mileage(valid_refill_logs[0]) if valid_refill_logs else 0
+        average_actual_mileage = round(mean(self._refill_actual_mileage(item) for item in valid_refill_logs), 2) if valid_refill_logs else 0
+        mileage_gap = round(average_actual_mileage - expected_mileage, 2) if average_actual_mileage and expected_mileage else 0
+        service_history_summary = self._build_service_history_summary(scoped_service_records, scoped_documents, scoped_condition_snapshots, scoped_refill_logs)
         part_insights = self._build_part_insights(scoped_service_records, scoped_issues, latest_condition, latest_service, today)
 
         pending_tasks = self._build_pending_tasks(latest_service, open_issues, current_documents, latest_condition, today, now)
-        observations = self._build_observations(scoped_service_records, scoped_issues, trip_cost_total, cost_per_km, document_summary, latest_condition)
+        observations = self._build_observations(
+            scoped_service_records,
+            scoped_issues,
+            trip_cost_total,
+            cost_per_km,
+            document_summary,
+            latest_condition,
+            scoped_refill_logs,
+            expected_mileage,
+            average_actual_mileage,
+        )
         service_center_brief = self._build_service_center_brief(open_issues, latest_service, latest_condition)
         bike_profile = self._build_bike_profile(primary_profile, latest_service, current_documents, latest_condition, modification_summary, estimated_range)
         document_compliance = self._build_document_compliance(current_documents, today)
@@ -262,7 +295,12 @@ class BikeServiceIntelligenceService:
                 "missing_required_documents": document_summary["missing_required_count"],
                 "document_compliance_score": document_summary["compliance_score"],
                 "expected_mileage_kmpl": expected_mileage,
+                "latest_actual_mileage_kmpl": latest_actual_mileage,
+                "average_actual_mileage_kmpl": average_actual_mileage,
+                "mileage_gap_kmpl": mileage_gap,
                 "estimated_range_km": estimated_range,
+                "refill_count": len(scoped_refill_logs),
+                "fuel_cost_total": round(sum(item.total_cost or 0 for item in scoped_refill_logs), 2),
                 "latest_condition_score": latest_condition.overall_score if latest_condition else 0,
                 "latest_condition_status": latest_condition.get_overall_status_display() if latest_condition else "No data",
             },
@@ -272,7 +310,16 @@ class BikeServiceIntelligenceService:
             "observations": observations,
             "suggestions": self._build_suggestions(open_issues, latest_service),
             "service_center_brief": service_center_brief,
-            "charts": self._build_charts(scoped_service_records, scoped_trip_logs, scoped_issues),
+            "charts": self._build_charts(
+                scoped_service_records,
+                scoped_trip_logs,
+                scoped_issues,
+                scoped_condition_snapshots,
+                scoped_refill_logs,
+                expected_mileage,
+                getattr(primary_profile, "official_source_name", ""),
+                getattr(primary_profile, "official_source_url", ""),
+            ),
             "document_summary": document_summary,
             "document_compliance": document_compliance,
             "service_history_summary": service_history_summary,
@@ -280,6 +327,15 @@ class BikeServiceIntelligenceService:
         }
 
     def risk_snapshot(self, user) -> dict:
+        return materialize_payload(
+            namespace="bike-service-risk-snapshot",
+            user_id=user.id,
+            revision=self._dashboard_revision(user),
+            ttl_seconds=30,
+            builder=lambda: self._risk_snapshot_uncached(user),
+        )
+
+    def _risk_snapshot_uncached(self, user) -> dict:
         today = timezone.localdate()
         now = timezone.now()
         bike_profiles = list(
@@ -354,6 +410,27 @@ class BikeServiceIntelligenceService:
             },
             "pending_tasks": pending_tasks,
         }
+
+    def _dashboard_revision(self, user) -> str:
+        profile_meta = BikeProfile.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
+        service_meta = BikeServiceRecord.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("service_date"))
+        issue_meta = BikeIssueReport.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_reported=Max("reported_at"))
+        trip_meta = TripLog.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("log_date"))
+        refill_meta = FuelRefillLog.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("refill_date"))
+        document_meta = BikeDocument.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
+        condition_meta = BikeConditionSnapshot.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_captured=Max("captured_at"))
+        return "|".join(
+            str(value or "")
+            for value in [
+                profile_meta["count"], profile_meta["max_id"], profile_meta["max_updated"],
+                service_meta["count"], service_meta["max_id"], service_meta["max_date"],
+                issue_meta["count"], issue_meta["max_id"], issue_meta["max_reported"],
+                trip_meta["count"], trip_meta["max_id"], trip_meta["max_date"],
+                refill_meta["count"], refill_meta["max_id"], refill_meta["max_date"],
+                document_meta["count"], document_meta["max_id"], document_meta["max_updated"],
+                condition_meta["count"], condition_meta["max_id"], condition_meta["max_captured"],
+            ]
+        )
 
     def hydrate_issue(self, issue: BikeIssueReport) -> BikeIssueReport:
         rule = self._match_rule(issue.title, issue.symptom, issue.observation, issue.system)
@@ -457,9 +534,35 @@ class BikeServiceIntelligenceService:
     def current_documents(self, documents: list[BikeDocument]) -> list[BikeDocument]:
         return self._current_documents(documents)
 
-    def _routine_service_baseline(self, service_records: list[BikeServiceRecord]) -> float:
+    def _routine_service_baseline(self, service_records: list[BikeServiceRecord], *, profile=None) -> float:
         routine_costs = [item.cost for item in service_records if item.service_type == "routine" and item.cost]
-        return round(mean(routine_costs[-3:]), 2) if routine_costs else 1800.0
+        heuristic = round(mean(routine_costs[-3:]), 2) if routine_costs else 1800.0
+        latest_record = next((item for item in service_records if item.cost), service_records[0] if service_records else None)
+        if latest_record is None:
+            return heuristic
+
+        active_profile = profile or getattr(latest_record, "bike_profile", None)
+        service_payload = ((latest_record.parsed_payload or {}).get("service_payload") or {})
+        parts_items = service_payload.get("parts_items") or []
+        labour_items = service_payload.get("labour_items") or []
+        predicted = service_cost_predictor.predict_cost(
+            {
+                "vehicle_type_score": vehicle_type_score(getattr(active_profile, "vehicle_type", "")),
+                "service_type_score": service_type_score("routine"),
+                "odometer_band": round(float(latest_record.odometer_km or 0) / 10000.0, 4),
+                "engine_cc_band": round(float(getattr(active_profile, "engine_cc", 0) or 0) / 100.0, 4),
+                "expected_mileage_band": round(float(getattr(active_profile, "expected_mileage_kmpl", 0) or 0) / 10.0, 4),
+                "line_item_count": int(service_payload.get("line_item_count") or len(parts_items) + len(labour_items) or 0),
+                "parts_item_count": int(service_payload.get("parts_item_count") or len(parts_items)),
+                "labour_item_count": int(service_payload.get("labour_item_count") or len(labour_items)),
+                "recent_average_cost": heuristic if routine_costs else 0.0,
+            }
+        )
+        if predicted is None:
+            return heuristic
+        if routine_costs:
+            return round((heuristic * 0.55) + (predicted * 0.45), 2)
+        return round(predicted, 2)
 
     def _issue_cost(self, issue: BikeIssueReport, issues: list[BikeIssueReport]) -> float:
         if issue.projected_cost:
@@ -548,12 +651,30 @@ class BikeServiceIntelligenceService:
         tasks.sort(key=lambda item: SEVERITY_ORDER.get(item["priority"], 0), reverse=True)
         return tasks[:6]
 
-    def _build_observations(self, service_records, issues, trip_cost_total, cost_per_km, document_summary, latest_condition) -> list[str]:
+    def _build_observations(
+        self,
+        service_records,
+        issues,
+        trip_cost_total,
+        cost_per_km,
+        document_summary,
+        latest_condition,
+        refill_logs,
+        expected_mileage,
+        average_actual_mileage,
+    ) -> list[str]:
         observations = []
         if service_records:
             observations.append(f"Total logged bike service spend is INR {sum(item.cost or 0 for item in service_records):,.0f}.")
         if trip_cost_total:
             observations.append(f"Trip logs currently capture INR {trip_cost_total:,.0f} of ride spend at roughly INR {cost_per_km:,.2f} per km.")
+        if refill_logs:
+            observations.append(f"Fuel refill history now covers {len(refill_logs)} refill log(s), so Alfred can compare your real mileage against the expected benchmark.")
+        if average_actual_mileage and expected_mileage:
+            if average_actual_mileage < (expected_mileage * 0.9):
+                observations.append(f"Average actual mileage is about {average_actual_mileage:,.1f} kmpl versus the benchmark {expected_mileage:,.1f} kmpl, which suggests below-optimal efficiency.")
+            elif average_actual_mileage > (expected_mileage * 1.05):
+                observations.append(f"Average actual mileage is about {average_actual_mileage:,.1f} kmpl, which is outperforming the saved benchmark of {expected_mileage:,.1f} kmpl.")
         recurring_systems = Counter(item.system for item in issues if item.system != "general")
         if recurring_systems:
             system, count = recurring_systems.most_common(1)[0]
@@ -598,7 +719,7 @@ class BikeServiceIntelligenceService:
             "projected_total": round(sum(issue.projected_cost or 0 for issue in top_issues), 2),
         }
 
-    def _build_service_history_summary(self, service_records, documents, condition_snapshots) -> dict:
+    def _build_service_history_summary(self, service_records, documents, condition_snapshots, refill_logs) -> dict:
         imported_bills = sum(1 for item in service_records if item.source_mode in {"bill_import", "work_note"})
         manual_logs = sum(1 for item in service_records if item.source_mode == "manual")
         average_cost = round(mean([item.cost for item in service_records if item.cost]), 2) if any(item.cost for item in service_records) else 0.0
@@ -610,11 +731,12 @@ class BikeServiceIntelligenceService:
             "average_service_cost": average_cost,
             "document_count": len(documents),
             "condition_snapshot_count": len(condition_snapshots),
+            "fuel_refill_count": len(refill_logs),
             "recurring_centers": recurring_centers,
             "history_note": (
-                "Imported service bills and manual logs are both retained, so Alfred can build a longer maintenance history for this vehicle."
-                if service_records
-                else "Start by importing a service bill or adding a manual service log to build maintenance history."
+                "Imported service bills, manual logs, and refill history are all retained, so Alfred can build a longer maintenance and mileage history for this vehicle."
+                if (service_records or refill_logs)
+                else "Start by importing a service bill, adding a manual service log, or storing a fuel refill to build maintenance history."
             ),
         }
 
@@ -703,7 +825,27 @@ class BikeServiceIntelligenceService:
         insights.sort(key=lambda item: CONDITION_ORDER.get(item["status"], 0), reverse=True)
         return insights[:6]
 
-    def _build_charts(self, service_records, trip_logs, issues) -> dict:
+    def _refill_actual_mileage(self, refill_log: FuelRefillLog):
+        if not refill_log or not refill_log.fuel_liters or not refill_log.trip_meter_km:
+            return None
+        if refill_log.fuel_liters <= 0 or refill_log.trip_meter_km <= 0:
+            return None
+        return round(refill_log.trip_meter_km / refill_log.fuel_liters, 2)
+
+    def _build_mileage_trend(self, refill_logs, expected_mileage, source_name, source_url) -> dict:
+        eligible_logs = [item for item in reversed(refill_logs[:10]) if self._refill_actual_mileage(item) is not None]
+        actual_values = [self._refill_actual_mileage(item) for item in eligible_logs]
+        return {
+            "labels": [item.refill_date.strftime("%d %b") for item in eligible_logs],
+            "actual_values": actual_values,
+            "optimal_values": [round(expected_mileage or 0, 2)] * len(actual_values),
+            "variance_values": [round(actual - (expected_mileage or 0), 2) for actual in actual_values],
+            "evidence_kind": "official_catalog" if source_url else "custom_profile",
+            "source_name": source_name,
+            "source_url": source_url,
+        }
+
+    def _build_charts(self, service_records, trip_logs, issues, condition_snapshots, refill_logs, expected_mileage, source_name, source_url) -> dict:
         service_chart = {
             "labels": [item.service_date.isoformat() for item in reversed(service_records[:8])],
             "values": [round(item.cost or 0, 2) for item in reversed(service_records[:8])],
@@ -733,6 +875,7 @@ class BikeServiceIntelligenceService:
             "service_cost_trend": service_chart,
             "cost_mix": cost_mix,
             "issue_breakdown": issue_chart,
+            "mileage_trend": self._build_mileage_trend(refill_logs, expected_mileage, source_name, source_url),
         }
 
     def _document_summary(self, documents: list[BikeDocument], today) -> dict:
@@ -787,12 +930,27 @@ class BikeServiceIntelligenceService:
         insurance = documents_by_type.get("insurance")
         puc = documents_by_type.get("puc")
         registration = documents_by_type.get("registration")
+        maintenance_guidance = build_maintenance_guidance(
+            {
+                "make": getattr(primary_profile, "make", ""),
+                "vehicle_type": getattr(primary_profile, "vehicle_type", ""),
+                "bike_class": getattr(primary_profile, "bike_class", ""),
+                "service_interval_km": getattr(primary_profile, "service_interval_km", None),
+                "service_interval_days": getattr(primary_profile, "service_interval_days", None),
+                "official_source_name": getattr(primary_profile, "official_source_name", ""),
+                "official_source_url": getattr(primary_profile, "official_source_url", ""),
+            }
+        )
         return {
+            "id": getattr(primary_profile, "id", None),
             "bike_name": getattr(source, "display_name", getattr(source, "bike_name", "")),
+            "model_name": getattr(primary_profile, "model_name", ""),
+            "variant": getattr(primary_profile, "variant", ""),
             "vehicle_type": getattr(primary_profile, "get_vehicle_type_display", lambda: "")(),
             "vehicle_number": getattr(source, "vehicle_number", ""),
             "make": getattr(primary_profile, "make", ""),
             "bike_class": getattr(primary_profile, "bike_class", ""),
+            "fuel_type": getattr(primary_profile, "fuel_type", ""),
             "usage_pattern": getattr(primary_profile, "get_usage_pattern_display", lambda: "")(),
             "estimated_market_value": getattr(primary_profile, "estimated_market_value", 0),
             "monthly_income_support": getattr(primary_profile, "monthly_income_support", 0),
@@ -821,6 +979,7 @@ class BikeServiceIntelligenceService:
             "condition_assessment": latest_condition.ai_assessment if latest_condition else "",
             "performance_modifications": modification_summary["labels"],
             "modification_impact_note": modification_summary["note"],
+            "maintenance_guidance": maintenance_guidance,
         }
 
     def _build_fleet_summary(self, bike_profiles, service_records, documents) -> list[dict]:

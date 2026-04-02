@@ -62,3 +62,42 @@ class SystemTicket(models.Model):
 
     def __str__(self):
         return f"{self.module} | {self.title}"
+
+
+class OperationalLog(models.Model):
+    CATEGORY_CHOICES = [
+        ("document", "Document Processing"),
+        ("visualization", "Visualization"),
+        ("api", "API"),
+        ("background", "Background Job"),
+    ]
+
+    SEVERITY_CHOICES = [
+        ("info", "Info"),
+        ("warning", "Warning"),
+        ("error", "Error"),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="operational_logs")
+    module = models.CharField(max_length=30, default="general")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default="document")
+    scope = models.CharField(max_length=50, blank=True)
+    event_type = models.CharField(max_length=50)
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default="info")
+    document_id = models.PositiveIntegerField(null=True, blank=True)
+    file_name = models.CharField(max_length=255, blank=True)
+    message = models.TextField()
+    payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "module", "created_at"]),
+            models.Index(fields=["user", "scope", "created_at"]),
+            models.Index(fields=["user", "severity", "created_at"]),
+            models.Index(fields=["category", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.module} | {self.event_type} | {self.severity}"

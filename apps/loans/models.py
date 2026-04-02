@@ -17,6 +17,8 @@ class Loan(models.Model):
 
     STATUS_CHOICES = [
         ("active", "Active"),
+        ("foreclosure_pending", "Foreclosure Pending"),
+        ("foreclosed", "Foreclosed"),
         ("closed", "Closed"),
         ("defaulted", "Defaulted"),
         ("prepaid", "Prepaid"),
@@ -69,6 +71,10 @@ class Loan(models.Model):
 
     @property
     def current_status(self) -> str:
+        if self.status == "foreclosure_pending":
+            return "foreclosure_pending"
+        if self.status in {"foreclosed", "closed", "prepaid", "defaulted"}:
+            return self.status
         if self.closed_on or not self.is_active:
             return "closed"
         return self.status
@@ -100,6 +106,11 @@ class LoanPaymentHistory(models.Model):
     amount = models.FloatField()
     principal_component = models.FloatField(default=0)
     interest_component = models.FloatField(default=0)
+    principal_paid = models.FloatField(default=0)
+    interest_paid = models.FloatField(default=0)
+    charges_paid = models.FloatField(default=0)
+    penalties_paid = models.FloatField(default=0)
+    tax_paid = models.FloatField(default=0)
     remaining_balance = models.FloatField(null=True, blank=True)
     is_auto_detected = models.BooleanField(default=False)
     detection_confidence = models.FloatField(default=0)
@@ -127,6 +138,12 @@ class LoanPaymentHistory(models.Model):
 
 
 class LoanClosureDocument(models.Model):
+    PARSER_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("parsed", "Parsed"),
+        ("needs_review", "Needs Review"),
+        ("failed", "Failed"),
+    ]
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("verified", "Verified"),
@@ -138,17 +155,115 @@ class LoanClosureDocument(models.Model):
     file_name = models.CharField(max_length=255)
     extracted_text = models.TextField(blank=True)
     extracted_payload = models.JSONField(default=dict, blank=True)
+    parser_status = models.CharField(max_length=20, choices=PARSER_STATUS_CHOICES, default="pending")
+    parse_confidence = models.FloatField(default=0)
     verification_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     verification_notes = models.TextField(blank=True)
     closure_amount = models.FloatField(default=0)
     closure_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
 
     class Meta:
-        ordering = ["-created_at", "-id"]
+        ordering = ["-updated_at", "-id"]
         indexes = [
             models.Index(fields=["loan", "verification_status", "created_at"]),
+            models.Index(fields=["loan", "parser_status", "updated_at"]),
         ]
 
     def __str__(self):
         return f"{self.loan_id} | {self.file_name}"
+
+
+class LoanForeclosureSnapshot(models.Model):
+    DOCUMENT_TYPE_CHOICES = [
+        ("foreclosure_statement", "Foreclosure Statement"),
+        ("closure_letter", "Closure Letter"),
+        ("noc", "No Objection / No Due"),
+        ("loan_statement", "Loan Statement"),
+        ("other", "Other"),
+    ]
+    RECONCILIATION_STATUS_CHOICES = [
+        ("unmatched", "Unmatched"),
+        ("partial_match", "Partial Match"),
+        ("full_match", "Full Match"),
+        ("mismatch", "Mismatch"),
+    ]
+
+    loan = models.ForeignKey(Loan, on_delete=models.CASCADE, related_name="foreclosure_snapshots")
+    closure_document = models.OneToOneField(
+        LoanClosureDocument,
+        on_delete=models.CASCADE,
+        related_name="foreclosure_snapshot",
+    )
+    document_type = models.CharField(max_length=40, choices=DOCUMENT_TYPE_CHOICES, default="other")
+    lender_name = models.CharField(max_length=120, blank=True)
+    borrower_name = models.CharField(max_length=180, blank=True)
+    loan_account_number = models.CharField(max_length=64, blank=True)
+    statement_date = models.DateField(null=True, blank=True)
+    effective_closure_date = models.DateField(null=True, blank=True)
+    due_by_date = models.DateField(null=True, blank=True)
+    outstanding_principal = models.FloatField(default=0)
+    accrued_interest = models.FloatField(default=0)
+    foreclosure_charges = models.FloatField(default=0)
+    taxes_gst = models.FloatField(default=0)
+    overdue_charges = models.FloatField(default=0)
+    total_amount_payable = models.FloatField(default=0)
+    classification_confidence = models.FloatField(default=0)
+    linkage_confidence = models.FloatField(default=0)
+    linkage_notes = models.TextField(blank=True)
+    reconciliation_status = models.CharField(
+        max_length=20,
+        choices=RECONCILIATION_STATUS_CHOICES,
+        default="unmatched",
+    )
+    reconciliation_confidence = models.FloatField(default=0)
+    matched_payment_total = models.FloatField(default=0)
+    matched_emi_transaction_ids = models.JSONField(default=list, blank=True)
+    matched_closure_transaction_ids = models.JSONField(default=list, blank=True)
+    reconciliation_notes = models.TextField(blank=True)
+    audit_payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        indexes = [
+            models.Index(fields=["loan", "document_type", "updated_at"]),
+            models.Index(fields=["loan", "reconciliation_status", "updated_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.loan_id} | {self.document_type} | {self.reconciliation_status}"
+
+
+class LoanImportDocument(models.Model):
+    PARSER_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("parsed", "Parsed"),
+        ("needs_review", "Needs Review"),
+        ("failed", "Failed"),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="loan_import_documents")
+    uploaded_file = models.FileField(upload_to="loan_imports/%Y/%m/")
+    file_name = models.CharField(max_length=255)
+    document_type = models.CharField(max_length=40, blank=True)
+    parser_status = models.CharField(max_length=20, choices=PARSER_STATUS_CHOICES, default="pending")
+    parse_confidence = models.FloatField(default=0)
+    extracted_text = models.TextField(blank=True)
+    extracted_payload = models.JSONField(default=dict, blank=True)
+    summary = models.TextField(blank=True)
+    linked_loans = models.ManyToManyField(Loan, blank=True, related_name="source_documents")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "document_type", "created_at"]),
+            models.Index(fields=["user", "parser_status", "created_at"]),
+        ]
+
+    def __str__(self):
+        document_type = self.document_type or "other"
+        return f"{self.user.username} | {document_type} | {self.file_name}"

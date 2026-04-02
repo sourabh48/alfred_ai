@@ -1,9 +1,42 @@
 """
 Models for Integration module - Credit Scores, Email Connections, etc.
 """
+import base64
+import hashlib
+
+from cryptography.fernet import Fernet, InvalidToken
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+
+
+TOKEN_PREFIX = "enc::"
+
+
+def _email_token_cipher() -> Fernet:
+    digest = hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def _encrypt_token(value: str | None) -> str | None:
+    if not value:
+        return value
+    if value.startswith(TOKEN_PREFIX):
+        return value
+    encrypted = _email_token_cipher().encrypt(value.encode("utf-8")).decode("utf-8")
+    return f"{TOKEN_PREFIX}{encrypted}"
+
+
+def _decrypt_token(value: str | None) -> str:
+    if not value:
+        return ""
+    if not value.startswith(TOKEN_PREFIX):
+        return value
+    try:
+        encrypted = value[len(TOKEN_PREFIX):].encode("utf-8")
+        return _email_token_cipher().decrypt(encrypted).decode("utf-8")
+    except InvalidToken:
+        return ""
 
 
 class CreditScore(models.Model):
@@ -85,6 +118,51 @@ class CreditScoreFactor(models.Model):
         return f"{self.factor_name} - {self.score}/100"
 
 
+class CreditReportUpload(models.Model):
+    """Store uploaded bureau report documents and their parsed results."""
+
+    PARSER_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("parsed", "Parsed"),
+        ("needs_review", "Needs Review"),
+        ("failed", "Failed"),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="credit_report_uploads")
+    uploaded_file = models.FileField(upload_to="credit_reports/%Y/%m/")
+    file_name = models.CharField(max_length=255)
+    bureau = models.CharField(max_length=20, choices=CreditScore.BUREAU_CHOICES, blank=True)
+    parser_status = models.CharField(max_length=20, choices=PARSER_STATUS_CHOICES, default="pending")
+    parse_confidence = models.FloatField(default=0)
+    extracted_text = models.TextField(blank=True)
+    extracted_payload = models.JSONField(default=dict, blank=True)
+    summary = models.TextField(blank=True)
+    parser_notes = models.TextField(blank=True)
+    applicant_name = models.CharField(max_length=180, blank=True)
+    report_number = models.CharField(max_length=120, blank=True)
+    report_date = models.DateField(null=True, blank=True)
+    parsed_credit_score = models.OneToOneField(
+        "CreditScore",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_upload",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "bureau", "created_at"]),
+            models.Index(fields=["user", "parser_status", "created_at"]),
+        ]
+
+    def __str__(self):
+        bureau = self.bureau or "Unknown bureau"
+        return f"{self.user.username} | {bureau} | {self.file_name}"
+
+
 class EmailConnection(models.Model):
     """Store email connection details for automatic imports."""
 
@@ -106,7 +184,7 @@ class EmailConnection(models.Model):
     auto_import_enabled = models.BooleanField(default=True)
     sync_frequency_days = models.IntegerField(default=7)  # Sync every N days
 
-    # OAuth tokens (encrypted in production)
+    # OAuth tokens are encrypted at rest before save.
     access_token = models.TextField(blank=True, null=True)
     refresh_token = models.TextField(blank=True, null=True)
     token_expires_at = models.DateTimeField(null=True, blank=True)
@@ -119,6 +197,28 @@ class EmailConnection(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.email_address} ({self.provider})"
+
+    def save(self, *args, **kwargs):
+        self.access_token = _encrypt_token(self.access_token)
+        self.refresh_token = _encrypt_token(self.refresh_token)
+        super().save(*args, **kwargs)
+
+    def get_access_token(self) -> str:
+        return _decrypt_token(self.access_token)
+
+    def get_refresh_token(self) -> str:
+        return _decrypt_token(self.refresh_token)
+
+    def set_access_token(self, value: str | None) -> None:
+        self.access_token = _encrypt_token(value)
+
+    def set_refresh_token(self, value: str | None) -> None:
+        self.refresh_token = _encrypt_token(value)
+
+    def clear_tokens(self) -> None:
+        self.access_token = ""
+        self.refresh_token = ""
+        self.token_expires_at = None
 
 
 class VerifiedExternalInsight(models.Model):

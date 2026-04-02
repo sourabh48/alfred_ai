@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, TravelPlan, TripLog, TripPhoto
+from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto
 
 
 class BikeProfileSerializer(serializers.ModelSerializer):
@@ -111,6 +111,77 @@ class BikeServiceRecordSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"bike_profile": "You can only use your own saved vehicle profiles."})
 
         return attrs
+
+
+class FuelRefillLogSerializer(serializers.ModelSerializer):
+    bike_profile_name = serializers.CharField(source="bike_profile.display_name", read_only=True)
+    bike_profile = serializers.PrimaryKeyRelatedField(queryset=BikeProfile.objects.all(), allow_null=True, required=False)
+    actual_mileage_kmpl = serializers.SerializerMethodField()
+    fuel_price_per_liter = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FuelRefillLog
+        fields = (
+            "id",
+            "user",
+            "bike_profile",
+            "bike_profile_name",
+            "bike_name",
+            "vehicle_number",
+            "refill_date",
+            "odometer_km",
+            "trip_meter_km",
+            "fuel_liters",
+            "total_cost",
+            "fuel_price_per_liter",
+            "is_full_tank",
+            "station_name",
+            "notes",
+            "actual_mileage_kmpl",
+            "created_at",
+        )
+        read_only_fields = ("user", "bike_profile_name", "fuel_price_per_liter", "actual_mileage_kmpl", "created_at")
+        extra_kwargs = {
+            "bike_name": {"required": False, "allow_blank": True},
+            "vehicle_number": {"required": False, "allow_blank": True},
+        }
+
+    def get_actual_mileage_kmpl(self, obj):
+        if not obj.fuel_liters or not obj.trip_meter_km:
+            return 0
+        return round((obj.trip_meter_km or 0) / max(obj.fuel_liters, 0.01), 2)
+
+    def get_fuel_price_per_liter(self, obj):
+        if not obj.fuel_liters:
+            return 0
+        return round((obj.total_cost or 0) / max(obj.fuel_liters, 0.01), 2)
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        bike_profile = attrs.get("bike_profile", getattr(self.instance, "bike_profile", None))
+        refill_date = attrs.get("refill_date", getattr(self.instance, "refill_date", None))
+        odometer_km = attrs.get("odometer_km", getattr(self.instance, "odometer_km", None))
+        trip_meter_km = attrs.get("trip_meter_km", getattr(self.instance, "trip_meter_km", 0))
+        fuel_liters = attrs.get("fuel_liters", getattr(self.instance, "fuel_liters", 0))
+
+        if request is not None and bike_profile and bike_profile.user_id != request.user.id:
+            raise serializers.ValidationError({"bike_profile": "You can only use your own saved vehicle profiles."})
+        if refill_date and refill_date > timezone.localdate():
+            raise serializers.ValidationError({"refill_date": "Refill date cannot be in the future."})
+        if odometer_km is not None and odometer_km < 0:
+            raise serializers.ValidationError({"odometer_km": "Odometer cannot be negative."})
+        if trip_meter_km is not None and trip_meter_km < 0:
+            raise serializers.ValidationError({"trip_meter_km": "Trip value cannot be negative."})
+        if fuel_liters is None or fuel_liters <= 0:
+            raise serializers.ValidationError({"fuel_liters": "Fuel liters must be greater than zero."})
+        return attrs
+
+    def to_internal_value(self, data):
+        normalized = data.copy()
+        for field in ("bike_profile", "odometer_km", "trip_meter_km", "fuel_liters", "total_cost", "station_name", "notes"):
+            if normalized.get(field) == "":
+                normalized[field] = None if field == "odometer_km" else (0 if field in {"trip_meter_km", "fuel_liters", "total_cost"} else "")
+        return super().to_internal_value(normalized)
 
 
 class TravelPlanSerializer(serializers.ModelSerializer):

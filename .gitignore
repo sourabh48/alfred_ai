@@ -6,6 +6,9 @@ __pycache__/
 *.pyo
 *.pyd
 *.sqlite3
+*.sqlite3-journal
+*.sqlite3-shm
+*.sqlite3-wal
 db.sqlite3
 
 # Django media & static build
@@ -15,9 +18,11 @@ db.sqlite3
 # =========================
 # Virtual Environments
 # =========================
+.venv/
 alfred_env/
 venv/
 .env
+.env.*
 
 # =========================
 # ML Models & Artifacts
@@ -36,6 +41,16 @@ ml_models/alfred/memory/users/
 # Logs & Reports
 # =========================
 *.log
+.coverage
+.coverage.*
+coverage.xml
+.pytest_cache/
+.hypothesis/
+.tox/
+.nox/
+.cache/
+.mypy_cache/
+.ruff_cache/
 logs/
 reports/generated/
 
@@ -52,12 +67,20 @@ celerybeat.pid
 .vscode/
 .DS_Store
 Thumbs.db
+Desktop.ini
+python-installer.exe
+*.tmp
+*.temp
+*.bak
+*.orig
 
 # =========================
 # Node / PWA / Mobile (later)
 # =========================
 node_modules/
 dist/
+.parcel-cache/
+.turbo/
 android/
 ios/
 
@@ -67,3 +90,10 @@ ios/
 .env
 *.key
 *.pem
+
+# =========================
+# Local UI / runtime config
+# =========================
+config/alfred_ui.json
+config/*.local.json
+!config/*.example.json

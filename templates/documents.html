@@ -24,7 +24,7 @@
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Statements</h2>
-            <p class="page-section-copy mb-3">Upload bank, credit-card, loan, investment, or other statements. ALFRED will classify the document, import transactions when possible, and still retain the statement metadata when parsing is partial.</p>
+            <p class="page-section-copy mb-3">Upload one or more bank, credit-card, loan, investment, or other statements. ALFRED will classify each document, import transactions when possible, and still retain the statement metadata when parsing is partial.</p>
             <form id="documentStatementForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-md-5">
@@ -39,28 +39,28 @@
                         </select>
                     </div>
                     <div class="col-md-7">
-                        <label class="form-label" for="documentStatementFile">Statement PDF</label>
-                        <input id="documentStatementFile" name="statement" type="file" class="form-control" accept=".pdf,application/pdf" required>
+                        <label class="form-label" for="documentStatementFile">Statement PDFs</label>
+                        <input id="documentStatementFile" name="statement" type="file" class="form-control" accept=".pdf,application/pdf" multiple required>
                     </div>
                 </div>
                 <div id="documentStatementFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Upload Statement</button>
+                <button class="btn btn-primary" type="submit">Upload Statements</button>
             </form>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Loan Documents</h2>
-            <p class="page-section-copy mb-3">Upload sanction letters, loan statements, repayment schedules, or loan books. ALFRED will detect the document type, infer loan type where possible, and update the loan registry.</p>
+            <p class="page-section-copy mb-3">Upload one or more sanction letters, loan statements, repayment schedules, or loan books. ALFRED will detect the document type, infer loan type where possible, and update the loan registry.</p>
             <form id="documentLoanForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-12">
-                        <label class="form-label" for="documentLoanFile">Loan PDF</label>
-                        <input id="documentLoanFile" name="file" type="file" class="form-control" accept=".pdf,application/pdf" required>
+                        <label class="form-label" for="documentLoanFile">Loan PDFs</label>
+                        <input id="documentLoanFile" name="file" type="file" class="form-control" accept=".pdf,application/pdf" multiple required>
                     </div>
                 </div>
                 <div id="documentLoanFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Import Loan Document</button>
+                <button class="btn btn-primary" type="submit">Import Loan Documents</button>
             </form>
         </div>
     </div>
@@ -70,7 +70,7 @@
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Vehicle Documents</h2>
-            <p class="page-section-copy mb-3">Upload insurance, PUC, RC, and related vehicle documents from the same place.</p>
+            <p class="page-section-copy mb-3">Upload one or more insurance, PUC, RC, and related vehicle documents from the same place.</p>
             <form id="documentVehicleForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-md-5">
@@ -89,19 +89,19 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="documentVehicleFile">Document File</label>
-                        <input id="documentVehicleFile" name="document_file" type="file" class="form-control" accept=".pdf,image/*" required>
+                        <label class="form-label" for="documentVehicleFile">Document Files</label>
+                        <input id="documentVehicleFile" name="document_file" type="file" class="form-control" accept=".pdf,image/*" multiple required>
                     </div>
                 </div>
                 <div id="documentVehicleFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Upload Vehicle Document</button>
+                <button class="btn btn-primary" type="submit">Upload Vehicle Documents</button>
             </form>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Service Bills and Notes</h2>
-            <p class="page-section-copy mb-3">Import a workshop bill or work note and let ALFRED derive the service log automatically.</p>
+            <p class="page-section-copy mb-3">Import one or more workshop bills or work notes and let ALFRED derive the service log automatically.</p>
             <form id="documentServiceForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-md-5">
@@ -109,12 +109,12 @@
                         <select id="documentServiceProfile" name="bike_profile_id" class="form-select" required></select>
                     </div>
                     <div class="col-md-7">
-                        <label class="form-label" for="documentServiceFile">Bill / Work Note</label>
-                        <input id="documentServiceFile" name="service_file" type="file" class="form-control" accept=".pdf,image/*" required>
+                        <label class="form-label" for="documentServiceFile">Bills / Work Notes</label>
+                        <input id="documentServiceFile" name="service_file" type="file" class="form-control" accept=".pdf,image/*" multiple required>
                     </div>
                 </div>
                 <div id="documentServiceFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Import Service File</button>
+                <button class="btn btn-primary" type="submit">Import Service Files</button>
             </form>
         </div>
     </div>
@@ -128,51 +128,97 @@
             <form id="documentResumeForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-12">
-                        <label class="form-label" for="documentResumeFile">Resume</label>
-                        <input id="documentResumeFile" name="resume" type="file" class="form-control" accept=".pdf,.doc,.docx,.txt,.md,.rtf,.html,.htm,.odt,image/*,application/pdf,text/plain,text/markdown,text/html,application/rtf,application/vnd.oasis.opendocument.text" required>
+                        <label class="form-label" for="documentResumeFile">Resumes / CVs</label>
+                        <input id="documentResumeFile" name="resume" type="file" class="form-control" accept=".pdf,.doc,.docx,.txt,.md,.rtf,.html,.htm,.odt,image/*,application/pdf,text/plain,text/markdown,text/html,application/rtf,application/vnd.oasis.opendocument.text" multiple required>
                     </div>
                 </div>
                 <div id="documentResumeFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Upload Resume</button>
+                <button class="btn btn-primary" type="submit">Upload Resume Files</button>
             </form>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Upload Principles</h2>
-            <p class="page-section-copy mb-3">The intake layer should stay consistent across modules even when the downstream dashboards differ.</p>
-            <ul class="insight-list mb-0">
-                <li class="insight-item">Every important external signal should show proof.</li>
-                <li class="insight-item">Every parser should expose confidence and allow review.</li>
-                <li class="insight-item">Every long-lived cache should carry a freshness contract.</li>
-                <li class="insight-item">Recommendations should be grounded in user history, verified external evidence, or both.</li>
-            </ul>
+            <h2 class="page-section-title">Credit Reports</h2>
+            <p class="page-section-copy mb-3">Upload one or more bureau reports here too. Alfred will retain weak parses for review instead of silently dropping them.</p>
+            <form id="documentCreditForm" class="soft-grid" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="documentCreditBureau">Bureau</label>
+                        <select id="documentCreditBureau" name="bureau" class="form-select">
+                            <option value="">Auto detect</option>
+                            <option value="CIBIL">CIBIL</option>
+                            <option value="EXPERIAN">Experian</option>
+                            <option value="EQUIFAX">Equifax</option>
+                            <option value="CRIF">CRIF High Mark</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label" for="documentCreditFile">Credit Report Files</label>
+                        <input id="documentCreditFile" name="report" type="file" class="form-control" accept=".pdf,image/*,application/pdf" multiple required>
+                    </div>
+                </div>
+                <div id="documentCreditFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Upload Credit Reports</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Review Queue</h2>
+            <p class="page-section-copy mb-3">Low-confidence documents stay here until Alfred retries them or you accept a correction. Accepted corrections are fed back into parser learning for future uploads.</p>
+            <div id="documentReviewQueue" class="data-stack stack-scroll"></div>
         </div>
     </div>
 </section>
 
 <section class="row g-4">
-    <div class="col-xl-4">
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recent Credit Reports</h2>
+            <div id="documentCreditList" class="data-stack stack-scroll stack-scroll-sm"></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Diagnostics Log</h2>
+            <p class="page-section-copy mb-3">These logs explain why data did not populate, why a parser stayed in review, or why a document or visualization failed.</p>
+            <div id="documentDiagnosticsList" class="data-stack stack-scroll"></div>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mt-0">
+    <div class="col-xl-3">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Recent Statements</h2>
-            <div id="documentStatementList" class="data-stack"></div>
+            <div id="documentStatementList" class="data-stack stack-scroll stack-scroll-sm"></div>
         </div>
     </div>
-    <div class="col-xl-4">
+    <div class="col-xl-3">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recent Loan Docs</h2>
+            <div id="documentLoanList" class="data-stack stack-scroll stack-scroll-sm"></div>
+        </div>
+    </div>
+    <div class="col-xl-3">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Recent Vehicle Docs</h2>
-            <div id="documentVehicleList" class="data-stack"></div>
+            <div id="documentVehicleList" class="data-stack stack-scroll stack-scroll-sm"></div>
         </div>
     </div>
-    <div class="col-xl-4">
+    <div class="col-xl-3">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Recent Career Files</h2>
-            <div id="documentResumeList" class="data-stack"></div>
+            <div id="documentResumeList" class="data-stack stack-scroll stack-scroll-sm"></div>
         </div>
     </div>
 </section>
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/documents.js?v=1.0"></script>
+<script src="/static/js/documents.js?v=2.0"></script>
 {% endblock %}

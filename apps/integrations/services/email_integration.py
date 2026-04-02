@@ -5,6 +5,7 @@ Complete IMAP/OAuth2 setup for automatic statement imports from Gmail, Outlook, 
 import imaplib
 import email
 from email.header import decode_header
+import logging
 import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, BinaryIO
@@ -96,6 +97,7 @@ class EmailIntegrationService:
         self.gmail_service = None
         self.outlook_client = None
         self.imap_connection = None
+        self.logger = logging.getLogger(__name__)
 
     # ==================== Gmail OAuth2 Integration ====================
 
@@ -160,7 +162,8 @@ class EmailIntegrationService:
         try:
             profile = self.gmail_service.users().getProfile(userId='me').execute()
             return profile.get('emailAddress', 'Unknown')
-        except:
+        except Exception:
+            self.logger.warning("Failed to read the authenticated Gmail profile.", exc_info=True)
             return 'Unknown'
 
     # ==================== Outlook OAuth2 Integration ====================
@@ -507,7 +510,7 @@ class EmailIntegrationService:
             else:
                 return None
         except Exception as e:
-            print(f"Download failed: {str(e)}")
+            self.logger.warning("Email attachment download failed: %s", str(e), exc_info=True)
             return None
 
     def _download_gmail_attachment(self, message_id: str, attachment_index: int) -> BinaryIO:
@@ -602,8 +605,8 @@ class EmailIntegrationService:
             try:
                 self.imap_connection.close()
                 self.imap_connection.logout()
-            except:
-                pass
+            except Exception:
+                self.logger.warning("Failed to close the IMAP connection cleanly.", exc_info=True)
 
         self.gmail_service = None
         self.outlook_client = None

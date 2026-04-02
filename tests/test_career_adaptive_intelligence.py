@@ -1,10 +1,11 @@
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 
-from apps.career.models import CareerJobAnalysis, CareerResume, CareerResumeLearningMemory
+from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, CareerResumeLearningMemory
 from apps.expenses.models import StatementUpload
 from apps.integrations.models import CreditScore
 from apps.mobility.models import BikeDocument, BikeProfile
@@ -122,6 +123,100 @@ class CareerAdaptiveIntelligenceTests(TestCase):
         self.assertTrue(payload["study_recommendations"]["tracks"])
         suggested_skills = {item["skill"] for item in payload["study_recommendations"]["tracks"]}
         self.assertTrue({"Sql", "Power Bi"} & suggested_skills)
+
+    @patch(
+        "apps.career.views.verified_intelligence.macro_context",
+        return_value={
+            "payload": {
+                "unemployment": {"latest_value": 5.1, "latest_year": 2024},
+                "inflation": {"latest_value": 4.8, "latest_year": 2024},
+                "market": {"one_month_return_pct": 2.4, "india_vix": 15.0},
+            },
+            "evidence": [],
+        },
+    )
+    @patch(
+        "apps.career.views.job_intelligence.market_outlook",
+        return_value={
+            "risk_score": 34,
+            "layoff_news": [],
+            "job_market_news": [],
+            "macro_context": {
+                "unemployment": {"latest_value": 5.1, "latest_year": 2024},
+                "inflation": {"latest_value": 4.8, "latest_year": 2024},
+                "market": {"one_month_return_pct": 2.4, "india_vix": 15.0},
+            },
+            "insights": ["Market pressure is moderate."],
+            "evidence": [],
+        },
+    )
+    @patch("apps.career.services.job_intelligence.verified_intelligence.remotive_jobs")
+    def test_career_dashboard_filters_verified_openings_by_country_and_state(self, remotive_jobs, _market_outlook, _macro_context):
+        CareerProfile.objects.create(
+            user=self.user,
+            role="Data Analyst",
+            experience_years=3.0,
+            skills="Python, SQL, Tableau",
+            last_salary=90000,
+        )
+        remotive_jobs.return_value = SimpleNamespace(
+            payload={
+                "jobs": [
+                    {
+                        "title": "Senior Data Analyst",
+                        "company": "Example Co",
+                        "location": "Bengaluru, Karnataka, India",
+                        "category": "Data",
+                        "url": "https://boards.greenhouse.io/example/jobs/1",
+                        "publication_date": "2026-04-01T10:00:00Z",
+                        "salary": "INR 18 LPA",
+                        "tags": ["Python", "SQL", "Tableau"],
+                    },
+                    {
+                        "title": "Data Analyst",
+                        "company": "Other Co",
+                        "location": "Mumbai, Maharashtra, India",
+                        "category": "Data",
+                        "url": "https://example.com/jobs/2",
+                        "publication_date": "2026-04-01T10:00:00Z",
+                        "salary": "",
+                        "tags": ["Python", "Excel"],
+                    },
+                    {
+                        "title": "Analytics Engineer",
+                        "company": "US Co",
+                        "location": "San Francisco, California, United States",
+                        "category": "Engineering",
+                        "url": "https://example.com/jobs/3",
+                        "publication_date": "2026-04-01T10:00:00Z",
+                        "salary": "$120k",
+                        "tags": ["Python", "SQL"],
+                    },
+                ]
+            },
+            evidence={
+                "source_name": "Remotive Jobs API",
+                "source_url": "https://remotive.com/api/remote-jobs",
+                "status": "fresh",
+                "verified_at": "2026-04-01T10:00:00Z",
+            },
+        )
+
+        response = self.client.get("/api/career/dashboard/?country=India&state=Karnataka")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["active_opening_filters"]["country"], "India")
+        self.assertEqual(payload["active_opening_filters"]["state"], "Karnataka")
+        self.assertEqual(payload["opening_counts"]["filtered_candidates"], 1)
+        self.assertEqual(payload["openings"][0]["country"], "India")
+        self.assertEqual(payload["openings"][0]["state"], "Karnataka")
+        self.assertTrue(payload["openings"][0]["verified_source"])
+        self.assertEqual(payload["openings"][0]["portal_name"], "Remotive Jobs API")
+        self.assertEqual(payload["openings"][0]["portal_family"], "Greenhouse")
+        self.assertEqual(payload["openings"][0]["portal_host"], "boards.greenhouse.io")
+        self.assertIn("India", payload["opening_filters"]["countries"])
+        self.assertIn("Karnataka", payload["opening_filters"]["states_by_country"]["India"])
 
 
 class UserDataIsolationTests(TestCase):

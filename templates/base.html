@@ -11,31 +11,44 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/static/css/style.css?v=2.1">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.7">
 
     <!-- PWA -->
     <link rel="manifest" href="/static/manifest.json">
 </head>
 
-<body class="alfred-body">
+<body
+    class="alfred-body {% block body_class %}{% endblock %}"
+    data-authenticated="{% if request.user.is_authenticated %}true{% else %}false{% endif %}"
+    data-superuser="{% if request.user.is_superuser %}true{% else %}false{% endif %}"
+    data-home-url="{{ ui_config.brand.home_path }}"
+    data-shell-mode="{% if request.user.is_authenticated and not hide_sidebar %}workspace{% else %}focus{% endif %}"
+>
 
 {% include "partials/navbar.html" %}
 
+<div id="alfredTopProgress" class="alfred-top-progress" aria-hidden="true">
+    <div class="alfred-top-progress-bar"></div>
+</div>
+
 <div class="container-fluid alfred-layout">
-    <div class="row">
-
+    <div id="alfredMlRuntimeBannerHost" class="alfred-shell-banner px-3 px-lg-4 pt-3"></div>
+    <div class="row g-0 alfred-workspace-row">
+        {% if request.user.is_authenticated and not hide_sidebar %}
         {% include "partials/sidebar.html" %}
-
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4 alfred-main">
+        <main class="col-12 col-md-9 ms-sm-auto col-lg-10 px-3 px-md-4 py-4 alfred-main" id="alfredMainScroll">
+        {% else %}
+        <main class="col-12 px-3 px-lg-4 py-4 alfred-main alfred-main-wide" id="alfredMainScroll">
+        {% endif %}
             {% block content %}{% endblock %}
         </main>
-
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="/static/js/app.js?v=2.1"></script>
+{{ ui_config|json_script:"alfred-ui-config" }}
+<script src="/static/js/app.js?v=2.5"></script>
 {% block extra_js %}{% endblock %}
 
 </body>

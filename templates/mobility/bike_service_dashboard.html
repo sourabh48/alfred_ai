@@ -9,13 +9,14 @@
             <h1 class="alfred-hero-title">Run your vehicle maintenance, documents, condition snapshots, workshop briefings, and projected service costs from one dedicated dashboard.</h1>
             <p class="alfred-hero-copy">This view reads your service history, trip logs, document expiry records, and condition checks to flag pending work, suggest probable causes, and prepare a clean service-center brief for the selected primary vehicle.</p>
         </div>
-        <div class="surface-card" style="min-width: 300px;">
+        <div class="surface-card surface-card-accent" style="min-width: 300px;">
             <p class="metric-kicker">Next Service</p>
             <div class="metric-value" id="bikeServiceNextValue">No data</div>
             <p class="metric-caption mb-1" id="bikeServiceNextMeta">Log your latest service to activate due-date tracking.</p>
             <p class="metric-caption mb-0" id="bikeServiceProjectionMeta">Projected service cost: INR 0</p>
         </div>
     </div>
+    <div id="bikeHeroSignalStrip" class="hero-signal-strip"></div>
 </section>
 
 <section class="soft-grid four-up mb-4" id="bikeServiceSummaryCards"></section>
@@ -23,11 +24,14 @@
 
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Vehicle Setup</h2>
             <p class="page-section-copy mb-3">Select a known model or add your own vehicle. Alfred will verify the name, attach defaults, and keep this as the source for documents and service imports.</p>
             <form id="bikeProfileForm" class="soft-grid">
-                <div class="row g-3">
+                <input id="bikeProfileId" type="hidden">
+                <div class="surface-inset">
+                    <div class="panel-eyebrow">Identity And Catalog Match</div>
+                    <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label" for="bikeProfileVehicleType">Vehicle Type</label>
                         <select id="bikeProfileVehicleType" name="vehicle_type" class="form-select">
@@ -64,6 +68,24 @@
                         <input id="bikeProfileVehicleNumber" name="vehicle_number" class="form-control">
                     </div>
                     <div class="col-md-6">
+                        <label class="form-label" for="bikeProfileClass">Vehicle Class</label>
+                        <select id="bikeProfileClass" name="bike_class" class="form-select">
+                            <option value="commuter">Commuter</option>
+                            <option value="roadster">Roadster</option>
+                            <option value="retro">Retro</option>
+                            <option value="adventure">Adventure</option>
+                            <option value="sport">Sport</option>
+                            <option value="cruiser">Cruiser</option>
+                            <option value="scooter">Scooter</option>
+                            <option value="touring">Touring</option>
+                            <option value="hatchback">Hatchback</option>
+                            <option value="sedan">Sedan</option>
+                            <option value="suv">SUV</option>
+                            <option value="mpv">MPV</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label" for="bikeProfileUsagePattern">Usage Pattern</label>
                         <select id="bikeProfileUsagePattern" name="usage_pattern" class="form-select">
                             <option value="personal">Personal / Lifestyle</option>
@@ -80,6 +102,41 @@
                         <label class="form-label" for="bikeProfileIncomeSupport">Monthly Utility / Income Support</label>
                         <input id="bikeProfileIncomeSupport" name="monthly_income_support" type="number" step="0.01" class="form-control" placeholder="Optional monthly value supported by this vehicle">
                     </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="bikeProfileEngineCc">Engine (cc)</label>
+                        <input id="bikeProfileEngineCc" name="engine_cc" type="number" step="0.1" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="bikeProfileFuelTank">Fuel Tank (L)</label>
+                        <input id="bikeProfileFuelTank" name="fuel_tank_capacity_l" type="number" step="0.1" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="bikeProfileMileage">Expected Mileage</label>
+                        <input id="bikeProfileMileage" name="expected_mileage_kmpl" type="number" step="0.1" class="form-control" placeholder="kmpl">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="bikeProfileFuelType">Fuel Type</label>
+                        <select id="bikeProfileFuelType" name="fuel_type" class="form-select">
+                            <option value="petrol">Petrol</option>
+                            <option value="diesel">Diesel</option>
+                            <option value="cng">CNG</option>
+                            <option value="electric">Electric</option>
+                            <option value="hybrid">Hybrid</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="bikeProfileServiceIntervalKm">Service Interval (km)</label>
+                        <input id="bikeProfileServiceIntervalKm" name="service_interval_km" type="number" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="bikeProfileServiceIntervalDays">Service Interval (days)</label>
+                        <input id="bikeProfileServiceIntervalDays" name="service_interval_days" type="number" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bikeProfileCruisingSpeed">Optimal Cruising Speed</label>
+                        <input id="bikeProfileCruisingSpeed" name="optimal_cruising_speed_kmph" type="number" class="form-control" placeholder="km/h">
+                    </div>
                     <div class="col-md-6">
                         <label class="form-label" for="bikeProfilePrimary">Primary Vehicle</label>
                         <select id="bikeProfilePrimary" name="is_primary" class="form-select">
@@ -88,17 +145,22 @@
                         </select>
                     </div>
                 </div>
+                </div>
                 <div id="bikeProfileFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Save Vehicle Profile</button>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button id="bikeProfileSubmit" class="btn btn-primary" type="submit">Save Vehicle Profile</button>
+                    <button id="bikeProfileCancel" class="btn btn-outline-secondary d-none" type="button">Cancel Edit</button>
+                </div>
             </form>
             <div class="mt-4">
+                <div class="panel-eyebrow">Saved Fleet</div>
                 <h3 class="h6 fw-bold mb-3">Saved Vehicles</h3>
                 <div id="bikeProfileList" class="data-stack"></div>
             </div>
         </div>
     </div>
     <div class="col-xl-7">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Primary Vehicle Profile</h2>
             <p class="page-section-copy mb-3">Current vehicle identity, spec defaults, condition, and the latest insurance / PUC / RC snapshot.</p>
             <div id="bikeProfilePanel" class="data-stack"></div>
@@ -107,8 +169,75 @@
 </section>
 
 <section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card surface-card-accent h-100">
+            <h2 class="page-section-title">Fuel Refill And Mileage Tracker</h2>
+            <p class="page-section-copy mb-3">After each refill, enter the trip value since the previous refill. Alfred will calculate actual mileage and compare it with the saved model benchmark.</p>
+            <form id="bikeRefillForm" class="soft-grid">
+                <div class="surface-inset">
+                    <div class="panel-eyebrow">Refill Input</div>
+                    <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="bikeRefillProfile">Vehicle Profile</label>
+                        <select id="bikeRefillProfile" class="form-select" required></select>
+                        <input id="bikeRefillProfileId" name="bike_profile" type="hidden">
+                        <input id="bikeRefillBikeName" name="bike_name" type="hidden">
+                        <input id="bikeRefillVehicleNumber" name="vehicle_number" type="hidden">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bikeRefillDate">Refill Date</label>
+                        <input id="bikeRefillDate" name="refill_date" type="date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bikeRefillTripKm">Trip Value Since Last Refill</label>
+                        <input id="bikeRefillTripKm" name="trip_meter_km" type="number" step="0.1" class="form-control" placeholder="km">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bikeRefillFuelLiters">Fuel Filled</label>
+                        <input id="bikeRefillFuelLiters" name="fuel_liters" type="number" step="0.01" class="form-control" required placeholder="liters">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bikeRefillOdometer">Odometer (km)</label>
+                        <input id="bikeRefillOdometer" name="odometer_km" type="number" class="form-control" placeholder="optional">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bikeRefillTotalCost">Total Cost</label>
+                        <input id="bikeRefillTotalCost" name="total_cost" type="number" step="0.01" class="form-control" value="0">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bikeRefillStation">Station / Pump</label>
+                        <input id="bikeRefillStation" name="station_name" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bikeRefillFullTank">Full Tank Refill</label>
+                        <select id="bikeRefillFullTank" name="is_full_tank" class="form-select">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="bikeRefillNotes">Notes</label>
+                        <textarea id="bikeRefillNotes" name="notes" rows="2" class="form-control" placeholder="Traffic, highway ride, luggage, pillion, weather, fuel type"></textarea>
+                    </div>
+                </div>
+                </div>
+                <div id="bikeRefillFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Save Refill Log</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="surface-card surface-card-accent h-100">
+            <h2 class="page-section-title">Mileage Intelligence</h2>
+            <p class="page-section-copy mb-3">Actual mileage is based on your refill history. Optimal mileage comes from the saved official catalog source or your custom profile value.</p>
+            <div id="bikeMileageInsightPanel" class="data-stack"></div>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
     <div class="col-xl-12">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Document Compliance</h2>
             <p class="page-section-copy mb-3">Required vehicle documents, verification notes, and what still needs attention.</p>
             <div id="bikeComplianceList" class="data-stack"></div>
@@ -118,29 +247,34 @@
 
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Service Log Entry</h2>
-            <p class="page-section-copy mb-3">Import a service bill/work note for automatic extraction, or add the service manually against a selected vehicle.</p>
+            <p class="page-section-copy mb-3">Import one or more service bills or work notes for automatic extraction, or add the service manually against a selected vehicle.</p>
             <form id="bikeServiceImportForm" class="soft-grid mb-4" enctype="multipart/form-data">
-                <div class="row g-3">
+                <div class="surface-inset">
+                    <div class="panel-eyebrow">Import Bills Or Work Notes</div>
+                    <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label" for="bikeServiceImportProfile">Vehicle Profile</label>
                         <select id="bikeServiceImportProfile" name="bike_profile_id" class="form-select" required></select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="bikeServiceImportFile">Service Bill / Work Note</label>
-                        <input id="bikeServiceImportFile" name="service_file" type="file" class="form-control" accept=".pdf,image/*" required>
+                        <label class="form-label" for="bikeServiceImportFile">Service Bills / Work Notes</label>
+                        <input id="bikeServiceImportFile" name="service_file" type="file" class="form-control" accept=".pdf,image/*" multiple required>
                     </div>
                     <div class="col-12">
                         <label class="form-label" for="bikeServiceImportNotes">Import Notes</label>
                         <textarea id="bikeServiceImportNotes" name="notes" rows="2" class="form-control" placeholder="Optional notes for unclear bills or handwritten workshop notes"></textarea>
                     </div>
                 </div>
+                </div>
                 <div id="bikeServiceImportFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-outline-primary" type="submit">Import From Bill</button>
+                <button class="btn btn-outline-primary" type="submit">Import From Bills</button>
             </form>
             <form id="bikeServiceRecordForm" class="soft-grid">
-                <div class="row g-3">
+                <div class="surface-inset">
+                    <div class="panel-eyebrow">Manual Service Entry</div>
+                    <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label" for="bikeServiceProfile">Vehicle Profile</label>
                         <select id="bikeServiceProfile" class="form-select" required></select>
@@ -188,17 +322,20 @@
                         <textarea id="bikeServiceNotes" name="notes" rows="3" class="form-control" placeholder="Oil, chain clean, pad change, technician notes"></textarea>
                     </div>
                 </div>
+                </div>
                 <div id="bikeServiceRecordFeedback" class="d-none alert mb-0"></div>
                 <button class="btn btn-primary" type="submit">Save Service Log</button>
             </form>
         </div>
     </div>
     <div class="col-xl-7">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Fault Report Reader</h2>
             <p class="page-section-copy mb-3">Describe the issue once. ALFRED will infer probable causes, next actions, workshop wording, and projected cost.</p>
             <form id="bikeIssueForm" class="soft-grid">
-                <div class="row g-3">
+                <div class="surface-inset">
+                    <div class="panel-eyebrow">Diagnostic Intake</div>
+                    <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label" for="bikeIssueTitle">Issue Title</label>
                         <input id="bikeIssueTitle" name="title" class="form-control" required>
@@ -270,6 +407,7 @@
                         <textarea id="bikeIssueObservation" name="observation" rows="3" class="form-control" placeholder="Only after long rides, worsens with pillion, after washing, after rain"></textarea>
                     </div>
                 </div>
+                </div>
                 <div id="bikeIssueFeedback" class="d-none alert mb-0"></div>
                 <button class="btn btn-primary" type="submit">Create Fault Report</button>
             </form>
@@ -279,11 +417,13 @@
 
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Vehicle Documents</h2>
-            <p class="page-section-copy mb-3">Upload insurance, PUC, RC, and invoice files. Alfred extracts fields from the document instead of asking you to type them and rejects unrelated uploads.</p>
+            <p class="page-section-copy mb-3">Upload one or more insurance, PUC, RC, or invoice files. Alfred extracts fields from each document instead of asking you to type them and rejects unrelated uploads.</p>
             <form id="bikeDocumentForm" class="soft-grid" enctype="multipart/form-data">
-                <div class="row g-3">
+                <div class="surface-inset">
+                    <div class="panel-eyebrow">Upload And Parse</div>
+                    <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label" for="bikeDocumentProfile">Vehicle Profile</label>
                         <select id="bikeDocumentProfile" name="bike_profile_id" class="form-select" required></select>
@@ -302,25 +442,28 @@
                         </select>
                     </div>
                     <div class="col-12">
-                        <label class="form-label" for="bikeDocumentFile">Document File</label>
-                        <input id="bikeDocumentFile" name="document_file" type="file" class="form-control" accept=".pdf,image/*" required>
+                        <label class="form-label" for="bikeDocumentFile">Document Files</label>
+                        <input id="bikeDocumentFile" name="document_file" type="file" class="form-control" accept=".pdf,image/*" multiple required>
                     </div>
                     <div class="col-12">
                         <label class="form-label" for="bikeDocumentNotes">Notes</label>
                         <textarea id="bikeDocumentNotes" name="notes" rows="2" class="form-control" placeholder="Optional notes for unusual or handwritten documents"></textarea>
                     </div>
                 </div>
+                </div>
                 <div id="bikeDocumentFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Upload And Parse Document</button>
+                <button class="btn btn-primary" type="submit">Upload And Parse Documents</button>
             </form>
         </div>
     </div>
     <div class="col-xl-6">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Condition Snapshot</h2>
             <p class="page-section-copy mb-3">Log the vehicle's current condition so ALFRED can score readiness and push the right maintenance tasks.</p>
             <form id="bikeConditionForm" class="soft-grid">
-                <div class="row g-3">
+                <div class="surface-inset">
+                    <div class="panel-eyebrow">Condition Capture</div>
+                    <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label" for="bikeConditionProfile">Vehicle Profile</label>
                         <select id="bikeConditionProfile" class="form-select" required></select>
@@ -399,6 +542,7 @@
                         <textarea id="bikeConditionNotes" name="notes" rows="2" class="form-control"></textarea>
                     </div>
                 </div>
+                </div>
                 <div id="bikeConditionFeedback" class="d-none alert mb-0"></div>
                 <button class="btn btn-primary" type="submit">Save Condition Snapshot</button>
             </form>
@@ -408,14 +552,14 @@
 
 <section class="row g-4 mb-4">
     <div class="col-xl-4">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Service History Intelligence</h2>
             <p class="page-section-copy mb-3">Imported bills and manual logs are preserved together so ALFRED can build longer maintenance memory.</p>
             <div id="bikeServiceHistorySummary" class="data-stack"></div>
         </div>
     </div>
     <div class="col-xl-8">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Parts And Performance Impact</h2>
             <p class="page-section-copy mb-3">How the parts changed in service history affect performance, reliability, mileage, and safety for the active vehicle.</p>
             <div id="bikePartImpactBoard" class="data-stack"></div>
@@ -425,21 +569,21 @@
 
 <section class="row g-4 mb-4">
     <div class="col-xl-4">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Pending Tasks</h2>
             <p class="page-section-copy mb-3">Due work ordered by urgency.</p>
             <div id="bikeServiceTasks" class="data-stack"></div>
         </div>
     </div>
     <div class="col-xl-4">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Observations</h2>
             <p class="page-section-copy mb-3">Adaptive notes from your own maintenance and trip history for the active primary vehicle.</p>
             <div id="bikeServiceObservations" class="data-stack"></div>
         </div>
     </div>
     <div class="col-xl-4">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Workshop Brief</h2>
             <p class="page-section-copy mb-3">What to say to the service center.</p>
             <div id="bikeServiceBrief" class="data-stack"></div>
@@ -448,46 +592,60 @@
 </section>
 
 <section class="row g-4 mb-4">
-    <div class="col-xl-4">
-        <div class="surface-card h-100">
+    <div class="col-xl-6 col-xxl-3">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Service Cost Trend</h2>
             <canvas id="bikeServiceCostChart" height="220"></canvas>
             <p id="bikeServiceCostChartMeta" class="page-section-copy mt-3 mb-0">Live service spend from actual logs.</p>
         </div>
     </div>
-    <div class="col-xl-4">
-        <div class="surface-card h-100">
+    <div class="col-xl-6 col-xxl-3">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Trip vs Service Cost</h2>
             <canvas id="bikeServiceMixChart" height="220"></canvas>
             <p id="bikeServiceMixChartMeta" class="page-section-copy mt-3 mb-0">Live trip and service cost mix from stored history.</p>
         </div>
     </div>
-    <div class="col-xl-4">
-        <div class="surface-card h-100">
+    <div class="col-xl-6 col-xxl-3">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Fault Severity Mix</h2>
             <canvas id="bikeServiceIssueChart" height="220"></canvas>
             <p id="bikeServiceIssueChartMeta" class="page-section-copy mt-3 mb-0">Open fault distribution from actual issue reports.</p>
         </div>
     </div>
+    <div class="col-xl-6 col-xxl-3">
+        <div class="surface-card surface-card-accent h-100">
+            <h2 class="page-section-title">Mileage vs Optimal</h2>
+            <canvas id="bikeMileageChart" height="220"></canvas>
+            <p id="bikeMileageChartMeta" class="page-section-copy mt-3 mb-0">Live refill-based mileage compared with the saved benchmark.</p>
+        </div>
+    </div>
 </section>
 
 <section class="row g-4">
-    <div class="col-xl-4">
-        <div class="surface-card h-100">
+    <div class="col-xl-3">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Recent Service Logs</h2>
             <p class="page-section-copy mb-3">Service history with spend and next due checkpoint.</p>
             <div id="bikeServiceLogList" class="data-stack"></div>
         </div>
     </div>
-    <div class="col-xl-4">
-        <div class="surface-card h-100">
+    <div class="col-xl-3">
+        <div class="surface-card surface-card-accent h-100">
+            <h2 class="page-section-title">Recent Refills</h2>
+            <p class="page-section-copy mb-3">Trip-value and fuel-fill history used for mileage comparison.</p>
+            <div id="bikeRefillList" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-3">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Documents and Renewals</h2>
             <p class="page-section-copy mb-3">Insurance, PUC, RC, and other uploaded vehicle documents.</p>
             <div id="bikeDocumentList" class="data-stack"></div>
         </div>
     </div>
-    <div class="col-xl-4">
-        <div class="surface-card h-100">
+    <div class="col-xl-3">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Condition History</h2>
             <p class="page-section-copy mb-3">Latest health snapshots scored by the adaptive advisor.</p>
             <div id="bikeConditionList" class="data-stack"></div>
@@ -497,7 +655,7 @@
 
 <section class="row g-4 mt-1">
     <div class="col-12">
-        <div class="surface-card h-100">
+        <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Fault Board</h2>
             <p class="page-section-copy mb-3">Probable cause, observation, suggestion, projected cost, and suggested wording per issue.</p>
             <div id="bikeIssueBoard" class="data-stack"></div>
@@ -507,5 +665,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/bike_service.js?v=2.7"></script>
+<script src="/static/js/bike_service.js?v=3.3"></script>
 {% endblock %}

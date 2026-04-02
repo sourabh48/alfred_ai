@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
 
+from alfred_ai.pagination import OptionalPageNumberPagination
 from .models import GeneratedReport, SystemTicket
 from .serializers import GeneratedReportSerializer, SystemTicketSerializer
 from .services import reporting_service
@@ -11,6 +12,7 @@ from .services import reporting_service
 class ReportListView(ListAPIView):
     serializer_class = GeneratedReportSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = OptionalPageNumberPagination
 
     def get_queryset(self):
         return GeneratedReport.objects.filter(user=self.request.user).order_by("-created_at")
@@ -19,6 +21,7 @@ class ReportListView(ListAPIView):
 class SystemTicketListCreateView(ListCreateAPIView):
     serializer_class = SystemTicketSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = OptionalPageNumberPagination
 
     def get_queryset(self):
         queryset = SystemTicket.objects.all().order_by("-created_at", "-id")

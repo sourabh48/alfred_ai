@@ -142,7 +142,7 @@ class ProjectDetailsDashboardTests(TestCase):
         response = self.client.get("/project-details/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Operational Guardrails")
-        self.assertContains(response, "AI Learning Progress")
+        self.assertContains(response, "Adaptive Learning Progress")
         self.assertContains(response, "In Progress Tracks")
         self.assertContains(response, "Operational Snapshot")
         self.assertContains(response, "Internal Clock")

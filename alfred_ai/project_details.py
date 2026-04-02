@@ -6,11 +6,12 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.career.models import CareerJobAnalysis, CareerResume
+from apps.career.models import CareerJobAnalysis, CareerResume, CareerResumeLearningMemory
 from apps.expenses.models import Expense, StatementUpload
-from apps.integrations.models import VerifiedExternalInsight
+from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
 from apps.loans.models import LoanClosureDocument, LoanPaymentHistory
 from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeServiceRecord
+from apps.ml_engine.training.orchestrator import training_health_snapshot
 from apps.reports.models import GeneratedReport, SystemTicket
 from .internal_clock import clock_snapshot
 
@@ -23,6 +24,7 @@ def _progress(current: float, target: float, *, floor: int = 10, ceiling: int = 
 
 
 def _build_learning_snapshot(now) -> dict:
+    model_training = training_health_snapshot()
     transaction_count = Expense.objects.count()
     statement_upload_count = StatementUpload.objects.count()
     matched_loan_payments = LoanPaymentHistory.objects.filter(match_status="matched").count()
@@ -34,11 +36,16 @@ def _build_learning_snapshot(now) -> dict:
     vehicle_issues = BikeIssueReport.objects.count()
 
     resumes = CareerResume.objects.count()
+    recruiter_documents = CareerJobAnalysis.objects.filter(
+        extracted_payload__source_kind__in=["recruiter_message", "jd_attachment"]
+    ).count()
+    resume_learning_memories = CareerResumeLearningMemory.objects.count()
     job_analyses = CareerJobAnalysis.objects.count()
+    credit_report_uploads = CreditReportUpload.objects.count()
 
     verified_evidence = VerifiedExternalInsight.objects.filter(is_active=True).count()
     fresh_evidence = VerifiedExternalInsight.objects.filter(is_active=True).filter(
-        Q(status="verified") & (Q(stale_after__isnull=True) | Q(stale_after__gt=now))
+        Q(status="fresh") & (Q(stale_after__isnull=True) | Q(stale_after__gt=now))
     ).count()
     stale_evidence = VerifiedExternalInsight.objects.filter(is_active=True).filter(
         Q(status__in=["stale", "failed", "rejected"]) | Q(stale_after__lte=now)
@@ -47,17 +54,25 @@ def _build_learning_snapshot(now) -> dict:
     finance_progress = _progress(transaction_count + (statement_upload_count * 12) + (matched_loan_payments * 8), 420, floor=18)
     document_progress = max(
         14,
-        _progress(vehicle_documents + statement_upload_count + resumes, 42, floor=20) - min(review_loan_payments * 2, 10),
+        _progress(
+            vehicle_documents + statement_upload_count + resumes + recruiter_documents + credit_report_uploads + (resume_learning_memories * 0.75),
+            60,
+            floor=20,
+        ) - min(review_loan_payments * 2, 10),
     )
     mobility_progress = _progress(service_records + condition_snapshots + vehicle_issues + (vehicle_documents * 0.5), 54, floor=16)
-    career_progress = _progress((resumes * 14) + (job_analyses * 18) + (fresh_evidence * 2), 140, floor=15)
+    career_progress = _progress(
+        (resumes * 14) + (resume_learning_memories * 10) + (job_analyses * 18) + (fresh_evidence * 2),
+        170,
+        floor=15,
+    )
     evidence_progress = max(12, _progress(fresh_evidence, max(verified_evidence, 1), floor=22) - min(stale_evidence * 3, 25))
 
     tracks = [
         {
             "title": "Finance behavior learning",
             "progress": finance_progress,
-            "detail": "Expense classification, emotional-spend scoring, anomaly detection, and statement-linked loan recognition are learning from live transaction history.",
+            "detail": "Expense classification, emotional-spend scoring, anomaly detection, monthly timeline windows, and statement-linked loan recognition are learning from live transaction history.",
             "signals": [
                 f"{transaction_count} transactions",
                 f"{statement_upload_count} statement uploads",
@@ -68,35 +83,37 @@ def _build_learning_snapshot(now) -> dict:
         {
             "title": "Document intelligence",
             "progress": document_progress,
-            "detail": "Statements, resumes, vehicle documents, and loan PDFs now expose parser confidence, but correction queues and OCR review are still pending.",
+            "detail": "Statements, resumes, recruiter/JD intake, vehicle documents, and loan PDFs now expose parser confidence, with correction and retry learning live across more families.",
             "signals": [
-                f"{statement_upload_count + vehicle_documents + resumes} parser-tracked uploads",
+                f"{statement_upload_count + vehicle_documents + resumes + recruiter_documents + credit_report_uploads} parser-tracked uploads",
                 f"{review_loan_payments} review-needed loan matches",
+                f"{recruiter_documents} recruiter/JD intake records",
                 f"{vehicle_documents} vehicle documents stored",
             ],
-            "blocker": "Unknown layouts still need a user-facing correction and feedback workflow.",
+            "blocker": "Unknown layouts still need broader OCR overlays and deeper field-level review tooling.",
         },
         {
             "title": "Vehicle maintenance learning",
             "progress": mobility_progress,
-            "detail": "Service bills, condition snapshots, issue history, and parts-impact reasoning are now blended into the vehicle dashboard.",
+            "detail": "Service bills, condition snapshots, issue history, model-specific maintenance guidance, and bounded service-cost learning are now blended into the vehicle dashboard.",
             "signals": [
                 f"{service_records} service logs",
                 f"{condition_snapshots} condition snapshots",
                 f"{vehicle_issues} issue reports",
             ],
-            "blocker": "Model-specific maintenance schedules and richer route-aware wear/cost signals are still missing.",
+            "blocker": "Broader manufacturer coverage and richer route-aware wear/cost signals are still incomplete.",
         },
         {
             "title": "Career and market intelligence",
             "progress": career_progress,
-            "detail": "Resume parsing, fit analysis, and market signals are active, but the pipeline is still partly heuristic and source coverage is not broad enough yet.",
+            "detail": "Resume parsing, recruiter/JD intake, compensation benchmarking, and public job-page parsing are active, but live source coverage is still not broad enough yet.",
             "signals": [
                 f"{resumes} resumes",
+                f"{resume_learning_memories} learned parser memory signatures",
                 f"{job_analyses} job analyses",
                 f"{fresh_evidence} fresh evidence records",
             ],
-            "blocker": "Recruiter-mail parsing, salary benchmarks, and wider source coverage remain open.",
+            "blocker": "Broader live opening-feed diversity and denser salary-bearing evidence remain open.",
         },
         {
             "title": "Verified evidence refresh",
@@ -107,20 +124,32 @@ def _build_learning_snapshot(now) -> dict:
                 f"{fresh_evidence} fresh",
                 f"{stale_evidence} stale or failed",
             ],
-            "blocker": "The same freshness and proof contracts still need to cover more recommendation and relationship paths.",
+            "blocker": "The same freshness and proof contracts still need to reach the remaining recommendation and financial-relationship paths.",
+        },
+        {
+            "title": "Model training lifecycle",
+            "progress": max(18, int(model_training["overall_progress"])),
+            "detail": "Supported models now retrain only when runtime dependencies are healthy, data thresholds are met, and the refresh window is due, including bounded mobility service-cost coverage.",
+            "signals": [
+                f"{model_training['ready_models']} ready model states",
+                f"{model_training['fresh_models']} fresh artifacts",
+                f"{model_training['average_confidence']} average confidence estimate",
+            ],
+            "blocker": model_training["summary"],
         },
     ]
 
     overall_progress = round(mean(track["progress"] for track in tracks)) if tracks else 0
     return {
         "overall_progress": overall_progress,
-        "summary": "ALFRED is adaptive and AI-assisted across multiple modules, but the whole product is not yet fully model-trained end-to-end. Several important paths still blend ML components with rule-based and evidence-backed heuristics.",
+        "summary": "ALFRED is adaptive across multiple modules, but it is not fully model-trained end-to-end. Several important paths still blend reviewed ML components with rule-based and evidence-backed heuristics.",
         "tracks": sorted(tracks, key=lambda item: item["progress"]),
         "implementation_state": {
             "ml_backed": [
                 "Behavioral anomaly detection, signature generation, and savings-strategy personalization run on stored transaction history.",
                 "Expense enrichment applies model-style confidence scoring and emotional-spend detection to imported and manual entries.",
                 "Parser confidence is stored for resumes, statements, vehicle documents, and loan PDFs.",
+                "Supported structured models now keep persisted training state, refresh windows, and confidence estimates, including a bounded mobility service-cost regressor.",
             ],
             "adaptive_blended": [
                 "Career timing, risk radar, vehicle fault diagnosis, and travel readiness are adaptive but still blend verified evidence with heuristics.",
@@ -128,11 +157,12 @@ def _build_learning_snapshot(now) -> dict:
                 "Verified external intelligence refreshes in the background with freshness contracts, stale fallback, and circuit breakers.",
             ],
             "not_yet_fully_learned": [
-                "Unknown document layouts do not yet improve through a user correction queue.",
-                "Job-source coverage, salary benchmarks, and portfolio/recommendation signals are not yet broad enough to claim mature learning.",
+                "Unknown document layouts now improve through correction memory, but OCR overlays and broader field-level coverage are still incomplete.",
+                "Job-source coverage, salary evidence density, and portfolio/recommendation signals are not yet broad enough to claim mature learning.",
                 "Large-data aggregations are still request-time reads in many paths and are not yet moved to materialized/cache layers.",
             ],
         },
+        "model_training": model_training,
     }
 
 
@@ -152,20 +182,25 @@ def project_details_payload(guardrails: dict) -> dict:
     generated_reports = GeneratedReport.objects.order_by("-created_at", "-id")
 
     learning_snapshot = _build_learning_snapshot(now)
+    learning_tracks_by_title = {item["title"]: item for item in learning_snapshot["tracks"]}
+    document_track = learning_tracks_by_title.get("Document intelligence", {})
+    evidence_track = learning_tracks_by_title.get("Verified evidence refresh", {})
+    vehicle_track = learning_tracks_by_title.get("Vehicle maintenance learning", {})
+    career_track = learning_tracks_by_title.get("Career and market intelligence", {})
 
     next_steps = [
-        "Add parser correction and review queues so user fixes can improve future parsing instead of staying manual.",
-        "Expand verified evidence beyond travel, career, and risk into recommendation, tax, and relationship signals where appropriate.",
+        "Expand correction-backed parser learning beyond the current review queue into richer OCR overlays and tougher invoice/document families.",
+        "Expand verified evidence beyond travel, career, risk, investment, tax, and relationship into the remaining recommendation and relationship-adjacent signals where appropriate.",
         "Move large dashboard aggregations to cache or materialized layers if the current history size keeps growing.",
-        "Broaden official vehicle catalog coverage and model-specific maintenance schedules across more bikes, scooters, and cars.",
-        "Expand career intelligence to more job sources, recruiter-email parsing, and geography-aware salary evidence.",
+        "Broaden official vehicle catalog coverage further and add more route-aware wear and service-cost signals.",
+        "Expand career intelligence to more live job feeds and geography-aware salary evidence density.",
     ]
     improvements = [
         "add OCR confidence overlays and visual document review",
         "support route-aware trip costing with fuel-price estimates and service-prep buffers",
         "add user feedback loops so corrections can improve parser heuristics over time",
         "add portfolio and job-market alerting with freshness thresholds and proof links",
-        "add salary benchmark sources with evidence and geography-aware compensation views",
+        "add more salary benchmark sources with evidence and geography-aware compensation views",
         "replace more request-time aggregations with cache-aware summary layers when data volume grows materially",
     ]
     avoid_items = [
@@ -238,6 +273,11 @@ def project_details_payload(guardrails: dict) -> dict:
             "value": generated_reports.count(),
             "copy": "Stored reporting artifacts now kept off the normal user navigation.",
         },
+        {
+            "label": "Model States",
+            "value": learning_snapshot["model_training"]["ready_models"],
+            "copy": "Structured models currently ready for inference after the last safe training cycle.",
+        },
     ]
 
     hardening_decisions = [
@@ -251,33 +291,39 @@ def project_details_payload(guardrails: dict) -> dict:
     in_progress_tracks = [
         {
             "title": "Document correction workflow",
-            "progress": max(learning_snapshot["tracks"][1]["progress"], 24),
-            "detail": "Parser confidence is already stored, but end-user correction queues and OCR review overlays are still being built.",
-            "next_focus": "Expose review queues for low-confidence documents and use accepted corrections to improve future parsing.",
+            "progress": max(int(document_track.get("progress", 0)), 24),
+            "detail": "Low-confidence review queues, accepted corrections, and retry-fed parser learning now cover statements, loans, closures, investments, resumes, recruiter/JD intake, vehicle documents, credit reports, and deeper service-bill payload updates.",
+            "next_focus": "Push accepted corrections and retry outcomes deeper into tougher OCR overlays and remaining invoice edge cases.",
         },
         {
             "title": "Cross-module proof enforcement",
-            "progress": max(learning_snapshot["tracks"][4]["progress"] - 12, 18),
-            "detail": "Travel, career, and risk carry proof-linked evidence today, but recommendation, tax, and relationship paths still need the same contract.",
-            "next_focus": "Expand verified evidence and freshness metadata into the remaining advisory modules.",
+            "progress": max(int(evidence_track.get("progress", 0)) - 12, 18),
+            "detail": "Travel, career, risk, investment, tax, and relationship now carry proof-linked freshness metadata, but recommendation and financial-relationship paths still need the same contract.",
+            "next_focus": "Expand verified evidence and freshness metadata into the remaining recommendation and relationship-adjacent modules.",
         },
         {
             "title": "Vehicle catalog and maintenance depth",
-            "progress": max(learning_snapshot["tracks"][2]["progress"] - 8, 20),
-            "detail": "Vehicle maintenance intelligence is live, but official catalog coverage and model-specific schedules are still incomplete.",
-            "next_focus": "Broaden official manufacturer coverage and attach more model-specific maintenance guidance.",
+            "progress": max(int(vehicle_track.get("progress", 0)) - 8, 20),
+            "detail": "Vehicle maintenance intelligence is live, with broader official catalog coverage and more model-specific guidance, but the catalog is still not exhaustive.",
+            "next_focus": "Broaden official manufacturer coverage further and attach more route-aware maintenance and service-cost guidance.",
         },
         {
             "title": "Career source coverage",
-            "progress": max(learning_snapshot["tracks"][3]["progress"] - 10, 18),
-            "detail": "Resume parsing and role-fit are active, but recruiter-mail parsing, salary benchmarks, and wider job-source coverage are still in flight.",
-            "next_focus": "Add recruiter-mail ingestion, compensation benchmarks, and more robust job-source adapters.",
+            "progress": max(int(career_track.get("progress", 0)) - 10, 18),
+            "detail": "Resume parsing, recruiter-mail/JD intake, compensation benchmarks, and broader job-page adapters are active, but live source breadth is still in flight.",
+            "next_focus": "Add more live job-feed adapters and denser geography-aware compensation evidence.",
         },
         {
             "title": "Large-data hardening",
             "progress": 42,
             "detail": "Indexes and selective summaries exist, but several large dashboards still aggregate request-time data directly.",
             "next_focus": "Move the heaviest dashboard aggregations to cache-aware materialized layers as history grows.",
+        },
+        {
+            "title": "Auto-training coverage",
+            "progress": max(20, int(learning_snapshot["model_training"]["overall_progress"])),
+            "detail": "ALFRED now auto-trains supported models in the background on startup and on scheduled refresh, including parser, relationship, salary, and bounded mobility service-cost coverage, but not every module has a safe trainable model yet.",
+            "next_focus": "Extend safe, evaluated training coverage into more modules without claiming unsupported accuracy.",
         },
     ]
 

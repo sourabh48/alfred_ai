@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+
 class User(AbstractUser):
     class Meta:
         app_label = "users"
@@ -10,6 +11,8 @@ class User(AbstractUser):
 
     city = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True)
+    ml_training_consent_granted = models.BooleanField(default=False)
+    ml_training_consent_given_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

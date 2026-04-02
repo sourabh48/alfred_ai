@@ -14,6 +14,8 @@ urlpatterns = [
     path('credit-score/peer-comparison/', views.compare_with_peers, name='peer_comparison'),
     path('credit-score/comprehensive-report/', views.comprehensive_credit_report, name='comprehensive_report'),
     path('credit-score/refresh/', views.refresh_credit_score, name='refresh_credit_score'),
+    path('credit-score/uploads/', views.list_credit_report_uploads, name='credit_report_uploads'),
+    path('credit-score/upload-report/', views.upload_credit_report, name='upload_credit_report'),
     path('recommendations/overview/', views.recommendation_overview, name='recommendation_overview'),
     path('tax/overview/', views.tax_optimizer_overview, name='tax_optimizer_overview'),
 ]

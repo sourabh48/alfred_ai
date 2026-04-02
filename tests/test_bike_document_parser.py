@@ -1,0 +1,258 @@
+from io import BytesIO
+from unittest.mock import patch
+
+from django.test import SimpleTestCase
+
+from apps.mobility.services.bike_document_ai import BikeDocumentAI
+
+
+SAMPLE_INVOICE_TEXT = """
+Customer Name
+Sourabh Sarkar
+Service Consultant
+Israel S
+Address
+C405, Sanjeevini Sruti, Soukya Road,
+Kachrakanahalli village,Whitefield, ,HOSAKOTE
+Model Code
+VSKM60HE
+Registration Number
+Ka01kc6667
+Job Card Number
+RJC011402IJ11758
+Model Name
+HUNTER 350 DAPPER GREEN
+Job Card Date
+10-08-2025 12:20
+Odometer Reading
+26,021
+Invoice Date
+Recipient GSTIN
+Service Centre
+Jagadamba Automobiles
+Engine Number
+J3A5FCR1223168
+Supplier GSTIN
+29ATMPJ3615M1Z7
+Chassis Number
+ME3J3D5FCR1005699
+Customer Voice
+Paid service
+1050
+1
+engine oil & filter change
+750
+2
+chain lube
+170
+3
+.consumables
+120
+4
+.back rear brake pad replacement
+370
+5
+.clutch cable check and inform to customer
+7077927159
+Surya
+Service Pre-Invoice
+Code
+Description
+Qty
+Price
+Discount
+Amount
+CGST/SGST
+(%)
+CGST
+SGST
+IGST
+(%)
+IGST
+Customer
+Amount
+Amount
+3600027
+LIQUID GUN SEMI
+SYNTHETIC-15W50- 210
+LTS
+1.70
+330.51
+\u20b9 0.00
+9.00
+50.57
+\u20b9 50.57
+0.00
+\u20b9 0.00
+\u20b9 663.01
+\u20b9 663.01
+3600008/A
+CHAIN LUBE & CLEANER
+KIT- 500ML.
+85.00
+1.69
+\u20b9 0.00
+9.00
+12.93
+\u20b9 12.93
+0.00
+\u20b9 0.00
+\u20b9 169.51
+\u20b9 169.51
+1570120/B
+FILTER COMP-ENGINE OIL
+1.00
+80.51
+\u20b9 0.00
+9.00
+7.25
+\u20b9 7.25
+0.00
+\u20b9 0.00
+\u20b9 95.00
+\u20b9 95.01
+KAB00246/
+A
+BRAKE PAD KIT
+1.00
+226.56
+\u20b9 0.00
+14.00
+31.72
+\u20b9 31.72
+0.00
+\u20b9 0.00
+\u20b9 290.00
+\u20b9 290.00
+Total
+\u20b9 1217.52
+\u20b9 1217.53
+Labour Description
+Code
+Description
+Hrs
+Price
+Discount
+Amount
+CGST/SGST
+(%)
+CGST
+SGST
+IGST
+(%)
+IGST
+Customer
+Amount
+Amount
+GELA017
+CONSUMABLE CHARGES
+FOR SERVICE
+1.00
+\u20b9 100.00
+\u20b9 0.00
+9.00
+\u20b9 9.00
+\u20b9 9.00
+0.00
+\u20b9 0.00
+\u20b9 118.00
+\u20b9 118.00
+WBRB007
+R&R REAR BRAKE SHOES
+/ PADS (INCLUS OF
+WHEEL REMOVAL FOR
+DRUM BRAKE)
+0.12
+\u20b9 500.00
+\u20b9 0.00
+9.00
+\u20b9 5.40
+\u20b9 5.40
+0.00
+\u20b9 0.00
+\u20b9 70.80
+\u20b9 70.80
+DSC7-36M-
+30K
+SCHEDULED PAID 36
+MONTHS OR 30K
+KILOMETERS SERVICE
+1.00
+\u20b9 870.00
+\u20b9 0.00
+9.00
+\u20b9 78.30
+\u20b9 78.30
+0.00
+\u20b9 0.00
+\u20b9 1,026.60
+\u20b9 1,026.60
+Total
+\u20b9 1215.40
+\u20b9 1215.40
+Total Amount
+\u20b9 2432.93
+Address
+:
+#11, Eioz Industrial area, SY. no.88, Sadarmangala Village, K.R.Puram Hubli, Bangalore 560066
+,
+,
+BENGALURU
+,
+,
+KARNATAKA
+Contact Number:
+8879945595
+Mobile:
+9606468371
+Email:
+servicewhitefield.jagadamba@gmail.com
+Website: www.royalenfield.com
+Jagadamba Automobiles
+Total Customer Amount
+\u20b9 2432.92
+""".strip()
+
+
+class BikeDocumentParserTests(SimpleTestCase):
+    @patch.object(BikeDocumentAI, "_extract_text", return_value=SAMPLE_INVOICE_TEXT)
+    def test_invoice_parser_extracts_structured_invoice_data(self, _extract_text):
+        parser = BikeDocumentAI()
+        upload = BytesIO(b"fake-pdf")
+        upload.name = "JcPreInvoice.pdf"
+
+        parsed = parser.parse(upload, upload.name)
+
+        self.assertEqual(parsed.document_type, "invoice")
+        self.assertEqual(parsed.fields["document_number"], "RJC011402IJ11758")
+        self.assertEqual(parsed.fields["issuer"], "Jagadamba Automobiles")
+        self.assertEqual(parsed.fields["customer_name"], "Sourabh Sarkar")
+        self.assertEqual(parsed.fields["service_consultant"], "Israel S")
+        self.assertEqual(parsed.fields["vehicle_number"], "Ka01kc6667")
+        self.assertEqual(parsed.fields["odometer_km"], 26021)
+        self.assertAlmostEqual(parsed.fields["total_customer_amount"], 2432.92)
+        self.assertAlmostEqual(parsed.fields["parts_total_amount"], 1217.53)
+        self.assertAlmostEqual(parsed.fields["labour_total_amount"], 1215.4)
+        self.assertAlmostEqual(parsed.fields["total_tax_amount"], 390.34)
+        self.assertAlmostEqual(parsed.fields["total_taxable_amount"], 2042.59)
+        self.assertEqual(parsed.fields["service_center_contact"], "8879945595")
+        self.assertEqual(parsed.fields["service_center_email"], "servicewhitefield.jagadamba@gmail.com")
+        self.assertEqual(parsed.fields["service_advisor_name"], "Surya")
+        self.assertEqual(parsed.fields["service_advisor_contact"], "7077927159")
+        self.assertEqual(parsed.fields["parts_item_count"], 4)
+        self.assertEqual(parsed.fields["labour_item_count"], 3)
+        self.assertEqual(parsed.fields["line_item_count"], 7)
+        self.assertIn("engine", parsed.fields["systems_impacted"])
+        self.assertIn("brakes", parsed.fields["systems_impacted"])
+        self.assertEqual(len(parsed.fields["parts_items"]), 4)
+        self.assertEqual(len(parsed.fields["labour_items"]), 3)
+
+        self.assertEqual(parsed.service_payload["service_type"], "routine")
+        self.assertEqual(parsed.service_payload["job_card_number"], "RJC011402IJ11758")
+        self.assertAlmostEqual(parsed.service_payload["cost"], 2432.92)
+        self.assertEqual(parsed.service_payload["odometer_km"], 26021)
+        self.assertEqual(parsed.service_payload["service_advisor_name"], "Surya")
+        self.assertEqual(parsed.service_payload["line_item_count"], 7)
+        self.assertIn("BRAKE PAD KIT", parsed.service_payload["replaced_parts"])
+        self.assertIn("brake pad replacement", parsed.service_payload["extracted_work_summary"].lower())
+        self.assertIn("line item", parsed.parser_notes.lower())

@@ -1,29 +1,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from io import BytesIO
+from io import BytesIO, StringIO
 import html
 from html.parser import HTMLParser
+import logging
 import os
 import re
 from typing import BinaryIO
 from xml.etree import ElementTree
 import zipfile
 
+from alfred_ai.services import extract_document_text
 from pypdf import PdfReader
 
 try:
     import pdfplumber
 except Exception:  # pragma: no cover - optional runtime dependency
     pdfplumber = None
-
-try:
-    import pytesseract
-    from PIL import Image
-except Exception:  # pragma: no cover - optional runtime dependency
-    pytesseract = None
-    Image = None
-
 
 SKILL_CATALOG = {
     "python", "sql", "excel", "power bi", "tableau", "django", "flask", "fastapi", "java", "javascript",
@@ -32,18 +26,26 @@ SKILL_CATALOG = {
     "nlp", "llm", "prompt engineering", "product management", "strategy", "finance", "risk", "operations",
     "analytics", "etl", "airflow", "spark", "hadoop", "salesforce", "seo", "content", "marketing",
     "project management", "agile", "scrum", "leadership", "communication", "stakeholder management",
+    "spring", "spring boot", "spring cloud", "microservices", "rest api", "soap", "hibernate", "jpa",
+    "mongodb", "oracle", "mysql", "postgresql", "kafka", "jenkins", "jira", "maven", "gradle",
+    "postman", "junit", "mockito", "tomcat", "servicenow", "api gateway", "redis", "jenkins pipeline",
+    "ci/cd", "ci cd", "unit testing", "integration testing", "backend development",
 }
 
 ROLE_HINTS = [
     "software engineer", "data analyst", "data scientist", "machine learning engineer", "product manager",
     "business analyst", "financial analyst", "operations analyst", "backend developer", "frontend developer",
     "full stack developer", "consultant", "project manager", "marketing manager", "sales manager",
+    "java backend developer", "java developer", "backend engineer", "software developer",
 ]
 
 ACHIEVEMENT_HINTS = ("improved", "reduced", "built", "launched", "led", "grew", "optimized", "delivered", "increased")
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 PHONE_RE = re.compile(r"(?:\+91[\s-]?)?[6-9]\d{9}")
-LINK_RE = re.compile(r"https?://[^\s]+", re.IGNORECASE)
+LINK_RE = re.compile(
+    r"(?:(?:https?://)|(?:www\.))[^\s]+|(?:linkedin\.com/[^\s]+)|(?:github\.com/[^\s]+)",
+    re.IGNORECASE,
+)
 YEARS_RE = re.compile(r"(\d+(?:\.\d+)?)\+?\s+(?:years?|yrs?)", re.IGNORECASE)
 
 
@@ -60,25 +62,13 @@ class _HTMLTextStripper(HTMLParser):
         return "\n".join(self.parts)
 
 
-def _ocr_enabled() -> bool:
-    if not pytesseract or not Image:
-        return False
-    configured_cmd = os.getenv("TESSERACT_CMD", "").strip()
-    if configured_cmd:
-        pytesseract.pytesseract.tesseract_cmd = configured_cmd
-    try:
-        pytesseract.get_tesseract_version()
-        return True
-    except Exception:
-        return False
-
-
-OCR_ENABLED = _ocr_enabled()
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
 TEXTISH_EXTENSIONS = {".txt", ".md", ".csv", ".log"}
 RICH_TEXT_EXTENSIONS = {".rtf", ".html", ".htm", ".xml"}
 ARCHIVE_TEXT_EXTENSIONS = {".docx", ".odt"}
 RESUME_FILE_EXTENSIONS = {".pdf", ".doc", ".docx", ".txt", ".md", ".rtf", ".html", ".htm", ".odt", *IMAGE_EXTENSIONS}
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -96,10 +86,11 @@ class ResumeIntelligenceService:
     def parse(self, upload: BinaryIO, filename: str = "", user=None) -> ParsedResume:
         raw_bytes = self._read_bytes(upload)
         effective_name = filename or getattr(upload, "name", "resume")
-        text = self._extract_text(raw_bytes, effective_name)
+        extraction = extract_document_text(raw_bytes, effective_name)
+        text = extraction.text or self._extract_text(raw_bytes, effective_name)
         normalized = " ".join(text.split())
         skills = self._extract_skills(normalized)
-        links = LINK_RE.findall(text)
+        links = self._extract_links(text)
         experience = self._extract_experience(normalized)
         role = self._extract_role(text)
         email = EMAIL_RE.search(text)
@@ -127,10 +118,13 @@ class ResumeIntelligenceService:
             weaknesses.append("Contact information looks incomplete or hard to detect.")
         if not text.strip():
             weaknesses.insert(0, "Resume text could not be extracted cleanly. This usually means the CV is scanned, image-based, or in an unusual export format.")
-            if not OCR_ENABLED:
-                weaknesses.insert(1, "OCR fallback is not active on this server right now, so scanned PDFs and image-only CVs will stay in review until OCR is configured.")
+            weaknesses.insert(1, "ALFRED could not recover stable readable text from this file on this pass. A cleaner export or a manual correction may still be needed.")
+        elif extraction.method:
+            strengths.append(f"Primary extraction path: {extraction.method.replace('_', ' ')}.")
+            if "ocr" in extraction.method:
+                strengths.append("Scanned-resume OCR recovered readable text for profile extraction.")
 
-        confidence = 0.18 if not text.strip() else 0.45
+        confidence = 0.18 if not text.strip() else max(0.45, extraction.confidence * 0.75)
         if len(normalized) >= 1200:
             confidence += 0.2
         if skills:
@@ -153,6 +147,8 @@ class ResumeIntelligenceService:
             "phone": phone.group(0) if phone else "",
             "links": links[:8],
             "achievement_signal_count": achievements,
+            "extraction_method": extraction.method,
+            "extraction_notes": extraction.notes[:4],
         }
         summary = self._build_summary(role, experience, skills, strengths, weaknesses)
 
@@ -245,7 +241,7 @@ class ResumeIntelligenceService:
             texts.append("\n".join((page.extract_text() or "") for page in reader.pages))
             texts.append("\n".join((page.extract_text(extraction_mode="layout") or "") for page in reader.pages))
         except Exception:
-            pass
+            logger.warning("Resume PDF extraction via pypdf failed.", exc_info=True)
 
         for candidate in texts:
             if candidate and candidate.strip():
@@ -258,20 +254,7 @@ class ResumeIntelligenceService:
                     if plumber_text.strip():
                         return plumber_text
             except Exception:
-                pass
-
-        if OCR_ENABLED and pdfplumber:
-            try:
-                with pdfplumber.open(BytesIO(raw_bytes)) as pdf:
-                    ocr_parts = []
-                    for page in pdf.pages[:6]:
-                        image = page.to_image(resolution=150).original
-                        ocr_parts.append(pytesseract.image_to_string(image))
-                    ocr_text = "\n".join(part for part in ocr_parts if part)
-                    if ocr_text.strip():
-                        return ocr_text
-            except Exception:
-                pass
+                logger.warning("Resume PDF extraction via pdfplumber failed.", exc_info=True)
         return ""
 
     def _extract_docx_text(self, raw_bytes: bytes) -> str:
@@ -326,17 +309,12 @@ class ResumeIntelligenceService:
             parser.feed(text)
             return html.unescape(parser.text())
         except Exception:
+            logger.warning("Resume HTML extraction fell back to tag stripping after parser failure.", exc_info=True)
             stripped = re.sub(r"<[^>]+>", " ", text)
             return " ".join(html.unescape(stripped).split())
 
     def _extract_image_text(self, raw_bytes: bytes) -> str:
-        if not OCR_ENABLED or not Image:
-            return ""
-        try:
-            image = Image.open(BytesIO(raw_bytes))
-            return pytesseract.image_to_string(image)
-        except Exception:
-            return ""
+        return ""
 
     def _decode_text(self, raw_bytes: bytes) -> str:
         for encoding in ("utf-8", "utf-16", "latin-1"):
@@ -411,6 +389,16 @@ class ResumeIntelligenceService:
 
     def _extract_role(self, text: str) -> str:
         lines = [line.strip() for line in text.splitlines() if line.strip()]
+        for line in lines[:8]:
+            if EMAIL_RE.search(line) or PHONE_RE.search(line):
+                continue
+            cleaned = re.sub(r"[^A-Za-z/&+ -]", "", line).strip()
+            lowered = cleaned.lower()
+            if 2 <= len(cleaned.split()) <= 7 and any(
+                token in lowered
+                for token in ("developer", "engineer", "analyst", "manager", "architect", "consultant", "specialist")
+            ):
+                return cleaned[:100]
         first_block = " ".join(lines[:10]).lower()
         for role in ROLE_HINTS:
             if role in first_block:
@@ -425,6 +413,25 @@ class ResumeIntelligenceService:
     def _extract_experience(self, text: str) -> float:
         matches = [float(match.group(1)) for match in YEARS_RE.finditer(text)]
         return max(matches) if matches else 0.0
+
+    def _extract_links(self, text: str) -> list[str]:
+        found = []
+        seen = set()
+        for match in LINK_RE.findall(text):
+            candidate = str(match or "").strip().rstrip(".,);]")
+            if not candidate:
+                continue
+            lowered = candidate.lower()
+            if lowered.startswith("www."):
+                candidate = f"https://{candidate}"
+            elif "://" not in lowered and (lowered.startswith("linkedin.com/") or lowered.startswith("github.com/")):
+                candidate = f"https://{candidate}"
+            key = candidate.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            found.append(candidate)
+        return found[:8]
 
     def _achievement_density(self, text: str) -> int:
         score = 0

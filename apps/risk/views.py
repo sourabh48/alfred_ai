@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
+from apps.integrations.services.verified_intelligence import freshness_snapshot
 from .models import RiskSignal
 from .serializers import RiskSignalSerializer
 from .services import risk_intelligence
@@ -34,6 +35,7 @@ def risk_outlook(request):
             "action_items": payload["action_items"],
             "module_signals": payload["module_signals"],
             "evidence": payload["evidence"],
+            "evidence_freshness": payload.get("evidence_freshness", freshness_snapshot(payload.get("evidence", []))),
             "insights": payload["insights"],
         }
     )

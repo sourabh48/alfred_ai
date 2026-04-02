@@ -1,136 +1,59 @@
-"""
-Quick test script to verify Alfred AI enhancements are working.
-Run with: python manage.py shell < test_alfred_brain.py
-"""
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from unittest.mock import patch
 
-import os
-import django
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'alfred_ai.settings')
-django.setup()
+class AlfredBrainTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            username="brain_user",
+            password="Pass12345!",
+            monthly_income=85000,
+            rent_or_emi=22000,
+            city="Bengaluru",
+        )
 
-print("=" * 60)
-print("ALFRED AI ENHANCEMENT TEST")
-print("=" * 60)
+    def test_transaction_classifier_falls_back_without_transformers(self):
+        from apps.ml_engine.inference_adapters.transaction_classifier import transaction_classifier
 
-# Test 1: Import all services
-print("\n[1/7] Testing imports...")
-try:
-    from apps.ml_engine.services.alfred_financial_brain import alfred_brain
-    from apps.loans.services import loan_intelligence_service
-    from apps.investments.services import portfolio_intelligence_service
-    from apps.budgets.services import budget_intelligence_service
-    from apps.expenses.services.multi_bank_aggregator import multi_bank_aggregator
-    from apps.ml_engine.inference_adapters.transaction_classifier import transaction_classifier
-    print("[OK] All services imported successfully")
-except Exception as e:
-    print(f"[ERROR] Import failed: {e}")
-    exit(1)
+        result = transaction_classifier.predict("UPI-SWIGGY-FOOD ORDER-12345", "debit")
 
-# Test 2: Initialize Alfred Brain
-print("\n[2/7] Initializing Alfred Brain...")
-try:
-    alfred_brain.initialize()
-    print("[OK] Alfred Brain initialized")
-except Exception as e:
-    print(f"✗ Initialization failed: {e}")
+        self.assertEqual(result["classification"], "expense")
+        self.assertEqual(result["category"], "food")
+        self.assertEqual(result["payment_mode"], "UPI")
+        self.assertIn("merchant", result)
+        self.assertIn("confidence", result)
 
-# Test 3: Test transaction classifier
-print("\n[3/7] Testing transaction classifier...")
-try:
-    result = transaction_classifier.predict("UPI-SWIGGY-FOOD ORDER-12345", "debit")
-    print(f"[OK] Transaction classified: category={result['category']}, merchant={result['merchant']}")
-except Exception as e:
-    print(f"[WARN] Transaction classifier: {e}")
+    def test_alfred_brain_initializes_without_crashing(self):
+        from apps.ml_engine.services.alfred_financial_brain import alfred_brain
 
-# Test 4: Test models
-print("\n[4/7] Testing database models...")
-try:
-    from apps.loans.models import Loan, LoanPaymentHistory
-    from apps.expenses.models import BankAccount, Expense
-    from apps.investments.models import Investment
-    from apps.budgets.models import Budget
-    print("[OK] All models loaded successfully")
-    print(f"  - Loans in DB: {Loan.objects.count()}")
-    print(f"  - Bank Accounts in DB: {BankAccount.objects.count()}")
-    print(f"  - Investments in DB: {Investment.objects.count()}")
-    print(f"  - Expenses in DB: {Expense.objects.count()}")
-except Exception as e:
-    print(f"[ERROR] Model test failed: {e}")
+        alfred_brain.initialize()
 
-# Test 5: Test with a user (if exists)
-print("\n[5/7] Testing with user data...")
-try:
-    from apps.users.models import User
-    user = User.objects.first()
-    if user:
-        print(f"[OK] Testing with user: {user.username}")
+        self.assertIsNotNone(alfred_brain.transaction_classifier)
 
-        # Test multi-bank aggregation
-        bank_view = multi_bank_aggregator.get_consolidated_view(user)
-        print(f"  - Bank accounts: {bank_view['total_accounts']}")
-        print(f"  - Total balance: ₹{bank_view['total_balance']:,.0f}")
+    @patch("apps.ml_engine.inference_adapters.transaction_classifier.SENTENCE_TRANSFORMERS_AVAILABLE", True)
+    @patch("apps.ml_engine.inference_adapters.transaction_classifier.SentenceTransformer")
+    def test_transaction_classifier_does_not_trigger_remote_model_loads_in_tests(self, sentence_transformer):
+        from apps.ml_engine.inference_adapters.transaction_classifier import transaction_classifier
 
-        # Test loan metrics
-        loan_metrics = loan_intelligence_service.calculate_loan_metrics(user)
-        print(f"  - Active loans: {loan_metrics['active_loan_count']}")
-        print(f"  - DTI ratio: {loan_metrics['debt_to_income_ratio']}%")
+        transaction_classifier.load()
 
-    else:
-        print("[WARN] No users in database (create a user to test)")
-except Exception as e:
-    print(f"[WARN] User test: {e}")
+        sentence_transformer.assert_not_called()
 
-# Test 6: Test budget intelligence
-print("\n[6/7] Testing budget intelligence...")
-try:
-    from apps.users.models import User
-    user = User.objects.first()
-    if user and hasattr(user, 'monthly_income') and user.monthly_income > 0:
-        budget = budget_intelligence_service.suggest_budget(user)
-        if budget.get('success'):
-            print(f"[OK] Budget suggestions generated")
-            print(f"  - Monthly income: ₹{budget['monthly_income']:,.0f}")
-            print(f"  - Disposable income: ₹{budget['disposable_income']:,.0f}")
-            print(f"  - Daily limit: ₹{budget['daily_expenditure_limit']:,.0f}")
-        else:
-            print(f"[WARN] {budget.get('message')}")
-    else:
-        print("[WARN] User has no income data (update user profile to test)")
-except Exception as e:
-    print(f"[WARN] Budget test: {e}")
+    def test_comprehensive_snapshot_returns_expected_sections(self):
+        from apps.ml_engine.services.alfred_financial_brain import alfred_brain
 
-# Test 7: Test comprehensive snapshot
-print("\n[7/7] Testing comprehensive financial snapshot...")
-try:
-    from apps.users.models import User
-    user = User.objects.first()
-    if user:
-        snapshot = alfred_brain.get_comprehensive_financial_snapshot(user)
-        print(f"[OK] Snapshot generated successfully")
-        print(f"\n  FINANCIAL HEALTH REPORT:")
-        print(f"  {'=' * 50}")
-        if 'health_score' in snapshot:
-            print(f"  Score: {snapshot['health_score']['score']}/100")
-            print(f"  Assessment: {snapshot['health_score']['assessment']}")
-            print(f"  Message: {snapshot['health_score']['message']}")
-        if 'priority_actions' in snapshot:
-            print(f"\n  Priority Actions:")
-            for i, action in enumerate(snapshot['priority_actions'][:3], 1):
-                print(f"    {i}. [{action['priority']}] {action['action']}")
-    else:
-        print("[WARN] No user to generate snapshot")
-except Exception as e:
-    print(f"[WARN] Snapshot test: {e}")
+        snapshot = alfred_brain.get_comprehensive_financial_snapshot(self.user)
 
-print("\n" + "=" * 60)
-print("TEST COMPLETE")
-print("=" * 60)
-print("\n[SUCCESS] Alfred AI enhancements are installed and functional!")
-print("\nNext steps:")
-print("  1. Create a user account if you haven't")
-print("  2. Add income data to user profile")
-print("  3. Import bank statements or add manual expenses")
-print("  4. Explore Alfred's intelligent insights in the dashboard")
-print("\nFor full documentation, see: ALFRED_AI_ENHANCEMENTS.md")
-print("=" * 60)
+        self.assertEqual(snapshot["user"], self.user.username)
+        self.assertIn("generated_at", snapshot)
+        self.assertIn("accounts", snapshot)
+        self.assertIn("loans", snapshot)
+        self.assertIn("investments", snapshot)
+        self.assertIn("budget", snapshot)
+        self.assertIn("daily_affordability", snapshot)
+        self.assertIn("forecast", snapshot)
+        self.assertIn("health_score", snapshot)
+        self.assertIn("priority_actions", snapshot)
+        self.assertIn("score", snapshot["health_score"])

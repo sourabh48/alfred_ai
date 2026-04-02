@@ -139,6 +139,77 @@ class CreditScoreTrackerService:
             },
         }
 
+    def _latest_official_score(self, user, bureau: str | None = None):
+        from apps.integrations.models import CreditScore
+
+        queryset = CreditScore.objects.filter(user=user, score_kind="official")
+        if bureau:
+            queryset = queryset.filter(bureau=bureau.upper())
+
+        preferred = queryset.filter(is_active=True).prefetch_related("factors").order_by("-fetched_at", "-id").first()
+        if preferred is not None:
+            return preferred
+        return queryset.prefetch_related("factors").order_by("-fetched_at", "-id").first()
+
+    def _official_factor_analysis(self, score) -> Dict:
+        analysis = {
+            "factors": [],
+            "strengths": [],
+            "weaknesses": [],
+            "improvement_suggestions": [],
+            "overall_score": int(score.score or 0),
+            "rating": score.rating,
+            "source_kind": "uploaded_report" if hasattr(score, "source_upload") else "official_record",
+            "source_bureau": score.bureau,
+        }
+
+        improvement_by_factor = {
+            "payment history": "Protect a perfect repayment record and clear any overdue markers before seeking new credit.",
+            "credit utilization": "Keep revolving utilization below 30% and spread spending away from maxed-out lines.",
+            "credit age": "Avoid closing older accounts unless there is a strong reason to do so.",
+            "credit mix": "Add variety only when it fits a real financial need; do not open credit purely for scoring.",
+            "recent inquiries": "Pause new credit applications until hard inquiries cool off.",
+        }
+
+        for factor in score.factors.all():
+            factor_payload = {
+                "name": factor.factor_name,
+                "weight": factor.weight,
+                "score": factor.score,
+                "status": factor.status,
+            }
+            analysis["factors"].append(factor_payload)
+            normalized_status = str(factor.status or "").lower()
+            normalized_name = str(factor.factor_name or "").strip().lower()
+            if factor.score >= 75 or normalized_status in {"good", "excellent", "stable"}:
+                analysis["strengths"].append(f"{factor.factor_name} looks healthy in the uploaded bureau report.")
+            elif factor.score <= 60 or normalized_status in {"poor", "fair", "needs improvement", "high"}:
+                analysis["weaknesses"].append(f"{factor.factor_name} is one of the weaker signals in the uploaded bureau report.")
+                suggestion = improvement_by_factor.get(normalized_name)
+                if suggestion and suggestion not in analysis["improvement_suggestions"]:
+                    analysis["improvement_suggestions"].append(suggestion)
+
+        if score.credit_utilization >= 30:
+            analysis["weaknesses"].append(f"Reported credit utilization is {score.credit_utilization:.1f}%, which is above the healthier range.")
+            suggestion = improvement_by_factor["credit utilization"]
+            if suggestion not in analysis["improvement_suggestions"]:
+                analysis["improvement_suggestions"].append(suggestion)
+        elif score.credit_utilization:
+            analysis["strengths"].append(f"Reported credit utilization is a healthy {score.credit_utilization:.1f}%.")
+
+        if score.delinquent_accounts:
+            analysis["weaknesses"].append(f"{score.delinquent_accounts} delinquent account(s) were reported by the bureau snapshot.")
+            suggestion = improvement_by_factor["payment history"]
+            if suggestion not in analysis["improvement_suggestions"]:
+                analysis["improvement_suggestions"].append(suggestion)
+
+        if not analysis["factors"]:
+            analysis["improvement_suggestions"].append(
+                "The uploaded bureau report provided the headline score, but not a clean factor breakdown. Re-upload the original export for richer factor analysis."
+            )
+
+        return analysis
+
     def get_all_bureau_scores(self, user) -> Dict:
         """
         Fetch scores from all bureaus.
@@ -152,9 +223,17 @@ class CreditScoreTrackerService:
         scores = {}
 
         for bureau in self.BUREAUS.keys():
-            result = self.fetch_credit_score(user, bureau)
-            if result.get('success') and result.get('score_kind') == 'official':
-                scores[bureau] = result
+            latest_official = self._latest_official_score(user, bureau)
+            if latest_official is None:
+                continue
+            scores[bureau] = {
+                "bureau": bureau,
+                "score": latest_official.score,
+                "score_kind": latest_official.score_kind,
+                "rating": latest_official.rating,
+                "fetched_at": latest_official.fetched_at.isoformat(),
+                "valid_until": latest_official.valid_until.isoformat(),
+            }
 
         if scores:
             avg_score = sum(s['score'] for s in scores.values()) / len(scores)
@@ -162,7 +241,8 @@ class CreditScoreTrackerService:
                 'success': True,
                 'scores': scores,
                 'average_score': round(avg_score),
-                'timestamp': timezone.now().isoformat()
+                'timestamp': timezone.now().isoformat(),
+                'source_kind': 'official_records',
             }
 
         return {
@@ -181,6 +261,10 @@ class CreditScoreTrackerService:
         Returns:
             Dict with detailed factor analysis
         """
+        latest_official = self._latest_official_score(user)
+        if latest_official is not None:
+            return self._official_factor_analysis(latest_official)
+
         from apps.loans.models import Loan
         from apps.expenses.models import BankAccount
 
@@ -310,6 +394,7 @@ class CreditScoreTrackerService:
 
         analysis['overall_score'] = round(final_score)
         analysis['rating'] = self._get_rating(final_score, 'CIBIL')
+        analysis['source_kind'] = 'estimated_credit_health'
 
         return analysis
 
@@ -381,8 +466,9 @@ class CreditScoreTrackerService:
         Returns:
             Dict with action plan and timeline
         """
+        latest_official = self._latest_official_score(user)
         analysis = self.analyze_score_factors(user)
-        current_score = analysis['overall_score']
+        current_score = int((latest_official.score if latest_official is not None else analysis['overall_score']) or 0)
 
         plan = {
             'current_score': current_score,
@@ -390,7 +476,8 @@ class CreditScoreTrackerService:
             'estimated_timeline': '6-12 months',
             'action_items': [],
             'quick_wins': [],
-            'long_term_goals': []
+            'long_term_goals': [],
+            'source_kind': analysis.get('source_kind', 'estimated_credit_health'),
         }
 
         # Prioritize based on weaknesses
@@ -445,7 +532,8 @@ class CreditScoreTrackerService:
         Returns:
             Dict with peer comparison
         """
-        current_score = self.analyze_score_factors(user).get('overall_score', 0)
+        latest_official = self._latest_official_score(user)
+        current_score = int((latest_official.score if latest_official is not None else self.analyze_score_factors(user).get('overall_score', 0)) or 0)
         age = getattr(user, 'age', 30)
         income = getattr(user, 'monthly_income', 75000)
 
@@ -467,7 +555,7 @@ class CreditScoreTrackerService:
 
         return {
             'your_score': current_score,
-            'comparison_basis': 'estimated_credit_health',
+            'comparison_basis': 'official_uploaded_score' if latest_official is not None else 'estimated_credit_health',
             'peer_group': peer_group,
             'peer_average': peer_avg,
             'percentile': round(percentile),
@@ -499,6 +587,7 @@ class CreditScoreTrackerService:
         Returns:
             Complete credit report with all analyses
         """
+        latest_official = self._latest_official_score(user)
         return {
             'user_id': user.id,
             'generated_at': timezone.now().isoformat(),
@@ -509,7 +598,13 @@ class CreditScoreTrackerService:
             'peer_comparison': self.compare_with_peers(user),
             'alerts': self._generate_alerts(user),
             'next_update': (timezone.now() + timedelta(days=30)).date().isoformat(),
-            'bureau_status': 'official_integration_required',
+            'bureau_status': 'uploaded_report_active' if latest_official is not None else 'official_integration_required',
+            'active_score_source': {
+                'bureau': latest_official.bureau,
+                'score': latest_official.score,
+                'rating': latest_official.rating,
+                'fetched_at': latest_official.fetched_at.isoformat(),
+            } if latest_official is not None else None,
         }
 
     def _generate_alerts(self, user) -> List[Dict]:

@@ -1,1 +1,72 @@
-{}
+{
+    "parser_confidence_calibrator": {
+        "version": "2026-04-02T12:52:36.528359+00:00",
+        "metadata": {
+            "status": "ready",
+            "quality_score": 100.0,
+            "confidence_estimate": 73.17,
+            "sample_count": 14,
+            "artifact_path": "ml_models\\alfred\\parser_confidence\\model.pkl"
+        }
+    },
+    "relationship_model": {
+        "version": "2026-04-02T12:52:46.503517+00:00",
+        "metadata": {
+            "status": "ready",
+            "quality_score": 100.0,
+            "confidence_estimate": 74.67,
+            "sample_count": 11,
+            "artifact_path": "ml_models\\alfred\\relationship_model\\model.pkl"
+        }
+    },
+    "salary_predictor": {
+        "version": "2026-04-02T12:53:26.440062+00:00",
+        "metadata": {
+            "status": "ready",
+            "quality_score": 69.96,
+            "confidence_estimate": 55.97,
+            "sample_count": 12,
+            "artifact_path": "ml_models/alfred/salary_model/model.pkl"
+        }
+    },
+    "expense_forecaster": {
+        "version": "2026-04-02T12:53:26.447434+00:00",
+        "metadata": {
+            "status": "ready",
+            "quality_score": 95.34,
+            "confidence_estimate": 73.2,
+            "sample_count": 48,
+            "artifact_path": "ml_models/alfred/expense_lstm/model.pkl"
+        }
+    },
+    "burnout_rf": {
+        "version": "2026-04-02T12:53:26.454888+00:00",
+        "metadata": {
+            "status": "ready",
+            "quality_score": 100.0,
+            "confidence_estimate": 79.0,
+            "sample_count": 24,
+            "artifact_path": "ml_models/alfred/burnout_rf/model.pkl"
+        }
+    },
+    "risk_classifier": {
+        "version": "2026-04-02T12:53:26.464341+00:00",
+        "metadata": {
+            "status": "ready",
+            "quality_score": 100.0,
+            "confidence_estimate": 82.0,
+            "sample_count": 24,
+            "artifact_path": "ml_models/alfred/risk_classifier/model.pkl"
+        }
+    },
+    "service_cost_predictor": {
+        "version": "2026-04-02T12:53:06.702820+00:00",
+        "metadata": {
+            "status": "ready",
+            "quality_score": 99.94,
+            "confidence_estimate": 73.36,
+            "sample_count": 12,
+            "artifact_path": "ml_models/alfred/service_cost_predictor/model.pkl"
+        }
+    }
+}

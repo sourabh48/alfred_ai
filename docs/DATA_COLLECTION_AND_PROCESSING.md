@@ -12,6 +12,7 @@ This document explains how ALFRED collects, validates, stores, and uses data acr
 - uploaded files such as resumes, bank statements, vehicle documents, service bills, and foreclosure or no-due documents
 - manual records such as expenses, loans, behavioral signals, family or dependent records, service logs, and risk snapshots
 - pasted links such as job postings
+- recruiter mails or pasted JDs, with optional attachment extraction in the career intake flow
 - support-ticket summaries from the reports page
 
 ### Internet-Backed Data
@@ -46,8 +47,12 @@ These are stored through `VerifiedExternalInsight` records so ALFRED can keep so
 Central upload note:
 
 - `/documents/` acts as a unified intake surface for statements, loan PDFs, vehicle documents, service bills, and resumes
+- multi-file selection is supported on the main document-oriented upload surfaces, but files are still processed one by one so parser status, confidence, and verification stay attached to the correct document record
 - the same file can still be consumed by its domain dashboard later, but intake metadata is retained centrally
 - statement uploads now keep metadata even when no clean transaction table can be extracted, so partial understanding is not discarded
+- low-confidence documents now enter a central review queue where accepted corrections are stored back onto the source record and fed into parser-learning memory
+- accepted correction fields and retry outcomes now feed the same parser-learning memory across statements, resumes, vehicle documents, loan documents, credit reports, and recruiter/JD intake
+- statement uploads can now queue background retries so broken or weak PDFs can be reprocessed later with deeper OCR coverage
 - career uploads now accept broader resume formats including html, rtf, odt, and image-style CV files; scanned/image CVs remain review-bound until OCR is available on the server
 - resume parser learning memory is stored per user, so parser calibration does not borrow patterns from other users' uploads
 
@@ -83,10 +88,12 @@ Loan-specific note:
 - vehicle documents are checked against the selected vehicle profile
 - foreclosure documents are checked against lender text, closure keywords, and loan account references
 - statement uploads keep document kind, parser status, confidence, and extracted hints so users and developers can see what ALFRED actually understood
+- statement uploads also keep background retry state and accepted corrections so the document lifecycle remains auditable after the first parse attempt
 - loan PDFs now expose detected document type such as sanction letter, repayment schedule, loan statement, or loan book
 - repeated bank-statement uploads are filtered using account-scoped transaction fingerprints
 - cached external signals keep source URL and verification metadata
 - external-source cache records stay separate from user-owned records; user dashboards join them only at response-build time
+- recommendation and tax advisory outputs now return freshness-backed evidence blocks instead of only opaque summaries
 
 ### Score And Enrich
 
@@ -95,6 +102,9 @@ Loan-specific note:
 - behavioral dashboards compute stress and pattern signals
 - career dashboards compute job fit, market risk, projections, and timing guidance
 - career dashboards now also compute study recommendations from experience stage, latest job gaps, and live opening signals
+- career dashboards now also compute compensation benchmark summaries when salary-bearing evidence is present in parsed openings or recruiter/JD intake
+- investment dashboards now also compute verified market-context guidance with proof and freshness metadata
+- relationship dashboards now blend partner inputs, household affordability pressure, and verified external planning context
 - risk dashboards blend manual risk with finance, behavior, mobility, and external market context
 - mobility dashboards compute compliance, service cost, trip cost, maintenance recommendations, and part-impact guidance from service history plus issue history
 - support tickets are classified into severity, handler, and resolution route
@@ -104,7 +114,9 @@ Loan-specific note:
 
 - raw user records remain in module tables
 - parsed or extracted payloads remain attached to their source records
+- accepted corrections remain attached to the same source records instead of being stored as an unlinked side channel
 - verified external records are cached separately
+- heavy dashboard summaries can also be stored as revision-keyed materialized payloads so repeated reads do not recompute the full graph every second
 - support tickets store summarized issue context, internal-clock metadata, and triage routing context
 - dashboards read the stored data rather than trusting transient request state
 
@@ -136,6 +148,7 @@ The result is a timing payload with:
 - guaranteed correctness for every uploaded format
 - visual OCR confidence overlays and end-user parser correction queues
 - official-source verification for every user-entered field across every module
+- fully autonomous retraining or self-healing across unsupported modules without reviewed data boundaries
 
 ## Current Design Rule
 

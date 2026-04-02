@@ -1,70 +1,101 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sign In | Alfred AI</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/static/css/style.css?v=2.1">
-</head>
-<body class="bg-light">
-    <div class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-md-6 col-lg-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-body p-4">
-                        <h1 class="h3 fw-bold mb-2">Alfred AI</h1>
-                        <p class="text-muted mb-4">Sign in to access your dashboard.</p>
+{% extends "base.html" %}
 
-                        {% if form.errors %}
-                        <div class="alert alert-danger" role="alert">
-                            Invalid username or password.
-                        </div>
-                        {% endif %}
+{% block title %}Sign In | Alfred{% endblock %}
 
-                        <form method="post">
-                            {% csrf_token %}
-
-                            <div class="mb-3">
-                                <label class="form-label" for="id_username">Username</label>
-                                <input
-                                    type="text"
-                                    name="username"
-                                    id="id_username"
-                                    class="form-control"
-                                    autocomplete="username"
-                                    autofocus
-                                    required
-                                >
-                            </div>
-
-                            <div class="mb-4">
-                                <label class="form-label" for="id_password">Password</label>
-                                <input
-                                    type="password"
-                                    name="password"
-                                    id="id_password"
-                                    class="form-control"
-                                    autocomplete="current-password"
-                                    required
-                                >
-                            </div>
-
-                            {% if next %}
-                            <input type="hidden" name="next" value="{{ next }}">
-                            {% endif %}
-
-                            <button type="submit" class="btn btn-dark w-100">Sign in</button>
-                        </form>
-
-                        <div class="text-center mt-3">
-                            <a href="/admin/login/" class="small text-decoration-none">Admin login</a>
-                        </div>
-                    </div>
+{% block content %}
+<section class="auth-shell">
+    <div class="auth-shell-grid">
+        <div class="auth-hero alfred-fade-up">
+            <div class="auth-market-scene" aria-hidden="true">
+                <span class="auth-market-orb auth-market-orb-one"></span>
+                <span class="auth-market-orb auth-market-orb-two"></span>
+                <span class="auth-market-line auth-market-line-one"></span>
+                <span class="auth-market-line auth-market-line-two"></span>
+                <span class="auth-market-chip auth-market-chip-one">Cash flow clarity</span>
+                <span class="auth-market-chip auth-market-chip-two">Debt control</span>
+                <span class="auth-market-chip auth-market-chip-three">Credit confidence</span>
+            </div>
+            <div class="auth-eyebrow">{{ ui_config.auth.login.eyebrow }}</div>
+            <h1 class="auth-title">{{ ui_config.auth.login.title }}</h1>
+            <p class="auth-copy">{{ ui_config.auth.login.description }}</p>
+            <div class="auth-feature-list">
+                {% for item in ui_config.auth.login.highlights %}
+                <div class="auth-feature-item">{{ item }}</div>
+                {% endfor %}
+            </div>
+            <div class="auth-finance-board">
+                <div class="auth-finance-stat">
+                    <span class="auth-finance-label">One ledger</span>
+                    <strong>Expenses, debt, credit</strong>
+                </div>
+                <div class="auth-finance-stat">
+                    <span class="auth-finance-label">Live review</span>
+                    <strong>Documents and reconciliation</strong>
+                </div>
+                <div class="auth-finance-stat">
+                    <span class="auth-finance-label">Fresh start</span>
+                    <strong>Reset data without losing the account</strong>
                 </div>
             </div>
         </div>
+        <div class="auth-panel alfred-fade-up" style="animation-delay: 0.08s;">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div>
+                    <div class="panel-eyebrow">{{ ui_config.brand.name }}</div>
+                    <h2 class="h3 fw-bold mb-2">{{ ui_config.auth.login.title }}</h2>
+                    <p class="text-muted mb-0">{{ ui_config.auth.login.description }}</p>
+                </div>
+                <a href="{% url 'signup' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">{{ ui_config.auth.login.secondary_cta }}</a>
+            </div>
+
+            {% if form.errors %}
+            <div class="alert alert-danger" role="alert">
+                Invalid username or password.
+            </div>
+            {% endif %}
+
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+
+                <div class="col-12">
+                    <label class="form-label" for="id_username">Username</label>
+                    <input
+                        type="text"
+                        name="username"
+                        id="id_username"
+                        class="form-control form-control-lg"
+                        autocomplete="username"
+                        autofocus
+                        required
+                    >
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label" for="id_password">Password</label>
+                    <input
+                        type="password"
+                        name="password"
+                        id="id_password"
+                        class="form-control form-control-lg"
+                        autocomplete="current-password"
+                        required
+                    >
+                </div>
+
+                {% if next %}
+                <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+
+                <div class="col-12 d-grid">
+                    <button type="submit" class="btn btn-dark btn-lg rounded-pill">{{ ui_config.auth.login.primary_cta }}</button>
+                </div>
+            </form>
+
+            <div class="auth-panel-note mt-4">
+                <div class="auth-panel-note-kicker">Ready when you are</div>
+                <div class="text-muted small">Use the same Alfred account across finance, documents, loans, career, and credit workflows.</div>
+            </div>
+        </div>
     </div>
-</body>
-</html>
+</section>
+{% endblock %}

@@ -19,6 +19,8 @@
 
 <section class="soft-grid four-up mb-4" id="loanSummaryCards"></section>
 
+<div id="loanPendingForeclosureNotice" class="d-none mb-4"></div>
+
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
@@ -89,7 +91,7 @@
             <div class="row g-4">
                 <div class="col-lg-6">
                     <h2 class="page-section-title">Loan Document Import</h2>
-                    <p class="page-section-copy mb-3">Upload lender PDFs so ALFRED can extract lender, principal, EMI, tenure, rate, and outstanding balance.</p>
+                    <p class="page-section-copy mb-3">Upload one or more lender PDFs so ALFRED can extract lender, principal, EMI, tenure, rate, and outstanding balance.</p>
                     <div class="soft-grid">
                         <div class="chip-row">
                             <span class="chip-neutral">Lender</span>
@@ -100,14 +102,15 @@
                             <span class="chip-neutral">Outstanding</span>
                         </div>
                         <div>
-                            <label class="form-label" for="loanPdfFile">Loan PDF</label>
-                            <input id="loanPdfFile" type="file" class="form-control" accept=".pdf,application/pdf">
+                            <label class="form-label" for="loanPdfFile">Loan PDFs</label>
+                            <input id="loanPdfFile" type="file" class="form-control" accept=".pdf,application/pdf" multiple>
                         </div>
                         <div class="d-flex flex-wrap gap-2">
-                            <button id="loanImportBtn" class="btn btn-primary" type="button">Import Loan PDF</button>
+                            <button id="loanImportBtn" class="btn btn-primary" type="button">Import Loan PDFs</button>
                             <button id="loanDetectBtn" class="btn btn-soft-primary" type="button">Detect From Expenses</button>
                         </div>
                         <div id="loanImportStatus" class="empty-state">Import a lender statement or repayment schedule PDF to auto-fill the manual loan book.</div>
+                        <div id="loanImportHistory" class="data-stack"></div>
                     </div>
                 </div>
                 <div class="col-lg-6">
@@ -225,6 +228,11 @@
                 </form>
             </div>
             <div class="mt-4">
+                <h2 class="page-section-title">Foreclosure Activity</h2>
+                <p class="page-section-copy mb-3">Recent closure letters, reconciliation status, and matched payoff totals.</p>
+                <div id="loanClosureActivity"></div>
+            </div>
+            <div class="mt-4">
                 <h2 class="page-section-title">Detected Repayments</h2>
                 <p class="page-section-copy mb-3">Loan and debt repayments inferred directly from your statement imports.</p>
                 <div id="loanDetectedRepayments"></div>
@@ -235,5 +243,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/loans.js?v=2.1"></script>
+<script src="/static/js/loans.js?v=2.7"></script>
 {% endblock %}

@@ -5,6 +5,7 @@ from datetime import date
 from apps.mobility.models import BikeProfile
 from apps.mobility.services.bike_service_intelligence import bike_service_intelligence
 from apps.integrations.services import verified_intelligence
+from apps.integrations.services.verified_intelligence import freshness_snapshot
 
 
 class TravelAdvisorService:
@@ -49,6 +50,7 @@ class TravelAdvisorService:
                 "service_buffer": bike_readiness["suggested_service_buffer"],
             },
             "evidence": evidence,
+            "evidence_freshness": freshness_snapshot(evidence),
         }
 
     def _weather(self, location: dict, start_date: date, end_date: date, evidence: list[dict]) -> dict:

@@ -1,11 +1,26 @@
 from __future__ import annotations
 
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from datetime import date, datetime
+from functools import lru_cache
+from importlib import import_module
+from io import BytesIO
+from io import StringIO
+import json
+import logging
+import os
 import re
+import subprocess
+import sys
+import tempfile
+import textwrap
 from typing import BinaryIO
 
 from pypdf import PdfReader
+
+from alfred_ai.services import apply_parser_learning
+from alfred_ai.services.pdf_recovery import rebuild_orphaned_pdf
 
 
 TXN_START_RE = re.compile(r"^\d{2}/\d{2}/\d{2}\s+")
@@ -17,9 +32,16 @@ TXN_RE = re.compile(
     r"(?P<closing>[0-9,]+\.\d{2})"
     r"(?:\s+(?P<tail>.*))?$"
 )
-PERIOD_RE = re.compile(r"Statement of accountFrom : (\d{2}/\d{2}/\d{4}) To : (\d{2}/\d{2}/\d{4})")
-ACCOUNT_NO_RE = re.compile(r"Account No : ([0-9A-Z ]+)")
-ACCOUNT_HOLDER_RE = re.compile(r"MR ([A-Z ]+)")
+PERIOD_RE = re.compile(
+    r"(?:Statement(?:\s+of\s+account)?|Stat(?:ement| ent))?\s*From\s*[:\-]?\s*"
+    r"(\d{2}[/:\-]\d{2}[/:\-]\d{4})\s*To\s*[:\-]?\s*(\d{2}[/:\-]\d{2}[/:\-]\d{4})",
+    re.IGNORECASE,
+)
+ACCOUNT_NO_RE = re.compile(
+    r"(?:Account|Accoust|Accont|Accoent)\s*(?:No|No\.|Number)\s*[:\-]?\s*([0-9A-Z ]{8,})",
+    re.IGNORECASE,
+)
+ACCOUNT_HOLDER_RE = re.compile(r"\b(?:MR|MRS|MS)\s+([A-Z ]{3,80})")
 REFERENCE_RE = re.compile(r"\b[A-Z0-9]{10,}\b")
 
 HEADER_PREFIXES = (
@@ -52,6 +74,19 @@ HEADER_PREFIXES = (
     "Date Narration",
 )
 
+ACCOUNT_HOLDER_STOP_WORDS = {
+    "BENGALURU",
+    "BANGALORE",
+    "KARNATAKA",
+    "CITY",
+    "STATE",
+    "EMAIL",
+    "PHONE",
+    "ACCOUNT",
+    "ADDRESS",
+    "BRANCH",
+}
+
 PAYMENT_MODE_RULES = [
     ("UPI", "UPI"),
     ("ACH D", "ACH"),
@@ -74,6 +109,10 @@ NOISE_MARKERS = (
 KNOWN_MERCHANT_RULES = [
     (("SWIGGY",), "Swiggy"),
     (("ZOMATO", "ETERNAL"), "Zomato"),
+    (("GOOGLE PLAY", "PLAYSTORE"), "Google Play"),
+    (("NETFLIX",), "Netflix"),
+    (("SPOTIFY",), "Spotify"),
+    (("YOUTUBE",), "YouTube"),
     (("JIO PREPAID RECHARGE",), "Jio Prepaid Recharge"),
     (("CRED CLUB", "PAYMENT ON CRED", "RAZPCREDCLUB"), "CRED Club"),
     (("ONECARD",), "OneCard"),
@@ -94,7 +133,6 @@ MERCHANT_NOISE_PATTERNS = (
 )
 
 CLASSIFICATION_RULES = [
-    ("loan", "loan", ("BAJAJ HOUSING", "POONAWALLA", "FINCOR", "EMI", "LOAN", "H404HHL", "FINANC", "PLA")),
     ("other", "investment", ("GROWW", "ZERODHA", "MUTUAL FUND", "STOCK", "MF ")),
     ("expense", "groceries", ("GROCERY", "SUPERMARKET", "SMART BAZAAR")),
     ("expense", "food", ("CAFE", "BAKERY", "HOTEL", "RESTAURANT", "SWIGGY", "ZOMATO", "FOOD")),
@@ -106,6 +144,29 @@ CLASSIFICATION_RULES = [
     ("expense", "travel", ("UBER", "OLA", "METRO", "IRCTC", "AUTOMOB")),
     ("other", "credit_card", ("ONECARD", "CRED CLUB", "PAYMENT ON CRED", "RAZPCREDCLUB", "CREDIT CARD")),
 ]
+SUBSCRIPTION_KEYWORDS = ("GOOGLE PLAY", "PLAYSTORE", "NETFLIX", "SPOTIFY", "PRIME", "YOUTUBE", "SUBSCRIPTION", "MANDATEEXECUTE")
+INVESTMENT_KEYWORDS = ("GROWW", "ZERODHA", "MUTUAL FUND", "STOCK", "MF ")
+CREDIT_CARD_KEYWORDS = ("ONECARD", "CRED CLUB", "PAYMENT ON CRED", "RAZPCREDCLUB", "CREDIT CARD")
+LOAN_EXCLUSION_KEYWORDS = ("GOOGLE PLAY", "PLAYSTORE", "NETFLIX", "SPOTIFY", "YOUTUBE", "SUBSCRIPTION", "MEMBERSHIP", "MANDATEEXECUTE")
+LOAN_KEYWORD_PATTERNS = (
+    re.compile(r"\bBAJAJ(?:\s+HOUSING)?\b"),
+    re.compile(r"\bPOONAWALLA\b"),
+    re.compile(r"\bEMI\b"),
+    re.compile(r"\bLOAN(?:\s+PAYMENT|\s+ACCOUNT|\s+A/C|\s+INSTAL(?:L)?MENT)?\b"),
+    re.compile(r"\bH404HHL[0-9A-Z]*\b"),
+    re.compile(r"\bHOUSING\s+FINANC(?:E|)\b"),
+    re.compile(r"\bFINCORP\b"),
+    re.compile(r"\bFINANCE\b"),
+    re.compile(r"\bHOME\s+LOAN\b"),
+    re.compile(r"\bHOUSING\s+LOAN\b"),
+    re.compile(r"\bPERSONAL\s+LOAN\b"),
+    re.compile(r"\bCAR\s+LOAN\b"),
+    re.compile(r"\bAUTO\s+LOAN\b"),
+    re.compile(r"\bVEHICLE\s+LOAN\b"),
+    re.compile(r"\bEDUCATION\s+LOAN\b"),
+    re.compile(r"\bSTUDENT\s+LOAN\b"),
+    re.compile(r"\bPLA\d+\b"),
+)
 BANK_NAME_RULES = [
     ("HDFC BANK", "HDFC Bank"),
     ("ICICI BANK", "ICICI Bank"),
@@ -126,6 +187,71 @@ LOAN_TYPE_HINT_RULES = [
     ("business", ("BUSINESS LOAN",)),
     ("credit_card", ("CREDIT CARD",)),
 ]
+
+STATEMENT_OCR_PAGE_LIMIT = max(1, int(os.getenv("STATEMENT_OCR_PAGE_LIMIT", "6")))
+STATEMENT_OCR_PREVIEW_PAGES = max(2, int(os.getenv("STATEMENT_OCR_PREVIEW_PAGES", "2")))
+ISOLATED_OCR_TIMEOUT_SECONDS = max(45, int(os.getenv("STATEMENT_ISOLATED_OCR_TIMEOUT_SECONDS", "90")))
+
+ISOLATED_OCR_WORKER = textwrap.dedent(
+    """
+    import json
+    import sys
+    from io import BytesIO
+
+    import fitz
+    from PIL import Image
+    from rapidocr_onnxruntime import RapidOCR
+
+    def normalize(value):
+        return " ".join(str(value or "").replace("\\uFF1A", ":").replace("₹", "Rs ").split())
+
+    def group_rows(results):
+        grouped = []
+        for item in results or []:
+            if len(item) < 2:
+                continue
+            box = item[0]
+            text = normalize(item[1])
+            if not text:
+                continue
+            top = min(float(point[1]) for point in box)
+            left = min(float(point[0]) for point in box)
+            if grouped and abs(grouped[-1][0] - top) <= 10:
+                grouped[-1][1].append((left, text))
+            else:
+                grouped.append((top, [(left, text)]))
+        lines = []
+        for _, cells in grouped:
+            ordered = [text for _, text in sorted(cells, key=lambda entry: entry[0])]
+            line = normalize(" ".join(ordered))
+            if line:
+                lines.append(line)
+        return lines
+
+    pdf_path = sys.argv[1]
+    page_limit = max(int(sys.argv[2]), 1)
+    ocr = RapidOCR(no_cls=True, det_limit_side_len=768, max_side_len=1920)
+    document = fitz.open(pdf_path)
+    pages = []
+    try:
+        for index in range(min(document.page_count, page_limit)):
+            page = document.load_page(index)
+            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0), alpha=False)
+            image = Image.open(BytesIO(pix.tobytes("png")))
+            if index > 0:
+                crop_top = int(image.height * 0.14)
+                image = image.crop((0, crop_top, image.width, image.height))
+            result, _ = ocr(image)
+            lines = group_rows(result)
+            if lines:
+                pages.append("\\n".join(lines))
+    finally:
+        document.close()
+    print(json.dumps({"text": "\\n".join(part for part in pages if part).strip()}, ensure_ascii=False))
+    """
+)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -158,12 +284,33 @@ class StatementParseResult:
     confidence: float
     source_text: str
     loan_hints: dict
+    parser_notes: str = ""
+    preview_only: bool = False
+    processed_page_count: int = 0
+    total_page_count: int = 0
+    preview_transaction_count: int = 0
 
 
-def parse_bank_statement(file_obj: BinaryIO) -> StatementParseResult:
-    reader = PdfReader(file_obj)
-    pages = [page.extract_text() or "" for page in reader.pages]
-    full_text = "\n".join(pages)
+@dataclass
+class StatementTextExtraction:
+    text: str
+    notes: list[str]
+    preview_only: bool
+    processed_page_count: int = 0
+    total_page_count: int = 0
+
+
+def parse_bank_statement(file_obj: BinaryIO, user=None, *, ocr_page_limit: int | None = None, preview_page_limit: int | None = None, enable_isolated_ocr: bool = True) -> StatementParseResult:
+    raw_bytes = _read_file_bytes(file_obj)
+    extraction = _extract_statement_text(
+        raw_bytes,
+        ocr_page_limit=ocr_page_limit or STATEMENT_OCR_PAGE_LIMIT,
+        preview_page_limit=preview_page_limit or STATEMENT_OCR_PREVIEW_PAGES,
+        enable_isolated_ocr=enable_isolated_ocr,
+    )
+    full_text = extraction.text
+    extraction_notes = list(extraction.notes)
+    preview_only = extraction.preview_only
 
     bank_name = _extract_bank_name(full_text)
     account_holder = _extract_account_holder(full_text)
@@ -183,7 +330,22 @@ def parse_bank_statement(file_obj: BinaryIO) -> StatementParseResult:
         transactions.append(transaction)
         previous_closing = transaction.closing_balance
 
-    confidence = 0.45
+    preview_transaction_count = len(transactions) if preview_only else 0
+    if preview_only:
+        if preview_transaction_count:
+            extraction_notes.append(
+                f"OCR preview recovered {preview_transaction_count} transaction row(s) from the first "
+                f"{max(extraction.processed_page_count, 1)} repaired page(s); Alfred imported this partial slice "
+                f"while deeper parsing remains queued for the remaining "
+                f"{max(extraction.total_page_count - extraction.processed_page_count, 0)} page(s)."
+            )
+        elif extraction.total_page_count > extraction.processed_page_count:
+            extraction_notes.append(
+                f"OCR preview recovered header data from the first {max(extraction.processed_page_count, 1)} repaired page(s); "
+                "full transaction extraction still needs a deeper retry or a cleaner bank-export PDF."
+            )
+
+    confidence = 0.08 if not full_text.strip() else 0.45
     if full_text.strip():
         confidence += 0.15
     if bank_name:
@@ -194,8 +356,20 @@ def parse_bank_statement(file_obj: BinaryIO) -> StatementParseResult:
         confidence += 0.25
     elif statement_kind != "other_statement":
         confidence += 0.05
-    confidence = round(min(confidence, 0.97), 2)
-    parser_status = "parsed" if transactions else ("needs_review" if full_text.strip() else "failed")
+    if preview_only and preview_transaction_count:
+        confidence = min(max(confidence, 0.56), 0.68)
+    elif preview_only or any("OCR preview" in note or "first page" in note for note in extraction_notes):
+        confidence = min(confidence, 0.62)
+    confidence, _ = apply_parser_learning(
+        user=user,
+        scope="statement_document",
+        filename=getattr(file_obj, "name", "statement.pdf"),
+        detected_type=statement_kind,
+        text=full_text,
+        field_names=["bank_name", "account_holder", "account_number", "statement_start", "statement_end"] + ([item.category for item in transactions[:6]] if transactions else []),
+        confidence=confidence,
+    )
+    parser_status = "parsed" if transactions and not preview_only else ("needs_review" if full_text.strip() else "failed")
 
     return StatementParseResult(
         bank_name=bank_name,
@@ -209,6 +383,11 @@ def parse_bank_statement(file_obj: BinaryIO) -> StatementParseResult:
         confidence=confidence,
         source_text=full_text[:20000],
         loan_hints=loan_hints,
+        parser_notes=" ".join(extraction_notes[:5]).strip(),
+        preview_only=preview_only,
+        processed_page_count=extraction.processed_page_count,
+        total_page_count=extraction.total_page_count,
+        preview_transaction_count=preview_transaction_count,
     )
 
 
@@ -234,6 +413,235 @@ def summarize_transactions(transactions: list[ParsedTransaction]) -> dict[str, f
             summary["other_total"] += item.amount
 
     return summary
+
+
+def _read_file_bytes(file_obj: BinaryIO) -> bytes:
+    raw_bytes = file_obj.read()
+    if hasattr(file_obj, "seek"):
+        file_obj.seek(0)
+    return raw_bytes
+
+
+def _extract_statement_text(raw_bytes: bytes, *, ocr_page_limit: int, preview_page_limit: int, enable_isolated_ocr: bool) -> StatementTextExtraction:
+    if not raw_bytes:
+        return StatementTextExtraction(text="", notes=["Uploaded statement file was empty."], preview_only=False)
+
+    extraction_notes: list[str] = []
+
+    try:
+        text = _extract_with_pypdf(raw_bytes)
+        if text:
+            return StatementTextExtraction(text=text, notes=extraction_notes, preview_only=False)
+        extraction_notes.append("Primary PDF reader did not extract readable text.")
+    except Exception as exc:
+        extraction_notes.append(f"Primary PDF reader failed: {exc}")
+
+    try:
+        text = _extract_with_fitz(raw_bytes)
+        if text:
+            extraction_notes.append("Fallback PDF reader recovered readable text.")
+            return StatementTextExtraction(text=text, notes=extraction_notes, preview_only=False)
+        extraction_notes.append("Fallback PDF reader did not extract readable text.")
+    except Exception as exc:
+        extraction_notes.append(f"Fallback PDF reader failed: {exc}")
+
+    if enable_isolated_ocr and len(raw_bytes) >= 4096:
+        isolated_text = _extract_with_isolated_ocr(raw_bytes, page_limit=preview_page_limit)
+        if isolated_text:
+            extraction_notes.append("Isolated OCR worker recovered readable text from the original PDF.")
+            return StatementTextExtraction(
+                text=isolated_text,
+                notes=extraction_notes,
+                preview_only=True,
+                processed_page_count=preview_page_limit,
+            )
+
+    repaired = rebuild_orphaned_pdf(raw_bytes)
+    if repaired:
+        extraction_notes.append(
+            f"Recovered a structurally broken PDF by rebuilding its page tree and xref table ({repaired.page_count} page(s))."
+        )
+        repaired_machine_page_limit = repaired.page_count if repaired.page_count <= ocr_page_limit else min(max(preview_page_limit, 2), repaired.page_count)
+        repaired_text = _extract_with_pypdf(repaired.repaired_bytes, page_limit=repaired_machine_page_limit) or _extract_with_fitz(
+            repaired.repaired_bytes,
+            page_limit=repaired_machine_page_limit,
+        )
+        if repaired_text:
+            extraction_notes.append(
+                "Repaired PDF yielded machine-readable text."
+                if repaired.page_count <= repaired_machine_page_limit
+                else f"Repaired PDF yielded machine-readable preview text from the first {repaired_machine_page_limit} page(s)."
+            )
+            return StatementTextExtraction(
+                text=repaired_text,
+                notes=extraction_notes,
+                preview_only=repaired.page_count > repaired_machine_page_limit,
+                processed_page_count=repaired_machine_page_limit,
+                total_page_count=repaired.page_count,
+            )
+
+        ocr_page_count = repaired.page_count if repaired.page_count <= ocr_page_limit else min(max(preview_page_limit, 2), repaired.page_count)
+        ocr_text = _extract_with_ocr(repaired.repaired_bytes, page_limit=ocr_page_count)
+        if not ocr_text and enable_isolated_ocr:
+            ocr_text = _extract_with_isolated_ocr(repaired.repaired_bytes, page_limit=ocr_page_count)
+            if ocr_text:
+                extraction_notes.append("Isolated OCR worker recovered readable text from the repaired PDF.")
+        if ocr_text:
+            if repaired.page_count <= ocr_page_limit:
+                extraction_notes.append(
+                    f"OCR recovered statement text from {ocr_page_count} repaired page(s)."
+                )
+            return StatementTextExtraction(
+                text=ocr_text,
+                notes=extraction_notes,
+                preview_only=repaired.page_count > ocr_page_limit,
+                processed_page_count=ocr_page_count,
+                total_page_count=repaired.page_count,
+            )
+
+    return StatementTextExtraction(text="", notes=extraction_notes, preview_only=False)
+
+
+def _extract_with_pypdf(raw_bytes: bytes, page_limit: int | None = None) -> str:
+    with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+        reader = PdfReader(BytesIO(raw_bytes))
+    pages = [page.extract_text() or "" for page in reader.pages[:page_limit]]
+    return "\n".join(pages).strip()
+
+
+def _extract_with_fitz(raw_bytes: bytes, page_limit: int | None = None) -> str:
+    fitz = _load_fitz()
+    if not fitz:
+        return ""
+    document = fitz.open(stream=raw_bytes, filetype="pdf")
+    try:
+        pages = [document.load_page(index).get_text("text") or "" for index in range(min(document.page_count, page_limit or document.page_count))]
+    finally:
+        document.close()
+    text = "\n".join(pages).strip()
+    return text
+
+
+def _extract_with_ocr(raw_bytes: bytes, page_limit: int) -> str:
+    fitz, rapid_ocr, image_module = _load_ocr_dependencies()
+    if not fitz or not rapid_ocr or not image_module:
+        return ""
+
+    try:
+        document = fitz.open(stream=raw_bytes, filetype="pdf")
+    except Exception:
+        logger.warning("Statement OCR could not open the PDF stream.", exc_info=True)
+        return ""
+
+    text_parts: list[str] = []
+    try:
+        pages_to_process = min(document.page_count, page_limit)
+        matrix_scale = 1.6 if pages_to_process <= 4 else 1.3
+        for index in range(pages_to_process):
+            try:
+                page = document.load_page(index)
+                pix = page.get_pixmap(matrix=fitz.Matrix(matrix_scale, matrix_scale), alpha=False)
+                image = image_module.open(BytesIO(pix.tobytes("png")))
+                if index > 0:
+                    top = int(image.height * 0.14)
+                    image = image.crop((0, top, image.width, max(image.height - 40, top + 1)))
+                result, _ = rapid_ocr(image)
+            except Exception:
+                logger.warning("Statement OCR failed on one PDF page; continuing with remaining pages.", exc_info=True)
+                continue
+
+            lines = _group_ocr_rows(result or [])
+            if lines:
+                text_parts.append("\n".join(lines))
+    finally:
+        document.close()
+
+    return "\n".join(part for part in text_parts if part).strip()
+
+
+def _group_ocr_rows(results: list) -> list[str]:
+    grouped_rows: list[tuple[float, list[tuple[float, str]]]] = []
+
+    for item in results:
+        if len(item) < 2:
+            continue
+        box = item[0]
+        text = _normalize_space(str(item[1]).replace("：", ":").replace("₹", "Rs "))
+        if not text:
+            continue
+        top = min(float(point[1]) for point in box)
+        left = min(float(point[0]) for point in box)
+        if grouped_rows and abs(grouped_rows[-1][0] - top) <= 8:
+            grouped_rows[-1][1].append((left, text))
+        else:
+            grouped_rows.append((top, [(left, text)]))
+
+    lines: list[str] = []
+    for _, cells in grouped_rows:
+        ordered = [text for _, text in sorted(cells, key=lambda entry: entry[0])]
+        line = _normalize_space(" ".join(ordered))
+        if line:
+            lines.append(line)
+    return lines
+
+
+@lru_cache(maxsize=1)
+def _load_fitz():
+    try:
+        return import_module("fitz")
+    except Exception:
+        return None
+
+
+@lru_cache(maxsize=1)
+def _load_ocr_dependencies():
+    try:
+        fitz = import_module("fitz")
+        rapid_ocr = import_module("rapidocr_onnxruntime").RapidOCR(
+            no_cls=True,
+            det_limit_side_len=768,
+            max_side_len=1920,
+        )
+        image_module = import_module("PIL.Image")
+    except Exception:
+        return None, None, None
+    return fitz, rapid_ocr, image_module
+
+
+def _extract_with_isolated_ocr(raw_bytes: bytes, page_limit: int) -> str:
+    if len(raw_bytes) < 4096:
+        return ""
+    temp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as handle:
+            handle.write(raw_bytes)
+            temp_path = handle.name
+
+        completed = subprocess.run(
+            [sys.executable, "-c", ISOLATED_OCR_WORKER, temp_path, str(max(page_limit, 1))],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=ISOLATED_OCR_TIMEOUT_SECONDS,
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+        )
+        if completed.returncode != 0:
+            return ""
+        lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
+        if not lines:
+            return ""
+        payload = json.loads(lines[-1])
+        return str(payload.get("text") or "").strip()
+    except Exception:
+        logger.warning("Isolated OCR worker failed for statement extraction.", exc_info=True)
+        return ""
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                logger.warning("Temporary statement OCR cleanup failed for %s.", temp_path, exc_info=True)
 
 
 def _collect_transaction_groups(lines: list[str]) -> list[str]:
@@ -319,6 +727,18 @@ def _classify_transaction(description: str, direction: str) -> tuple[str, str]:
             return "other", "income"
         return "other", "transfer"
 
+    if any(keyword in text for keyword in SUBSCRIPTION_KEYWORDS):
+        return "expense", "subscription"
+
+    if any(keyword in text for keyword in INVESTMENT_KEYWORDS):
+        return "other", "investment"
+
+    if any(keyword in text for keyword in CREDIT_CARD_KEYWORDS):
+        return "other", "credit_card"
+
+    if _looks_like_loan_payment(text):
+        return "loan", "loan"
+
     for classification, category, keywords in CLASSIFICATION_RULES:
         if any(keyword in text for keyword in keywords):
             return classification, category
@@ -327,6 +747,12 @@ def _classify_transaction(description: str, direction: str) -> tuple[str, str]:
         return "other", "transfer"
 
     return "expense", "other"
+
+
+def _looks_like_loan_payment(text: str) -> bool:
+    if any(keyword in text for keyword in LOAN_EXCLUSION_KEYWORDS):
+        return False
+    return any(pattern.search(text) for pattern in LOAN_KEYWORD_PATTERNS)
 
 
 def _infer_direction(description: str, closing_balance: float, previous_closing: float | None) -> str:
@@ -404,8 +830,8 @@ def _extract_statement_period(full_text: str) -> tuple[date | None, date | None]
     if match is None:
         return None, None
     return (
-        datetime.strptime(match.group(1), "%d/%m/%Y").date(),
-        datetime.strptime(match.group(2), "%d/%m/%Y").date(),
+        datetime.strptime(match.group(1).replace(":", "/").replace("-", "/"), "%d/%m/%Y").date(),
+        datetime.strptime(match.group(2).replace(":", "/").replace("-", "/"), "%d/%m/%Y").date(),
     )
 
 
@@ -417,10 +843,32 @@ def _extract_account_number(full_text: str) -> str:
 
 
 def _extract_account_holder(full_text: str) -> str:
-    match = ACCOUNT_HOLDER_RE.search(full_text)
+    for raw_line in full_text.splitlines():
+        line = _normalize_space(raw_line).upper()
+        if not line.startswith(("MR ", "MRS ", "MS ")):
+            continue
+        candidate = line.split(" ", 1)[1]
+        cleaned_tokens: list[str] = []
+        for token in candidate.split():
+            if token in ACCOUNT_HOLDER_STOP_WORDS:
+                break
+            cleaned_tokens.append(token)
+            if len(cleaned_tokens) >= 4:
+                break
+        if cleaned_tokens:
+            return _normalize_space(" ".join(cleaned_tokens).title())
+
+    match = ACCOUNT_HOLDER_RE.search(full_text.upper())
     if match is None:
         return ""
-    return _normalize_space(match.group(1).title())
+    tokens: list[str] = []
+    for token in match.group(1).split():
+        if token in ACCOUNT_HOLDER_STOP_WORDS:
+            break
+        tokens.append(token)
+        if len(tokens) >= 4:
+            break
+    return _normalize_space(" ".join(tokens).title())
 
 
 def _extract_bank_name(full_text: str) -> str:
@@ -509,9 +957,9 @@ def _extract_company_name(text: str) -> str:
     for keyword, label in BANK_NAME_RULES:
         if keyword in upper:
             return label
-    for keyword in ("AMAZON", "FLIPKART", "MYNTRA", "SWIGGY", "ZOMATO", "GROWW", "ZERODHA", "CRED", "JIO", "NETFLIX", "SPOTIFY"):
+    for keyword in ("AMAZON", "FLIPKART", "MYNTRA", "SWIGGY", "ZOMATO", "GROWW", "ZERODHA", "CRED", "JIO", "NETFLIX", "SPOTIFY", "GOOGLE PLAY", "PLAYSTORE", "YOUTUBE"):
         if keyword in upper:
-            return keyword.title()
+            return "Google Play" if keyword in {"GOOGLE PLAY", "PLAYSTORE"} else keyword.title()
 
     merchant_guess = _extract_merchant(text)
     return merchant_guess[:255]

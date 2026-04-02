@@ -74,13 +74,24 @@ class CareerResumeLearningMemory(models.Model):
 
 
 class CareerJobAnalysis(models.Model):
+    PARSER_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("parsed", "Parsed"),
+        ("needs_review", "Needs Review"),
+        ("failed", "Failed"),
+    ]
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="career_job_analyses")
     source_name = models.CharField(max_length=120, blank=True)
+    source_document_name = models.CharField(max_length=255, blank=True)
     job_url = models.URLField()
     apply_url = models.URLField(blank=True)
     company = models.CharField(max_length=180, blank=True)
     job_title = models.CharField(max_length=180, blank=True)
     location = models.CharField(max_length=180, blank=True)
+    parser_status = models.CharField(max_length=20, choices=PARSER_STATUS_CHOICES, default="pending")
+    parse_confidence = models.FloatField(default=0)
+    extracted_text = models.TextField(blank=True)
     fit_score = models.FloatField(default=0)
     market_risk_score = models.FloatField(default=0)
     strengths = models.TextField(blank=True)
@@ -89,12 +100,14 @@ class CareerJobAnalysis(models.Model):
     extracted_payload = models.JSONField(default=dict, blank=True)
     evidence = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-created_at", "-id"]
+        ordering = ["-updated_at", "-id"]
         indexes = [
             models.Index(fields=["user", "created_at"]),
             models.Index(fields=["user", "company", "created_at"]),
+            models.Index(fields=["user", "parser_status", "updated_at"]),
         ]
 
     def __str__(self):

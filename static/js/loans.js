@@ -22,17 +22,20 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function loadLoanPage() {
+    Alfred.setPageBusy("loanPlannerRoot", true, { label: "Loading loan workspace" });
     return Alfred.fetchJSON("/api/loans/summary/")
         .then(renderLoanSummary)
         .then(() => Alfred.clearPageAlert("loanPlannerRoot"))
         .catch(error => {
             Alfred.upsertPageAlert("loanPlannerRoot", error.message, "danger");
-        });
+        })
+        .finally(() => Alfred.setPageBusy("loanPlannerRoot", false));
 }
 
 function renderLoanSummary(payload) {
     const summary = payload.summary;
     const behavior = payload.behavior;
+    const pendingForeclosureBalance = Number(summary.pending_foreclosure_excluded_balance || 0);
 
     document.getElementById("loanDebtRatio").textContent = Alfred.formatPercent(behavior.debt_service_ratio);
 
@@ -45,7 +48,9 @@ function renderLoanSummary(payload) {
         {
             kicker: "Manual Outstanding",
             value: Alfred.formatCurrency(summary.manual_total_outstanding),
-            caption: "Estimated outstanding balance across manual loans.",
+            caption: pendingForeclosureBalance
+                ? `${Alfred.formatCurrency(pendingForeclosureBalance)} is pending foreclosure verification and still counted in liabilities.`
+                : "Estimated outstanding balance across manual loans.",
         },
         {
             kicker: "Planned EMI",
@@ -57,6 +62,11 @@ function renderLoanSummary(payload) {
             value: Alfred.formatCurrency(summary.detected_repayment_total),
             caption: `${summary.projected_payoff_months} projected months to close current manual book.`,
         },
+        {
+            kicker: "Foreclosure Watch",
+            value: summary.foreclosure_pending_count,
+            caption: `${summary.reconciled_foreclosures} closure payment match${summary.reconciled_foreclosures === 1 ? "" : "es"} confirmed from statements.`,
+        },
     ];
 
     document.getElementById("loanSummaryCards").innerHTML = cards.map(card => `
@@ -67,9 +77,35 @@ function renderLoanSummary(payload) {
         </article>
     `).join("");
 
+    renderPendingForeclosureNotice(summary, payload.balance_sheet || {});
     renderLoanChart(payload.chart);
     renderLoanTable(summary.manual_loans);
+    renderRecentClosures(payload.recent_closures || []);
     renderDetectedRepayments(summary.detected_repayments);
+    renderLoanImportHistory(payload.recent_imports || []);
+}
+
+function renderPendingForeclosureNotice(summary, balanceSheet) {
+    const target = document.getElementById("loanPendingForeclosureNotice");
+    if (!target) {
+        return;
+    }
+    const pendingBalance = Number(summary.pending_foreclosure_excluded_balance || 0);
+    const totalLiabilities = Number(balanceSheet.total_liabilities || 0);
+    if (pendingBalance <= 0 || Number(summary.foreclosure_pending_count || 0) <= 0) {
+        target.className = "d-none mb-4";
+        target.innerHTML = "";
+        return;
+    }
+
+    target.className = "alert alert-warning border-0 shadow-sm mb-4";
+    target.innerHTML = `
+        <div class="fw-semibold">Pending foreclosure still counts as debt.</div>
+        <div class="small mt-1">
+            ${Alfred.formatCurrency(pendingBalance)} remains inside liabilities and net worth until Alfred confirms a full closure-payment match from statements.
+            Current tracked liabilities: ${Alfred.formatCurrency(totalLiabilities)}.
+        </div>
+    `;
 }
 
 function renderLoanChart(chart) {
@@ -187,6 +223,68 @@ function renderDetectedRepayments(items) {
             </div>
         </div>
     `).join("");
+}
+
+function renderLoanImportHistory(items) {
+    const target = document.getElementById("loanImportHistory");
+    if (!target) {
+        return;
+    }
+    if (!items.length) {
+        target.innerHTML = `<div class="empty-state">No loan import history saved yet.</div>`;
+        return;
+    }
+
+    target.innerHTML = items.slice(0, 5).map(item => {
+        const linkedLoans = Array.isArray(item.linked_loans) ? item.linked_loans : [];
+        const linkedSummary = linkedLoans.length
+            ? `${linkedLoans.length} loan record${linkedLoans.length === 1 ? "" : "s"} linked`
+            : "Saved for review";
+        return `
+            <div class="mini-card">
+                <div class="fw-semibold">${Alfred.escapeHtml(item.file_name || "Loan document")}</div>
+                <div class="muted small">${Alfred.escapeHtml(formatLoanType(item.document_type || "other"))} | ${(Number(item.parse_confidence || 0) * 100).toFixed(0)}% | ${Alfred.formatDateTime(item.created_at)}</div>
+                <div class="muted small mt-2">${Alfred.escapeHtml(item.parser_status_label || item.parser_status || "Unknown")} | ${Alfred.escapeHtml(linkedSummary)}</div>
+                <div class="muted small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
+            </div>
+        `;
+    }).join("");
+}
+
+function renderRecentClosures(items) {
+    const target = document.getElementById("loanClosureActivity");
+    if (!target) {
+        return;
+    }
+    if (!items.length) {
+        target.innerHTML = `<div class="detail-item">No foreclosure or no-due documents have been uploaded yet.</div>`;
+        return;
+    }
+
+    target.innerHTML = items.slice(0, 6).map(item => {
+        const snapshot = item.foreclosure_snapshot || {};
+        const amount = snapshot.total_amount_payable ?? item.closure_amount ?? 0;
+        const matched = snapshot.matched_payment_total ?? 0;
+        const status = snapshot.reconciliation_status_label || snapshot.reconciliation_status || item.verification_status_label || item.verification_status || "Pending";
+        const dateLabel = snapshot.effective_closure_date ? Alfred.formatDate(snapshot.effective_closure_date) : (item.closure_date ? Alfred.formatDate(item.closure_date) : "Date not detected");
+        return `
+            <div class="detail-item mb-3">
+                <div class="d-flex justify-content-between gap-3 align-items-start">
+                    <div>
+                        <div class="fw-semibold">${Alfred.escapeHtml(item.file_name || "Closure document")}</div>
+                        <div class="muted small">${Alfred.escapeHtml(item.parser_status_label || item.parser_status || "Unknown")} | ${Alfred.escapeHtml(item.verification_status_label || item.verification_status || "Pending")} | ${Alfred.escapeHtml(status)}</div>
+                        <div class="muted small mt-1">${Alfred.escapeHtml(snapshot.document_type_label || snapshot.document_type || "Closure document")} | ${Alfred.escapeHtml(snapshot.lender_name || "")}</div>
+                        <div class="muted small mt-1">${dateLabel}${snapshot.loan_account_number ? ` | A/C ${Alfred.escapeHtml(snapshot.loan_account_number)}` : ""}</div>
+                        <div class="muted small mt-2">${Alfred.escapeHtml(snapshot.reconciliation_notes || item.verification_notes || "")}</div>
+                    </div>
+                    <div class="text-end">
+                        <div><strong>${Alfred.formatCurrency(amount)}</strong></div>
+                        <div class="muted small mt-1">Matched ${Alfred.formatCurrency(matched)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join("");
 }
 
 function submitLoanForm(event) {
@@ -397,35 +495,51 @@ function showLoanError(error) {
 
 function importLoanPdf() {
     const fileInput = document.getElementById("loanPdfFile");
-    const file = fileInput.files[0];
-    if (!file) {
-        showLoanImportStatus("Choose a PDF loan document first.", "warning");
+    const files = Array.from(fileInput.files || []);
+    if (!files.length) {
+        showLoanImportStatus("Choose at least one PDF loan document first.", "warning");
         return;
     }
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
+    if (files.some(file => !file.name.toLowerCase().endsWith(".pdf"))) {
         showLoanImportStatus("Only PDF loan documents are supported.", "warning");
         return;
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
     const button = document.getElementById("loanImportBtn");
     button.disabled = true;
-    button.textContent = "Importing...";
+    Alfred.showUploadProgress("loanImportStatus", {
+        phase: "preparing",
+        percent: 0,
+        current: 1,
+        total: files.length,
+    });
 
-    Alfred.fetchJSON("/api/loans/import-pdf/", {
-        method: "POST",
-        body: formData,
-    })
-        .then(data => {
-            fileInput.value = "";
-            showLoanImportResult(data);
-            loadLoanPage();
+    Alfred.uploadFilesSequentially(
+        files,
+        (file, uploadContext) => {
+            const formData = new FormData();
+            formData.append("file", file);
+            return Alfred.uploadJSON("/api/loans/import-pdf/", {
+                method: "POST",
+                body: formData,
+                onUploadState: uploadContext?.reportProgress,
+            });
+        },
+        {
+            onProgress: state => Alfred.showUploadProgress("loanImportStatus", state),
+        },
+    )
+        .then(results => {
+            const summary = summarizeLoanImportBatch(results);
+            if (summary.succeeded.length) {
+                fileInput.value = "";
+                loadLoanPage();
+            }
+            showLoanImportStatus(summary.message, summary.tone);
         })
         .catch(error => showLoanImportStatus(error.message, "danger"))
         .finally(() => {
             button.disabled = false;
-            button.textContent = "Import Loan PDF";
         });
 }
 
@@ -470,6 +584,34 @@ function showLoanImportResult(payload) {
             ${chips ? `<div class="chip-row mt-3">${chips}</div>` : ""}
         </div>
     `;
+}
+
+function summarizeLoanImportBatch(results) {
+    const summary = Alfred.summarizeUploadBatch(results, { itemLabel: "loan document", successVerb: "processed" });
+    const importedLoans = summary.succeeded.reduce((sum, result) => sum + Number(result.data?.loans?.length || 0), 0);
+    const reviewCount = summary.succeeded.filter(result => result.data?.upload?.parser_status !== "parsed").length;
+    const documentTypes = [...new Set(
+        summary.succeeded
+            .map(result => result.data?.document_type)
+            .filter(Boolean)
+            .map(formatLoanType)
+    )];
+    const extras = [];
+
+    if (summary.succeeded.length) {
+        extras.push(`${Alfred.formatNumber(importedLoans, 0)} loan record${importedLoans === 1 ? "" : "s"} created or updated`);
+    }
+    if (reviewCount) {
+        extras.push(`${reviewCount} saved for review`);
+    }
+    if (documentTypes.length) {
+        extras.push(`types: ${documentTypes.join(", ")}`);
+    }
+
+    return {
+        ...summary,
+        message: extras.length ? `${summary.message} ${extras.join(" | ")}.` : summary.message,
+    };
 }
 
 function formatLoanType(value) {

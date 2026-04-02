@@ -38,6 +38,8 @@ class BankAccountSerializer(serializers.ModelSerializer):
 class StatementUploadSerializer(serializers.ModelSerializer):
     bank_account_id = serializers.IntegerField(source="bank_account.id", read_only=True)
     parser_status_label = serializers.CharField(source="get_parser_status_display", read_only=True)
+    parser_notes = serializers.SerializerMethodField()
+    has_transactions = serializers.SerializerMethodField()
 
     class Meta:
         model = StatementUpload
@@ -54,12 +56,21 @@ class StatementUploadSerializer(serializers.ModelSerializer):
             "statement_end",
             "parser_status",
             "parser_status_label",
+            "parser_notes",
             "parse_confidence",
             "extracted_payload",
             "imported_count",
+            "has_transactions",
             "uploaded_at",
         )
         read_only_fields = fields
+
+    def get_parser_notes(self, obj):
+        payload = obj.extracted_payload or {}
+        return payload.get("parser_notes", "")
+
+    def get_has_transactions(self, obj):
+        return bool(obj.imported_count)
 
 
 class ExpenseSerializer(serializers.ModelSerializer):

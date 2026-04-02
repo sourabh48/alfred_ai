@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     LoanDetailView,
+    LoanImportDocumentListView,
     LoanListCreateView,
     LoanConsolidationView,
     LoanSummaryView,
@@ -15,6 +16,7 @@ from .views import (
 urlpatterns = [
     path("", LoanListCreateView.as_view(), name="loan_list_create"),
     path("summary/", LoanSummaryView.as_view(), name="loan_summary"),
+    path("import-uploads/", LoanImportDocumentListView.as_view(), name="loan_import_uploads"),
     path("import-pdf/", import_loan_pdf, name="import_loan_pdf"),
     path("consolidate/", LoanConsolidationView.as_view(), name="loan_consolidate"),
     path("detect-from-expenses/", detect_loans_from_expenses, name="detect_loans"),

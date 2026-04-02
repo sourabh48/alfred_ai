@@ -20,6 +20,7 @@ function loadRelationshipDashboard(options = {}) {
             renderRelationshipSummary(profiles, alignment);
             renderRelationshipChart(profiles, alignment);
             renderRelationshipInsights(alignment.insights || [alignment.message || "No relationship insights yet."]);
+            renderRelationshipGrounding(alignment);
             renderRelationshipTable(profiles);
             if (!options.live) {
                 hydrateRelationshipForm(profiles[0]);
@@ -62,16 +63,17 @@ function renderRelationshipChart(profiles, alignment) {
         relationshipChart.destroy();
     }
 
+    const factorMap = Object.fromEntries((alignment.factors || []).map(item => [item.label, item.score]));
     const partner = [
-        latest?.partner_financial_score || 0,
-        (latest?.partner_savings_habits || 0) * 20,
-        latest?.compatibility_score || 0,
+        factorMap["Financial Alignment"] || latest?.partner_financial_score || 0,
+        factorMap["Savings Habit Fit"] || (latest?.partner_savings_habits || 0) * 20,
+        factorMap["Shared Resilience"] || latest?.compatibility_score || 0,
         alignment.alignment_score || 0,
     ];
     const baseline = [
         alignment.alignment_score || 0,
-        75,
-        Math.max(60, alignment.alignment_score || 0),
+        factorMap["Savings Habit Fit"] || 75,
+        factorMap["Planning Pressure"] || Math.max(60, alignment.alignment_score || 0),
         80,
     ];
 
@@ -108,6 +110,31 @@ function renderRelationshipChart(profiles, alignment) {
 function renderRelationshipInsights(items) {
     const target = document.getElementById("relationshipInsightList");
     target.innerHTML = items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+}
+
+function renderRelationshipGrounding(alignment) {
+    const factors = alignment.factors || [];
+    const grounding = alignment.grounding || {};
+    const history = grounding.history || {};
+    const cardsTarget = document.getElementById("relationshipFactorCards");
+    const listTarget = document.getElementById("relationshipGroundingList");
+
+    cardsTarget.innerHTML = factors.map(item => `
+        <article class="metric-card metric-card--compact">
+            <p class="metric-kicker">${Alfred.escapeHtml(item.label)}</p>
+            <h3 class="metric-value" style="font-size:1.35rem;">${Alfred.formatNumber(item.score || 0, 0)}/100</h3>
+            <p class="metric-caption">${Alfred.escapeHtml(item.detail || "")}</p>
+        </article>
+    `).join("");
+
+    const details = [
+        `Monthly income grounding: ${Alfred.formatCurrency(history.monthly_income || 0)}`,
+        `Monthly expense grounding: ${Alfred.formatCurrency(history.monthly_expenses || 0)}`,
+        `Debt pressure: ${Alfred.formatNumber(history.debt_pressure || 0, 0)}/100`,
+        ...((grounding.notes || []).map(item => item)),
+        ...((grounding.evidence || []).map(item => `${item.source_name || item.title}: ${item.summary || ""}`)),
+    ];
+    listTarget.innerHTML = details.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
 }
 
 function renderRelationshipTable(items) {

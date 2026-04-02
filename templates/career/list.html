@@ -79,22 +79,24 @@
                     </div>
                 </div>
                 <div id="careerFormFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Update Career Profile</button>
+                <div class="d-flex flex-wrap gap-3 align-items-center">
+                    <button class="btn btn-primary" type="submit">Update Career Profile</button>
+                </div>
             </form>
         </div>
     </div>
     <div class="col-xl-7">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Resume Intelligence</h2>
-            <p class="page-section-copy mb-3">Upload a resume so ALFRED can extract skills, strengths, weaknesses, and improve job-fit analysis. PDF, DOCX, TXT, HTML, RTF, ODT, and image-based CV files are accepted; scanned files move to review if OCR is not available on the server.</p>
+            <p class="page-section-copy mb-3">Upload one or more resumes so ALFRED can extract skills, strengths, weaknesses, and improve job-fit analysis. PDF, DOCX, TXT, HTML, RTF, ODT, and image-based CV files are accepted; scanned files move to review if OCR is not available on the server.</p>
             <form id="careerResumeForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-md-8">
-                        <label class="form-label" for="careerResumeFile">Resume File</label>
-                        <input id="careerResumeFile" name="resume" type="file" class="form-control" accept=".pdf,.doc,.docx,.txt,.md,.rtf,.html,.htm,.odt,image/*,application/pdf,text/plain,text/markdown,text/html,application/rtf,application/vnd.oasis.opendocument.text" required>
+                        <label class="form-label" for="careerResumeFile">Resume Files</label>
+                        <input id="careerResumeFile" name="resume" type="file" class="form-control" accept=".pdf,.doc,.docx,.txt,.md,.rtf,.html,.htm,.odt,image/*,application/pdf,text/plain,text/markdown,text/html,application/rtf,application/vnd.oasis.opendocument.text" multiple required>
                     </div>
                     <div class="col-md-4 d-flex align-items-end">
-                        <button class="btn btn-primary w-100" type="submit">Upload Resume</button>
+                        <button class="btn btn-primary w-100" type="submit">Upload Resume Files</button>
                     </div>
                 </div>
                 <div id="careerResumeFeedback" class="d-none alert mb-0"></div>
@@ -122,6 +124,54 @@
 </section>
 
 <section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">What-If Simulation</h2>
+            <p class="page-section-copy mb-3">Change one or more career inputs and compare the current projection against the simulated path.</p>
+            <form id="careerSimulationForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="simulationIncome">Monthly Income</label>
+                        <input id="simulationIncome" name="monthly_income" type="number" step="0.01" class="form-control" placeholder="Current income">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="simulationVariableIncome">Variable Income</label>
+                        <input id="simulationVariableIncome" name="variable_income" type="number" step="0.01" class="form-control" placeholder="Bonus or side income">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="simulationRentOrEmi">Rent / EMI</label>
+                        <input id="simulationRentOrEmi" name="rent_or_emi" type="number" step="0.01" class="form-control" placeholder="Monthly fixed load">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="simulationCity">City</label>
+                        <input id="simulationCity" name="city" class="form-control" placeholder="Bengaluru">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="simulationExperience">Experience (Years)</label>
+                        <input id="simulationExperience" name="experience_years" type="number" step="0.1" class="form-control" placeholder="5.0">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="simulationSkills">Skills</label>
+                        <textarea id="simulationSkills" name="skills" rows="3" class="form-control" placeholder="Python, SQL, Django, AWS"></textarea>
+                    </div>
+                </div>
+                <div id="careerSimulationFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Run Simulation</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Before / After Comparison</h2>
+            <p class="page-section-copy mb-3">Baseline projection vs the simulated scenario, with explicit assumptions and deltas.</p>
+            <div id="careerSimulationPanel" class="data-stack">
+                <div class="empty-state">Run a simulation to compare baseline and scenario outcomes.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Five-Year Projection</h2>
@@ -136,7 +186,7 @@
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Job Match</h2>
-            <p class="page-section-copy mb-3">Paste a job link from a career portal. ALFRED will parse the role, compare it against your resume, and show the fit score.</p>
+            <p class="page-section-copy mb-3">Paste a job link from a career portal or drop recruiter mail / JD text so ALFRED can compare the role against your resume and compensation baseline.</p>
             <form id="careerJobMatchForm" class="soft-grid">
                 <div class="row g-3">
                     <div class="col-12">
@@ -147,7 +197,25 @@
                 <div id="careerJobFeedback" class="d-none alert mb-0"></div>
                 <button class="btn btn-primary" type="submit">Analyze Job Link</button>
             </form>
+            <div class="section-divider my-4"></div>
+            <form id="careerRecruiterForm" class="soft-grid" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="careerRecruiterText">Recruiter Mail / JD Text</label>
+                        <textarea id="careerRecruiterText" name="message_text" rows="4" class="form-control" placeholder="Paste recruiter email text or JD notes here."></textarea>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label" for="careerRecruiterFile">JD Attachment</label>
+                        <input id="careerRecruiterFile" name="attachment" type="file" class="form-control" accept=".pdf,.doc,.docx,.txt,.html,.htm,.rtf,.odt,application/pdf,text/plain,text/html">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-outline-primary w-100" type="submit">Analyze Recruiter Lead</button>
+                    </div>
+                </div>
+                <div id="careerRecruiterFeedback" class="d-none alert mb-0"></div>
+            </form>
             <div class="mt-4" id="careerJobMatchPanel"></div>
+            <div class="mt-4" id="careerCompensationPanel"></div>
         </div>
     </div>
 </section>
@@ -169,8 +237,21 @@
     </div>
     <div class="col-xl-4">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Suggested Openings</h2>
-            <p class="page-section-copy mb-3">Live openings with application links based on your current role and skills.</p>
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <h2 class="page-section-title mb-1">Suggested Openings</h2>
+                    <p class="page-section-copy mb-0">Verified opening feeds matched to your current role and skills.</p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <select id="careerOpeningCountryFilter" class="form-select form-select-sm" style="min-width: 140px;">
+                        <option value="">All countries</option>
+                    </select>
+                    <select id="careerOpeningStateFilter" class="form-select form-select-sm" style="min-width: 140px;">
+                        <option value="">All states</option>
+                    </select>
+                </div>
+            </div>
+            <div class="muted small mb-3" id="careerOpeningsMeta">Openings will be narrowed by the filters you choose here.</div>
             <div id="careerOpenings" class="data-stack"></div>
         </div>
     </div>
@@ -178,5 +259,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/career.js?v=2.4"></script>
+<script src="/static/js/career.js?v=3.2"></script>
 {% endblock %}

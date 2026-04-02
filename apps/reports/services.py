@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.utils import timezone
 
 from alfred_ai.internal_clock import clock_snapshot
-from apps.reports.models import SystemTicket
+from apps.reports.models import OperationalLog, SystemTicket
 
 
 class ReportingService:
@@ -135,3 +135,58 @@ class ReportingService:
 
 
 reporting_service = ReportingService()
+
+
+class OperationalLoggingService:
+    def log(
+        self,
+        *,
+        user,
+        module: str,
+        event_type: str,
+        message: str,
+        category: str = "document",
+        severity: str = "info",
+        scope: str = "",
+        document_id: int | None = None,
+        file_name: str = "",
+        payload: dict | None = None,
+    ) -> OperationalLog:
+        normalized_payload = dict(payload or {})
+        normalized_payload["internal_clock"] = clock_snapshot()
+        return OperationalLog.objects.create(
+            user=user,
+            module=module[:30] or "general",
+            category=category,
+            scope=scope[:50],
+            event_type=event_type[:50] or "event",
+            severity=severity,
+            document_id=document_id,
+            file_name=file_name[:255],
+            message=message.strip(),
+            payload=normalized_payload,
+        )
+
+    def recent_for_user(self, user, *, limit: int = 20, category: str | None = None) -> list[OperationalLog]:
+        queryset = OperationalLog.objects.filter(user=user)
+        if category:
+            queryset = queryset.filter(category=category)
+        return list(queryset.order_by("-created_at", "-id")[:limit])
+
+    def serialize(self, entry: OperationalLog) -> dict:
+        return {
+            "id": entry.id,
+            "module": entry.module,
+            "category": entry.category,
+            "scope": entry.scope,
+            "event_type": entry.event_type,
+            "severity": entry.severity,
+            "document_id": entry.document_id,
+            "file_name": entry.file_name,
+            "message": entry.message,
+            "payload": entry.payload or {},
+            "created_at": entry.created_at.isoformat(),
+        }
+
+
+operational_logging_service = OperationalLoggingService()

@@ -4,8 +4,11 @@ Django settings for alfred_ai project.
 
 import environ
 import os
+import sys
 from pathlib import Path
 from datetime import timedelta
+
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -13,14 +16,62 @@ env = environ.Env()
 env.read_env(os.path.join(BASE_DIR, ".env"))
 
 
+def _is_local_runtime(argv: list[str] | None = None) -> bool:
+    argv = list(argv or sys.argv)
+    command = argv[1] if len(argv) > 1 else ""
+    return command in {
+        "check",
+        "createsuperuser",
+        "flush",
+        "loaddata",
+        "makemigrations",
+        "migrate",
+        "runserver",
+        "shell",
+        "showmigrations",
+        "test",
+    }
+
+
+def _default_secret_key(local_runtime: bool) -> str:
+    if local_runtime:
+        return "alfred-local-development-key"
+    return ""
+
+
+def _default_allowed_hosts(local_runtime: bool) -> list[str]:
+    if local_runtime:
+        return ["127.0.0.1", "localhost", "[::1]", "testserver"]
+    return []
+
+
+def _default_cors_allow_all(local_runtime: bool) -> bool:
+    return bool(local_runtime)
+
+
+def _default_ssl_redirect(local_runtime: bool) -> bool:
+    return not local_runtime
+
+
+def _default_secure_cookie(local_runtime: bool) -> bool:
+    return not local_runtime
+
+
+def _default_hsts_seconds(local_runtime: bool) -> int:
+    return 0 if local_runtime else 31536000
+
+
 # ---------------------------------------------------------
 # CORE
 # ---------------------------------------------------------
 
-SECRET_KEY = env("DJANGO_SECRET_KEY", default="CHANGEME")
-DEBUG = env.bool("DEBUG", default=True)
+LOCAL_RUNTIME = env.bool("ALFRED_LOCAL_RUNTIME", default=_is_local_runtime())
+DEBUG = env.bool("DEBUG", default=LOCAL_RUNTIME)
+SECRET_KEY = env("DJANGO_SECRET_KEY", default=_default_secret_key(LOCAL_RUNTIME))
+if not SECRET_KEY:
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when local runtime mode is disabled.")
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "192.168.0.108", "[::1]", "testserver"]
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=_default_allowed_hosts(LOCAL_RUNTIME))
 
 # ---------------------------------------------------------
 # INSTALLED APPS
@@ -50,7 +101,7 @@ INSTALLED_APPS = [
     "apps.risk",
     "apps.reports",
     "apps.mobility",
-    "apps.ml_engine",
+    "apps.ml_engine.apps.MlEngineConfig",
     "apps.integrations",
 ]
 
@@ -78,9 +129,27 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=True)
+CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=_default_cors_allow_all(LOCAL_RUNTIME))
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=_default_ssl_redirect(LOCAL_RUNTIME))
+SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=_default_secure_cookie(LOCAL_RUNTIME))
+CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=_default_secure_cookie(LOCAL_RUNTIME))
+SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=_default_hsts_seconds(LOCAL_RUNTIME))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool(
+    "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    default=bool(SECURE_HSTS_SECONDS),
+)
+SECURE_HSTS_PRELOAD = env.bool(
+    "SECURE_HSTS_PRELOAD",
+    default=bool(SECURE_HSTS_SECONDS),
+)
+SECURE_CONTENT_TYPE_NOSNIFF = env.bool("SECURE_CONTENT_TYPE_NOSNIFF", default=True)
+SECURE_REFERRER_POLICY = env("SECURE_REFERRER_POLICY", default="same-origin")
+X_FRAME_OPTIONS = env("X_FRAME_OPTIONS", default="DENY")
 
 
 # ---------------------------------------------------------
@@ -105,6 +174,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "alfred_ai.context_processors.global_ui_config",
             ],
         },
     },
@@ -191,6 +261,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.ml_engine.continual.tasks.run_global_training_cycle",
         "schedule": timedelta(hours=24),
     },
+    "statement-review-retry": {
+        "task": "apps.expenses.tasks.retry_low_confidence_statement_uploads",
+        "schedule": timedelta(minutes=20),
+        "args": (3,),
+    },
     "verified-intelligence-refresh": {
         "task": "apps.integrations.tasks.refresh_verified_external_intelligence",
         "schedule": timedelta(hours=6),
@@ -200,6 +275,37 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.integrations.tasks.cleanup_verified_external_intelligence",
         "schedule": timedelta(hours=24),
         "args": (90,),
+    },
+}
+
+ALFRED_AUTO_TRAIN_ON_STARTUP = env.bool("ALFRED_AUTO_TRAIN_ON_STARTUP", default=True)
+ALFRED_AUTO_TRAIN_COOLDOWN_MINUTES = env.int("ALFRED_AUTO_TRAIN_COOLDOWN_MINUTES", default=45)
+
+
+# ---------------------------------------------------------
+# LOGGING
+# ---------------------------------------------------------
+
+LOG_LEVEL = env("LOG_LEVEL", default="INFO").upper()
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "structured": {
+            "format": "ts=%(asctime)s level=%(levelname)s logger=%(name)s msg=%(message)s",
+            "datefmt": "%Y-%m-%dT%H:%M:%S%z",
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "structured",
+        }
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": LOG_LEVEL,
     },
 }
 

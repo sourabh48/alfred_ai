@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Create Account | Alfred{% endblock %}
+
+{% block content %}
+<section class="auth-shell">
+    <div class="auth-shell-grid auth-shell-grid-wide">
+        <div class="auth-hero alfred-fade-up">
+            <div class="auth-market-scene" aria-hidden="true">
+                <span class="auth-market-orb auth-market-orb-one"></span>
+                <span class="auth-market-orb auth-market-orb-two"></span>
+                <span class="auth-market-line auth-market-line-one"></span>
+                <span class="auth-market-line auth-market-line-two"></span>
+                <span class="auth-market-chip auth-market-chip-one">Income context</span>
+                <span class="auth-market-chip auth-market-chip-two">Credit-aware setup</span>
+                <span class="auth-market-chip auth-market-chip-three">Life dashboard ready</span>
+            </div>
+            <div class="auth-eyebrow">{{ ui_config.auth.signup.eyebrow }}</div>
+            <h1 class="auth-title">{{ ui_config.auth.signup.title }}</h1>
+            <p class="auth-copy">{{ ui_config.auth.signup.description }}</p>
+            <div class="auth-feature-list">
+                {% for item in ui_config.auth.signup.highlights %}
+                <div class="auth-feature-item">{{ item }}</div>
+                {% endfor %}
+            </div>
+            <div class="auth-finance-board">
+                <div class="auth-finance-stat">
+                    <span class="auth-finance-label">Baseline profile</span>
+                    <strong>Income, city, and fixed load</strong>
+                </div>
+                <div class="auth-finance-stat">
+                    <span class="auth-finance-label">Reusable context</span>
+                    <strong>Shared across finance and career modules</strong>
+                </div>
+                <div class="auth-finance-stat">
+                    <span class="auth-finance-label">Production flow</span>
+                    <strong>Start simple, enrich with statements and documents later</strong>
+                </div>
+            </div>
+        </div>
+        <div class="auth-panel alfred-fade-up" style="animation-delay: 0.08s;">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div>
+                    <div class="panel-eyebrow">{{ ui_config.brand.name }}</div>
+                    <h2 class="h3 fw-bold mb-2">{{ ui_config.auth.signup.title }}</h2>
+                    <p class="text-muted mb-0">{{ ui_config.auth.signup.description }}</p>
+                </div>
+                <a href="{% url 'login' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">{{ ui_config.auth.signup.secondary_cta }}</a>
+            </div>
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+                {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <div class="col-12">
+                    <div class="auth-form-section">
+                        <div class="auth-form-section-title">Identity</div>
+                        <div class="auth-form-section-copy">Set the personal profile Alfred uses across dashboards.</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="{{ form.username.id_for_label }}">Username</label>
+                    {{ form.username }}
+                    {% for error in form.username.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+                    {{ form.email }}
+                    {% for error in form.email.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="{{ form.first_name.id_for_label }}">First name</label>
+                    {{ form.first_name }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="{{ form.last_name.id_for_label }}">Last name</label>
+                    {{ form.last_name }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="{{ form.city.id_for_label }}">City</label>
+                    {{ form.city }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="{{ form.country.id_for_label }}">Country</label>
+                    {{ form.country }}
+                </div>
+                <div class="col-12">
+                    <div class="auth-form-section auth-form-section-compact">
+                        <div class="auth-form-section-title">Monthly context</div>
+                        <div class="auth-form-section-copy">These numbers power early debt, cash-flow, and career guidance.</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="{{ form.monthly_income.id_for_label }}">Monthly income</label>
+                    {{ form.monthly_income }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="{{ form.variable_income.id_for_label }}">Variable income</label>
+                    {{ form.variable_income }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="{{ form.rent_or_emi.id_for_label }}">Rent / EMI</label>
+                    {{ form.rent_or_emi }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="{{ form.password1.id_for_label }}">Password</label>
+                    {{ form.password1 }}
+                    {% for error in form.password1.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="{{ form.password2.id_for_label }}">Confirm password</label>
+                    {{ form.password2 }}
+                    {% for error in form.password2.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-12 d-grid d-sm-flex gap-3 align-items-center">
+                    <button type="submit" class="btn btn-dark rounded-pill px-4">{{ ui_config.auth.signup.primary_cta }}</button>
+                    <div class="text-muted small">You will be signed in immediately after the account is created.</div>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}

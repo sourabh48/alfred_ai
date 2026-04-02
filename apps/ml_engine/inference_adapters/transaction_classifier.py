@@ -2,7 +2,9 @@
 Advanced Transaction Classifier using ML for payment type, recipient, and company detection.
 Uses sentence transformers for semantic understanding of transaction descriptions.
 """
+import os
 import re
+import sys
 from typing import Dict, List, Tuple, Optional
 from .base_adapter import BaseModelAdapter
 
@@ -11,9 +13,10 @@ try:
     from sentence_transformers import SentenceTransformer, util
     import torch
     SENTENCE_TRANSFORMERS_AVAILABLE = True
-except (ImportError, NameError):
+except (ImportError, NameError, OSError):
     SENTENCE_TRANSFORMERS_AVAILABLE = False
     SentenceTransformer = None
+    util = None
 
 
 class TransactionClassifierAdapter(BaseModelAdapter):
@@ -36,13 +39,27 @@ class TransactionClassifierAdapter(BaseModelAdapter):
             self.model = None
             return
 
+        if self._offline_model_loading_disabled():
+            print("Info: Remote transformer loading disabled in offline/test mode. Using rule-based classification only.")
+            self.model = None
+            return
+
         try:
-            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+            self.model = SentenceTransformer(
+                "all-MiniLM-L6-v2",
+                local_files_only=self._should_force_local_files_only(),
+            )
             self._precompute_category_embeddings()
             print("✓ Sentence transformer model loaded successfully")
         except Exception as e:
             print(f"Warning: Could not load transformer model: {e}")
             self.model = None
+
+    def _offline_model_loading_disabled(self) -> bool:
+        return any(arg == "test" for arg in sys.argv[1:]) or os.getenv("ALFRED_OFFLINE_TESTS", "0") == "1"
+
+    def _should_force_local_files_only(self) -> bool:
+        return self._offline_model_loading_disabled() or os.getenv("ALFRED_LOCAL_MODELS_ONLY", "0") == "1"
 
     def _precompute_category_embeddings(self):
         """Precompute embeddings for each expense category."""

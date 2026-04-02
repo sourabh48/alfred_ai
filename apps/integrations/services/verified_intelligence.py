@@ -25,6 +25,16 @@ class InsightResult:
     cached: bool
 
 
+def freshness_snapshot(items: list[dict]) -> dict:
+    active = [item for item in items if item]
+    stale_after_values = [item.get("stale_after") for item in active if item.get("stale_after")]
+    return {
+        "tracked_records": len(active),
+        "fresh_records": sum(1 for item in active if item.get("status") == "fresh"),
+        "next_stale_after": min(stale_after_values) if stale_after_values else "",
+    }
+
+
 class VerifiedIntelligenceService:
     USER_AGENT = "AlfredAI/1.0 (verified-intelligence)"
     CIRCUIT_FAILURE_THRESHOLD = 3
@@ -137,6 +147,59 @@ class VerifiedIntelligenceService:
             fetcher=lambda: self._fetch_remotive_jobs(search_term),
         )
 
+    def tax_regime_reference(self, stale_days: int = 45) -> InsightResult:
+        return self._static_reference(
+            scope="tax",
+            cache_key="india-income-tax-regimes",
+            title="India income tax regime reference",
+            source_name="Income Tax Department",
+            source_url="https://www.incometax.gov.in/iec/foportal/",
+            ttl=timedelta(days=stale_days),
+            payload={
+                "assessment_year": "2026-27",
+                "old_regime_basic_exemption": 250000,
+                "new_regime_basic_exemption": 300000,
+                "standard_deduction_old": 50000,
+                "standard_deduction_new": 75000,
+            },
+            summary="Official income tax regime reference payload for current slab and standard-deduction comparisons.",
+            notes="This record is source-backed and refreshed on a slower cadence because tax slab references do not change intraday.",
+        )
+
+    def nps_tax_reference(self, stale_days: int = 45) -> InsightResult:
+        return self._static_reference(
+            scope="tax",
+            cache_key="india-nps-tax-benefit",
+            title="NPS tax benefit reference",
+            source_name="NPS Trust",
+            source_url="https://npstrust.org.in/",
+            ttl=timedelta(days=stale_days),
+            payload={
+                "section": "80CCD(1B)",
+                "additional_limit": 50000,
+                "instrument": "National Pension System",
+            },
+            summary="Official NPS Trust reference for additional 80CCD(1B) tax-benefit tracking.",
+            notes="Use this as a policy reference only; final eligibility still depends on the user's filed tax profile.",
+        )
+
+    def ppf_reference(self, stale_days: int = 45) -> InsightResult:
+        return self._static_reference(
+            scope="tax",
+            cache_key="india-ppf-reference",
+            title="PPF contribution reference",
+            source_name="India Post",
+            source_url="https://www.indiapost.gov.in/Financial/pages/content/post-office-saving-schemes.aspx",
+            ttl=timedelta(days=stale_days),
+            payload={
+                "instrument": "Public Provident Fund",
+                "section": "80C",
+                "annual_limit": 150000,
+            },
+            summary="Official India Post reference for PPF contribution treatment under long-term tax-saving planning.",
+            notes="PPF is tracked here as an official reference input for Alfred's deduction catalog and planning guidance.",
+        )
+
     def macro_context(self) -> dict:
         unemployment = self.world_bank_indicator("SL.UEM.TOTL.ZS", "India unemployment rate")
         inflation = self.world_bank_indicator("FP.CPI.TOTL.ZG", "India inflation rate")
@@ -150,6 +213,29 @@ class VerifiedIntelligenceService:
 
         evidence = [unemployment.evidence, inflation.evidence, market.evidence]
         return {"payload": payload, "evidence": evidence}
+
+    def _static_reference(
+        self,
+        *,
+        scope: str,
+        cache_key: str,
+        title: str,
+        source_name: str,
+        source_url: str,
+        ttl: timedelta,
+        payload: dict,
+        summary: str,
+        notes: str,
+    ) -> InsightResult:
+        return self._use_or_refresh(
+            scope=scope,
+            cache_key=cache_key,
+            title=title,
+            source_name=source_name,
+            source_url=source_url,
+            ttl=ttl,
+            fetcher=lambda: (payload, summary, notes),
+        )
 
     def _use_or_refresh(self, scope: str, cache_key: str, title: str, source_name: str, source_url: str, ttl: timedelta, fetcher, query: str = "") -> InsightResult:
         self.cleanup_stale()
@@ -355,6 +441,15 @@ class VerifiedIntelligenceService:
                 return "refreshed"
             if record.scope == "jobs" and record.query:
                 self.remotive_jobs(record.query)
+                return "refreshed"
+            if record.scope == "tax" and record.cache_key == "india-income-tax-regimes":
+                self.tax_regime_reference()
+                return "refreshed"
+            if record.scope == "tax" and record.cache_key == "india-nps-tax-benefit":
+                self.nps_tax_reference()
+                return "refreshed"
+            if record.scope == "tax" and record.cache_key == "india-ppf-reference":
+                self.ppf_reference()
                 return "refreshed"
         except Exception:
             return "failed"

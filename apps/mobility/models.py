@@ -107,6 +107,7 @@ class BikeServiceRecord(models.Model):
     next_service_km = models.PositiveIntegerField(null=True, blank=True)
     notes = models.TextField(blank=True)
     source_mode = models.CharField(max_length=20, choices=SOURCE_MODE_CHOICES, default="manual")
+    source_document = models.ForeignKey("BikeDocument", on_delete=models.SET_NULL, null=True, blank=True, related_name="imported_service_records")
     source_document_name = models.CharField(max_length=220, blank=True)
     extracted_work_summary = models.TextField(blank=True)
     parsed_payload = models.JSONField(default=dict, blank=True)
@@ -121,6 +122,32 @@ class BikeServiceRecord(models.Model):
 
     def __str__(self):
         return f"{self.bike_name} service on {self.service_date}"
+
+
+class FuelRefillLog(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="fuel_refill_logs")
+    bike_profile = models.ForeignKey("BikeProfile", on_delete=models.SET_NULL, null=True, blank=True, related_name="fuel_refill_logs")
+    bike_name = models.CharField(max_length=120)
+    vehicle_number = models.CharField(max_length=40, blank=True)
+    refill_date = models.DateField()
+    odometer_km = models.PositiveIntegerField(null=True, blank=True)
+    trip_meter_km = models.FloatField(default=0)
+    fuel_liters = models.FloatField(default=0)
+    total_cost = models.FloatField(default=0)
+    is_full_tank = models.BooleanField(default=True)
+    station_name = models.CharField(max_length=160, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-refill_date", "-id"]
+        indexes = [
+            models.Index(fields=["user", "bike_profile", "refill_date"]),
+            models.Index(fields=["user", "vehicle_number", "refill_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.bike_name} refill on {self.refill_date}"
 
 
 class TravelPlan(models.Model):

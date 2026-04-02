@@ -25,7 +25,34 @@
         <option value="EQUIFAX">Equifax</option>
         <option value="CRIF">CRIF High Mark</option>
     </select>
-    <button id="creditRefreshBtn" class="btn btn-soft-primary" type="button">Refresh Score</button>
+    <button id="creditRefreshBtn" class="btn btn-soft-primary" type="button">Refresh Estimate</button>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Upload Credit Report</h2>
+            <p class="page-section-copy mb-3">Upload one or more bureau PDFs or image reports. ALFRED will parse the score, report summary, and factor inputs from each document instead of depending on a live bureau API.</p>
+            <form id="creditReportUploadForm" class="row g-3">
+                <div class="col-12">
+                    <label for="creditReportFile" class="form-label fw-semibold">Credit report files</label>
+                    <input id="creditReportFile" name="report" class="form-control" type="file" accept=".pdf,image/*" multiple required>
+                </div>
+                <div class="col-12 d-grid d-sm-flex gap-3">
+                    <button class="btn btn-primary" type="submit">Upload Reports</button>
+                    <div class="muted small">Best results come from the original bureau PDF export instead of a printed scan.</div>
+                </div>
+            </form>
+            <div id="creditReportFeedback" class="alert d-none mt-3 mb-0"></div>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recent Credit Reports</h2>
+            <p class="page-section-copy mb-3">Uploaded bureau reports and parser confidence.</p>
+            <div id="creditReportUploadList" class="data-stack"></div>
+        </div>
+    </div>
 </section>
 
 <section class="soft-grid four-up mb-4" id="creditSummaryCards"></section>
@@ -77,5 +104,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/credit_score.js?v=2.1"></script>
+<script src="/static/js/credit_score.js?v=2.4"></script>
 {% endblock %}

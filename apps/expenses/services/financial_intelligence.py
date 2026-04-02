@@ -5,16 +5,21 @@ from datetime import date
 from math import log
 from statistics import mean, pstdev
 
+from django.db.models import Count, Max
 from django.utils import timezone
 
+from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.models import BankAccount, Expense
+from apps.integrations.models import CreditReportUpload
 from apps.investments.models import Investment
-from apps.loans.models import Loan, LoanPaymentHistory
+from apps.loans.models import Loan, LoanForeclosureSnapshot, LoanPaymentHistory
+from apps.loans.services.payment_history_access import fetch_payment_history_rows
 from apps.ml_engine.behavior.anomaly_detector import anomaly_detector
 from apps.ml_engine.behavior.behavior_signature import behavior_signature
 from apps.ml_engine.behavior.insight_generator import insight_generator
 from apps.ml_engine.behavior.personalizer import personalizer
 from apps.mobility.models import BikeProfile, BikeServiceRecord, TripLog
+from .financial_relationships import build_financial_relationships
 
 
 DISCRETIONARY_CATEGORIES = {
@@ -29,12 +34,25 @@ RECURRING_CATEGORIES = {"loan", "utilities", "subscription", "rent", "bills", "c
 
 
 def build_financial_intelligence(user) -> dict:
+    revision = _financial_revision(user)
+    return materialize_payload(
+        namespace="financial-intelligence",
+        user_id=user.id,
+        revision=revision,
+        ttl_seconds=45,
+        builder=lambda: _build_financial_intelligence_uncached(user),
+    )
+
+
+def _build_financial_intelligence_uncached(user) -> dict:
     expenses = list(Expense.objects.filter(user=user).order_by("transaction_date", "id"))
     loans = list(Loan.objects.filter(user=user).order_by("-start_date", "-id"))
 
     intelligence = _empty_intelligence()
     balance_sheet = _build_balance_sheet(user=user, loans=loans)
     intelligence["balance_sheet"] = balance_sheet
+    financial_relationships, transaction_relationships = build_financial_relationships(user=user, expenses=expenses, loans=loans)
+    intelligence["financial_relationships"] = financial_relationships
     if not expenses and not loans:
         if balance_sheet["total_assets"] or balance_sheet["total_liabilities"] or balance_sheet["vehicle_positions"]:
             intelligence["summary"]["risk_level"] = "Limited data"
@@ -74,7 +92,7 @@ def build_financial_intelligence(user) -> dict:
     lifestyle = _build_lifestyle_profile(category_distribution, debit_total, discretionary_ratio)
     recurring_commitments = _build_recurring_commitments(debit_expenses)
     spike_days = _build_spike_days(debit_expenses)
-    recent_transactions = _serialize_recent_transactions(expenses)
+    recent_transactions = _serialize_recent_transactions(expenses, transaction_relationships)
     manual_loans = _serialize_loans(loans, today)
     debt_trend = _build_debt_trend(monthly_buckets)
     monthly_outflows = [bucket["expense"] + bucket["loan"] + bucket["other"] for _, bucket in sorted(monthly_buckets.items())]
@@ -173,6 +191,7 @@ def build_financial_intelligence(user) -> dict:
             },
             "loan_portfolio": _build_loan_portfolio(loans, debt_entries, current_bucket),
             "balance_sheet": balance_sheet,
+            "financial_relationships": financial_relationships,
             "lifestyle": lifestyle,
             "recent_transactions": recent_transactions,
             "recurring_commitments": recurring_commitments,
@@ -181,6 +200,39 @@ def build_financial_intelligence(user) -> dict:
     )
 
     return intelligence
+
+
+def _financial_revision(user) -> str:
+    expense_meta = Expense.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("transaction_date"))
+    loan_meta = Loan.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"))
+    payment_meta = LoanPaymentHistory.objects.filter(loan__user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        max_date=Max("payment_date"),
+        max_created=Max("created_at"),
+    )
+    account_meta = BankAccount.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_sync=Max("last_synced_at"))
+    investment_meta = Investment.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"))
+    foreclosure_meta = LoanForeclosureSnapshot.objects.filter(loan__user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
+    credit_meta = CreditReportUpload.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
+    vehicle_meta = BikeProfile.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
+    service_meta = BikeServiceRecord.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("service_date"))
+    trip_meta = TripLog.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("log_date"))
+    return "|".join(
+        str(value or "")
+        for value in [
+            expense_meta["count"], expense_meta["max_id"], expense_meta["max_date"],
+            loan_meta["count"], loan_meta["max_id"],
+            payment_meta["count"], payment_meta["max_id"], payment_meta["max_date"], payment_meta["max_created"],
+            account_meta["count"], account_meta["max_id"], account_meta["max_sync"],
+            investment_meta["count"], investment_meta["max_id"],
+            foreclosure_meta["count"], foreclosure_meta["max_id"], foreclosure_meta["max_updated"],
+            credit_meta["count"], credit_meta["max_id"], credit_meta["max_updated"],
+            vehicle_meta["count"], vehicle_meta["max_id"], vehicle_meta["max_updated"],
+            service_meta["count"], service_meta["max_id"], service_meta["max_date"],
+            trip_meta["count"], trip_meta["max_id"], trip_meta["max_date"],
+        ]
+    )
 
 
 def _empty_intelligence() -> dict:
@@ -233,6 +285,17 @@ def _empty_intelligence() -> dict:
             "manual_total_outstanding": 0.0,
             "manual_total_emi": 0.0,
             "manual_interest_remaining": 0.0,
+            "pending_foreclosure_excluded_balance": 0.0,
+            "payment_component_totals": {
+                "principal_paid": 0.0,
+                "interest_paid": 0.0,
+                "charges_paid": 0.0,
+                "penalties_paid": 0.0,
+                "tax_paid": 0.0,
+            },
+            "foreclosure_pending_count": 0,
+            "reconciled_foreclosures": 0,
+            "foreclosure_watchlist": [],
             "detected_repayment_total": 0.0,
             "current_month_repayment": 0.0,
             "projected_payoff_months": 0,
@@ -244,10 +307,31 @@ def _empty_intelligence() -> dict:
             "total_liabilities": 0.0,
             "net_worth": 0.0,
             "asset_liability_ratio": 0.0,
+            "pending_foreclosure_excluded_balance": 0.0,
             "assets": [],
             "liabilities": [],
             "vehicle_positions": [],
             "summary": "Add account balances, investments, loans, or vehicle profiles to build the balance-sheet view.",
+        },
+        "financial_relationships": {
+            "summary": {
+                "tracked_events": 0,
+                "self_transfers": 0,
+                "loan_disbursements": 0,
+                "loan_repayments": 0,
+                "loan_part_payments": 0,
+                "loan_closure_payments": 0,
+                "bureau_accounts": 0,
+                "bureau_accounts_linked": 0,
+            },
+            "bureau_report": {
+                "source_upload_id": None,
+                "bureau": "",
+                "report_date": "",
+                "file_name": "",
+            },
+            "bureau_accounts": [],
+            "events": [],
         },
         "lifestyle": {
             "diversity_score": 0.0,
@@ -360,9 +444,10 @@ def _build_spike_days(expenses: list[Expense]) -> list[dict]:
     return spikes[:5]
 
 
-def _serialize_recent_transactions(expenses: list[Expense]) -> list[dict]:
+def _serialize_recent_transactions(expenses: list[Expense], transaction_relationships: dict[int, list[dict]] | None = None) -> list[dict]:
     category_labels = dict(Expense.CATEGORY_CHOICES)
     classification_labels = dict(Expense.CLASSIFICATION_CHOICES)
+    transaction_relationships = transaction_relationships or {}
 
     recent = sorted(expenses, key=lambda item: (item.transaction_date, item.id), reverse=True)[:8]
     return [
@@ -376,6 +461,8 @@ def _serialize_recent_transactions(expenses: list[Expense]) -> list[dict]:
             "direction": item.direction,
             "amount": round(item.amount, 2),
             "description": item.description or item.raw_description,
+            "relationship_types": [relationship.get("relation_type", "") for relationship in transaction_relationships.get(item.id, [])],
+            "linked_relationships": transaction_relationships.get(item.id, []),
         }
         for item in recent
     ]
@@ -383,13 +470,35 @@ def _serialize_recent_transactions(expenses: list[Expense]) -> list[dict]:
 
 def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], current_bucket: dict) -> dict:
     manual_loans = _serialize_loans(loans, timezone.localdate())
-    total_outstanding = sum(item["estimated_balance"] for item in manual_loans)
-    total_emi = sum(item["emi"] for item in manual_loans if item["is_active"])
-    interest_remaining = sum(item["interest_remaining"] for item in manual_loans)
+    active_manual_loans = [item for item in manual_loans if item["is_active"]]
+    liability_manual_loans = [item for item in manual_loans if item["counts_toward_liabilities"]]
+    pending_manual_loans = [item for item in liability_manual_loans if item["status"] == "foreclosure_pending"]
+    total_outstanding = sum(item["estimated_balance"] for item in liability_manual_loans)
+    total_emi = sum(item["emi"] for item in active_manual_loans)
+    interest_remaining = sum(item["interest_remaining"] for item in active_manual_loans)
+    pending_foreclosure_balance = round(sum(item["estimated_balance"] for item in pending_manual_loans), 2)
     current_month_repayment = current_bucket["loan"]
+    payment_user = loans[0].user if loans else (debt_entries[0].user if debt_entries else None)
+    linked_payment_rows = (
+        fetch_payment_history_rows(
+            user=payment_user,
+            expense_reference_ids=[entry.id for entry in debt_entries if entry.id],
+            include_loan_fields=True,
+        )
+        if payment_user
+        else []
+    )
     linked_payments = {
-        item.expense_reference_id: item
-        for item in LoanPaymentHistory.objects.select_related("loan").filter(expense_reference_id__in=[entry.id for entry in debt_entries if entry.id])
+        item.get("expense_reference_id"): item
+        for item in linked_payment_rows
+        if item.get("expense_reference_id")
+    }
+    payment_component_totals = {
+        "principal_paid": round(sum(float(item.get("principal_paid") or item.get("principal_component") or 0) for item in linked_payment_rows), 2),
+        "interest_paid": round(sum(float(item.get("interest_paid") or item.get("interest_component") or 0) for item in linked_payment_rows), 2),
+        "charges_paid": round(sum(float(item.get("charges_paid") or 0) for item in linked_payment_rows), 2),
+        "penalties_paid": round(sum(float(item.get("penalties_paid") or 0) for item in linked_payment_rows), 2),
+        "tax_paid": round(sum(float(item.get("tax_paid") or 0) for item in linked_payment_rows), 2),
     }
     detected_repayments = [
         {
@@ -398,19 +507,48 @@ def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], curren
             "amount": round(item.amount, 2),
             "description": item.description or item.raw_description,
             "category": dict(Expense.CATEGORY_CHOICES).get(item.category, item.category.title()),
-            "linked_loan": linked_payments[item.id].loan.lender if item.id in linked_payments else "",
-            "match_status": linked_payments[item.id].match_status if item.id in linked_payments else "",
+            "linked_loan": linked_payments[item.id].get("loan__lender", "") if item.id in linked_payments else "",
+            "match_status": linked_payments[item.id].get("match_status", "") if item.id in linked_payments else "",
+            "principal_paid": round(float(linked_payments[item.id].get("principal_paid") or linked_payments[item.id].get("principal_component") or 0), 2) if item.id in linked_payments else 0.0,
+            "interest_paid": round(float(linked_payments[item.id].get("interest_paid") or linked_payments[item.id].get("interest_component") or 0), 2) if item.id in linked_payments else 0.0,
+            "charges_paid": round(float(linked_payments[item.id].get("charges_paid") or 0), 2) if item.id in linked_payments else 0.0,
+            "penalties_paid": round(float(linked_payments[item.id].get("penalties_paid") or 0), 2) if item.id in linked_payments else 0.0,
+            "tax_paid": round(float(linked_payments[item.id].get("tax_paid") or 0), 2) if item.id in linked_payments else 0.0,
         }
         for item in sorted(debt_entries, key=lambda value: (value.transaction_date, value.id), reverse=True)[:8]
     ]
 
-    projected_months = max([loan["months_remaining"] for loan in manual_loans], default=0)
+    projected_months = max([loan["months_remaining"] for loan in active_manual_loans], default=0)
+    snapshots = list(
+        LoanForeclosureSnapshot.objects.select_related("loan")
+        .filter(loan__in=[loan.id for loan in loans])
+        .order_by("-updated_at", "-id")
+    )
+    foreclosure_watchlist = [
+        {
+            "loan_id": item.loan_id,
+            "lender": item.loan.lender,
+            "document_type": item.get_document_type_display(),
+            "status": item.get_reconciliation_status_display(),
+            "effective_closure_date": item.effective_closure_date.isoformat() if item.effective_closure_date else "",
+            "amount_payable": round(item.total_amount_payable or 0, 2),
+            "matched_payment_total": round(item.matched_payment_total or 0, 2),
+            "settlement_allocation": dict((item.audit_payload or {}).get("settlement_allocation") or {}),
+            "notes": item.reconciliation_notes,
+        }
+        for item in snapshots[:6]
+    ]
 
     return {
         "active_loans": sum(1 for item in manual_loans if item["is_active"]),
         "manual_total_outstanding": round(total_outstanding, 2),
         "manual_total_emi": round(total_emi, 2),
         "manual_interest_remaining": round(interest_remaining, 2),
+        "pending_foreclosure_excluded_balance": pending_foreclosure_balance,
+        "payment_component_totals": payment_component_totals,
+        "foreclosure_pending_count": sum(1 for item in manual_loans if item["status"] == "foreclosure_pending"),
+        "reconciled_foreclosures": sum(1 for item in snapshots if item.reconciliation_status == "full_match"),
+        "foreclosure_watchlist": foreclosure_watchlist,
         "detected_repayment_total": round(sum(item.amount for item in debt_entries), 2),
         "current_month_repayment": round(current_month_repayment, 2),
         "projected_payoff_months": projected_months,
@@ -424,13 +562,7 @@ def _serialize_loans(loans: list[Loan], today: date) -> list[dict]:
 
     for loan in loans:
         months_elapsed = max(0, _months_between(loan.start_date, today))
-        estimated_balance = loan.remaining_balance if loan.remaining_balance is not None else _amortized_balance(
-            principal=loan.principal,
-            annual_rate=loan.interest_rate,
-            emi=loan.emi,
-            months_elapsed=months_elapsed,
-            tenure_months=loan.tenure_months,
-        )
+        estimated_balance = _loan_reporting_balance(loan, today=today, months_elapsed=months_elapsed)
         months_to_close, interest_remaining = _forecast_payoff_months(
             balance=estimated_balance,
             annual_rate=loan.interest_rate,
@@ -463,6 +595,7 @@ def _serialize_loans(loans: list[Loan], today: date) -> list[dict]:
                 "recommended_prepayment": round(min(max(loan.emi * 2, 0), estimated_balance * 0.1 if estimated_balance else 0), 2),
                 "notes": loan.notes,
                 "is_active": loan.is_active and estimated_balance > 0,
+                "counts_toward_liabilities": _loan_counts_toward_liabilities(loan, estimated_balance),
             }
         )
 
@@ -487,7 +620,23 @@ def _build_balance_sheet(*, user, loans: list[Loan]) -> dict:
     liquid_cash = round(sum(max(account.current_balance or 0, 0) for account in accounts if account.account_type != "credit"), 2)
     credit_liability = round(sum(abs(account.current_balance or 0) for account in accounts if account.account_type == "credit"), 2)
     investment_assets = round(sum(item.current_value or 0 for item in investments), 2)
-    loan_liability = round(sum((loan.remaining_balance or 0) for loan in loans if loan.is_active), 2)
+    liability_loans = []
+    pending_foreclosure_balance = 0.0
+    open_loan_liability = 0.0
+    today = timezone.localdate()
+    for loan in loans:
+        balance = _loan_reporting_balance(loan, today=today)
+        if not _loan_counts_toward_liabilities(loan, balance):
+            continue
+        liability_loans.append((loan, balance))
+        if loan.status == "foreclosure_pending":
+            pending_foreclosure_balance += balance
+        else:
+            open_loan_liability += balance
+
+    open_loan_liability = round(open_loan_liability, 2)
+    pending_foreclosure_balance = round(pending_foreclosure_balance, 2)
+    loan_liability = round(open_loan_liability + pending_foreclosure_balance, 2)
 
     vehicle_positions = _build_vehicle_positions(vehicle_profiles, vehicle_services, trip_logs)
     vehicle_assets = round(sum(item["recognized_value"] for item in vehicle_positions if item["bucket"] == "asset"), 2)
@@ -500,10 +649,13 @@ def _build_balance_sheet(*, user, loans: list[Loan]) -> dict:
     if vehicle_assets:
         assets.append({"label": "Utility and income-supporting vehicles", "amount": vehicle_assets})
 
-    liabilities = [
-        {"label": "Active loans", "amount": loan_liability},
-        {"label": "Credit card liability", "amount": credit_liability},
-    ]
+    liabilities = []
+    if open_loan_liability:
+        liabilities.append({"label": "Open loan liabilities", "amount": open_loan_liability})
+    if pending_foreclosure_balance:
+        liabilities.append({"label": "Pending foreclosure liabilities", "amount": pending_foreclosure_balance})
+    if credit_liability:
+        liabilities.append({"label": "Credit card liability", "amount": credit_liability})
     if vehicle_liabilities:
         liabilities.append({"label": "Lifestyle vehicle burden", "amount": vehicle_liabilities})
 
@@ -511,22 +663,49 @@ def _build_balance_sheet(*, user, loans: list[Loan]) -> dict:
     total_liabilities = round(sum(item["amount"] for item in liabilities), 2)
     net_worth = round(total_assets - total_liabilities, 2)
     ratio = round((total_assets / total_liabilities), 2) if total_liabilities else 0.0
-    summary = (
-        f"Tracked assets total INR {total_assets:,.0f} and liabilities total INR {total_liabilities:,.0f}."
-        if total_assets or total_liabilities
-        else "Add account balances, investments, loans, or vehicle profiles to build the balance-sheet view."
-    )
+    if total_assets or total_liabilities:
+        summary = f"Tracked assets total INR {total_assets:,.0f} and liabilities total INR {total_liabilities:,.0f}."
+        if pending_foreclosure_balance:
+            summary = (
+                f"{summary} Pending foreclosure balances of INR {pending_foreclosure_balance:,.0f} "
+                "remain in liabilities until a full closure-payment match is confirmed."
+            )
+    else:
+        summary = "Add account balances, investments, loans, or vehicle profiles to build the balance-sheet view."
 
     return {
         "total_assets": total_assets,
         "total_liabilities": total_liabilities,
         "net_worth": net_worth,
         "asset_liability_ratio": ratio,
+        "pending_foreclosure_excluded_balance": pending_foreclosure_balance,
         "assets": assets,
         "liabilities": liabilities,
         "vehicle_positions": vehicle_positions,
         "summary": summary,
     }
+
+
+def _loan_reporting_balance(loan: Loan, *, today: date, months_elapsed: int | None = None) -> float:
+    if loan.status in {"foreclosed", "closed", "prepaid"}:
+        return 0.0
+    if loan.remaining_balance is not None:
+        return round(max(float(loan.remaining_balance or 0), 0), 2)
+    elapsed = months_elapsed if months_elapsed is not None else max(0, _months_between(loan.start_date, today))
+    return round(
+        _amortized_balance(
+            principal=loan.principal,
+            annual_rate=loan.interest_rate,
+            emi=loan.emi,
+            months_elapsed=elapsed,
+            tenure_months=loan.tenure_months,
+        ),
+        2,
+    )
+
+
+def _loan_counts_toward_liabilities(loan: Loan, estimated_balance: float) -> bool:
+    return loan.status not in {"foreclosed", "closed", "prepaid"} and round(float(estimated_balance or 0), 2) > 0
 
 
 def _build_vehicle_positions(

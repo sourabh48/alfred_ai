@@ -11,23 +11,68 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function loadDashboard() {
+    Alfred.setPageBusy("dashboardRoot", true, { label: "Loading dashboard intelligence" });
     return Alfred.fetchJSON("/api/expenses/dashboard/")
         .then(renderDashboard)
         .then(() => Alfred.clearPageAlert("dashboardRoot"))
         .catch(error => {
             Alfred.upsertPageAlert("dashboardRoot", error.message, "danger");
-        });
+        })
+        .finally(() => Alfred.setPageBusy("dashboardRoot", false));
 }
 
 function renderDashboard(data) {
     renderHero(data.summary, data.behavior);
     renderSummaryCards(data.summary, data.loan_portfolio);
+    renderFocusStrip(data.summary, data.loan_portfolio, data.behavior);
     renderMonthlyChart(data.charts);
     renderCategoryChart(data.charts);
     renderBehavior(data.summary, data.behavior);
     renderRecurring(data.recurring_commitments);
     renderStress(data.behavior, data.spike_days);
     renderTransactions(data.recent_transactions);
+}
+
+function renderFocusStrip(summary, loanPortfolio, behavior) {
+    const target = document.getElementById("dashboardFocusStrip");
+    if (!target) {
+        return;
+    }
+
+    const items = [
+        {
+            label: "Cash Flow",
+            value: Alfred.formatCurrency(summary.current_month_net),
+            meta: summary.current_month_net >= 0 ? "Net positive this month" : "Outflow is ahead of inflow",
+            tone: summary.current_month_net >= 0 ? "success" : "danger",
+        },
+        {
+            label: "Debt Service",
+            value: Alfred.formatPercent(summary.debt_service_ratio),
+            meta: `${loanPortfolio.active_loans} active loan${loanPortfolio.active_loans === 1 ? "" : "s"}`,
+            tone: "primary",
+        },
+        {
+            label: "Savings Rate",
+            value: Alfred.formatPercent(summary.savings_rate),
+            meta: "Measured from current-month inflow vs outflow",
+            tone: "good",
+        },
+        {
+            label: "Behavior Tone",
+            value: behavior.personality || "Calibrating",
+            meta: behavior.coach_tone ? `Coach tone: ${behavior.coach_tone}` : "Awaiting stronger pattern depth",
+            tone: "accent",
+        },
+    ];
+
+    document.getElementById("dashboardFocusStrip").innerHTML = items.map(item => `
+        <article class="dashboard-focus-card dashboard-focus-${item.tone}">
+            <div class="dashboard-focus-label">${item.label}</div>
+            <div class="dashboard-focus-value">${Alfred.escapeHtml(String(item.value))}</div>
+            <div class="dashboard-focus-meta">${Alfred.escapeHtml(item.meta)}</div>
+        </article>
+    `).join("");
 }
 
 function renderHero(summary, behavior) {

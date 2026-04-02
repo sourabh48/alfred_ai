@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setMobilityDefaults();
     loadMobilityDashboard();
-    Alfred.enableLiveRefresh("mobility-live", loadMobilityDashboard, { rootId: "mobilityRoot" });
+    Alfred.enableLiveRefresh("mobility-live", loadMobilityDashboard, { rootId: "mobilityRoot", interactionHoldMs: 4200 });
 });
 
 function loadMobilityDashboard() {
@@ -55,13 +55,13 @@ function renderSummaryCards(summary) {
         ["Photo Trail", Alfred.formatNumber(summary.photo_count || 0, 0), `${Alfred.formatNumber(summary.mapped_points || 0, 0)} mapped points`],
         ["Bike Service Link", summary.condition_score ? `${Alfred.formatNumber(summary.condition_score, 0)}/100` : "No data", `${Alfred.escapeHtml(summary.condition_status || "No status")} | ${Alfred.formatNumber(summary.expiring_documents || 0, 0)} documents due`],
     ];
-    document.getElementById("mobilitySummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTMLIfChanged("mobilitySummaryCards", cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card[0]}</p>
             <h2 class="metric-value">${card[1]}</h2>
             <p class="metric-caption">${card[2]}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderTravelAdvice(data) {
@@ -70,7 +70,7 @@ function renderTravelAdvice(data) {
     const itinerary = data.itinerary_outline || [];
     const reasons = data.feasibility?.reasons || [];
     const evidence = data.evidence || [];
-    target.innerHTML = `
+    Alfred.setHTMLIfChanged(target, `
         <div class="detail-item">
             <div class="fw-semibold mb-2">Destination match</div>
             <div class="muted">${Alfred.escapeHtml(data.destination_match?.display_name || "Not resolved")}</div>
@@ -103,12 +103,12 @@ function renderTravelAdvice(data) {
             <div class="fw-semibold mb-2">Evidence</div>
             ${evidence.length ? evidence.map(item => `<div class="muted small mb-2">${Alfred.escapeHtml(item.source_name || "Source")} | refreshed ${Alfred.formatDateTime(item.verified_at)} | <a href="${item.source_url}" target="_blank" rel="noopener">open</a></div>`).join("") : `<div class="muted">No external evidence captured yet.</div>`}
         </div>
-    `;
+    `);
 }
 
 function renderTravelPlans(items) {
     const target = document.getElementById("travelPlanList");
-    target.innerHTML = items.length ? items.map(item => {
+    Alfred.setHTMLIfChanged(target, items.length ? items.map(item => {
         const planLogs = mobilityState.logs.filter(log => log.travel_plan === item.id);
         const spend = planLogs.reduce((sum, log) => sum + Number(log.spend_amount || 0), 0);
         const distance = planLogs.reduce((sum, log) => sum + Number(log.distance_km || 0), 0);
@@ -129,12 +129,12 @@ function renderTravelPlans(items) {
                 </div>
             </div>
         `;
-    }).join("") : `<div class="empty-state">No travel plans saved yet.</div>`;
+    }).join("") : `<div class="empty-state">No travel plans saved yet.</div>`);
 }
 
 function renderTripLogs(items) {
     const target = document.getElementById("tripLogList");
-    target.innerHTML = items.length ? items.map(item => `
+    Alfred.setHTMLIfChanged(target, items.length ? items.map(item => `
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -146,12 +146,12 @@ function renderTripLogs(items) {
                 <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTripLog(${item.id})">Delete</button>
             </div>
         </div>
-    `).join("") : `<div class="empty-state">No trip logs captured yet.</div>`;
+    `).join("") : `<div class="empty-state">No trip logs captured yet.</div>`);
 }
 
 function renderPhotoGallery(items) {
     const target = document.getElementById("tripPhotoGallery");
-    target.innerHTML = items.length ? items.map(item => `
+    Alfred.setHTMLIfChanged(target, items.length ? items.map(item => `
         <article class="photo-card">
             <img src="${item.photo_url}" alt="${Alfred.escapeHtml(item.caption || item.travel_plan_title)}" loading="lazy">
             <div class="photo-card-body">
@@ -162,14 +162,14 @@ function renderPhotoGallery(items) {
                 <button class="btn btn-sm btn-outline-danger mt-3" type="button" onclick="deleteTripPhoto(${item.id})">Delete</button>
             </div>
         </article>
-    `).join("") : `<div class="empty-state w-100">No trip photos uploaded yet.</div>`;
+    `).join("") : `<div class="empty-state w-100">No trip photos uploaded yet.</div>`);
 }
 
 function renderHeatmap(points) {
     const target = document.getElementById("tripHeatmap");
     const validPoints = points.filter(point => point.latitude !== null && point.longitude !== null);
     if (!validPoints.length) {
-        target.innerHTML = `<div class="empty-state">Add log or photo coordinates to generate the travel heat map.</div>`;
+        Alfred.setHTMLIfChanged(target, `<div class="empty-state">Add log or photo coordinates to generate the travel heat map.</div>`);
         return;
     }
     const latitudes = validPoints.map(point => Number(point.latitude));
@@ -182,13 +182,13 @@ function renderHeatmap(points) {
     const lngSpan = Math.max(maxLng - minLng, 0.0001);
     const maxIntensity = Math.max(...validPoints.map(point => Number(point.intensity || 1)), 1);
 
-    target.innerHTML = validPoints.map(point => {
+    Alfred.setHTMLIfChanged(target, validPoints.map(point => {
         const x = ((Number(point.longitude) - minLng) / lngSpan) * 100;
         const y = 100 - (((Number(point.latitude) - minLat) / latSpan) * 100);
         const size = 18 + ((Number(point.intensity || 1) / maxIntensity) * 26);
         const title = [point.title || "Trip point", point.location_name || "Location not set", point.date || "No date"].join(" | ");
         return `<div class="heatmap-spot ${point.type === "photo" ? "photo" : "log"}" style="left:${x}%; top:${y}%; width:${size}px; height:${size}px;" title="${Alfred.escapeHtml(title)}"></div>`;
-    }).join("");
+    }).join(""));
 }
 
 function hydratePlanSelects(selectedPhotoPlan, selectedPhotoLog) {
@@ -198,19 +198,29 @@ function hydratePlanSelects(selectedPhotoPlan, selectedPhotoLog) {
     const defaultPlanId = hasPlans ? String(mobilityState.plans[0].id) : "";
     const activePhotoPlan = keepValue(selectedPhotoPlan, mobilityState.plans) || defaultPlanId;
 
-    const options = hasPlans ? mobilityState.plans.map(item => `<option value="${item.id}">${Alfred.escapeHtml(item.title)} | ${Alfred.escapeHtml(item.destination)}</option>`).join("") : `<option value="">Create a travel plan first</option>`;
-    tripLogPlan.innerHTML = options;
-    photoPlan.innerHTML = options;
-    tripLogPlan.disabled = !hasPlans;
-    photoPlan.disabled = !hasPlans;
-    if (hasPlans) {
-        tripLogPlan.value = defaultPlanId;
-        photoPlan.value = activePhotoPlan;
-    }
+    const planLabel = item => `${item.title} | ${item.destination}`;
+    Alfred.syncSelectOptions(tripLogPlan, mobilityState.plans, {
+        includeBlank: !hasPlans,
+        blankLabel: "Create a travel plan first",
+        getValue: item => item.id,
+        getLabel: planLabel,
+        disableWhenEmpty: true,
+        preferredValue: defaultPlanId,
+        fallbackValue: defaultPlanId,
+    });
+    Alfred.syncSelectOptions(photoPlan, mobilityState.plans, {
+        includeBlank: !hasPlans,
+        blankLabel: "Create a travel plan first",
+        getValue: item => item.id,
+        getLabel: planLabel,
+        disableWhenEmpty: true,
+        preferredValue: activePhotoPlan,
+        fallbackValue: activePhotoPlan || defaultPlanId,
+    });
 
     syncPhotoLogOptions(selectedPhotoLog);
-    document.querySelector("#tripLogForm button[type='submit']").disabled = !hasPlans;
-    document.querySelector("#tripPhotoForm button[type='submit']").disabled = !hasPlans;
+    Alfred.setDisabledIfChanged(document.querySelector("#tripLogForm button[type='submit']"), !hasPlans);
+    Alfred.setDisabledIfChanged(document.querySelector("#tripPhotoForm button[type='submit']"), !hasPlans);
     if (!hasPlans) {
         showFeedback("tripLogFeedback", "Create a travel plan before logging trip activity.", "warning");
         showFeedback("tripPhotoFeedback", "Create a travel plan before uploading trip photos.", "warning");
@@ -226,14 +236,15 @@ function hydrateVehicleProfiles() {
         return;
     }
     const currentValue = target.value;
-    const options = [`<option value="">Optional vehicle link</option>`].concat(
-        mobilityState.profiles.map(item => `<option value="${item.id}">${Alfred.escapeHtml(item.display_name)}${item.vehicle_type_label ? ` | ${Alfred.escapeHtml(item.vehicle_type_label)}` : ""}</option>`)
-    );
-    target.innerHTML = options.join("");
-    if (mobilityState.profiles.some(item => item.is_primary)) {
-        const primary = mobilityState.profiles.find(item => item.is_primary);
-        target.value = mobilityState.profiles.some(item => String(item.id) === String(currentValue)) ? currentValue : String(primary.id);
-    }
+    const primary = mobilityState.profiles.find(item => item.is_primary);
+    Alfred.syncSelectOptions(target, mobilityState.profiles, {
+        includeBlank: true,
+        blankLabel: "Optional vehicle link",
+        getValue: item => item.id,
+        getLabel: item => `${item.display_name}${item.vehicle_type_label ? ` | ${item.vehicle_type_label}` : ""}`,
+        currentValue,
+        preferredValue: primary ? primary.id : "",
+    });
 }
 
 function syncPhotoLogOptions(selectedPhotoLog = "") {
@@ -241,11 +252,15 @@ function syncPhotoLogOptions(selectedPhotoLog = "") {
     const planId = Number(document.getElementById("photoPlan").value || 0);
     const eligibleLogs = mobilityState.logs.filter(item => item.travel_plan === planId);
     const selected = keepValue(selectedPhotoLog, eligibleLogs);
-    const options = [`<option value="">Optional log link</option>`].concat(
-        eligibleLogs.map(item => `<option value="${item.id}" ${String(item.id) === selected ? "selected" : ""}>${Alfred.escapeHtml(item.title)} | ${Alfred.escapeHtml(item.travel_plan_title)}</option>`)
-    );
-    photoLog.innerHTML = options.join("");
-    photoLog.disabled = !eligibleLogs.length;
+    Alfred.syncSelectOptions(photoLog, eligibleLogs, {
+        includeBlank: true,
+        blankLabel: "Optional log link",
+        getValue: item => item.id,
+        getLabel: item => `${item.title} | ${item.travel_plan_title}`,
+        preferredValue: selected,
+        currentValue: selected,
+    });
+    Alfred.setDisabledIfChanged(photoLog, !eligibleLogs.length);
 }
 
 function submitTravelPlan(event) {
@@ -256,7 +271,7 @@ function submitTravelPlan(event) {
     Alfred.fetchJSON("/api/mobility/travel-plans/", { method: "POST", body: JSON.stringify(payload) })
         .then(() => {
             showFeedback("travelPlanFeedback", "Travel plan saved.", "success");
-            renderTravelAdvicePlaceholder("Travel plan saved. Generate AI Travel Advice to pull live weather and itinerary guidance for the destination.");
+    renderTravelAdvicePlaceholder("Travel plan saved. Generate Travel Advice to pull live weather and itinerary guidance for the destination.");
             loadMobilityDashboard();
         })
         .catch(error => showFeedback("travelPlanFeedback", error.message, "danger"));
@@ -268,7 +283,7 @@ function previewTravelAdvice() {
     payload.budget = Number(payload.budget || 0);
     payload.vehicle_profile_id = payload.vehicle_profile ? Number(payload.vehicle_profile) : null;
     if (!payload.destination || !payload.start_date || !payload.end_date) {
-        showFeedback("travelPlanFeedback", "Destination, start date, and end date are required for AI travel advice.", "warning");
+        showFeedback("travelPlanFeedback", "Destination, start date, and end date are required for travel advice.", "warning");
         return;
     }
     renderTravelAdvicePlaceholder("Pulling live location and weather context...");
@@ -345,7 +360,7 @@ function showRootAlert(message, tone) {
 }
 
 function renderTravelAdvicePlaceholder(message) {
-    document.getElementById("travelAdvisorPanel").innerHTML = `<div class="detail-item">${Alfred.escapeHtml(message)}</div>`;
+    Alfred.setHTMLIfChanged("travelAdvisorPanel", `<div class="detail-item">${Alfred.escapeHtml(message)}</div>`);
 }
 
 function keepValue(value, items) { return items.some(item => String(item.id) === String(value || "")) ? String(value) : ""; }

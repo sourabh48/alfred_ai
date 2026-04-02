@@ -2,6 +2,7 @@
 {% block title %}Project Details{% endblock %}
 
 {% block content %}
+<div id="projectDetailsRoot" data-project-details-api="/api/project-details/">
 <section class="alfred-hero fade-in">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
@@ -11,21 +12,20 @@
         </div>
         <div class="surface-card" style="min-width: 280px;">
             <p class="metric-kicker">Internal Clock</p>
-            <div class="metric-value">{{ clock.local_time }}</div>
-            <p class="metric-caption mb-1">{{ clock.local_date }} | {{ clock.timezone }}</p>
-            <p class="metric-caption mb-0">UTC: {{ clock.generated_at_utc }}</p>
+            <div class="metric-value" id="projectDetailsClockTime">{{ clock.local_time }}</div>
+            <p class="metric-caption mb-1" id="projectDetailsClockLabel">{{ clock.local_date }} | {{ clock.timezone }}</p>
+            <p class="metric-caption mb-0" id="projectDetailsClockUtc">UTC: {{ clock.generated_at_utc }}</p>
         </div>
     </div>
-</section>
-
-<section class="soft-grid four-up mb-4">
-    {% for card in summary_cards %}
-    <article class="metric-card">
-        <p class="metric-kicker">{{ card.label }}</p>
-        <h2 class="metric-value">{{ card.value }}</h2>
-        <p class="metric-caption">{{ card.copy }}</p>
-    </article>
-    {% endfor %}
+    <div class="hero-signal-strip mt-4" id="projectDetailsSummaryCards">
+        {% for card in summary_cards %}
+        <article class="hero-signal project-hero-signal">
+            <p class="hero-signal-label">{{ card.label }}</p>
+            <p class="hero-signal-value">{{ card.value }}</p>
+            <p class="hero-signal-meta">{{ card.copy }}</p>
+        </article>
+        {% endfor %}
+    </div>
 </section>
 
 <section class="row g-4 mb-4">
@@ -33,7 +33,7 @@
         <div class="surface-card h-100">
             <h2 class="page-section-title">Operational Snapshot</h2>
             <p class="page-section-copy mb-3">Live counts from the current dataset, developer queue, and verification pipelines.</p>
-            <div class="data-stack">
+            <div class="data-stack" id="projectDetailsOperationalMetrics">
                 {% for item in operational_metrics %}
                 <div class="data-row">
                     <div class="data-label">{{ item.label }}</div>
@@ -45,18 +45,18 @@
     </div>
     <div class="col-xl-7">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">AI Learning Progress</h2>
-            <p class="page-section-copy mb-3">{{ learning_snapshot.summary }}</p>
+            <h2 class="page-section-title">Adaptive Learning Progress</h2>
+            <p class="page-section-copy mb-3" id="projectDetailsLearningSummary">{{ learning_snapshot.summary }}</p>
             <div class="learning-progress-shell mb-4">
                 <div class="d-flex justify-content-between align-items-center gap-3 mb-2">
                     <div class="fw-semibold">Overall adaptive progress</div>
-                    <div class="metric-value" style="font-size: 1.8rem;">{{ learning_snapshot.overall_progress }}%</div>
+                    <div class="metric-value" id="projectDetailsOverallProgressValue" style="font-size: 1.8rem;">{{ learning_snapshot.overall_progress }}%</div>
                 </div>
                 <div class="progress alfred-progress">
-                    <div class="progress-bar" role="progressbar" style="width: {{ learning_snapshot.overall_progress }}%;" aria-valuenow="{{ learning_snapshot.overall_progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div class="progress-bar" id="projectDetailsOverallProgressBar" role="progressbar" style="width: {{ learning_snapshot.overall_progress }}%;" aria-valuenow="{{ learning_snapshot.overall_progress }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
             </div>
-            <div class="learning-track-grid">
+            <div class="learning-track-grid" id="projectDetailsLearningTracks">
                 {% for track in learning_snapshot.tracks %}
                 <div class="learning-track-card">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
@@ -85,7 +85,7 @@
         <div class="surface-card h-100">
             <h2 class="page-section-title">In Progress Tracks</h2>
             <p class="page-section-copy mb-3">Only active workstreams are shown here. Completed areas have been removed from this view.</p>
-            <div class="data-stack">
+            <div class="data-stack" id="projectDetailsInProgressTracks">
                 {% for item in in_progress_tracks %}
                 <div class="mini-card">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
@@ -108,6 +108,7 @@
             <p class="page-section-copy mb-3">Generated reports and operational issue-routing now live only in superuser surfaces.</p>
             <div class="mini-card mb-3">
                 <div class="fw-semibold mb-2">Recent report artifacts</div>
+                <div id="projectDetailsReportLibrary" class="stack-scroll stack-scroll-sm">
                 {% if report_library %}
                 <div class="data-stack">
                     {% for item in report_library %}
@@ -120,9 +121,11 @@
                 {% else %}
                 <div class="empty-state">No generated report artifacts are stored yet.</div>
                 {% endif %}
+                </div>
             </div>
             <div class="mini-card">
                 <div class="fw-semibold mb-2">Developer escalation queue</div>
+                <div id="projectDetailsDeveloperQueue" class="stack-scroll stack-scroll-sm">
                 {% if developer_queue %}
                 <div class="data-stack">
                     {% for item in developer_queue %}
@@ -135,9 +138,11 @@
                 {% else %}
                 <div class="empty-state">No open developer escalations are waiting right now.</div>
                 {% endif %}
+                </div>
             </div>
             <div class="mini-card mt-3">
                 <div class="fw-semibold mb-2">Recent ALFRED auto-resolutions</div>
+                <div id="projectDetailsAutoTicketActivity" class="stack-scroll stack-scroll-sm">
                 {% if auto_ticket_activity %}
                 <div class="data-stack">
                     {% for item in auto_ticket_activity %}
@@ -150,6 +155,7 @@
                 {% else %}
                 <div class="empty-state">No ALFRED auto-resolutions are stored yet.</div>
                 {% endif %}
+                </div>
             </div>
         </div>
     </div>
@@ -161,7 +167,7 @@
             <h2 class="page-section-title">Adaptive System State</h2>
             <p class="page-section-copy mb-3">A truthful split between what is actually model-backed today and what is still heuristic or partially learned.</p>
             <div class="mini-card mb-3">
-                <div class="fw-semibold mb-2">ML-Backed Today</div>
+                <div class="fw-semibold mb-2">Model-backed today</div>
                 <ul class="insight-list mb-0">
                     {% for item in learning_snapshot.implementation_state.ml_backed %}
                     <li class="insight-item">{{ item }}</li>
@@ -291,4 +297,9 @@
         </div>
     </div>
 </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/project_details.js?v=1.1"></script>
 {% endblock %}

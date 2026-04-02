@@ -22,7 +22,8 @@ function loadInvestmentDashboard() {
             renderInvestmentSummary(summaryData);
             renderAllocationChart(allocationData);
             renderGrowthChart(growthData);
-            renderInvestmentRecommendations(summaryData.analysis?.recommendations || []);
+            renderInvestmentRecommendations(summaryData.analysis?.recommendations || [], summaryData.market_context?.suggestions || []);
+            renderInvestmentGrounding(summaryData.grounding || {});
             renderInvestmentPositions(summaryData.positions || []);
             Alfred.clearPageAlert("investmentRoot");
         })
@@ -106,14 +107,49 @@ function renderGrowthChart(data) {
     });
 }
 
-function renderInvestmentRecommendations(items) {
+function renderInvestmentRecommendations(items, marketItems) {
     const target = document.getElementById("investmentRecommendationList");
-    if (!items.length) {
+    const combined = [...items, ...(marketItems || []).map(item => item.message)];
+    if (!combined.length) {
         target.innerHTML = `<li class="insight-item">Add holdings to unlock portfolio guidance.</li>`;
         return;
     }
 
-    target.innerHTML = items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+    target.innerHTML = combined.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+}
+
+function renderInvestmentGrounding(grounding) {
+    const cardsTarget = document.getElementById("investmentGroundingCards");
+    const evidenceTarget = document.getElementById("investmentGroundingEvidence");
+    const history = grounding.history || {};
+    const freshness = grounding.freshness || {};
+    const cards = [
+        { title: "Tracked Positions", value: Alfred.formatNumber(history.positions || 0, 0), copy: "User portfolio records in this view" },
+        { title: "Evidence Records", value: Alfred.formatNumber(freshness.tracked_records || 0, 0), copy: `${Alfred.formatNumber(freshness.fresh_records || 0, 0)} currently fresh` },
+        { title: "Monthly SIP", value: Alfred.formatCurrency(history.monthly_sip || 0), copy: "Recurring contribution grounding" },
+        { title: "Total Value", value: Alfred.formatCurrency(history.total_value || 0), copy: "Position-backed market value" },
+    ];
+    cardsTarget.innerHTML = cards.map(card => `
+        <article class="metric-card metric-card--compact">
+            <p class="metric-kicker">${card.title}</p>
+            <h3 class="metric-value" style="font-size:1.35rem;">${card.value}</h3>
+            <p class="metric-caption">${Alfred.escapeHtml(card.copy)}</p>
+        </article>
+    `).join("");
+
+    const notes = grounding.notes || [];
+    const evidence = grounding.evidence || [];
+    const evidenceItems = [
+        ...notes.map(note => ({ note })),
+        ...evidence.map(item => ({ proof: item })),
+    ];
+    evidenceTarget.innerHTML = evidenceItems.map(item => {
+        if (item.note) {
+            return `<li class="insight-item">${Alfred.escapeHtml(item.note)}</li>`;
+        }
+        const proof = item.proof || {};
+        return `<li class="insight-item"><strong>${Alfred.escapeHtml(proof.source_name || proof.title || "Evidence")}</strong>: ${Alfred.escapeHtml(proof.summary || "")}${proof.source_url ? ` <a href="${proof.source_url}" target="_blank" rel="noopener">Proof</a>` : ""}</li>`;
+    }).join("");
 }
 
 function renderInvestmentPositions(items) {

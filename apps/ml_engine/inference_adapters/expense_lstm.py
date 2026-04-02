@@ -1,36 +1,37 @@
-import torch
-import torch.nn as nn
+import math
+
 import joblib
-import os
+
 from .base_adapter import BaseModelAdapter
 
-MODEL_PATH = "ml_models/alfred/expense_lstm/lstm_model.pt"
 
-class ExpenseLSTM(nn.Module):
+MODEL_PATH = "ml_models/alfred/expense_lstm/model.pkl"
 
-    def __init__(self, input_size=1, hidden=32):
-        super().__init__()
-        self.lstm = nn.LSTM(input_size, hidden, batch_first=True)
-        self.fc = nn.Linear(hidden, 1)
-
-    def forward(self, x):
-        output, _ = self.lstm(x)
-        return self.fc(output[:, -1])
 
 class ExpenseLSTMAdapter(BaseModelAdapter):
+    WINDOW_SIZE = 10
 
     def load(self):
-        self.model = ExpenseLSTM()
-        self.model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
-        self.model.eval()
+        payload = joblib.load(MODEL_PATH)
+        self.model = payload["model"]
+        self.window_size = int(payload.get("window_size", self.WINDOW_SIZE))
+        self.transform = payload.get("transform", "")
 
     def preprocess(self, seq):
-        seq = [[s] for s in seq]  # shape → batch, seq, features
-        return torch.tensor([seq], dtype=torch.float32)
+        values = [float(item or 0) for item in list(seq or [])]
+        window = values[-self.window_size :]
+        if len(window) < self.window_size:
+            window = ([0.0] * (self.window_size - len(window))) + window
+        if self.transform == "log1p":
+            return [float(math.log1p(max(item, 0.0))) for item in window]
+        return window
 
     def predict(self, seq):
         x = self.preprocess(seq)
-        with torch.no_grad():
-            return self.model(x).item()
+        prediction = float(self.model.predict([x])[0])
+        if self.transform == "log1p":
+            return float(math.expm1(prediction))
+        return prediction
+
 
 expense_lstm = ExpenseLSTMAdapter()

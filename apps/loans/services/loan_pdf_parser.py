@@ -5,7 +5,8 @@ Parses loan statements and loan books from banks and NBFCs.
 import re
 from datetime import datetime
 from typing import List, Dict, BinaryIO
-import pdfplumber
+
+from alfred_ai.services import apply_parser_learning, extract_document_text
 
 
 class LoanPDFParser:
@@ -34,14 +35,14 @@ class LoanPDFParser:
         (r"CREDIT\s+CARD", "credit_card"),
     ]
 
-    def parse_loan_pdf(self, pdf_file: BinaryIO) -> List[Dict]:
+    def parse_loan_pdf(self, pdf_file: BinaryIO, user=None, filename: str = "") -> List[Dict]:
         """
         Parse loan details from PDF.
         Returns list of loan dictionaries.
         """
-        return self.parse_document(pdf_file)["loans"]
+        return self.parse_document(pdf_file, user=user, filename=filename)["loans"]
 
-    def parse_document(self, pdf_file: BinaryIO) -> Dict:
+    def parse_document(self, pdf_file: BinaryIO, user=None, filename: str = "") -> Dict:
         """Parse a loan document and return metadata plus extracted loan rows."""
         loans = []
         full_text = ""
@@ -49,18 +50,26 @@ class LoanPDFParser:
         confidence = 0.0
 
         try:
-            with pdfplumber.open(pdf_file) as pdf:
-                for page in pdf.pages:
-                    full_text += (page.extract_text() or "") + "\n"
-
-                document_type = self._detect_document_type(full_text)
-                if document_type == "loan_book":
-                    loans = self._parse_loan_book(full_text)
-                else:
-                    loan = self._parse_single_loan_statement(full_text)
-                    if loan:
-                        loans = [loan]
-                confidence = self._document_confidence(full_text, loans, document_type)
+            raw_bytes = self._read_bytes(pdf_file)
+            extraction = extract_document_text(raw_bytes, filename or getattr(pdf_file, "name", "loan.pdf"))
+            full_text = extraction.text
+            document_type = self._detect_document_type(full_text)
+            if document_type == "loan_book":
+                loans = self._parse_loan_book(full_text)
+            else:
+                loan = self._parse_single_loan_statement(full_text)
+                if loan and any(loan.values()):
+                    loans = [loan]
+            confidence = max(self._document_confidence(full_text, loans, document_type), extraction.confidence * 0.75 if full_text.strip() else 0.0)
+            confidence, _ = apply_parser_learning(
+                user=user,
+                scope="loan_document",
+                filename=filename or getattr(pdf_file, "name", "loan.pdf"),
+                detected_type=document_type,
+                text=full_text,
+                field_names=sorted({key for loan in loans for key, value in loan.items() if value not in ("", None, 0)}),
+                confidence=confidence,
+            )
 
         except Exception as e:
             print(f"Error parsing loan PDF: {e}")
@@ -71,6 +80,15 @@ class LoanPDFParser:
             "extracted_text": full_text[:20000],
             "loans": loans,
         }
+
+    def _read_bytes(self, upload: BinaryIO) -> bytes:
+        current = upload.tell() if hasattr(upload, "tell") else None
+        if hasattr(upload, "seek"):
+            upload.seek(0)
+        content = upload.read()
+        if current is not None and hasattr(upload, "seek"):
+            upload.seek(current)
+        return content
 
     def _is_loan_book(self, text: str) -> bool:
         """Detect if PDF is a loan book (multiple loans) or single statement."""

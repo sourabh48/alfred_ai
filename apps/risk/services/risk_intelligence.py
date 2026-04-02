@@ -10,6 +10,7 @@ from apps.career.services import job_intelligence
 from apps.expenses.models import BankAccount
 from apps.family.models import Dependent
 from apps.integrations.services import verified_intelligence
+from apps.integrations.services.verified_intelligence import freshness_snapshot
 from apps.loans.models import Loan
 from apps.mobility.services import bike_service_intelligence
 from apps.risk.models import RiskSignal
@@ -261,6 +262,7 @@ class RiskIntelligenceService:
             },
             "insights": self._build_insights(consolidated, career_market, monthly_income, liquid_cash),
             "evidence": evidence,
+            "evidence_freshness": freshness_snapshot(evidence),
         }
 
     def _build_actions(self, consolidated: list[dict], career_market: dict, mobility: dict, latest_job_analysis) -> list[dict]:

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Investment
+from .models import Investment, InvestmentImportDocument
 
 
 class InvestmentSerializer(serializers.ModelSerializer):
@@ -33,3 +33,35 @@ class InvestmentSerializer(serializers.ModelSerializer):
         if invested_amount < 0 or current_value < 0 or monthly_sip < 0:
             raise serializers.ValidationError("Investment amounts cannot be negative.")
         return attrs
+
+
+class InvestmentImportDocumentSerializer(serializers.ModelSerializer):
+    parser_status_label = serializers.CharField(source="get_parser_status_display", read_only=True)
+    file_url = serializers.SerializerMethodField()
+    linked_investments = InvestmentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = InvestmentImportDocument
+        fields = (
+            "id",
+            "file_name",
+            "broker_name",
+            "parser_status",
+            "parser_status_label",
+            "parse_confidence",
+            "summary",
+            "extracted_payload",
+            "file_url",
+            "linked_investments",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def get_file_url(self, obj):
+        request = self.context.get("request")
+        if not obj.uploaded_file:
+            return ""
+        if request is not None:
+            return request.build_absolute_uri(obj.uploaded_file.url)
+        return obj.uploaded_file.url

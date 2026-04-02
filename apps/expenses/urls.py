@@ -8,7 +8,9 @@ from .views import (
     ExpenseDetailView,
     ExpenseListCreateView,
     ExpenseStatementImportView,
+    StatementUploadDetailView,
     StatementUploadListView,
+    StatementUploadRetryView,
     ExpenseTimelineView,
 )
 
@@ -20,6 +22,8 @@ urlpatterns = [
     path("timeline/", ExpenseTimelineView.as_view()),
     path("chart/", ExpenseChartView.as_view()),
     path("uploads/", StatementUploadListView.as_view()),
+    path("uploads/<int:pk>/", StatementUploadDetailView.as_view()),
+    path("uploads/<int:pk>/retry/", StatementUploadRetryView.as_view()),
     path("import-statement/", ExpenseStatementImportView.as_view()),
     path("<int:pk>/", ExpenseDetailView.as_view()),
 ]
