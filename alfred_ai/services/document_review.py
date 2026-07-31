@@ -130,6 +130,40 @@ REVIEW_FIELD_SCHEMAS = {
     ],
 }
 
+REVIEW_GENERIC_FIELD_ALIASES = {
+    "statement_document": {
+        "date": ["statement_start", "statement_end"],
+        "document_date": ["statement_start", "statement_end"],
+    },
+    "loan_document": {
+        "account_number": ["loan_account_number"],
+    },
+    "loan_closure_document": {
+        "account_number": ["loan_account_number"],
+        "amount": ["closure_amount"],
+        "date": ["closure_date"],
+        "document_date": ["closure_date"],
+    },
+    "investment_document": {
+        "amount": ["invested_amount", "current_value"],
+    },
+    "vehicle_document": {
+        "amount": ["cost", "total_customer_amount"],
+        "date": ["issue_date", "service_date", "expiry_date", "next_service_date"],
+        "document_date": ["issue_date", "service_date", "expiry_date", "next_service_date"],
+        "invoice_number": ["document_number"],
+        "policy_number": ["document_number"],
+        "registration_number": ["vehicle_number"],
+    },
+    "recruiter_document": {
+        "amount": ["salary_min", "salary_max"],
+    },
+    "credit_report": {
+        "date": ["report_date"],
+        "document_date": ["report_date"],
+    },
+}
+
 
 def _log_document_event(
     *,
@@ -1652,7 +1686,7 @@ def _serialize_statement(upload: StatementUpload) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=payload.get("raw_text_excerpt", "")),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=payload.get("raw_text_excerpt", ""), scope="statement_document"),
         "review_fields": REVIEW_FIELD_SCHEMAS["statement_document"],
         "created_at": upload.uploaded_at.isoformat(),
         "priority_rank": _priority_rank(upload.parser_status, upload.parse_confidence),
@@ -1678,7 +1712,7 @@ def _serialize_loan(document: LoanImportDocument) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text, scope="loan_document"),
         "review_fields": REVIEW_FIELD_SCHEMAS["loan_document"],
         "created_at": document.created_at.isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -1713,7 +1747,7 @@ def _serialize_loan_closure(document: LoanClosureDocument) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text, scope="loan_closure_document"),
         "review_fields": REVIEW_FIELD_SCHEMAS["loan_closure_document"],
         "created_at": (document.updated_at or document.created_at).isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -1748,7 +1782,7 @@ def _serialize_investment(document: InvestmentImportDocument) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text, scope="investment_document"),
         "review_fields": REVIEW_FIELD_SCHEMAS["investment_document"],
         "created_at": document.updated_at.isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -1791,7 +1825,7 @@ def _serialize_vehicle(document: BikeDocument) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.source_text),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.source_text, scope="vehicle_document"),
         "review_fields": REVIEW_FIELD_SCHEMAS["vehicle_document"],
         "created_at": document.updated_at.isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -1815,7 +1849,7 @@ def _serialize_resume(resume: CareerResume) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=resume.extracted_text),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=resume.extracted_text, scope="resume_document"),
         "review_fields": REVIEW_FIELD_SCHEMAS["resume_document"],
         "created_at": resume.updated_at.isoformat(),
         "priority_rank": _priority_rank(resume.parser_status, resume.parse_confidence),
@@ -1843,7 +1877,7 @@ def _serialize_recruiter(analysis: CareerJobAnalysis) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=analysis.extracted_text),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=analysis.extracted_text, scope="recruiter_document"),
         "review_fields": REVIEW_FIELD_SCHEMAS["recruiter_document"],
         "created_at": (analysis.updated_at or analysis.created_at).isoformat(),
         "priority_rank": _priority_rank(analysis.parser_status, analysis.parse_confidence),
@@ -1868,7 +1902,7 @@ def _serialize_credit(upload: CreditReportUpload) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=upload.extracted_text),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=upload.extracted_text, scope="credit_report"),
         "review_fields": REVIEW_FIELD_SCHEMAS["credit_report"],
         "created_at": upload.updated_at.isoformat(),
         "priority_rank": _priority_rank(upload.parser_status, upload.parse_confidence),
@@ -1891,6 +1925,17 @@ def _review_field_label(field_name: str) -> str:
             if field.get("name") == normalized:
                 return str(field.get("label") or normalized)
     return normalized.replace("_", " ").title()
+
+
+def _review_schema_names(scope: str) -> set[str]:
+    return {str(field.get("name") or "") for field in REVIEW_FIELD_SCHEMAS.get(scope, []) if field.get("name")}
+
+
+def _review_schema_label(scope: str, field_name: str) -> str:
+    for field in REVIEW_FIELD_SCHEMAS.get(scope, []):
+        if field.get("name") == field_name:
+            return str(field.get("label") or field_name)
+    return _review_field_label(field_name)
 
 
 def _review_candidate_value(value) -> str:
@@ -1968,7 +2013,42 @@ def _accepted_correction_candidates(payload: dict | None) -> list[dict]:
     return candidates
 
 
-def _merge_review_field_candidates(source: dict, extraction_review: dict) -> list[dict]:
+def _scope_aware_review_field_candidates(scope: str, candidates: list[dict]) -> list[dict]:
+    schema_names = _review_schema_names(scope)
+    alias_map = REVIEW_GENERIC_FIELD_ALIASES.get(scope, {})
+    if not schema_names or not alias_map:
+        return candidates
+
+    expanded = list(candidates)
+    for candidate in candidates:
+        if candidate.get("accepted"):
+            continue
+        alias_keys = {
+            str(candidate.get("field_type") or "").strip(),
+            str(candidate.get("field_name") or "").strip(),
+        }
+        target_fields = []
+        for key in alias_keys:
+            for field_name in alias_map.get(key, []):
+                if field_name in schema_names and field_name not in target_fields:
+                    target_fields.append(field_name)
+        if not target_fields:
+            continue
+        existing_name = str(candidate.get("field_name") or "")
+        if existing_name in schema_names and len(target_fields) == 1 and target_fields[0] == existing_name:
+            continue
+        for field_name in target_fields:
+            alias = dict(candidate)
+            alias["field_name"] = field_name
+            alias["label"] = _review_schema_label(scope, field_name)
+            alias["source"] = f"{candidate.get('source') or 'candidate'}_schema_alias"[:80]
+            alias["confidence"] = max(0.0, min(1.0, round(float(candidate.get("confidence") or 0) - 0.01, 2)))
+            alias["context"] = str(candidate.get("context") or "Mapped from generic OCR evidence for this review schema.")[:220]
+            expanded.append(alias)
+    return expanded
+
+
+def _merge_review_field_candidates(source: dict, extraction_review: dict, *, scope: str = "") -> list[dict]:
     merged = [
         *list(source.get("field_candidates") or []),
         *list(extraction_review.get("field_candidates") or []),
@@ -1989,15 +2069,31 @@ def _merge_review_field_candidates(source: dict, extraction_review: dict) -> lis
             continue
         seen.add(key)
         normalized.append(candidate)
+    normalized = _scope_aware_review_field_candidates(scope, normalized)
+    normalized_deduped = []
+    seen = set()
+    for candidate in normalized:
+        key = (
+            candidate.get("field_name") or candidate.get("field_type"),
+            candidate.get("value"),
+            candidate.get("source"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized_deduped.append(candidate)
+    schema_names = _review_schema_names(scope)
+    normalized = normalized_deduped
     normalized.sort(
         key=lambda item: (
             not bool(item.get("accepted")),
+            bool(schema_names) and str(item.get("field_name") or "") not in schema_names,
             item.get("field_type") == "low_confidence_text",
             -float(item.get("confidence") or 0),
             item.get("field_name") or item.get("field_type") or "",
         )
     )
-    return normalized[:20]
+    return normalized[:24]
 
 
 def _annotate_review_ocr_pages(ocr_pages: list[dict], field_candidates: list[dict]) -> list[dict]:
@@ -2077,14 +2173,14 @@ def _review_overlay_summary(
     }
 
 
-def _review_artifacts_payload(payload: dict | None, *, fallback_excerpt: str = "") -> dict:
+def _review_artifacts_payload(payload: dict | None, *, fallback_excerpt: str = "", scope: str = "") -> dict:
     source = dict(payload or {})
     extraction_review = dict(source.get("extraction_review") or {})
     excerpt = str(source.get("raw_text_excerpt") or extraction_review.get("raw_text_excerpt") or fallback_excerpt or "").strip()
     extraction_notes = source.get("extraction_notes") or source.get("raw_notes") or []
     if isinstance(extraction_notes, str):
         extraction_notes = [extraction_notes]
-    field_candidates = _merge_review_field_candidates(source, extraction_review)
+    field_candidates = _merge_review_field_candidates(source, extraction_review, scope=scope)
     ocr_pages = _annotate_review_ocr_pages(list(extraction_review.get("ocr_pages") or []), field_candidates)
     retry_outcome = {
         key: value

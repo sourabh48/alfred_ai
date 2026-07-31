@@ -358,6 +358,53 @@ Total Customer Amount: Rs 2123.01
         self.assertEqual(parsed.review_payload["invoice_review"]["compact_ocr_rows"], 3)
         self.assertIn("Recovered 3 invoice line item", parsed.parser_notes)
 
+    @patch.object(BikeDocumentAI, "_extract_text", return_value="""
+Service Invoice
+Job Card No EDGE INV 3003
+Registration No KA 01 KC 6667
+Service Center Jagadamba Automobiles
+Invoice Date 04 Apr 2026
+Odometer Reading 27,140 KM
+Parts Description
+Code Description Qty Customer Amount
+BPK001 BRAKE PAD KIT Qty 1 Customer Amount Rs 820.00
+EOL15W50 ENGINE OIL 15W50 Qty 1.70 Amount Rs 663.01
+Total Rs 1483.01
+Labour Description
+Code Description Hrs Customer Amount
+LAB001 PERIODIC SERVICE LABOUR Hrs 1 Amount Rs 640.00
+Total Rs 640.00
+Total Customer Amount Rs 2123.01
+""".strip())
+    def test_invoice_parser_recovers_label_collapsed_ocr_rows(self, _extract_text):
+        parser = BikeDocumentAI()
+        upload = BytesIO(b"fake-pdf")
+        upload.name = "label-collapsed-invoice.pdf"
+
+        parsed = parser.parse(upload, upload.name)
+
+        self.assertEqual(parsed.document_type, "invoice")
+        self.assertEqual(parsed.fields["document_number"], "EDGE INV 3003")
+        self.assertEqual(parsed.fields["service_center_name"], "Jagadamba Automobiles")
+        self.assertEqual(parsed.fields["invoice_date"], "2026-04-04")
+        self.assertEqual(parsed.fields["odometer_km"], 27140)
+        self.assertEqual(parsed.fields["parts_item_count"], 2)
+        self.assertEqual(parsed.fields["labour_item_count"], 1)
+        self.assertEqual(parsed.fields["line_item_count"], 3)
+        self.assertAlmostEqual(parsed.fields["parts_customer_amount"], 1483.01)
+        self.assertAlmostEqual(parsed.fields["labour_customer_amount"], 640.0)
+        self.assertAlmostEqual(parsed.fields["total_customer_amount"], 2123.01)
+        self.assertEqual(parsed.service_payload["parts_items"][0]["description"], "BRAKE PAD KIT")
+        self.assertEqual(parsed.service_payload["parts_items"][1]["description"], "ENGINE OIL 15W50")
+        self.assertEqual(parsed.service_payload["labour_items"][0]["description"], "PERIODIC SERVICE LABOUR")
+        self.assertTrue(
+            all(
+                item["parse_mode"] == "compact_ocr_row"
+                for item in [*parsed.service_payload["parts_items"], *parsed.service_payload["labour_items"]]
+            )
+        )
+        self.assertEqual(parsed.review_payload["invoice_review"]["compact_ocr_rows"], 3)
+
     def test_invoice_amount_parser_ignores_empty_ocr_amount_tokens(self):
         parser = BikeDocumentAI()
 

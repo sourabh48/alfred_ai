@@ -86,6 +86,31 @@ TABLE_HEADER_LABELS = {
     "hrs",
 }
 
+INLINE_INVOICE_LABEL_TOKENS = {
+    "amount",
+    "amt",
+    "cgst",
+    "customer",
+    "disc",
+    "discount",
+    "gst",
+    "hour",
+    "hours",
+    "hrs",
+    "igst",
+    "inr",
+    "mrp",
+    "no",
+    "nos",
+    "price",
+    "qty",
+    "quantity",
+    "rate",
+    "rs",
+    "sgst",
+    "total",
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -496,7 +521,7 @@ class BikeDocumentAI:
         return self._amount_string_to_float(generic.group(1)) if generic else 0.0
 
     def _extract_odometer(self, text: str) -> int:
-        pattern = re.compile(r"(?:odometer|kms?|km reading)\s*[:#-]?\s*([0-9,]{3,8})", re.IGNORECASE)
+        pattern = re.compile(r"(?:odometer(?:\s+reading)?|kms?|km reading)\s*[:#-]?\s*([0-9,]{3,8})", re.IGNORECASE)
         match = pattern.search(text)
         if match:
             return int(match.group(1).replace(",", ""))
@@ -820,11 +845,13 @@ class BikeDocumentAI:
                     numeric_values.append(amount)
                     numeric_started = True
             elif numeric_started:
-                if re.search(r"[A-Za-z]", token):
+                if self._is_inline_invoice_label_token(token):
+                    pass
+                elif re.search(r"[A-Za-z]", token):
                     return {}
             else:
                 cleaned = token.strip(":-")
-                if cleaned and not self._looks_like_known_label(cleaned):
+                if cleaned and not self._looks_like_known_label(cleaned) and not self._is_inline_invoice_label_token(cleaned):
                     description_parts.append(cleaned)
             index += 1
 
@@ -1026,6 +1053,10 @@ class BikeDocumentAI:
     def _looks_like_known_label(self, line: str) -> bool:
         normalized = self._normalize_token(line.rstrip(":"))
         return normalized in KNOWN_LABELS or normalized in TABLE_HEADER_LABELS
+
+    def _is_inline_invoice_label_token(self, value: str) -> bool:
+        normalized = self._normalize_token(value.rstrip(":"))
+        return normalized in INLINE_INVOICE_LABEL_TOKENS
 
     def _parse_amount_token(self, value: str) -> float:
         if not value:

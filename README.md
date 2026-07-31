@@ -21,7 +21,7 @@ ALFRED is a Django application that turns personal financial records into one wo
 | Credit report upload and tradeline sync | Working |
 | Investments manual + PDF intake | Working |
 | Career source coverage | 88% - current resume, recruiter/JD, multi-feed jobs, job-page adapter, and geography-aware compensation scope is implemented, but real salary/outcome breadth still needs growth |
-| Shared document review / retry flow | 82% - parser confidence, OCR candidates, ChatGPT context import, accepted corrections, and retry learning are implemented; long-tail layouts still need more real samples |
+| Shared document review / retry flow | 86% - parser confidence, schema-aware OCR candidates, ChatGPT context import, accepted corrections, retry learning, and tougher service-invoice recovery are implemented; long-tail layouts and browser interaction proof still need more real samples |
 | External proof and freshness | 90% - proof contracts and freshness metadata are active; due/stale evidence still needs refresh monitoring |
 | UI polish and responsive shell | 45% - live-server smoke coverage and the guarded vehicle catalog picker are active, but Playwright/Selenium browser interaction coverage is not installed locally |
 | Mobility vehicle catalog and service intelligence | 88% - supported India consumer-vehicle seed scope has 80 source-linked models across 32 manufacturers, route-aware wear guidance, and service-cost learning; not exhaustive |
@@ -35,12 +35,13 @@ Last verified locally on 31 July 2026.
 | Scope | Verified state |
 | --- | --- |
 | Project tracker | Broad product areas now stay in In Progress until implementation, data maturity, and browser verification are all strong enough |
-| Scope completion | 79% in the current local snapshot; this is the average maturity across active broad product scopes |
+| Scope completion | 80% in the current local snapshot; this is the average maturity across active broad product scopes |
 | Verified complete checks | Backend/API regression baseline, vehicle make/model picker fix, and supervised model refresh are the only 100% entries |
 | Vehicle maintenance learning | 88% - current catalog, route-aware maintenance, service-cost learning, and brand-filtered selection are implemented, but long-tail models, source upkeep automation, condition snapshots, and real issue outcomes still matter |
 | Vehicle catalog UI | One Make / Brand combobox submits the actual `make` value; Official Catalog Model is populated only after a make is selected and is guarded from live-refresh re-render while the user is choosing |
 | Catalog API | `/api/mobility/bike-models/catalog/` supports `vehicle_type` plus `make`, `brand`, or `manufacturer` filters |
 | ChatGPT context import | `/api/reports/chatgpt-imports/` and the document center accept pasted transcripts or ChatGPT JSON exports, then store detected module evidence for review |
+| Document OCR correction | Generic OCR amount/date candidates are mapped into scope-specific correction fields, and vehicle service invoices now recover label-collapsed compact rows such as embedded `Qty`, `Hrs`, `Amount`, and currency tokens |
 | Model training | 7/7 supervised trainable model states are fresh and ready; 1 planned future RL learner is excluded from supervised coverage |
 | Evidence watchlist | 1 stale, failed, rejected, or due verified evidence record in the current local data snapshot |
 

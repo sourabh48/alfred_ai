@@ -232,7 +232,7 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertTrue(expected_active.issubset(set(in_progress_by_title)))
         self.assertEqual(in_progress_by_title["Browser/UI regression coverage"]["progress"], 45)
         self.assertEqual(in_progress_by_title["Large-data hardening"]["progress"], 84)
-        self.assertGreaterEqual(in_progress_by_title["Document OCR and correction maturity"]["progress"], 82)
+        self.assertGreaterEqual(in_progress_by_title["Document OCR and correction maturity"]["progress"], 86)
         self.assertGreaterEqual(in_progress_by_title["Vehicle catalog and maintenance depth"]["progress"], 88)
         self.assertLess(in_progress_by_title["Vehicle catalog and maintenance depth"]["progress"], 100)
         self.assertEqual(learning_by_title["Vehicle maintenance learning"]["blocker_label"], "Remaining maturity")

@@ -101,7 +101,7 @@ def _build_learning_snapshot(now) -> dict:
         {
             "title": "Document intelligence",
             "progress": document_progress,
-            "detail": "Statements, resumes, recruiter/JD intake, vehicle documents, credit reports, ChatGPT context imports, and loan PDFs now expose parser confidence, OCR overlay evidence, accepted correction candidates, and retry-fed learning traces where applicable.",
+            "detail": "Statements, resumes, recruiter/JD intake, vehicle documents, credit reports, ChatGPT context imports, and loan PDFs now expose parser confidence, OCR overlay evidence, schema-aware correction candidates, and retry-fed learning traces where applicable.",
             "signals": [
                 f"{statement_upload_count + vehicle_documents + resumes + recruiter_documents + credit_report_uploads} parser-tracked uploads",
                 f"{chatgpt_imports} ChatGPT context imports",
@@ -109,7 +109,7 @@ def _build_learning_snapshot(now) -> dict:
                 f"{recruiter_documents} recruiter/JD intake records",
                 f"{vehicle_documents} vehicle documents stored",
             ],
-            "blocker": "The current review workflow is complete; live maturity still depends on more real samples from unknown and long-tail document layouts.",
+            "blocker": "The current review workflow is stronger for supported layouts; live maturity still depends on more real samples from unknown and long-tail document layouts plus full browser interaction proof.",
         },
         {
             "title": "Vehicle maintenance learning",
@@ -197,7 +197,7 @@ def _build_learning_snapshot(now) -> dict:
                 "Investment watchlist ranking blends official AMFI NAV history, verified market context, and user portfolio fit, but still remains a transparent watchlist rather than a guarantee engine.",
             ],
             "not_yet_fully_learned": [
-                "Unknown document layouts now improve through correction memory, OCR overlay candidates, and retry outcomes; maturity still depends on real long-tail sample volume.",
+                "Unknown document layouts now improve through correction memory, schema-aware OCR overlay candidates, label-collapsed invoice recovery, and retry outcomes; maturity still depends on real long-tail sample volume.",
                 "Career source breadth is complete for the current scope, but career outcome learning still needs more local accepted/rejected offers and salary-bearing samples.",
                 "Home-loan dashboard value now includes tracked upfront cash inputs, but it is still an acquisition-cost proxy rather than a live market valuation.",
                 "Large dashboard payloads now use revision-keyed materialized responses; remaining scaling work is production cache sizing, TTL tuning, and observability.",
@@ -238,21 +238,21 @@ def project_details_payload(guardrails: dict) -> dict:
     ml_maturity_progress = _bounded_percent(model_training.get("overall_progress", 0))
 
     browser_ui_progress = 45
-    document_scope_progress = min(max(_bounded_percent(document_track.get("progress", 0)), 82), 90)
+    document_scope_progress = min(max(_bounded_percent(document_track.get("progress", 0)), 86), 91)
     vehicle_scope_progress = min(max(_bounded_percent(vehicle_track.get("progress", 0)), 88), 92)
     career_scope_progress = min(max(_bounded_percent(career_track.get("progress", 0)), 88), 92)
     evidence_scope_progress = min(max(_bounded_percent(evidence_track.get("progress", 0)), 88 if not evidence_watchlist.exists() else 0), 92)
     large_data_scope_progress = 84
 
     next_steps = [
-        "Maintain correction-backed parser learning for new document layouts and service-invoice variants as real edge cases arrive.",
+        "Maintain correction-backed parser learning for new document layouts and keep adding real invoice/OCR edge cases to the field-correction suite.",
         "Keep verified evidence refresh jobs healthy across advisory surfaces and require proof contracts on any new recommendation or relationship-adjacent path.",
         "Add browser-driven regression checks for the most important user journeys so UI correctness is not inferred only from API and Django tests.",
         "Tune production cache TTLs, capacity, and dashboard invalidation observability as real history grows.",
         "Maintain career feed freshness and add specialized sources only when real users expose target geography or role-family gaps.",
     ]
     improvements = [
-        "maintain OCR confidence overlays, accepted correction candidates, ChatGPT context imports, and retry evidence in visual document review",
+        "maintain OCR confidence overlays, schema-aware correction candidates, ChatGPT context imports, and retry evidence in visual document review",
         "maintain route-aware trip costing with fuel-price estimates and service-prep buffers as more models are added",
         "add user feedback loops so corrections can improve parser heuristics over time",
         "add portfolio and job-market alerting with freshness thresholds and proof links",
@@ -361,8 +361,8 @@ def project_details_payload(guardrails: dict) -> dict:
         {
             "title": "Document OCR and correction maturity",
             "progress": document_scope_progress,
-            "detail": "Parser confidence, low-confidence queues, accepted corrections, ChatGPT context import, retry-fed learning, OCR overlay candidates, and degraded service-invoice recovery are implemented across the current document families.",
-            "next_focus": "Use more real unknown layouts to raise field-level correction quality and prove tougher invoice/OCR overlays through browser interaction tests.",
+            "detail": "Parser confidence, low-confidence queues, accepted corrections, ChatGPT context import, retry-fed learning, schema-aware OCR overlay candidates, and degraded service-invoice recovery are implemented across the current document families.",
+            "next_focus": "Use more real unknown layouts to raise field-level correction quality and prove the tougher invoice/OCR overlays through Playwright or Selenium browser interaction tests.",
         },
         {
             "title": "Vehicle catalog and maintenance depth",

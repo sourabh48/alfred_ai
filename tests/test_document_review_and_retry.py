@@ -356,6 +356,82 @@ class DocumentReviewAndRetryTests(TestCase):
         self.assertEqual(artifacts["overlay_summary"]["retry_resolution"], "still_needs_review")
         self.assertEqual(artifacts["overlay_summary"]["low_confidence_regions"], 1)
 
+    def test_review_queue_maps_generic_ocr_candidates_to_vehicle_review_fields(self):
+        profile = BikeProfile.objects.create(
+            user=self.user,
+            display_name="Honda Activa 6G",
+            model_name="Activa 6G",
+            vehicle_type="scooter",
+            bike_class="scooter",
+        )
+        BikeDocument.objects.create(
+            user=self.user,
+            bike_profile=profile,
+            bike_name=profile.display_name,
+            document_type="invoice",
+            parser_status="needs_review",
+            parse_confidence=0.43,
+            source_text="Invoice Date 2026-03-31 Total Customer Amount Rs 2432.92",
+            extracted_payload={
+                "raw_text_excerpt": "Invoice Date 2026-03-31 Total Customer Amount Rs 2432.92",
+                "extraction_review": {
+                    "field_candidates": [
+                        {
+                            "field_type": "amount",
+                            "field_name": "amount",
+                            "label": "Amount",
+                            "value": "2432.92",
+                            "confidence": 0.82,
+                            "source": "raw_text",
+                            "context": "Total Customer Amount Rs 2432.92",
+                            "page": 1,
+                        },
+                        {
+                            "field_type": "date",
+                            "field_name": "document_date",
+                            "label": "Date",
+                            "value": "2026-03-31",
+                            "confidence": 0.79,
+                            "source": "ocr_region",
+                            "context": "Invoice Date 2026-03-31",
+                            "page": 1,
+                        },
+                    ],
+                    "ocr_pages": [
+                        {
+                            "page": 1,
+                            "width": 1000,
+                            "height": 1400,
+                            "preview": "Invoice Date 2026-03-31 Total Customer Amount Rs 2432.92",
+                            "regions": [
+                                {
+                                    "text": "Total Customer Amount Rs 2432.92",
+                                    "confidence": 0.48,
+                                    "bbox": [[20, 60], [620, 60], [620, 96], [20, 96]],
+                                    "origin": "rapidocr_image",
+                                }
+                            ],
+                        }
+                    ],
+                },
+            },
+        )
+
+        response = self.client.get("/api/documents/review-queue/")
+
+        self.assertEqual(response.status_code, 200)
+        item = next(entry for entry in response.json()["results"] if entry["scope"] == "vehicle_document")
+        artifacts = item["review_artifacts"]
+        candidate_names = [candidate["field_name"] for candidate in artifacts["field_candidates"]]
+        for field_name in ["cost", "total_customer_amount", "service_date"]:
+            self.assertIn(field_name, candidate_names)
+        self.assertLess(candidate_names.index("cost"), candidate_names.index("amount"))
+        schema_aliases = [candidate for candidate in artifacts["field_candidates"] if candidate.get("source", "").endswith("_schema_alias")]
+        self.assertTrue(any(candidate["label"] == "Service Cost" and candidate["value"] == "2432.92" for candidate in schema_aliases))
+        self.assertIn("cost", artifacts["ocr_pages"][0]["candidate_fields"])
+        self.assertEqual(artifacts["overlay_summary"]["low_confidence_regions"], 1)
+        self.assertGreaterEqual(artifacts["overlay_summary"]["field_candidate_count"], 6)
+
     def test_statement_retry_creates_internal_retry_ticket_when_still_unresolved(self):
         upload = StatementUpload.objects.create(
             user=self.user,

@@ -155,6 +155,26 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn("submitChatGPTImport", script)
         self.assertIn("renderChatGPTImports", script)
 
+    def test_document_review_ui_exposes_ocr_overlay_and_candidate_correction_controls(self):
+        html = self._fetch_text("/documents/")
+        parser = _AssetParser()
+        parser.feed(html)
+
+        self.assertIn("documentReviewQueue", parser.ids)
+        self.assertIn("/static/js/documents.js", parser.static_assets)
+
+        script = self._fetch_text("/static/js/documents.js")
+        self.assertIn("renderReviewArtifacts", script)
+        self.assertIn("renderOcrOverlayPages", script)
+        self.assertIn("fillReviewCandidate", script)
+        self.assertIn("field_candidates", script)
+        self.assertIn("overlay_summary", script)
+        self.assertIn("data-field-name", script)
+        self.assertIn("data-field-value", script)
+        self.assertIn("field_matches", script)
+        self.assertIn("low-confidence OCR region", script)
+        self.assertIn("<rect", script)
+
     def _fetch_text(self, path: str, *, session_cookie: str | None = None) -> str:
         return self._fetch_bytes(path, session_cookie=session_cookie).decode("utf-8", errors="replace")
 
