@@ -1,0 +1,446 @@
+import os
+import unittest
+from datetime import date
+from pathlib import Path
+
+from django.contrib.auth import get_user_model
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+
+from apps.mobility.models import BikeDocument, BikeProfile, BikeServiceRecord
+
+
+RUN_BROWSER_TESTS = os.environ.get("ALFRED_RUN_BROWSER_TESTS", "").lower() in {"1", "true", "yes"}
+
+
+@unittest.skipUnless(RUN_BROWSER_TESTS, "Set ALFRED_RUN_BROWSER_TESTS=true to run Selenium document-review browser tests.")
+class DocumentReviewBrowserTests(StaticLiveServerTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        try:
+            from selenium import webdriver
+            from selenium.common.exceptions import WebDriverException
+            from selenium.common.exceptions import StaleElementReferenceException
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support import expected_conditions as EC
+            from selenium.webdriver.support.ui import WebDriverWait
+        except ImportError as exc:
+            raise unittest.SkipTest(f"Selenium is not installed: {exc}") from exc
+
+        cls.By = By
+        cls.EC = EC
+        cls.StaleElementReferenceException = StaleElementReferenceException
+        cls.WebDriverWait = WebDriverWait
+        cls.WebDriverException = WebDriverException
+        cls.selenium = cls._create_driver(webdriver)
+        cls.selenium.set_window_size(1440, 1200)
+        cls.wait = WebDriverWait(cls.selenium, 18)
+
+    @classmethod
+    def tearDownClass(cls):
+        driver = getattr(cls, "selenium", None)
+        if driver:
+            driver.quit()
+        super().tearDownClass()
+
+    @classmethod
+    def _create_driver(cls, webdriver):
+        errors = []
+        for browser_name, options in cls._browser_options():
+            try:
+                return getattr(webdriver, browser_name)(options=options)
+            except Exception as exc:
+                errors.append(f"{browser_name}: {exc}")
+        raise unittest.SkipTest(f"No Selenium browser driver available. Tried {'; '.join(errors)}")
+
+    @classmethod
+    def _browser_options(cls):
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.edge.options import Options as EdgeOptions
+
+        chrome = ChromeOptions()
+        for argument in (
+            "--headless=new",
+            "--disable-gpu",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--window-size=1440,1200",
+        ):
+            chrome.add_argument(argument)
+        chrome_binary = cls._first_existing(
+            os.environ.get("CHROME_BINARY", ""),
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        )
+        if chrome_binary:
+            chrome.binary_location = chrome_binary
+
+        edge = EdgeOptions()
+        for argument in (
+            "--headless=new",
+            "--disable-gpu",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--window-size=1440,1200",
+        ):
+            edge.add_argument(argument)
+        edge_binary = cls._first_existing(
+            os.environ.get("EDGE_BINARY", ""),
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        )
+        if edge_binary:
+            edge.binary_location = edge_binary
+
+        return (("Chrome", chrome), ("Edge", edge))
+
+    @staticmethod
+    def _first_existing(*paths):
+        for path in paths:
+            if path and Path(path).exists():
+                return path
+        return ""
+
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            username="document_browser_user",
+            password="Pass12345!",
+            monthly_income=95000,
+            rent_or_emi=24000,
+            city="Bengaluru",
+        )
+        self.profile = BikeProfile.objects.create(
+            user=self.user,
+            display_name="Honda Activa 6G",
+            make="Honda",
+            model_name="Activa 6G",
+            vehicle_type="scooter",
+            bike_class="scooter",
+            vehicle_number="KA03XY9999",
+        )
+        self.document = BikeDocument.objects.create(
+            user=self.user,
+            bike_profile=self.profile,
+            bike_name=self.profile.display_name,
+            vehicle_number=self.profile.vehicle_number,
+            document_type="invoice",
+            document_title="jagadamba-mobile-photo-invoice.png",
+            parser_status="needs_review",
+            parse_confidence=0.36,
+            source_text="\n".join(
+                [
+                    "JAGADAMBA AUTOMOBILES",
+                    "Mobile photo service bill",
+                    "DATE 31-03-2026",
+                    "KM 26021",
+                    "Customer Payable 2432.92",
+                ]
+            ),
+            extracted_payload={
+                "extraction_method": "rapidocr_mobile_layout",
+                "raw_text_excerpt": "DATE 31-03-2026 KM 26021 Customer Payable 2432.92",
+                "invoice_review": {"recovered_edge_rows": 1, "compact_ocr_rows": 2},
+                "extraction_review": {
+                    "field_candidates": [
+                        {
+                            "field_type": "grand_total",
+                            "field_name": "customer_payable",
+                            "label": "Customer Payable",
+                            "value": "2432.92",
+                            "confidence": 0.93,
+                            "source": "mobile_ocr",
+                            "context": "Customer Payable 2432.92",
+                            "page": 1,
+                        },
+                        {
+                            "field_type": "document_date",
+                            "field_name": "service_on",
+                            "label": "Service On",
+                            "value": "2026-03-31",
+                            "confidence": 0.89,
+                            "source": "mobile_ocr",
+                            "context": "DATE 31-03-2026",
+                            "page": 1,
+                        },
+                        {
+                            "field_type": "odometer",
+                            "field_name": "km",
+                            "label": "KM",
+                            "value": "26021",
+                            "confidence": 0.87,
+                            "source": "mobile_ocr",
+                            "context": "KM 26021",
+                            "page": 1,
+                        },
+                        {
+                            "field_type": "service_center",
+                            "field_name": "service_center",
+                            "label": "Service Center",
+                            "value": "Jagadamba Automobiles",
+                            "confidence": 0.85,
+                            "source": "mobile_ocr",
+                            "context": "JAGADAMBA AUTOMOBILES",
+                            "page": 1,
+                        },
+                    ],
+                    "ocr_pages": [
+                        {
+                            "page": 1,
+                            "width": 1000,
+                            "height": 1400,
+                            "preview": "DATE 31-03-2026 KM 26021 Customer Payable 2432.92",
+                            "variant": "unknown_mobile_layout",
+                            "regions": [
+                                {
+                                    "text": "DATE 31-03-2026 KM 26021",
+                                    "confidence": 0.43,
+                                    "bbox": [[24, 118], [620, 118], [620, 154], [24, 154]],
+                                    "origin": "mobile_photo",
+                                },
+                                {
+                                    "text": "Customer Payable 2432.92",
+                                    "confidence": 0.4,
+                                    "bbox": [[24, 380], [610, 380], [610, 418], [24, 418]],
+                                    "origin": "mobile_photo",
+                                },
+                            ],
+                        }
+                    ],
+                    "recovery_steps": [{"step": "unknown_layout_alias_review", "status": "mapped"}],
+                    "attempts": [{"method": "rapidocr_mobile_layout", "quality": 0.72}],
+                },
+            },
+        )
+        self.record = BikeServiceRecord.objects.create(
+            user=self.user,
+            bike_profile=self.profile,
+            bike_name=self.profile.display_name,
+            vehicle_number=self.profile.vehicle_number,
+            service_date=date(2026, 3, 20),
+            service_center="Unknown Workshop",
+            source_document=self.document,
+            source_mode="bill_import",
+        )
+
+    def test_vehicle_invoice_overlay_candidate_buttons_fill_and_save_correction(self):
+        self._login_browser()
+        self._install_review_queue_harness()
+
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, "documentCenterRoot")))
+        self.wait.until(
+            lambda driver: "jagadamba-mobile-photo-invoice.png"
+            in driver.find_element(self.By.ID, "documentReviewQueue").text
+        )
+        self._open_review_summary("Review extraction evidence")
+        self._open_review_summary("Accept correction")
+
+        self.wait.until(
+            lambda driver: len(driver.find_elements(self.By.CSS_SELECTOR, "#documentReviewQueue svg rect")) >= 3
+        )
+        for field_name, value in (
+            ("cost", "2432.92"),
+            ("service_date", "2026-03-31"),
+            ("odometer_km", "26021"),
+            ("service_center", "Jagadamba Automobiles"),
+        ):
+            self._click_candidate(field_name, value)
+            self.assertEqual(self._review_field(field_name).get_attribute("value"), value)
+
+        submit = self.wait.until(
+            self.EC.presence_of_element_located(
+                (
+                    self.By.XPATH,
+                    "//*[@id='documentReviewQueue']//form[contains(@id, 'review-form-vehicle_document')]//button[normalize-space()='Save Correction']",
+                )
+            )
+        )
+        self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center'});", submit)
+        self.selenium.execute_script(
+            """
+            arguments[0].closest("details").open = true;
+            window.submitDocumentCorrection(
+                { preventDefault: () => {}, currentTarget: arguments[0].form },
+                "vehicle_document",
+                arguments[1]
+            );
+            """,
+            submit,
+            self.document.pk,
+        )
+
+        self.wait.until(
+            lambda driver: BikeDocument.objects.get(pk=self.document.pk).parser_status == "parsed"
+            or driver.execute_script("return Boolean(window.__lastCorrectionError);")
+        )
+        correction_error = self.selenium.execute_script("return window.__lastCorrectionError || '';")
+        if correction_error:
+            correction_request = self.selenium.execute_script("return window.__lastCorrectionRequest || '';")
+            correction_result = self.selenium.execute_script("return window.__lastCorrectionResult || null;")
+            self.fail(
+                f"Correction POST failed: {correction_error}; request={correction_request}; result={correction_result}"
+            )
+        self.wait.until(
+            lambda driver: "No low-confidence uploads are waiting for review right now."
+            in driver.find_element(self.By.ID, "documentReviewQueue").text
+        )
+
+        self.document.refresh_from_db()
+        self.record.refresh_from_db()
+        service_payload = self.document.extracted_payload["service_payload"]
+        self.assertEqual(service_payload["service_center"], "Jagadamba Automobiles")
+        self.assertEqual(service_payload["service_date"], "2026-03-31")
+        self.assertEqual(service_payload["odometer_km"], 26021)
+        self.assertAlmostEqual(service_payload["cost"], 2432.92)
+        self.assertEqual(self.record.service_center, "Jagadamba Automobiles")
+        self.assertEqual(str(self.record.service_date), "2026-03-31")
+        self.assertEqual(self.record.odometer_km, 26021)
+        self.assertAlmostEqual(self.record.cost, 2432.92)
+        self.assertEqual(
+            self.record.parsed_payload["review_trace"]["accepted_corrections"]["service_center"],
+            "Jagadamba Automobiles",
+        )
+
+    def _login_browser(self):
+        self.selenium.get(f"{self.live_server_url}/login/")
+        self.selenium.delete_all_cookies()
+        self.selenium.get(f"{self.live_server_url}/login/?next=/login/")
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, "id_username"))).send_keys(self.user.username)
+        self.selenium.find_element(self.By.ID, "id_password").send_keys("Pass12345!")
+        self.selenium.find_element(self.By.CSS_SELECTOR, "button[type='submit']").click()
+        self.wait.until(lambda driver: driver.execute_script("return document.body.dataset.authenticated") == "true")
+
+    def _install_review_queue_harness(self):
+        self.wait.until(lambda driver: driver.execute_script("return Boolean(window.Alfred)"))
+        self.selenium.execute_script(
+            """
+            document.body.innerHTML = `
+                <main class="container-fluid alfred-layout">
+                    <section id="documentCenterRoot"></section>
+                    <section id="documentReviewQueue"></section>
+                </main>
+            `;
+            window.__alfredReviewQueueLoaded = false;
+            window.__alfredReviewQueueError = "";
+            window.__lastCorrectionRequest = "";
+            window.__lastCorrectionResult = null;
+            window.__lastCorrectionError = "";
+            const originalFetchJSON = window.Alfred.fetchJSON;
+            window.Alfred.fetchJSON = function(url, options = {}) {
+                const isCorrection = url === "/api/documents/review-queue/resolve/";
+                if (isCorrection) {
+                    window.__lastCorrectionRequest = options.body || "";
+                    window.__lastCorrectionError = "";
+                    window.__lastCorrectionResult = null;
+                }
+                return originalFetchJSON(url, options)
+                    .then(data => {
+                        if (isCorrection) {
+                            window.__lastCorrectionResult = data;
+                        }
+                        return data;
+                    })
+                    .catch(error => {
+                        if (isCorrection) {
+                            window.__lastCorrectionError = error.message || String(error);
+                        }
+                        throw error;
+                    });
+            };
+            const loadReviewQueueOnly = () => {
+                window.loadDocumentCenter = function() {
+                    return window.Alfred.fetchJSON("/api/documents/review-queue/")
+                        .then(data => {
+                            window.renderReviewQueue(data.results || []);
+                            return data;
+                        });
+                };
+                window.loadDocumentCenter()
+                    .then(() => { window.__alfredReviewQueueLoaded = true; })
+                    .catch(error => { window.__alfredReviewQueueError = error.message || String(error); });
+            };
+            if (window.renderReviewQueue) {
+                loadReviewQueueOnly();
+            } else {
+                const script = document.createElement("script");
+                script.src = "/static/js/documents.js?v=2.3";
+                script.onload = loadReviewQueueOnly;
+                script.onerror = () => { window.__alfredReviewQueueError = "documents.js failed to load"; };
+                document.head.appendChild(script);
+            }
+            """
+        )
+        self.wait.until(
+            lambda driver: driver.execute_script(
+                "return window.__alfredReviewQueueLoaded === true || Boolean(window.__alfredReviewQueueError);"
+            )
+        )
+        error = self.selenium.execute_script("return window.__alfredReviewQueueError || '';")
+        if error:
+            self.fail(error)
+
+    def _open_review_summary(self, label):
+        last_error = None
+        for _attempt in range(5):
+            try:
+                summary = self.wait.until(
+                    self.EC.presence_of_element_located(
+                        (self.By.XPATH, f"//*[@id='documentReviewQueue']//summary[normalize-space()='{label}']")
+                    )
+                )
+                self.selenium.execute_script(
+                    "arguments[0].scrollIntoView({block: 'center'}); arguments[0].closest('details').open = true;",
+                    summary,
+                )
+                return
+            except (self.StaleElementReferenceException, self.WebDriverException) as exc:
+                last_error = exc
+        if last_error:
+            raise last_error
+
+    def _click_candidate(self, field_name, value):
+        last_error = None
+        for _attempt in range(5):
+            try:
+                self.wait.until(
+                    lambda driver: len(
+                        driver.find_elements(self.By.CSS_SELECTOR, "#documentReviewQueue button[data-field-name]")
+                    )
+                    > 0
+                )
+                button = self.selenium.find_element(
+                    self.By.CSS_SELECTOR,
+                    f'#documentReviewQueue button[data-field-name="{field_name}"][data-field-value="{value}"]',
+                )
+                self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center'});", button)
+                try:
+                    button.click()
+                except self.WebDriverException:
+                    self.selenium.execute_script("arguments[0].click();", button)
+                return
+            except (self.StaleElementReferenceException, self.WebDriverException) as exc:
+                last_error = exc
+        available = self.selenium.execute_script(
+            """
+            return Array.from(document.querySelectorAll("#documentReviewQueue button[data-field-name]")).map(button => ({
+                field: button.dataset.fieldName,
+                value: button.dataset.fieldValue,
+                text: button.textContent.trim(),
+                visible: Boolean(button.offsetWidth || button.offsetHeight || button.getClientRects().length),
+            }));
+            """
+        )
+        if last_error:
+            raise AssertionError(
+                f"Could not click candidate {field_name}={value}. Available buttons: {available}"
+            ) from last_error
+
+    def _review_field(self, field_name):
+        return self.wait.until(
+            self.EC.presence_of_element_located(
+                (
+                    self.By.CSS_SELECTOR,
+                    f'#documentReviewQueue form[id^="review-form-vehicle_document"] [name="{field_name}"]',
+                )
+            )
+        )

@@ -81,12 +81,13 @@ COUNTRY_ALIASES = {
     "global": "Remote",
 }
 SALARY_BLOCK_RE = re.compile(
-    r"(?P<currency>INR|Rs\.?|₹|USD|\$)?\s*"
+    r"(?P<currency>INR|Rs\.?|\u20b9|USD|\$)?\s*"
     r"(?P<first>\d[\d,]*(?:\.\d+)?)\s*(?P<first_unit>k|lpa|lakh|lakhs|crore|cr|million|m)?"
-    r"(?:\s*(?:-|to|–)\s*(?P<second>\d[\d,]*(?:\.\d+)?)\s*(?P<second_unit>k|lpa|lakh|lakhs|crore|cr|million|m)?)?"
+    r"(?:\s*(?:-|to|\u2013|\u2014)\s*(?P<second>\d[\d,]*(?:\.\d+)?)\s*(?P<second_unit>k|lpa|lakh|lakhs|crore|cr|million|m)?)?"
     r"\s*(?P<period>per\s+annum|per\s+year|/year|yearly|annual|annum|lpa|per\s+month|/month|monthly|month|pm|per\s+hour|/hour|hourly)?",
     re.IGNORECASE,
 )
+OPPORTUNITY_OUTCOME_STATUSES = {"accepted", "rejected"}
 JOB_FEED_ADAPTERS = (
     {
         "name": "Remotive Jobs API",
@@ -105,6 +106,36 @@ JOB_FEED_ADAPTERS = (
     },
 )
 JOB_PAGE_ADAPTERS = ("Generic JSON-LD", "Greenhouse", "Lever", "Workday", "Ashby")
+SPECIALTY_SOURCE_CANDIDATES = (
+    {
+        "name": "Naukri",
+        "source_url": "https://www.naukri.com/",
+        "role_families": ["general", "data", "engineering", "finance", "product"],
+        "countries": ["India"],
+        "reason": "Broad India job-market coverage useful when configured feeds miss local role/geography samples.",
+    },
+    {
+        "name": "Instahyre",
+        "source_url": "https://www.instahyre.com/search-jobs/",
+        "role_families": ["engineering", "data", "product", "finance"],
+        "countries": ["India"],
+        "reason": "India startup and MNC roles can expose salary-bearing tech and business openings by city.",
+    },
+    {
+        "name": "Wellfound Jobs",
+        "source_url": "https://wellfound.com/jobs",
+        "role_families": ["engineering", "data", "product", "general"],
+        "countries": ["Global", "Remote", "United States", "India"],
+        "reason": "Startup roles often expose remote/local geography and salary or equity signals.",
+    },
+    {
+        "name": "AI Jobs",
+        "source_url": "https://aijobs.net/",
+        "role_families": ["data", "engineering"],
+        "countries": ["Global", "Remote"],
+        "reason": "Specialized AI, ML, data-science, and big-data roles fill long-tail role-family gaps.",
+    },
+)
 
 
 def career_source_coverage_summary() -> dict:
@@ -120,6 +151,18 @@ def career_source_coverage_summary() -> dict:
             "salary-bearing live opening samples",
             "city/state/country salary-sample matching",
             "freshness-backed evidence contracts",
+        ],
+        "specialty_source_policy": "Specialty sources remain candidates only until a real user's role/geography request exposes a salary-bearing coverage gap.",
+        "candidate_specialty_source_count": len(SPECIALTY_SOURCE_CANDIDATES),
+        "candidate_specialty_sources": [
+            {
+                "name": item["name"],
+                "source_url": item["source_url"],
+                "role_families": item["role_families"],
+                "countries": item["countries"],
+                "reason": item["reason"],
+            }
+            for item in SPECIALTY_SOURCE_CANDIDATES
         ],
     }
 
@@ -322,7 +365,16 @@ class JobIntelligenceService:
             "openings": filtered_jobs[:8],
             "evidence": evidence,
             "source_evidence": evidence_records,
-            "source_coverage": self._opening_source_coverage(jobs, filtered_jobs, unique_terms, evidence_records, feed_queries),
+            "source_coverage": self._opening_source_coverage(
+                jobs,
+                filtered_jobs,
+                unique_terms,
+                evidence_records,
+                feed_queries,
+                role=role,
+                country=country,
+                state=state,
+            ),
             "filters": self._opening_filter_metadata(jobs),
             "active_filters": {
                 "country": country,
@@ -404,7 +456,18 @@ class JobIntelligenceService:
             "period": salary["period"],
         }
 
-    def _opening_source_coverage(self, openings: list[dict], filtered_jobs: list[dict], used_terms: list[str], evidence_records: list[dict], feed_queries: list[dict] | None = None) -> dict:
+    def _opening_source_coverage(
+        self,
+        openings: list[dict],
+        filtered_jobs: list[dict],
+        used_terms: list[str],
+        evidence_records: list[dict],
+        feed_queries: list[dict] | None = None,
+        *,
+        role: str = "",
+        country: str = "",
+        state: str = "",
+    ) -> dict:
         statuses = sorted({str(item.get("status") or "") for item in evidence_records if isinstance(item, dict) and item.get("status")})
         portal_families = sorted({item.get("portal_family", "") for item in openings if item.get("portal_family")})
         countries = sorted({item.get("country", "") for item in openings if item.get("country")})
@@ -443,8 +506,96 @@ class JobIntelligenceService:
             "filtered_salary_bearing_candidates": len([item for item in filtered_jobs if item.get("salary_signal", {}).get("available")]),
             "source_candidate_counts": source_candidate_counts,
             "source_salary_counts": source_salary_counts,
+            "specialty_source_gap_policy": self._specialty_source_gap_policy(
+                role,
+                country,
+                state,
+                openings,
+                filtered_jobs,
+                used_terms,
+                evidence_records,
+            ),
             "coverage_complete": len(active_feed_names) >= len(JOB_FEED_ADAPTERS),
         }
+
+    def _specialty_source_gap_policy(
+        self,
+        role: str,
+        country: str,
+        state: str,
+        openings: list[dict],
+        filtered_jobs: list[dict],
+        used_terms: list[str],
+        evidence_records: list[dict],
+    ) -> dict:
+        role_family = self._role_family(role)
+        requested_country = self._normalize_country(country)
+        requested_state = str(state or "").strip()
+        salary_bearing = [item for item in openings if item.get("salary_signal", {}).get("available")]
+        filtered_salary_bearing = [item for item in filtered_jobs if item.get("salary_signal", {}).get("available")]
+        reasons = []
+        if requested_country or requested_state:
+            location_label = ", ".join(part for part in [requested_state, requested_country] if part)
+            if not filtered_jobs:
+                reasons.append(f"No live opening candidates matched {location_label or 'the requested geography'}.")
+            elif not filtered_salary_bearing:
+                reasons.append(f"No salary-bearing live opening matched {location_label or 'the requested geography'}.")
+        elif not salary_bearing:
+            reasons.append("No salary-bearing live opening appeared for the requested role family.")
+        if evidence_records and not any(item.get("status", "fresh") in {"fresh", "stale"} for item in evidence_records if isinstance(item, dict)):
+            reasons.append("Configured job-feed evidence did not return a usable freshness status.")
+
+        gap_exposed = bool(reasons)
+        recommended_sources = self._candidate_specialty_sources(role_family, requested_country) if gap_exposed else []
+        return {
+            "gap_exposed": gap_exposed,
+            "policy": "candidate_only_until_connector_or_adapter_is_added" if gap_exposed else "core_feeds_sufficient_for_current_role_geography",
+            "source_addition_allowed": gap_exposed,
+            "requested_role": role,
+            "role_family": role_family,
+            "requested_country": requested_country,
+            "requested_state": requested_state,
+            "query_variants": used_terms[:6],
+            "salary_bearing_candidates": len(salary_bearing),
+            "filtered_salary_bearing_candidates": len(filtered_salary_bearing),
+            "filtered_candidates": len(filtered_jobs),
+            "gap_basis": reasons,
+            "recommended_sources": recommended_sources,
+        }
+
+    def _candidate_specialty_sources(self, role_family: str, requested_country: str) -> list[dict]:
+        candidates = []
+        for item in SPECIALTY_SOURCE_CANDIDATES:
+            family_match = role_family in item["role_families"] or "general" in item["role_families"]
+            country_match = (
+                not requested_country
+                or requested_country in item["countries"]
+                or "Global" in item["countries"]
+                or (requested_country == "Remote" and "Remote" in item["countries"])
+            )
+            if family_match and country_match:
+                candidates.append(
+                    {
+                        "name": item["name"],
+                        "source_url": item["source_url"],
+                        "role_families": item["role_families"],
+                        "countries": item["countries"],
+                        "reason": item["reason"],
+                    }
+                )
+        return candidates[:4]
+
+    def _role_family(self, role: str) -> str:
+        normalized = str(role or "").lower()
+        if any(token in normalized for token in ("data", "analyst", "analytics", "scientist", "machine learning", "ml", "ai", "bi")):
+            return "data"
+        if any(token in normalized for token in ("engineer", "developer", "frontend", "backend", "full stack", "software", "devops", "platform")):
+            return "engineering"
+        if "product" in normalized or "program manager" in normalized:
+            return "product"
+        if any(token in normalized for token in ("finance", "risk", "accounting", "fp&a", "financial")):
+            return "finance"
+        return "general"
 
     def _opening_relevance(self, role: str, skills: list[str], opening: dict) -> dict:
         title = str(opening.get("title", "") or "").lower()
@@ -677,6 +828,142 @@ class JobIntelligenceService:
             ],
             "evidence_contract": evidence_contract,
             "evidence": evidence[:6],
+        }
+
+    def normalize_opportunity_outcome(self, analysis, payload: dict) -> dict:
+        if not isinstance(payload, dict):
+            raise ValueError("Outcome payload must be an object.")
+        outcome = str(payload.get("outcome") or payload.get("status") or "").strip().lower()
+        if outcome not in OPPORTUNITY_OUTCOME_STATUSES:
+            raise ValueError("Outcome must be accepted or rejected.")
+
+        analysis_payload = getattr(analysis, "extracted_payload", {}) or {}
+        snapshot = analysis_payload.get("job_snapshot", {}) if isinstance(analysis_payload, dict) else {}
+        salary_text = str(payload.get("salary_text") or payload.get("salary") or "").strip()
+        parsed_salary = self._parse_salary_text(salary_text) if salary_text else None
+
+        period = (
+            payload.get("salary_period")
+            or payload.get("period")
+            or (parsed_salary or {}).get("period")
+            or snapshot.get("salary_period")
+            or "year"
+        )
+        salary_unit = payload.get("salary_unit") or payload.get("salary_scale") or self._salary_unit_hint(str(period))
+        salary_min = self._outcome_salary_value(payload.get("salary_min"), salary_unit)
+        salary_max = self._outcome_salary_value(payload.get("salary_max"), salary_unit)
+        if parsed_salary and not salary_min:
+            salary_min = float(parsed_salary.get("salary_min") or 0)
+        if parsed_salary and not salary_max:
+            salary_max = float(parsed_salary.get("salary_max") or 0)
+        if not salary_min:
+            salary_min = float(snapshot.get("salary_min") or 0)
+        if not salary_max:
+            salary_max = float(snapshot.get("salary_max") or salary_min or 0)
+        if not salary_min and salary_max:
+            salary_min = salary_max
+        if not salary_max and salary_min:
+            salary_max = salary_min
+
+        normalized_period = self._normalize_salary_period(str(period))
+        annual_min, annual_max = self._annualize_salary_range(salary_min, salary_max, normalized_period)
+        if not annual_min and not annual_max:
+            raise ValueError("Accepted or rejected opportunities must include salary evidence before they count toward outcome learning.")
+
+        now = timezone.now()
+        location = str(payload.get("location") or getattr(analysis, "location", "") or snapshot.get("location", "") or "").strip()
+        location_meta = self._location_hierarchy(location)
+        currency = (
+            payload.get("salary_currency")
+            or payload.get("currency")
+            or (parsed_salary or {}).get("currency")
+            or snapshot.get("salary_currency")
+            or "INR"
+        )
+        return {
+            "outcome": outcome,
+            "salary_bearing": True,
+            "salary_min": round(salary_min, 2),
+            "salary_max": round(salary_max, 2),
+            "salary_currency": str(currency).upper(),
+            "salary_period": normalized_period,
+            "salary_min_annual": annual_min,
+            "salary_max_annual": annual_max,
+            "salary_mid_annual": round((annual_min + annual_max) / 2, 2),
+            "salary_text": salary_text,
+            "decided_at": str(payload.get("decided_at") or now.date().isoformat()),
+            "recorded_at": now.isoformat(),
+            "source_kind": str(payload.get("source_kind") or snapshot.get("source_kind") or "manual_outcome"),
+            "source_url": str(payload.get("source_url") or getattr(analysis, "job_url", "") or ""),
+            "apply_url": str(payload.get("apply_url") or getattr(analysis, "apply_url", "") or ""),
+            "company": str(payload.get("company") or getattr(analysis, "company", "") or snapshot.get("company", "") or ""),
+            "job_title": str(payload.get("job_title") or payload.get("title") or getattr(analysis, "job_title", "") or snapshot.get("title", "") or ""),
+            "location": location,
+            "country": location_meta["country"],
+            "state": location_meta["state"],
+            "city": location_meta["city"],
+            "notes": str(payload.get("notes") or "").strip()[:1200],
+            "rejection_reason": str(payload.get("rejection_reason") or "").strip()[:600],
+        }
+
+    def opportunity_outcome_learning_summary(self, analyses) -> dict:
+        outcomes = []
+        for analysis in analyses:
+            payload = getattr(analysis, "extracted_payload", {}) or {}
+            outcome = payload.get("opportunity_outcome") if isinstance(payload, dict) else None
+            if isinstance(outcome, dict):
+                outcomes.append(outcome)
+
+        salary_bearing = [item for item in outcomes if item.get("salary_bearing") and (item.get("salary_min_annual") or item.get("salary_max_annual"))]
+        accepted = [item for item in salary_bearing if item.get("outcome") == "accepted"]
+        rejected = [item for item in salary_bearing if item.get("outcome") == "rejected"]
+        source_urls = sorted({str(item.get("source_url") or "") for item in salary_bearing if item.get("source_url")})
+        geography_counts = {}
+        for item in salary_bearing:
+            location_key = ", ".join(part for part in [item.get("city", ""), item.get("state", ""), item.get("country", "")] if part) or item.get("location") or "Unknown"
+            geography_counts[location_key] = geography_counts.get(location_key, 0) + 1
+
+        minimum_salary_bearing = 8
+        minimum_accepted = 3
+        minimum_rejected = 3
+        maturity_ready = (
+            len(salary_bearing) >= minimum_salary_bearing
+            and len(accepted) >= minimum_accepted
+            and len(rejected) >= minimum_rejected
+        )
+        if maturity_ready:
+            maturity_status = "mature"
+            blocker = "Accepted/rejected salary-bearing outcome coverage is mature for the current scope."
+        elif salary_bearing:
+            maturity_status = "collecting"
+            blocker = (
+                f"Need {max(minimum_salary_bearing - len(salary_bearing), 0)} more salary-bearing outcome(s), "
+                f"{max(minimum_accepted - len(accepted), 0)} more accepted outcome(s), and "
+                f"{max(minimum_rejected - len(rejected), 0)} more rejected outcome(s)."
+            )
+        else:
+            maturity_status = "not_started"
+            blocker = "No accepted or rejected salary-bearing opportunity outcome has been recorded yet."
+
+        return {
+            "maturity_status": maturity_status,
+            "outcome_count": len(outcomes),
+            "salary_bearing_outcome_count": len(salary_bearing),
+            "accepted_count": len(accepted),
+            "rejected_count": len(rejected),
+            "minimum_salary_bearing_outcomes": minimum_salary_bearing,
+            "minimum_accepted_outcomes": minimum_accepted,
+            "minimum_rejected_outcomes": minimum_rejected,
+            "accepted_salary_mid_median": self._median_salary_mid(accepted),
+            "rejected_salary_mid_median": self._median_salary_mid(rejected),
+            "source_count": len(source_urls),
+            "source_urls": source_urls[:8],
+            "geography_counts": dict(sorted(geography_counts.items())),
+            "blocker": blocker,
+            "summary": (
+                f"{len(salary_bearing)} salary-bearing accepted/rejected outcome(s) recorded "
+                f"across {len(source_urls)} source URL(s)."
+            ),
         }
 
     def _normalize_evidence_collection(self, evidence: dict | list[dict] | None) -> list[dict]:
@@ -1069,6 +1356,14 @@ class JobIntelligenceService:
             return None
         return {"salary_min": salary_min, "salary_max": salary_max or salary_min, "currency": currency.upper(), "period": self._normalize_salary_period(period)}
 
+    def _outcome_salary_value(self, raw_value, unit: str | None) -> float:
+        if raw_value is None or raw_value == "":
+            return 0.0
+        try:
+            return self._salary_value(str(raw_value), unit)
+        except (TypeError, ValueError):
+            return 0.0
+
     def _parse_salary_text(self, text: str) -> dict | None:
         match = SALARY_BLOCK_RE.search(text or "")
         if not match:
@@ -1124,6 +1419,10 @@ class JobIntelligenceService:
     def _annualize_salary_range(self, salary_min: float, salary_max: float, period: str) -> tuple[float, float]:
         multiplier = 12 if (period or "year").lower() == "month" else (2080 if (period or "year").lower() == "hour" else 1)
         return round((salary_min or 0) * multiplier, 2), round((salary_max or salary_min or 0) * multiplier, 2)
+
+    def _median_salary_mid(self, outcomes: list[dict]) -> float:
+        mids = [float(item.get("salary_mid_annual") or 0) for item in outcomes if item.get("salary_mid_annual")]
+        return round(median(mids), 2) if mids else 0.0
 
     def _combine_evidence(self, items: list[dict], *, title: str, source_name: str, source_url: str, summary: str) -> dict:
         normalized_items = [item for item in items if item]
@@ -1210,3 +1509,7 @@ class JobIntelligenceService:
 
 
 job_intelligence = JobIntelligenceService()
+
+
+def career_opportunity_outcome_summary(analyses) -> dict:
+    return job_intelligence.opportunity_outcome_learning_summary(analyses)

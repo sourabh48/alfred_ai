@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 import json
+import re
 from types import SimpleNamespace
 
 from django.db import transaction
@@ -132,35 +133,174 @@ REVIEW_FIELD_SCHEMAS = {
 
 REVIEW_GENERIC_FIELD_ALIASES = {
     "statement_document": {
+        "account": ["account_number"],
+        "account_no": ["account_number"],
+        "account_number": ["account_number"],
+        "acct_no": ["account_number"],
+        "acct_number": ["account_number"],
+        "applicant_name": ["account_holder"],
+        "bank": ["bank_name"],
+        "bank_name": ["bank_name"],
         "date": ["statement_start", "statement_end"],
         "document_date": ["statement_start", "statement_end"],
+        "end_date": ["statement_end"],
+        "from_date": ["statement_start"],
+        "holder": ["account_holder"],
+        "institution": ["bank_name"],
+        "institution_name": ["bank_name"],
+        "name": ["account_holder"],
+        "period_end": ["statement_end"],
+        "period_start": ["statement_start"],
+        "statement_from": ["statement_start"],
+        "statement_to": ["statement_end"],
+        "to_date": ["statement_end"],
     },
     "loan_document": {
+        "account": ["loan_account_number"],
+        "account_no": ["loan_account_number"],
         "account_number": ["loan_account_number"],
+        "agreement_no": ["loan_account_number"],
+        "bank": ["lender"],
+        "doc_type": ["document_type"],
+        "document_kind": ["document_type"],
+        "institution": ["lender"],
+        "lender_name": ["lender"],
+        "loan_kind": ["loan_type"],
+        "loan_no": ["loan_account_number"],
+        "loan_number": ["loan_account_number"],
+        "loan_product": ["loan_type"],
+        "product_type": ["loan_type"],
     },
     "loan_closure_document": {
+        "account": ["loan_account_number"],
+        "account_no": ["loan_account_number"],
         "account_number": ["loan_account_number"],
+        "amount_payable": ["closure_amount"],
         "amount": ["closure_amount"],
+        "close_amount": ["closure_amount"],
+        "closure_amount": ["closure_amount"],
+        "closure_date": ["closure_date"],
+        "closure_dt": ["closure_date"],
+        "closure_on": ["closure_date"],
         "date": ["closure_date"],
         "document_date": ["closure_date"],
+        "foreclosure_amount": ["closure_amount"],
+        "keyword": ["matched_keyword"],
+        "loan_no": ["loan_account_number"],
+        "loan_number": ["loan_account_number"],
+        "matched_status": ["matched_keyword"],
+        "outstanding_amount": ["closure_amount"],
+        "settlement_amount": ["closure_amount"],
+        "status": ["matched_keyword"],
+        "total_due": ["closure_amount"],
     },
     "investment_document": {
         "amount": ["invested_amount", "current_value"],
+        "account": ["account_number"],
+        "account_no": ["account_number"],
+        "asset": ["asset_name"],
+        "asset_class": ["asset_type"],
+        "broker": ["broker_name"],
+        "broker_name": ["broker_name"],
+        "current_amount": ["current_value"],
+        "current_value": ["current_value"],
+        "dp_name": ["broker_name"],
+        "folio": ["account_number"],
+        "folio_no": ["account_number"],
+        "fund_name": ["asset_name"],
+        "institution": ["broker_name"],
+        "invested_amount": ["invested_amount"],
+        "invested_value": ["invested_amount"],
+        "market_value": ["current_value"],
+        "nav_value": ["current_value"],
+        "product_type": ["asset_type"],
+        "purchase_value": ["invested_amount"],
+        "scheme": ["asset_name"],
+        "scheme_name": ["asset_name"],
+        "valuation": ["current_value"],
     },
     "vehicle_document": {
         "amount": ["cost", "total_customer_amount"],
+        "bill_total": ["cost", "total_customer_amount"],
+        "customer_amount": ["total_customer_amount", "cost"],
+        "customer_payable": ["total_customer_amount", "cost"],
         "date": ["issue_date", "service_date", "expiry_date", "next_service_date"],
         "document_date": ["issue_date", "service_date", "expiry_date", "next_service_date"],
+        "grand_total": ["cost", "total_customer_amount"],
         "invoice_number": ["document_number"],
+        "invoice_total": ["cost", "total_customer_amount"],
+        "kilometer": ["odometer_km"],
+        "kilometers": ["odometer_km"],
+        "km": ["odometer_km"],
+        "kms": ["odometer_km"],
+        "labor_amount": ["labour_customer_amount"],
+        "labor_total": ["labour_customer_amount"],
+        "labour_amount": ["labour_customer_amount"],
+        "labour_total": ["labour_customer_amount"],
+        "odometer": ["odometer_km"],
+        "odomtr": ["odometer_km"],
+        "part_amount": ["parts_customer_amount"],
+        "part_total": ["parts_customer_amount"],
+        "parts_amount": ["parts_customer_amount"],
+        "parts_total": ["parts_customer_amount"],
         "policy_number": ["document_number"],
         "registration_number": ["vehicle_number"],
+        "service_dt": ["service_date", "issue_date"],
+        "service_on": ["service_date", "issue_date"],
+        "total": ["cost", "total_customer_amount"],
+    },
+    "resume_document": {
+        "current_title": ["role"],
+        "designation": ["role"],
+        "experience": ["experience_years"],
+        "exp_years": ["experience_years"],
+        "key_skills": ["skills"],
+        "position": ["role"],
+        "role_title": ["role"],
+        "skill_set": ["skills"],
+        "title": ["role"],
+        "total_experience": ["experience_years"],
+        "years_exp": ["experience_years"],
     },
     "recruiter_document": {
         "amount": ["salary_min", "salary_max"],
+        "city": ["location"],
+        "company_name": ["company"],
+        "ctc": ["salary_min", "salary_max"],
+        "ctc_max": ["salary_max"],
+        "ctc_min": ["salary_min"],
+        "designation": ["job_title"],
+        "employer": ["company"],
+        "employer_name": ["company"],
+        "exp": ["experience_years"],
+        "experience": ["experience_years"],
+        "max_ctc": ["salary_max"],
+        "min_ctc": ["salary_min"],
+        "organization": ["company"],
+        "package_max": ["salary_max"],
+        "package_min": ["salary_min"],
+        "role_title": ["job_title"],
+        "salary": ["salary_min", "salary_max"],
+        "salary_from": ["salary_min"],
+        "salary_to": ["salary_max"],
+        "title": ["job_title"],
+        "work_location": ["location"],
+        "years_exp": ["experience_years"],
     },
     "credit_report": {
+        "applicant": ["applicant_name"],
+        "bureau_name": ["bureau"],
+        "control_number": ["report_number"],
+        "credit_bureau": ["bureau"],
+        "crif_ref_no": ["report_number"],
+        "customer_name": ["applicant_name"],
         "date": ["report_date"],
         "document_date": ["report_date"],
+        "generated_date": ["report_date"],
+        "issue_date": ["report_date"],
+        "name": ["applicant_name"],
+        "report_id": ["report_number"],
+        "report_no": ["report_number"],
     },
 }
 
@@ -2013,6 +2153,11 @@ def _accepted_correction_candidates(payload: dict | None) -> list[dict]:
     return candidates
 
 
+def _review_alias_key(value: str | None) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(value or "").lower()).strip("_")
+    return re.sub(r"_+", "_", normalized)
+
+
 def _scope_aware_review_field_candidates(scope: str, candidates: list[dict]) -> list[dict]:
     schema_names = _review_schema_names(scope)
     alias_map = REVIEW_GENERIC_FIELD_ALIASES.get(scope, {})
@@ -2024,11 +2169,14 @@ def _scope_aware_review_field_candidates(scope: str, candidates: list[dict]) -> 
         if candidate.get("accepted"):
             continue
         alias_keys = {
-            str(candidate.get("field_type") or "").strip(),
-            str(candidate.get("field_name") or "").strip(),
+            _review_alias_key(candidate.get("field_type")),
+            _review_alias_key(candidate.get("field_name")),
+            _review_alias_key(candidate.get("label")),
         }
         target_fields = []
         for key in alias_keys:
+            if not key:
+                continue
             for field_name in alias_map.get(key, []):
                 if field_name in schema_names and field_name not in target_fields:
                     target_fields.append(field_name)

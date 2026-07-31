@@ -72,6 +72,17 @@ class ProjectDetailsLiveTests(TestCase):
                 status="pending",
                 symptom="Engine feels rough",
             )
+        for index in range(2):
+            BikeIssueReport.objects.create(
+                user=self.user,
+                bike_profile=profile,
+                title=f"Resolved issue {index}",
+                system="brakes",
+                severity="medium",
+                status="resolved",
+                symptom="Brake bite changed",
+                actual_cost=1400 + index,
+            )
         for index in range(4):
             BikeDocument.objects.create(
                 user=self.user,
@@ -109,10 +120,14 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertEqual(refreshed["summary_cards"][1]["label"], "Scope Completion")
         self.assertEqual(refreshed["summary_cards"][2]["label"], "Learning Maturity")
         self.assertIn("18 service logs", tracks_by_title["Vehicle maintenance learning"]["signals"])
+        self.assertIn("4 open issue reports", tracks_by_title["Vehicle maintenance learning"]["signals"])
+        self.assertIn("2 resolved issue outcomes", tracks_by_title["Vehicle maintenance learning"]["signals"])
+        self.assertIn("2 costed issue outcomes", tracks_by_title["Vehicle maintenance learning"]["signals"])
         self.assertGreaterEqual(tracks_by_title["Vehicle maintenance learning"]["progress"], 88)
         self.assertLess(tracks_by_title["Vehicle maintenance learning"]["progress"], 100)
         self.assertEqual(tracks_by_title["Vehicle maintenance learning"]["blocker_label"], "Remaining maturity")
         self.assertIn("not exhaustive", tracks_by_title["Vehicle maintenance learning"]["blocker"])
+        self.assertIn("costed issue outcomes", tracks_by_title["Vehicle maintenance learning"]["blocker"])
         self.assertIn("Model training lifecycle", tracks_by_title)
 
     def test_project_details_page_includes_live_refresh_hook(self):
@@ -230,12 +245,18 @@ class ProjectDetailsLiveTests(TestCase):
             "ML maturity and training lifecycle",
         }
         self.assertTrue(expected_active.issubset(set(in_progress_by_title)))
-        self.assertEqual(in_progress_by_title["Browser/UI regression coverage"]["progress"], 45)
+        self.assertEqual(in_progress_by_title["Browser/UI regression coverage"]["progress"], 58)
         self.assertEqual(in_progress_by_title["Large-data hardening"]["progress"], 84)
-        self.assertGreaterEqual(in_progress_by_title["Document OCR and correction maturity"]["progress"], 86)
+        self.assertGreaterEqual(in_progress_by_title["Document OCR and correction maturity"]["progress"], 91)
+        self.assertIn("Selenium", in_progress_by_title["Browser/UI regression coverage"]["detail"])
+        self.assertIn("cross-family unknown-layout", in_progress_by_title["Document OCR and correction maturity"]["detail"])
         self.assertGreaterEqual(in_progress_by_title["Vehicle catalog and maintenance depth"]["progress"], 88)
         self.assertLess(in_progress_by_title["Vehicle catalog and maintenance depth"]["progress"], 100)
+        self.assertIn("2026-07-31", in_progress_by_title["Vehicle catalog and maintenance depth"]["detail"])
         self.assertEqual(learning_by_title["Vehicle maintenance learning"]["blocker_label"], "Remaining maturity")
+        self.assertIn("salary-bearing accepted/rejected", in_progress_by_title["Career source and compensation breadth"]["detail"])
+        self.assertIn("required-source proof contracts", in_progress_by_title["Evidence freshness and proof rigor"]["detail"])
+        self.assertIn("excludes the planned future RL learner", in_progress_by_title["ML maturity and training lifecycle"]["detail"])
         self.assertEqual(in_progress_by_title["ML maturity and training lifecycle"]["progress"], round(payload["learning_snapshot"]["model_training"]["overall_progress"]))
         self.assertEqual(completed_by_title["Backend/API regression baseline"]["progress"], 100)
         self.assertEqual(completed_by_title["Vehicle make/model picker fix"]["progress"], 100)
@@ -251,11 +272,11 @@ class ProjectDetailsLiveTests(TestCase):
     def test_completed_supervised_training_moves_auto_training_out_of_active_tracks(self, training_snapshot):
         training_snapshot.return_value = {
             "overall_progress": 75.9,
-            "summary": "7/8 model states are fresh and ready; 0 trainable model state(s) are waiting on data or environment gates, 1 planned future model(s) are excluded from supervised coverage, and 0 failed recently.",
+            "summary": "7/7 production-ready model states are fresh and ready; 0 trainable model state(s) are waiting on data or environment gates, 1 planned future model(s) are excluded from production-ready ML and supervised coverage, and 0 failed recently.",
             "total_models": 8,
             "ready_models": 7,
             "fresh_models": 7,
-            "skipped_models": 1,
+            "skipped_models": 0,
             "failed_models": 0,
             "training_models": 0,
             "trainable_models": 7,

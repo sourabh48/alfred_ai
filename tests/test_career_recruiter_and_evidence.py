@@ -199,3 +199,10 @@ class CareerRecruiterAndEvidenceTests(TestCase):
         self.assertIn("Bengaluru", snapshot.location)
         self.assertEqual(snapshot.salary_min, 4000000)
         self.assertEqual(snapshot.salary_max, 4800000)
+
+    def test_salary_parser_supports_rupee_en_dash_lpa_ranges(self):
+        salary = job_intelligence._parse_salary_text("Compensation: \u20b918\u201322 LPA")
+
+        self.assertEqual(salary["currency"], "INR")
+        self.assertEqual(salary["salary_min"], 1800000)
+        self.assertEqual(salary["salary_max"], 2200000)

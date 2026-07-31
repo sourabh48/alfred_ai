@@ -13,6 +13,7 @@ from apps.expenses.services.statement_import import parse_bank_statement
 from apps.integrations.models import CreditReportUpload, CreditScore
 from apps.investments.models import Investment, InvestmentImportDocument
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument
+from apps.ml_engine.models import DocumentParserLearningMemory
 from apps.mobility.models import BikeDocument, BikeProfile, BikeServiceRecord
 from apps.mobility.services.bike_document_ai import ParsedDocument
 from apps.reports.models import OperationalLog, SystemTicket
@@ -24,6 +25,34 @@ class DocumentReviewAndRetryTests(TestCase):
         self.user = user_model.objects.create_user(username="review_user", password="Pass12345!")
         self.client = Client()
         self.client.force_login(self.user)
+
+    def _unknown_layout_review_payload(self, *, method, text, field_candidates):
+        return {
+            "extraction_method": method,
+            "raw_text_excerpt": text,
+            "extraction_review": {
+                "field_candidates": field_candidates,
+                "ocr_pages": [
+                    {
+                        "page": 1,
+                        "width": 900,
+                        "height": 1200,
+                        "preview": text,
+                        "variant": "real_unknown_mobile_layout",
+                        "regions": [
+                            {
+                                "text": text[:160],
+                                "confidence": 0.42,
+                                "bbox": [[20, 40], [840, 40], [840, 96], [20, 96]],
+                                "origin": method,
+                            }
+                        ],
+                    }
+                ],
+                "recovery_steps": [{"step": "cross_family_unknown_layout", "status": "mapped"}],
+                "attempts": [{"method": method, "quality": 0.68}],
+            },
+        }
 
     def test_parse_bank_statement_uses_isolated_ocr_preview_when_inprocess_ocr_is_unavailable(self):
         preview_text = """
@@ -431,6 +460,866 @@ class DocumentReviewAndRetryTests(TestCase):
         self.assertIn("cost", artifacts["ocr_pages"][0]["candidate_fields"])
         self.assertEqual(artifacts["overlay_summary"]["low_confidence_regions"], 1)
         self.assertGreaterEqual(artifacts["overlay_summary"]["field_candidate_count"], 6)
+
+    def test_review_queue_maps_unknown_vehicle_invoice_layout_aliases(self):
+        profile = BikeProfile.objects.create(
+            user=self.user,
+            display_name="Suzuki V-Strom SX",
+            make="Suzuki",
+            model_name="V-Strom SX",
+            vehicle_type="motorcycle",
+            bike_class="adventure",
+            vehicle_number="KA05MN4321",
+        )
+        layouts = [
+            {
+                "title": "jagadamba-thermal-strip.jpg",
+                "text": "\n".join(
+                    [
+                        "JAGADAMBA AUTOMOBILES",
+                        "Retail Bill / Job Slip",
+                        "JC RJC011402IJ11758 DATE 31-03-2026",
+                        "KM 26021",
+                        "Part BRAKE PAD KIT 820",
+                        "Labour PERIODIC SERVICE LABOUR 640",
+                        "Customer Payable 2432.92",
+                    ]
+                ),
+                "field_candidates": [
+                    {
+                        "field_type": "grand_total",
+                        "field_name": "customer_payable",
+                        "label": "Customer Payable",
+                        "value": "2432.92",
+                        "confidence": 0.91,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Customer Payable 2432.92",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "document_date",
+                        "field_name": "service_on",
+                        "label": "Date",
+                        "value": "2026-03-31",
+                        "confidence": 0.89,
+                        "source": "unknown_invoice_ocr",
+                        "context": "DATE 31-03-2026",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "odometer",
+                        "field_name": "km",
+                        "label": "KM",
+                        "value": "26021",
+                        "confidence": 0.87,
+                        "source": "unknown_invoice_ocr",
+                        "context": "KM 26021",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "parts_amount",
+                        "field_name": "part_total",
+                        "label": "Part Total",
+                        "value": "820",
+                        "confidence": 0.83,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Part BRAKE PAD KIT 820",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "labour_amount",
+                        "field_name": "labour_total",
+                        "label": "Labour Total",
+                        "value": "640",
+                        "confidence": 0.81,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Labour PERIODIC SERVICE LABOUR 640",
+                        "page": 1,
+                    },
+                ],
+                "regions": [
+                    {
+                        "text": "JC RJC011402IJ11758 DATE 31-03-2026",
+                        "confidence": 0.46,
+                        "bbox": [[18, 56], [520, 56], [520, 88], [18, 88]],
+                        "origin": "mobile_crop",
+                    },
+                    {
+                        "text": "Customer Payable 2432.92",
+                        "confidence": 0.42,
+                        "bbox": [[18, 250], [560, 250], [560, 286], [18, 286]],
+                        "origin": "mobile_crop",
+                    },
+                ],
+                "expected": {
+                    "cost": "2432.92",
+                    "total_customer_amount": "2432.92",
+                    "service_date": "2026-03-31",
+                    "odometer_km": "26021",
+                    "parts_customer_amount": "820",
+                    "labour_customer_amount": "640",
+                },
+            },
+            {
+                "title": "gst-two-column-service-invoice.png",
+                "text": "\n".join(
+                    [
+                        "AUTH DEALER TAX INV",
+                        "Inv no SI-22071",
+                        "Service Dt 2026/04/12",
+                        "Odomtr 31580",
+                        "Parts Amt 1520.50",
+                        "Labour Amt 900",
+                        "Invoice Total 2420.50",
+                    ]
+                ),
+                "field_candidates": [
+                    {
+                        "field_type": "invoice_number",
+                        "field_name": "invoice_number",
+                        "label": "Invoice Number",
+                        "value": "SI-22071",
+                        "confidence": 0.84,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Inv no SI-22071",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "date",
+                        "field_name": "service_dt",
+                        "label": "Service Dt",
+                        "value": "2026-04-12",
+                        "confidence": 0.88,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Service Dt 2026/04/12",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "kilometer",
+                        "field_name": "odomtr",
+                        "label": "Odomtr",
+                        "value": "31580",
+                        "confidence": 0.8,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Odomtr 31580",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "parts_amount",
+                        "field_name": "parts_amount",
+                        "label": "Parts Amt",
+                        "value": "1520.50",
+                        "confidence": 0.79,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Parts Amt 1520.50",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "labor_amount",
+                        "field_name": "labor_amount",
+                        "label": "Labour Amt",
+                        "value": "900",
+                        "confidence": 0.78,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Labour Amt 900",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "invoice_total",
+                        "field_name": "invoice_total",
+                        "label": "Invoice Total",
+                        "value": "2420.50",
+                        "confidence": 0.86,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Invoice Total 2420.50",
+                        "page": 1,
+                    },
+                ],
+                "regions": [
+                    {
+                        "text": "Service Dt 2026/04/12 Odomtr 31580",
+                        "confidence": 0.49,
+                        "bbox": [[42, 135], [710, 135], [710, 171], [42, 171]],
+                        "origin": "two_column_table",
+                    },
+                    {
+                        "text": "Invoice Total 2420.50",
+                        "confidence": 0.51,
+                        "bbox": [[430, 530], [840, 530], [840, 568], [430, 568]],
+                        "origin": "two_column_table",
+                    },
+                ],
+                "expected": {
+                    "document_number": "SI-22071",
+                    "cost": "2420.50",
+                    "total_customer_amount": "2420.50",
+                    "service_date": "2026-04-12",
+                    "odometer_km": "31580",
+                    "parts_customer_amount": "1520.50",
+                    "labour_customer_amount": "900",
+                },
+            },
+            {
+                "title": "mobile-photo-crumpled-invoice.webp",
+                "text": "\n".join(
+                    [
+                        "Work Order",
+                        "No: WO-441",
+                        "Dt. 29 Mar 2026",
+                        "KMs 18204",
+                        "Grand Total Rs. 1187.00",
+                    ]
+                ),
+                "field_candidates": [
+                    {
+                        "field_type": "invoice_number",
+                        "field_name": "invoice_number",
+                        "label": "Work Order No",
+                        "value": "WO-441",
+                        "confidence": 0.82,
+                        "source": "unknown_invoice_ocr",
+                        "context": "No: WO-441",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "document_date",
+                        "field_name": "date",
+                        "label": "Date",
+                        "value": "2026-03-29",
+                        "confidence": 0.77,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Dt. 29 Mar 2026",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "kms",
+                        "field_name": "kilometers",
+                        "label": "KMs",
+                        "value": "18204",
+                        "confidence": 0.76,
+                        "source": "unknown_invoice_ocr",
+                        "context": "KMs 18204",
+                        "page": 1,
+                    },
+                    {
+                        "field_type": "grand_total",
+                        "field_name": "total",
+                        "label": "Grand Total",
+                        "value": "1187.00",
+                        "confidence": 0.79,
+                        "source": "unknown_invoice_ocr",
+                        "context": "Grand Total Rs. 1187.00",
+                        "page": 1,
+                    },
+                ],
+                "regions": [
+                    {
+                        "text": "Dt. 29 Mar 2026 KMs 18204",
+                        "confidence": 0.39,
+                        "bbox": [[30, 90], [498, 90], [498, 123], [30, 123]],
+                        "origin": "creased_photo",
+                    },
+                    {
+                        "text": "Grand Total Rs. 1187.00",
+                        "confidence": 0.44,
+                        "bbox": [[30, 330], [565, 330], [565, 368], [30, 368]],
+                        "origin": "creased_photo",
+                    },
+                ],
+                "expected": {
+                    "document_number": "WO-441",
+                    "cost": "1187.00",
+                    "total_customer_amount": "1187.00",
+                    "service_date": "2026-03-29",
+                    "odometer_km": "18204",
+                },
+            },
+        ]
+        for layout in layouts:
+            BikeDocument.objects.create(
+                user=self.user,
+                bike_profile=profile,
+                bike_name=profile.display_name,
+                vehicle_number=profile.vehicle_number,
+                document_type="invoice",
+                document_title=layout["title"],
+                parser_status="needs_review",
+                parse_confidence=0.37,
+                source_text=layout["text"],
+                extracted_payload={
+                    "extraction_method": "real_unknown_invoice_ocr",
+                    "raw_text_excerpt": layout["text"],
+                    "invoice_review": {"recovered_edge_rows": 1, "compact_ocr_rows": 2},
+                    "extraction_review": {
+                        "field_candidates": layout["field_candidates"],
+                        "ocr_pages": [
+                            {
+                                "page": 1,
+                                "width": 1000,
+                                "height": 1400,
+                                "preview": layout["text"],
+                                "variant": "unknown_mobile_layout",
+                                "regions": layout["regions"],
+                            }
+                        ],
+                        "recovery_steps": [{"step": "unknown_layout_alias_review", "status": "mapped"}],
+                        "attempts": [{"method": "rapidocr_mobile_layout", "quality": 0.71}],
+                    },
+                },
+            )
+
+        response = self.client.get("/api/documents/review-queue/")
+
+        self.assertEqual(response.status_code, 200)
+        vehicle_items = {
+            item["file_name"]: item
+            for item in response.json()["results"]
+            if item["scope"] == "vehicle_document"
+        }
+        self.assertEqual(set(vehicle_items), {layout["title"] for layout in layouts})
+        for layout in layouts:
+            with self.subTest(layout=layout["title"]):
+                artifacts = vehicle_items[layout["title"]]["review_artifacts"]
+                alias_candidates = [
+                    candidate
+                    for candidate in artifacts["field_candidates"]
+                    if candidate.get("source", "").endswith("_schema_alias")
+                ]
+                alias_values = {
+                    (candidate.get("field_name"), candidate.get("value"))
+                    for candidate in alias_candidates
+                }
+                for field_name, value in layout["expected"].items():
+                    self.assertIn((field_name, value), alias_values)
+                self.assertIn("unknown_layout_alias_review", [step["step"] for step in artifacts["recovery_steps"]])
+                self.assertGreaterEqual(artifacts["overlay_summary"]["field_candidate_count"], 10)
+                self.assertGreaterEqual(artifacts["overlay_summary"]["low_confidence_regions"], 2)
+                self.assertIn("odometer_km", artifacts["ocr_pages"][0]["candidate_fields"])
+
+    def test_review_queue_maps_cross_family_unknown_layouts_and_records_corrections(self):
+        statement = StatementUpload.objects.create(
+            user=self.user,
+            source="bank_statement",
+            file_name="statement-mobile-photo.jpg",
+            parser_status="needs_review",
+            parse_confidence=0.34,
+            extracted_payload=self._unknown_layout_review_payload(
+                method="unknown_statement_ocr",
+                text="Institution HDFC Bank Acct No 50100244137504 Period Start 2026-03-01 Period End 2026-03-31",
+                field_candidates=[
+                    {
+                        "field_type": "institution",
+                        "field_name": "bank",
+                        "label": "Institution",
+                        "value": "HDFC Bank",
+                        "confidence": 0.77,
+                        "source": "unknown_statement_ocr",
+                    },
+                    {
+                        "field_type": "account no",
+                        "field_name": "acct-no",
+                        "label": "Acct No",
+                        "value": "50100244137504",
+                        "confidence": 0.75,
+                        "source": "unknown_statement_ocr",
+                    },
+                    {
+                        "field_type": "from date",
+                        "field_name": "period start",
+                        "label": "Period Start",
+                        "value": "2026-03-01",
+                        "confidence": 0.74,
+                        "source": "unknown_statement_ocr",
+                    },
+                    {
+                        "field_type": "to date",
+                        "field_name": "period end",
+                        "label": "Period End",
+                        "value": "2026-03-31",
+                        "confidence": 0.74,
+                        "source": "unknown_statement_ocr",
+                    },
+                ],
+            ),
+        )
+        loan_import = LoanImportDocument.objects.create(
+            user=self.user,
+            uploaded_file=SimpleUploadedFile("loan-whatsapp.jpg", b"loan", content_type="image/jpeg"),
+            file_name="loan-whatsapp.jpg",
+            parser_status="needs_review",
+            parse_confidence=0.3,
+            extracted_text="Lender Name Axis Bank Loan No AXIS-PL-001 Product Type Personal Doc Type Sanction Letter",
+            extracted_payload=self._unknown_layout_review_payload(
+                method="unknown_loan_ocr",
+                text="Lender Name Axis Bank Loan No AXIS-PL-001 Product Type Personal Doc Type Sanction Letter",
+                field_candidates=[
+                    {
+                        "field_type": "lender-name",
+                        "field_name": "bank",
+                        "label": "Lender Name",
+                        "value": "Axis Bank",
+                        "confidence": 0.72,
+                        "source": "unknown_loan_ocr",
+                    },
+                    {
+                        "field_type": "loan no",
+                        "field_name": "loan no",
+                        "label": "Loan No",
+                        "value": "AXIS-PL-001",
+                        "confidence": 0.73,
+                        "source": "unknown_loan_ocr",
+                    },
+                    {
+                        "field_type": "product type",
+                        "field_name": "product type",
+                        "label": "Product Type",
+                        "value": "personal",
+                        "confidence": 0.7,
+                        "source": "unknown_loan_ocr",
+                    },
+                    {
+                        "field_type": "doc type",
+                        "field_name": "doc type",
+                        "label": "Doc Type",
+                        "value": "sanction_letter",
+                        "confidence": 0.69,
+                        "source": "unknown_loan_ocr",
+                    },
+                ],
+            ),
+        )
+        loan = Loan.objects.create(
+            user=self.user,
+            loan_type="personal",
+            lender="Axis Bank",
+            loan_account_number="AXISCLOSE123",
+            principal=220000,
+            interest_rate=12.0,
+            emi=7100,
+            tenure_months=36,
+            remaining_balance=84500,
+            start_date="2025-04-01",
+        )
+        closure = LoanClosureDocument.objects.create(
+            loan=loan,
+            uploaded_file=SimpleUploadedFile("closure-sms.pdf", b"closure", content_type="application/pdf"),
+            file_name="closure-sms.pdf",
+            parser_status="needs_review",
+            parse_confidence=0.33,
+            verification_status="pending",
+            extracted_text="Axis Bank FORECLOSURE statement Loan No AXISCLOSE123 Total Due 84500 Closure On 2026-03-30",
+            extracted_payload=self._unknown_layout_review_payload(
+                method="unknown_closure_ocr",
+                text="Axis Bank FORECLOSURE statement Loan No AXISCLOSE123 Total Due 84500 Closure On 2026-03-30",
+                field_candidates=[
+                    {
+                        "field_type": "loan-no",
+                        "field_name": "loan no",
+                        "label": "Loan No",
+                        "value": "AXISCLOSE123",
+                        "confidence": 0.76,
+                        "source": "unknown_closure_ocr",
+                    },
+                    {
+                        "field_type": "total due",
+                        "field_name": "amount payable",
+                        "label": "Total Due",
+                        "value": "84500",
+                        "confidence": 0.75,
+                        "source": "unknown_closure_ocr",
+                    },
+                    {
+                        "field_type": "closure on",
+                        "field_name": "closure on",
+                        "label": "Closure On",
+                        "value": "2026-03-30",
+                        "confidence": 0.74,
+                        "source": "unknown_closure_ocr",
+                    },
+                    {
+                        "field_type": "matched status",
+                        "field_name": "status",
+                        "label": "Status",
+                        "value": "Foreclosure",
+                        "confidence": 0.8,
+                        "source": "unknown_closure_ocr",
+                    },
+                ],
+            ),
+        )
+        investment_doc = InvestmentImportDocument.objects.create(
+            user=self.user,
+            uploaded_file=SimpleUploadedFile("folio-screenshot.png", b"folio", content_type="image/png"),
+            file_name="folio-screenshot.png",
+            parser_status="needs_review",
+            parse_confidence=0.35,
+            extracted_text="Broker Groww Folio No FOLIO7788 Scheme Axis Bluechip Market Value 56200 Purchase Value 50000",
+            extracted_payload=self._unknown_layout_review_payload(
+                method="unknown_portfolio_ocr",
+                text="Broker Groww Folio No FOLIO7788 Scheme Axis Bluechip Market Value 56200 Purchase Value 50000",
+                field_candidates=[
+                    {
+                        "field_type": "broker",
+                        "field_name": "dp name",
+                        "label": "Broker",
+                        "value": "Groww",
+                        "confidence": 0.78,
+                        "source": "unknown_portfolio_ocr",
+                    },
+                    {
+                        "field_type": "folio no",
+                        "field_name": "folio no",
+                        "label": "Folio No",
+                        "value": "FOLIO7788",
+                        "confidence": 0.77,
+                        "source": "unknown_portfolio_ocr",
+                    },
+                    {
+                        "field_type": "scheme",
+                        "field_name": "scheme name",
+                        "label": "Scheme",
+                        "value": "Axis Bluechip Fund",
+                        "confidence": 0.76,
+                        "source": "unknown_portfolio_ocr",
+                    },
+                    {
+                        "field_type": "market value",
+                        "field_name": "valuation",
+                        "label": "Market Value",
+                        "value": "56200",
+                        "confidence": 0.75,
+                        "source": "unknown_portfolio_ocr",
+                    },
+                    {
+                        "field_type": "purchase value",
+                        "field_name": "purchase value",
+                        "label": "Purchase Value",
+                        "value": "50000",
+                        "confidence": 0.75,
+                        "source": "unknown_portfolio_ocr",
+                    },
+                ],
+            ),
+        )
+        resume = CareerResume.objects.create(
+            user=self.user,
+            uploaded_file=SimpleUploadedFile("resume-scan.jpg", b"resume", content_type="image/jpeg"),
+            file_name="resume-scan.jpg",
+            parser_status="needs_review",
+            parse_confidence=0.4,
+            extracted_text="Current Title Backend Engineer Years Exp 5 Key Skills Java Spring Boot SQL",
+            summary="Unknown resume scan retained for review.",
+            extracted_payload=self._unknown_layout_review_payload(
+                method="unknown_resume_ocr",
+                text="Current Title Backend Engineer Years Exp 5 Key Skills Java Spring Boot SQL",
+                field_candidates=[
+                    {
+                        "field_type": "current title",
+                        "field_name": "current-title",
+                        "label": "Current Title",
+                        "value": "Backend Engineer",
+                        "confidence": 0.76,
+                        "source": "unknown_resume_ocr",
+                    },
+                    {
+                        "field_type": "years exp",
+                        "field_name": "years exp",
+                        "label": "Years Exp",
+                        "value": "5",
+                        "confidence": 0.74,
+                        "source": "unknown_resume_ocr",
+                    },
+                    {
+                        "field_type": "key skills",
+                        "field_name": "key-skills",
+                        "label": "Key Skills",
+                        "value": "Java, Spring Boot, SQL",
+                        "confidence": 0.73,
+                        "source": "unknown_resume_ocr",
+                    },
+                ],
+            ),
+        )
+        recruiter = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="Recruiter WhatsApp",
+            source_document_name="recruiter-whatsapp.txt",
+            job_url="https://example.com/recruiter/backend",
+            apply_url="https://example.com/recruiter/backend",
+            parser_status="needs_review",
+            parse_confidence=0.37,
+            extracted_text="Role Title Senior Backend Engineer Employer Acme Location Pune CTC Min 1800000 CTC Max 2600000",
+            summary="Recruiter chat retained for review.",
+            extracted_payload=self._unknown_layout_review_payload(
+                method="unknown_recruiter_ocr",
+                text="Role Title Senior Backend Engineer Employer Acme Location Pune CTC Min 1800000 CTC Max 2600000",
+                field_candidates=[
+                    {
+                        "field_type": "role title",
+                        "field_name": "role-title",
+                        "label": "Role Title",
+                        "value": "Senior Backend Engineer",
+                        "confidence": 0.78,
+                        "source": "unknown_recruiter_ocr",
+                    },
+                    {
+                        "field_type": "employer",
+                        "field_name": "employer",
+                        "label": "Employer",
+                        "value": "Acme",
+                        "confidence": 0.76,
+                        "source": "unknown_recruiter_ocr",
+                    },
+                    {
+                        "field_type": "work location",
+                        "field_name": "work location",
+                        "label": "Work Location",
+                        "value": "Pune",
+                        "confidence": 0.75,
+                        "source": "unknown_recruiter_ocr",
+                    },
+                    {
+                        "field_type": "ctc min",
+                        "field_name": "ctc-min",
+                        "label": "CTC Min",
+                        "value": "1800000",
+                        "confidence": 0.74,
+                        "source": "unknown_recruiter_ocr",
+                    },
+                    {
+                        "field_type": "ctc max",
+                        "field_name": "ctc-max",
+                        "label": "CTC Max",
+                        "value": "2600000",
+                        "confidence": 0.74,
+                        "source": "unknown_recruiter_ocr",
+                    },
+                ],
+            )
+            | {"source_kind": "recruiter_message", "job_snapshot": {}},
+        )
+        credit = CreditReportUpload.objects.create(
+            user=self.user,
+            uploaded_file=SimpleUploadedFile("cibil-mobile.jpg", b"credit", content_type="image/jpeg"),
+            file_name="cibil-mobile.jpg",
+            parser_status="needs_review",
+            parse_confidence=0.36,
+            extracted_text="Credit Bureau CIBIL Customer Name Sourabh Sarkar Control Number CN998877 Generated Date 2026-03-28",
+            extracted_payload=self._unknown_layout_review_payload(
+                method="unknown_credit_ocr",
+                text="Credit Bureau CIBIL Customer Name Sourabh Sarkar Control Number CN998877 Generated Date 2026-03-28",
+                field_candidates=[
+                    {
+                        "field_type": "credit bureau",
+                        "field_name": "credit-bureau",
+                        "label": "Credit Bureau",
+                        "value": "CIBIL",
+                        "confidence": 0.8,
+                        "source": "unknown_credit_ocr",
+                    },
+                    {
+                        "field_type": "customer name",
+                        "field_name": "customer-name",
+                        "label": "Customer Name",
+                        "value": "Sourabh Sarkar",
+                        "confidence": 0.78,
+                        "source": "unknown_credit_ocr",
+                    },
+                    {
+                        "field_type": "control number",
+                        "field_name": "control-number",
+                        "label": "Control Number",
+                        "value": "CN998877",
+                        "confidence": 0.77,
+                        "source": "unknown_credit_ocr",
+                    },
+                    {
+                        "field_type": "generated date",
+                        "field_name": "generated-date",
+                        "label": "Generated Date",
+                        "value": "2026-03-28",
+                        "confidence": 0.76,
+                        "source": "unknown_credit_ocr",
+                    },
+                ],
+            ),
+        )
+
+        queue_response = self.client.get("/api/documents/review-queue/")
+
+        self.assertEqual(queue_response.status_code, 200)
+        items = {(item["scope"], item["file_name"]): item for item in queue_response.json()["results"]}
+        expected_aliases = {
+            ("statement_document", statement.file_name): {"bank_name", "account_number", "statement_start", "statement_end"},
+            ("loan_document", loan_import.file_name): {"lender", "loan_account_number", "loan_type", "document_type"},
+            ("loan_closure_document", closure.file_name): {"loan_account_number", "closure_amount", "closure_date", "matched_keyword"},
+            ("investment_document", investment_doc.file_name): {"broker_name", "account_number", "asset_name", "invested_amount", "current_value"},
+            ("resume_document", resume.file_name): {"role", "experience_years", "skills"},
+            ("recruiter_document", recruiter.source_document_name): {"job_title", "company", "location", "salary_min", "salary_max"},
+            ("credit_report", credit.file_name): {"bureau", "applicant_name", "report_number", "report_date"},
+        }
+        for key, field_names in expected_aliases.items():
+            with self.subTest(queue_item=key):
+                self.assertIn(key, items)
+                alias_field_names = {
+                    candidate["field_name"]
+                    for candidate in items[key]["review_artifacts"]["field_candidates"]
+                    if candidate.get("source", "").endswith("_schema_alias")
+                }
+                self.assertTrue(field_names.issubset(alias_field_names))
+
+        with patch("alfred_ai.services.document_review.retry_statement_upload", return_value=None):
+            statement_response = self.client.post(
+                "/api/documents/review-queue/resolve/",
+                data={
+                    "scope": "statement_document",
+                    "id": statement.id,
+                    "corrections": {
+                        "bank_name": "HDFC Bank",
+                        "account_holder": "Sourabh Sarkar",
+                        "account_number": "50100244137504",
+                        "statement_start": "2026-03-01",
+                        "statement_end": "2026-03-31",
+                    },
+                },
+                content_type="application/json",
+            )
+        loan_response = self.client.post(
+            "/api/documents/review-queue/resolve/",
+            data={
+                "scope": "loan_document",
+                "id": loan_import.id,
+                "corrections": {
+                    "document_type": "sanction_letter",
+                    "lender": "Axis Bank",
+                    "loan_type": "personal",
+                    "loan_account_number": "AXIS-PL-001",
+                },
+            },
+            content_type="application/json",
+        )
+        closure_response = self.client.post(
+            "/api/documents/review-queue/resolve/",
+            data={
+                "scope": "loan_closure_document",
+                "id": closure.id,
+                "corrections": {
+                    "loan_account_number": "AXISCLOSE123",
+                    "matched_keyword": "Foreclosure",
+                    "closure_amount": "84500",
+                    "closure_date": "2026-03-30",
+                },
+            },
+            content_type="application/json",
+        )
+        investment_response = self.client.post(
+            "/api/documents/review-queue/resolve/",
+            data={
+                "scope": "investment_document",
+                "id": investment_doc.id,
+                "corrections": {
+                    "broker_name": "Groww",
+                    "asset_name": "Axis Bluechip Fund",
+                    "asset_type": "mutual_fund",
+                    "account_number": "FOLIO7788",
+                    "invested_amount": "50000",
+                    "current_value": "56200",
+                },
+            },
+            content_type="application/json",
+        )
+        resume_response = self.client.post(
+            "/api/documents/review-queue/resolve/",
+            data={
+                "scope": "resume_document",
+                "id": resume.id,
+                "corrections": {
+                    "role": "Backend Engineer",
+                    "experience_years": "5",
+                    "skills": "Java, Spring Boot, SQL",
+                },
+            },
+            content_type="application/json",
+        )
+        recruiter_response = self.client.post(
+            "/api/documents/review-queue/resolve/",
+            data={
+                "scope": "recruiter_document",
+                "id": recruiter.id,
+                "corrections": {
+                    "job_title": "Senior Backend Engineer",
+                    "company": "Acme",
+                    "location": "Pune",
+                    "experience_years": "5",
+                    "salary_min": "1800000",
+                    "salary_max": "2600000",
+                },
+            },
+            content_type="application/json",
+        )
+        credit_response = self.client.post(
+            "/api/documents/review-queue/resolve/",
+            data={
+                "scope": "credit_report",
+                "id": credit.id,
+                "corrections": {
+                    "bureau": "CIBIL",
+                    "applicant_name": "Sourabh Sarkar",
+                    "report_number": "CN998877",
+                    "report_date": "2026-03-28",
+                },
+            },
+            content_type="application/json",
+        )
+
+        for response in [
+            statement_response,
+            loan_response,
+            closure_response,
+            investment_response,
+            resume_response,
+            recruiter_response,
+            credit_response,
+        ]:
+            self.assertEqual(response.status_code, 200, response.content)
+
+        statement.refresh_from_db()
+        loan_import.refresh_from_db()
+        closure.refresh_from_db()
+        investment_doc.refresh_from_db()
+        resume.refresh_from_db()
+        recruiter.refresh_from_db()
+        credit.refresh_from_db()
+
+        self.assertEqual(statement.bank_name, "HDFC Bank")
+        self.assertEqual(statement.account_number, "50100244137504")
+        self.assertEqual(str(statement.statement_start), "2026-03-01")
+        self.assertTrue(statement.extracted_payload["review_queue_resolved"])
+        self.assertEqual(loan_import.document_type, "sanction_letter")
+        self.assertEqual(loan_import.extracted_payload["accepted_corrections"]["loan_account_number"], "AXIS-PL-001")
+        self.assertEqual(closure.verification_status, "verified")
+        self.assertEqual(closure.parser_status, "parsed")
+        self.assertEqual(closure.closure_amount, 84500)
+        self.assertEqual(investment_doc.parser_status, "parsed")
+        self.assertEqual(investment_doc.broker_name, "Groww")
+        self.assertTrue(investment_doc.linked_investments.filter(asset_name="Axis Bluechip Fund").exists())
+        self.assertEqual(resume.parser_status, "parsed")
+        self.assertEqual(resume.extracted_payload["skills"], ["Java", "Spring Boot", "SQL"])
+        self.assertEqual(recruiter.parser_status, "parsed")
+        self.assertEqual(recruiter.job_title, "Senior Backend Engineer")
+        self.assertEqual(recruiter.extracted_payload["job_snapshot"]["salary_min"], 1800000.0)
+        self.assertEqual(credit.parser_status, "parsed")
+        self.assertEqual(credit.report_number, "CN998877")
+        self.assertEqual(str(credit.report_date), "2026-03-28")
+        self.assertGreaterEqual(
+            DocumentParserLearningMemory.objects.filter(correction_count__gt=0).values("scope").distinct().count(),
+            7,
+        )
+        recruiter_memory = DocumentParserLearningMemory.objects.get(
+            scope="recruiter_document",
+            last_resolution="accepted_correction_recruiter_document",
+        )
+        self.assertTrue({"salary_min", "salary_max"}.issubset(set(recruiter_memory.accepted_field_hints)))
 
     def test_statement_retry_creates_internal_retry_ticket_when_still_unresolved(self):
         upload = StatementUpload.objects.create(

@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import tempfile
+from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -10,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.management import call_command
 from django.test import TestCase
+from django.utils import timezone
 
 from apps.behavioral.models import BehavioralSignal
 from apps.expenses.models import Expense
@@ -339,6 +341,30 @@ class MLTrainingOrchestratorTests(TestCase):
         self.assertIn("data_gap", first_model)
         self.assertIn("maturity_level", first_model)
         self.assertIn("fallback_mode", first_model)
+
+    def test_training_health_snapshot_excludes_planned_rl_from_production_ready_counts(self):
+        training_health_snapshot()
+        now = timezone.now()
+        rl_state = AdaptiveModelState.objects.get(model_key="rl_agent")
+        rl_state.status = "ready"
+        rl_state.confidence_estimate = 100.0
+        rl_state.sample_count = 999
+        rl_state.last_started_at = now - timedelta(minutes=10)
+        rl_state.last_finished_at = now - timedelta(minutes=1)
+        rl_state.next_refresh_due_at = now + timedelta(hours=24)
+        rl_state.save()
+
+        snapshot = training_health_snapshot()
+        rl_model = next(item for item in snapshot["models"] if item["model_key"] == "rl_agent")
+
+        self.assertEqual(snapshot["planned_models"], 1)
+        self.assertEqual(snapshot["ready_models"], 0)
+        self.assertEqual(snapshot["fresh_models"], 0)
+        self.assertEqual(snapshot["supervised_ready_models"], 0)
+        self.assertEqual(snapshot["supervised_fresh_models"], 0)
+        self.assertEqual(snapshot["average_confidence"], 0.0)
+        self.assertEqual(rl_model["maturity_level"], "planned")
+        self.assertIn("excluded from production-ready ML", snapshot["summary"])
 
     def test_training_cycle_skips_when_trainer_import_is_blocked(self):
         with patch(

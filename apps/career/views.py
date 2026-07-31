@@ -257,7 +257,7 @@ def _opening_filter_params(request) -> tuple[str, str]:
 def _career_dashboard_revision(user, *, country: str = "", state: str = "") -> str:
     profile = CareerProfile.objects.filter(user=user).first()
     resume_meta = CareerResume.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
-    analysis_meta = CareerJobAnalysis.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_created=Max("created_at"))
+    analysis_meta = CareerJobAnalysis.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_created=Max("created_at"), max_updated=Max("updated_at"))
     account_meta = BankAccount.objects.filter(user=user, is_active=True).aggregate(count=Count("id"), max_id=Max("id"), max_synced=Max("last_synced_at"))
     loan_meta = Loan.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"))
     return "|".join(
@@ -268,13 +268,18 @@ def _career_dashboard_revision(user, *, country: str = "", state: str = "") -> s
             getattr(profile, "skills", ""),
             getattr(profile, "last_salary", 0),
             resume_meta["count"], resume_meta["max_id"], resume_meta["max_updated"],
-            analysis_meta["count"], analysis_meta["max_id"], analysis_meta["max_created"],
+            analysis_meta["count"], analysis_meta["max_id"], analysis_meta["max_created"], analysis_meta["max_updated"],
             account_meta["count"], account_meta["max_id"], account_meta["max_synced"],
             loan_meta["count"], loan_meta["max_id"],
             country,
             state,
         ]
     )
+
+
+def _career_outcome_learning_payload(user) -> dict:
+    analyses = CareerJobAnalysis.objects.filter(user=user).order_by("-updated_at", "-id")
+    return job_intelligence.opportunity_outcome_learning_summary(analyses)
 
 
 def _job_snapshot_payload(snapshot) -> dict:
@@ -629,6 +634,34 @@ class CareerJobMatchView(APIView):
         )
 
 
+class CareerJobOutcomeView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        analysis = CareerJobAnalysis.objects.filter(user=request.user, id=pk).first()
+        if analysis is None:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            outcome = job_intelligence.normalize_opportunity_outcome(analysis, request.data)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        extracted_payload = dict(analysis.extracted_payload or {})
+        extracted_payload["opportunity_outcome"] = outcome
+        analysis.extracted_payload = extracted_payload
+        analysis.save(update_fields=["extracted_payload", "updated_at"])
+        return Response(
+            {
+                "analysis": CareerJobAnalysisSerializer(analysis).data,
+                "opportunity_outcome": outcome,
+                "opportunity_outcome_learning": _career_outcome_learning_payload(request.user),
+            }
+        )
+
+    patch = post
+
+
 class CareerProjectionSimulationView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser]
@@ -737,4 +770,5 @@ def _career_dashboard_payload(request) -> dict:
             "filtered_candidates": openings.get("filtered_candidates", len(openings["openings"])),
         },
         "compensation_benchmark": compensation_benchmark,
+        "opportunity_outcome_learning": _career_outcome_learning_payload(request.user),
     }

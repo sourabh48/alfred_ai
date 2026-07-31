@@ -42,6 +42,11 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
                         "stale_or_due_records": 0,
                         "missing_source_records": 0,
                         "missing_freshness_records": 0,
+                        "refresh_contract": {
+                            "scheduled_refresh": "refresh_due_records",
+                            "stale_after_required": True,
+                            "circuit_breaker": True,
+                        },
                     },
                     "notes": [
                         "Relationship guidance is unavailable until a partner profile exists.",
@@ -157,6 +162,11 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
                     "stale_or_due_records": evidence_freshness.get("stale_or_due_records", 0),
                     "missing_source_records": evidence_freshness.get("missing_source_records", 0),
                     "missing_freshness_records": evidence_freshness.get("missing_freshness_records", 0),
+                    "refresh_contract": {
+                        "scheduled_refresh": "refresh_due_records",
+                        "stale_after_required": True,
+                        "circuit_breaker": True,
+                    },
                 },
                 "notes": [
                     "Relationship output is grounded in user-owned household cash-flow signals plus verified external affordability context.",

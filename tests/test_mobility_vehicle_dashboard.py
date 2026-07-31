@@ -293,12 +293,30 @@ class MobilityVehicleDashboardTests(TestCase):
         self.assertTrue(any(item["display_name"] == "BYD ATTO 3" for item in cars))
         self.assertTrue(any(item["display_name"] == "Triumph Speed 400" for item in motorcycles))
         self.assertTrue(any(item["display_name"] == "Ultraviolette F77" for item in motorcycles))
+        for display_name in [
+            "Maruti Suzuki Alto K10",
+            "Hyundai Verna",
+            "Kia Syros EV",
+            "MG Windsor EV",
+            "Royal Enfield Guerrilla 450",
+            "Honda Shine 125",
+            "River Indie",
+            "VIDA VX2 Plus",
+            "Aprilia SR 160",
+            "Suzuki e-ACCESS",
+        ]:
+            self.assertTrue(any(item["display_name"] == display_name for item in all_models), display_name)
         self.assertTrue(all(item["official_source_url"] for item in all_models))
+        self.assertTrue(all(item["source_checked_on"] for item in all_models))
         self.assertTrue(all(item["maintenance_guidance"] for item in all_models))
         self.assertEqual(len(manufacturers), coverage["manufacturer_count"])
         self.assertTrue(all(item["model_count"] >= 1 for item in manufacturers))
         self.assertEqual(coverage["completion_status"], "complete_current_scope")
+        self.assertGreaterEqual(coverage["model_count"], 115)
         self.assertEqual(coverage["official_source_coverage_pct"], 100)
+        self.assertEqual(coverage["source_checked_coverage_pct"], 100)
+        self.assertEqual(coverage["source_refresh"]["last_checked_on"], "2026-07-31")
+        self.assertEqual(coverage["source_refresh"]["source_checked_count"], coverage["model_count"])
         self.assertEqual(coverage, catalog_coverage_summary())
 
         payload = build_profile_payload("Hunter 350", make="Royal Enfield")

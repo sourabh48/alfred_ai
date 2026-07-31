@@ -7,12 +7,13 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.career.models import CareerJobAnalysis, CareerResume, CareerResumeLearningMemory
-from apps.career.services.job_intelligence import career_source_coverage_summary
+from apps.career.services.job_intelligence import career_opportunity_outcome_summary, career_source_coverage_summary
 from apps.expenses.models import Expense, StatementUpload
 from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
 from apps.loans.models import LoanClosureDocument, LoanPaymentHistory
 from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeServiceRecord
 from apps.mobility.services.bike_catalog import catalog_coverage_summary
+from apps.ml_engine.models import DocumentParserLearningMemory
 from apps.ml_engine.training.orchestrator import training_health_snapshot
 from apps.reports.models import ChatGPTImport, GeneratedReport, SystemTicket
 from .internal_clock import clock_snapshot
@@ -37,6 +38,7 @@ def _build_learning_snapshot(now) -> dict:
     model_training = training_health_snapshot()
     catalog_summary = catalog_coverage_summary()
     career_source_summary = career_source_coverage_summary()
+    career_outcome_summary = career_opportunity_outcome_summary(CareerJobAnalysis.objects.all())
     transaction_count = Expense.objects.count()
     statement_upload_count = StatementUpload.objects.count()
     matched_loan_payments = LoanPaymentHistory.objects.filter(match_status="matched").count()
@@ -45,7 +47,9 @@ def _build_learning_snapshot(now) -> dict:
     vehicle_documents = BikeDocument.objects.count()
     service_records = BikeServiceRecord.objects.count()
     condition_snapshots = BikeConditionSnapshot.objects.count()
-    vehicle_issues = BikeIssueReport.objects.count()
+    open_vehicle_issues = BikeIssueReport.objects.exclude(status="resolved").count()
+    resolved_vehicle_issues = BikeIssueReport.objects.filter(status="resolved").count()
+    costed_vehicle_issue_outcomes = BikeIssueReport.objects.filter(status="resolved").exclude(actual_cost__isnull=True).count()
 
     resumes = CareerResume.objects.count()
     recruiter_documents = CareerJobAnalysis.objects.filter(
@@ -55,6 +59,10 @@ def _build_learning_snapshot(now) -> dict:
     resume_learning_memories = CareerResumeLearningMemory.objects.count()
     job_analyses = CareerJobAnalysis.objects.count()
     credit_report_uploads = CreditReportUpload.objects.count()
+    parser_correction_memories = DocumentParserLearningMemory.objects.filter(correction_count__gt=0).count()
+    parser_correction_scopes = (
+        DocumentParserLearningMemory.objects.filter(correction_count__gt=0).values("scope").distinct().count()
+    )
 
     verified_evidence = VerifiedExternalInsight.objects.filter(is_active=True).count()
     fresh_evidence = VerifiedExternalInsight.objects.filter(is_active=True).filter(
@@ -65,21 +73,41 @@ def _build_learning_snapshot(now) -> dict:
     ).count()
 
     finance_progress = _progress(transaction_count + (statement_upload_count * 12) + (matched_loan_payments * 8), 420, floor=18)
-    document_progress = max(
-        14,
-        _progress(
-            vehicle_documents + statement_upload_count + resumes + recruiter_documents + credit_report_uploads + (chatgpt_imports * 0.5) + (resume_learning_memories * 0.75),
-            60,
-            floor=20,
-        ) - min(review_loan_payments * 2, 10),
+    document_progress = _bounded_percent(
+        max(
+            14,
+            _progress(
+                vehicle_documents + statement_upload_count + resumes + recruiter_documents + credit_report_uploads + (chatgpt_imports * 0.5) + (resume_learning_memories * 0.75),
+                72,
+                floor=20,
+            )
+            + (parser_correction_memories * 1.5)
+            + (parser_correction_scopes * 2)
+            - min(review_loan_payments * 2, 10),
+        )
     )
     mobility_scope_complete = catalog_summary["completion_status"] == "complete_current_scope"
-    mobility_progress = _progress(service_records + condition_snapshots + vehicle_issues + (vehicle_documents * 0.5), 54, floor=16)
+    mobility_progress = _progress(
+        service_records
+        + condition_snapshots
+        + open_vehicle_issues
+        + (resolved_vehicle_issues * 2)
+        + (costed_vehicle_issue_outcomes * 3)
+        + (vehicle_documents * 0.5),
+        64,
+        floor=16,
+    )
     if mobility_scope_complete:
         mobility_progress = max(mobility_progress, 88)
     career_progress = _progress(
-        (resumes * 14) + (resume_learning_memories * 10) + (job_analyses * 18) + (fresh_evidence * 2),
-        170,
+        (resumes * 14)
+        + (resume_learning_memories * 10)
+        + (job_analyses * 14)
+        + (career_outcome_summary["salary_bearing_outcome_count"] * 8)
+        + (career_outcome_summary["accepted_count"] * 4)
+        + (career_outcome_summary["rejected_count"] * 4)
+        + (fresh_evidence * 2),
+        190,
         floor=15,
     )
     if career_source_summary["completion_status"] == "complete_current_scope":
@@ -101,35 +129,40 @@ def _build_learning_snapshot(now) -> dict:
         {
             "title": "Document intelligence",
             "progress": document_progress,
-            "detail": "Statements, resumes, recruiter/JD intake, vehicle documents, credit reports, ChatGPT context imports, and loan PDFs now expose parser confidence, OCR overlay evidence, schema-aware correction candidates, and retry-fed learning traces where applicable.",
+            "detail": "Statements, resumes, recruiter/JD intake, vehicle documents, credit reports, ChatGPT context imports, and loan PDFs now expose parser confidence, OCR overlay evidence, schema-aware correction candidates, cross-family unknown-layout fixtures, accepted correction memory outcomes, Selenium-proven correction interaction, and retry-fed learning traces where applicable.",
             "signals": [
                 f"{statement_upload_count + vehicle_documents + resumes + recruiter_documents + credit_report_uploads} parser-tracked uploads",
                 f"{chatgpt_imports} ChatGPT context imports",
                 f"{review_loan_payments} review-needed loan matches",
                 f"{recruiter_documents} recruiter/JD intake records",
                 f"{vehicle_documents} vehicle documents stored",
+                f"{parser_correction_memories} accepted parser-correction memories",
+                f"{parser_correction_scopes} document families with accepted corrections",
             ],
-            "blocker": "The current review workflow is stronger for supported layouts; live maturity still depends on more real samples from unknown and long-tail document layouts plus full browser interaction proof.",
+            "blocker": "The current review workflow is stronger for supported layouts; live maturity still depends on more real samples from unknown and long-tail document layouts plus browser interaction proof beyond the vehicle invoice/OCR correction path.",
         },
         {
             "title": "Vehicle maintenance learning",
             "progress": mobility_progress,
             "detail": (
                 "The supported vehicle-maintenance implementation scope is in place: service bills, condition snapshots, issue history, "
-                "official model-specific maintenance guidance, route-aware wear signals, bounded service-cost learning, and brand-filtered catalog selection are blended into the vehicle dashboard."
+                "official model-specific maintenance guidance, source freshness metadata, route-aware wear signals, bounded service-cost learning, and brand-filtered catalog selection are blended into the vehicle dashboard."
                 if mobility_scope_complete
                 else "Service bills, condition snapshots, issue history, official model-specific maintenance guidance, route-aware wear signals, and bounded service-cost learning are now blended into the vehicle dashboard."
             ),
             "signals": [
                 f"{service_records} service logs",
                 f"{condition_snapshots} condition snapshots",
-                f"{vehicle_issues} issue reports",
+                f"{open_vehicle_issues} open issue reports",
+                f"{resolved_vehicle_issues} resolved issue outcomes",
+                f"{costed_vehicle_issue_outcomes} costed issue outcomes",
                 f"{catalog_summary['model_count']} official catalog models",
                 f"{catalog_summary['manufacturer_count']} manufacturers covered",
+                f"{catalog_summary['source_checked_coverage_pct']}% source links checked",
             ],
             "blocker_label": "Remaining maturity" if mobility_scope_complete else "Still blocked by",
             "blocker": (
-                "Catalog depth is strong for the supported India seed scope, but it is not exhaustive; maturity still needs source-upkeep automation, long-tail models, more condition snapshots, and real issue outcomes."
+                "Catalog depth is strong for the supported India seed scope, but it is not exhaustive; maturity still needs source-upkeep automation, long-tail models, denser condition snapshots, and more resolved/costed issue outcomes."
                 if mobility_scope_complete
                 else "Catalog coverage still has required manufacturer, model, source, or maintenance-guidance gaps."
             ),
@@ -137,16 +170,19 @@ def _build_learning_snapshot(now) -> dict:
         {
             "title": "Career and market intelligence",
             "progress": career_progress,
-            "detail": "Resume parsing, recruiter/JD intake, compensation benchmarking, public job-page parsing, multi-feed live openings, and geography-aware salary evidence are complete for the current source scope.",
+            "detail": "Resume parsing, recruiter/JD intake, compensation benchmarking, public job-page parsing, multi-feed live openings, geography-aware salary evidence, specialty-source gap policy, and salary-bearing opportunity outcomes are tracked for the current source scope.",
             "signals": [
                 f"{resumes} resumes",
                 f"{resume_learning_memories} learned parser memory signatures",
                 f"{job_analyses} job analyses",
+                f"{career_outcome_summary['salary_bearing_outcome_count']} salary-bearing outcomes",
+                f"{career_outcome_summary['accepted_count']} accepted outcomes",
+                f"{career_outcome_summary['rejected_count']} rejected outcomes",
                 f"{fresh_evidence} fresh evidence records",
                 f"{career_source_summary['configured_feed_count']} live job-feed adapters",
                 f"{career_source_summary['job_page_adapter_count']} job-page adapters",
             ],
-            "blocker": "Current source breadth is complete; maturity still improves as real users generate more salary-bearing openings, recruiter intakes, and accepted career outcomes.",
+            "blocker": "Current source breadth is complete; specialty-source additions stay gated on real role/geography gaps, and salary maturity still needs more accepted and rejected salary-bearing opportunity outcomes.",
         },
         {
             "title": "Verified evidence refresh",
@@ -191,16 +227,17 @@ def _build_learning_snapshot(now) -> dict:
             ],
             "adaptive_blended": [
                 "Career timing, risk radar, vehicle fault diagnosis, and travel readiness are adaptive but still blend verified evidence with heuristics.",
-                "Career source coverage now spans Remotive, Arbeitnow, Remote OK, recruiter/JD intake, job-page adapters, and geography-aware salary evidence contracts.",
-                "Vehicle dashboard suggestions adjust with service history, fault history, condition snapshots, and document state.",
+                "Career source coverage now spans Remotive, Arbeitnow, Remote OK, recruiter/JD intake, job-page adapters, geography-aware salary evidence contracts, specialty-source gap policy, and salary-bearing opportunity outcomes.",
+                "Vehicle dashboard suggestions adjust with service history, fault history, resolved/costed issue outcomes, condition snapshots, source-checked catalog metadata, and document state.",
                 "Verified external intelligence refreshes in the background with freshness contracts, stale fallback, and circuit breakers.",
                 "Investment watchlist ranking blends official AMFI NAV history, verified market context, and user portfolio fit, but still remains a transparent watchlist rather than a guarantee engine.",
             ],
             "not_yet_fully_learned": [
-                "Unknown document layouts now improve through correction memory, schema-aware OCR overlay candidates, label-collapsed invoice recovery, and retry outcomes; maturity still depends on real long-tail sample volume.",
-                "Career source breadth is complete for the current scope, but career outcome learning still needs more local accepted/rejected offers and salary-bearing samples.",
+                "Unknown document layouts now improve through correction memory, schema-aware OCR overlay candidates, cross-family unknown-layout fixtures, label-collapsed invoice recovery, Selenium-proven vehicle invoice correction, and retry outcomes; maturity still depends on real long-tail sample volume.",
+                "Career source breadth is complete for the current scope, but specialty-source additions are still gated on real role/geography gaps and career outcome learning needs more salary-bearing accepted/rejected decisions.",
                 "Home-loan dashboard value now includes tracked upfront cash inputs, but it is still an acquisition-cost proxy rather than a live market valuation.",
                 "Large dashboard payloads now use revision-keyed materialized responses; remaining scaling work is production cache sizing, TTL tuning, and observability.",
+                "The planned future RL learner is tracked as planned-only and is excluded from production-ready ML and supervised model coverage.",
             ],
         },
         "model_training": model_training,
@@ -231,23 +268,24 @@ def project_details_payload(guardrails: dict) -> dict:
     evidence_track = learning_tracks_by_title.get("Verified evidence refresh", {})
     catalog_summary = catalog_coverage_summary()
     career_source_summary = career_source_coverage_summary()
+    career_outcome_summary = career_opportunity_outcome_summary(CareerJobAnalysis.objects.all())
     model_training = learning_snapshot["model_training"]
     supervised_training_progress = _bounded_percent(
         model_training.get("supervised_training_progress", model_training.get("overall_progress", 0))
     )
     ml_maturity_progress = _bounded_percent(model_training.get("overall_progress", 0))
 
-    browser_ui_progress = 45
-    document_scope_progress = min(max(_bounded_percent(document_track.get("progress", 0)), 86), 91)
+    browser_ui_progress = 58
+    document_scope_progress = min(max(_bounded_percent(document_track.get("progress", 0)), 91), 94)
     vehicle_scope_progress = min(max(_bounded_percent(vehicle_track.get("progress", 0)), 88), 92)
     career_scope_progress = min(max(_bounded_percent(career_track.get("progress", 0)), 88), 92)
-    evidence_scope_progress = min(max(_bounded_percent(evidence_track.get("progress", 0)), 88 if not evidence_watchlist.exists() else 0), 92)
+    evidence_scope_progress = min(max(_bounded_percent(evidence_track.get("progress", 0)), 90 if not evidence_watchlist.exists() else 0), 93)
     large_data_scope_progress = 84
 
     next_steps = [
-        "Maintain correction-backed parser learning for new document layouts and keep adding real invoice/OCR edge cases to the field-correction suite.",
+        "Keep adding real unknown document layouts to the field-correction suite and promote confirmed correction outcomes back into parser-learning evidence.",
         "Keep verified evidence refresh jobs healthy across advisory surfaces and require proof contracts on any new recommendation or relationship-adjacent path.",
-        "Add browser-driven regression checks for the most important user journeys so UI correctness is not inferred only from API and Django tests.",
+        "Extend browser-driven regression checks from the proven vehicle invoice/OCR correction path into login, statement upload, vehicle setup, dashboard refresh, and core form submissions.",
         "Tune production cache TTLs, capacity, and dashboard invalidation observability as real history grows.",
         "Maintain career feed freshness and add specialized sources only when real users expose target geography or role-family gaps.",
     ]
@@ -273,7 +311,7 @@ def project_details_payload(guardrails: dict) -> dict:
     ]
 
     risks = [
-        "browser-only issues can still exist where no live frontend interaction pass was run",
+        "browser-only issues can still exist outside the covered document-review invoice/OCR correction path",
         "some external sources are authoritative APIs, but market data still relies on Yahoo Finance",
         "multiple-vehicle support is structurally improved, but some naming remains vehicle-service or bike-centric in code paths for backward compatibility",
         "job-link parsing is robust for many public pages, but some portals can still block direct fetches or hide content behind script/runtime layers",
@@ -355,21 +393,22 @@ def project_details_payload(guardrails: dict) -> dict:
         {
             "title": "Browser/UI regression coverage",
             "progress": browser_ui_progress,
-            "detail": "Django live-server page rendering, static-asset checks, and form-contract checks are active, but there is still no Playwright/Selenium interaction pass proving real browser workflows.",
-            "next_focus": "Install browser automation in the local/test environment and cover login, statement upload, document review, vehicle setup, dashboard refresh, and core form submissions.",
+            "detail": "Django live-server page rendering, static-asset checks, form-contract checks, and a gated Selenium interaction pass now prove the vehicle invoice/OCR overlay correction workflow.",
+            "next_focus": "Keep Selenium available in local/CI browser jobs and extend coverage to login, statement upload, vehicle setup, dashboard refresh, and core form submissions.",
         },
         {
             "title": "Document OCR and correction maturity",
             "progress": document_scope_progress,
-            "detail": "Parser confidence, low-confidence queues, accepted corrections, ChatGPT context import, retry-fed learning, schema-aware OCR overlay candidates, and degraded service-invoice recovery are implemented across the current document families.",
-            "next_focus": "Use more real unknown layouts to raise field-level correction quality and prove the tougher invoice/OCR overlays through Playwright or Selenium browser interaction tests.",
+            "detail": "Parser confidence, low-confidence queues, accepted corrections, ChatGPT context import, retry-fed learning, schema-aware OCR overlay candidates, degraded service-invoice recovery, cross-family unknown-layout fixtures, accepted correction memory outcomes, and Selenium-proven vehicle OCR overlay correction are implemented across the current document families.",
+            "next_focus": "Keep adding real unknown layouts and validated correction outcomes before treating field-level maintenance learning as mature across every document family.",
         },
         {
             "title": "Vehicle catalog and maintenance depth",
             "progress": vehicle_scope_progress,
             "detail": (
                 f"Supported seed coverage is strong: {catalog_summary['model_count']} official catalog models across "
-                f"{catalog_summary['manufacturer_count']} manufacturers, source-linked guidance, brand-filtered model selection, and route-aware service-cost actions."
+                f"{catalog_summary['manufacturer_count']} manufacturers, source-linked guidance checked on "
+                f"{catalog_summary['source_refresh']['last_checked_on']}, brand-filtered model selection, and route-aware service-cost actions."
             ),
             "next_focus": "Keep source links fresh, add long-tail models from real usage, and collect more condition snapshots plus issue outcomes before treating maintenance learning as mature.",
         },
@@ -378,14 +417,16 @@ def project_details_payload(guardrails: dict) -> dict:
             "progress": career_scope_progress,
             "detail": (
                 f"Current source breadth spans {career_source_summary['configured_feed_count']} live job feeds "
-                f"({', '.join(career_source_summary['configured_feeds'])}), {career_source_summary['job_page_adapter_count']} job-page adapters, recruiter/JD intake, and geography-aware salary evidence."
+                f"({', '.join(career_source_summary['configured_feeds'])}), {career_source_summary['job_page_adapter_count']} job-page adapters, recruiter/JD intake, geography-aware salary evidence, "
+                f"{career_source_summary['candidate_specialty_source_count']} candidate specialty sources gated by role/geography gaps, and "
+                f"{career_outcome_summary['salary_bearing_outcome_count']} salary-bearing accepted/rejected outcome(s)."
             ),
             "next_focus": "Add specialty sources only where real users expose role/geography gaps, then validate more salary-bearing outcomes from accepted or rejected opportunities.",
         },
         {
             "title": "Evidence freshness and proof rigor",
             "progress": evidence_scope_progress,
-            "detail": "Current advisory surfaces expose source URLs, freshness counters, stale/due status, stale fallback, and circuit-breaker metadata.",
+            "detail": "Current advisory surfaces expose source URLs, freshness counters, stale/due status, stale fallback, circuit-breaker metadata, scheduled-refresh contracts, and required-source proof contracts for recommendation and relationship-adjacent outputs.",
             "next_focus": "Keep scheduled refresh healthy and extend the proof contract before adding any new recommendation or relationship-adjacent signal.",
         },
         {
@@ -400,7 +441,7 @@ def project_details_payload(guardrails: dict) -> dict:
             "detail": (
                 f"Supervised training coverage is {supervised_training_progress}% with "
                 f"{model_training.get('supervised_fresh_models', 0)}/{model_training.get('trainable_models', 0)} trainable models fresh; "
-                "the broader ML maturity score still includes confidence, freshness, skipped/planned model state, and heuristic fallback risk."
+                "production-ready ML maturity excludes the planned future RL learner and still includes confidence, freshness, skipped model state, and heuristic fallback risk."
             ),
             "next_focus": "Keep supervised artifacts fresh, collect more accepted outcomes, and do not count the planned future RL learner as production-ready ML.",
         },

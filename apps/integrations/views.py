@@ -149,12 +149,46 @@ def _dedupe_evidence(items):
     return result
 
 
-def _grounding_payload(*, history, evidence=None, notes=None):
+def _proof_contract_payload(*, evidence_items, freshness, required_sources=None):
+    required_sources = list(required_sources or [])
+    observed_sources = sorted(
+        {
+            str(item.get("source_name") or "").strip()
+            for item in evidence_items
+            if str(item.get("source_name") or "").strip()
+        }
+    )
+    missing_required_sources = [source for source in required_sources if source not in observed_sources]
+    return {
+        "complete": bool(freshness.get("proof_complete")) and not missing_required_sources,
+        "required_sources": required_sources,
+        "observed_sources": observed_sources,
+        "tracked_records": freshness.get("tracked_records", 0),
+        "fresh_records": freshness.get("fresh_records", 0),
+        "stale_or_due_records": freshness.get("stale_or_due_records", 0),
+        "missing_source_records": freshness.get("missing_source_records", 0),
+        "missing_freshness_records": freshness.get("missing_freshness_records", 0),
+        "missing_required_sources": missing_required_sources,
+        "refresh_contract": {
+            "scheduled_refresh": "refresh_due_records",
+            "stale_after_required": True,
+            "circuit_breaker": True,
+        },
+    }
+
+
+def _grounding_payload(*, history, evidence=None, notes=None, required_sources=None):
     evidence_items = _dedupe_evidence(evidence or [])
+    freshness = freshness_snapshot(evidence_items)
     return {
         "history": history,
         "evidence": evidence_items,
-        "freshness": freshness_snapshot(evidence_items),
+        "freshness": freshness,
+        "proof_contract": _proof_contract_payload(
+            evidence_items=evidence_items,
+            freshness=freshness,
+            required_sources=required_sources,
+        ),
         "notes": notes or [],
     }
 
@@ -602,6 +636,7 @@ def _build_recommendation_overview_payload(request) -> dict:
             "recommendation_count": len(investments.get("recommendations", [])),
         },
         evidence=[market.evidence, inflation.evidence],
+        required_sources=["Yahoo Finance", "World Bank"],
         notes=[
             "Investment matching is grounded in your savings capacity, persona, and risk appetite, then contextualized with verified market and inflation evidence.",
             "External evidence shapes market posture and real-return context, not a guarantee that any product will outperform.",
@@ -616,6 +651,7 @@ def _build_recommendation_overview_payload(request) -> dict:
             "total_annual_premium": round(insurance.get("total_annual_premium", 0), 2),
         },
         evidence=[inflation.evidence],
+        required_sources=["World Bank"],
         notes=[
             "Insurance matching is grounded in household dependence, age, and affordability. Verified inflation evidence is attached only as protection-cost context.",
             "Coverage suggestions remain planning guidance, not insurer underwriting approval or premium quotes.",
@@ -630,6 +666,7 @@ def _build_recommendation_overview_payload(request) -> dict:
             "policy_state": "disabled",
         },
         evidence=[inflation.evidence],
+        required_sources=["World Bank"],
         notes=[
             "Credit-card recommendations are intentionally disabled for this workspace, so no card ranking or acquisition advice is produced.",
             "The evidence contract is retained to distinguish a policy suppression from missing user data.",
@@ -644,6 +681,7 @@ def _build_recommendation_overview_payload(request) -> dict:
             "policy_state": "disabled",
         },
         evidence=[market.evidence, inflation.evidence],
+        required_sources=["Yahoo Finance", "World Bank"],
         notes=[
             "Personal-loan recommendations are intentionally disabled for this workspace, so no borrowing shortlist is produced.",
             "Market and inflation evidence is attached only to document the suppressed decision context.",
@@ -659,6 +697,7 @@ def _build_recommendation_overview_payload(request) -> dict:
             *personal_loans_grounding["evidence"],
         ]
     )
+    combined_freshness = freshness_snapshot(combined_evidence)
 
     return {
         "profile": profile,
@@ -690,7 +729,12 @@ def _build_recommendation_overview_payload(request) -> dict:
                 "tracked_personas": profile.get("persona", []),
             },
             "evidence": combined_evidence,
-            "freshness": freshness_snapshot(combined_evidence),
+            "freshness": combined_freshness,
+            "proof_contract": _proof_contract_payload(
+                evidence_items=combined_evidence,
+                freshness=combined_freshness,
+                required_sources=["Yahoo Finance", "World Bank"],
+            ),
             "modules": [
                 {
                     "key": "investments",

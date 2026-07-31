@@ -187,22 +187,24 @@ def training_health_snapshot() -> dict:
     states = list(AdaptiveModelState.objects.order_by("display_name", "model_key"))
     spec_by_key = {spec.key: spec for spec in TRAINING_SPECS}
     total = len(states)
-    ready = [item for item in states if item.status == "ready"]
+    production_states = [item for item in states if item.model_key not in PLANNED_MODEL_KEYS]
+    ready = [item for item in production_states if item.status == "ready"]
     fresh = [item for item in ready if item.is_fresh]
-    skipped = [item for item in states if item.status == "skipped"]
-    failed = [item for item in states if item.status == "failed"]
-    training = [item for item in states if item.status == "training"]
-    trainable = [item for item in states if item.model_key not in PLANNED_MODEL_KEYS]
+    skipped = [item for item in production_states if item.status == "skipped"]
+    failed = [item for item in production_states if item.status == "failed"]
+    training = [item for item in production_states if item.status == "training"]
+    trainable = production_states
     ready_trainable = [item for item in trainable if item.status == "ready"]
     fresh_trainable = [item for item in ready_trainable if item.is_fresh]
     skipped_trainable = [item for item in trainable if item.status == "skipped"]
     planned = [item for item in states if item.model_key in PLANNED_MODEL_KEYS]
-    average_confidence = round(mean([item.confidence_estimate for item in states]) if states else 0.0, 2)
+    average_confidence = round(mean([item.confidence_estimate for item in production_states]) if production_states else 0.0, 2)
     maturity_items = [_model_maturity_payload(item, spec_by_key.get(item.model_key)) for item in states]
     maturity_counts = Counter(item["maturity_level"] for item in maturity_items)
 
-    ready_ratio = (len(ready) / total) * 100 if total else 0.0
-    freshness_ratio = (len(fresh) / total) * 100 if total else 0.0
+    production_total = len(production_states)
+    ready_ratio = (len(ready) / production_total) * 100 if production_total else 0.0
+    freshness_ratio = (len(fresh) / production_total) * 100 if production_total else 0.0
     overall_progress = round(min(96.0, (ready_ratio * 0.4) + (freshness_ratio * 0.2) + (average_confidence * 0.4)), 1)
     supervised_training_progress = round(
         (((len(ready_trainable) / len(trainable)) * 50.0) + ((len(fresh_trainable) / len(trainable)) * 50.0))
@@ -211,9 +213,9 @@ def training_health_snapshot() -> dict:
         1,
     )
     summary = (
-        f"{len(fresh)}/{total} model states are fresh and ready; "
+        f"{len(fresh)}/{production_total} production-ready model states are fresh and ready; "
         f"{len(skipped_trainable)} trainable model state(s) are waiting on data or environment gates, "
-        f"{len(planned)} planned future model(s) are excluded from supervised coverage, and {len(failed)} failed recently."
+        f"{len(planned)} planned future model(s) are excluded from production-ready ML and supervised coverage, and {len(failed)} failed recently."
         if total
         else "No model training states have been initialized yet."
     )

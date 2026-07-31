@@ -21,11 +21,11 @@ ALFRED is a Django application that turns personal financial records into one wo
 | Credit report upload and tradeline sync | Working |
 | Investments manual + PDF intake | Working |
 | Career source coverage | 88% - current resume, recruiter/JD, multi-feed jobs, job-page adapter, and geography-aware compensation scope is implemented, but real salary/outcome breadth still needs growth |
-| Shared document review / retry flow | 86% - parser confidence, schema-aware OCR candidates, ChatGPT context import, accepted corrections, retry learning, and tougher service-invoice recovery are implemented; long-tail layouts and browser interaction proof still need more real samples |
-| External proof and freshness | 90% - proof contracts and freshness metadata are active; due/stale evidence still needs refresh monitoring |
-| UI polish and responsive shell | 45% - live-server smoke coverage and the guarded vehicle catalog picker are active, but Playwright/Selenium browser interaction coverage is not installed locally |
+| Shared document review / retry flow | 91% - parser confidence, schema-aware OCR candidates, ChatGPT context import, cross-family unknown-layout fixtures, accepted correction outcomes, retry learning, tougher service-invoice recovery, and Selenium-proven vehicle OCR correction are implemented; long-tail layouts and more browser paths still need real samples |
+| External proof and freshness | 90% - required-source proof contracts, freshness metadata, circuit breakers, stale fallback, and scheduled-refresh contracts are active; due/stale evidence still needs refresh monitoring |
+| UI polish and responsive shell | 58% - live-server smoke coverage, static/form contracts, the guarded vehicle catalog picker, and Selenium vehicle invoice/OCR overlay correction are active; broader browser interaction coverage still needs expansion |
 | Mobility vehicle catalog and service intelligence | 88% - supported India consumer-vehicle seed scope has 80 source-linked models across 32 manufacturers, route-aware wear guidance, and service-cost learning; not exhaustive |
-| ML-assisted features | 76% - supervised trainable models are fresh and ready; broader ML maturity is capped by confidence, data volume, heuristic fallbacks, and a planned future RL learner |
+| ML-assisted features | 76% - production-ready supervised model counts exclude the planned future RL learner; broader ML maturity is capped by confidence, data volume, artifact freshness, and heuristic fallbacks |
 | Production hardening | 84% - heavy dashboard materialization exists for the current app scope; production cache sizing, TTL tuning, and observability remain open |
 
 ## Verification Snapshot
@@ -41,8 +41,8 @@ Last verified locally on 31 July 2026.
 | Vehicle catalog UI | One Make / Brand combobox submits the actual `make` value; Official Catalog Model is populated only after a make is selected and is guarded from live-refresh re-render while the user is choosing |
 | Catalog API | `/api/mobility/bike-models/catalog/` supports `vehicle_type` plus `make`, `brand`, or `manufacturer` filters |
 | ChatGPT context import | `/api/reports/chatgpt-imports/` and the document center accept pasted transcripts or ChatGPT JSON exports, then store detected module evidence for review |
-| Document OCR correction | Generic OCR amount/date candidates are mapped into scope-specific correction fields, and vehicle service invoices now recover label-collapsed compact rows such as embedded `Qty`, `Hrs`, `Amount`, and currency tokens |
-| Model training | 7/7 supervised trainable model states are fresh and ready; 1 planned future RL learner is excluded from supervised coverage |
+| Document OCR correction | Generic OCR candidates are mapped into scope-specific correction fields across statement, loan, loan-closure, investment, vehicle, resume, recruiter, and credit-report families; vehicle service invoices also recover label-collapsed compact rows such as embedded `Qty`, `Hrs`, `Amount`, and currency tokens |
+| Model training | 7/7 production-ready supervised model states are fresh and ready; 1 planned future RL learner is excluded from production-ready ML and supervised coverage |
 | Evidence watchlist | 1 stale, failed, rejected, or due verified evidence record in the current local data snapshot |
 
 The live tracker now separates narrow verified checks from broad product maturity. A 100% entry means that exact check is closed; it does not imply the surrounding product area is fully mature.

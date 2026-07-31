@@ -1,8 +1,10 @@
+import json
 from datetime import timedelta
 from unittest.mock import patch
 from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.utils import timezone
@@ -15,6 +17,7 @@ from apps.mobility.models import BikeDocument, BikeProfile
 
 class CareerAdaptiveIntelligenceTests(TestCase):
     def setUp(self):
+        cache.clear()
         user_model = get_user_model()
         self.user = user_model.objects.create_user(
             username="career_owner",
@@ -245,6 +248,10 @@ class CareerAdaptiveIntelligenceTests(TestCase):
         self.assertTrue(payload["openings_source_coverage"]["coverage_complete"])
         self.assertGreaterEqual(payload["openings_source_coverage"]["salary_bearing_candidates"], 2)
         self.assertIn("Remote OK API", payload["openings_source_coverage"]["source_salary_counts"])
+        gap_policy = payload["openings_source_coverage"]["specialty_source_gap_policy"]
+        self.assertFalse(gap_policy["gap_exposed"])
+        self.assertFalse(gap_policy["recommended_sources"])
+        self.assertEqual(gap_policy["policy"], "core_feeds_sufficient_for_current_role_geography")
         self.assertIn("India", payload["opening_filters"]["countries"])
         self.assertIn("Karnataka", payload["opening_filters"]["states_by_country"]["India"])
         self.assertTrue(payload["compensation_benchmark"]["available"])
@@ -253,6 +260,195 @@ class CareerAdaptiveIntelligenceTests(TestCase):
         self.assertEqual(payload["compensation_benchmark"]["evidence_contract"]["selected_salary_count"], 1)
         self.assertEqual(payload["compensation_benchmark"]["evidence_contract"]["geo_match_level"], "state")
         self.assertTrue(payload["compensation_benchmark"]["evidence_contract"]["proof_complete"])
+
+    @patch(
+        "apps.career.views.verified_intelligence.macro_context",
+        return_value={
+            "payload": {
+                "unemployment": {"latest_value": 5.1, "latest_year": 2024},
+                "inflation": {"latest_value": 4.8, "latest_year": 2024},
+                "market": {"one_month_return_pct": 2.4, "india_vix": 15.0},
+            },
+            "evidence": [],
+        },
+    )
+    @patch(
+        "apps.career.views.job_intelligence.market_outlook",
+        return_value={
+            "risk_score": 34,
+            "layoff_news": [],
+            "job_market_news": [],
+            "macro_context": {},
+            "insights": ["Market pressure is moderate."],
+            "evidence": [],
+        },
+    )
+    @patch("apps.career.services.job_intelligence.verified_intelligence.remoteok_jobs")
+    @patch("apps.career.services.job_intelligence.verified_intelligence.arbeitnow_jobs")
+    @patch("apps.career.services.job_intelligence.verified_intelligence.remotive_jobs")
+    def test_career_dashboard_recommends_specialty_sources_only_for_exposed_geo_salary_gap(self, remotive_jobs, arbeitnow_jobs, remoteok_jobs, _market_outlook, _macro_context):
+        CareerProfile.objects.create(
+            user=self.user,
+            role="Data Analyst",
+            experience_years=3.0,
+            skills="Python, SQL, Tableau",
+            last_salary=90000,
+        )
+        remotive_jobs.return_value = _job_feed_result(
+            "Remotive Jobs API",
+            "https://remotive.com/api/remote-jobs",
+            [
+                {
+                    "title": "Data Analyst",
+                    "company": "Local Co",
+                    "location": "Bengaluru, Karnataka, India",
+                    "category": "Data",
+                    "url": "https://example.com/jobs/local-data-analyst",
+                    "publication_date": "2026-04-01T10:00:00Z",
+                    "salary": "",
+                    "tags": ["Python", "SQL"],
+                }
+            ],
+        )
+        arbeitnow_jobs.return_value = _job_feed_result(
+            "Arbeitnow Job Board API",
+            "https://www.arbeitnow.com/api/job-board-api",
+            [
+                {
+                    "title": "Analytics Engineer",
+                    "company": "EU Co",
+                    "location": "Berlin, Germany",
+                    "category": "Engineering",
+                    "url": "https://arbeitnow.com/jobs/analytics-engineer-2",
+                    "publication_date": "2026-04-01T10:00:00Z",
+                    "salary": "USD 90000 per year",
+                    "tags": ["Python", "SQL"],
+                }
+            ],
+        )
+        remoteok_jobs.return_value = _job_feed_result(
+            "Remote OK API",
+            "https://remoteok.com/api",
+            [
+                {
+                    "title": "Remote Data Analyst",
+                    "company": "US Co",
+                    "location": "Remote",
+                    "category": "Data",
+                    "url": "https://remoteok.com/remote-jobs/2",
+                    "publication_date": "2026-04-01T10:00:00Z",
+                    "salary": "USD 120000 per year",
+                    "tags": ["Python", "SQL"],
+                }
+            ],
+        )
+
+        response = self.client.get("/api/career/dashboard/?country=India&state=Karnataka")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["opening_counts"]["filtered_candidates"], 1)
+        self.assertFalse(payload["openings"][0]["salary_signal"]["available"])
+        gap_policy = payload["openings_source_coverage"]["specialty_source_gap_policy"]
+        self.assertTrue(gap_policy["gap_exposed"])
+        self.assertEqual(gap_policy["role_family"], "data")
+        self.assertEqual(gap_policy["requested_country"], "India")
+        self.assertEqual(gap_policy["filtered_salary_bearing_candidates"], 0)
+        recommended_names = {item["name"] for item in gap_policy["recommended_sources"]}
+        self.assertTrue({"Naukri", "Instahyre"} <= recommended_names)
+        self.assertEqual(gap_policy["policy"], "candidate_only_until_connector_or_adapter_is_added")
+
+    def test_career_job_outcome_endpoint_records_salary_bearing_decisions_and_dashboard_summary(self):
+        CareerProfile.objects.create(
+            user=self.user,
+            role="Data Analyst",
+            experience_years=4.0,
+            skills="Python, SQL, Power BI",
+            last_salary=90000,
+        )
+        accepted_analysis = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/accepted",
+            apply_url="https://example.com/jobs/accepted/apply",
+            company="Accepted Co",
+            job_title="Senior Data Analyst",
+            location="Bengaluru, Karnataka, India",
+            fit_score=82,
+            market_risk_score=24,
+            summary="Accepted role",
+            extracted_payload={"job_snapshot": {"title": "Senior Data Analyst", "company": "Accepted Co", "location": "Bengaluru, Karnataka, India", "source_kind": "recruiter_message"}},
+            evidence=[],
+        )
+        rejected_analysis = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/rejected",
+            apply_url="https://example.com/jobs/rejected/apply",
+            company="Rejected Co",
+            job_title="BI Analyst",
+            location="Bengaluru, Karnataka, India",
+            fit_score=72,
+            market_risk_score=31,
+            summary="Rejected role",
+            extracted_payload={"job_snapshot": {"title": "BI Analyst", "company": "Rejected Co", "location": "Bengaluru, Karnataka, India", "source_kind": "job_page"}},
+            evidence=[],
+        )
+
+        accepted_response = self.client.post(
+            f"/api/career/job-analyses/{accepted_analysis.id}/outcome/",
+            data=json.dumps({"outcome": "accepted", "salary_text": "INR 24-30 LPA", "notes": "Offer accepted."}),
+            content_type="application/json",
+        )
+        rejected_response = self.client.post(
+            f"/api/career/job-analyses/{rejected_analysis.id}/outcome/",
+            data=json.dumps({"outcome": "rejected", "salary_text": "INR 18-22 LPA", "rejection_reason": "Below target."}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(accepted_response.status_code, 200)
+        self.assertEqual(rejected_response.status_code, 200)
+        accepted_analysis.refresh_from_db()
+        self.assertEqual(accepted_analysis.extracted_payload["opportunity_outcome"]["outcome"], "accepted")
+        self.assertTrue(accepted_analysis.extracted_payload["opportunity_outcome"]["salary_bearing"])
+        self.assertEqual(accepted_analysis.extracted_payload["opportunity_outcome"]["salary_min_annual"], 2400000)
+        summary = rejected_response.json()["opportunity_outcome_learning"]
+        self.assertEqual(summary["salary_bearing_outcome_count"], 2)
+        self.assertEqual(summary["accepted_count"], 1)
+        self.assertEqual(summary["rejected_count"], 1)
+        self.assertEqual(summary["maturity_status"], "collecting")
+
+        with patch(
+            "apps.career.views.verified_intelligence.macro_context",
+            return_value={
+                "payload": {
+                    "unemployment": {"latest_value": 5.1, "latest_year": 2024},
+                    "inflation": {"latest_value": 4.8, "latest_year": 2024},
+                    "market": {"one_month_return_pct": 2.4, "india_vix": 15.0},
+                },
+                "evidence": [],
+            },
+        ), patch(
+            "apps.career.views.job_intelligence.market_outlook",
+            return_value={
+                "risk_score": 34,
+                "layoff_news": [],
+                "job_market_news": [],
+                "macro_context": {},
+                "insights": ["Market pressure is moderate."],
+                "evidence": [],
+            },
+        ), patch(
+            "apps.career.views.job_intelligence.suggest_openings",
+            return_value={"openings": [], "evidence": {}, "source_coverage": {}},
+        ):
+            dashboard = self.client.get("/api/career/dashboard/")
+
+        self.assertEqual(dashboard.status_code, 200)
+        dashboard_summary = dashboard.json()["opportunity_outcome_learning"]
+        self.assertEqual(dashboard_summary["salary_bearing_outcome_count"], 2)
+        self.assertEqual(dashboard_summary["accepted_count"], 1)
+        self.assertEqual(dashboard_summary["rejected_count"], 1)
 
 
 class UserDataIsolationTests(TestCase):
