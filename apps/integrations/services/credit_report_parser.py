@@ -118,6 +118,10 @@ class CreditReportParser:
             payload["bureau"] = bureau
         if metadata.get("title") and not payload.get("document_title"):
             payload["document_title"] = metadata["title"]
+        payload["extraction_method"] = extraction.method
+        payload["extraction_notes"] = extraction.notes[:6]
+        payload["raw_text_excerpt"] = " ".join(text.split())[:600]
+        payload["extraction_review"] = extraction.review_payload
         factors = self._build_factors(payload, bureau)
 
         confidence = max(0.18 if (text.strip() or metadata) else 0.0, extraction.confidence * 0.7 if text.strip() else 0.0)
@@ -140,6 +144,7 @@ class CreditReportParser:
             field_names=[key for key, value in payload.items() if value not in ("", None, 0)],
             confidence=confidence,
         )
+        confidence = round(max(0.0, min(float(confidence or 0), 0.99)), 2)
 
         parser_notes = list(extraction_notes)
         if payload.get("score"):

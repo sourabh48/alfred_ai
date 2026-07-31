@@ -418,6 +418,14 @@ class ExpenseTimelineView(APIView):
             sum(item.amount for item in filtered_expenses if item.direction == "debit" and item.classification == "expense"),
             2,
         )
+        filtered_loan_total = round(
+            sum(item.amount for item in filtered_expenses if item.direction == "debit" and item.classification == "loan"),
+            2,
+        )
+        filtered_other_total = round(
+            sum(item.amount for item in filtered_expenses if item.direction == "debit" and item.classification == "other"),
+            2,
+        )
         filtered_outflow_total = round(sum(item.amount for item in filtered_expenses if item.direction == "debit"), 2)
         filtered_credit_total = round(sum(item.amount for item in filtered_expenses if item.direction == "credit"), 2)
 
@@ -432,6 +440,8 @@ class ExpenseTimelineView(APIView):
                     "visible_count": len(visible_expenses),
                     "has_more": len(filtered_expenses) > len(visible_expenses),
                     "filtered_expense_total": filtered_expense_total,
+                    "filtered_loan_total": filtered_loan_total,
+                    "filtered_other_total": filtered_other_total,
                     "filtered_outflow_total": filtered_outflow_total,
                     "filtered_credit_total": filtered_credit_total,
                 },

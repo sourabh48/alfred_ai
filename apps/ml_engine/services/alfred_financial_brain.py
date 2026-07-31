@@ -54,6 +54,14 @@ class AlfredFinancialBrain:
             "user": user.username,
         }
 
+        # Canonical current-state finance must be read once and reused by advisory layers.
+        try:
+            from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+
+            snapshot["financial_baseline"] = resolve_canonical_financial_baseline(user)
+        except Exception as e:
+            snapshot["financial_baseline"] = {"error": str(e)}
+
         # 1. Bank Accounts Overview
         try:
             snapshot["accounts"] = self.bank_service.get_consolidated_view(user)
@@ -256,8 +264,9 @@ class AlfredFinancialBrain:
             factors.append("Low cash reserves - build emergency fund")
 
         # Loan health (20 points)
+        baseline = snapshot.get("financial_baseline", {})
         loans = snapshot.get("loans", {})
-        dti = loans.get("debt_to_income_ratio", 0)
+        dti = float(baseline.get("debt_burden_ratio", loans.get("debt_to_income_ratio", 0)) or 0)
         if dti == 0:
             score += 20
             factors.append("Debt-free lifestyle")
@@ -356,8 +365,9 @@ class AlfredFinancialBrain:
             })
 
         # Check debt burden
+        baseline = snapshot.get("financial_baseline", {})
         loans = snapshot.get("loans", {})
-        dti = loans.get("debt_to_income_ratio", 0)
+        dti = float(baseline.get("debt_burden_ratio", loans.get("debt_to_income_ratio", 0)) or 0)
         if dti > 40:
             actions.append({
                 "priority": "HIGH",
@@ -385,12 +395,13 @@ class AlfredFinancialBrain:
 
         # Check emergency fund
         accounts = snapshot.get("accounts", {})
-        total_balance = accounts.get("total_balance", 0)
-        budget = snapshot.get("budget", {})
-        disposable_income = budget.get("disposable_income", 0)
-        emergency_fund_target = disposable_income * 6
+        total_balance = float(baseline.get("liquid_cash", accounts.get("total_balance", 0)) or 0)
+        fixed_obligations = float(baseline.get("fixed_obligations", 0) or 0)
+        observed_total_outflow = float(baseline.get("observed_average_monthly_total_outflow", 0) or 0)
+        monthly_emergency_base = max(fixed_obligations, observed_total_outflow, 0)
+        emergency_fund_target = monthly_emergency_base * 6
 
-        if total_balance < emergency_fund_target:
+        if emergency_fund_target and total_balance < emergency_fund_target:
             actions.append({
                 "priority": "HIGH",
                 "action": "Build Emergency Fund",

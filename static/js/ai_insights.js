@@ -25,7 +25,7 @@ function renderAIInsights(data) {
     document.getElementById("aiCoachTone").textContent = behavior.coach_tone;
     document.getElementById("aiStrategy").textContent = behavior.strategy;
 
-    renderSummary(summary, behavior.signature);
+    renderSummary(summary, behavior.signature, behavior.signature_readability || {});
     renderRecommendations(behavior.ai_insights);
     renderSignalChart(summary, behavior.signature);
     renderSimpleList("aiPatternFlags", behavior.pattern_flags, "No pattern flags yet.");
@@ -35,12 +35,20 @@ function renderAIInsights(data) {
     renderSpikes(spikes);
 }
 
-function renderSummary(summary, signature) {
+function renderSummary(summary, signature, readability) {
+    const volatility = readability.volatility || {
+        label: "No pattern yet",
+        summary: "ALFRED needs more months of history before it can describe spending variation clearly.",
+    };
+    const spikeFactor = readability.spike_factor || {
+        label: "No pattern yet",
+        summary: "ALFRED needs more months of history before it can describe spending jumps clearly.",
+    };
     const cards = [
         { title: "Stress Score", value: `${Math.round(summary.stress_score)}/100`, copy: `${summary.risk_level} operating state` },
         { title: "Discipline Score", value: `${Math.round(summary.discipline_score)}/100`, copy: "Ability to convert inflows into durable savings" },
-        { title: "Volatility", value: signature.expense_volatility.toFixed(0), copy: "Monthly outflow variability tracked by the behavior engine" },
-        { title: "Spike Factor", value: signature.spike_factor.toFixed(0), copy: "Distance between low and high spending periods" },
+        { title: "Spending variation", value: volatility.label, copy: volatility.summary },
+        { title: "Peak spending jumps", value: spikeFactor.label, copy: spikeFactor.summary },
     ];
 
     document.getElementById("aiInsightSummary").innerHTML = cards.map(card => `

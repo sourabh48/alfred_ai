@@ -20,6 +20,7 @@ function loadRiskDashboard() {
             renderRiskChart(data.consolidated_risks || []);
             renderRiskInsights(data.insights || []);
             renderRiskMacroContext(data.macro_context || {});
+            renderRiskGrounding(data.grounding || {}, data.evidence_freshness || {});
             renderRiskEvidence(data.evidence || []);
             renderRiskSignals(data.module_signals || {});
             renderRiskActions(data.action_items || []);
@@ -165,11 +166,42 @@ function renderRiskEvidence(items) {
     target.innerHTML = items.length ? items.map(item => `
         <div class="mini-card">
             <div class="fw-semibold">${Alfred.escapeHtml(item.title || item.source_name)}</div>
-            <div class="muted small">${Alfred.escapeHtml(item.source_name || "Source")} | refreshed ${Alfred.formatDateTime(item.verified_at)}</div>
+            <div class="muted small">${Alfred.escapeHtml(item.source_name || "Source")} | ${Alfred.escapeHtml(item.status || "unknown")}${item.verified_at ? ` | refreshed ${Alfred.formatDateTime(item.verified_at)}` : ""}</div>
             <div class="muted small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
-            <div class="mt-2"><a href="${item.source_url}" target="_blank" rel="noopener">Open source</a></div>
+            ${item.stale_after ? `<div class="muted small mt-2">Next stale after ${Alfred.formatDateTime(item.stale_after)}</div>` : ""}
+            ${item.source_url ? `<div class="mt-2"><a href="${item.source_url}" target="_blank" rel="noopener">Open source</a></div>` : ""}
         </div>
     `).join("") : `<div class="empty-state">No external evidence cached yet.</div>`;
+}
+
+function renderRiskGrounding(grounding, freshness) {
+    const cardsTarget = document.getElementById("riskEvidenceFreshnessCards");
+    const listTarget = document.getElementById("riskGroundingList");
+    const history = grounding.history || {};
+    const notes = grounding.notes || [];
+    const activeFreshness = Object.keys(grounding.freshness || {}).length ? grounding.freshness : freshness;
+
+    cardsTarget.innerHTML = [
+        ["Evidence tracked", Alfred.formatNumber(activeFreshness.tracked_records || 0, 0), "Verified records attached"],
+        ["Fresh now", Alfred.formatNumber(activeFreshness.fresh_records || 0, 0), activeFreshness.next_stale_after ? `Next stale after ${Alfred.formatDateTime(activeFreshness.next_stale_after)}` : "No stale deadline attached"],
+        ["Snapshots", Alfred.formatNumber(history.tracked_snapshots || 0, 0), `${Alfred.formatCurrency(history.monthly_income || 0)} income basis`],
+    ].map(([label, value, copy]) => `
+        <article class="metric-card metric-card--compact">
+            <p class="metric-kicker">${Alfred.escapeHtml(label)}</p>
+            <h3 class="metric-value" style="font-size:1.35rem;">${Alfred.escapeHtml(String(value))}</h3>
+            <p class="metric-caption">${Alfred.escapeHtml(copy)}</p>
+        </article>
+    `).join("");
+
+    const entries = [
+        `Liquid cash basis: ${Alfred.formatCurrency(history.liquid_cash || 0)}`,
+        `Monthly EMI basis: ${Alfred.formatCurrency(history.monthly_emi || 0)}`,
+        `Dependents tracked: ${Alfred.formatNumber(history.dependents || 0, 0)}`,
+        ...notes,
+    ];
+    listTarget.innerHTML = entries.length
+        ? entries.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("")
+        : `<li class="insight-item">No grounding notes are attached yet.</li>`;
 }
 
 function renderRiskSignals(signals) {

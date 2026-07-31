@@ -22,6 +22,7 @@ def should_bootstrap_training(argv: list[str] | None = None) -> bool:
 
     blocked_commands = {
         "check",
+        "bootstrap_training_samples",
         "collectstatic",
         "createsuperuser",
         "dbshell",

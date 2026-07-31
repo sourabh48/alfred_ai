@@ -8,6 +8,8 @@ from typing import Dict, List, Optional
 from django.db.models import Sum
 from django.utils import timezone
 
+from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+
 
 class FinancialRecommendationEngine:
     """
@@ -173,18 +175,20 @@ class FinancialRecommendationEngine:
         Returns:
             Dict with user financial profile
         """
-        from apps.expenses.models import Expense, BankAccount
+        from apps.expenses.models import Expense
         from apps.family.models import Dependent
         from apps.loans.models import Loan
         from apps.investments.models import Investment
 
         profile = {
             'user_id': user.id,
-            'income': getattr(user, 'monthly_income', 50000),
             'age': getattr(user, 'age', 30),
             'city': getattr(user, 'city', 'Mumbai'),
             'dependents': Dependent.objects.filter(user=user).count(),
         }
+        baseline = resolve_canonical_financial_baseline(user)
+        profile['financial_baseline'] = baseline
+        profile['income'] = baseline.get('monthly_income', 0) or 0
 
         # Spending analysis (last 90 days)
         last_90_days = timezone.now().date() - timedelta(days=90)
@@ -192,12 +196,9 @@ class FinancialRecommendationEngine:
             user=user,
             direction='debit',
             transaction_date__gte=last_90_days,
-        )
+        ).exclude(classification='loan')
 
-        profile['monthly_expenses'] = expenses.aggregate(
-            total=Sum('amount')
-        )['total'] or 0
-        profile['monthly_expenses'] /= 3  # Average per month
+        profile['monthly_expenses'] = float(baseline.get('observed_average_monthly_variable_spend', 0) or 0)
 
         # Category-wise spending
         category_spending = {}
@@ -211,14 +212,14 @@ class FinancialRecommendationEngine:
         profile['top_category'] = max(category_spending, key=category_spending.get) if category_spending else 'other'
 
         # Savings capacity
-        profile['monthly_savings'] = profile['income'] - profile['monthly_expenses']
-        profile['savings_rate'] = (profile['monthly_savings'] / profile['income'] * 100) if profile['income'] > 0 else 0
+        profile['monthly_savings'] = float(baseline.get('savings_capacity', 0) or 0)
+        profile['savings_rate'] = float(baseline.get('savings_rate', 0) or 0)
 
         # Loan analysis
         active_loans = Loan.objects.filter(user=user, is_active=True)
         profile['has_loans'] = active_loans.exists()
-        profile['total_emi'] = active_loans.aggregate(Sum('emi'))['emi__sum'] or 0
-        profile['dti_ratio'] = (profile['total_emi'] / profile['income'] * 100) if profile['income'] > 0 else 0
+        profile['total_emi'] = float(baseline.get('recurring_emi_burden', 0) or 0)
+        profile['dti_ratio'] = float(baseline.get('debt_burden_ratio', 0) or 0)
 
         # Investment analysis
         investments = Investment.objects.filter(user=user)

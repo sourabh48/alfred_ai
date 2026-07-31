@@ -535,7 +535,6 @@ class CreditScoreTrackerService:
         latest_official = self._latest_official_score(user)
         current_score = int((latest_official.score if latest_official is not None else self.analyze_score_factors(user).get('overall_score', 0)) or 0)
         age = getattr(user, 'age', 30)
-        income = getattr(user, 'monthly_income', 75000)
 
         # Generate peer benchmarks
         if age < 25:
@@ -613,11 +612,12 @@ class CreditScoreTrackerService:
 
         # Check for potential issues
         from apps.loans.models import Loan
+        from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 
         # High DTI warning
-        active_loans = Loan.objects.filter(user=user, is_active=True)
-        total_emi = active_loans.aggregate(Sum('emi'))['emi__sum'] or 0
-        monthly_income = getattr(user, 'monthly_income', 75000)
+        baseline = resolve_canonical_financial_baseline(user)
+        total_emi = float(baseline.get("recurring_emi_burden", 0) or 0)
+        monthly_income = float(baseline.get("monthly_income", 0) or 0)
         dti = (total_emi / monthly_income * 100) if monthly_income > 0 else 0
 
         if dti > 40:
@@ -629,6 +629,7 @@ class CreditScoreTrackerService:
             })
 
         # Missed payments
+        active_loans = Loan.objects.filter(user=user, is_active=True)
         missed_payments = sum(loan.missed_payments for loan in active_loans)
         if missed_payments > 0:
             alerts.append({

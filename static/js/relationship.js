@@ -116,8 +116,11 @@ function renderRelationshipGrounding(alignment) {
     const factors = alignment.factors || [];
     const grounding = alignment.grounding || {};
     const history = grounding.history || {};
+    const freshness = grounding.freshness || {};
     const cardsTarget = document.getElementById("relationshipFactorCards");
+    const metaTarget = document.getElementById("relationshipGroundingMeta");
     const listTarget = document.getElementById("relationshipGroundingList");
+    const evidenceTarget = document.getElementById("relationshipEvidenceLog");
 
     cardsTarget.innerHTML = factors.map(item => `
         <article class="metric-card metric-card--compact">
@@ -127,14 +130,42 @@ function renderRelationshipGrounding(alignment) {
         </article>
     `).join("");
 
+    metaTarget.innerHTML = [
+        ["Monthly income", Alfred.formatCurrency(history.monthly_income || 0), "Household income basis"],
+        ["Monthly spend", Alfred.formatCurrency(history.monthly_expenses || 0), "Recent spend basis"],
+        ["Fixed load", Alfred.formatCurrency(history.fixed_load || 0), "Rent plus EMI pressure"],
+        ["Fresh evidence", Alfred.formatNumber(freshness.fresh_records || 0, 0), `${Alfred.formatNumber(freshness.tracked_records || 0, 0)} records tracked`],
+    ].map(([label, value, copy]) => `
+        <article class="metric-card metric-card--compact">
+            <p class="metric-kicker">${Alfred.escapeHtml(label)}</p>
+            <h3 class="metric-value" style="font-size:1.35rem;">${Alfred.escapeHtml(String(value))}</h3>
+            <p class="metric-caption">${Alfred.escapeHtml(copy)}</p>
+        </article>
+    `).join("");
+
     const details = [
-        `Monthly income grounding: ${Alfred.formatCurrency(history.monthly_income || 0)}`,
-        `Monthly expense grounding: ${Alfred.formatCurrency(history.monthly_expenses || 0)}`,
+        `Monthly EMI grounding: ${Alfred.formatCurrency(history.monthly_emi || 0)}`,
         `Debt pressure: ${Alfred.formatNumber(history.debt_pressure || 0, 0)}/100`,
+        `Savings rate: ${Alfred.formatNumber(history.savings_rate || 0, 0)}%`,
+        freshness.next_stale_after ? `Next evidence refresh due after ${Alfred.formatDateTime(freshness.next_stale_after)}` : "No external refresh deadline attached yet.",
         ...((grounding.notes || []).map(item => item)),
-        ...((grounding.evidence || []).map(item => `${item.source_name || item.title}: ${item.summary || ""}`)),
     ];
     listTarget.innerHTML = details.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+
+    const evidence = grounding.evidence || [];
+    evidenceTarget.innerHTML = evidence.length ? evidence.map(item => `
+        <div class="mini-card">
+            <div class="d-flex justify-content-between gap-3 align-items-start">
+                <div>
+                    <div class="fw-semibold">${Alfred.escapeHtml(item.source_name || item.title || "Evidence")}</div>
+                    <div class="muted small">${Alfred.escapeHtml(item.status || "unknown")} ${item.verified_at ? `| refreshed ${Alfred.formatDateTime(item.verified_at)}` : ""}</div>
+                    <div class="muted small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
+                    ${item.stale_after ? `<div class="muted small mt-2">Next stale after ${Alfred.formatDateTime(item.stale_after)}</div>` : ""}
+                </div>
+                ${item.source_url ? `<a href="${item.source_url}" target="_blank" rel="noopener">Proof</a>` : ""}
+            </div>
+        </div>
+    `).join("") : `<div class="empty-state">No external proof items are attached yet.</div>`;
 }
 
 function renderRelationshipTable(items) {

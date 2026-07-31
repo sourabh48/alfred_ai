@@ -8,12 +8,43 @@ from django.utils import timezone
 
 from apps.integrations.models import VerifiedExternalInsight
 from apps.integrations.services import verified_intelligence
+from apps.integrations.services.verified_intelligence import freshness_snapshot
 from apps.reports.models import SystemTicket
 
 
 class VerifiedIntelligenceCircuitBreakerTests(TestCase):
     def setUp(self):
         cache.clear()
+
+    def test_freshness_snapshot_treats_due_records_as_not_fresh(self):
+        now = timezone.now()
+        snapshot = freshness_snapshot(
+            [
+                {
+                    "source_name": "Fresh source",
+                    "source_url": "https://example.com/fresh",
+                    "status": "fresh",
+                    "stale_after": (now + timedelta(hours=2)).isoformat(),
+                },
+                {
+                    "source_name": "Due source",
+                    "source_url": "https://example.com/due",
+                    "status": "fresh",
+                    "stale_after": (now - timedelta(minutes=5)).isoformat(),
+                },
+                {
+                    "source_name": "Missing freshness",
+                    "source_url": "https://example.com/missing",
+                    "status": "fresh",
+                },
+            ]
+        )
+
+        self.assertEqual(snapshot["tracked_records"], 3)
+        self.assertEqual(snapshot["fresh_records"], 1)
+        self.assertEqual(snapshot["stale_or_due_records"], 2)
+        self.assertEqual(snapshot["missing_freshness_records"], 1)
+        self.assertFalse(snapshot["proof_complete"])
 
     def test_circuit_breaker_falls_back_to_stale_payload_after_repeated_failures(self):
         now = timezone.now()
@@ -114,6 +145,42 @@ class VerifiedIntelligenceCircuitBreakerTests(TestCase):
         self.assertEqual(result["refreshed"], 1)
         self.assertEqual(result["batch_size"], 1)
         self.assertEqual(news_mock.call_count + jobs_mock.call_count, 1)
+
+    def test_refresh_due_records_routes_job_records_to_source_adapter(self):
+        now = timezone.now()
+        for cache_key, source_name, source_url in [
+            ("arbeitnow:data-analyst", "Arbeitnow Job Board API", "https://www.arbeitnow.com/api/job-board-api"),
+            ("remoteok:data-analyst", "Remote OK API", "https://remoteok.com/api"),
+        ]:
+            VerifiedExternalInsight.objects.create(
+                scope="jobs",
+                cache_key=cache_key,
+                title=f"{source_name} stale feed",
+                source_name=source_name,
+                source_url=source_url,
+                query="data analyst",
+                summary="Stale job feed",
+                payload={"jobs": []},
+                checksum=cache_key,
+                status="stale",
+                fetched_at=now - timedelta(hours=4),
+                verified_at=now - timedelta(hours=4),
+                stale_after=now - timedelta(hours=1),
+                notes="",
+                is_active=True,
+            )
+
+        with patch.object(verified_intelligence, "arbeitnow_jobs") as arbeitnow_mock, patch.object(
+            verified_intelligence,
+            "remoteok_jobs",
+        ) as remoteok_mock, patch.object(verified_intelligence, "remotive_jobs") as remotive_mock:
+            result = verified_intelligence.refresh_due_records(batch_size=2)
+
+        self.assertEqual(result["processed"], 2)
+        self.assertEqual(result["refreshed"], 2)
+        self.assertEqual(arbeitnow_mock.call_count, 1)
+        self.assertEqual(remoteok_mock.call_count, 1)
+        self.assertEqual(remotive_mock.call_count, 0)
 
 
 class ProjectDetailsDashboardTests(TestCase):

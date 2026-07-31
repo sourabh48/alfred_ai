@@ -1,9 +1,11 @@
+from datetime import timedelta
 from unittest.mock import patch
 from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
+from django.utils import timezone
 
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, CareerResumeLearningMemory
 from apps.expenses.models import StatementUpload
@@ -150,8 +152,10 @@ class CareerAdaptiveIntelligenceTests(TestCase):
             "evidence": [],
         },
     )
+    @patch("apps.career.services.job_intelligence.verified_intelligence.remoteok_jobs")
+    @patch("apps.career.services.job_intelligence.verified_intelligence.arbeitnow_jobs")
     @patch("apps.career.services.job_intelligence.verified_intelligence.remotive_jobs")
-    def test_career_dashboard_filters_verified_openings_by_country_and_state(self, remotive_jobs, _market_outlook, _macro_context):
+    def test_career_dashboard_filters_verified_openings_by_country_and_state(self, remotive_jobs, arbeitnow_jobs, remoteok_jobs, _market_outlook, _macro_context):
         CareerProfile.objects.create(
             user=self.user,
             role="Data Analyst",
@@ -159,47 +163,63 @@ class CareerAdaptiveIntelligenceTests(TestCase):
             skills="Python, SQL, Tableau",
             last_salary=90000,
         )
-        remotive_jobs.return_value = SimpleNamespace(
-            payload={
-                "jobs": [
-                    {
-                        "title": "Senior Data Analyst",
-                        "company": "Example Co",
-                        "location": "Bengaluru, Karnataka, India",
-                        "category": "Data",
-                        "url": "https://boards.greenhouse.io/example/jobs/1",
-                        "publication_date": "2026-04-01T10:00:00Z",
-                        "salary": "INR 18 LPA",
-                        "tags": ["Python", "SQL", "Tableau"],
-                    },
-                    {
-                        "title": "Data Analyst",
-                        "company": "Other Co",
-                        "location": "Mumbai, Maharashtra, India",
-                        "category": "Data",
-                        "url": "https://example.com/jobs/2",
-                        "publication_date": "2026-04-01T10:00:00Z",
-                        "salary": "",
-                        "tags": ["Python", "Excel"],
-                    },
-                    {
-                        "title": "Analytics Engineer",
-                        "company": "US Co",
-                        "location": "San Francisco, California, United States",
-                        "category": "Engineering",
-                        "url": "https://example.com/jobs/3",
-                        "publication_date": "2026-04-01T10:00:00Z",
-                        "salary": "$120k",
-                        "tags": ["Python", "SQL"],
-                    },
-                ]
-            },
-            evidence={
-                "source_name": "Remotive Jobs API",
-                "source_url": "https://remotive.com/api/remote-jobs",
-                "status": "fresh",
-                "verified_at": "2026-04-01T10:00:00Z",
-            },
+        remotive_jobs.return_value = _job_feed_result(
+            "Remotive Jobs API",
+            "https://remotive.com/api/remote-jobs",
+            [
+                {
+                    "title": "Senior Data Analyst",
+                    "company": "Example Co",
+                    "location": "Bengaluru, Karnataka, India",
+                    "category": "Data",
+                    "url": "https://boards.greenhouse.io/example/jobs/1",
+                    "publication_date": "2026-04-01T10:00:00Z",
+                    "salary": "INR 18 LPA",
+                    "tags": ["Python", "SQL", "Tableau"],
+                },
+                {
+                    "title": "Data Analyst",
+                    "company": "Other Co",
+                    "location": "Mumbai, Maharashtra, India",
+                    "category": "Data",
+                    "url": "https://example.com/jobs/2",
+                    "publication_date": "2026-04-01T10:00:00Z",
+                    "salary": "",
+                    "tags": ["Python", "Excel"],
+                },
+            ],
+        )
+        arbeitnow_jobs.return_value = _job_feed_result(
+            "Arbeitnow Job Board API",
+            "https://www.arbeitnow.com/api/job-board-api",
+            [
+                {
+                    "title": "Analytics Engineer",
+                    "company": "EU Co",
+                    "location": "Berlin, Germany",
+                    "category": "Engineering",
+                    "url": "https://arbeitnow.com/jobs/analytics-engineer-1",
+                    "publication_date": "2026-04-01T10:00:00Z",
+                    "salary": "USD 90000 per year",
+                    "tags": ["Python", "SQL"],
+                }
+            ],
+        )
+        remoteok_jobs.return_value = _job_feed_result(
+            "Remote OK API",
+            "https://remoteok.com/api",
+            [
+                {
+                    "title": "Remote Data Analyst",
+                    "company": "US Co",
+                    "location": "Remote",
+                    "category": "Data",
+                    "url": "https://remoteok.com/remote-jobs/1",
+                    "publication_date": "2026-04-01T10:00:00Z",
+                    "salary": "USD 120000 per year",
+                    "tags": ["Python", "SQL"],
+                }
+            ],
         )
 
         response = self.client.get("/api/career/dashboard/?country=India&state=Karnataka")
@@ -215,8 +235,24 @@ class CareerAdaptiveIntelligenceTests(TestCase):
         self.assertEqual(payload["openings"][0]["portal_name"], "Remotive Jobs API")
         self.assertEqual(payload["openings"][0]["portal_family"], "Greenhouse")
         self.assertEqual(payload["openings"][0]["portal_host"], "boards.greenhouse.io")
+        self.assertTrue(payload["openings"][0]["salary_signal"]["available"])
+        self.assertEqual(
+            payload["openings_source_coverage"]["configured_feeds"],
+            ["Remotive Jobs API", "Arbeitnow Job Board API", "Remote OK API"],
+        )
+        self.assertEqual(payload["openings_source_coverage"]["configured_feed_count"], 3)
+        self.assertEqual(payload["openings_source_coverage"]["live_feed_count"], 3)
+        self.assertTrue(payload["openings_source_coverage"]["coverage_complete"])
+        self.assertGreaterEqual(payload["openings_source_coverage"]["salary_bearing_candidates"], 2)
+        self.assertIn("Remote OK API", payload["openings_source_coverage"]["source_salary_counts"])
         self.assertIn("India", payload["opening_filters"]["countries"])
         self.assertIn("Karnataka", payload["opening_filters"]["states_by_country"]["India"])
+        self.assertTrue(payload["compensation_benchmark"]["available"])
+        self.assertEqual(payload["compensation_benchmark"]["geography_scope"]["requested_state"], "Karnataka")
+        self.assertEqual(payload["compensation_benchmark"]["geography_scope"]["requested_country"], "India")
+        self.assertEqual(payload["compensation_benchmark"]["evidence_contract"]["selected_salary_count"], 1)
+        self.assertEqual(payload["compensation_benchmark"]["evidence_contract"]["geo_match_level"], "state")
+        self.assertTrue(payload["compensation_benchmark"]["evidence_contract"]["proof_complete"])
 
 
 class UserDataIsolationTests(TestCase):
@@ -284,3 +320,20 @@ class CreditEstimateIntegrityTests(TestCase):
         trend = self.client.get("/api/integrations/credit-score/trend/?months=12")
         self.assertEqual(trend.status_code, 200)
         self.assertEqual(trend.json()["trend"], [])
+
+
+def _job_feed_result(source_name, source_url, jobs):
+    now = timezone.now()
+    return SimpleNamespace(
+        payload={"jobs": jobs},
+        evidence={
+            "source_name": source_name,
+            "source_url": source_url,
+            "summary": f"{source_name} fixture",
+            "status": "fresh",
+            "fetched_at": now.isoformat(),
+            "verified_at": now.isoformat(),
+            "stale_after": (now + timedelta(days=2)).isoformat(),
+            "query": "Data Analyst",
+        },
+    )

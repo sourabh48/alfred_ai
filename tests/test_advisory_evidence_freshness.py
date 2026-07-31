@@ -1,9 +1,10 @@
 import json
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
+from django.utils import timezone
 
 from apps.mobility.models import BikeProfile
 
@@ -90,7 +91,7 @@ class AdvisoryEvidenceFreshnessTests(TestCase):
                         "source_name": "World Bank",
                         "source_url": "https://example.com/world-bank",
                         "status": "fresh",
-                        "stale_after": "2026-04-30T00:00:00+05:30",
+                        "stale_after": _future_stale_after(),
                     }
                 ],
             },
@@ -107,6 +108,9 @@ class AdvisoryEvidenceFreshnessTests(TestCase):
             payload["evidence_freshness"]["fresh_records"],
             payload["evidence_freshness"]["tracked_records"],
         )
+        self.assertEqual(payload["grounding"]["freshness"], payload["evidence_freshness"])
+        self.assertEqual(payload["grounding"]["history"]["tracked_snapshots"], 0)
+        self.assertIn("External evidence grounds market and macro pressure only", payload["grounding"]["notes"][1])
 
 
 def _insight(payload, source_name):
@@ -117,7 +121,11 @@ def _insight(payload, source_name):
                 "source_name": source_name,
                 "source_url": "https://example.com/proof",
                 "status": "fresh",
-                "stale_after": "2026-04-30T00:00:00+05:30",
+                "stale_after": _future_stale_after(),
             }
 
     return DummyInsight()
+
+
+def _future_stale_after():
+    return (timezone.now() + timedelta(days=2)).isoformat()

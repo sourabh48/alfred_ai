@@ -108,20 +108,32 @@ class TravelAdvisorService:
             return []
 
     def _stay_advice(self, user, per_day_budget: float, duration_days: int) -> dict:
-        income = getattr(user, "monthly_income", 0) or 0
+        from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+
+        baseline = resolve_canonical_financial_baseline(user)
+        disposable_cash_flow = float(baseline.get("disposable_cash_flow", 0) or 0)
+        savings_capacity = float(baseline.get("savings_capacity", 0) or 0)
+        debt_burden_ratio = float(baseline.get("debt_burden_ratio", 0) or 0)
+        monthly_trip_capacity = savings_capacity if savings_capacity > 0 else disposable_cash_flow
         room_cap = round(min(max(per_day_budget * 0.42, 900), 4500), 2) if per_day_budget else 1500
-        if income >= 100000 and room_cap >= 2500:
+        if monthly_trip_capacity >= 60000 and debt_burden_ratio <= 35 and room_cap >= 2500:
             tier = "semi-budget to comfortable"
-        elif income >= 50000:
+        elif monthly_trip_capacity >= 25000 and debt_burden_ratio <= 55:
             tier = "budget to semi-budget"
         else:
             tier = "budget"
         return {
             "tier": tier,
             "recommended_room_cap": room_cap,
+            "affordability_basis": {
+                "disposable_cash_flow": round(disposable_cash_flow, 2),
+                "savings_capacity": round(savings_capacity, 2),
+                "debt_burden_ratio": round(debt_burden_ratio, 2),
+                "monthly_trip_capacity": round(monthly_trip_capacity, 2),
+            },
             "notes": (
                 f"For a {duration_days}-day trip, keep nightly stays near INR {room_cap:,.0f} "
-                "so food, fuel, and repair buffer remain inside the trip budget."
+                "so food, fuel, repair buffer, and existing obligations remain inside the trip budget."
             ),
         }
 
@@ -142,6 +154,7 @@ class TravelAdvisorService:
 
     def _bike_readiness(self, bike: BikeProfile | None, bike_summary: dict) -> dict:
         summary = bike_summary.get("summary", {})
+        route_wear = bike_summary.get("route_wear", {})
         due_date = summary.get("next_service_date")
         due_km = summary.get("next_service_km")
         expected_mileage = bike.expected_mileage_kmpl if bike and bike.expected_mileage_kmpl else 0
@@ -161,7 +174,20 @@ class TravelAdvisorService:
             "estimated_range_km": estimated_range,
             "next_service_date": due_date,
             "next_service_km": due_km,
-            "suggested_service_buffer": round(max((summary.get("projected_next_service_cost") or 0) * 0.35, 800), 2),
+            "suggested_service_buffer": round(
+                max(
+                    (summary.get("projected_next_service_cost") or 0) * 0.35,
+                    route_wear.get("suggested_service_buffer") or 0,
+                    800,
+                ),
+                2,
+            ),
+            "route_wear": {
+                "wear_status": route_wear.get("wear_status", ""),
+                "wear_index": route_wear.get("wear_index", 0),
+                "recent_distance_km": route_wear.get("recent_distance_km", 0),
+                "route_adjusted_service_cost": route_wear.get("route_adjusted_service_cost", 0),
+            },
             "recommendation": recommendation,
         }
 

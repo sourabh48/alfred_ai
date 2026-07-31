@@ -12,10 +12,12 @@ from datetime import date
 
 from apps.expenses.services.statement_import import (
     ParsedTransaction,
+    StatementTextExtraction,
     StatementParseResult,
     _extract_account_holder,
     _extract_account_number,
     classify_transaction_text,
+    parse_bank_statement,
 )
 from apps.expenses.services.transaction_intelligence import build_user_merchant_profiles, enrich_imported_expense
 from alfred_ai.services.pdf_recovery import RecoveredPdf
@@ -116,6 +118,51 @@ class DocumentCenterAndStatementImportTests(TestCase):
         self.assertEqual(upload.parser_status, "failed")
         self.assertIn("parser_notes", upload.extracted_payload)
 
+    def test_parse_bank_statement_confidence_is_capped_after_learning_adjustment(self):
+        extraction = StatementTextExtraction(
+            text="HDFC BANK Statement of account Account No: 1234567890",
+            notes=[],
+            preview_only=False,
+        )
+
+        with patch("apps.expenses.services.statement_import._extract_statement_text", return_value=extraction), patch(
+            "apps.expenses.services.statement_import.apply_parser_learning",
+            return_value=(1.42, []),
+        ):
+            parsed = parse_bank_statement(BytesIO(b"%PDF-1.4 fake"))
+
+        self.assertEqual(parsed.confidence, 0.99)
+
+    def test_parse_bank_statement_recovers_hdfc_credit_card_rows(self):
+        extraction = StatementTextExtraction(
+            text="""
+            HDFC BANK Diners Privilege Credit Card Statement
+            Credit Card No. 00361010XXXX2088
+            DATE&TIME TRANSACTIONDESCRIPTION REWARDS AMOUNT P1
+            19/02/2026|00:00 IGST-VPS2605102613986-RATE 18.0-29(Ref# 17800192200219999997420) 95.21
+            Share the benefits, 02/03/2026| 16:27 BPPYCCPAYMENTDP2160616DNF5YVVTIM(Ref# ST260620083000010100970) +1,310.00
+            17/03/2026| 15:09 BPPYCCPAYMENTDP2160768UZCWT1NI1(Ref# ST260770083000010104369) +24,703.00
+            19/03/2026|00:00 FINANCE CHARGES(Ref#17800192200319999997400) 779.63
+            """,
+            notes=[],
+            preview_only=False,
+        )
+
+        with patch("apps.expenses.services.statement_import._extract_statement_text", return_value=extraction), patch(
+            "apps.expenses.services.statement_import.apply_parser_learning",
+            return_value=(0.9, []),
+        ):
+            parsed = parse_bank_statement(BytesIO(b"%PDF-1.4 fake"))
+
+        self.assertEqual(parsed.statement_kind, "credit_card_statement")
+        self.assertEqual(parsed.parser_status, "parsed")
+        self.assertEqual(len(parsed.transactions), 4)
+        self.assertEqual([item.direction for item in parsed.transactions], ["debit", "credit", "credit", "debit"])
+        self.assertEqual([item.amount for item in parsed.transactions], [95.21, 1310.0, 24703.0, 779.63])
+        self.assertEqual(parsed.transactions[1].category, "transfer")
+        self.assertEqual(parsed.transactions[3].classification, "expense")
+        self.assertEqual(parsed.transactions[3].category, "bills")
+
     def test_statement_upload_list_exposes_parser_notes_and_transaction_flag(self):
         StatementUpload.objects.create(
             user=self.user,
@@ -211,6 +258,17 @@ class DocumentCenterAndStatementImportTests(TestCase):
         self.assertEqual(details["merchant"], "Google Play")
         self.assertEqual(details["company_name"], "Google Play")
 
+    def test_google_pay_mandate_is_classified_as_transfer_not_loan(self):
+        details = classify_transaction_text(
+            "UPI-GOOGLE PAY INDIA PVT LTD-GPAY@AXISBANK 0000728141860925-UTIB0000553-MANDATEEXECUTE",
+            "debit",
+        )
+
+        self.assertEqual(details["classification"], "other")
+        self.assertEqual(details["category"], "transfer")
+        self.assertEqual(details["merchant"], "Google Pay")
+        self.assertEqual(details["company_name"], "Google Pay")
+
     def test_merchant_profiles_reinterpret_legacy_google_play_rows(self):
         for index in range(2):
             Expense.objects.create(
@@ -236,6 +294,32 @@ class DocumentCenterAndStatementImportTests(TestCase):
         self.assertIsNotNone(google_play_profile)
         self.assertEqual(google_play_profile["classification"], "expense")
         self.assertEqual(google_play_profile["category"], "subscription")
+
+    def test_merchant_profiles_do_not_learn_google_pay_mandate_as_loan(self):
+        for index in range(2):
+            Expense.objects.create(
+                user=self.user,
+                amount=1499.0,
+                classification="loan",
+                category="loan",
+                payment_mode="UPI",
+                merchant="Google Pay India Pvt Ltd",
+                description="Auto-classified as loan payment: UPI-GOOGLE PAY INDIA PVT LTD",
+                raw_description="UPI-GOOGLE PAY INDIA PVT LTD-GPAY@AXISBANK-UTIB0000553-MANDATEEXECUTE",
+                transaction_date=date(2026, 4, 1),
+                direction="debit",
+                source="manual",
+                external_reference=f"GPAY-M-{index}",
+                counterparty="Google Pay India Pvt Ltd",
+                company_name="Google Pay India Pvt Ltd",
+            )
+
+        profiles = build_user_merchant_profiles(user=self.user)
+
+        google_pay_profile = profiles.get(("debit", "GOOGLE PAY"))
+        self.assertIsNotNone(google_pay_profile)
+        self.assertEqual(google_pay_profile["classification"], "other")
+        self.assertEqual(google_pay_profile["category"], "transfer")
 
     def test_enrich_imported_expense_reuses_dominant_merchant_history(self):
         for index in range(2):

@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
 
-from django.db.models import Sum
-from django.utils import timezone
-
-from apps.expenses.models import Expense
+from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.integrations.services import verified_intelligence
-from apps.loans.models import Loan
+from apps.integrations.services.verified_intelligence import freshness_snapshot
 from apps.ml_engine.inference_adapters.relationship_model import relationship_model_predictor
 from apps.relationship.models import RelationshipProfile
 
@@ -19,6 +15,7 @@ class RelationshipAlignment:
 
 
 def build_relationship_alignment(user) -> RelationshipAlignment:
+    baseline = resolve_canonical_financial_baseline(user)
     profile = RelationshipProfile.objects.filter(user=user).order_by("-id").first()
     if not profile:
         return RelationshipAlignment(
@@ -28,18 +25,23 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
                 "message": "No relationship profile found. Create one to unlock alignment, planning pressure, and shared-finance guidance.",
                 "insights": ["Add a partner profile so Alfred can compare household planning signals."],
                 "factors": [],
+                "financial_baseline": baseline,
                 "grounding": {
                     "history": {
-                        "monthly_income": float(getattr(user, "monthly_income", 0) or 0),
+                        "monthly_income": float(baseline.get("monthly_income", 0) or 0),
                         "monthly_expenses": 0.0,
                         "savings_rate": 0.0,
                         "debt_pressure": 0.0,
                     },
                     "evidence": [],
-                    "freshness": {
+                    "freshness": freshness_snapshot([]),
+                    "proof_contract": {
+                        "complete": False,
+                        "required_sources": ["World Bank", "Yahoo Finance"],
                         "tracked_records": 0,
-                        "fresh_records": 0,
-                        "next_stale_after": "",
+                        "stale_or_due_records": 0,
+                        "missing_source_records": 0,
+                        "missing_freshness_records": 0,
                     },
                     "notes": [
                         "Relationship guidance is unavailable until a partner profile exists.",
@@ -48,24 +50,19 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
             }
         )
 
-    monthly_income = float(getattr(user, "monthly_income", 0) or 0)
-    recent_expense_total = float(
-        Expense.objects.filter(
-            user=user,
-            transaction_date__gte=timezone.now().date() - timedelta(days=45),
-        ).aggregate(total=Sum("amount")).get("total") or 0
-    )
-    monthly_emi = float(
-        Loan.objects.filter(user=user, is_active=True).aggregate(total=Sum("emi")).get("total") or 0
-    )
-    fixed_load = monthly_emi + float(getattr(user, "rent_or_emi", 0) or 0)
-    effective_spend = recent_expense_total if recent_expense_total > 0 else fixed_load
-    savings_rate = max(0.0, min(100.0, ((monthly_income - effective_spend) / monthly_income) * 100.0)) if monthly_income else 0.0
-    debt_pressure = max(0.0, min(100.0, (fixed_load / monthly_income) * 100.0)) if monthly_income else 0.0
+    monthly_income = float(baseline.get("monthly_income", 0) or 0)
+    recent_expense_total = float(baseline.get("observed_average_monthly_variable_spend", 0) or 0)
+    monthly_emi = float(baseline.get("recurring_emi_burden", 0) or 0)
+    fixed_load = float(baseline.get("fixed_obligations", 0) or 0)
+    savings_rate = max(0.0, min(100.0, float(baseline.get("savings_rate", 0) or 0)))
+    debt_pressure = max(0.0, min(100.0, float(baseline.get("debt_burden_ratio", 0) or 0)))
 
-    inflation = verified_intelligence.world_bank_indicator("FP.CPI.TOTL.ZG", "India inflation rate")
-    market = verified_intelligence.market_snapshot()
-    evidence_items = [inflation.evidence, market.evidence]
+    planning_context = verified_intelligence.household_planning_context()
+    planning_payload = planning_context.get("payload", {})
+    inflation_payload = planning_payload.get("inflation", {})
+    market_payload = planning_payload.get("market", {})
+    evidence_items = planning_context.get("evidence", [])
+    evidence_freshness = planning_context.get("freshness") or freshness_snapshot(evidence_items)
 
     baseline_financial_score = round(max(25.0, min(95.0, (savings_rate * 0.55) + (100.0 - debt_pressure) * 0.45)), 2)
     user_habit_score = max(20.0, min(100.0, savings_rate))
@@ -78,8 +75,8 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
             100.0,
             100.0
             - (
-                float(inflation.payload.get("latest_value") or 0) * 4.5
-                + float(market.payload.get("india_vix") or 0) * 1.1
+                float(inflation_payload.get("latest_value") or 0) * 4.5
+                + float(market_payload.get("india_vix") or 0) * 1.1
             ),
         ),
     )
@@ -134,6 +131,7 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
             "compatibility": compatibility,
             "message": f"Alignment is {compatibility.lower()} based on partner inputs, current household cash-flow pressure, and shared planning context.",
             "insights": insights,
+            "financial_baseline": baseline,
             "factors": [
                 {"label": "Financial Alignment", "score": round(financial_alignment, 2), "detail": "Partner score vs your current financial baseline."},
                 {"label": "Savings Habit Fit", "score": round(habit_alignment, 2), "detail": "Partner savings habit vs your observed savings capacity."},
@@ -150,17 +148,20 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
                     "debt_pressure": round(debt_pressure, 2),
                 },
                 "evidence": evidence_items,
-                "freshness": {
-                    "tracked_records": len([item for item in evidence_items if item]),
-                    "fresh_records": sum(1 for item in evidence_items if item and item.get("status") == "fresh"),
-                    "next_stale_after": min(
-                        [item.get("stale_after") for item in evidence_items if item.get("stale_after")],
-                        default="",
-                    ),
+                "freshness": evidence_freshness,
+                "external_context": planning_payload,
+                "proof_contract": {
+                    "complete": bool(evidence_freshness.get("proof_complete")),
+                    "required_sources": ["World Bank", "Yahoo Finance"],
+                    "tracked_records": evidence_freshness.get("tracked_records", 0),
+                    "stale_or_due_records": evidence_freshness.get("stale_or_due_records", 0),
+                    "missing_source_records": evidence_freshness.get("missing_source_records", 0),
+                    "missing_freshness_records": evidence_freshness.get("missing_freshness_records", 0),
                 },
                 "notes": [
                     "Relationship output is grounded in user-owned household cash-flow signals plus verified external affordability context.",
                     "External evidence contextualizes planning pressure, not emotional compatibility.",
+                    *planning_context.get("notes", []),
                     model_note,
                 ],
             },

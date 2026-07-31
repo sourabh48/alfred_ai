@@ -247,6 +247,8 @@ class MobilityEndpointContractTests(TestCase):
         self.assertEqual(payload["document"]["extracted_payload"]["service_payload"]["line_item_count"], 2)
         self.assertEqual(payload["service_record"]["parsed_payload"]["document_parse"]["issuer"], "Jagadamba Automobiles")
         self.assertEqual(payload["service_record"]["parsed_payload"]["service_payload"]["parts_items"][0]["description"], "CHAIN KIT")
+        self.assertEqual(payload["service_record"]["parsed_payload"]["review_trace"]["document_parser_status"], "parsed")
+        self.assertEqual(payload["service_record"]["parsed_payload"]["review_trace"]["document_parse_confidence"], 0.93)
 
     def test_service_record_patch_merges_existing_parsed_payload_instead_of_overwriting(self):
         response = self.client.patch(

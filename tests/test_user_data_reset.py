@@ -21,7 +21,7 @@ from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot
 from apps.ml_engine.models.parser_memory import DocumentParserLearningMemory
 from apps.mobility.models import BikeDocument, BikeProfile, BikeServiceRecord, TravelPlan, TripPhoto
 from apps.relationship.models import RelationshipProfile
-from apps.reports.models import GeneratedReport, OperationalLog, SystemTicket
+from apps.reports.models import ChatGPTImport, GeneratedReport, OperationalLog, SystemTicket
 from apps.risk.models import RiskSignal
 
 
@@ -93,6 +93,7 @@ class UserDataResetApiTests(TestCase):
         self.assertEqual(RiskSignal.objects.filter(user=self.user).count(), 0)
         self.assertEqual(SystemTicket.objects.filter(user=self.user).count(), 0)
         self.assertEqual(OperationalLog.objects.filter(user=self.user).count(), 0)
+        self.assertEqual(ChatGPTImport.objects.filter(user=self.user).count(), 0)
         self.assertEqual(DocumentParserLearningMemory.objects.filter(user=self.user).count(), 0)
         self.assertEqual(GeneratedReport.objects.filter(user=self.user).count(), 0)
         self.assertEqual(VerifiedExternalInsight.objects.filter(user=self.user).count(), 0)
@@ -293,6 +294,7 @@ class UserDataResetApiTests(TestCase):
         RiskSignal.objects.create(user=self.user, layoff_risk=25)
         SystemTicket.objects.create(user=self.user, module="career", title="Sample", summary="sample")
         OperationalLog.objects.create(user=self.user, module="career", event_type="resume_saved", message="saved")
+        ChatGPTImport.objects.create(user=self.user, title="Dashboard import", raw_text="Vehicle service chat")
         DocumentParserLearningMemory.objects.create(user=self.user, scope="resume_document", file_extension=".pdf")
 
         self.generated_report_path = Path(self.media_root) / "generated-report.txt"

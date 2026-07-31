@@ -26,7 +26,7 @@ from .serializers import (
     TripLogSerializer,
     TripPhotoSerializer,
 )
-from .services import bike_document_ai, bike_service_intelligence, build_profile_payload, list_catalog_models, travel_advisor
+from .services import bike_document_ai, bike_service_intelligence, build_profile_payload, catalog_coverage_summary, list_catalog_manufacturers, list_catalog_models, travel_advisor
 from .services import build_document_payload, build_service_record_payload, merge_nested_payload, resolve_vehicle_identity
 
 
@@ -92,7 +92,20 @@ class BikeModelCatalogView(APIView):
 
     def get(self, request):
         vehicle_type = str(request.query_params.get("vehicle_type", "") or "").strip().lower()
-        return Response({"results": list_catalog_models(vehicle_type=vehicle_type)})
+        make = (
+            request.query_params.get("make")
+            or request.query_params.get("brand")
+            or request.query_params.get("manufacturer")
+            or ""
+        )
+        return Response(
+            {
+                "results": list_catalog_models(vehicle_type=vehicle_type, make=make),
+                "manufacturers": list_catalog_manufacturers(vehicle_type=vehicle_type),
+                "selected_make": str(make or "").strip(),
+                "coverage": catalog_coverage_summary(),
+            }
+        )
 
 
 class BikeProfileListCreateView(ListCreateAPIView):
@@ -516,7 +529,12 @@ class BikeServiceImportView(APIView):
             source_document=document,
             source_document_name=upload.name,
             extracted_work_summary=service_payload.get("extracted_work_summary", ""),
-            parsed_payload=build_service_record_payload(parsed, service_payload),
+            parsed_payload=build_service_record_payload(
+                parsed,
+                service_payload,
+                document=document,
+                document_payload=document.extracted_payload,
+            ),
         )
         record_parser_learning(
             user=request.user,
@@ -803,7 +821,9 @@ class BikeServiceDashboardView(APIView):
         return {
             **intelligence,
             "bike_profiles": BikeProfileSerializer(bike_profiles, many=True, context={"request": request}).data,
-            "bike_catalog": list_catalog_models(),
+            "bike_catalog": [],
+            "bike_catalog_manufacturers": list_catalog_manufacturers(),
+            "bike_catalog_summary": catalog_coverage_summary(),
             "bike_services": BikeServiceRecordSerializer(service_records, many=True, context={"request": request}).data,
             "bike_refills": FuelRefillLogSerializer(refill_logs, many=True, context={"request": request}).data,
             "bike_issues": BikeIssueReportSerializer(issue_reports, many=True, context={"request": request}).data,

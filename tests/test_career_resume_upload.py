@@ -70,6 +70,25 @@ class CareerResumeUploadTests(TestCase):
             method="isolated_rapidocr_pdf",
             confidence=0.78,
             notes=["OCR fallback recovered text using isolated_rapidocr_pdf."],
+            review_payload={
+                "ocr_pages": [
+                    {
+                        "page": 1,
+                        "width": 1200,
+                        "height": 1700,
+                        "preview": "SOURABH SARKAR Java Backend Developer",
+                        "line_count": 2,
+                        "regions": [
+                            {
+                                "text": "SOURABH SARKAR",
+                                "confidence": 0.98,
+                                "bbox": [[10, 10], [220, 10], [220, 36], [10, 36]],
+                                "origin": "isolated_rapidocr_pdf",
+                            }
+                        ],
+                    }
+                ]
+            },
         )
         resume = SimpleUploadedFile(
             "resume.pdf",
@@ -89,4 +108,5 @@ class CareerResumeUploadTests(TestCase):
         self.assertIn("Spring Boot", payload["extracted_payload"]["skills"])
         self.assertIn("Kafka", payload["extracted_payload"]["skills"])
         self.assertEqual(payload["extracted_payload"]["extraction_method"], "isolated_rapidocr_pdf")
+        self.assertEqual(payload["extracted_payload"]["extraction_review"]["ocr_pages"][0]["page"], 1)
         self.assertNotIn("OCR fallback is not active", payload["weaknesses"])

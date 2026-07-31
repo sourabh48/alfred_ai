@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone as datetime_timezone
 import hashlib
 import json
+import re
 from statistics import mean
 from urllib.parse import quote_plus
 
@@ -25,13 +26,67 @@ class InsightResult:
     cached: bool
 
 
+JOB_SALARY_SNIPPET_RE = re.compile(
+    r"(?:(?:INR|RS\.?|USD|\$)\s*)?\d[\d,]*(?:\.\d+)?\s*"
+    r"(?:k|lpa|lakh|lakhs|crore|cr|million|m)?"
+    r"(?:\s*(?:-|to)\s*(?:(?:INR|RS\.?|USD|\$)\s*)?\d[\d,]*(?:\.\d+)?\s*"
+    r"(?:k|lpa|lakh|lakhs|crore|cr|million|m)?)?"
+    r"\s*(?:per\s+annum|per\s+year|/year|yearly|annual|annum|lpa|per\s+month|/month|monthly|month|pm)?",
+    re.IGNORECASE,
+)
+
+
+def _parse_stale_after(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed)
+    return parsed
+
+
 def freshness_snapshot(items: list[dict]) -> dict:
     active = [item for item in items if item]
-    stale_after_values = [item.get("stale_after") for item in active if item.get("stale_after")]
+    now = timezone.now()
+    stale_after_values = []
+    fresh_records = 0
+    stale_or_due_records = 0
+    missing_source_records = 0
+    missing_freshness_records = 0
+    for item in active:
+        status = item.get("status") or ""
+        stale_after = _parse_stale_after(item.get("stale_after"))
+        if stale_after:
+            stale_after_values.append(stale_after)
+        elif status == "fresh":
+            missing_freshness_records += 1
+        if not item.get("source_url"):
+            missing_source_records += 1
+        is_due = bool(stale_after and stale_after <= now)
+        if status == "fresh" and stale_after and not is_due:
+            fresh_records += 1
+        else:
+            stale_or_due_records += 1
+    next_stale_after = min(stale_after_values).isoformat() if stale_after_values else ""
     return {
         "tracked_records": len(active),
-        "fresh_records": sum(1 for item in active if item.get("status") == "fresh"),
-        "next_stale_after": min(stale_after_values) if stale_after_values else "",
+        "fresh_records": fresh_records,
+        "stale_or_due_records": stale_or_due_records,
+        "missing_source_records": missing_source_records,
+        "missing_freshness_records": missing_freshness_records,
+        "next_stale_after": next_stale_after,
+        "proof_complete": bool(active)
+        and fresh_records == len(active)
+        and missing_source_records == 0
+        and missing_freshness_records == 0,
     }
 
 
@@ -147,6 +202,34 @@ class VerifiedIntelligenceService:
             fetcher=lambda: self._fetch_remotive_jobs(search_term),
         )
 
+    def arbeitnow_jobs(self, search_term: str, stale_hours: int = 8) -> InsightResult:
+        slug = slugify(search_term)[:120] or "jobs"
+        source_url = "https://www.arbeitnow.com/api/job-board-api"
+        return self._use_or_refresh(
+            scope="jobs",
+            cache_key=f"arbeitnow:{slug}",
+            title=f"Arbeitnow job search for {search_term}",
+            source_name="Arbeitnow Job Board API",
+            source_url=source_url,
+            ttl=timedelta(hours=stale_hours),
+            query=search_term,
+            fetcher=lambda: self._fetch_arbeitnow_jobs(search_term),
+        )
+
+    def remoteok_jobs(self, search_term: str, stale_hours: int = 8) -> InsightResult:
+        slug = slugify(search_term)[:120] or "jobs"
+        source_url = "https://remoteok.com/api"
+        return self._use_or_refresh(
+            scope="jobs",
+            cache_key=f"remoteok:{slug}",
+            title=f"Remote OK job search for {search_term}",
+            source_name="Remote OK API",
+            source_url=source_url,
+            ttl=timedelta(hours=stale_hours),
+            query=search_term,
+            fetcher=lambda: self._fetch_remoteok_jobs(search_term),
+        )
+
     def tax_regime_reference(self, stale_days: int = 45) -> InsightResult:
         return self._static_reference(
             scope="tax",
@@ -213,6 +296,23 @@ class VerifiedIntelligenceService:
 
         evidence = [unemployment.evidence, inflation.evidence, market.evidence]
         return {"payload": payload, "evidence": evidence}
+
+    def household_planning_context(self) -> dict:
+        inflation = self.world_bank_indicator("FP.CPI.TOTL.ZG", "India inflation rate")
+        market = self.market_snapshot()
+        evidence = [inflation.evidence, market.evidence]
+        return {
+            "payload": {
+                "inflation": inflation.payload,
+                "market": market.payload,
+            },
+            "evidence": evidence,
+            "freshness": freshness_snapshot(evidence),
+            "notes": [
+                "Household planning context is source-backed by inflation and market-volatility evidence.",
+                "External evidence is used only to contextualize affordability and decision pressure.",
+            ],
+        }
 
     def _static_reference(
         self,
@@ -440,7 +540,12 @@ class VerifiedIntelligenceService:
                 self.google_news_search(record.query)
                 return "refreshed"
             if record.scope == "jobs" and record.query:
-                self.remotive_jobs(record.query)
+                if record.cache_key.startswith("arbeitnow:"):
+                    self.arbeitnow_jobs(record.query)
+                elif record.cache_key.startswith("remoteok:"):
+                    self.remoteok_jobs(record.query)
+                else:
+                    self.remotive_jobs(record.query)
                 return "refreshed"
             if record.scope == "tax" and record.cache_key == "india-income-tax-regimes":
                 self.tax_regime_reference()
@@ -691,6 +796,150 @@ class VerifiedIntelligenceService:
             )
         summary = f"Loaded {len(jobs)} remote openings for search term '{search_term}'."
         return {"jobs": jobs}, summary, "Openings are cached from the Remotive Jobs API and refreshed on a short TTL."
+
+    def _fetch_arbeitnow_jobs(self, search_term: str) -> tuple[dict, str, str]:
+        response = requests.get(
+            "https://www.arbeitnow.com/api/job-board-api",
+            params={"page": 1},
+            headers={"User-Agent": self.USER_AGENT, "Accept": "application/json"},
+            timeout=15,
+        )
+        response.raise_for_status()
+        data = response.json()
+        terms = self._job_search_terms(search_term)
+        jobs = []
+        for item in data.get("data", [])[:80]:
+            description = self._clean_html_text(item.get("description", ""))
+            tags = self._tag_list(item.get("tags", []))
+            combined = " ".join(
+                str(value or "")
+                for value in [
+                    item.get("title", ""),
+                    item.get("company_name", ""),
+                    item.get("location", ""),
+                    description,
+                    " ".join(tags),
+                ]
+            ).lower()
+            if terms and not any(term in combined for term in terms):
+                continue
+            location = item.get("location") or ("Remote" if item.get("remote") else "")
+            job_types = self._tag_list(item.get("job_types", []))
+            jobs.append(
+                {
+                    "title": item.get("title", ""),
+                    "company": item.get("company_name", ""),
+                    "location": location,
+                    "category": ", ".join(job_types[:3]),
+                    "url": item.get("url", ""),
+                    "publication_date": self._iso_from_timestamp(item.get("created_at")),
+                    "salary": self._salary_snippet(description),
+                    "tags": tags[:8],
+                    "description_excerpt": description[:1200],
+                }
+            )
+            if len(jobs) >= 10:
+                break
+        summary = f"Loaded {len(jobs)} matching openings from Arbeitnow for search term '{search_term}'."
+        return {"jobs": jobs}, summary, "Openings are cached from the Arbeitnow public job-board API and refreshed on a short TTL."
+
+    def _fetch_remoteok_jobs(self, search_term: str) -> tuple[dict, str, str]:
+        response = requests.get(
+            "https://remoteok.com/api",
+            headers={"User-Agent": self.USER_AGENT, "Accept": "application/json"},
+            timeout=15,
+        )
+        response.raise_for_status()
+        data = response.json()
+        rows = data if isinstance(data, list) else []
+        terms = self._job_search_terms(search_term)
+        jobs = []
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            title = item.get("position") or item.get("title") or ""
+            if not title:
+                continue
+            tags = self._tag_list(item.get("tags", []))
+            description = self._clean_html_text(item.get("description", ""))
+            combined = " ".join(
+                str(value or "")
+                for value in [
+                    title,
+                    item.get("company", ""),
+                    item.get("location", ""),
+                    " ".join(tags),
+                    description,
+                ]
+            ).lower()
+            if terms and not any(term in combined for term in terms):
+                continue
+            salary = item.get("salary") or self._salary_range_text(item.get("salary_min"), item.get("salary_max"), currency="USD")
+            jobs.append(
+                {
+                    "title": title,
+                    "company": item.get("company", ""),
+                    "location": item.get("location") or "Remote",
+                    "category": ", ".join(tags[:3]),
+                    "url": item.get("url") or item.get("apply_url") or "",
+                    "publication_date": str(item.get("date") or self._iso_from_timestamp(item.get("epoch")) or ""),
+                    "salary": salary,
+                    "tags": tags[:8],
+                    "description_excerpt": description[:1200],
+                }
+            )
+            if len(jobs) >= 10:
+                break
+        summary = f"Loaded {len(jobs)} matching remote openings from Remote OK for search term '{search_term}'."
+        return {"jobs": jobs}, summary, "Openings are cached from the Remote OK public feed and refreshed on a short TTL."
+
+    def _job_search_terms(self, search_term: str) -> list[str]:
+        ignored = {"and", "for", "the", "with", "job", "jobs", "remote"}
+        return [
+            token
+            for token in re.split(r"[^a-z0-9+#.]+", str(search_term or "").lower())
+            if len(token) >= 3 and token not in ignored
+        ][:8]
+
+    def _clean_html_text(self, value: str) -> str:
+        text = re.sub(r"<[^>]+>", " ", str(value or ""))
+        return " ".join(text.split())
+
+    def _tag_list(self, value) -> list[str]:
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, str):
+            return [item.strip() for item in re.split(r"[,|/]", value) if item.strip()]
+        return []
+
+    def _salary_snippet(self, text: str) -> str:
+        for match in JOB_SALARY_SNIPPET_RE.finditer(text or ""):
+            candidate = " ".join(match.group(0).split())
+            if not candidate:
+                continue
+            lowered = candidate.lower()
+            if any(token in lowered for token in ("lpa", "lakh", "crore", "cr", "inr", "rs", "usd", "$", "per", "annual", "year", "month")):
+                return candidate[:80]
+        return ""
+
+    def _salary_range_text(self, minimum, maximum, *, currency: str) -> str:
+        try:
+            salary_min = float(minimum or 0)
+            salary_max = float(maximum or 0)
+        except (TypeError, ValueError):
+            return ""
+        if not salary_min and not salary_max:
+            return ""
+        if salary_min and salary_max and salary_min != salary_max:
+            return f"{currency} {salary_min:.0f}-{salary_max:.0f} per year"
+        value = salary_min or salary_max
+        return f"{currency} {value:.0f} per year"
+
+    def _iso_from_timestamp(self, value) -> str:
+        try:
+            return datetime.fromtimestamp(float(value), tz=datetime_timezone.utc).isoformat()
+        except (TypeError, ValueError, OSError):
+            return str(value or "")
 
 
 verified_intelligence = VerifiedIntelligenceService()

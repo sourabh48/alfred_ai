@@ -8,6 +8,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
+    document.querySelector('#loanForm select[name="loan_type"]').addEventListener("change", toggleHomeLoanFields);
+    document.querySelector('#loanForm input[name="principal"]').addEventListener("input", updateHomeLoanDerivedFields);
+    document.querySelector('#loanForm input[name="home_purchase_price"]').addEventListener("input", updateHomeLoanDerivedFields);
+    document.querySelector('#loanForm input[name="home_other_upfront_payments"]').addEventListener("input", updateHomeLoanDerivedFields);
+    document.querySelector('#loanForm input[name="home_down_payment"]').addEventListener("input", updateHomeLoanDerivedFields);
     document.getElementById("loanForm").addEventListener("submit", submitLoanForm);
     document.getElementById("loanConsolidationForm").addEventListener("submit", submitLoanConsolidation);
     document.getElementById("loanForeclosureForm").addEventListener("submit", submitLoanForeclosure);
@@ -35,7 +40,8 @@ function loadLoanPage() {
 function renderLoanSummary(payload) {
     const summary = payload.summary;
     const behavior = payload.behavior;
-    const pendingForeclosureBalance = Number(summary.pending_foreclosure_excluded_balance || 0);
+    const pendingForeclosureBalance = Number(summary.pending_foreclosure_balance || summary.pending_foreclosure_excluded_balance || 0);
+    const homeSummary = summary.home_ownership_summary || {};
 
     document.getElementById("loanDebtRatio").textContent = Alfred.formatPercent(behavior.debt_service_ratio);
 
@@ -68,6 +74,14 @@ function renderLoanSummary(payload) {
             caption: `${summary.reconciled_foreclosures} closure payment match${summary.reconciled_foreclosures === 1 ? "" : "es"} confirmed from statements.`,
         },
     ];
+    if (Number(homeSummary.positions || 0) > 0) {
+        const purchasePrice = Number(homeSummary.purchase_price_total || 0);
+        cards.push({
+            kicker: "Home Equity",
+            value: Alfred.formatCurrency(homeSummary.equity_built_total || 0),
+            caption: `${purchasePrice ? `${Alfred.formatCurrency(purchasePrice)} purchase price | ` : ""}${Alfred.formatCurrency(homeSummary.upfront_cash_invested_total || 0)} upfront cash | ${Alfred.formatCurrency(homeSummary.property_acquisition_cost_total || 0)} acquisition base.`,
+        });
+    }
 
     document.getElementById("loanSummaryCards").innerHTML = cards.map(card => `
         <article class="metric-card">
@@ -90,7 +104,7 @@ function renderPendingForeclosureNotice(summary, balanceSheet) {
     if (!target) {
         return;
     }
-    const pendingBalance = Number(summary.pending_foreclosure_excluded_balance || 0);
+    const pendingBalance = Number(summary.pending_foreclosure_balance || summary.pending_foreclosure_excluded_balance || 0);
     const totalLiabilities = Number(balanceSheet.total_liabilities || 0);
     if (pendingBalance <= 0 || Number(summary.foreclosure_pending_count || 0) <= 0) {
         target.className = "d-none mb-4";
@@ -172,6 +186,13 @@ function renderLoanTable(loans) {
         const consolidationCopy = item.consolidated_into_id
             ? `<div class="muted small">Consolidated into loan #${item.consolidated_into_id}</div>`
             : "";
+        const homeCashCopy = item.loan_type === "home" && (
+            Number(item.home_purchase_price || 0) > 0
+            || Number(item.home_down_payment || 0) > 0
+            || Number(item.home_other_upfront_payments || 0) > 0
+        )
+            ? `<div class="muted small">${Number(item.home_purchase_price || 0) > 0 ? `Purchase price ${Alfred.formatCurrency(item.home_purchase_price || 0)} | ` : ""}Down payment ${Alfred.formatCurrency(item.home_down_payment || 0)} | Other upfront ${Alfred.formatCurrency(item.home_other_upfront_payments || 0)}</div>`
+            : "";
         return `
             <tr>
                 <td>
@@ -181,6 +202,7 @@ function renderLoanTable(loans) {
                     <div class="fw-semibold">${loanLabel}</div>
                     <div class="muted small">${Alfred.escapeHtml(item.lender || "Unspecified lender")}</div>
                     ${accountRef}
+                    ${homeCashCopy}
                     ${statusCopy}
                     ${consolidationCopy}
                 </td>
@@ -299,6 +321,9 @@ function submitLoanForm(event) {
     payload.emi = Number(payload.emi);
     payload.tenure_months = Number(payload.tenure_months);
     payload.remaining_balance = payload.remaining_balance ? Number(payload.remaining_balance) : null;
+    payload.home_purchase_price = Number(payload.home_purchase_price || 0);
+    payload.home_down_payment = Number(payload.home_down_payment || 0);
+    payload.home_other_upfront_payments = Number(payload.home_other_upfront_payments || 0);
     payload.loan_account_number = payload.loan_account_number || "";
     payload.is_active = true;
 
@@ -327,8 +352,12 @@ function resetLoanForm() {
     form.elements.loan_type.value = "home";
     form.elements.start_date.value = todayLocal();
     form.elements.tenure_months.value = 12;
+    form.elements.home_purchase_price.value = 0;
+    form.elements.home_down_payment.value = 0;
+    form.elements.home_other_upfront_payments.value = 0;
     document.getElementById("loanSubmitButton").textContent = "Save Loan";
     document.getElementById("loanFormError").classList.add("d-none");
+    toggleHomeLoanFields();
 }
 
 function resetLoanConsolidationForm() {
@@ -366,9 +395,13 @@ function editLoan(id) {
     form.elements.emi.value = loan.emi;
     form.elements.tenure_months.value = loan.tenure_months;
     form.elements.remaining_balance.value = loan.remaining_balance || "";
+    form.elements.home_purchase_price.value = loan.home_purchase_price || 0;
+    form.elements.home_down_payment.value = loan.home_down_payment || 0;
+    form.elements.home_other_upfront_payments.value = loan.home_other_upfront_payments || 0;
     form.elements.start_date.value = loan.start_date;
     form.elements.notes.value = loan.notes || "";
     document.getElementById("loanSubmitButton").textContent = "Update Loan";
+    toggleHomeLoanFields();
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -624,6 +657,65 @@ function todayLocal() {
     const now = new Date();
     const offsetMs = now.getTimezoneOffset() * 60000;
     return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+}
+
+function toggleHomeLoanFields() {
+    const form = document.getElementById("loanForm");
+    const target = document.getElementById("loanHomeFields");
+    if (!form || !target) {
+        return;
+    }
+    const isHomeLoan = String(form.elements.loan_type.value || "").toLowerCase() === "home";
+    target.classList.toggle("d-none", !isHomeLoan);
+    if (!isHomeLoan) {
+        form.elements.home_purchase_price.value = 0;
+        form.elements.home_down_payment.value = 0;
+        form.elements.home_other_upfront_payments.value = 0;
+    }
+    updateHomeLoanDerivedFields();
+}
+
+function updateHomeLoanDerivedFields() {
+    const form = document.getElementById("loanForm");
+    const summary = document.getElementById("loanHomeAcquisitionSummary");
+    const hint = document.getElementById("loanDownPaymentHint");
+    if (!form || !summary || !hint) {
+        return;
+    }
+
+    const isHomeLoan = String(form.elements.loan_type.value || "").toLowerCase() === "home";
+    if (!isHomeLoan) {
+        form.elements.home_down_payment.readOnly = false;
+        hint.textContent = "Enter the upfront cash used at purchase, or let Alfred derive it automatically when purchase price is set.";
+        summary.textContent = "For home loans, Alfred uses the purchase price when you provide it. Otherwise it falls back to financed loan amount plus down payment to estimate the acquisition-cost base.";
+        return;
+    }
+
+    const principal = Number(form.elements.principal.value || 0);
+    const purchasePrice = Number(form.elements.home_purchase_price.value || 0);
+    const otherUpfront = Number(form.elements.home_other_upfront_payments.value || 0);
+    let downPayment = Number(form.elements.home_down_payment.value || 0);
+
+    if (purchasePrice > 0) {
+        downPayment = Math.max(purchasePrice - principal, 0);
+        form.elements.home_down_payment.value = downPayment ? downPayment.toFixed(2) : "0";
+        form.elements.home_down_payment.readOnly = true;
+        hint.textContent = purchasePrice >= principal
+            ? "Down payment is being derived automatically from purchase price minus financed loan amount."
+            : "Purchase price is below financed loan amount. Alfred will ask you to correct this before saving.";
+    } else {
+        form.elements.home_down_payment.readOnly = false;
+        hint.textContent = "Enter the upfront cash used at purchase, or let Alfred derive it automatically when purchase price is set.";
+        downPayment = Number(form.elements.home_down_payment.value || 0);
+    }
+
+    const purchaseBase = purchasePrice > 0 ? purchasePrice : Math.max(principal + downPayment, 0);
+    const upfrontCash = Math.max(downPayment + otherUpfront, 0);
+    const acquisitionCost = Math.max(purchaseBase + otherUpfront, 0);
+
+    summary.textContent = purchasePrice > 0
+        ? `Tracked purchase price ${Alfred.formatCurrency(purchasePrice)} minus financed loan amount ${Alfred.formatCurrency(principal)} gives a derived down payment of ${Alfred.formatCurrency(downPayment)}. With other upfront cash of ${Alfred.formatCurrency(otherUpfront)}, Alfred uses an acquisition-cost base of ${Alfred.formatCurrency(acquisitionCost)} for net worth and home equity tracking.`
+        : `Without a tracked purchase price, Alfred falls back to financed loan amount ${Alfred.formatCurrency(principal)} plus down payment ${Alfred.formatCurrency(downPayment)} and other upfront cash ${Alfred.formatCurrency(otherUpfront)} to estimate an acquisition-cost base of ${Alfred.formatCurrency(acquisitionCost)}.`;
 }
 
 window.editLoan = editLoan;

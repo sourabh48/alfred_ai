@@ -2,16 +2,13 @@ from __future__ import annotations
 
 from statistics import mean
 
-from django.db.models import Sum
-
 from apps.behavioral.models import BehavioralSignal
 from apps.career.models import CareerJobAnalysis, CareerProfile
 from apps.career.services import job_intelligence
-from apps.expenses.models import BankAccount
+from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.family.models import Dependent
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot
-from apps.loans.models import Loan
 from apps.mobility.services import bike_service_intelligence
 from apps.risk.models import RiskSignal
 
@@ -99,19 +96,13 @@ class RiskIntelligenceService:
         avg_sleep = mean(row[1] for row in recent_behavior) if recent_behavior else 0.0
         avg_work = mean(row[2] for row in recent_behavior) if recent_behavior else 0.0
 
-        liquid_cash = (
-            BankAccount.objects.filter(user=user, is_active=True)
-            .exclude(account_type="credit")
-            .aggregate(total=Sum("current_balance"))
-            .get("total")
-            or 0.0
-        )
-        monthly_emi = Loan.objects.filter(user=user, is_active=True).aggregate(total=Sum("emi")).get("total") or 0.0
+        baseline = resolve_canonical_financial_baseline(user)
+        liquid_cash = float(baseline.get("liquid_cash", 0) or 0)
+        monthly_emi = float(baseline.get("recurring_emi_burden", 0) or 0)
         dependents = Dependent.objects.filter(user=user).count()
-        monthly_income = getattr(user, "monthly_income", 0) or 0.0
-        rent_or_emi = getattr(user, "rent_or_emi", 0) or 0.0
-        debt_burden = ((monthly_emi + rent_or_emi) / monthly_income * 100) if monthly_income else 0.0
-        emergency_months = (liquid_cash / max(monthly_emi + rent_or_emi, 1)) if (monthly_emi + rent_or_emi) else 0.0
+        monthly_income = float(baseline.get("monthly_income", 0) or 0)
+        debt_burden = float(baseline.get("debt_burden_ratio", 0) or 0)
+        emergency_months = float(baseline.get("liquid_runway_months", 0) or 0)
 
         mobility = bike_service_intelligence.risk_snapshot(user)
         mobility_summary = mobility.get("summary", {})
@@ -229,6 +220,7 @@ class RiskIntelligenceService:
 
         top = max(consolidated, key=lambda item: item["score"]) if consolidated else None
         overall_average = round(mean(item["score"] for item in consolidated), 1) if consolidated else 0.0
+        evidence_freshness = freshness_snapshot(evidence)
 
         return {
             "history": history,
@@ -260,9 +252,31 @@ class RiskIntelligenceService:
                 "mobility_document_compliance": mobility_summary.get("document_compliance_score", 0),
                 "mobility_condition_score": mobility_summary.get("latest_condition_score", 0),
             },
+            "financial_baseline": baseline,
             "insights": self._build_insights(consolidated, career_market, monthly_income, liquid_cash),
             "evidence": evidence,
-            "evidence_freshness": freshness_snapshot(evidence),
+            "evidence_freshness": evidence_freshness,
+            "grounding": {
+                "history": {
+                    "tracked_snapshots": len(history),
+                    "monthly_income": round(float(monthly_income or 0), 2),
+                    "liquid_cash": round(float(liquid_cash or 0), 2),
+                    "monthly_emi": round(float(monthly_emi or 0), 2),
+                    "fixed_obligations": round(float(baseline.get("fixed_obligations", 0) or 0), 2),
+                    "dependents": dependents,
+                    "average_stress": round(float(avg_stress or 0), 1),
+                    "average_sleep": round(float(avg_sleep or 0), 1),
+                    "latest_manual_layoff": round(float(manual_layoff or 0), 1),
+                    "latest_manual_illness": round(float(manual_illness or 0), 1),
+                    "latest_manual_relocation": round(float(manual_relocation or 0), 1),
+                },
+                "evidence": evidence,
+                "freshness": evidence_freshness,
+                "notes": [
+                    "Risk Radar blends user-owned financial, behavioral, mobility, and manual risk snapshots with verified external context.",
+                    "External evidence grounds market and macro pressure only; the final category scores remain bounded and deterministic.",
+                ],
+            },
         }
 
     def _build_actions(self, consolidated: list[dict], career_market: dict, mobility: dict, latest_job_analysis) -> list[dict]:

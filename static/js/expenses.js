@@ -466,6 +466,7 @@ function renderBalanceSheet(balanceSheet) {
 
     const assets = balanceSheet.assets || [];
     const liabilities = balanceSheet.liabilities || [];
+    const homeOwnership = balanceSheet.home_ownership_positions || [];
     const vehicles = balanceSheet.vehicle_positions || [];
     const rows = [
         {
@@ -477,6 +478,20 @@ function renderBalanceSheet(balanceSheet) {
             key: "liabilities",
             label: "Liabilities",
             value: liabilities.map(item => `${Alfred.escapeHtml(item.label)} ${formatCurrency(item.amount)}`).join(" | ") || "No liabilities tracked",
+        },
+        {
+            key: "home-ownership",
+            label: "Home ownership",
+            value: homeOwnership.length
+                ? homeOwnership.map(item => (
+                    `${Alfred.escapeHtml(item.lender || "Home loan")} | `
+                    + `Acquisition base ${formatCurrency(item.property_acquisition_cost || item.financed_asset_value)} | `
+                    + `Upfront cash ${formatCurrency(item.upfront_cash_invested || 0)} | `
+                    + `Loan left ${formatCurrency(item.current_loan_balance)} | `
+                    + `Equity ${formatCurrency(item.equity_built)} | `
+                    + `Recorded cost ${formatCurrency(item.interest_and_cost_paid_recorded)}`
+                )).join(" | ")
+                : "No home-loan-backed property position tracked",
         },
         {
             key: "vehicles",
@@ -545,14 +560,50 @@ function renderTimeline(timeline, meta = {}) {
     const matchingCount = Number(meta.total_matching_count || 0);
     const visibleCount = Number(meta.visible_count || 0);
     const filteredExpenseTotal = Number(meta.filtered_expense_total || 0);
+    const filteredLoanTotal = Number(meta.filtered_loan_total || 0);
+    const filteredOtherTotal = Number(meta.filtered_other_total || 0);
+    const filteredOutflowTotal = Number(meta.filtered_outflow_total || 0);
+    const filteredCreditTotal = Number(meta.filtered_credit_total || 0);
     const hasMore = Boolean(meta.has_more);
 
     if (summaryCard) {
+        const summaryConfigLabel = getUiConfig("expenses.timeline.filtered_total_label", "Filtered Expense Total");
+        const activeClassification = String(meta.classification || "").trim().toLowerCase();
+        let summaryLabel = summaryConfigLabel;
+        let summaryValue = filteredExpenseTotal;
+
+        if (activeClassification === "loan") {
+            summaryLabel = "Filtered Loan Total";
+            summaryValue = filteredLoanTotal;
+        } else if (activeClassification === "other") {
+            summaryLabel = "Filtered Other Total";
+            summaryValue = filteredOtherTotal;
+        } else if (activeClassification === "expense") {
+            summaryLabel = "Filtered Expense Total";
+            summaryValue = filteredExpenseTotal;
+        } else if (filteredOutflowTotal > 0) {
+            summaryLabel = "Filtered Spend Total";
+            summaryValue = filteredOutflowTotal;
+        } else if (filteredCreditTotal > 0) {
+            summaryLabel = "Filtered Credit Total";
+            summaryValue = filteredCreditTotal;
+        }
+
+        const breakdown = [
+            `Expense ${formatCurrency(filteredExpenseTotal)}`,
+            `Loan ${formatCurrency(filteredLoanTotal)}`,
+            `Other ${formatCurrency(filteredOtherTotal)}`,
+        ];
+        if (filteredCreditTotal > 0) {
+            breakdown.push(`Credits ${formatCurrency(filteredCreditTotal)}`);
+        }
+
         summaryCard.innerHTML = `
-            <div class="expense-filter-summary-label">${escapeHtml(getUiConfig("expenses.timeline.filtered_total_label", "Filtered Expense Total"))}</div>
-            <div class="expense-filter-summary-value">${formatCurrency(filteredExpenseTotal)}</div>
+            <div class="expense-filter-summary-label">${escapeHtml(summaryLabel)}</div>
+            <div class="expense-filter-summary-value">${formatCurrency(summaryValue)}</div>
             <div class="expense-filter-summary-meta">
                 ${Alfred.formatNumber(matchingCount, 0)} ${matchingCount === 1 ? "result" : "results"} | ${Alfred.formatNumber(visibleCount, 0)} visible
+                <br>${escapeHtml(breakdown.join(" | "))}
             </div>
         `;
     }

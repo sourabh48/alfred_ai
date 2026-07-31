@@ -44,6 +44,7 @@ KNOWN_COMPANIES = {
     "JIO": "Jio",
     "NETFLIX": "Netflix",
     "SPOTIFY": "Spotify",
+    "GOOGLE PAY": "Google Pay",
     "NOBROKER": "NoBroker",
     "BAJAJ": "Bajaj Finance",
     "POONAWALLA": "Poonawalla Fincorp",
@@ -72,9 +73,24 @@ MERCHANT_PROFILE_STOPWORDS = {
 MERCHANT_PROFILE_REPLACEMENTS = {
     "PLAYSTORE": "GOOGLE PLAY",
     "GOOGLEPLAY": "GOOGLE PLAY",
+    "GPAY": "GOOGLE PAY",
+    "G PAY": "GOOGLE PAY",
     "NETFLIXCOM": "NETFLIX",
     "YOUTUBEPREMIUM": "YOUTUBE",
 }
+NON_LOAN_PROTECTED_KEYWORDS = (
+    "GOOGLE PLAY",
+    "PLAYSTORE",
+    "GOOGLE PAY",
+    "GOOGLEPAY",
+    "GPAY",
+    "NETFLIX",
+    "SPOTIFY",
+    "YOUTUBE",
+    "SUBSCRIPTION",
+    "MEMBERSHIP",
+)
+PROTECTED_MERCHANT_KEYS = ("GOOGLE PAY", "GOOGLE PLAY", "NETFLIX", "SPOTIFY", "YOUTUBE")
 
 
 def hydrate_expense_data(*, user, payload: dict, initial_data: dict | None = None, instance: Expense | None = None) -> dict:
@@ -270,7 +286,7 @@ def build_user_merchant_profiles(*, user, exclude_expense_id: int | None = None)
     )
 
     for item in queryset.iterator():
-        sample = _history_sample_details(item)
+        sample = _normalize_protected_transaction_details(_history_sample_details(item), item.direction)
         keys = _merchant_profile_keys(
             merchant=sample["merchant"],
             company_name=sample["company_name"],
@@ -323,7 +339,7 @@ def apply_transaction_history_learning(
     merchant_profiles: dict | None = None,
     exclude_expense_id: int | None = None,
 ) -> dict:
-    resolved = dict(details)
+    resolved = _normalize_protected_transaction_details(dict(details), direction)
     profiles = merchant_profiles if merchant_profiles is not None else build_user_merchant_profiles(
         user=user,
         exclude_expense_id=exclude_expense_id,
@@ -366,6 +382,7 @@ def apply_transaction_history_learning(
 
 
 def remember_transaction_profile(*, merchant_profiles: dict, details: dict, direction: str) -> None:
+    details = _normalize_protected_transaction_details(dict(details), direction)
     keys = _merchant_profile_keys(
         merchant=details.get("merchant", ""),
         company_name=details.get("company_name", ""),
@@ -635,6 +652,9 @@ def _normalize_merchant_profile_key(value: str) -> str:
         return ""
     for source, target in MERCHANT_PROFILE_REPLACEMENTS.items():
         text = text.replace(source, target)
+    for protected_key in PROTECTED_MERCHANT_KEYS:
+        if protected_key in text:
+            return protected_key
     normalized = re.sub(r"[^A-Z0-9 ]", " ", text)
     tokens: list[str] = []
     for token in normalized.split():
@@ -666,8 +686,20 @@ def _should_override_with_profile(*, current: dict, profile: dict) -> bool:
     current_category = current.get("category") or "other"
     profile_classification = profile.get("classification") or current_classification
     profile_category = profile.get("category") or current_category
+    protected_text = " ".join(
+        str(value or "")
+        for value in [
+            current.get("raw_description"),
+            current.get("description"),
+            current.get("merchant"),
+            current.get("company_name"),
+            current.get("counterparty"),
+        ]
+    ).upper()
 
     if current_classification == profile_classification and current_category == profile_category:
+        return False
+    if profile_classification == "loan" and _is_non_loan_protected_text(protected_text):
         return False
     if current_classification == "loan" and profile_classification != "loan":
         return True
@@ -694,6 +726,40 @@ def _build_inferred_description(*, raw_description: str, classification: str, ca
     if category == "subscription":
         return f"Auto-classified as subscription spend: {cleaned[:140]}"
     return cleaned[:140]
+
+
+def _normalize_protected_transaction_details(details: dict, direction: str) -> dict:
+    if direction != "debit":
+        return details
+    raw_text = " ".join(
+        str(value or "")
+        for value in [
+            details.get("raw_description"),
+            details.get("description"),
+            details.get("merchant"),
+            details.get("company_name"),
+            details.get("counterparty"),
+        ]
+    )
+    if not _is_non_loan_protected_text(raw_text):
+        return details
+    inferred = classify_transaction_text(raw_text, direction)
+    if inferred.get("classification") == "loan":
+        return details
+    details["classification"] = inferred.get("classification", details.get("classification", "expense"))
+    details["category"] = inferred.get("category", details.get("category", "other"))
+    details["payment_mode"] = inferred.get("payment_mode", details.get("payment_mode", "BANK"))
+    details["merchant"] = inferred.get("merchant") or details.get("merchant", "")
+    details["company_name"] = inferred.get("company_name") or details.get("company_name", "")
+    details["counterparty"] = inferred.get("counterparty") or details.get("counterparty", "")
+    if _is_generated_description(details.get("description", "")) or not details.get("description"):
+        details["description"] = inferred.get("description", details.get("description", ""))
+    return details
+
+
+def _is_non_loan_protected_text(value: str) -> bool:
+    text = str(value or "").upper()
+    return any(keyword in text for keyword in NON_LOAN_PROTECTED_KEYWORDS)
 
 
 def _infer_company_name(counterparty: str, raw_text: str) -> str:

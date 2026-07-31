@@ -7,8 +7,9 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.utils import timezone
 
-from apps.expenses.models import Expense
+from apps.expenses.models import BankAccount, Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
+from apps.investments.models import Investment
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanPaymentHistory
 from apps.loans.serializers import LoanSerializer
 from apps.loans.services.loan_closure_parser import loan_closure_parser
@@ -131,6 +132,82 @@ class LoanLifecycleTests(TestCase):
         self.assertEqual(loan_one.consolidated_into_id, consolidated.id)
         self.assertTrue(consolidated.is_active)
 
+    def test_home_loan_serializer_derives_down_payment_from_purchase_price(self):
+        serializer = LoanSerializer(
+            data={
+                "loan_type": "home",
+                "lender": "SBI",
+                "loan_account_number": "HOME-001",
+                "principal": 4000000,
+                "interest_rate": 8.5,
+                "emi": 36500,
+                "tenure_months": 240,
+                "remaining_balance": 3200000,
+                "home_purchase_price": 4500000,
+                "home_down_payment": 0,
+                "home_other_upfront_payments": 150000,
+                "start_date": timezone.localdate().isoformat(),
+            }
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        loan = serializer.save(user=self.user)
+
+        self.assertEqual(loan.home_purchase_price, 4500000.0)
+        self.assertEqual(loan.home_down_payment, 500000.0)
+        self.assertEqual(loan.resolved_home_down_payment, 500000.0)
+        self.assertEqual(loan.resolved_home_property_acquisition_cost, 4650000.0)
+        self.assertEqual(LoanSerializer(loan).data["home_down_payment"], 500000.0)
+
+    def test_networth_endpoint_matches_canonical_balance_sheet_exactly(self):
+        BankAccount.objects.create(
+            user=self.user,
+            bank_name="HDFC",
+            account_number="000011112222",
+            account_type="savings",
+            current_balance=125000,
+            is_active=True,
+        )
+        Investment.objects.create(
+            user=self.user,
+            asset_type="mutual_fund",
+            asset_name="Index Fund",
+            institution="Groww",
+            invested_amount=200000,
+            current_value=240000,
+            annual_return_rate=11.0,
+        )
+        Loan.objects.create(
+            user=self.user,
+            loan_type="home",
+            lender="SBI",
+            loan_account_number="HOME-NW-001",
+            principal=4000000,
+            home_purchase_price=4500000,
+            home_other_upfront_payments=150000,
+            interest_rate=8.4,
+            emi=36000,
+            tenure_months=240,
+            remaining_balance=3200000,
+            start_date=timezone.localdate(),
+            is_active=True,
+            status="active",
+        )
+
+        intelligence = build_financial_intelligence(self.user)
+        balance_sheet = intelligence["balance_sheet"]
+
+        response = self.client.get("/api/loans/networth/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["net_worth"], balance_sheet["net_worth"])
+        self.assertEqual(payload["assets"]["total"], balance_sheet["total_assets"])
+        self.assertEqual(payload["liabilities"]["total"], balance_sheet["total_liabilities"])
+        self.assertEqual(payload["assets"]["cash"], 125000.0)
+        self.assertEqual(payload["assets"]["investments"], 240000.0)
+        self.assertEqual(payload["assets"]["home_property_acquisition_cost"], 4650000.0)
+
     def test_foreclosure_parser_extracts_structured_fields(self):
         parsed = loan_closure_parser.parse_document(
             BytesIO(
@@ -166,6 +243,28 @@ class LoanLifecycleTests(TestCase):
         self.assertEqual(parsed["payload"]["foreclosure_charges"], 900.0)
         self.assertEqual(parsed["payload"]["taxes_gst"], 162.0)
         self.assertEqual(parsed["payload"]["total_amount_payable"], 128262.0)
+
+    def test_foreclosure_parser_ignores_empty_ocr_amount_tokens(self):
+        parsed = loan_closure_parser.parse_document(
+            BytesIO(
+                b"""
+                Axis Bank Foreclosure Statement
+                Loan Account Number: AXIS123456
+                Outstanding Principal: INR 125000
+                Accrued Interest: ,
+                Foreclosure Charges: INR 900
+                Total Amount Payable: INR 125900
+                """
+            ),
+            "foreclosure-ocr-noise.txt",
+            user=self.user,
+        )
+
+        self.assertEqual(parsed["parser_status"], "parsed")
+        self.assertEqual(parsed["payload"]["outstanding_principal"], 125000.0)
+        self.assertEqual(parsed["payload"]["accrued_interest"], 0.0)
+        self.assertEqual(parsed["payload"]["foreclosure_charges"], 900.0)
+        self.assertEqual(parsed["payload"]["total_amount_payable"], 125900.0)
 
     def test_pending_foreclosure_keeps_liability_until_statement_reconciliation_confirms_payment(self):
         loan = Loan.objects.create(

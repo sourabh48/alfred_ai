@@ -4,9 +4,7 @@ Automatically detects loan payments from expense transactions and tracks loan li
 """
 from __future__ import annotations
 
-from datetime import timedelta
 from uuid import uuid4
-from django.db.models import Q, Sum
 from django.utils import timezone
 from typing import Dict, List, Optional
 
@@ -288,37 +286,58 @@ class LoanIntelligenceService:
 
     def calculate_loan_metrics(self, user) -> Dict[str, any]:
         """Calculate comprehensive loan metrics for user."""
-        active_loans = Loan.objects.filter(user=user, is_active=True)
+        from apps.expenses.services.financial_intelligence import (
+            _loan_counts_toward_recurring_emi,
+            _loan_reporting_balance,
+            resolve_canonical_financial_baseline,
+        )
 
-        total_principal = active_loans.aggregate(total=Sum("principal"))["total"] or 0
-        total_remaining = active_loans.aggregate(total=Sum("remaining_balance"))["total"] or 0
-        total_paid = active_loans.aggregate(total=Sum("total_paid"))["total"] or 0
-        total_monthly_emi = active_loans.aggregate(total=Sum("emi"))["total"] or 0
+        baseline = resolve_canonical_financial_baseline(user)
+        today = timezone.localdate()
+        all_loans = list(Loan.objects.filter(user=user).order_by("-updated_at", "-id"))
+        recurring_loans = []
+        pending_foreclosure_balance = 0.0
 
-        # Calculate debt-to-income ratio
-        monthly_income = getattr(user, "monthly_income", 0) or 0
-        dti_ratio = (total_monthly_emi / monthly_income * 100) if monthly_income > 0 else 0
+        for loan in all_loans:
+            balance = _loan_reporting_balance(loan, today=today)
+            if loan.status == "foreclosure_pending" and round(float(balance or 0), 2) > 0:
+                pending_foreclosure_balance += float(balance or 0)
+            if _loan_counts_toward_recurring_emi(loan, balance):
+                recurring_loans.append((loan, balance))
+
+        total_principal = sum(float(loan.principal or 0) for loan, _ in recurring_loans)
+        total_remaining = sum(float(balance or 0) for _, balance in recurring_loans)
+        total_paid = sum(float(loan.total_paid or 0) for loan, _ in recurring_loans)
+        total_monthly_emi = float(baseline.get("recurring_emi_burden", 0) or 0)
+        monthly_income = float(baseline.get("monthly_income", 0) or 0)
+        dti_ratio = (total_monthly_emi / monthly_income * 100) if monthly_income > 0 else 0.0
 
         # Get loan breakdown by type
         loan_breakdown = []
         for loan_type, label in Loan.LOAN_TYPE_CHOICES:
-            type_loans = active_loans.filter(loan_type=loan_type)
-            if type_loans.exists():
+            type_loans = [(loan, balance) for loan, balance in recurring_loans if loan.loan_type == loan_type]
+            if type_loans:
                 loan_breakdown.append({
                     "type": label,
-                    "count": type_loans.count(),
-                    "total_emi": type_loans.aggregate(total=Sum("emi"))["total"] or 0,
-                    "remaining_balance": type_loans.aggregate(total=Sum("remaining_balance"))["total"] or 0,
+                    "count": len(type_loans),
+                    "total_emi": round(sum(float(loan.emi or 0) for loan, _ in type_loans), 2),
+                    "remaining_balance": round(sum(float(balance or 0) for _, balance in type_loans), 2),
                 })
 
         return {
-            "active_loan_count": active_loans.count(),
+            "active_loan_count": len(recurring_loans),
             "total_principal": round(total_principal, 2),
             "total_remaining": round(total_remaining, 2),
             "total_paid": round(total_paid, 2),
             "completion_percentage": round((total_paid / total_principal * 100) if total_principal > 0 else 0, 2),
             "monthly_emi_burden": round(total_monthly_emi, 2),
             "debt_to_income_ratio": round(dti_ratio, 2),
+            "monthly_income": round(monthly_income, 2),
+            "fixed_obligations": round(float(baseline.get("fixed_obligations", 0) or 0), 2),
+            "disposable_cash_flow": round(float(baseline.get("disposable_cash_flow", 0) or 0), 2),
+            "savings_capacity": round(float(baseline.get("savings_capacity", 0) or 0), 2),
+            "pending_foreclosure_balance": round(pending_foreclosure_balance, 2),
+            "financial_baseline": baseline,
             "loan_breakdown": loan_breakdown,
         }
 

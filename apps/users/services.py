@@ -29,7 +29,7 @@ from apps.mobility.models import (
     TripPhoto,
 )
 from apps.relationship.models import RelationshipProfile
-from apps.reports.models import GeneratedReport, OperationalLog, SystemTicket
+from apps.reports.models import ChatGPTImport, GeneratedReport, OperationalLog, SystemTicket
 from apps.risk.models import RiskSignal
 
 
@@ -109,6 +109,7 @@ def clear_user_fed_data(user) -> dict:
         "credit_scores": CreditScore.objects.filter(user=user).count(),
         "system_tickets": SystemTicket.objects.filter(user=user).count(),
         "operational_logs": OperationalLog.objects.filter(user=user).count(),
+        "chatgpt_imports": ChatGPTImport.objects.filter(user=user).count(),
         "parser_memories": DocumentParserLearningMemory.objects.filter(user=user).count() + CareerResumeLearningMemory.objects.filter(user=user).count(),
     }
 
@@ -153,6 +154,7 @@ def clear_user_fed_data(user) -> dict:
         RiskSignal.objects.filter(user=user).delete()
 
         DocumentParserLearningMemory.objects.filter(user=user).delete()
+        ChatGPTImport.objects.filter(user=user).delete()
         generated_report_qs.delete()
         SystemTicket.objects.filter(user=user).delete()
         OperationalLog.objects.filter(user=user).delete()

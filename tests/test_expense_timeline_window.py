@@ -99,6 +99,11 @@ class ExpenseTimelineWindowTests(TestCase):
         self.assertEqual(payload["unwanted_expenses"]["items"][0]["signal"], "Emotional + discretionary")
         self.assertEqual(payload["timeline_meta"]["total_matching_count"], 4)
         self.assertEqual(payload["timeline_meta"]["visible_count"], 4)
+        self.assertEqual(payload["timeline_meta"]["filtered_expense_total"], 5000.0)
+        self.assertEqual(payload["timeline_meta"]["filtered_loan_total"], 0.0)
+        self.assertEqual(payload["timeline_meta"]["filtered_other_total"], 1500.0)
+        self.assertEqual(payload["timeline_meta"]["filtered_outflow_total"], 6500.0)
+        self.assertEqual(payload["timeline_meta"]["filtered_credit_total"], 25000.0)
 
     def test_timeline_filters_by_query_and_transaction_id(self):
         target = Expense.objects.get(merchant="Myntra")
@@ -108,6 +113,7 @@ class ExpenseTimelineWindowTests(TestCase):
         payload = response.json()
         self.assertEqual(payload["timeline_meta"]["total_matching_count"], 1)
         self.assertEqual(payload["timeline_meta"]["filtered_expense_total"], 4000.0)
+        self.assertEqual(payload["timeline_meta"]["filtered_outflow_total"], 4000.0)
         self.assertEqual(payload["timeline"][0]["items"][0]["merchant"], "Myntra")
 
         response = self.client.get(f"/api/expenses/timeline/?transaction_id={target.id}")
@@ -116,3 +122,16 @@ class ExpenseTimelineWindowTests(TestCase):
         self.assertEqual(payload["timeline_meta"]["transaction_id"], str(target.id))
         self.assertEqual(payload["timeline_meta"]["total_matching_count"], 1)
         self.assertEqual(payload["timeline"][0]["items"][0]["id"], target.id)
+
+    def test_timeline_meta_breaks_out_mixed_filtered_totals(self):
+        response = self.client.get("/api/expenses/timeline/?q=outflow")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertEqual(payload["timeline_meta"]["total_matching_count"], 1)
+        self.assertEqual(payload["timeline_meta"]["filtered_expense_total"], 0.0)
+        self.assertEqual(payload["timeline_meta"]["filtered_loan_total"], 0.0)
+        self.assertEqual(payload["timeline_meta"]["filtered_other_total"], 1500.0)
+        self.assertEqual(payload["timeline_meta"]["filtered_outflow_total"], 1500.0)
+        self.assertEqual(payload["timeline_meta"]["filtered_credit_total"], 0.0)

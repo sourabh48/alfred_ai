@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models import Count, Max, Sum
+from django.db.models import Count, Max
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -13,12 +13,13 @@ from rest_framework.views import APIView
 from alfred_ai.services import record_parser_learning
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.models import BankAccount
+from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.integrations.services import verified_intelligence
 from apps.loans.models import Loan
 from apps.reports.services import operational_logging_service
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 from .serializers import CareerJobAnalysisSerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
-from .services import build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
+from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
 
 
 def _get_profile(user):
@@ -52,9 +53,11 @@ def _study_recommendations_payload(profile, latest_resume=None, latest_analysis=
     )
 
 
-def _compensation_benchmark_payload(user, profile, *, openings=None, openings_evidence=None, latest_analysis=None, latest_resume=None) -> dict:
+def _compensation_benchmark_payload(user, profile, *, openings=None, openings_evidence=None, latest_analysis=None, latest_resume=None, income_signals: dict | None = None, country: str = "", state: str = "") -> dict:
     role = profile.role if profile.role and profile.role != "Profile pending" else ((latest_resume.extracted_payload.get("role", "") if latest_resume else "") or "analyst")
-    location = getattr(user, "city", "") or getattr(latest_analysis, "location", "") or ""
+    filter_location = ", ".join(part for part in [state, country] if part)
+    location = getattr(user, "city", "") or getattr(latest_analysis, "location", "") or filter_location
+    resolved_income_signals = income_signals or build_employment_income_signals(user=user, latest_resume=latest_resume, profile=profile)
     snapshot_payload = ((getattr(latest_analysis, "extracted_payload", {}) or {}).get("job_snapshot", {}) if latest_analysis else {}) or {}
     job_snapshot = None
     if latest_analysis and snapshot_payload:
@@ -88,7 +91,7 @@ def _compensation_benchmark_payload(user, profile, *, openings=None, openings_ev
         openings=openings or [],
         job_snapshot=job_snapshot,
         openings_evidence=openings_evidence,
-        current_income_annual=((getattr(user, "monthly_income", 0) or profile.last_salary or 0) * 12),
+        current_income_annual=float(resolved_income_signals.get("annualized_compensation", 0) or 0),
     )
 
 
@@ -96,26 +99,21 @@ def _clamp(value: float, lower: float = 0.0, upper: float = 100.0) -> float:
     return max(lower, min(upper, value))
 
 
-def _career_projection_payload(user, profile, macro: dict | None = None, *, latest_resume=None) -> dict:
+def _career_projection_payload(user, profile, macro: dict | None = None, *, latest_resume=None, income_signals: dict | None = None) -> dict:
     macro = macro or verified_intelligence.macro_context()
-    return build_salary_projection(user, profile, macro=macro, latest_resume=latest_resume)
+    return build_salary_projection(user, profile, macro=macro, latest_resume=latest_resume, income_signals=income_signals)
 
 
-def _career_timing_payload(user, profile, market: dict, latest_analysis=None) -> dict:
+def _career_timing_payload(user, profile, market: dict, latest_analysis=None, latest_resume=None, income_signals: dict | None = None) -> dict:
     today = timezone.localdate()
-    monthly_income = getattr(user, "monthly_income", 0) or profile.last_salary or 0
-    rent_or_emi = getattr(user, "rent_or_emi", 0) or 0
-    liquid_cash = (
-        BankAccount.objects.filter(user=user, is_active=True)
-        .exclude(account_type="credit")
-        .aggregate(total=Sum("current_balance"))
-        .get("total")
-        or 0.0
-    )
-    monthly_loan_emi = Loan.objects.filter(user=user, is_active=True).aggregate(total=Sum("emi")).get("total") or 0.0
-    total_fixed_load = monthly_loan_emi + rent_or_emi
-    emergency_months = (liquid_cash / max(total_fixed_load, 1)) if total_fixed_load else (liquid_cash / max(monthly_income, 1) if monthly_income else 0.0)
-    fixed_load_ratio = ((total_fixed_load / monthly_income) * 100) if monthly_income else 0.0
+    resolved_income_signals = income_signals or build_employment_income_signals(user=user, latest_resume=latest_resume, profile=profile)
+    baseline = resolve_canonical_financial_baseline(user)
+    monthly_income = float(baseline.get("monthly_income", 0) or 0)
+    liquid_cash = float(baseline.get("liquid_cash", 0) or 0)
+    monthly_loan_emi = float(baseline.get("recurring_emi_burden", 0) or 0)
+    total_fixed_load = float(baseline.get("fixed_obligations", 0) or 0)
+    emergency_months = float(baseline.get("liquid_runway_months", 0) or 0)
+    fixed_load_ratio = float(baseline.get("debt_burden_ratio", 0) or 0)
     market_risk = float(market.get("risk_score", 0) or 0)
     fit_score = float(getattr(latest_analysis, "fit_score", 0) or 0) if latest_analysis else 0.0
 
@@ -198,6 +196,8 @@ def _career_timing_payload(user, profile, market: dict, latest_analysis=None) ->
         "signals": signals,
         "blockers": blockers[:4],
         "moves": moves,
+        "income_source_summary": resolved_income_signals.get("source_summary", ""),
+        "financial_baseline": baseline,
     }
 
 
@@ -415,6 +415,7 @@ class CareerRecruiterMatchView(APIView):
         latest_resume = CareerResume.objects.filter(user=request.user).order_by("-created_at", "-id").first()
         resume_payload = latest_resume.extracted_payload if latest_resume else _resume_payload_from_profile(profile)
         macro = verified_intelligence.macro_context()
+        income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)
 
         try:
             snapshot = job_intelligence.parse_recruiter_message(
@@ -434,7 +435,7 @@ class CareerRecruiterMatchView(APIView):
             openings=openings["openings"],
             job_snapshot=snapshot,
             openings_evidence=openings["evidence"],
-            current_income_annual=((getattr(request.user, "monthly_income", 0) or profile.last_salary or 0) * 12),
+            current_income_annual=float(income_signals.get("annualized_compensation", 0) or 0),
         )
         parser_status, confidence = _analysis_parser_state(
             snapshot,
@@ -493,7 +494,7 @@ class CareerRecruiterMatchView(APIView):
             },
             evidence=[*market["evidence"], *(compensation.get("evidence") or [])][:8],
         )
-        career_timing = _career_timing_payload(request.user, profile, market, analysis)
+        career_timing = _career_timing_payload(request.user, profile, market, analysis, latest_resume=latest_resume, income_signals=income_signals)
         study_recommendations = job_intelligence.build_study_recommendations(
             profile,
             resume_payload,
@@ -525,7 +526,9 @@ class CareerRecruiterMatchView(APIView):
                 "study_recommendations": study_recommendations,
                 "openings": openings["openings"],
                 "openings_evidence": openings["evidence"],
+                "openings_source_coverage": openings.get("source_coverage", {}),
                 "compensation_benchmark": compensation,
+                "employment_signals": income_signals,
             }
         )
 
@@ -543,6 +546,7 @@ class CareerJobMatchView(APIView):
         latest_resume = CareerResume.objects.filter(user=request.user).order_by("-created_at", "-id").first()
         resume_payload = latest_resume.extracted_payload if latest_resume else _resume_payload_from_profile(profile)
         macro = verified_intelligence.macro_context()
+        income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)
 
         try:
             job_snapshot = job_intelligence.parse_job_page(job_url)
@@ -558,7 +562,7 @@ class CareerJobMatchView(APIView):
             openings=openings["openings"],
             job_snapshot=job_snapshot,
             openings_evidence=openings["evidence"],
-            current_income_annual=((getattr(request.user, "monthly_income", 0) or profile.last_salary or 0) * 12),
+            current_income_annual=float(income_signals.get("annualized_compensation", 0) or 0),
         )
         parser_status, parse_confidence = _analysis_parser_state(job_snapshot, source_kind=job_snapshot.source_kind)
         analysis = CareerJobAnalysis.objects.create(
@@ -586,7 +590,7 @@ class CareerJobMatchView(APIView):
             },
             evidence=[*market["evidence"], *(compensation.get("evidence") or [])][:8],
         )
-        career_timing = _career_timing_payload(request.user, profile, market, analysis)
+        career_timing = _career_timing_payload(request.user, profile, market, analysis, latest_resume=latest_resume, income_signals=income_signals)
         study_recommendations = job_intelligence.build_study_recommendations(
             profile,
             resume_payload,
@@ -618,7 +622,9 @@ class CareerJobMatchView(APIView):
                 "study_recommendations": study_recommendations,
                 "openings": openings["openings"],
                 "openings_evidence": openings["evidence"],
+                "openings_source_coverage": openings.get("source_coverage", {}),
                 "compensation_benchmark": compensation,
+                "employment_signals": income_signals,
             }
         )
 
@@ -654,14 +660,16 @@ def career_projection(request):
         profile = _get_profile(request.user)
         latest_resume = CareerResume.objects.filter(user=request.user).order_by("-created_at", "-id").first()
         macro = verified_intelligence.macro_context()
-        projection = _career_projection_payload(request.user, profile, macro=macro, latest_resume=latest_resume)
+        income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)
+        projection = _career_projection_payload(request.user, profile, macro=macro, latest_resume=latest_resume, income_signals=income_signals)
         latest_analysis = CareerJobAnalysis.objects.filter(user=request.user).order_by("-created_at", "-id").first()
         role = profile.role if profile.role and profile.role != "Profile pending" else "analyst"
         market = job_intelligence.market_outlook(role, macro=macro)
         return Response(
             {
                 **projection,
-                "career_timing": _career_timing_payload(request.user, profile, market, latest_analysis),
+                "career_timing": _career_timing_payload(request.user, profile, market, latest_analysis, latest_resume=latest_resume, income_signals=income_signals),
+                "employment_signals": income_signals,
             }
         )
     except Exception as e:
@@ -688,13 +696,14 @@ def _career_dashboard_payload(request) -> dict:
     latest_resume = CareerResume.objects.filter(user=request.user).order_by("-created_at", "-id").first()
     latest_analysis = CareerJobAnalysis.objects.filter(user=request.user).order_by("-created_at", "-id").first()
     macro = verified_intelligence.macro_context()
+    income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)
     country, state = _opening_filter_params(request)
-    projection = _career_projection_payload(request.user, profile, macro=macro, latest_resume=latest_resume)
+    projection = _career_projection_payload(request.user, profile, macro=macro, latest_resume=latest_resume, income_signals=income_signals)
     role = profile.role if profile.role and profile.role != "Profile pending" else ((latest_resume.extracted_payload.get("role", "") if latest_resume else "") or "analyst")
     skills = latest_resume.extracted_payload.get("skills", []) if latest_resume else [item.strip() for item in (profile.skills or "").split(",") if item.strip()]
     market = job_intelligence.market_outlook(role, macro=macro)
     openings = job_intelligence.suggest_openings(role, skills, country=country, state=state)
-    career_timing = _career_timing_payload(request.user, profile, market, latest_analysis)
+    career_timing = _career_timing_payload(request.user, profile, market, latest_analysis, latest_resume=latest_resume, income_signals=income_signals)
     study_recommendations = _study_recommendations_payload(profile, latest_resume, latest_analysis, openings["openings"])
     data_pipeline = _career_data_pipeline_payload(profile, latest_resume, latest_analysis, projection, market, career_timing)
     compensation_benchmark = _compensation_benchmark_payload(
@@ -704,9 +713,13 @@ def _career_dashboard_payload(request) -> dict:
         openings_evidence=openings["evidence"],
         latest_analysis=latest_analysis,
         latest_resume=latest_resume,
+        income_signals=income_signals,
+        country=country,
+        state=state,
     )
     return {
         "profile": CareerProfileSerializer(profile).data,
+        "employment_signals": income_signals,
         "projection": projection,
         "latest_resume": CareerResumeSerializer(latest_resume, context={"request": request}).data if latest_resume else None,
         "latest_job_analysis": CareerJobAnalysisSerializer(latest_analysis).data if latest_analysis else None,
@@ -716,6 +729,7 @@ def _career_dashboard_payload(request) -> dict:
         "data_pipeline": data_pipeline,
         "openings": openings["openings"],
         "openings_evidence": openings["evidence"],
+        "openings_source_coverage": openings.get("source_coverage", {}),
         "opening_filters": openings.get("filters", {}),
         "active_opening_filters": openings.get("active_filters", {"country": country, "state": state}),
         "opening_counts": {

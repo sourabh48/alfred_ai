@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import redirect_stderr, redirect_stdout
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from functools import lru_cache
 from importlib import import_module
@@ -131,6 +131,7 @@ class ParsedDocument:
     parser_notes: str
     source_text: str
     service_payload: dict
+    review_payload: dict = field(default_factory=dict)
 
 
 class BikeDocumentAI:
@@ -173,6 +174,13 @@ class BikeDocumentAI:
             labour_count = len(service_payload.get("labour_items") or [])
             if part_count or labour_count:
                 parser_notes.append(f"Extracted {part_count} parts line item(s) and {labour_count} labour line item(s).")
+            recovered_edge_rows = sum(
+                1
+                for item in [*(service_payload.get("parts_items") or []), *(service_payload.get("labour_items") or [])]
+                if self._is_degraded_invoice_item(item)
+            )
+            if recovered_edge_rows:
+                parser_notes.append(f"Recovered {recovered_edge_rows} invoice line item(s) from degraded OCR rows.")
         elif document_type == "invoice":
             parser_notes.append("Invoice detected, but work-summary extraction is weak. Review the imported log before relying on it.")
         if confidence < 0.65:
@@ -192,6 +200,13 @@ class BikeDocumentAI:
             parser_notes=" ".join(parser_notes).strip(),
             source_text=text[:12000],
             service_payload=service_payload,
+            review_payload={
+                "extraction_method": extraction.method,
+                "extraction_notes": extraction.notes[:6],
+                "raw_text_excerpt": " ".join(text.split())[:600],
+                "extraction_review": extraction.review_payload,
+                "invoice_review": self._invoice_review_payload(invoice_fields, service_payload),
+            },
         )
 
     def verify_relevance(self, profile, parsed: ParsedDocument, override_type: str = "") -> dict:
@@ -472,13 +487,13 @@ class BikeDocumentAI:
             pattern = re.compile(rf"{re.escape(label)}\s*[:#-]?\s*(?:{CURRENCY_TOKEN_RE})?\s*([0-9,]+(?:\.\d{{1,2}})?)", re.IGNORECASE)
             match = pattern.search(text)
             if match:
-                return float(match.group(1).replace(",", ""))
+                return self._amount_string_to_float(match.group(1))
         value = self._extract_label_value(self._split_lines(text), labels, max_lines=2)
         amount = self._parse_amount_token(value)
         if amount:
             return amount
         generic = MONEY_RE.search(text)
-        return float(generic.group(1).replace(",", "")) if generic else 0.0
+        return self._amount_string_to_float(generic.group(1)) if generic else 0.0
 
     def _extract_odometer(self, text: str) -> int:
         pattern = re.compile(r"(?:odometer|kms?|km reading)\s*[:#-]?\s*([0-9,]{3,8})", re.IGNORECASE)
@@ -555,7 +570,7 @@ class BikeDocumentAI:
         total_amount = self._extract_amount_by_labels(text, ["total amount", "grand total", "net amount"])
         service_center_name = self._extract_label_value(lines, ["service centre", "service center", "dealer", "workshop"], max_lines=2)
         job_card_number = self._extract_label_value(lines, ["job card number", "job card no", "invoice no", "bill no"], max_lines=1)
-        registration_number = self._extract_label_value(lines, ["registration number"], max_lines=1)
+        registration_number = self._extract_label_value(lines, ["registration number", "registration no", "regn. no", "regn no"], max_lines=1)
         invoice_enrichment = self._derive_invoice_enrichment(parts_items, labour_items, customer_voice_items)
 
         return self._drop_empty_values(
@@ -694,8 +709,8 @@ class BikeDocumentAI:
 
     def _extract_invoice_table(self, lines: list[str], section: str) -> tuple[list[dict], dict]:
         if section == "parts":
-            start_labels = ["service pre invoice", "service invoice", "tax invoice"]
-            stop_labels = {"parts description", "labour description"}
+            start_labels = ["parts description", "service pre invoice", "service invoice", "tax invoice"]
+            stop_labels = {"labour description"}
         else:
             start_labels = ["labour description"]
             stop_labels = {"total amount", "address", "customer signature and date"}
@@ -714,11 +729,16 @@ class BikeDocumentAI:
             if not line or normalized in TABLE_HEADER_LABELS:
                 index += 1
                 continue
+            if self._is_total_line(line):
+                totals = self._extract_table_totals(lines, index)
+                break
             if normalized in stop_labels and section == "parts":
                 break
-            if normalized == "total":
-                totals = self._extract_table_totals(lines, index + 1)
-                break
+            compact_item = self._build_compact_invoice_item(section, line)
+            if compact_item:
+                items.append(compact_item)
+                index += 1
+                continue
             if not self._is_code_token(line):
                 index += 1
                 continue
@@ -755,7 +775,7 @@ class BikeDocumentAI:
                 if not candidate:
                     index += 1
                     continue
-                if normalized_candidate == "total" and numeric_values:
+                if self._is_total_line(candidate) and numeric_values:
                     break
                 if self._looks_numeric_token(candidate):
                     numeric_values.append(self._parse_amount_token(candidate))
@@ -776,6 +796,45 @@ class BikeDocumentAI:
 
         return items, totals
 
+    def _build_compact_invoice_item(self, section: str, line: str) -> dict:
+        tokens = [token.strip(" ,;") for token in self._clean_line(line).split() if token.strip(" ,;")]
+        if len(tokens) < 4 or not self._is_code_token(tokens[0]):
+            return {}
+
+        code = tokens[0]
+        description_parts = []
+        numeric_values = []
+        numeric_started = False
+        index = 1
+        while index < len(tokens):
+            token = tokens[index].strip("()[]")
+            if re.fullmatch(CURRENCY_TOKEN_RE, token, re.IGNORECASE) and index + 1 < len(tokens):
+                next_token = tokens[index + 1].strip("()[]")
+                if self._looks_numeric_token(next_token):
+                    token = f"{token} {next_token}"
+                    index += 1
+
+            if self._looks_numeric_token(token):
+                amount = self._parse_amount_token(token)
+                if amount:
+                    numeric_values.append(amount)
+                    numeric_started = True
+            elif numeric_started:
+                if re.search(r"[A-Za-z]", token):
+                    return {}
+            else:
+                cleaned = token.strip(":-")
+                if cleaned and not self._looks_like_known_label(cleaned):
+                    description_parts.append(cleaned)
+            index += 1
+
+        if len(numeric_values) < 2 or not description_parts:
+            return {}
+        item = self._build_invoice_item(section, code, description_parts, numeric_values)
+        if item:
+            item["parse_mode"] = "compact_ocr_row"
+        return item
+
     def _extract_table_totals(self, lines: list[str], start_index: int) -> dict:
         totals = []
         index = start_index
@@ -783,6 +842,13 @@ class BikeDocumentAI:
             candidate = self._clean_line(lines[index])
             normalized = self._normalize_token(candidate)
             if not candidate:
+                index += 1
+                continue
+            inline_totals = self._inline_totals_from_line(candidate) if self._is_total_line(candidate) else []
+            if inline_totals:
+                totals.extend(inline_totals[:3 - len(totals)])
+                if len(inline_totals) >= 2:
+                    break
                 index += 1
                 continue
             if normalized in KNOWN_LABELS and normalized != "total":
@@ -798,17 +864,47 @@ class BikeDocumentAI:
         return self._drop_empty_values({"customer_amount": totals[0], "amount": totals[-1]})
 
     def _build_invoice_item(self, section: str, code: str, description_parts: list[str], numeric_values: list[float]) -> dict:
-        if not code or not description_parts or len(numeric_values) < 8:
+        if not code or not description_parts or len(numeric_values) < 2:
             return {}
 
         first_value = numeric_values[0]
         second_value = numeric_values[1] if len(numeric_values) > 1 else 0.0
+        parse_mode = "full"
         if first_value > 20 and 0 < second_value <= 20:
             quantity = second_value
             unit_price = first_value
         else:
             quantity = first_value
             unit_price = second_value
+
+        if len(numeric_values) >= 8:
+            return self._drop_empty_values(
+                {
+                    "section": section,
+                    "code": code,
+                    "description": " ".join(description_parts).strip(),
+                    "quantity": round(quantity, 2) if quantity else 0,
+                    "unit_price": round(unit_price, 2) if unit_price else 0,
+                    "discount_amount": round(numeric_values[2], 2) if len(numeric_values) > 2 else 0,
+                    "tax_rate": round(numeric_values[3], 2) if len(numeric_values) > 3 else 0,
+                    "cgst_amount": round(numeric_values[4], 2) if len(numeric_values) > 4 else 0,
+                    "sgst_amount": round(numeric_values[5], 2) if len(numeric_values) > 5 else 0,
+                    "igst_rate": round(numeric_values[6], 2) if len(numeric_values) > 6 else 0,
+                    "igst_amount": round(numeric_values[7], 2) if len(numeric_values) > 7 else 0,
+                    "customer_amount": round(numeric_values[8], 2) if len(numeric_values) > 8 else 0,
+                    "line_total_amount": round(numeric_values[9], 2) if len(numeric_values) > 9 else round(numeric_values[8], 2) if len(numeric_values) > 8 else 0,
+                }
+            )
+
+        parse_mode = "edge_recovered"
+        customer_amount = round(numeric_values[-1], 2)
+        if len(numeric_values) == 2 and first_value > 20:
+            quantity = 1
+            unit_price = round(first_value, 2)
+        elif len(numeric_values) == 2 and first_value <= 20:
+            unit_price = round(customer_amount / quantity, 2) if quantity else 0
+        elif len(numeric_values) >= 3:
+            unit_price = round(second_value, 2) if second_value else unit_price
 
         return self._drop_empty_values(
             {
@@ -817,14 +913,9 @@ class BikeDocumentAI:
                 "description": " ".join(description_parts).strip(),
                 "quantity": round(quantity, 2) if quantity else 0,
                 "unit_price": round(unit_price, 2) if unit_price else 0,
-                "discount_amount": round(numeric_values[2], 2) if len(numeric_values) > 2 else 0,
-                "tax_rate": round(numeric_values[3], 2) if len(numeric_values) > 3 else 0,
-                "cgst_amount": round(numeric_values[4], 2) if len(numeric_values) > 4 else 0,
-                "sgst_amount": round(numeric_values[5], 2) if len(numeric_values) > 5 else 0,
-                "igst_rate": round(numeric_values[6], 2) if len(numeric_values) > 6 else 0,
-                "igst_amount": round(numeric_values[7], 2) if len(numeric_values) > 7 else 0,
-                "customer_amount": round(numeric_values[8], 2) if len(numeric_values) > 8 else 0,
-                "line_total_amount": round(numeric_values[9], 2) if len(numeric_values) > 9 else round(numeric_values[8], 2) if len(numeric_values) > 8 else 0,
+                "customer_amount": customer_amount,
+                "line_total_amount": customer_amount,
+                "parse_mode": parse_mode,
             }
         )
 
@@ -873,9 +964,50 @@ class BikeDocumentAI:
     def _find_line_index(self, lines: list[str], labels: list[str]) -> int:
         normalized_labels = {self._normalize_token(label) for label in labels}
         for index, line in enumerate(lines):
-            if self._normalize_token(line) in normalized_labels:
+            normalized_line = self._normalize_token(line)
+            if normalized_line in normalized_labels:
+                return index
+            if any(normalized_line.startswith(label) for label in normalized_labels):
                 return index
         return -1
+
+    def _is_total_line(self, value: str) -> bool:
+        normalized = self._normalize_token(value)
+        if normalized in {"total amount", "total customer amount"}:
+            return False
+        return normalized == "total" or normalized.startswith("total ")
+
+    def _inline_totals_from_line(self, value: str) -> list[float]:
+        cleaned = self._clean_line(value)
+        if not self._is_total_line(cleaned):
+            return []
+        tokens = re.findall(rf"(?:{CURRENCY_TOKEN_RE}\s*)?[0-9,]+(?:\.\d{{1,2}})?", cleaned, re.IGNORECASE)
+        amounts = []
+        for token in tokens:
+            amount = self._parse_amount_token(token)
+            if amount:
+                amounts.append(round(amount, 2))
+        return amounts
+
+    def _invoice_review_payload(self, invoice_fields: dict, service_payload: dict) -> dict:
+        parts_items = invoice_fields.get("parts_items") or []
+        labour_items = invoice_fields.get("labour_items") or []
+        degraded_items = [item for item in [*parts_items, *labour_items] if self._is_degraded_invoice_item(item)]
+        compact_ocr_rows = sum(1 for item in degraded_items if item.get("parse_mode") == "compact_ocr_row")
+        return self._drop_empty_values(
+            {
+                "parts_item_count": len(parts_items),
+                "labour_item_count": len(labour_items),
+                "line_item_count": service_payload.get("line_item_count") or invoice_fields.get("line_item_count") or 0,
+                "recovered_edge_rows": len(degraded_items),
+                "compact_ocr_rows": compact_ocr_rows,
+                "invoice_kind": invoice_fields.get("invoice_kind", ""),
+                "systems_impacted": invoice_fields.get("systems_impacted") or [],
+            }
+        )
+
+    def _is_degraded_invoice_item(self, item: dict) -> bool:
+        return item.get("parse_mode") in {"edge_recovered", "compact_ocr_row"}
 
     def _split_lines(self, text: str) -> list[str]:
         return [line for line in (self._clean_line(raw) for raw in (text or "").splitlines()) if line]
@@ -901,14 +1033,24 @@ class BikeDocumentAI:
         cleaned = self._clean_line(value)
         direct_match = NUMERIC_TOKEN_RE.match(cleaned)
         if direct_match:
-            return float(direct_match.group(1).replace(",", ""))
+            return self._amount_string_to_float(direct_match.group(1))
         money_match = MONEY_RE.search(cleaned)
         if money_match:
-            return float(money_match.group(1).replace(",", ""))
+            return self._amount_string_to_float(money_match.group(1))
         return 0.0
 
     def _looks_numeric_token(self, value: str) -> bool:
-        return bool(NUMERIC_TOKEN_RE.match(self._clean_line(value)))
+        cleaned = self._clean_line(value)
+        return bool(NUMERIC_TOKEN_RE.match(cleaned)) and any(char.isdigit() for char in cleaned)
+
+    def _amount_string_to_float(self, value: str) -> float:
+        cleaned = re.sub(r"[^0-9.]", "", value or "")
+        if not any(char.isdigit() for char in cleaned):
+            return 0.0
+        try:
+            return float(cleaned)
+        except ValueError:
+            return 0.0
 
     def _is_code_token(self, value: str) -> bool:
         cleaned = self._clean_line(value)

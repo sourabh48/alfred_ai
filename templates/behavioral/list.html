@@ -5,9 +5,9 @@
 <section class="alfred-hero fade-in" id="behavioralRoot">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
-            <div class="alfred-chip mb-3">Stress, sleep, and work balance</div>
+            <div class="alfred-chip mb-3">Stress, sleep, work, and linked spending pressure</div>
             <h1 class="alfred-hero-title">Log your behavioral signals and map how pressure is moving beneath the financial surface.</h1>
-            <p class="alfred-hero-copy">The behavioral layer lets ALFRED connect stress, sleep, and work intensity with spending behavior and decision quality.</p>
+            <p class="alfred-hero-copy">ALFRED now links your stress logs with imported transactions, debt pressure, lifestyle spikes, and recurring commitments to explain spending behavior more clearly.</p>
         </div>
         <div class="surface-card" style="min-width: 260px;">
             <p class="metric-kicker">Current Fingerprint</p>
@@ -64,14 +64,22 @@
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Fingerprint Breakdown</h2>
-            <p class="page-section-copy mb-3">Derived personality, spending style, and current trend signals.</p>
+            <p class="page-section-copy mb-3">Derived personality, linked spending style, and current trend signals.</p>
             <div id="behavioralFingerprintPanel" class="data-stack"></div>
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">Financial Pressure Map</h3>
+                <div id="behavioralPressureMap" class="data-stack"></div>
+            </div>
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">Grounding And Freshness</h3>
+                <div id="behavioralGroundingPanel" class="data-stack"></div>
+            </div>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Recent Logs</h2>
-            <p class="page-section-copy mb-3">Last recorded behavioral snapshots.</p>
+            <p class="page-section-copy mb-3">Last recorded behavioral snapshots, alongside what ALFRED is reading from your spending data.</p>
             <div id="behavioralHistory" class="data-stack"></div>
         </div>
     </div>
@@ -79,5 +87,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/behavioral.js?v=2.3"></script>
+<script src="/static/js/behavioral.js?v=2.5"></script>
 {% endblock %}

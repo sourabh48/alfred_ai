@@ -20,6 +20,7 @@ function loadProjectDetails() {
             renderOperationalMetrics(payload.operational_metrics || []);
             renderLearningSnapshot(payload.learning_snapshot || {});
             renderInProgressTracks(payload.in_progress_tracks || []);
+            renderCompletedTracks(payload.completed_tracks || []);
             renderReportRows("projectDetailsReportLibrary", payload.report_library || [], item => `
                 <div class="data-row">
                     <div class="data-label">${Alfred.escapeHtml(formatDateTimeValue(item.created_at))}</div>
@@ -79,23 +80,18 @@ function renderOperationalMetrics(items) {
 }
 
 function renderLearningSnapshot(snapshot) {
-    const overallProgress = Number(snapshot.overall_progress || 0);
+    const overallProgress = normalizePercent(snapshot.overall_progress);
     setText("projectDetailsLearningSummary", snapshot.summary || "");
     setText("projectDetailsOverallProgressValue", `${overallProgress}%`);
     const bar = document.getElementById("projectDetailsOverallProgressBar");
     if (bar) {
-        if (bar.style.width !== `${overallProgress}%`) {
-            bar.style.width = `${overallProgress}%`;
-        }
-        if (bar.getAttribute("aria-valuenow") !== String(overallProgress)) {
-            bar.setAttribute("aria-valuenow", String(overallProgress));
-        }
+        setProgressBar(bar, overallProgress);
     }
     const container = document.getElementById("projectDetailsLearningTracks");
     if (!container) {
         return;
     }
-    Alfred.setHTMLIfChanged(container, (snapshot.tracks || []).map(track => renderProgressCard(track, "learning-track-card", "Still blocked by", "blocker")).join(""));
+    Alfred.setHTMLIfChanged(container, (snapshot.tracks || []).map(track => renderProgressCard(track, "learning-track-card", track.blocker_label || "Still blocked by", "blocker")).join(""));
 }
 
 function renderInProgressTracks(items) {
@@ -103,17 +99,26 @@ function renderInProgressTracks(items) {
     if (!container) {
         return;
     }
-    Alfred.setHTMLIfChanged(container, items.map(item => renderProgressCard(item, "mini-card", "Next focus", "next_focus")).join(""));
+    Alfred.setHTMLIfChanged(container, items.map(item => renderProgressCard(item, "mini-card", "Next focus", "next_focus", "status-guarded")).join(""));
 }
 
-function renderProgressCard(item, className, footerLabel, footerKey) {
-    const progress = Number(item.progress || 0);
+function renderCompletedTracks(items) {
+    const container = document.getElementById("projectDetailsCompletedTracks");
+    if (!container) {
+        return;
+    }
+    Alfred.setHTMLIfChanged(container, items.map(item => renderProgressCard(item, "mini-card", "Maintenance focus", "maintenance_focus", "status-good")).join(""));
+}
+
+function renderProgressCard(item, className, footerLabel, footerKey, statusClass = "status-guarded") {
+    const progress = normalizePercent(item.progress);
+    const effectiveStatusClass = progress >= 100 ? "status-good" : statusClass;
     const signals = Array.isArray(item.signals) ? item.signals : [];
     return `
         <div class="${className}">
             <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                 <div class="fw-semibold">${Alfred.escapeHtml(item.title || "")}</div>
-                <span class="status-pill status-guarded">${progress}%</span>
+                <span class="status-pill ${Alfred.escapeHtml(effectiveStatusClass)}">${progress}%</span>
             </div>
             <div class="progress alfred-progress mb-2">
                 <div class="progress-bar" role="progressbar" style="width: ${progress}%;" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"></div>
@@ -123,6 +128,24 @@ function renderProgressCard(item, className, footerLabel, footerKey) {
             <div class="muted small"><strong>${Alfred.escapeHtml(footerLabel)}:</strong> ${Alfred.escapeHtml(item[footerKey] || "")}</div>
         </div>
     `;
+}
+
+function normalizePercent(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+        return 0;
+    }
+    return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function setProgressBar(bar, progress) {
+    const width = `${progress}%`;
+    if (bar.style.width !== width) {
+        bar.style.width = width;
+    }
+    if (bar.getAttribute("aria-valuenow") !== String(progress)) {
+        bar.setAttribute("aria-valuenow", String(progress));
+    }
 }
 
 function renderReportRows(containerId, items, rowRenderer, emptyMessage) {

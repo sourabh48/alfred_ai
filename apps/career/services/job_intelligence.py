@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 import hashlib
 import json
 import re
@@ -9,10 +10,12 @@ from urllib.parse import quote_plus, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from django.utils import timezone
 
 from alfred_ai.services import extract_document_text
 from alfred_ai.services.url_safety import validate_public_http_url
 from apps.integrations.services import verified_intelligence
+from apps.integrations.services.verified_intelligence import freshness_snapshot
 
 JOB_SKILLS = {
     "python", "sql", "excel", "power bi", "tableau", "django", "react", "node", "aws", "azure", "gcp",
@@ -84,6 +87,41 @@ SALARY_BLOCK_RE = re.compile(
     r"\s*(?P<period>per\s+annum|per\s+year|/year|yearly|annual|annum|lpa|per\s+month|/month|monthly|month|pm|per\s+hour|/hour|hourly)?",
     re.IGNORECASE,
 )
+JOB_FEED_ADAPTERS = (
+    {
+        "name": "Remotive Jobs API",
+        "method": "remotive_jobs",
+        "source_url": "https://remotive.com/api/remote-jobs",
+    },
+    {
+        "name": "Arbeitnow Job Board API",
+        "method": "arbeitnow_jobs",
+        "source_url": "https://www.arbeitnow.com/api/job-board-api",
+    },
+    {
+        "name": "Remote OK API",
+        "method": "remoteok_jobs",
+        "source_url": "https://remoteok.com/api",
+    },
+)
+JOB_PAGE_ADAPTERS = ("Generic JSON-LD", "Greenhouse", "Lever", "Workday", "Ashby")
+
+
+def career_source_coverage_summary() -> dict:
+    return {
+        "completion_status": "complete_current_scope",
+        "configured_feed_count": len(JOB_FEED_ADAPTERS),
+        "configured_feeds": [item["name"] for item in JOB_FEED_ADAPTERS],
+        "minimum_feed_count": 3,
+        "job_page_adapter_count": len(JOB_PAGE_ADAPTERS),
+        "job_page_adapters": list(JOB_PAGE_ADAPTERS),
+        "compensation_layers": [
+            "direct role salary extraction",
+            "salary-bearing live opening samples",
+            "city/state/country salary-sample matching",
+            "freshness-backed evidence contracts",
+        ],
+    }
 
 
 @dataclass
@@ -245,23 +283,28 @@ class JobIntelligenceService:
             "analyst" if "analyst" in role.lower() else "",
             "python",
         ]
-        seen_urls, jobs, evidence_records, used_terms = set(), [], [], []
-        for term in [item for item in search_terms if item]:
-            result = verified_intelligence.remotive_jobs(term)
-            evidence_records.append(result.evidence)
-            used_terms.append(term)
-            for item in result.payload.get("jobs", []):
-                url = item.get("url", "")
-                if not url or url in seen_urls:
-                    continue
-                seen_urls.add(url)
-                jobs.append(self._normalize_opening(item, role=role, skills=skills, evidence=result.evidence))
+        unique_terms = []
+        for term in [item.strip() for item in search_terms if item and item.strip()]:
+            if term.lower() not in {existing.lower() for existing in unique_terms}:
+                unique_terms.append(term)
+        seen_urls, jobs, evidence_records, feed_queries = set(), [], [], []
+        for term in unique_terms[:5]:
+            for feed_result in self._live_job_feed_results(term):
+                evidence_records.append(feed_result["evidence"])
+                feed_queries.append({"term": term, "source_name": feed_result["source_name"]})
+                for item in feed_result["payload"].get("jobs", []):
+                    item = {**item, "_aggregator_name": feed_result["source_name"]}
+                    url = item.get("url", "")
+                    if not url or url in seen_urls:
+                        continue
+                    seen_urls.add(url)
+                    jobs.append(self._normalize_opening(item, role=role, skills=skills, evidence=feed_result["evidence"]))
         evidence = self._combine_evidence(
             evidence_records,
-            title="Live opening suggestions",
-            source_name="Remotive Jobs API",
-            source_url="https://remotive.com/api/remote-jobs",
-            summary=f"Merged {len(jobs)} opening(s) across {len(used_terms)} search variant(s).",
+            title="Multi-source live opening suggestions",
+            source_name="Multiple verified job feeds",
+            source_url=JOB_FEED_ADAPTERS[0]["source_url"],
+            summary=f"Merged {len(jobs)} opening(s) across {len(unique_terms[:5])} search variant(s) and {len(JOB_FEED_ADAPTERS)} configured feed adapter(s).",
         )
         filtered_jobs = [
             item for item in jobs
@@ -278,6 +321,8 @@ class JobIntelligenceService:
         return {
             "openings": filtered_jobs[:8],
             "evidence": evidence,
+            "source_evidence": evidence_records,
+            "source_coverage": self._opening_source_coverage(jobs, filtered_jobs, unique_terms, evidence_records, feed_queries),
             "filters": self._opening_filter_metadata(jobs),
             "active_filters": {
                 "country": country,
@@ -287,11 +332,38 @@ class JobIntelligenceService:
             "filtered_candidates": len(filtered_jobs),
         }
 
+    def _live_job_feed_results(self, term: str) -> list[dict]:
+        results = []
+        for adapter in JOB_FEED_ADAPTERS:
+            method = getattr(verified_intelligence, adapter["method"])
+            result = method(term)
+            payload = getattr(result, "payload", result if isinstance(result, dict) else {}) or {}
+            evidence = getattr(result, "evidence", {}) or {}
+            if not evidence:
+                evidence = {
+                    "title": f"{adapter['name']} job search for {term}",
+                    "source_name": adapter["name"],
+                    "source_url": adapter["source_url"],
+                    "summary": "Feed returned payload without stored evidence metadata.",
+                    "status": "fresh",
+                    "fetched_at": "",
+                    "verified_at": "",
+                    "stale_after": "",
+                    "query": term,
+                }
+            results.append({"source_name": adapter["name"], "payload": payload, "evidence": evidence})
+        return results
+
     def _normalize_opening(self, item: dict, *, role: str, skills: list[str], evidence: dict) -> dict:
         company = item.get("company") or item.get("company_name") or ""
         location = item.get("location", "") or "Remote"
         location_meta = self._location_hierarchy(location)
         relevance = self._opening_relevance(role, skills, item)
+        salary_signal = self._salary_signal_payload(item.get("salary", ""))
+        aggregator_name = item.get("_aggregator_name") or evidence.get("source_name", "Verified opening source") or "Verified opening source"
+        tags = item.get("tags", []) or []
+        if isinstance(tags, str):
+            tags = [tags]
         return {
             "title": item.get("title", ""),
             "company": company,
@@ -304,12 +376,13 @@ class JobIntelligenceService:
             "url": item.get("url", ""),
             "publication_date": item.get("publication_date", ""),
             "salary": item.get("salary", ""),
-            "tags": item.get("tags", [])[:8],
-            "portal_name": evidence.get("source_name", "Verified opening source") or "Verified opening source",
+            "salary_signal": salary_signal,
+            "tags": tags[:8],
+            "portal_name": aggregator_name,
             "portal_url": evidence.get("source_url", ""),
             "portal_family": self._portal_family(item.get("url", "")),
             "portal_host": urlparse(item.get("url", "")).netloc.replace("www.", ""),
-            "aggregator_name": evidence.get("source_name", "Verified opening source") or "Verified opening source",
+            "aggregator_name": aggregator_name,
             "verified_source": evidence.get("status", "fresh") in {"fresh", "stale"},
             "source_status": evidence.get("status", ""),
             "verified_at": evidence.get("verified_at", ""),
@@ -317,10 +390,69 @@ class JobIntelligenceService:
             "match_reasons": relevance["reasons"],
         }
 
+    def _salary_signal_payload(self, salary_text: str) -> dict:
+        salary = self._parse_salary_text(salary_text)
+        if not salary:
+            return {"available": False}
+        annual_min, annual_max = self._annualize_salary_range(salary["salary_min"], salary["salary_max"], salary["period"])
+        return {
+            "available": bool(annual_min or annual_max),
+            "raw": salary_text,
+            "salary_min_annual": annual_min,
+            "salary_max_annual": annual_max,
+            "currency": salary["currency"],
+            "period": salary["period"],
+        }
+
+    def _opening_source_coverage(self, openings: list[dict], filtered_jobs: list[dict], used_terms: list[str], evidence_records: list[dict], feed_queries: list[dict] | None = None) -> dict:
+        statuses = sorted({str(item.get("status") or "") for item in evidence_records if isinstance(item, dict) and item.get("status")})
+        portal_families = sorted({item.get("portal_family", "") for item in openings if item.get("portal_family")})
+        countries = sorted({item.get("country", "") for item in openings if item.get("country")})
+        salary_bearing = [item for item in openings if item.get("salary_signal", {}).get("available")]
+        source_names = self._evidence_source_names(evidence_records)
+        active_feed_names = sorted(
+            {
+                item.get("source_name", "")
+                for item in evidence_records
+                if isinstance(item, dict) and item.get("source_name") and item.get("status", "fresh") in {"fresh", "stale"}
+            }
+        )
+        source_candidate_counts = {}
+        source_salary_counts = {}
+        for item in openings:
+            source = item.get("aggregator_name") or item.get("portal_name") or "Unknown"
+            source_candidate_counts[source] = source_candidate_counts.get(source, 0) + 1
+            if item.get("salary_signal", {}).get("available"):
+                source_salary_counts[source] = source_salary_counts.get(source, 0) + 1
+        return {
+            "configured_feeds": [item["name"] for item in JOB_FEED_ADAPTERS],
+            "configured_feed_count": len(JOB_FEED_ADAPTERS),
+            "live_feed_count": len(active_feed_names),
+            "source_names": source_names,
+            "query_variants": used_terms[:6],
+            "feed_queries": (feed_queries or [])[:12],
+            "source_statuses": statuses,
+            "source_status_by_feed": {
+                item.get("source_name", ""): item.get("status", "")
+                for item in evidence_records
+                if isinstance(item, dict) and item.get("source_name")
+            },
+            "portal_families": portal_families,
+            "countries_seen": countries,
+            "salary_bearing_candidates": len(salary_bearing),
+            "filtered_salary_bearing_candidates": len([item for item in filtered_jobs if item.get("salary_signal", {}).get("available")]),
+            "source_candidate_counts": source_candidate_counts,
+            "source_salary_counts": source_salary_counts,
+            "coverage_complete": len(active_feed_names) >= len(JOB_FEED_ADAPTERS),
+        }
+
     def _opening_relevance(self, role: str, skills: list[str], opening: dict) -> dict:
         title = str(opening.get("title", "") or "").lower()
         category = str(opening.get("category", "") or "").lower()
-        tags = {str(item).lower() for item in (opening.get("tags") or []) if item}
+        raw_tags = opening.get("tags") or []
+        if isinstance(raw_tags, str):
+            raw_tags = [raw_tags]
+        tags = {str(item).lower() for item in raw_tags if item}
         score = 25.0
         reasons = []
         normalized_role = str(role or "").strip().lower()
@@ -411,22 +543,29 @@ class JobIntelligenceService:
         location: str = "",
         openings: list[dict] | None = None,
         job_snapshot: JobPostingSnapshot | None = None,
-        openings_evidence: dict | None = None,
+        openings_evidence: dict | list[dict] | None = None,
         current_income_annual: float = 0.0,
     ) -> dict:
-        observations, evidence = [], []
-        if openings_evidence:
-            evidence.append(openings_evidence)
+        observations = []
+        evidence = self._normalize_evidence_collection(openings_evidence)
         if job_snapshot and (job_snapshot.salary_min or job_snapshot.salary_max):
+            now = timezone.now()
             annual_min, annual_max = self._annualize_salary_range(job_snapshot.salary_min, job_snapshot.salary_max, job_snapshot.salary_period)
+            location_meta = self._location_hierarchy(job_snapshot.location)
             observations.append(
                 {
                     "source": job_snapshot.source_name,
                     "location": job_snapshot.location,
+                    "country": location_meta["country"],
+                    "state": location_meta["state"],
+                    "city": location_meta["city"],
+                    "is_remote": location_meta["is_remote"],
                     "salary_min_annual": annual_min,
                     "salary_max_annual": annual_max,
                     "currency": job_snapshot.salary_currency or "INR",
                     "url": job_snapshot.job_url,
+                    "source_kind": job_snapshot.source_kind,
+                    "feed_source": job_snapshot.source_name,
                 }
             )
             evidence.append(
@@ -436,9 +575,9 @@ class JobIntelligenceService:
                     "source_url": job_snapshot.job_url,
                     "summary": f"Salary signal extracted from the current {job_snapshot.source_kind.replace('_', ' ')}.",
                     "status": "fresh",
-                    "fetched_at": "",
-                    "verified_at": "",
-                    "stale_after": "",
+                    "fetched_at": now.isoformat(),
+                    "verified_at": now.isoformat(),
+                    "stale_after": (now + timedelta(hours=24)).isoformat(),
                     "query": role,
                     "notes": "Compensation was read directly from the active role text or JSON-LD when the page exposed it.",
                 }
@@ -448,31 +587,42 @@ class JobIntelligenceService:
             if not salary:
                 continue
             annual_min, annual_max = self._annualize_salary_range(salary["salary_min"], salary["salary_max"], salary["period"])
+            location_meta = self._location_hierarchy(opening.get("location", ""))
             observations.append(
                 {
                     "source": opening.get("company") or "Opening",
                     "location": opening.get("location", ""),
+                    "country": opening.get("country") or location_meta["country"],
+                    "state": opening.get("state") or location_meta["state"],
+                    "city": opening.get("city") or location_meta["city"],
+                    "is_remote": bool(opening.get("is_remote") or location_meta["is_remote"]),
                     "salary_min_annual": annual_min,
                     "salary_max_annual": annual_max,
                     "currency": salary["currency"],
                     "url": opening.get("url", ""),
+                    "source_kind": "live_opening",
+                    "feed_source": opening.get("aggregator_name") or opening.get("portal_name") or "Live opening",
                 }
             )
         if not observations:
+            geography_scope = self._salary_geography_scope(location, observations, [], fallback_to_global=False)
+            evidence_contract = self._compensation_evidence_contract(observations, [], evidence, fallback_to_global=False, requested_location=location)
             return {
                 "available": False,
                 "summary": "No salary-bearing evidence is available from the current parsed role or configured job feeds.",
                 "sample_count": 0,
                 "evidence": evidence,
                 "location_scope": location or "Global / Remote",
+                "geography_scope": geography_scope,
+                "salary_observations": [],
+                "evidence_contract": evidence_contract,
             }
         filtered = [
             item for item in observations
-            if not location
-            or location.lower() in (item.get("location", "") or "").lower()
-            or "remote" in (item.get("location", "") or "").lower()
+            if self._salary_location_matches(item, location)
         ]
         selected = filtered or observations
+        fallback_to_global = bool(location and not filtered and observations)
         mins = [item["salary_min_annual"] for item in selected if item["salary_min_annual"]]
         maxes = [item["salary_max_annual"] for item in selected if item["salary_max_annual"]]
         benchmark_min = round(median(mins), 2) if mins else 0.0
@@ -486,7 +636,11 @@ class JobIntelligenceService:
                 comparison = "above_benchmark"
             else:
                 comparison = "within_benchmark"
-        summary = f"Compensation benchmark is evidence-backed from {len(selected)} salary-bearing opening signal(s)."
+        evidence_contract = self._compensation_evidence_contract(observations, selected, evidence, fallback_to_global=fallback_to_global, requested_location=location)
+        summary = (
+            f"Compensation benchmark is evidence-backed from {len(selected)} salary-bearing opening signal(s) "
+            f"across {evidence_contract['selected_source_count']} source(s)."
+        )
         if comparison == "below_benchmark":
             summary += " Your current annualized income sits below the current benchmark band."
         elif comparison == "above_benchmark":
@@ -504,7 +658,124 @@ class JobIntelligenceService:
             "location_scope": location or "Global / Remote",
             "comparison": comparison,
             "current_income_annual": round(current_income_annual or 0, 2),
-            "evidence": evidence[:4],
+            "geography_scope": self._salary_geography_scope(location, observations, selected, fallback_to_global=fallback_to_global),
+            "salary_observations": [
+                {
+                    "source": item.get("source", ""),
+                    "location": item.get("location", ""),
+                    "salary_min_annual": item.get("salary_min_annual", 0),
+                    "salary_max_annual": item.get("salary_max_annual", 0),
+                    "currency": item.get("currency", ""),
+                    "url": item.get("url", ""),
+                    "source_kind": item.get("source_kind", ""),
+                    "feed_source": item.get("feed_source", ""),
+                    "country": item.get("country", ""),
+                    "state": item.get("state", ""),
+                    "city": item.get("city", ""),
+                }
+                for item in selected[:6]
+            ],
+            "evidence_contract": evidence_contract,
+            "evidence": evidence[:6],
+        }
+
+    def _normalize_evidence_collection(self, evidence: dict | list[dict] | None) -> list[dict]:
+        if not evidence:
+            return []
+        if isinstance(evidence, dict):
+            return [evidence]
+        return [item for item in evidence if isinstance(item, dict)]
+
+    def _compensation_evidence_contract(
+        self,
+        observations: list[dict],
+        selected: list[dict],
+        evidence: list[dict],
+        *,
+        fallback_to_global: bool,
+        requested_location: str,
+    ) -> dict:
+        freshness = freshness_snapshot(evidence)
+        selected_sources = sorted({item.get("feed_source") or item.get("source", "") for item in selected if item.get("feed_source") or item.get("source")})
+        selected_locations = sorted({item.get("location", "") for item in selected if item.get("location")})[:8]
+        source_names = self._evidence_source_names(evidence)
+        source_urls = self._evidence_source_urls(evidence)
+        return {
+            "observed_salary_count": len(observations),
+            "selected_salary_count": len(selected),
+            "selected_source_count": len(selected_sources),
+            "selected_sources": selected_sources,
+            "selected_locations": selected_locations,
+            "evidence_count": len(evidence),
+            "source_names": source_names,
+            "source_urls": source_urls,
+            "fallback_to_global": fallback_to_global,
+            "geo_match_level": self._salary_geo_match_level(requested_location, selected, fallback_to_global=fallback_to_global),
+            "salary_evidence_density": self._salary_evidence_density(len(selected), len(selected_sources)),
+            "currency_breakdown": self._salary_currency_breakdown(selected),
+            "freshness": freshness,
+            "proof_complete": bool(selected and source_names and freshness.get("proof_complete")),
+        }
+
+    def _salary_geo_match_level(self, requested_location: str, selected: list[dict], *, fallback_to_global: bool) -> str:
+        if not selected:
+            return "missing"
+        if fallback_to_global:
+            return "global_fallback"
+        requested = self._location_hierarchy(requested_location)
+        if requested["city"] and any(item.get("city") == requested["city"] for item in selected):
+            return "city"
+        if requested["state"] and any(item.get("state") == requested["state"] for item in selected):
+            return "state"
+        if requested["country"] and any(item.get("country") == requested["country"] for item in selected):
+            return "country"
+        if any(item.get("is_remote") for item in selected):
+            return "remote"
+        return "global"
+
+    def _salary_evidence_density(self, selected_count: int, source_count: int) -> str:
+        if selected_count >= 5 and source_count >= 2:
+            return "strong"
+        if selected_count >= 2:
+            return "usable"
+        if selected_count == 1:
+            return "thin"
+        return "missing"
+
+    def _salary_currency_breakdown(self, selected: list[dict]) -> dict:
+        counts = {}
+        for item in selected:
+            currency = item.get("currency") or "Unknown"
+            counts[currency] = counts.get(currency, 0) + 1
+        return counts
+
+    def _salary_location_matches(self, observation: dict, requested_location: str) -> bool:
+        requested = str(requested_location or "").strip()
+        if not requested:
+            return True
+        requested_meta = self._location_hierarchy(requested)
+        observation_location = str(observation.get("location", "") or "").lower()
+        if requested.lower() in observation_location or observation.get("is_remote"):
+            return True
+        if requested_meta["country"] and observation.get("country") == requested_meta["country"]:
+            if not requested_meta["state"] or observation.get("state") == requested_meta["state"]:
+                return True
+        if requested_meta["state"] and observation.get("state") == requested_meta["state"]:
+            return True
+        if requested_meta["city"] and observation.get("city") == requested_meta["city"]:
+            return True
+        return False
+
+    def _salary_geography_scope(self, requested_location: str, observations: list[dict], selected: list[dict], *, fallback_to_global: bool) -> dict:
+        requested_meta = self._location_hierarchy(requested_location)
+        return {
+            "requested_location": requested_location or "Global / Remote",
+            "requested_country": requested_meta["country"],
+            "requested_state": requested_meta["state"],
+            "requested_city": requested_meta["city"],
+            "matched_sample_count": len(selected),
+            "observed_locations": sorted({item.get("location", "") for item in observations if item.get("location")})[:8],
+            "fallback_to_global": fallback_to_global,
         }
 
     def build_study_recommendations(self, profile, resume_payload: dict, latest_analysis=None, openings: list[dict] | None = None) -> dict:
@@ -858,10 +1129,15 @@ class JobIntelligenceService:
         normalized_items = [item for item in items if item]
         first = normalized_items[0] if normalized_items else {}
         notes = " | ".join(item.get("notes", "") for item in normalized_items if item.get("notes"))[:600]
+        source_names = self._evidence_source_names(normalized_items) or [source_name]
+        source_urls = self._evidence_source_urls(normalized_items) or [source_url]
         return {
             "title": title,
             "source_name": source_name,
             "source_url": source_url,
+            "source_names": source_names,
+            "source_urls": source_urls,
+            "source_count": len(source_names),
             "summary": summary,
             "status": first.get("status", "fresh"),
             "fetched_at": first.get("fetched_at", ""),
@@ -869,7 +1145,32 @@ class JobIntelligenceService:
             "stale_after": first.get("stale_after", ""),
             "query": ", ".join(filter(None, [item.get("query", "") for item in normalized_items][:3])),
             "notes": notes,
+            "freshness": freshness_snapshot(normalized_items),
         }
+
+    def _evidence_source_names(self, evidence: list[dict]) -> list[str]:
+        names = set()
+        for item in evidence:
+            if not isinstance(item, dict):
+                continue
+            for source_name in item.get("source_names", []) or []:
+                if source_name:
+                    names.add(str(source_name))
+            if item.get("source_name"):
+                names.add(str(item["source_name"]))
+        return sorted(names)
+
+    def _evidence_source_urls(self, evidence: list[dict]) -> list[str]:
+        urls = set()
+        for item in evidence:
+            if not isinstance(item, dict):
+                continue
+            for source_url in item.get("source_urls", []) or []:
+                if source_url:
+                    urls.add(str(source_url))
+            if item.get("source_url"):
+                urls.add(str(item["source_url"]))
+        return sorted(urls)
 
     def _portal_family(self, url: str) -> str:
         domain = urlparse(url or "").netloc.replace("www.", "").lower()

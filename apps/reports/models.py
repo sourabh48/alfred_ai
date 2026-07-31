@@ -8,6 +8,42 @@ class GeneratedReport(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class ChatGPTImport(models.Model):
+    IMPORT_TYPE_CHOICES = [
+        ("chat_transcript", "Chat Transcript"),
+        ("dashboard_export", "Dashboard Export"),
+        ("mixed_context", "Mixed Context"),
+    ]
+
+    STATUS_CHOICES = [
+        ("review_ready", "Review Ready"),
+        ("mapped", "Mapped"),
+        ("archived", "Archived"),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="chatgpt_imports")
+    title = models.CharField(max_length=180)
+    import_type = models.CharField(max_length=30, choices=IMPORT_TYPE_CHOICES, default="chat_transcript")
+    source_label = models.CharField(max_length=120, default="ChatGPT", blank=True)
+    raw_text = models.TextField()
+    parsed_payload = models.JSONField(default=dict, blank=True)
+    content_hash = models.CharField(max_length=64, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="review_ready")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "status", "created_at"]),
+            models.Index(fields=["user", "content_hash"]),
+            models.Index(fields=["import_type", "status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.source_label or 'ChatGPT'} | {self.title}"
+
+
 class SystemTicket(models.Model):
     MODULE_CHOICES = [
         ("expenses", "Expenses"),

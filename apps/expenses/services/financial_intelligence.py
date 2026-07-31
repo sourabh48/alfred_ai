@@ -44,13 +44,42 @@ def build_financial_intelligence(user) -> dict:
     )
 
 
+def build_canonical_financial_baseline(user) -> dict:
+    revision = _financial_revision(user)
+    return materialize_payload(
+        namespace="financial-baseline",
+        user_id=user.id,
+        revision=revision,
+        ttl_seconds=45,
+        builder=lambda: _build_canonical_financial_baseline_uncached(user),
+    )
+
+
+def resolve_canonical_financial_baseline(user) -> dict:
+    payload = build_canonical_financial_baseline(user)
+    return {key: value for key, value in payload.items() if key != "_materialized"}
+
+
 def _build_financial_intelligence_uncached(user) -> dict:
     expenses = list(Expense.objects.filter(user=user).order_by("transaction_date", "id"))
     loans = list(Loan.objects.filter(user=user).order_by("-start_date", "-id"))
+    payment_rows = fetch_payment_history_rows(user=user) if loans else []
 
     intelligence = _empty_intelligence()
-    balance_sheet = _build_balance_sheet(user=user, loans=loans)
+    today = timezone.localdate()
+    reference_date = max([item.transaction_date for item in expenses], default=today)
+    monthly_buckets = _build_monthly_buckets(expenses)
+    balance_sheet = _build_balance_sheet(user=user, loans=loans, payment_rows=payment_rows)
     intelligence["balance_sheet"] = balance_sheet
+    intelligence["baseline"] = _build_canonical_financial_baseline_uncached(
+        user,
+        expenses=expenses,
+        loans=loans,
+        payment_rows=payment_rows,
+        balance_sheet=balance_sheet,
+        monthly_buckets=monthly_buckets,
+        reference_date=reference_date,
+    )
     financial_relationships, transaction_relationships = build_financial_relationships(user=user, expenses=expenses, loans=loans)
     intelligence["financial_relationships"] = financial_relationships
     if not expenses and not loans:
@@ -63,10 +92,6 @@ def _build_financial_intelligence_uncached(user) -> dict:
             intelligence["behavior"]["strategy"] = "Import a statement to combine cash-flow behavior with the balance-sheet view."
         return intelligence
 
-    today = timezone.localdate()
-    reference_date = max([item.transaction_date for item in expenses], default=today)
-
-    monthly_buckets = _build_monthly_buckets(expenses)
     current_key = (reference_date.year, reference_date.month)
     previous_date = _shift_month(reference_date, -1)
     previous_key = (previous_date.year, previous_date.month)
@@ -103,6 +128,7 @@ def _build_financial_intelligence_uncached(user) -> dict:
     avg_monthly_outflow = mean(monthly_outflows) if monthly_outflows else 0.0
     volatility_ratio = _safe_ratio(_series_std(monthly_outflows), max(avg_monthly_outflow, 1))
     signature = behavior_signature.generate_signature(monthly_outflows, monthly_stress)
+    signature_readability = _humanize_behavior_signature(signature)
     expense_spike, spike_amount = anomaly_detector.detect_expense_spike(monthly_outflows)
     burnout_spike = anomaly_detector.detect_burnout_spike(monthly_stress)
     ai_insights = insight_generator.generate_insights(
@@ -147,8 +173,10 @@ def _build_financial_intelligence_uncached(user) -> dict:
                 "discipline_score": round(discipline_score, 1),
                 "liquidity_score": round(liquidity_score, 1),
                 "stress_score": round(stress_score, 1),
+                "financial_stress_score": round(stress_score, 1),
                 "risk_level": risk_level,
                 "savings_rate": round(savings_rate * 100, 1),
+                "observed_savings_rate": round(savings_rate * 100, 1),
                 "loan_ratio": round(loan_ratio * 100, 1),
                 "debt_service_ratio": round(debt_service_ratio * 100, 1),
                 "discretionary_ratio": round(discretionary_ratio * 100, 1),
@@ -171,6 +199,7 @@ def _build_financial_intelligence_uncached(user) -> dict:
                 "personality": personality,
                 "coach_tone": tone,
                 "signature": signature,
+                "signature_readability": signature_readability,
                 "strategy": strategy,
                 "ai_insights": ai_insights,
                 "pattern_flags": _build_pattern_flags(
@@ -189,7 +218,7 @@ def _build_financial_intelligence_uncached(user) -> dict:
                     peak_day=peak_day,
                 ),
             },
-            "loan_portfolio": _build_loan_portfolio(loans, debt_entries, current_bucket),
+            "loan_portfolio": _build_loan_portfolio(loans, debt_entries, current_bucket, payment_rows=payment_rows),
             "balance_sheet": balance_sheet,
             "financial_relationships": financial_relationships,
             "lifestyle": lifestyle,
@@ -203,8 +232,10 @@ def _build_financial_intelligence_uncached(user) -> dict:
 
 
 def _financial_revision(user) -> str:
+    from apps.career.models import CareerProfile, CareerResume
+
     expense_meta = Expense.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("transaction_date"))
-    loan_meta = Loan.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"))
+    loan_meta = Loan.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
     payment_meta = LoanPaymentHistory.objects.filter(loan__user=user).aggregate(
         count=Count("id"),
         max_id=Max("id"),
@@ -218,11 +249,14 @@ def _financial_revision(user) -> str:
     vehicle_meta = BikeProfile.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
     service_meta = BikeServiceRecord.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("service_date"))
     trip_meta = TripLog.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("log_date"))
+    career_profile_meta = CareerProfile.objects.filter(user=user).aggregate(count=Count("id"), max_last_salary=Max("last_salary"))
+    career_resume_meta = CareerResume.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
     return "|".join(
         str(value or "")
         for value in [
+            user.monthly_income, user.variable_income, user.rent_or_emi, user.city,
             expense_meta["count"], expense_meta["max_id"], expense_meta["max_date"],
-            loan_meta["count"], loan_meta["max_id"],
+            loan_meta["count"], loan_meta["max_id"], loan_meta["max_updated"],
             payment_meta["count"], payment_meta["max_id"], payment_meta["max_date"], payment_meta["max_created"],
             account_meta["count"], account_meta["max_id"], account_meta["max_sync"],
             investment_meta["count"], investment_meta["max_id"],
@@ -231,6 +265,8 @@ def _financial_revision(user) -> str:
             vehicle_meta["count"], vehicle_meta["max_id"], vehicle_meta["max_updated"],
             service_meta["count"], service_meta["max_id"], service_meta["max_date"],
             trip_meta["count"], trip_meta["max_id"], trip_meta["max_date"],
+            career_profile_meta["count"], career_profile_meta["max_last_salary"],
+            career_resume_meta["count"], career_resume_meta["max_id"], career_resume_meta["max_updated"],
         ]
     )
 
@@ -250,8 +286,10 @@ def _empty_intelligence() -> dict:
             "discipline_score": 0.0,
             "liquidity_score": 0.0,
             "stress_score": 0.0,
+            "financial_stress_score": 0.0,
             "risk_level": "No data",
             "savings_rate": 0.0,
+            "observed_savings_rate": 0.0,
             "loan_ratio": 0.0,
             "debt_service_ratio": 0.0,
             "discretionary_ratio": 0.0,
@@ -274,6 +312,16 @@ def _empty_intelligence() -> dict:
             "personality": "Awaiting history",
             "coach_tone": "energetic",
             "signature": {"avg_expense": 0.0, "expense_volatility": 0.0, "stress_avg": 0.0, "spike_factor": 0.0},
+            "signature_readability": {
+                "volatility": {
+                    "label": "No pattern yet",
+                    "summary": "ALFRED needs more months of spending before it can describe how steady your outflow is.",
+                },
+                "spike_factor": {
+                    "label": "No pattern yet",
+                    "summary": "ALFRED needs more months of spending before it can explain how sharply your spend jumps.",
+                },
+            },
             "strategy": "Import bank statements or add expenses so ALFRED can build your profile.",
             "ai_insights": ["ALFRED needs transaction history before it can learn your patterns."],
             "pattern_flags": [],
@@ -285,6 +333,7 @@ def _empty_intelligence() -> dict:
             "manual_total_outstanding": 0.0,
             "manual_total_emi": 0.0,
             "manual_interest_remaining": 0.0,
+            "pending_foreclosure_balance": 0.0,
             "pending_foreclosure_excluded_balance": 0.0,
             "payment_component_totals": {
                 "principal_paid": 0.0,
@@ -300,6 +349,18 @@ def _empty_intelligence() -> dict:
             "current_month_repayment": 0.0,
             "projected_payoff_months": 0,
             "manual_loans": [],
+            "home_ownership_summary": {
+                "positions": 0,
+                "financed_asset_value_total": 0.0,
+                "property_acquisition_cost_total": 0.0,
+                "down_payment_total": 0.0,
+                "other_upfront_payments_total": 0.0,
+                "upfront_cash_invested_total": 0.0,
+                "equity_built_total": 0.0,
+                "principal_paid_recorded_total": 0.0,
+                "interest_and_cost_paid_recorded_total": 0.0,
+            },
+            "home_ownership_positions": [],
             "detected_repayments": [],
         },
         "balance_sheet": {
@@ -307,12 +368,17 @@ def _empty_intelligence() -> dict:
             "total_liabilities": 0.0,
             "net_worth": 0.0,
             "asset_liability_ratio": 0.0,
+            "pending_foreclosure_balance": 0.0,
             "pending_foreclosure_excluded_balance": 0.0,
+            "home_loan_asset_proxy_total": 0.0,
+            "home_loan_upfront_cash_total": 0.0,
             "assets": [],
             "liabilities": [],
+            "home_ownership_positions": [],
             "vehicle_positions": [],
             "summary": "Add account balances, investments, loans, or vehicle profiles to build the balance-sheet view.",
         },
+        "baseline": _empty_canonical_financial_baseline(),
         "financial_relationships": {
             "summary": {
                 "tracked_events": 0,
@@ -343,6 +409,148 @@ def _empty_intelligence() -> dict:
         "recent_transactions": [],
         "recurring_commitments": [],
         "spike_days": [],
+    }
+
+
+def _empty_canonical_financial_baseline() -> dict:
+    return {
+        "reference_month": timezone.localdate().strftime("%B %Y"),
+        "sample_months": 0,
+        "monthly_income": 0.0,
+        "income_source": "not_evidenced",
+        "income_source_summary": "ALFRED needs salary credits, a reported income baseline, or other credit history before it can set a monthly income baseline.",
+        "supplemental_variable_income": 0.0,
+        "observed_average_monthly_inflow": 0.0,
+        "observed_average_monthly_variable_spend": 0.0,
+        "observed_average_monthly_total_outflow": 0.0,
+        "current_month_variable_spend": 0.0,
+        "current_month_total_outflow": 0.0,
+        "recurring_emi_burden": 0.0,
+        "rent_burden": 0.0,
+        "fixed_obligations": 0.0,
+        "debt_burden_ratio": 0.0,
+        "disposable_cash_flow": 0.0,
+        "savings_capacity": 0.0,
+        "savings_rate": 0.0,
+        "baseline_savings_rate": 0.0,
+        "savings_capacity_rate": 0.0,
+        "liquid_cash": 0.0,
+        "liquid_runway_months": 0.0,
+        "pending_foreclosure_balance": 0.0,
+        "total_assets": 0.0,
+        "total_liabilities": 0.0,
+        "net_worth": 0.0,
+        "asset_liability_ratio": 0.0,
+    }
+
+
+def _build_canonical_financial_baseline_uncached(
+    user,
+    *,
+    expenses: list[Expense] | None = None,
+    loans: list[Loan] | None = None,
+    payment_rows: list[dict] | None = None,
+    balance_sheet: dict | None = None,
+    monthly_buckets: dict[tuple[int, int], dict] | None = None,
+    reference_date: date | None = None,
+) -> dict:
+    from apps.career.models import CareerProfile, CareerResume
+    from apps.career.services import build_employment_income_signals
+
+    expenses = list(expenses) if expenses is not None else list(Expense.objects.filter(user=user).order_by("transaction_date", "id"))
+    loans = list(loans) if loans is not None else list(Loan.objects.filter(user=user).order_by("-start_date", "-id"))
+    payment_rows = list(payment_rows or [])
+    if loans and not payment_rows:
+        payment_rows = fetch_payment_history_rows(user=user)
+
+    today = timezone.localdate()
+    resolved_reference_date = reference_date or max([item.transaction_date for item in expenses], default=today)
+    monthly_buckets = monthly_buckets or _build_monthly_buckets(expenses)
+    recent_month_keys = sorted(monthly_buckets.keys())[-3:]
+    recent_buckets = [monthly_buckets[key] for key in recent_month_keys]
+    current_key = (resolved_reference_date.year, resolved_reference_date.month)
+    current_bucket = monthly_buckets.get(current_key, _empty_month_bucket())
+
+    observed_average_monthly_inflow = round(mean(bucket["income"] for bucket in recent_buckets), 2) if recent_buckets else 0.0
+    observed_average_monthly_variable_spend = round(mean((bucket["expense"] + bucket["other"]) for bucket in recent_buckets), 2) if recent_buckets else 0.0
+    observed_average_monthly_total_outflow = round(mean((bucket["expense"] + bucket["loan"] + bucket["other"]) for bucket in recent_buckets), 2) if recent_buckets else 0.0
+    current_month_variable_spend = round(current_bucket["expense"] + current_bucket["other"], 2)
+    current_month_total_outflow = round(current_bucket["expense"] + current_bucket["loan"] + current_bucket["other"], 2)
+
+    profile = CareerProfile.objects.filter(user=user).first()
+    latest_resume = CareerResume.objects.filter(user=user).order_by("-updated_at", "-id").first()
+    income_signals = build_employment_income_signals(user=user, latest_resume=latest_resume, profile=profile)
+
+    reported_income = income_signals.get("reported_income", {}) or {}
+    salary_signal = income_signals.get("salary_credit_signal") or {}
+    profile_last_salary = float(getattr(profile, "last_salary", 0) or 0)
+    monthly_income = float(income_signals.get("monthly_cash_income", 0) or 0)
+    income_source = "not_evidenced"
+    income_source_summary = income_signals.get("source_summary") or ""
+    if salary_signal:
+        income_source = "salary_credits"
+    elif float(reported_income.get("value", 0) or 0) > 0:
+        income_source = "reported_annual_ctc" if reported_income.get("mode") == "annual_ctc" else "reported_monthly_income"
+    elif profile_last_salary > 0:
+        income_source = "career_profile_last_salary"
+        income_source_summary = "Monthly income falls back to the last salary stored in the career profile because stronger salary signals are not available yet."
+    elif observed_average_monthly_inflow > 0:
+        monthly_income = observed_average_monthly_inflow
+        income_source = "observed_credit_inflow"
+        income_source_summary = "Monthly income falls back to the recent average of observed credit inflows because a cleaner salary signal is not evidenced yet."
+
+    monthly_income = round(monthly_income, 2)
+    supplemental_variable_income = round(float(income_signals.get("variable_income", 0) or 0), 2)
+    rent_burden = round(float(getattr(user, "rent_or_emi", 0) or 0), 2)
+
+    recurring_emi_burden = 0.0
+    for loan in loans:
+        balance = _loan_reporting_balance(loan, today=today)
+        if _loan_counts_toward_recurring_emi(loan, balance):
+            recurring_emi_burden += float(loan.emi or 0)
+    recurring_emi_burden = round(recurring_emi_burden, 2)
+    fixed_obligations = round(rent_burden + recurring_emi_burden, 2)
+    disposable_cash_flow = round(monthly_income - fixed_obligations, 2)
+    savings_capacity = round(monthly_income - fixed_obligations - observed_average_monthly_variable_spend, 2)
+    savings_rate = round(((savings_capacity / monthly_income) * 100) if monthly_income else 0.0, 2)
+    debt_burden_ratio = round(((fixed_obligations / monthly_income) * 100) if monthly_income else 0.0, 2)
+
+    accounts = list(BankAccount.objects.filter(user=user, is_active=True))
+    liquid_cash = round(sum(max(float(account.current_balance or 0), 0.0) for account in accounts if account.account_type != "credit"), 2)
+    liquid_runway_months = round(
+        (liquid_cash / fixed_obligations) if fixed_obligations else ((liquid_cash / monthly_income) if monthly_income else 0.0),
+        2,
+    )
+
+    resolved_balance_sheet = balance_sheet or _build_balance_sheet(user=user, loans=loans, payment_rows=payment_rows)
+    return {
+        "reference_month": resolved_reference_date.strftime("%B %Y"),
+        "sample_months": len(recent_buckets),
+        "monthly_income": monthly_income,
+        "income_source": income_source,
+        "income_source_summary": income_source_summary or _empty_canonical_financial_baseline()["income_source_summary"],
+        "supplemental_variable_income": supplemental_variable_income,
+        "observed_average_monthly_inflow": observed_average_monthly_inflow,
+        "observed_average_monthly_variable_spend": observed_average_monthly_variable_spend,
+        "observed_average_monthly_total_outflow": observed_average_monthly_total_outflow,
+        "current_month_variable_spend": current_month_variable_spend,
+        "current_month_total_outflow": current_month_total_outflow,
+        "recurring_emi_burden": recurring_emi_burden,
+        "rent_burden": rent_burden,
+        "fixed_obligations": fixed_obligations,
+        "debt_burden_ratio": debt_burden_ratio,
+        "disposable_cash_flow": disposable_cash_flow,
+        "savings_capacity": savings_capacity,
+        "savings_rate": savings_rate,
+        "baseline_savings_rate": savings_rate,
+        "savings_capacity_rate": savings_rate,
+        "liquid_cash": liquid_cash,
+        "liquid_runway_months": liquid_runway_months,
+        "pending_foreclosure_balance": round(float(resolved_balance_sheet.get("pending_foreclosure_balance", resolved_balance_sheet.get("pending_foreclosure_excluded_balance", 0)) or 0), 2),
+        "total_assets": round(float(resolved_balance_sheet.get("total_assets", 0) or 0), 2),
+        "total_liabilities": round(float(resolved_balance_sheet.get("total_liabilities", 0) or 0), 2),
+        "net_worth": round(float(resolved_balance_sheet.get("net_worth", 0) or 0), 2),
+        "asset_liability_ratio": round(float(resolved_balance_sheet.get("asset_liability_ratio", 0) or 0), 2),
     }
 
 
@@ -468,7 +676,7 @@ def _serialize_recent_transactions(expenses: list[Expense], transaction_relation
     ]
 
 
-def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], current_bucket: dict) -> dict:
+def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], current_bucket: dict, *, payment_rows: list[dict] | None = None) -> dict:
     manual_loans = _serialize_loans(loans, timezone.localdate())
     active_manual_loans = [item for item in manual_loans if item["is_active"]]
     liability_manual_loans = [item for item in manual_loans if item["counts_toward_liabilities"]]
@@ -478,21 +686,18 @@ def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], curren
     interest_remaining = sum(item["interest_remaining"] for item in active_manual_loans)
     pending_foreclosure_balance = round(sum(item["estimated_balance"] for item in pending_manual_loans), 2)
     current_month_repayment = current_bucket["loan"]
+    payment_rows = list(payment_rows or [])
     payment_user = loans[0].user if loans else (debt_entries[0].user if debt_entries else None)
-    linked_payment_rows = (
-        fetch_payment_history_rows(
-            user=payment_user,
-            expense_reference_ids=[entry.id for entry in debt_entries if entry.id],
-            include_loan_fields=True,
-        )
-        if payment_user
-        else []
-    )
+    if payment_user and not payment_rows:
+        payment_rows = fetch_payment_history_rows(user=payment_user, include_loan_fields=True)
+    expense_reference_ids = {entry.id for entry in debt_entries if entry.id}
+    linked_payment_rows = [item for item in payment_rows if item.get("expense_reference_id") in expense_reference_ids]
     linked_payments = {
         item.get("expense_reference_id"): item
         for item in linked_payment_rows
         if item.get("expense_reference_id")
     }
+    home_ownership_positions, home_ownership_summary = _build_home_ownership_positions(loans=loans, payment_rows=payment_rows)
     payment_component_totals = {
         "principal_paid": round(sum(float(item.get("principal_paid") or item.get("principal_component") or 0) for item in linked_payment_rows), 2),
         "interest_paid": round(sum(float(item.get("interest_paid") or item.get("interest_component") or 0) for item in linked_payment_rows), 2),
@@ -544,6 +749,7 @@ def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], curren
         "manual_total_outstanding": round(total_outstanding, 2),
         "manual_total_emi": round(total_emi, 2),
         "manual_interest_remaining": round(interest_remaining, 2),
+        "pending_foreclosure_balance": pending_foreclosure_balance,
         "pending_foreclosure_excluded_balance": pending_foreclosure_balance,
         "payment_component_totals": payment_component_totals,
         "foreclosure_pending_count": sum(1 for item in manual_loans if item["status"] == "foreclosure_pending"),
@@ -553,6 +759,8 @@ def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], curren
         "current_month_repayment": round(current_month_repayment, 2),
         "projected_payoff_months": projected_months,
         "manual_loans": manual_loans,
+        "home_ownership_summary": home_ownership_summary,
+        "home_ownership_positions": home_ownership_positions,
         "detected_repayments": detected_repayments,
     }
 
@@ -568,6 +776,11 @@ def _serialize_loans(loans: list[Loan], today: date) -> list[dict]:
             annual_rate=loan.interest_rate,
             emi=loan.emi,
         )
+        home_purchase_price = loan.resolved_home_purchase_price
+        home_down_payment = loan.resolved_home_down_payment
+        home_other_upfront_payments = loan.resolved_home_other_upfront_payments
+        home_upfront_cash_invested = loan.resolved_home_upfront_cash_invested
+        home_property_acquisition_cost = loan.resolved_home_property_acquisition_cost
         months_remaining = months_to_close
         projected_end_date = _shift_month(today, months_remaining)
         result.append(
@@ -583,6 +796,11 @@ def _serialize_loans(loans: list[Loan], today: date) -> list[dict]:
                 "tenure_months": loan.tenure_months,
                 "start_date": loan.start_date.isoformat(),
                 "remaining_balance": round(loan.remaining_balance, 2) if loan.remaining_balance is not None else None,
+                "home_purchase_price": home_purchase_price,
+                "home_down_payment": home_down_payment,
+                "home_other_upfront_payments": home_other_upfront_payments,
+                "home_upfront_cash_invested": home_upfront_cash_invested,
+                "home_property_acquisition_cost": home_property_acquisition_cost,
                 "estimated_balance": round(estimated_balance, 2),
                 "status": loan.status,
                 "closure_reason": loan.closure_reason,
@@ -610,16 +828,22 @@ def _build_debt_trend(monthly_buckets: dict[tuple[int, int], dict]) -> dict:
     }
 
 
-def _build_balance_sheet(*, user, loans: list[Loan]) -> dict:
+def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | None = None) -> dict:
     accounts = list(BankAccount.objects.filter(user=user, is_active=True))
     investments = list(Investment.objects.filter(user=user))
     vehicle_profiles = list(BikeProfile.objects.filter(user=user))
     vehicle_services = list(BikeServiceRecord.objects.filter(user=user).select_related("bike_profile"))
     trip_logs = list(TripLog.objects.filter(user=user).select_related("travel_plan", "travel_plan__vehicle_profile"))
+    payment_rows = list(payment_rows or [])
+    if loans and not payment_rows:
+        payment_rows = fetch_payment_history_rows(user=user)
 
     liquid_cash = round(sum(max(account.current_balance or 0, 0) for account in accounts if account.account_type != "credit"), 2)
     credit_liability = round(sum(abs(account.current_balance or 0) for account in accounts if account.account_type == "credit"), 2)
     investment_assets = round(sum(item.current_value or 0 for item in investments), 2)
+    home_ownership_positions, home_ownership_summary = _build_home_ownership_positions(loans=loans, payment_rows=payment_rows)
+    home_loan_asset_proxy_total = round(home_ownership_summary["property_acquisition_cost_total"], 2)
+    home_loan_upfront_cash_total = round(home_ownership_summary["upfront_cash_invested_total"], 2)
     liability_loans = []
     pending_foreclosure_balance = 0.0
     open_loan_liability = 0.0
@@ -646,6 +870,8 @@ def _build_balance_sheet(*, user, loans: list[Loan]) -> dict:
         {"label": "Cash and bank balances", "amount": liquid_cash},
         {"label": "Investments", "amount": investment_assets},
     ]
+    if home_loan_asset_proxy_total:
+        assets.append({"label": "Home property acquisition-cost base (proxy)", "amount": home_loan_asset_proxy_total})
     if vehicle_assets:
         assets.append({"label": "Utility and income-supporting vehicles", "amount": vehicle_assets})
 
@@ -670,6 +896,12 @@ def _build_balance_sheet(*, user, loans: list[Loan]) -> dict:
                 f"{summary} Pending foreclosure balances of INR {pending_foreclosure_balance:,.0f} "
                 "remain in liabilities until a full closure-payment match is confirmed."
             )
+        if home_loan_asset_proxy_total:
+            summary = (
+                f"{summary} Home-property acquisition cost of INR {home_loan_asset_proxy_total:,.0f} is shown as a conservative proxy, "
+                f"including tracked upfront cash of INR {home_loan_upfront_cash_total:,.0f}. "
+                "This still excludes appreciation and sale value unless you track them separately."
+            )
     else:
         summary = "Add account balances, investments, loans, or vehicle profiles to build the balance-sheet view."
 
@@ -678,9 +910,13 @@ def _build_balance_sheet(*, user, loans: list[Loan]) -> dict:
         "total_liabilities": total_liabilities,
         "net_worth": net_worth,
         "asset_liability_ratio": ratio,
+        "pending_foreclosure_balance": pending_foreclosure_balance,
         "pending_foreclosure_excluded_balance": pending_foreclosure_balance,
+        "home_loan_asset_proxy_total": home_loan_asset_proxy_total,
+        "home_loan_upfront_cash_total": home_loan_upfront_cash_total,
         "assets": assets,
         "liabilities": liabilities,
+        "home_ownership_positions": home_ownership_positions,
         "vehicle_positions": vehicle_positions,
         "summary": summary,
     }
@@ -706,6 +942,14 @@ def _loan_reporting_balance(loan: Loan, *, today: date, months_elapsed: int | No
 
 def _loan_counts_toward_liabilities(loan: Loan, estimated_balance: float) -> bool:
     return loan.status not in {"foreclosed", "closed", "prepaid"} and round(float(estimated_balance or 0), 2) > 0
+
+
+def _loan_counts_toward_recurring_emi(loan: Loan, estimated_balance: float) -> bool:
+    if round(float(estimated_balance or 0), 2) <= 0:
+        return False
+    if loan.status in {"foreclosed", "closed", "prepaid", "foreclosure_pending"}:
+        return False
+    return bool(loan.is_active and float(loan.emi or 0) > 0)
 
 
 def _build_vehicle_positions(
@@ -794,6 +1038,132 @@ def _build_pattern_flags(
         flags.append(f"ALFRED detected {len(spike_days)} spike days that should be reviewed before they become habits.")
 
     return flags[:6]
+
+
+def _build_home_ownership_positions(*, loans: list[Loan], payment_rows: list[dict]) -> tuple[list[dict], dict]:
+    today = timezone.localdate()
+    payment_totals_by_loan: dict[int, dict[str, float]] = defaultdict(
+        lambda: {
+            "principal_paid": 0.0,
+            "interest_and_cost_paid": 0.0,
+        }
+    )
+    for item in payment_rows:
+        loan_id = item.get("loan_id")
+        if not loan_id:
+            continue
+        payment_totals_by_loan[loan_id]["principal_paid"] += float(item.get("principal_paid") or item.get("principal_component") or 0)
+        payment_totals_by_loan[loan_id]["interest_and_cost_paid"] += (
+            float(item.get("interest_paid") or item.get("interest_component") or 0)
+            + float(item.get("charges_paid") or 0)
+            + float(item.get("penalties_paid") or 0)
+            + float(item.get("tax_paid") or 0)
+        )
+
+    positions = []
+    for loan in loans:
+        if loan.loan_type != "home" or loan.status in {"foreclosed", "defaulted"}:
+            continue
+        financed_asset_value = round(max(float(loan.principal or 0), 0), 2)
+        purchase_price = loan.resolved_home_purchase_price
+        down_payment = loan.resolved_home_down_payment
+        other_upfront_payments = loan.resolved_home_other_upfront_payments
+        upfront_cash_invested = loan.resolved_home_upfront_cash_invested
+        property_acquisition_cost = loan.resolved_home_property_acquisition_cost
+        if property_acquisition_cost <= 0:
+            continue
+        current_loan_balance = _loan_reporting_balance(loan, today=today)
+        estimated_principal_repaid = round(max(financed_asset_value - current_loan_balance, 0), 2)
+        equity_built = round(max(upfront_cash_invested + estimated_principal_repaid, 0), 2)
+        recorded = payment_totals_by_loan.get(loan.id, {})
+        principal_paid_recorded = round(float(recorded.get("principal_paid") or 0), 2)
+        interest_and_cost_paid_recorded = round(float(recorded.get("interest_and_cost_paid") or 0), 2)
+        ownership_progress_pct = round((equity_built / property_acquisition_cost) * 100, 1) if property_acquisition_cost else 0.0
+        positions.append(
+            {
+                "loan_id": loan.id,
+                "lender": loan.lender,
+                "loan_account_number": loan.loan_account_number,
+                "status": loan.status,
+                "status_label": loan.get_status_display(),
+                "monthly_emi": round(float(loan.emi or 0), 2),
+                "financed_asset_value": financed_asset_value,
+                "purchase_price": purchase_price,
+                "property_acquisition_cost": property_acquisition_cost,
+                "down_payment": down_payment,
+                "other_upfront_payments": other_upfront_payments,
+                "upfront_cash_invested": upfront_cash_invested,
+                "current_loan_balance": round(current_loan_balance, 2),
+                "equity_built": equity_built,
+                "estimated_principal_repaid": estimated_principal_repaid,
+                "ownership_progress_pct": ownership_progress_pct,
+                "principal_paid_recorded": principal_paid_recorded,
+                "interest_and_cost_paid_recorded": interest_and_cost_paid_recorded,
+                "insight": (
+                    f"Property acquisition cost proxy is INR {property_acquisition_cost:,.0f}, including "
+                    f"upfront cash of INR {upfront_cash_invested:,.0f} "
+                    f"against a purchase-price base of INR {purchase_price:,.0f}. "
+                    f"Estimated owner equity built is INR {equity_built:,.0f}; recorded non-equity borrowing cost is INR {interest_and_cost_paid_recorded:,.0f}."
+                ),
+            }
+        )
+
+    summary = {
+        "positions": len(positions),
+        "financed_asset_value_total": round(sum(item["financed_asset_value"] for item in positions), 2),
+        "purchase_price_total": round(sum(item["purchase_price"] for item in positions), 2),
+        "property_acquisition_cost_total": round(sum(item["property_acquisition_cost"] for item in positions), 2),
+        "down_payment_total": round(sum(item["down_payment"] for item in positions), 2),
+        "other_upfront_payments_total": round(sum(item["other_upfront_payments"] for item in positions), 2),
+        "upfront_cash_invested_total": round(sum(item["upfront_cash_invested"] for item in positions), 2),
+        "equity_built_total": round(sum(item["equity_built"] for item in positions), 2),
+        "principal_paid_recorded_total": round(sum(item["principal_paid_recorded"] for item in positions), 2),
+        "interest_and_cost_paid_recorded_total": round(sum(item["interest_and_cost_paid_recorded"] for item in positions), 2),
+    }
+    return positions, summary
+
+
+def _humanize_behavior_signature(signature: dict) -> dict:
+    average_expense = float(signature.get("avg_expense") or 0)
+    volatility = float(signature.get("expense_volatility") or 0)
+    spike_factor = float(signature.get("spike_factor") or 0)
+    volatility_ratio = _safe_ratio(volatility, max(average_expense, 1))
+    spike_ratio = _safe_ratio(spike_factor, max(average_expense, 1))
+
+    if volatility_ratio <= 0.15:
+        volatility_label = "Very steady"
+    elif volatility_ratio <= 0.35:
+        volatility_label = "Mostly steady"
+    elif volatility_ratio <= 0.6:
+        volatility_label = "Noticeable swings"
+    else:
+        volatility_label = "High swings"
+
+    if spike_ratio <= 0.25:
+        spike_label = "Small peaks"
+    elif spike_ratio <= 0.55:
+        spike_label = "Occasional peaks"
+    elif spike_ratio <= 0.9:
+        spike_label = "Large peaks"
+    else:
+        spike_label = "Extreme peaks"
+
+    return {
+        "volatility": {
+            "label": volatility_label,
+            "summary": (
+                f"Your monthly spending variation is about {volatility_ratio * 100:.0f}% of a typical month, "
+                "so Alfred is describing how smooth or uneven your spending pattern feels."
+            ),
+        },
+        "spike_factor": {
+            "label": spike_label,
+            "summary": (
+                f"Your biggest gap between low-spend and high-spend months is about {spike_ratio * 100:.0f}% of a typical month, "
+                "which Alfred uses to explain how sharply your spending can jump."
+            ),
+        },
+    }
 
 
 def _build_stress_drivers(loan_ratio: float, debt_service_ratio: float, discretionary_ratio: float, spike_days: list[dict]) -> list[str]:

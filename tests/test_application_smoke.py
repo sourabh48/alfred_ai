@@ -176,6 +176,7 @@ class ApplicationSmokeTests(TestCase):
             "/api/budgets/dashboard/",
             "/api/loans/summary/",
             "/api/loans/metrics/",
+            "/api/loans/networth/",
             "/api/behavioral/fingerprint/",
             "/api/behavioral/stress/",
             "/api/mobility/dashboard/",

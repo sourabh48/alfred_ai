@@ -13,7 +13,7 @@ import requests
 
 from apps.budgets.models import Budget
 from apps.expenses.models import Expense
-from apps.loans.models import Loan
+from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 
 
 class BudgetIntelligenceService:
@@ -60,29 +60,32 @@ class BudgetIntelligenceService:
         - Historical spending patterns
         - City cost of living
         """
-        monthly_income = getattr(user, "monthly_income", 0) or 0
+        baseline = resolve_canonical_financial_baseline(user)
+        monthly_income = float(baseline.get("monthly_income", 0) or 0)
         city = getattr(user, "city", "").lower()
 
         if monthly_income <= 0:
             return {
                 "success": False,
                 "message": "Please update your monthly income in profile to get budget suggestions.",
+                "financial_baseline": baseline,
             }
 
         # Calculate cost adjustment based on city
         city_multiplier = self._get_city_cost_multiplier(city)
 
         # Calculate fixed obligations
-        fixed_obligations = self._calculate_fixed_obligations(user)
+        fixed_obligations = float(baseline.get("fixed_obligations", 0) or 0)
 
         # Disposable income after fixed costs
-        disposable_income = monthly_income - fixed_obligations
+        disposable_income = float(baseline.get("disposable_cash_flow", monthly_income - fixed_obligations) or 0)
 
         if disposable_income <= 0:
             return {
                 "success": False,
                 "message": "Your fixed obligations exceed your income. Consider debt restructuring.",
                 "fixed_obligations": fixed_obligations,
+                "financial_baseline": baseline,
             }
 
         # Generate category-wise budget
@@ -108,6 +111,7 @@ class BudgetIntelligenceService:
             "category_budgets": category_budgets,
             "daily_expenditure_limit": round(daily_expenditure, 2),
             "recommendations": recommendations,
+            "financial_baseline": baseline,
         }
 
     def calculate_daily_affordability(self, user) -> Dict[str, any]:
@@ -121,17 +125,16 @@ class BudgetIntelligenceService:
         days_remaining = days_in_month - today.day + 1
 
         # Get current month spending
+        baseline = resolve_canonical_financial_baseline(user)
         month_spending = Expense.objects.filter(
             user=user,
             transaction_date__gte=month_start,
             transaction_date__lte=today,
             direction="debit",
-        ).aggregate(total=Sum("amount"))["total"] or 0
+        ).exclude(classification="loan").aggregate(total=Sum("amount"))["total"] or 0
 
-        # Get monthly budget or income
-        monthly_income = getattr(user, "monthly_income", 0) or 0
-        fixed_obligations = self._calculate_fixed_obligations(user)
-        monthly_budget = monthly_income - fixed_obligations
+        # Get monthly budget from the canonical baseline so EMI burden is not double counted.
+        monthly_budget = float(baseline.get("disposable_cash_flow", 0) or 0)
 
         remaining_budget = monthly_budget - month_spending
 
@@ -163,6 +166,7 @@ class BudgetIntelligenceService:
             "avg_daily_spending": round(avg_daily_spending, 2),
             "status": status,
             "message": self._get_affordability_message(status, safe_daily_spend, today_spending),
+            "financial_baseline": baseline,
         }
 
     def forecast_finances(self, user, months_ahead: int = 6) -> Dict[str, any]:
@@ -183,7 +187,7 @@ class BudgetIntelligenceService:
                 transaction_date__gte=month_start,
                 transaction_date__lt=month_end,
                 direction="debit",
-            ).aggregate(total=Sum("amount"))["total"] or 0
+            ).exclude(classification="loan").aggregate(total=Sum("amount"))["total"] or 0
 
             monthly_expenses.append(expense_total)
 
@@ -197,8 +201,9 @@ class BudgetIntelligenceService:
             trend = "unknown"
 
         # Forecast future months
-        monthly_income = getattr(user, "monthly_income", 0) or 0
-        fixed_obligations = self._calculate_fixed_obligations(user)
+        baseline = resolve_canonical_financial_baseline(user)
+        monthly_income = float(baseline.get("monthly_income", 0) or 0)
+        fixed_obligations = float(baseline.get("fixed_obligations", 0) or 0)
 
         forecasts = []
         for i in range(months_ahead):
@@ -220,6 +225,7 @@ class BudgetIntelligenceService:
             "trend": trend,
             "forecasts": forecasts,
             "insights": self._generate_forecast_insights(forecasts, trend),
+            "financial_baseline": baseline,
         }
 
     def _get_city_cost_multiplier(self, city: str) -> float:
@@ -233,15 +239,8 @@ class BudgetIntelligenceService:
 
     def _calculate_fixed_obligations(self, user) -> float:
         """Calculate fixed monthly obligations (rent, EMIs, etc.)."""
-        rent_or_emi = getattr(user, "rent_or_emi", 0) or 0
-
-        # Add active loan EMIs
-        active_loan_emis = Loan.objects.filter(
-            user=user,
-            is_active=True
-        ).aggregate(total=Sum("emi"))["total"] or 0
-
-        return rent_or_emi + active_loan_emis
+        baseline = resolve_canonical_financial_baseline(user)
+        return float(baseline.get("fixed_obligations", 0) or 0)
 
     def _generate_category_budgets(
         self, disposable_income: float, city_multiplier: float, user

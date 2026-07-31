@@ -107,6 +107,7 @@ def _investment_summary_payload(user) -> dict:
     gain_loss = total_value - total_invested
     analysis = portfolio_intelligence_service.analyze_portfolio_risk(user)
     market_context = portfolio_intelligence_service.get_market_trends_and_suggestions(user)
+    watchlist = portfolio_intelligence_service.build_short_horizon_watchlist(user)
 
     return {
         "summary": {
@@ -120,6 +121,7 @@ def _investment_summary_payload(user) -> dict:
         },
         "analysis": analysis,
         "market_context": market_context,
+        "watchlist": watchlist,
         "positions": InvestmentSerializer(investments, many=True).data,
         "grounding": {
             "history": {

@@ -5,9 +5,9 @@ from rest_framework.response import Response
 from django.utils import timezone
 
 from alfred_ai.pagination import OptionalPageNumberPagination
-from .models import GeneratedReport, SystemTicket
-from .serializers import GeneratedReportSerializer, SystemTicketSerializer
-from .services import reporting_service
+from .models import ChatGPTImport, GeneratedReport, SystemTicket
+from .serializers import ChatGPTImportSerializer, GeneratedReportSerializer, SystemTicketSerializer
+from .services import chatgpt_import_service, reporting_service
 
 class ReportListView(ListAPIView):
     serializer_class = GeneratedReportSerializer
@@ -16,6 +16,38 @@ class ReportListView(ListAPIView):
 
     def get_queryset(self):
         return GeneratedReport.objects.filter(user=self.request.user).order_by("-created_at")
+
+
+class ChatGPTImportListCreateView(ListCreateAPIView):
+    serializer_class = ChatGPTImportSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = OptionalPageNumberPagination
+
+    def get_queryset(self):
+        return ChatGPTImport.objects.filter(user=self.request.user).order_by("-created_at", "-id")
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            payload = chatgpt_import_service.build_payload(
+                raw_text=serializer.validated_data["raw_text"],
+                title=serializer.validated_data.get("title") or "",
+                import_type=serializer.validated_data.get("import_type") or "chat_transcript",
+            )
+        except ValueError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+        import_record = ChatGPTImport.objects.create(
+            user=request.user,
+            title=payload["title"],
+            import_type=payload["import_type"],
+            source_label=(serializer.validated_data.get("source_label") or "ChatGPT")[:120],
+            raw_text=serializer.validated_data["raw_text"].strip(),
+            parsed_payload=payload["parsed_payload"],
+            content_hash=payload["content_hash"],
+        )
+        return Response(self.get_serializer(import_record).data, status=status.HTTP_201_CREATED)
 
 
 class SystemTicketListCreateView(ListCreateAPIView):

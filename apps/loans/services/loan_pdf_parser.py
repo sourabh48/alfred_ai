@@ -79,6 +79,13 @@ class LoanPDFParser:
             "confidence": confidence,
             "extracted_text": full_text[:20000],
             "loans": loans,
+            "parser_notes": " ".join(extraction.notes[:6]).strip() if 'extraction' in locals() else "",
+            "payload": {
+                "extraction_method": extraction.method if 'extraction' in locals() else "",
+                "extraction_notes": extraction.notes[:6] if 'extraction' in locals() else [],
+                "raw_text_excerpt": " ".join((full_text or "").split())[:600],
+                "extraction_review": extraction.review_payload if 'extraction' in locals() else {},
+            },
         }
 
     def _read_bytes(self, upload: BinaryIO) -> bytes:

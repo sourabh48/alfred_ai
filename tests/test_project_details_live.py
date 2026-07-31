@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
@@ -105,8 +106,13 @@ class ProjectDetailsLiveTests(TestCase):
         tracks_by_title = {item["title"]: item for item in refreshed["learning_snapshot"]["tracks"]}
 
         self.assertGreater(refreshed["learning_snapshot"]["overall_progress"], initial["learning_snapshot"]["overall_progress"])
-        self.assertEqual(refreshed["summary_cards"][1]["label"], "Learning Progress")
+        self.assertEqual(refreshed["summary_cards"][1]["label"], "Scope Completion")
+        self.assertEqual(refreshed["summary_cards"][2]["label"], "Learning Maturity")
         self.assertIn("18 service logs", tracks_by_title["Vehicle maintenance learning"]["signals"])
+        self.assertGreaterEqual(tracks_by_title["Vehicle maintenance learning"]["progress"], 88)
+        self.assertLess(tracks_by_title["Vehicle maintenance learning"]["progress"], 100)
+        self.assertEqual(tracks_by_title["Vehicle maintenance learning"]["blocker_label"], "Remaining maturity")
+        self.assertIn("not exhaustive", tracks_by_title["Vehicle maintenance learning"]["blocker"])
         self.assertIn("Model training lifecycle", tracks_by_title)
 
     def test_project_details_page_includes_live_refresh_hook(self):
@@ -115,7 +121,30 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="projectDetailsRoot"')
         self.assertContains(response, "/api/project-details/")
-        self.assertContains(response, "project_details.js")
+        self.assertContains(response, "project_details.js?v=1.4")
+        self.assertContains(response, "Verified Complete Checks")
+
+    def test_project_details_progress_values_are_bounded_integer_percentages(self):
+        self.client.force_login(self.superuser)
+        payload = self.client.get("/api/project-details/").json()
+
+        progress_values = [payload["learning_snapshot"]["overall_progress"]]
+        progress_values.extend(item["progress"] for item in payload["learning_snapshot"]["tracks"])
+        progress_values.extend(item["progress"] for item in payload["in_progress_tracks"])
+        progress_values.extend(item["progress"] for item in payload["completed_tracks"])
+
+        for value in progress_values:
+            with self.subTest(value=value):
+                self.assertIsInstance(value, int)
+                self.assertGreaterEqual(value, 0)
+                self.assertLessEqual(value, 100)
+
+        learning_card = next(item for item in payload["summary_cards"] if item["label"] == "Learning Maturity")
+        self.assertEqual(learning_card["value"], f"{payload['learning_snapshot']['overall_progress']}%")
+        scope_card = next(item for item in payload["summary_cards"] if item["label"] == "Scope Completion")
+        self.assertTrue(scope_card["value"].endswith("%"))
+        in_progress_card = next(item for item in payload["summary_cards"] if item["label"] == "In-Progress Tracks")
+        self.assertEqual(in_progress_card["value"], len(payload["in_progress_tracks"]))
 
     def test_in_progress_tracks_follow_named_learning_tracks_not_sorted_positions(self):
         self.client.force_login(self.superuser)
@@ -189,20 +218,64 @@ class ProjectDetailsLiveTests(TestCase):
         payload = self.client.get("/api/project-details/").json()
         learning_by_title = {item["title"]: item for item in payload["learning_snapshot"]["tracks"]}
         in_progress_by_title = {item["title"]: item for item in payload["in_progress_tracks"]}
+        completed_by_title = {item["title"]: item for item in payload["completed_tracks"]}
 
-        self.assertEqual(
-            in_progress_by_title["Document correction workflow"]["progress"],
-            max(learning_by_title["Document intelligence"]["progress"], 24),
-        )
-        self.assertEqual(
-            in_progress_by_title["Cross-module proof enforcement"]["progress"],
-            max(learning_by_title["Verified evidence refresh"]["progress"] - 12, 18),
-        )
-        self.assertEqual(
-            in_progress_by_title["Vehicle catalog and maintenance depth"]["progress"],
-            max(learning_by_title["Vehicle maintenance learning"]["progress"] - 8, 20),
-        )
-        self.assertEqual(
-            in_progress_by_title["Career source coverage"]["progress"],
-            max(learning_by_title["Career and market intelligence"]["progress"] - 10, 18),
-        )
+        expected_active = {
+            "Browser/UI regression coverage",
+            "Document OCR and correction maturity",
+            "Vehicle catalog and maintenance depth",
+            "Career source and compensation breadth",
+            "Evidence freshness and proof rigor",
+            "Large-data hardening",
+            "ML maturity and training lifecycle",
+        }
+        self.assertTrue(expected_active.issubset(set(in_progress_by_title)))
+        self.assertEqual(in_progress_by_title["Browser/UI regression coverage"]["progress"], 45)
+        self.assertEqual(in_progress_by_title["Large-data hardening"]["progress"], 84)
+        self.assertGreaterEqual(in_progress_by_title["Document OCR and correction maturity"]["progress"], 82)
+        self.assertGreaterEqual(in_progress_by_title["Vehicle catalog and maintenance depth"]["progress"], 88)
+        self.assertLess(in_progress_by_title["Vehicle catalog and maintenance depth"]["progress"], 100)
+        self.assertEqual(learning_by_title["Vehicle maintenance learning"]["blocker_label"], "Remaining maturity")
+        self.assertEqual(in_progress_by_title["ML maturity and training lifecycle"]["progress"], round(payload["learning_snapshot"]["model_training"]["overall_progress"]))
+        self.assertEqual(completed_by_title["Backend/API regression baseline"]["progress"], 100)
+        self.assertEqual(completed_by_title["Vehicle make/model picker fix"]["progress"], 100)
+        self.assertNotIn("Vehicle catalog and maintenance depth", completed_by_title)
+        self.assertNotIn("Large-data hardening", completed_by_title)
+        self.assertNotIn("Career source coverage", completed_by_title)
+        if round(payload["learning_snapshot"]["model_training"]["supervised_training_progress"]) >= 100:
+            self.assertEqual(completed_by_title["Supervised model refresh"]["progress"], 100)
+        else:
+            self.assertIn("Supervised model refresh", in_progress_by_title)
+
+    @patch("alfred_ai.project_details.training_health_snapshot")
+    def test_completed_supervised_training_moves_auto_training_out_of_active_tracks(self, training_snapshot):
+        training_snapshot.return_value = {
+            "overall_progress": 75.9,
+            "summary": "7/8 model states are fresh and ready; 0 trainable model state(s) are waiting on data or environment gates, 1 planned future model(s) are excluded from supervised coverage, and 0 failed recently.",
+            "total_models": 8,
+            "ready_models": 7,
+            "fresh_models": 7,
+            "skipped_models": 1,
+            "failed_models": 0,
+            "training_models": 0,
+            "trainable_models": 7,
+            "supervised_ready_models": 7,
+            "supervised_fresh_models": 7,
+            "supervised_skipped_models": 0,
+            "planned_models": 1,
+            "supervised_training_progress": 100.0,
+            "average_confidence": 58.52,
+            "maturity": {},
+            "models": [],
+        }
+        self.client.force_login(self.superuser)
+
+        payload = self.client.get("/api/project-details/").json()
+        in_progress_by_title = {item["title"]: item for item in payload["in_progress_tracks"]}
+        completed_by_title = {item["title"]: item for item in payload["completed_tracks"]}
+
+        self.assertIn("ML maturity and training lifecycle", in_progress_by_title)
+        self.assertEqual(in_progress_by_title["ML maturity and training lifecycle"]["progress"], 76)
+        self.assertNotIn("Supervised model refresh", in_progress_by_title)
+        self.assertEqual(completed_by_title["Supervised model refresh"]["progress"], 100)
+        self.assertIn("7/7 trainable models fresh and ready", completed_by_title["Supervised model refresh"]["detail"])

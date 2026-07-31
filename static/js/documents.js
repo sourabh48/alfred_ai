@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("documentServiceForm").addEventListener("submit", submitServiceDocument);
     document.getElementById("documentResumeForm").addEventListener("submit", submitResumeDocument);
     document.getElementById("documentCreditForm").addEventListener("submit", submitCreditDocument);
+    document.getElementById("documentChatGPTImportForm").addEventListener("submit", submitChatGPTImport);
 
     loadDocumentCenter();
     Alfred.enableLiveRefresh("documents-live", loadDocumentCenter, { rootId: "documentCenterRoot", interactionHoldMs: 4500 });
@@ -23,6 +24,7 @@ const documentCenterResources = [
     { key: "bikeDashboard", url: "/api/mobility/bike-service-dashboard/", fallback: { bike_profiles: [], bike_documents: [] } },
     { key: "careerFiles", url: "/api/career/resumes/", fallback: [] },
     { key: "creditUploads", url: "/api/integrations/credit-score/uploads/", fallback: [] },
+    { key: "chatgptImports", url: "/api/reports/chatgpt-imports/", fallback: [] },
     { key: "reviewQueue", url: "/api/documents/review-queue/", fallback: { results: [] } },
     { key: "diagnostics", url: "/api/documents/diagnostics/", fallback: { results: [] } },
 ];
@@ -38,16 +40,18 @@ function loadDocumentCenter() {
             const bikeDashboard = payload.bikeDashboard || { bike_profiles: [], bike_documents: [] };
             const careerFiles = payload.careerFiles || [];
             const creditUploads = payload.creditUploads || [];
+            const chatgptImports = documentCenterItems(payload.chatgptImports || []);
             const reviewQueue = payload.reviewQueue || { results: [] };
             const diagnostics = payload.diagnostics || { results: [] };
 
             hydrateVehicleProfiles(bikeDashboard.bike_profiles || []);
-            renderDocumentSummary(statementUploads, loanUploads, bikeDashboard.bike_documents || [], careerFiles, creditUploads);
+            renderDocumentSummary(statementUploads, loanUploads, bikeDashboard.bike_documents || [], careerFiles, creditUploads, chatgptImports);
             renderStatementUploads(statementUploads);
             renderLoanUploads(loanUploads);
             renderVehicleDocuments(bikeDashboard.bike_documents || []);
             renderCareerFiles(careerFiles);
             renderCreditUploads(creditUploads);
+            renderChatGPTImports(chatgptImports);
             renderReviewQueue(reviewQueue.results || []);
             renderDiagnostics(diagnostics.results || []);
 
@@ -117,10 +121,21 @@ function documentCenterLabel(key) {
         bikeDashboard: "Vehicle docs",
         careerFiles: "Career files",
         creditUploads: "Credit reports",
+        chatgptImports: "ChatGPT imports",
         reviewQueue: "Review queue",
         diagnostics: "Diagnostics",
     };
     return labels[key] || key;
+}
+
+function documentCenterItems(payload) {
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+    if (Array.isArray(payload?.results)) {
+        return payload.results;
+    }
+    return [];
 }
 
 function setDocumentCenterBusy(isBusy) {
@@ -180,6 +195,23 @@ function getReviewFieldValue(state, fieldName, fallbackValue) {
     return fallbackValue ?? "";
 }
 
+function formatReviewFieldValue(field, value) {
+    if (field?.type === "json") {
+        if (typeof value === "string") {
+            return value;
+        }
+        if (value === null || value === undefined || value === "") {
+            return "";
+        }
+        try {
+            return JSON.stringify(value, null, 2);
+        } catch (_error) {
+            return String(value);
+        }
+    }
+    return String(value ?? "");
+}
+
 function hydrateVehicleProfiles(profiles) {
     ["documentVehicleProfile", "documentServiceProfile"].forEach(id => {
         Alfred.syncSelectOptions(id, profiles, {
@@ -192,7 +224,7 @@ function hydrateVehicleProfiles(profiles) {
     });
 }
 
-function renderDocumentSummary(statementUploads, loanUploads, vehicleDocuments, resumes, creditUploads) {
+function renderDocumentSummary(statementUploads, loanUploads, vehicleDocuments, resumes, creditUploads, chatgptImports = []) {
     const recentConfidence = [
         ...statementUploads.map(item => Number(item.parse_confidence || 0)),
         ...loanUploads.map(item => Number(item.parse_confidence || 0)),
@@ -205,8 +237,8 @@ function renderDocumentSummary(statementUploads, loanUploads, vehicleDocuments, 
         : 0;
 
     Alfred.setTextIfChanged("documentConfidenceValue", `${avgConfidence}%`);
-    Alfred.setTextIfChanged("documentCenterMeta", statementUploads.length || loanUploads.length || vehicleDocuments.length || resumes.length || creditUploads.length
-        ? `${statementUploads.length} statements | ${loanUploads.length} loan docs | ${vehicleDocuments.length} vehicle docs | ${resumes.length} career files | ${creditUploads.length} credit reports tracked`
+    Alfred.setTextIfChanged("documentCenterMeta", statementUploads.length || loanUploads.length || vehicleDocuments.length || resumes.length || creditUploads.length || chatgptImports.length
+        ? `${statementUploads.length} statements | ${loanUploads.length} loan docs | ${vehicleDocuments.length} vehicle docs | ${resumes.length} career files | ${creditUploads.length} credit reports | ${chatgptImports.length} chat imports tracked`
         : "No recent uploads yet.");
 
     const cards = [
@@ -215,6 +247,7 @@ function renderDocumentSummary(statementUploads, loanUploads, vehicleDocuments, 
         { label: "Vehicle Docs", value: vehicleDocuments.length, copy: "Compliance and service-supporting files" },
         { label: "Career Files", value: resumes.length, copy: "Resume-based career intelligence inputs" },
         { label: "Credit Reports", value: creditUploads.length, copy: "Uploaded bureau reports retained with parser status" },
+        { label: "Chat Imports", value: chatgptImports.length, copy: "Imported ChatGPT context retained for review" },
         { label: "Parser Avg", value: `${avgConfidence}%`, copy: "Average parser confidence across recent uploads" },
     ];
     Alfred.setHTMLIfChanged("documentCenterCards", cards.map(card => `
@@ -351,6 +384,39 @@ function renderCreditUploads(items) {
     `).join(""));
 }
 
+function renderChatGPTImports(items) {
+    const target = document.getElementById("documentChatGPTImportList");
+    if (!target) {
+        return;
+    }
+    if (!items.length) {
+        Alfred.setHTMLIfChanged(target, `<div class="empty-state">No ChatGPT imports saved yet.</div>`);
+        return;
+    }
+
+    Alfred.setHTMLIfChanged(target, items.slice(0, 8).map(item => {
+        const modules = Array.isArray(item.detected_modules) ? item.detected_modules : [];
+        const moduleChips = modules.slice(0, 5).map(module => `
+            <span class="chip-neutral">${Alfred.escapeHtml(formatDocType(module.module || "context"))} ${Math.round(Number(module.confidence || 0) * 100)}%</span>
+        `).join("");
+        const payload = item.parsed_payload || {};
+        const sourceMeta = [
+            item.import_type_label || formatDocType(item.import_type || "chat_transcript"),
+            item.status_label || formatDocType(item.status || "review_ready"),
+            payload.message_count ? `${Alfred.formatNumber(payload.message_count, 0)} messages` : "",
+            payload.word_count ? `${Alfred.formatNumber(payload.word_count, 0)} words` : "",
+        ].filter(Boolean).join(" | ");
+        return `
+            <div class="mini-card">
+                <div class="fw-semibold">${Alfred.escapeHtml(item.title || "ChatGPT import")}</div>
+                <div class="muted small">${Alfred.escapeHtml(item.source_label || "ChatGPT")} | ${Alfred.escapeHtml(sourceMeta)} | ${Alfred.formatDateTime(item.created_at)}</div>
+                ${moduleChips ? `<div class="chip-row mt-2">${moduleChips}</div>` : ""}
+                <div class="small mt-2">${Alfred.escapeHtml(item.summary || item.preview || "Saved for review.")}</div>
+            </div>
+        `;
+    }).join(""));
+}
+
 function renderDiagnostics(items) {
     const target = document.getElementById("documentDiagnosticsList");
     if (!items.length) {
@@ -391,6 +457,7 @@ function renderReviewQueue(items) {
         const formId = `review-form-${item.scope}-${item.id}`;
         const retryState = item.background_retry?.state ? `Retry state: ${item.background_retry.state}` : "No queued retry state";
         const acceptedCorrections = formatAcceptedCorrections(item);
+        const reviewArtifacts = renderReviewArtifacts(item.review_artifacts, formId, item.review_fields || []);
         return `
             <div class="mini-card timeline-card">
                 <div class="d-flex justify-content-between gap-3 align-items-start">
@@ -400,6 +467,7 @@ function renderReviewQueue(items) {
                         <div class="small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
                         ${item.notes ? `<div class="small mt-2">${Alfred.escapeHtml(item.notes)}</div>` : ""}
                         ${acceptedCorrections ? `<div class="small mt-2"><strong>Accepted correction:</strong><div class="mt-1">${acceptedCorrections}</div></div>` : ""}
+                        ${reviewArtifacts}
                         <div class="muted small mt-2">${Alfred.escapeHtml(retryState)}</div>
                     </div>
                     <div class="list-actions">
@@ -414,13 +482,24 @@ function renderReviewQueue(items) {
                             ${(item.review_fields || []).map(field => `
                                 <div class="col-md-6">
                                     <label class="form-label" for="${formId}-${field.name}">${Alfred.escapeHtml(field.label)}</label>
-                                    <input
-                                        id="${formId}-${field.name}"
-                                        name="${field.name}"
-                                        type="${field.type === "number" ? "number" : (field.type === "date" ? "date" : "text")}"
-                                        class="form-control"
-                                        value="${Alfred.escapeHtml(String(getReviewFieldValue(state, field.name, item.fields?.[field.name] ?? "")))}"
-                                    >
+                                    ${field.type === "json"
+                                        ? `
+                                            <textarea
+                                                id="${formId}-${field.name}"
+                                                name="${field.name}"
+                                                class="form-control"
+                                                rows="5"
+                                            >${Alfred.escapeHtml(formatReviewFieldValue(field, getReviewFieldValue(state, field.name, item.fields?.[field.name] ?? "")))}</textarea>
+                                        `
+                                        : `
+                                            <input
+                                                id="${formId}-${field.name}"
+                                                name="${field.name}"
+                                                type="${field.type === "number" ? "number" : (field.type === "date" ? "date" : "text")}"
+                                                class="form-control"
+                                                value="${Alfred.escapeHtml(formatReviewFieldValue(field, getReviewFieldValue(state, field.name, item.fields?.[field.name] ?? "")))}"
+                                            >
+                                        `}
                                 </div>
                             `).join("")}
                         </div>
@@ -572,6 +651,51 @@ function submitCreditDocument(event) {
         summarizeResults: summarizeCreditBatch,
         onSuccess: loadDocumentCenter,
     });
+}
+
+function submitChatGPTImport(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const rawText = String(form.elements.raw_text?.value || "").trim();
+    if (!rawText) {
+        showFormFeedback("documentChatGPTFeedback", "Paste a ChatGPT dashboard, transcript, or exported conversation JSON first.", "warning");
+        return;
+    }
+
+    const submitButton = form.querySelector("button[type='submit']");
+    if (submitButton) {
+        submitButton.disabled = true;
+    }
+    setDocumentCenterBusy(true);
+    showFormFeedback("documentChatGPTFeedback", "Importing chat context...", "info");
+
+    Alfred.fetchJSON("/api/reports/chatgpt-imports/", {
+        method: "POST",
+        body: JSON.stringify(Object.fromEntries(new FormData(form).entries())),
+    })
+        .then(result => {
+            form.reset();
+            document.getElementById("documentChatGPTSource").value = "ChatGPT";
+            showFormFeedback("documentChatGPTFeedback", `Imported ${result.title || "ChatGPT context"} for review.`, "success");
+            return loadDocumentCenter();
+        })
+        .catch(error => {
+            Alfred.logClientIssue({
+                module: "documents",
+                category: "api",
+                scope: "chatgpt_import",
+                eventType: "chatgpt_import_failure",
+                severity: "warning",
+                message: error.message,
+            });
+            showFormFeedback("documentChatGPTFeedback", error.message, "danger");
+        })
+        .finally(() => {
+            setDocumentCenterBusy(false);
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
+        });
 }
 
 function runBatchUpload(config) {
@@ -870,6 +994,147 @@ function formatAcceptedCorrections(item) {
     }).join("");
 }
 
+function renderReviewArtifacts(artifacts, formId = "", reviewFields = []) {
+    if (!artifacts || (typeof artifacts === "object" && !Object.keys(artifacts).length)) {
+        return "";
+    }
+    const steps = Array.isArray(artifacts.recovery_steps) ? artifacts.recovery_steps : [];
+    const attempts = Array.isArray(artifacts.attempts) ? artifacts.attempts : [];
+    const variants = Array.isArray(artifacts.attempted_variants) ? artifacts.attempted_variants : [];
+    const pages = Array.isArray(artifacts.ocr_pages) ? artifacts.ocr_pages : [];
+    const fieldCandidates = Array.isArray(artifacts.field_candidates) ? artifacts.field_candidates : [];
+    const correctedFields = Array.isArray(artifacts.corrected_fields) ? artifacts.corrected_fields : [];
+    const retryOutcome = artifacts.retry_outcome || {};
+    const invoiceSummary = artifacts.invoice_summary || {};
+    const overlaySummary = artifacts.overlay_summary || {};
+    const editableFieldNames = new Set(reviewFields.map(field => field.name));
+    const chips = [];
+    if (artifacts.extraction_method) {
+        chips.push(`<span class="chip-neutral">${Alfred.escapeHtml(formatDocType(String(artifacts.extraction_method).replace(/^repaired_/, "")))}</span>`);
+    }
+    if (artifacts.review_resolution) {
+        chips.push(`<span class="chip-neutral">Resolution: ${Alfred.escapeHtml(formatDocType(artifacts.review_resolution))}</span>`);
+    }
+    steps.forEach(step => {
+        if (step.step && step.status) {
+            chips.push(`<span class="chip-neutral">${Alfred.escapeHtml(formatDocType(step.step))}: ${Alfred.escapeHtml(step.status)}</span>`);
+        }
+    });
+    if (retryOutcome.state) {
+        chips.push(`<span class="chip-neutral">Retry ${Alfred.escapeHtml(retryOutcome.state)}</span>`);
+    }
+    const noteLine = [
+        attempts.length ? `${attempts.length} extractor path${attempts.length === 1 ? "" : "s"} scored` : "",
+        variants.length ? `${variants.length} image variant${variants.length === 1 ? "" : "s"} tried` : "",
+        pages.length ? `${pages.length} OCR page overlay${pages.length === 1 ? "" : "s"}` : "",
+        fieldCandidates.length ? `${fieldCandidates.length} field candidate${fieldCandidates.length === 1 ? "" : "s"}` : "",
+        correctedFields.length ? `${correctedFields.length} accepted correction${correctedFields.length === 1 ? "" : "s"}` : "",
+        overlaySummary.low_confidence_regions ? `${overlaySummary.low_confidence_regions} low-confidence OCR region${Number(overlaySummary.low_confidence_regions) === 1 ? "" : "s"}` : "",
+    ].filter(Boolean).join(" | ");
+    const invoiceNote = invoiceSummary.line_item_count
+        ? `Invoice signals: ${Alfred.formatNumber(invoiceSummary.line_item_count || 0, 0)} line item(s) | ${Alfred.formatNumber(invoiceSummary.parts_item_count || 0, 0)} part row(s) | ${Alfred.formatNumber(invoiceSummary.labour_item_count || 0, 0)} labour row(s)${invoiceSummary.recovered_edge_rows ? ` | ${Alfred.formatNumber(invoiceSummary.recovered_edge_rows, 0)} OCR edge row(s) recovered` : ""}${invoiceSummary.compact_ocr_rows ? ` | ${Alfred.formatNumber(invoiceSummary.compact_ocr_rows, 0)} compact row(s)` : ""}`
+        : "";
+    const candidateRows = fieldCandidates.slice(0, 8).map(candidate => {
+        const fieldName = candidate.field_name || "";
+        const canApply = formId && fieldName && editableFieldNames.has(fieldName);
+        const source = [candidate.source || "", candidate.page ? `p${candidate.page}` : ""].filter(Boolean).join(" | ");
+        return `
+            <div class="d-flex justify-content-between gap-2 align-items-start border-top pt-2 mt-2">
+                <div>
+                    <div class="small"><strong>${Alfred.escapeHtml(candidate.label || formatDocType(candidate.field_type || "candidate"))}</strong>: ${Alfred.escapeHtml(String(candidate.value || ""))}</div>
+                    <div class="muted small">${Alfred.escapeHtml(source)}${candidate.confidence ? ` | ${Math.round(Number(candidate.confidence || 0) * 100)}%` : ""}</div>
+                    ${candidate.context ? `<div class="muted small">${Alfred.escapeHtml(candidate.context)}</div>` : ""}
+                </div>
+                ${canApply ? `<button class="btn btn-sm btn-outline-primary" type="button" data-form-id="${Alfred.escapeHtml(formId)}" data-field-name="${Alfred.escapeHtml(fieldName)}" data-field-value="${Alfred.escapeHtml(String(candidate.value || ""))}" onclick="fillReviewCandidate(this)">Use</button>` : ""}
+            </div>
+        `;
+    }).join("");
+    return `
+        <details class="mt-3">
+            <summary class="small fw-semibold">Review extraction evidence</summary>
+            ${chips.length ? `<div class="chip-row mt-2">${chips.join("")}</div>` : ""}
+            ${noteLine ? `<div class="muted small mt-2">${Alfred.escapeHtml(noteLine)}</div>` : ""}
+            ${invoiceNote ? `<div class="muted small mt-2">${Alfred.escapeHtml(invoiceNote)}</div>` : ""}
+            ${candidateRows ? `<div class="mt-2">${candidateRows}</div>` : ""}
+            ${correctedFields.length ? `<div class="small mt-2"><strong>Accepted fields:</strong> ${correctedFields.map(item => Alfred.escapeHtml(formatDocType(item))).join(", ")}</div>` : ""}
+            ${retryOutcome.retry_count ? `<div class="small mt-2"><strong>Retry outcome:</strong> attempt ${Alfred.escapeHtml(String(retryOutcome.retry_count))}${retryOutcome.resolution ? ` | ${Alfred.escapeHtml(formatDocType(retryOutcome.resolution))}` : ""}${retryOutcome.last_attempt_at ? ` | ${Alfred.escapeHtml(Alfred.formatDateTime(retryOutcome.last_attempt_at))}` : ""}</div>` : ""}
+            ${artifacts.raw_text_excerpt ? `<pre class="small mt-2 mb-0" style="white-space: pre-wrap; overflow-wrap: anywhere;">${Alfred.escapeHtml(artifacts.raw_text_excerpt)}</pre>` : ""}
+            ${attempts.length ? `<div class="small mt-2"><strong>Scored paths:</strong> ${attempts.map(item => `${Alfred.escapeHtml(item.method || "path")} ${Math.round(Number(item.quality || 0) * 100)}%`).join(" | ")}</div>` : ""}
+            ${renderOcrOverlayPages(pages)}
+        </details>
+    `;
+}
+
+function fillReviewCandidate(button) {
+    const form = document.getElementById(button?.dataset?.formId || "");
+    if (!form) {
+        return;
+    }
+    const field = form.querySelector(`[name="${button.dataset.fieldName}"]`);
+    if (!field) {
+        return;
+    }
+    field.value = button.dataset.fieldValue || "";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    field.dispatchEvent(new Event("change", { bubbles: true }));
+    field.focus({ preventScroll: true });
+}
+
+function renderOcrOverlayPages(pages) {
+    if (!pages.length) {
+        return "";
+    }
+    return `
+        <div class="row g-3 mt-1">
+            ${pages.map(page => {
+                const width = Number(page.width || 0) || 1;
+                const height = Number(page.height || 0) || 1;
+                const boxes = (page.regions || []).map(region => {
+                    const points = Array.isArray(region.bbox) ? region.bbox : [];
+                    if (!points.length) {
+                        return "";
+                    }
+                    const xs = points.map(point => Number(point[0] || 0));
+                    const ys = points.map(point => Number(point[1] || 0));
+                    const x = Math.min(...xs);
+                    const y = Math.min(...ys);
+                    const boxWidth = Math.max(...xs) - x;
+                    const boxHeight = Math.max(...ys) - y;
+                    const fieldMatches = Array.isArray(region.field_matches) ? region.field_matches : [];
+                    const confidence = Number(region.confidence || 0);
+                    const isLowConfidence = confidence > 0 && confidence < 0.55;
+                    const fill = fieldMatches.length ? "rgba(37, 99, 235, 0.18)" : isLowConfidence ? "rgba(217, 119, 6, 0.18)" : "rgba(22, 163, 74, 0.15)";
+                    const stroke = fieldMatches.length ? "rgba(37, 99, 235, 0.78)" : isLowConfidence ? "rgba(217, 119, 6, 0.78)" : "rgba(22, 163, 74, 0.65)";
+                    return `<rect x="${((x / width) * 100).toFixed(2)}" y="${((y / height) * 100).toFixed(2)}" width="${((boxWidth / width) * 100).toFixed(2)}" height="${((boxHeight / height) * 100).toFixed(2)}" fill="${fill}" stroke="${stroke}" stroke-width="0.8"></rect>`;
+                }).join("");
+                const lines = (page.regions || []).slice(0, 3).map(region => {
+                    const matches = Array.isArray(region.field_matches) && region.field_matches.length
+                        ? ` | corrected: ${region.field_matches.map(item => formatDocType(item)).join(", ")}`
+                        : "";
+                    return `<div>${Alfred.escapeHtml(region.text || "")}${matches ? `<span class="muted">${Alfred.escapeHtml(matches)}</span>` : ""}</div>`;
+                }).join("");
+                return `
+                    <div class="col-md-6">
+                        <div class="mini-card h-100">
+                            <div class="d-flex justify-content-between align-items-center gap-2">
+                                <div class="fw-semibold small">Page ${Alfred.escapeHtml(String(page.page || 1))}</div>
+                                <div class="muted small">${Alfred.escapeHtml(page.variant || "ocr")} ${page.rotation ? `| ${Alfred.escapeHtml(`${page.rotation}°`)}` : ""}</div>
+                            </div>
+                            <svg viewBox="0 0 100 140" class="w-100 mt-2" style="max-height: 10rem; border-radius: 0.8rem; background: linear-gradient(180deg, rgba(245,247,250,0.95), rgba(228,234,240,0.92));">
+                                <rect x="7" y="5" width="86" height="130" rx="5" fill="rgba(255,255,255,0.95)" stroke="rgba(16,37,63,0.12)"></rect>
+                                <g transform="translate(7 5) scale(0.86 0.93)">${boxes}</g>
+                            </svg>
+                            ${page.preview ? `<div class="small mt-2">${Alfred.escapeHtml(page.preview)}</div>` : ""}
+                            ${lines ? `<div class="muted small mt-2">${lines}</div>` : ""}
+                        </div>
+                    </div>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
+
 window.retryReviewItem = retryReviewItem;
 window.deleteDocumentCenterItem = deleteDocumentCenterItem;
 window.submitDocumentCorrection = submitDocumentCorrection;
+window.fillReviewCandidate = fillReviewCandidate;

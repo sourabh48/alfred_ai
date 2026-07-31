@@ -8,7 +8,7 @@
         <div>
             <div class="alfred-chip mb-3">System planning and guardrails</div>
             <h1 class="alfred-hero-title">Track in-progress work, adaptive-system maturity, reports, and operational risks outside the main user dashboard.</h1>
-            <p class="alfred-hero-copy">This superuser console now acts as the live operations surface for ALFRED. It shows what is still in progress, how the adaptive pipeline is learning from stored data, and which tickets or report artifacts still need developer attention.</p>
+            <p class="alfred-hero-copy">This superuser console acts as the live operations surface for ALFRED. It shows what is still in progress, how the adaptive pipeline is learning from stored data, and which tickets or report artifacts still need developer attention. The percentages here are maturity heuristics, not a release checklist.</p>
         </div>
         <div class="surface-card" style="min-width: 280px;">
             <p class="metric-kicker">Internal Clock</p>
@@ -61,7 +61,7 @@
                 <div class="learning-track-card">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                         <div class="fw-semibold">{{ track.title }}</div>
-                        <span class="status-pill status-guarded">{{ track.progress }}%</span>
+                        <span class="status-pill {% if track.progress >= 100 %}status-good{% else %}status-guarded{% endif %}">{{ track.progress }}%</span>
                     </div>
                     <div class="progress alfred-progress mb-2">
                         <div class="progress-bar" role="progressbar" style="width: {{ track.progress }}%;" aria-valuenow="{{ track.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
@@ -72,7 +72,7 @@
                         <span class="chip-neutral">{{ signal }}</span>
                         {% endfor %}
                     </div>
-                    <div class="muted small"><strong>Still blocked by:</strong> {{ track.blocker }}</div>
+                    <div class="muted small"><strong>{{ track.blocker_label|default:"Still blocked by" }}:</strong> {{ track.blocker }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -84,7 +84,7 @@
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title">In Progress Tracks</h2>
-            <p class="page-section-copy mb-3">Only active workstreams are shown here. Completed areas have been removed from this view.</p>
+            <p class="page-section-copy mb-3">Broad product scopes stay here until they have both implementation coverage and the verification depth needed to avoid overclaiming.</p>
             <div class="data-stack" id="projectDetailsInProgressTracks">
                 {% for item in in_progress_tracks %}
                 <div class="mini-card">
@@ -99,6 +99,25 @@
                     <div class="muted small"><strong>Next focus:</strong> {{ item.next_focus }}</div>
                 </div>
                 {% endfor %}
+            </div>
+            <div class="mt-4">
+                <h3 class="compact-section-title">Verified Complete Checks</h3>
+                <p class="page-section-copy mb-3">Only narrow checks that are fully verified are listed here at 100%.</p>
+                <div class="data-stack" id="projectDetailsCompletedTracks">
+                    {% for item in completed_tracks %}
+                    <div class="mini-card">
+                        <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                            <div class="fw-semibold">{{ item.title }}</div>
+                            <span class="status-pill status-good">{{ item.progress }}%</span>
+                        </div>
+                        <div class="progress alfred-progress mb-2">
+                            <div class="progress-bar" role="progressbar" style="width: {{ item.progress }}%;" aria-valuenow="{{ item.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                        <div class="muted small mb-2">{{ item.detail }}</div>
+                        <div class="muted small"><strong>Maintenance focus:</strong> {{ item.maintenance_focus }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
     </div>
@@ -301,5 +320,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/project_details.js?v=1.1"></script>
+<script src="/static/js/project_details.js?v=1.4"></script>
 {% endblock %}

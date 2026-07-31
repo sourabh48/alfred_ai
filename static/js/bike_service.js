@@ -2,11 +2,17 @@ let bikeServiceCostChart;
 let bikeServiceMixChart;
 let bikeServiceIssueChart;
 let bikeMileageChart;
+let bikeCatalogMakeTimer;
+let bikeCatalogFetchToken = 0;
+const BIKE_CATALOG_INTERACTION_HOLD_MS = 7000;
 
 const bikeState = {
     profiles: [],
     catalog: [],
+    catalogManufacturers: [],
+    catalogRequestKey: "",
     editingProfileId: null,
+    catalogInteractionUntil: 0,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -15,9 +21,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     document.getElementById("bikeProfileForm").addEventListener("submit", submitBikeProfile);
+    installBikeProfileFormGuards();
     document.getElementById("bikeProfileCancel").addEventListener("click", resetBikeProfileForm);
+    document.getElementById("bikeCatalogMakeSelect").addEventListener("input", event => {
+        lockBikeCatalogInteraction();
+        scheduleBikeCatalogHydration(event);
+    });
+    document.getElementById("bikeCatalogMakeSelect").addEventListener("change", () => {
+        lockBikeCatalogInteraction();
+        hydrateBikeCatalog();
+    });
     document.getElementById("bikeCatalogSelect").addEventListener("change", syncCatalogIntoProfileForm);
-    document.getElementById("bikeProfileVehicleType").addEventListener("change", hydrateBikeCatalog);
+    document.getElementById("bikeProfileVehicleType").addEventListener("change", () => {
+        lockBikeCatalogInteraction();
+        hydrateBikeCatalogManufacturers();
+    });
     document.getElementById("bikeServiceImportForm").addEventListener("submit", submitBikeServiceImport);
     document.getElementById("bikeServiceRecordForm").addEventListener("submit", submitBikeServiceRecord);
     document.getElementById("bikeRefillForm").addEventListener("submit", submitBikeRefill);
@@ -36,10 +54,18 @@ document.addEventListener("DOMContentLoaded", () => {
 function loadBikeServiceDashboard() {
     return Alfred.fetchJSON("/api/mobility/bike-service-dashboard/")
         .then(data => {
+            const selectedMake = document.getElementById("bikeCatalogMakeSelect")?.value || "";
+            const selectedCatalogKey = document.getElementById("bikeCatalogSelect")?.value || "";
+            const catalogLocked = isBikeCatalogInteractionActive();
+            const profileEditorLocked = isBikeProfileEditorDirty();
             const summary = data.summary || {};
             const profile = data.bike_profile || {};
             bikeState.profiles = data.bike_profiles || [];
-            bikeState.catalog = data.bike_catalog || [];
+            if (!catalogLocked) {
+                bikeState.catalog = data.bike_catalog || [];
+                bikeState.catalogRequestKey = "";
+            }
+            bikeState.catalogManufacturers = data.bike_catalog_manufacturers || buildCatalogManufacturersFromModels(bikeState.catalog);
             showBikeServiceAlert("", "secondary");
             renderBikeServiceHero(summary);
             renderBikeHeroSignals(summary, profile, data.pending_tasks || []);
@@ -49,6 +75,7 @@ function loadBikeServiceDashboard() {
             renderBikeMileageInsights(summary, profile, data.charts?.mileage_trend || {});
             renderBikeCompliance(data.document_compliance || []);
             renderServiceHistorySummary(data.service_history_summary || {});
+            renderRouteWearPanel(data.route_wear || {});
             renderPartInsights(data.part_insights || []);
             renderBikeServiceTasks(data.pending_tasks || []);
             renderBikeServiceObservations(data.observations || [], data.suggestions || []);
@@ -58,10 +85,14 @@ function loadBikeServiceDashboard() {
             renderBikeIssues(data.bike_issues || []);
             renderBikeDocuments(data.bike_documents || []);
             renderBikeConditions(data.bike_conditions || []);
-            hydrateBikeCatalog();
+            if (!catalogLocked) {
+                hydrateBikeCatalogManufacturers(selectedMake, selectedCatalogKey);
+            }
             hydrateBikeProfileSelectors();
             hydrateTravelPlanOptions(data.travel_plans || []);
-            syncBikeProfileEditor();
+            if (!profileEditorLocked) {
+                syncBikeProfileEditor();
+            }
             renderBikeCharts(data.charts || {});
         })
         .catch(error => showBikeServiceAlert(error.message, "danger"));
@@ -74,7 +105,13 @@ function renderBikeServiceHero(summary) {
     Alfred.setTextIfChanged(nextMeta, summary.next_service_km
         ? `Next checkpoint at ${Alfred.formatNumber(summary.next_service_km, 0)} km`
         : "Upload a service bill or log a manual service to activate due-date tracking.");
-    Alfred.setTextIfChanged("bikeServiceProjectionMeta", `Projected service cost: ${Alfred.formatCurrency(summary.projected_next_service_cost || 0)}`);
+    const projectedCost = summary.projected_next_service_cost || 0;
+    const adjustedCost = summary.route_adjusted_service_cost || projectedCost;
+    const routeBuffer = summary.route_service_buffer || 0;
+    Alfred.setTextIfChanged(
+        "bikeServiceProjectionMeta",
+        `Projected service cost: ${Alfred.formatCurrency(projectedCost)} | route-adjusted ${Alfred.formatCurrency(adjustedCost)} | buffer ${Alfred.formatCurrency(routeBuffer)}`
+    );
 }
 
 function renderBikeHeroSignals(summary, profile, tasks) {
@@ -145,6 +182,11 @@ function renderBikeServiceSummary(summary) {
         ["Trip Costing", Alfred.formatCurrency(summary.trip_cost_total || 0), `${Alfred.formatNumber(summary.trip_distance_total || 0, 1)} km | ${summary.trip_cost_per_km ? `${Alfred.formatCurrency(summary.trip_cost_per_km)} / km` : "No cost/km yet"}`],
         ["Compliance", `${Alfred.formatNumber(summary.document_compliance_score || 0, 0)}/100`, `${Alfred.formatNumber(summary.expiring_documents || 0, 0)} expiring | ${Alfred.formatNumber(summary.missing_required_documents || 0, 0)} missing required`],
         ["Mileage vs Optimal", mileageValue, mileageCaption],
+        [
+            "Route Wear",
+            summary.route_wear_index ? `${Alfred.formatNumber(summary.route_wear_index, 1)}/100` : "No route signal",
+            `${Alfred.formatNumber(summary.route_distance_90d || 0, 1)} km in 90 days | buffer ${Alfred.formatCurrency(summary.route_service_buffer || 0)}`,
+        ],
     ];
 
     Alfred.setHTMLIfChanged("bikeServiceSummaryCards", cards.map(card => `
@@ -363,6 +405,115 @@ function renderServiceHistorySummary(summary) {
     `);
 }
 
+function renderRouteWearPanel(routeWear) {
+    const target = document.getElementById("bikeRouteWearPanel");
+    if (!target) {
+        return;
+    }
+
+    const signals = routeWear.signals || {};
+    const componentPressure = routeWear.component_pressure || [];
+    const routeGuidance = routeWear.maintenance_guidance || {};
+    const routeActions = routeGuidance.actions || [];
+    const costFactors = routeWear.service_cost_guidance?.cost_factors || routeGuidance.cost_factors || [];
+    const evidence = routeWear.evidence || [];
+    const hasRouteLogs = Number(routeWear.recent_distance_km || 0) > 0 || Number(signals.recent_trip_count || 0) > 0;
+    const stats = [
+        {
+            label: "Wear Status",
+            value: routeWear.wear_status ? humanizeToken(routeWear.wear_status) : "No route signal",
+            meta: routeWear.wear_index != null ? `${Alfred.formatNumber(routeWear.wear_index, 1)}/100 wear index` : "Trip logs activate this score",
+        },
+        {
+            label: "90-Day Distance",
+            value: `${Alfred.formatNumber(routeWear.recent_distance_km || 0, 1)} km`,
+            meta: `${Alfred.formatNumber(signals.recent_trip_count || 0, 0)} recent trip log${Number(signals.recent_trip_count || 0) === 1 ? "" : "s"}`,
+        },
+        {
+            label: "Route-Adjusted Cost",
+            value: Alfred.formatCurrency(routeWear.route_adjusted_service_cost || 0),
+            meta: `Pressure ${Alfred.formatCurrency(routeWear.route_cost_pressure || 0)}`,
+        },
+        {
+            label: "Service Buffer",
+            value: Alfred.formatCurrency(routeWear.suggested_service_buffer || 0),
+            meta: routeWear.interval_consumed_pct != null
+                ? `${Alfred.formatNumber(routeWear.interval_consumed_pct, 1)}% of ${Alfred.formatNumber(routeWear.service_interval_km || 0, 0)} km interval`
+                : "No service interval saved",
+        },
+        {
+            label: "Tightened Interval",
+            value: routeGuidance.recommended_interval_km ? `${Alfred.formatNumber(routeGuidance.recommended_interval_km, 0)} km` : "Model interval",
+            meta: routeGuidance.service_interval_tightening_pct
+                ? `${Alfred.formatNumber(routeGuidance.service_interval_tightening_pct, 1)}% tighter than saved interval`
+                : "No route tightening needed yet",
+        },
+    ];
+    const signalChips = [
+        ["Rough", signals.rough_route_logs],
+        ["Hill", signals.hill_route_logs],
+        ["Rain", signals.rain_route_logs],
+        ["Dust", signals.dust_route_logs],
+        ["Highway", signals.highway_route_logs],
+        ["City", signals.city_stop_go_logs],
+        ["Load", signals.loaded_route_logs],
+    ].map(([label, value]) => `<span class="chip-neutral">${label} ${Alfred.formatNumber(value || 0, 0)}</span>`).join("");
+    const componentCards = componentPressure.length
+        ? componentPressure.map(item => `
+            <div class="mini-card timeline-card">
+                <div class="d-flex justify-content-between gap-3 align-items-start">
+                    <div>
+                        <div class="fw-semibold">${Alfred.escapeHtml(item.component || "")}</div>
+                        <div class="muted small mt-2">${Alfred.escapeHtml(item.reason || "")}</div>
+                    </div>
+                    <span class="status-pill ${routeWearTone(item.pressure)}">${Alfred.escapeHtml(humanizeToken(item.pressure || "watch"))}</span>
+                </div>
+            </div>
+        `).join("")
+        : `<div class="empty-state">Component pressure appears after trip or fault history is available.</div>`;
+    const actionCards = routeActions.length
+        ? routeActions.map(action => `
+            <div class="mini-card timeline-card">
+                <div class="d-flex justify-content-between gap-3 align-items-start">
+                    <div>
+                        <div class="fw-semibold">${Alfred.escapeHtml(action.label || "")}</div>
+                        <div class="muted small mt-2">${Alfred.escapeHtml(action.note || "")}</div>
+                        <div class="muted small mt-2">${Alfred.escapeHtml((action.components || []).join(" | "))}</div>
+                        ${action.evidence ? `<div class="muted small mt-2">${Alfred.escapeHtml(action.evidence)}</div>` : ""}
+                    </div>
+                    <div class="text-end" style="min-width: 120px;">
+                        <span class="status-pill ${routeWearTone(action.priority)}">${Alfred.escapeHtml(humanizeToken(action.priority || "watch"))}</span>
+                        <div class="muted small mt-2">${action.next_check_km ? `${Alfred.formatNumber(action.next_check_km, 0)} km check` : "No interval"}</div>
+                        <div class="muted small">${action.estimated_cost_range ? `${Alfred.formatCurrency(action.estimated_cost_range.min || 0)}-${Alfred.formatCurrency(action.estimated_cost_range.max || 0)}` : ""}</div>
+                    </div>
+                </div>
+            </div>
+        `).join("")
+        : `<div class="empty-state">Route-specific actions appear after trip evidence is stored.</div>`;
+    const costFactorLine = costFactors.length
+        ? `<div class="detail-item">Cost factors: ${costFactors.map(item => `${Alfred.escapeHtml(item.label || item.key || "Route")} ${Alfred.formatCurrency(item.estimated_pressure_cost || 0)}`).join(" | ")}</div>`
+        : "";
+    const evidenceList = evidence.length
+        ? evidence.map(item => `<div class="muted small">${Alfred.escapeHtml(item)}</div>`).join("")
+        : `<div class="muted small">No route evidence has been stored yet.</div>`;
+
+    Alfred.setHTMLIfChanged(target, `
+        <div class="surface-inset surface-inset-strong">
+            <div class="panel-eyebrow">Route-Wear Contract</div>
+            ${renderInsightStatGrid(stats)}
+        </div>
+        <div class="chip-row">${signalChips}</div>
+        <div class="detail-item">${Alfred.escapeHtml(routeWear.recommendation || (hasRouteLogs ? "Route wear is being tracked from saved trip logs." : "Add trip logs with route notes to activate route-aware service costs."))}</div>
+        ${costFactorLine}
+        <div class="data-stack">${actionCards}</div>
+        <div class="data-stack">${componentCards}</div>
+        <div class="detail-item">
+            <div class="fw-semibold mb-2">Evidence</div>
+            ${evidenceList}
+        </div>
+    `);
+}
+
 function renderPartInsights(items) {
     const target = document.getElementById("bikePartImpactBoard");
     if (!items.length) {
@@ -562,15 +713,239 @@ function renderBikeIssues(items) {
     `).join("") : `<div class="empty-state">No fault reports yet.</div>`);
 }
 
-function hydrateBikeCatalog() {
+function installBikeProfileFormGuards() {
+    const form = document.getElementById("bikeProfileForm");
+    if (!form) {
+        return;
+    }
+    const markDirty = event => {
+        if (event.target?.closest?.("#bikeProfileForm")) {
+            markBikeProfileEditorDirty();
+        }
+    };
+    form.addEventListener("input", markDirty, true);
+    form.addEventListener("change", markDirty, true);
+    form.addEventListener("focusin", event => {
+        if (event.target?.closest?.("#bikeCatalogMakeSelect, #bikeCatalogSelect")) {
+            lockBikeCatalogInteraction();
+        }
+    }, true);
+    form.addEventListener("pointerdown", event => {
+        if (event.target?.closest?.("#bikeCatalogMakeSelect, #bikeCatalogSelect")) {
+            lockBikeCatalogInteraction();
+        }
+    }, true);
+    form.addEventListener("keydown", event => {
+        if (event.target?.closest?.("#bikeCatalogMakeSelect, #bikeCatalogSelect")) {
+            lockBikeCatalogInteraction();
+        }
+    }, true);
+}
+
+function lockBikeCatalogInteraction(durationMs = BIKE_CATALOG_INTERACTION_HOLD_MS) {
+    const nextUntil = Date.now() + Number(durationMs || 0);
+    bikeState.catalogInteractionUntil = Math.max(Number(bikeState.catalogInteractionUntil || 0), nextUntil);
+    const root = document.getElementById("bikeServiceRoot");
+    if (root && Alfred.lockLiveRefresh) {
+        Alfred.lockLiveRefresh(root, durationMs);
+    }
+}
+
+function isBikeCatalogInteractionActive() {
+    const makeInput = document.getElementById("bikeCatalogMakeSelect");
+    const modelSelect = document.getElementById("bikeCatalogSelect");
+    const active = document.activeElement;
+    return Boolean(
+        Number(bikeState.catalogInteractionUntil || 0) > Date.now()
+        || active === makeInput
+        || active === modelSelect
+    );
+}
+
+function markBikeProfileEditorDirty() {
+    const form = document.getElementById("bikeProfileForm");
+    if (form) {
+        form.dataset.userEditing = "true";
+    }
+}
+
+function clearBikeProfileEditorDirty() {
+    const form = document.getElementById("bikeProfileForm");
+    if (form) {
+        form.dataset.userEditing = "false";
+    }
+    bikeState.catalogInteractionUntil = 0;
+}
+
+function isBikeProfileEditorDirty() {
+    const form = document.getElementById("bikeProfileForm");
+    if (!form) {
+        return false;
+    }
+    return form.dataset.userEditing === "true" || form.contains(document.activeElement);
+}
+
+function hydrateBikeCatalogManufacturers(preferredMake = "", preferredCatalogKey = "") {
+    const makeInput = document.getElementById("bikeCatalogMakeSelect");
+    if (!makeInput) {
+        return Promise.resolve([]);
+    }
     const vehicleType = document.getElementById("bikeProfileVehicleType")?.value || "";
-    const filteredCatalog = bikeState.catalog.filter(item => !vehicleType || item.vehicle_type === vehicleType);
-    Alfred.syncSelectOptions("bikeCatalogSelect", filteredCatalog, {
-        includeBlank: true,
-        blankLabel: "Choose a known model or leave blank for custom",
-        getValue: item => item.catalog_key,
-        getLabel: item => item.display_name,
+    const manufacturers = catalogManufacturersForVehicleType(vehicleType);
+    const nextMake = preferredMake || makeInput.value || "";
+    renderCatalogMakeOptions(manufacturers, nextMake);
+    if (makeInput.value !== nextMake) {
+        makeInput.value = nextMake;
+    }
+    return hydrateBikeCatalog({ preferredCatalogKey });
+}
+
+function renderCatalogMakeOptions(manufacturers, selectedMake = "") {
+    const datalist = document.getElementById("bikeCatalogMakeOptions");
+    if (!datalist) {
+        return;
+    }
+    const entries = [...(manufacturers || [])];
+    const normalizedSelected = normalizeCatalogMake(selectedMake);
+    if (normalizedSelected && !entries.some(item => normalizeCatalogMake(item.make) === normalizedSelected)) {
+        entries.push({ make: selectedMake, model_count: 0, vehicle_types: [] });
+    }
+    entries.sort((left, right) => left.make.localeCompare(right.make));
+    Alfred.setHTMLIfChanged(datalist, entries.map(item => {
+        const label = item.model_count ? `${item.make} (${Alfred.formatNumber(item.model_count, 0)})` : item.make;
+        return `<option value="${Alfred.escapeHtml(item.make)}" label="${Alfred.escapeHtml(label)}"></option>`;
+    }).join(""));
+}
+
+function scheduleBikeCatalogHydration() {
+    clearTimeout(bikeCatalogMakeTimer);
+    bikeCatalogMakeTimer = setTimeout(() => {
+        hydrateBikeCatalog();
+    }, 250);
+}
+
+function hydrateBikeCatalog(options = {}) {
+    const modelSelect = document.getElementById("bikeCatalogSelect");
+    if (!modelSelect) {
+        return Promise.resolve([]);
+    }
+    const vehicleType = document.getElementById("bikeProfileVehicleType")?.value || "";
+    const make = document.getElementById("bikeCatalogMakeSelect")?.value || "";
+    const preferredCatalogKey = options.preferredCatalogKey || "";
+    const requestToken = ++bikeCatalogFetchToken;
+
+    if (!make) {
+        bikeState.catalog = [];
+        bikeState.catalogRequestKey = "";
+        Alfred.syncSelectOptions(modelSelect, [], {
+            includeBlank: true,
+            blankLabel: "Choose a make first",
+            fallbackValue: "",
+            disableWhenEmpty: true,
+        });
+        return Promise.resolve([]);
+    }
+
+    const requestKey = `${vehicleType || "all"}|${make}`;
+    const renderCatalog = models => {
+        Alfred.syncSelectOptions(modelSelect, models, {
+            includeBlank: true,
+            blankLabel: "Choose a known model or leave blank for custom",
+            currentValue: preferredCatalogKey || modelSelect.value,
+            preferredValue: preferredCatalogKey,
+            fallbackValue: "",
+            getValue: item => item.catalog_key,
+            getLabel: item => item.display_name,
+            disableWhenEmpty: true,
+        });
+        return models;
+    };
+
+    if (bikeState.catalogRequestKey === requestKey) {
+        return Promise.resolve(renderCatalog(bikeState.catalog));
+    }
+
+    if (!isBikeCatalogInteractionActive()) {
+        Alfred.syncSelectOptions(modelSelect, [], {
+            includeBlank: true,
+            blankLabel: "Loading models...",
+            fallbackValue: "",
+            disableWhenEmpty: true,
+        });
+    }
+
+    const params = new URLSearchParams();
+    if (vehicleType) {
+        params.set("vehicle_type", vehicleType);
+    }
+    params.set("make", make);
+
+    return Alfred.fetchJSON(`/api/mobility/bike-models/catalog/?${params.toString()}`)
+        .then(data => {
+            const currentMake = document.getElementById("bikeCatalogMakeSelect")?.value || "";
+            const currentVehicleType = document.getElementById("bikeProfileVehicleType")?.value || "";
+            const currentRequestKey = `${currentVehicleType || "all"}|${currentMake}`;
+            if (requestToken !== bikeCatalogFetchToken || currentRequestKey !== requestKey) {
+                return bikeState.catalog;
+            }
+            bikeState.catalog = data.results || [];
+            bikeState.catalogRequestKey = requestKey;
+            if (isBikeCatalogInteractionActive() && document.activeElement === modelSelect) {
+                return bikeState.catalog;
+            }
+            return renderCatalog(bikeState.catalog);
+        })
+        .catch(error => {
+            if (requestToken !== bikeCatalogFetchToken) {
+                return [];
+            }
+            bikeState.catalog = [];
+            bikeState.catalogRequestKey = requestKey;
+            Alfred.syncSelectOptions(modelSelect, [], {
+                includeBlank: true,
+                blankLabel: "Unable to load models for this make",
+                fallbackValue: "",
+                disableWhenEmpty: true,
+            });
+            showBikeServiceFeedback("bikeProfileFeedback", error.message || "Unable to load catalog models for the selected make.", "warning");
+            return [];
+        });
+}
+
+function catalogManufacturersForVehicleType(vehicleType) {
+    const normalizedType = String(vehicleType || "").trim();
+    return (bikeState.catalogManufacturers || []).filter(item => {
+        const vehicleTypes = Array.isArray(item.vehicle_types) ? item.vehicle_types : [];
+        return !normalizedType || !vehicleTypes.length || vehicleTypes.includes(normalizedType);
     });
+}
+
+function normalizeCatalogMake(value) {
+    return String(value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+}
+
+function buildCatalogManufacturersFromModels(models) {
+    const grouped = new Map();
+    (models || []).forEach(item => {
+        const make = item.make || "";
+        if (!make) {
+            return;
+        }
+        if (!grouped.has(make)) {
+            grouped.set(make, { make, model_count: 0, vehicle_types: new Set() });
+        }
+        const entry = grouped.get(make);
+        entry.model_count += 1;
+        if (item.vehicle_type) {
+            entry.vehicle_types.add(item.vehicle_type);
+        }
+    });
+    return Array.from(grouped.values())
+        .map(item => ({ ...item, vehicle_types: Array.from(item.vehicle_types).sort() }))
+        .sort((left, right) => left.make.localeCompare(right.make));
 }
 
 function hydrateBikeProfileSelectors() {
@@ -600,14 +975,16 @@ function hydrateTravelPlanOptions(plans) {
 }
 
 function syncCatalogIntoProfileForm(event) {
+    lockBikeCatalogInteraction();
+    markBikeProfileEditorDirty();
     const key = event.currentTarget.value;
     const match = bikeState.catalog.find(item => item.catalog_key === key);
     if (!match) {
         return;
     }
     document.getElementById("bikeProfileVehicleType").value = match.vehicle_type || "motorcycle";
+    document.getElementById("bikeCatalogMakeSelect").value = match.make || "";
     document.getElementById("bikeProfileDisplayName").value = match.display_name || "";
-    document.getElementById("bikeProfileMake").value = match.make || "";
     document.getElementById("bikeProfileModelName").value = match.model_name || "";
     document.getElementById("bikeProfileVariant").value = match.variant || "";
     document.getElementById("bikeProfileClass").value = match.bike_class || "roadster";
@@ -628,10 +1005,8 @@ function valueOrEmpty(value) {
 function populateBikeProfileForm(profile) {
     document.getElementById("bikeProfileId").value = profile.id || "";
     document.getElementById("bikeProfileVehicleType").value = profile.vehicle_type || "motorcycle";
-    hydrateBikeCatalog();
-    document.getElementById("bikeCatalogSelect").value = profile.catalog_key || "";
+    hydrateBikeCatalogManufacturers(profile.make || "", profile.catalog_key || "");
     document.getElementById("bikeProfileDisplayName").value = profile.display_name || "";
-    document.getElementById("bikeProfileMake").value = profile.make || "";
     document.getElementById("bikeProfileModelName").value = profile.model_name || "";
     document.getElementById("bikeProfileVariant").value = profile.variant || "";
     document.getElementById("bikeProfileVehicleNumber").value = profile.vehicle_number || "";
@@ -647,6 +1022,7 @@ function populateBikeProfileForm(profile) {
     document.getElementById("bikeProfileServiceIntervalDays").value = valueOrEmpty(profile.service_interval_days);
     document.getElementById("bikeProfileCruisingSpeed").value = valueOrEmpty(profile.optimal_cruising_speed_kmph);
     document.getElementById("bikeProfilePrimary").value = profile.is_primary ? "true" : "false";
+    clearBikeProfileEditorDirty();
 }
 
 function syncBikeProfileEditor() {
@@ -678,10 +1054,10 @@ function resetBikeProfileForm() {
     const form = document.getElementById("bikeProfileForm");
     bikeState.editingProfileId = null;
     form.reset();
+    clearBikeProfileEditorDirty();
     document.getElementById("bikeProfileId").value = "";
     document.getElementById("bikeProfileVehicleType").value = "motorcycle";
-    hydrateBikeCatalog();
-    document.getElementById("bikeCatalogSelect").value = "";
+    hydrateBikeCatalogManufacturers();
     document.getElementById("bikeProfileClass").value = "roadster";
     document.getElementById("bikeProfileUsagePattern").value = "personal";
     document.getElementById("bikeProfileFuelType").value = "petrol";
@@ -842,6 +1218,7 @@ function submitBikeProfile(event) {
 
 function buildBikeProfilePayload(form) {
     const payload = Object.fromEntries(new FormData(form).entries());
+    payload.make = String(payload.make || "").trim();
     payload.is_primary = payload.is_primary === "true";
     payload.estimated_market_value = Number(payload.estimated_market_value || 0);
     payload.monthly_income_support = Number(payload.monthly_income_support || 0);
@@ -1099,6 +1476,16 @@ function partStatusTone(status) {
         return "status-high";
     }
     if (status === "watch") {
+        return "status-guarded";
+    }
+    return "status-low";
+}
+
+function routeWearTone(status) {
+    if (status === "high" || status === "urgent") {
+        return "status-high";
+    }
+    if (status === "watch" || status === "medium") {
         return "status-guarded";
     }
     return "status-low";

@@ -1,72 +1,90 @@
 {
     "parser_confidence_calibrator": {
-        "version": "2026-04-02T12:52:36.528359+00:00",
+        "version": "2026-07-31T09:42:16.462073+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 100.0,
-            "confidence_estimate": 73.17,
-            "sample_count": 14,
-            "artifact_path": "ml_models\\alfred\\parser_confidence\\model.pkl"
+            "confidence_estimate": 72.0,
+            "sample_count": 12,
+            "artifact_path": "ml_models\\alfred\\parser_confidence\\model.pkl",
+            "notes": "Parser-confidence calibrator trained on 12 parser-memory rows with holdout accuracy 1.00."
         }
     },
     "relationship_model": {
-        "version": "2026-04-02T12:52:46.503517+00:00",
+        "version": "2026-07-31T09:42:16.612297+00:00",
         "metadata": {
             "status": "ready",
-            "quality_score": 100.0,
-            "confidence_estimate": 74.67,
-            "sample_count": 11,
-            "artifact_path": "ml_models\\alfred\\relationship_model\\model.pkl"
+            "quality_score": 98.48,
+            "confidence_estimate": 69.75,
+            "sample_count": 8,
+            "artifact_path": "ml_models\\alfred\\relationship_model\\model.pkl",
+            "notes": "Relationship regressor trained on 8 scored profiles with holdout MAE 1.52."
         }
     },
     "salary_predictor": {
-        "version": "2026-04-02T12:53:26.440062+00:00",
+        "version": "2026-07-31T09:42:15.837323+00:00",
         "metadata": {
             "status": "ready",
-            "quality_score": 69.96,
-            "confidence_estimate": 55.97,
-            "sample_count": 12,
-            "artifact_path": "ml_models/alfred/salary_model/model.pkl"
+            "quality_score": 97.18,
+            "confidence_estimate": 70.17,
+            "sample_count": 8,
+            "artifact_path": "ml_models/alfred/salary_model/model.pkl",
+            "notes": "Linear salary regressor trained on 8 user profiles with holdout MAPE 0.03."
         }
     },
     "expense_forecaster": {
-        "version": "2026-04-02T12:53:26.447434+00:00",
+        "version": "2026-07-31T09:42:15.998723+00:00",
         "metadata": {
             "status": "ready",
-            "quality_score": 95.34,
-            "confidence_estimate": 73.2,
-            "sample_count": 48,
-            "artifact_path": "ml_models/alfred/expense_lstm/model.pkl"
+            "quality_score": 0.0,
+            "confidence_estimate": 40.0,
+            "sample_count": 1734,
+            "artifact_path": "ml_models/alfred/expense_lstm/model.pkl",
+            "notes": "Windowed expense forecaster trained on 1734 expense rows with holdout MAE 8951.69 and relative error 8.09."
         }
     },
     "burnout_rf": {
-        "version": "2026-04-02T12:53:26.454888+00:00",
+        "version": "2026-07-31T09:42:16.170220+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 100.0,
-            "confidence_estimate": 79.0,
-            "sample_count": 24,
-            "artifact_path": "ml_models/alfred/burnout_rf/model.pkl"
+            "confidence_estimate": 72.0,
+            "sample_count": 12,
+            "artifact_path": "ml_models/alfred/burnout_rf/model.pkl",
+            "notes": "Burnout regressor trained on 12 behavioral rows with holdout MAE 0.00."
         }
     },
     "risk_classifier": {
-        "version": "2026-04-02T12:53:26.464341+00:00",
+        "version": "2026-07-31T09:42:16.311998+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 100.0,
-            "confidence_estimate": 82.0,
-            "sample_count": 24,
-            "artifact_path": "ml_models/alfred/risk_classifier/model.pkl"
+            "confidence_estimate": 76.0,
+            "sample_count": 12,
+            "artifact_path": "ml_models/alfred/risk_classifier/model.pkl",
+            "notes": "Risk classifier trained on 12 behavioral rows with holdout accuracy 1.00."
         }
     },
     "service_cost_predictor": {
-        "version": "2026-04-02T12:53:06.702820+00:00",
+        "version": "2026-07-31T09:42:16.754303+00:00",
         "metadata": {
             "status": "ready",
-            "quality_score": 99.94,
-            "confidence_estimate": 73.36,
-            "sample_count": 12,
-            "artifact_path": "ml_models/alfred/service_cost_predictor/model.pkl"
+            "quality_score": 94.18,
+            "confidence_estimate": 68.22,
+            "sample_count": 10,
+            "artifact_path": "ml_models/alfred/service_cost_predictor/model.pkl",
+            "notes": "Service-cost regressor trained on 10 service records with holdout MAPE 0.06."
+        }
+    },
+    "rl_agent": {
+        "version": "2026-07-31T11:37:55.279683+00:00",
+        "metadata": {
+            "status": "skipped",
+            "quality_score": 0.0,
+            "confidence_estimate": 0.0,
+            "sample_count": 0,
+            "artifact_path": "",
+            "notes": "RL agent training is still a placeholder and is intentionally excluded from auto-training."
         }
     }
 }

@@ -38,6 +38,7 @@ function renderFocusStrip(summary, loanPortfolio, behavior) {
     if (!target) {
         return;
     }
+    const homeSummary = loanPortfolio.home_ownership_summary || {};
 
     const items = [
         {
@@ -65,6 +66,14 @@ function renderFocusStrip(summary, loanPortfolio, behavior) {
             tone: "accent",
         },
     ];
+    if (Number(homeSummary.positions || 0) > 0) {
+        items.push({
+            label: "Home Equity",
+            value: Alfred.formatCurrency(homeSummary.equity_built_total || 0),
+            meta: `Upfront cash ${Alfred.formatCurrency(homeSummary.upfront_cash_invested_total || 0)}`,
+            tone: "good",
+        });
+    }
 
     document.getElementById("dashboardFocusStrip").innerHTML = items.map(item => `
         <article class="dashboard-focus-card dashboard-focus-${item.tone}">
@@ -108,6 +117,14 @@ function renderSummaryCards(summary, loanPortfolio) {
             caption: `${loanPortfolio.active_loans} active manual loans`,
         },
     ];
+    const homeSummary = loanPortfolio.home_ownership_summary || {};
+    if (Number(homeSummary.positions || 0) > 0) {
+        cards.push({
+            kicker: "Home Acquisition Base",
+            value: Alfred.formatCurrency(homeSummary.property_acquisition_cost_total || 0),
+            caption: `${Alfred.formatCurrency(homeSummary.down_payment_total || 0)} down payment | ${Alfred.formatCurrency(homeSummary.other_upfront_payments_total || 0)} other upfront`,
+        });
+    }
 
     document.getElementById("dashboardSummaryCards").innerHTML = cards.map(card => `
         <article class="metric-card">

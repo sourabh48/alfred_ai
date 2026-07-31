@@ -11,7 +11,7 @@ from django.utils import timezone
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.ml_engine.inference_adapters.service_cost_predictor import service_cost_predictor, service_type_score, vehicle_type_score
 from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TripLog
-from .bike_catalog import build_maintenance_guidance
+from .bike_catalog import build_maintenance_guidance, build_route_maintenance_guidance
 
 
 SERVICE_RULES = [
@@ -256,6 +256,7 @@ class BikeServiceIntelligenceService:
         mileage_gap = round(average_actual_mileage - expected_mileage, 2) if average_actual_mileage and expected_mileage else 0
         service_history_summary = self._build_service_history_summary(scoped_service_records, scoped_documents, scoped_condition_snapshots, scoped_refill_logs)
         part_insights = self._build_part_insights(scoped_service_records, scoped_issues, latest_condition, latest_service, today)
+        route_wear = self._build_route_wear(primary_profile, scoped_trip_logs, open_issues, projected_next_service_cost, today)
 
         pending_tasks = self._build_pending_tasks(latest_service, open_issues, current_documents, latest_condition, today, now)
         observations = self._build_observations(
@@ -268,6 +269,7 @@ class BikeServiceIntelligenceService:
             scoped_refill_logs,
             expected_mileage,
             average_actual_mileage,
+            route_wear,
         )
         service_center_brief = self._build_service_center_brief(open_issues, latest_service, latest_condition)
         bike_profile = self._build_bike_profile(primary_profile, latest_service, current_documents, latest_condition, modification_summary, estimated_range)
@@ -285,6 +287,10 @@ class BikeServiceIntelligenceService:
                 "open_faults": len(open_issues),
                 "critical_faults": len(critical_issues),
                 "projected_next_service_cost": projected_next_service_cost,
+                "route_adjusted_service_cost": route_wear["route_adjusted_service_cost"],
+                "route_service_buffer": route_wear["suggested_service_buffer"],
+                "route_wear_index": route_wear["wear_index"],
+                "route_distance_90d": route_wear["recent_distance_km"],
                 "next_service_date": latest_service.next_service_date.isoformat() if latest_service and latest_service.next_service_date else "",
                 "next_service_km": latest_service.next_service_km if latest_service else None,
                 "valid_documents": document_summary["valid_count"],
@@ -324,6 +330,7 @@ class BikeServiceIntelligenceService:
             "document_compliance": document_compliance,
             "service_history_summary": service_history_summary,
             "part_insights": part_insights,
+            "route_wear": route_wear,
         }
 
     def risk_snapshot(self, user) -> dict:
@@ -662,6 +669,7 @@ class BikeServiceIntelligenceService:
         refill_logs,
         expected_mileage,
         average_actual_mileage,
+        route_wear,
     ) -> list[str]:
         observations = []
         if service_records:
@@ -688,6 +696,10 @@ class BikeServiceIntelligenceService:
             observations.append(f"{document_summary['expiring_soon_count']} bike document(s) will expire soon and should be renewed proactively.")
         if latest_condition:
             observations.append(f"Latest condition snapshot is {latest_condition.get_overall_status_display().lower()} with a score of {latest_condition.overall_score}/100.")
+        if route_wear.get("recent_distance_km"):
+            observations.append(
+                f"Recent route logs add {route_wear['recent_distance_km']:,.0f} km of wear pressure with a {route_wear['wear_status']} service watch level."
+            )
         if not observations:
             observations.append("Log more service jobs or fault reports to let the advisor learn your bike's maintenance pattern.")
         return observations[:5]
@@ -739,6 +751,161 @@ class BikeServiceIntelligenceService:
                 else "Start by importing a service bill, adding a manual service log, or storing a fuel refill to build maintenance history."
             ),
         }
+
+    def _build_route_wear(self, profile, trip_logs, open_issues, projected_next_service_cost: float, today) -> dict:
+        recent_logs = [item for item in trip_logs if item.log_date and (today - item.log_date).days <= 90]
+        recent_distance = round(sum(item.distance_km or 0 for item in recent_logs), 1)
+        all_distance = round(sum(item.distance_km or 0 for item in trip_logs), 1)
+        rough_keywords = {"offroad", "off-road", "broken", "pothole", "bad road", "gravel", "forest", "trail", "construction", "mud", "unpaved"}
+        hill_keywords = {"ghat", "hill", "mountain", "descent", "climb", "hairpin", "valley"}
+        rain_keywords = {"rain", "monsoon", "wet", "waterlogged", "flood", "slush"}
+        dust_keywords = {"dust", "dusty", "sand", "gravel", "construction", "trail", "offroad", "off-road"}
+        highway_keywords = {"highway", "expressway", "tour", "long ride", "roadtrip", "intercity"}
+        city_keywords = {"traffic", "city", "commute", "stop-go", "office"}
+        load_keywords = {"pillion", "luggage", "cargo", "loaded", "family", "passenger", "towing", "bags"}
+        rough_logs = [item for item in recent_logs if any(token in self._trip_log_text(item) for token in rough_keywords)]
+        hill_logs = [item for item in recent_logs if any(token in self._trip_log_text(item) for token in hill_keywords)]
+        rain_logs = [item for item in recent_logs if any(token in self._trip_log_text(item) for token in rain_keywords)]
+        dust_logs = [item for item in recent_logs if any(token in self._trip_log_text(item) for token in dust_keywords)]
+        highway_logs = [item for item in recent_logs if any(token in self._trip_log_text(item) for token in highway_keywords)]
+        city_logs = [item for item in recent_logs if any(token in self._trip_log_text(item) for token in city_keywords)]
+        loaded_logs = [item for item in recent_logs if any(token in self._trip_log_text(item) for token in load_keywords)]
+        service_interval_km = (
+            getattr(profile, "service_interval_km", None)
+            or (10000 if getattr(profile, "vehicle_type", "") == "car" else 5000)
+        )
+        interval_consumed_pct = round(min((recent_distance / max(float(service_interval_km), 1.0)) * 100, 100), 1)
+        issue_penalty = min(len([item for item in open_issues if item.severity in {"high", "critical"}]) * 0.08, 0.24)
+        wear_multiplier = 1.0
+        wear_multiplier += min(recent_distance / max(float(service_interval_km) * 2.0, 1.0), 0.28)
+        wear_multiplier += min(len(rough_logs) * 0.07, 0.21)
+        wear_multiplier += min(len(hill_logs) * 0.05, 0.15)
+        wear_multiplier += min(len(rain_logs) * 0.04, 0.12)
+        wear_multiplier += min(len(dust_logs) * 0.03, 0.09)
+        wear_multiplier += min(len(highway_logs) * 0.04, 0.12)
+        wear_multiplier += min(len(city_logs) * 0.025, 0.08)
+        wear_multiplier += min(len(loaded_logs) * 0.04, 0.12)
+        wear_multiplier += issue_penalty
+        wear_multiplier = round(min(wear_multiplier, 1.85), 2)
+        wear_index = round(min((wear_multiplier - 1.0) * 100 + interval_consumed_pct * 0.55, 100), 1)
+
+        has_tough_route_signal = (
+            bool((rough_logs or hill_logs or rain_logs or dust_logs) and recent_distance >= 500)
+            or bool(highway_logs and interval_consumed_pct >= 15)
+            or bool(city_logs and interval_consumed_pct >= 20)
+            or bool(loaded_logs and interval_consumed_pct >= 12)
+        )
+
+        if wear_index >= 62:
+            wear_status = "high"
+            recommendation = "Add a preventive inspection before the next long route and prioritize tyres, brakes, chain or suspension checks."
+        elif wear_index >= 35 or has_tough_route_signal:
+            wear_status = "watch"
+            recommendation = "Keep the next service window tighter because recent trip logs are adding measurable route wear."
+        else:
+            wear_status = "normal"
+            recommendation = "Route wear looks manageable from the recent trip logs."
+
+        route_cost_pressure = round(max(projected_next_service_cost, 0) * max(wear_multiplier - 1.0, 0), 2)
+        route_adjusted_service_cost = round(max(projected_next_service_cost, 0) + route_cost_pressure, 2)
+        suggested_buffer = round(max(route_adjusted_service_cost * 0.35, 800), 2)
+        component_pressure = [
+            {
+                "component": "Tyres and alignment",
+                "pressure": "high" if rough_logs or hill_logs or interval_consumed_pct >= 55 else "watch",
+                "reason": "Rough, hill, rain, or high-distance routes accelerate tyre shoulder wear and alignment drift.",
+            },
+            {
+                "component": "Brakes",
+                "pressure": "high" if rough_logs or hill_logs or highway_logs or loaded_logs else "watch",
+                "reason": "Long descents, highway speed, and rain exposure raise brake heat and pad contamination risk.",
+            },
+            {
+                "component": "Suspension and bearings",
+                "pressure": "high" if rough_logs or hill_logs or loaded_logs else "watch",
+                "reason": "Potholes, trails, load, and ghat roads add shock, fork, wheel-bearing, and alignment load.",
+            },
+        ]
+        is_electric = getattr(profile, "fuel_type", "") == "electric" or getattr(profile, "engine_cc", None) in {0, 0.0}
+        if is_electric:
+            component_pressure.append(
+                {
+                    "component": "Battery, charging, and brake regen",
+                    "pressure": "high" if rain_logs or highway_logs or loaded_logs else "watch",
+                    "reason": "EV range and regen feel shift with tyre drag, charging heat, water exposure, sustained speed, and payload.",
+                }
+            )
+        elif getattr(profile, "vehicle_type", "") != "car":
+            component_pressure.append(
+                {
+                    "component": "Chain or CVT drive",
+                    "pressure": "high" if rough_logs or rain_logs or dust_logs else "watch",
+                    "reason": "Rain, dust, and stop-go loads shorten chain-lube or scooter CVT inspection intervals.",
+                }
+            )
+        else:
+            component_pressure.append(
+                {
+                    "component": "Cooling and fluids",
+                    "pressure": "watch" if highway_logs or rough_logs else "normal",
+                    "reason": "Long highway or hill use makes coolant, oil, brake fluid, and battery checks more important.",
+                }
+            )
+
+        evidence = [
+            f"{len(recent_logs)} trip log(s) in the last 90 days, covering {recent_distance:,.1f} km.",
+            f"Recent travel consumed about {interval_consumed_pct:.1f}% of the saved service interval.",
+        ]
+        if rough_logs:
+            evidence.append(f"{len(rough_logs)} log(s) mention rough, broken, trail, or pothole-heavy conditions.")
+        if hill_logs:
+            evidence.append(f"{len(hill_logs)} log(s) mention hill, ghat, climb, or descent conditions.")
+        if rain_logs:
+            evidence.append(f"{len(rain_logs)} log(s) mention rain, monsoon, wet, or waterlogged conditions.")
+        if dust_logs:
+            evidence.append(f"{len(dust_logs)} log(s) mention dust, gravel, construction, or trail exposure.")
+        if highway_logs:
+            evidence.append(f"{len(highway_logs)} log(s) mention highway or long-route use.")
+        if city_logs:
+            evidence.append(f"{len(city_logs)} log(s) mention commute or stop-go use.")
+        if loaded_logs:
+            evidence.append(f"{len(loaded_logs)} log(s) mention passenger, luggage, cargo, or towing load.")
+
+        payload = {
+            "wear_status": wear_status,
+            "wear_index": wear_index,
+            "wear_multiplier": wear_multiplier,
+            "recent_distance_km": recent_distance,
+            "lifetime_logged_distance_km": all_distance,
+            "service_interval_km": int(service_interval_km),
+            "interval_consumed_pct": interval_consumed_pct,
+            "route_cost_pressure": route_cost_pressure,
+            "route_adjusted_service_cost": route_adjusted_service_cost,
+            "suggested_service_buffer": suggested_buffer,
+            "signals": {
+                "recent_trip_count": len(recent_logs),
+                "rough_route_logs": len(rough_logs),
+                "hill_route_logs": len(hill_logs),
+                "rain_route_logs": len(rain_logs),
+                "dust_route_logs": len(dust_logs),
+                "highway_route_logs": len(highway_logs),
+                "city_stop_go_logs": len(city_logs),
+                "loaded_route_logs": len(loaded_logs),
+            },
+            "component_pressure": component_pressure,
+            "recommendation": recommendation,
+            "evidence": evidence[:5],
+        }
+        route_guidance = build_route_maintenance_guidance(profile, payload, projected_next_service_cost=projected_next_service_cost)
+        payload["maintenance_guidance"] = route_guidance
+        payload["service_cost_guidance"] = {
+            "base_projected_service_cost": round(max(projected_next_service_cost, 0), 2),
+            "route_cost_pressure": route_cost_pressure,
+            "route_adjusted_service_cost": route_adjusted_service_cost,
+            "suggested_service_buffer": suggested_buffer,
+            "cost_factors": route_guidance["cost_factors"],
+        }
+        return payload
 
     def _build_part_insights(self, service_records, issues, latest_condition, latest_service, today) -> list[dict]:
         current_odometer = (
@@ -1106,6 +1273,18 @@ class BikeServiceIntelligenceService:
                 issue.tags,
                 issue.probable_cause,
                 issue.suggested_action,
+            ]
+            if part
+        )
+
+    def _trip_log_text(self, trip_log: TripLog) -> str:
+        return " ".join(
+            str(part).lower()
+            for part in [
+                trip_log.title,
+                trip_log.location_name,
+                trip_log.notes,
+                trip_log.mood,
             ]
             if part
         )

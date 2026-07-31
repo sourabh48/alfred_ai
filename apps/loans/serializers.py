@@ -51,6 +51,8 @@ class LoanSerializer(serializers.ModelSerializer):
     consolidated_into_id = serializers.IntegerField(source="consolidated_into.id", read_only=True)
     closure_documents_count = serializers.SerializerMethodField()
     latest_foreclosure_snapshot = serializers.SerializerMethodField()
+    home_upfront_cash_invested = serializers.SerializerMethodField()
+    home_property_acquisition_cost = serializers.SerializerMethodField()
 
     class Meta:
         model = Loan
@@ -66,6 +68,11 @@ class LoanSerializer(serializers.ModelSerializer):
             "emi",
             "tenure_months",
             "remaining_balance",
+            "home_purchase_price",
+            "home_down_payment",
+            "home_other_upfront_payments",
+            "home_upfront_cash_invested",
+            "home_property_acquisition_cost",
             "start_date",
             "closed_on",
             "is_active",
@@ -91,27 +98,60 @@ class LoanSerializer(serializers.ModelSerializer):
             return None
         return LoanForeclosureSnapshotSerializer(snapshot).data
 
+    def get_home_upfront_cash_invested(self, obj):
+        return obj.resolved_home_upfront_cash_invested
+
+    def get_home_property_acquisition_cost(self, obj):
+        return obj.resolved_home_property_acquisition_cost
+
     def validate(self, attrs):
         principal = attrs.get("principal", getattr(self.instance, "principal", 0))
         emi = attrs.get("emi", getattr(self.instance, "emi", 0))
         start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
         closed_on = attrs.get("closed_on", getattr(self.instance, "closed_on", None))
         remaining_balance = attrs.get("remaining_balance", getattr(self.instance, "remaining_balance", None))
+        loan_type = attrs.get("loan_type", getattr(self.instance, "loan_type", "other"))
+        home_purchase_price = float(attrs.get("home_purchase_price", getattr(self.instance, "home_purchase_price", 0)) or 0)
+        home_down_payment = float(attrs.get("home_down_payment", getattr(self.instance, "home_down_payment", 0)) or 0)
+        home_other_upfront_payments = float(
+            attrs.get("home_other_upfront_payments", getattr(self.instance, "home_other_upfront_payments", 0)) or 0
+        )
         if principal <= 0:
             raise serializers.ValidationError("Principal must be greater than zero.")
         if emi <= 0:
             raise serializers.ValidationError("EMI must be greater than zero.")
+        if home_purchase_price < 0 or home_down_payment < 0 or home_other_upfront_payments < 0:
+            raise serializers.ValidationError("Home-loan upfront cash fields cannot be negative.")
         if closed_on and start_date and closed_on < start_date:
             raise serializers.ValidationError("Closing date cannot be earlier than the loan start date.")
         if self.instance and (attrs.get("is_active") is False or closed_on):
             if not self.instance.closure_documents.filter(verification_status="verified").exists() and not attrs.get("consolidated_into"):
                 raise serializers.ValidationError("A verified foreclosure or closure document is required before manually closing a loan.")
 
+        if loan_type == "home" and home_purchase_price > 0:
+            if home_purchase_price < float(principal or 0):
+                raise serializers.ValidationError(
+                    "Property purchase price cannot be lower than the financed home-loan amount. Clear the price field if the loan also covered non-property costs."
+                )
+            attrs["home_down_payment"] = round(home_purchase_price - float(principal or 0), 2)
+
+        if loan_type != "home":
+            attrs["home_purchase_price"] = 0.0
+            attrs["home_down_payment"] = 0.0
+            attrs["home_other_upfront_payments"] = 0.0
+
         if closed_on or (remaining_balance is not None and remaining_balance <= 0):
             attrs["is_active"] = False
         elif "is_active" not in attrs and not getattr(self.instance, "closed_on", None):
             attrs["is_active"] = True
         return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["home_down_payment"] = instance.resolved_home_down_payment
+        data["home_upfront_cash_invested"] = instance.resolved_home_upfront_cash_invested
+        data["home_property_acquisition_cost"] = instance.resolved_home_property_acquisition_cost
+        return data
 
 
 class LoanClosureDocumentSerializer(serializers.ModelSerializer):

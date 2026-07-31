@@ -47,6 +47,10 @@ LINK_RE = re.compile(
     re.IGNORECASE,
 )
 YEARS_RE = re.compile(r"(\d+(?:\.\d+)?)\+?\s+(?:years?|yrs?)", re.IGNORECASE)
+COMPANY_FIELD_RE = re.compile(
+    r"\b(?:company|current company|employer|organization)\s*[:\-]\s*([A-Z][A-Z0-9&.,'() /-]{2,90})",
+    re.IGNORECASE,
+)
 
 
 class _HTMLTextStripper(HTMLParser):
@@ -93,6 +97,7 @@ class ResumeIntelligenceService:
         links = self._extract_links(text)
         experience = self._extract_experience(normalized)
         role = self._extract_role(text)
+        current_company = self._extract_current_company(text)
         email = EMAIL_RE.search(text)
         phone = PHONE_RE.search(text)
         achievements = self._achievement_density(text)
@@ -141,6 +146,7 @@ class ResumeIntelligenceService:
 
         payload = {
             "role": role,
+            "current_company": current_company,
             "skills": skills,
             "experience_years": experience,
             "email": email.group(0) if email else "",
@@ -149,6 +155,8 @@ class ResumeIntelligenceService:
             "achievement_signal_count": achievements,
             "extraction_method": extraction.method,
             "extraction_notes": extraction.notes[:4],
+            "raw_text_excerpt": " ".join(text.split())[:600],
+            "extraction_review": extraction.review_payload,
         }
         summary = self._build_summary(role, experience, skills, strengths, weaknesses)
 
@@ -413,6 +421,28 @@ class ResumeIntelligenceService:
     def _extract_experience(self, text: str) -> float:
         matches = [float(match.group(1)) for match in YEARS_RE.finditer(text)]
         return max(matches) if matches else 0.0
+
+    def _extract_current_company(self, text: str) -> str:
+        direct_match = COMPANY_FIELD_RE.search(text)
+        if direct_match:
+            return re.sub(r"\s+", " ", direct_match.group(1)).strip()[:120]
+
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        for line in lines[:18]:
+            if "|" not in line:
+                continue
+            parts = [part.strip() for part in line.split("|") if part.strip()]
+            if len(parts) < 2:
+                continue
+            for part in parts:
+                lowered = part.lower()
+                if any(token in lowered for token in ("developer", "engineer", "analyst", "manager", "architect", "consultant")):
+                    continue
+                cleaned = re.sub(r"[^A-Za-z0-9&.,'() /-]", "", part).strip()
+                if 2 <= len(cleaned.split()) <= 6:
+                    return cleaned[:120]
+
+        return ""
 
     def _extract_links(self, text: str) -> list[str]:
         found = []

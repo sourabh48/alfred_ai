@@ -166,6 +166,47 @@
 </section>
 
 <section class="row g-4 mb-4">
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">ChatGPT Dashboard / Chat Import</h2>
+            <p class="page-section-copy mb-3">Bring an existing ChatGPT dashboard, chat transcript, or exported conversation into ALFRED as reviewable context before mapping it into live records.</p>
+            <form id="documentChatGPTImportForm" class="soft-grid">
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label" for="documentChatGPTTitle">Title</label>
+                        <input id="documentChatGPTTitle" name="title" class="form-control" placeholder="Optional import title">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="documentChatGPTImportType">Import Type</label>
+                        <select id="documentChatGPTImportType" name="import_type" class="form-select">
+                            <option value="chat_transcript">Chat Transcript</option>
+                            <option value="dashboard_export">Dashboard Export</option>
+                            <option value="mixed_context">Mixed Context</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="documentChatGPTSource">Source</label>
+                        <input id="documentChatGPTSource" name="source_label" class="form-control" value="ChatGPT">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="documentChatGPTRawText">Chat / Dashboard Text</label>
+                        <textarea id="documentChatGPTRawText" name="raw_text" class="form-control" rows="8" required></textarea>
+                    </div>
+                </div>
+                <div id="documentChatGPTFeedback" class="d-none alert mb-0"></div>
+                <button class="btn btn-primary" type="submit">Import Chat Context</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Recent Chat Imports</h2>
+            <div id="documentChatGPTImportList" class="data-stack stack-scroll"></div>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
     <div class="col-12">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Review Queue</h2>
@@ -220,5 +261,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/documents.js?v=2.0"></script>
+<script src="/static/js/documents.js?v=2.3"></script>
 {% endblock %}

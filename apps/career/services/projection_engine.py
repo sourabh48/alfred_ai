@@ -5,6 +5,7 @@ from pathlib import Path
 from django.conf import settings
 from django.utils import timezone
 
+from .income_intelligence import build_employment_income_signals
 from apps.ml_engine.inference_adapters.salary_predictor import MODEL_PATH, salary_predictor
 from apps.ml_engine.models import AdaptiveModelState
 
@@ -23,8 +24,14 @@ CITY_TIER_SCORES = {
 }
 
 
-def build_salary_projection(user, profile, *, macro: dict, latest_resume=None, overrides: dict | None = None) -> dict:
-    inputs = build_projection_inputs(user, profile, latest_resume=latest_resume, overrides=overrides)
+def build_salary_projection(user, profile, *, macro: dict, latest_resume=None, overrides: dict | None = None, income_signals: dict | None = None) -> dict:
+    inputs = build_projection_inputs(
+        user,
+        profile,
+        latest_resume=latest_resume,
+        overrides=overrides,
+        income_signals=income_signals,
+    )
     model_runtime = resolve_salary_model_runtime(user, inputs)
     growth_context = build_growth_context(macro=macro, inputs=inputs)
 
@@ -89,10 +96,14 @@ def build_salary_projection(user, profile, *, macro: dict, latest_resume=None, o
             "baseline_source": "salary_predictor_model" if model_runtime["available"] else "reported_income",
             "baseline_monthly_income": round(base_income, 2),
             "reported_current_income": round(inputs["current_income"], 2),
+            "reported_income_mode": inputs["income_signals"]["reported_income"]["mode"],
+            "annualized_compensation": round(inputs["income_signals"]["annualized_compensation"], 2),
+            "current_employer": inputs["income_signals"]["current_employer"],
             "model_predicted_income": round(model_runtime["predicted_monthly_income"], 2) if model_runtime["available"] else None,
         },
         "macro_context": macro["payload"],
         "evidence": macro["evidence"],
+        "income_signals": inputs["income_signals"],
         "insights": insights[:5],
         "reasoning": reasoning,
         "explainability_note": "Each reason below is tied to either the live salary-model baseline, explicit profile inputs, or verified macro evidence. It is not a confidence interval.",
@@ -104,7 +115,7 @@ def build_salary_projection(user, profile, *, macro: dict, latest_resume=None, o
     }
 
 
-def build_projection_inputs(user, profile, *, latest_resume=None, overrides: dict | None = None) -> dict:
+def build_projection_inputs(user, profile, *, latest_resume=None, overrides: dict | None = None, income_signals: dict | None = None) -> dict:
     overrides = overrides or {}
     resume_payload = (latest_resume.extracted_payload or {}) if latest_resume and latest_resume.parser_status == "parsed" else {}
     profile_skills = [item.strip() for item in (profile.skills or "").split(",") if item.strip()]
@@ -113,7 +124,21 @@ def build_projection_inputs(user, profile, *, latest_resume=None, overrides: dic
     if skills is None:
         skills = resume_skills or profile_skills
 
-    current_income = float(overrides.get("monthly_income", getattr(user, "monthly_income", 0) or profile.last_salary or 0) or 0)
+    resolved_income_signals = income_signals or build_employment_income_signals(
+        user=user,
+        latest_resume=latest_resume,
+        profile=profile,
+    )
+    current_income = float(
+        overrides.get(
+            "monthly_income",
+            resolved_income_signals.get("monthly_cash_income")
+            or getattr(user, "monthly_income", 0)
+            or profile.last_salary
+            or 0,
+        )
+        or 0
+    )
     variable_income = float(overrides.get("variable_income", getattr(user, "variable_income", 0) or 0) or 0)
     return {
         "current_income": current_income,
@@ -124,6 +149,7 @@ def build_projection_inputs(user, profile, *, latest_resume=None, overrides: dic
         "skills": [str(item).strip() for item in skills if str(item).strip()],
         "account_age_days": max((timezone.now() - getattr(user, "created_at", timezone.now())).days, 0),
         "resume_used": bool(resume_skills and skills == resume_skills),
+        "income_signals": resolved_income_signals,
     }
 
 

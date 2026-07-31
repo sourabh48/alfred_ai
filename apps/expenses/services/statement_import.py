@@ -32,6 +32,12 @@ TXN_RE = re.compile(
     r"(?P<closing>[0-9,]+\.\d{2})"
     r"(?:\s+(?P<tail>.*))?$"
 )
+CARD_TXN_RE = re.compile(
+    r"(?P<txn_date>\d{2}/\d{2}/\d{4})\|\s*\d{2}:\d{2}\s+"
+    r"(?P<body>.+?)\s+"
+    r"(?P<sign>\+)?(?P<amount>[0-9,]+\.\d{2})(?=\s|$)",
+    re.IGNORECASE,
+)
 PERIOD_RE = re.compile(
     r"(?:Statement(?:\s+of\s+account)?|Stat(?:ement| ent))?\s*From\s*[:\-]?\s*"
     r"(\d{2}[/:\-]\d{2}[/:\-]\d{4})\s*To\s*[:\-]?\s*(\d{2}[/:\-]\d{2}[/:\-]\d{4})",
@@ -110,6 +116,7 @@ KNOWN_MERCHANT_RULES = [
     (("SWIGGY",), "Swiggy"),
     (("ZOMATO", "ETERNAL"), "Zomato"),
     (("GOOGLE PLAY", "PLAYSTORE"), "Google Play"),
+    (("GOOGLE PAY", "GOOGLEPAY", "GPAY", "G PAY"), "Google Pay"),
     (("NETFLIX",), "Netflix"),
     (("SPOTIFY",), "Spotify"),
     (("YOUTUBE",), "YouTube"),
@@ -138,16 +145,37 @@ CLASSIFICATION_RULES = [
     ("expense", "food", ("CAFE", "BAKERY", "HOTEL", "RESTAURANT", "SWIGGY", "ZOMATO", "FOOD")),
     ("expense", "health", ("DENTAL", "PHARMA", "HOSPITAL", "CLINIC", "MEDICAL")),
     ("expense", "fuel", ("FILLING STATIO", "PETROL", "FUEL", "HPCL", "IOCL", "BPCL", "INDIAN OIL")),
+    ("expense", "bills", ("FINANCE CHARGES", "IGST-", "CGST-", "SGST-", "GST-")),
     ("expense", "utilities", ("ELECTRICIT", "RECHARGE", "PAYMENTFORBILLS", "BILL", "WATER", "GAS")),
     ("expense", "subscription", ("GOOGLE PLAY", "PLAYSTORE", "NETFLIX", "SPOTIFY", "PRIME", "YOUTUBE")),
     ("expense", "shopping", ("AMAZON", "MYNTRA", "FLIPKART", "SHOP", "NOBROKER")),
     ("expense", "travel", ("UBER", "OLA", "METRO", "IRCTC", "AUTOMOB")),
     ("other", "credit_card", ("ONECARD", "CRED CLUB", "PAYMENT ON CRED", "RAZPCREDCLUB", "CREDIT CARD")),
+    ("other", "transfer", ("GOOGLE PAY", "GOOGLEPAY", "GPAY", "G PAY", "PHONEPE", "PAYTM", "AMAZON PAY")),
 ]
-SUBSCRIPTION_KEYWORDS = ("GOOGLE PLAY", "PLAYSTORE", "NETFLIX", "SPOTIFY", "PRIME", "YOUTUBE", "SUBSCRIPTION", "MANDATEEXECUTE")
+SUBSCRIPTION_KEYWORDS = ("GOOGLE PLAY", "PLAYSTORE", "NETFLIX", "SPOTIFY", "PRIME", "YOUTUBE", "SUBSCRIPTION", "MEMBERSHIP")
 INVESTMENT_KEYWORDS = ("GROWW", "ZERODHA", "MUTUAL FUND", "STOCK", "MF ")
 CREDIT_CARD_KEYWORDS = ("ONECARD", "CRED CLUB", "PAYMENT ON CRED", "RAZPCREDCLUB", "CREDIT CARD")
-LOAN_EXCLUSION_KEYWORDS = ("GOOGLE PLAY", "PLAYSTORE", "NETFLIX", "SPOTIFY", "YOUTUBE", "SUBSCRIPTION", "MEMBERSHIP", "MANDATEEXECUTE")
+MANDATE_KEYWORDS = ("MANDATEEXECUTE", "AUTOPAY", "AUTO PAY", "EMANDATE", "E-MANDATE", "ENACH")
+DIGITAL_WALLET_KEYWORDS = ("GOOGLE PAY", "GOOGLEPAY", "GPAY", "G PAY", "PHONEPE", "PAYTM", "AMAZON PAY")
+LOAN_EXCLUSION_KEYWORDS = (
+    "GOOGLE PLAY",
+    "PLAYSTORE",
+    "GOOGLE PAY",
+    "GOOGLEPAY",
+    "GPAY",
+    "G PAY",
+    "NETFLIX",
+    "SPOTIFY",
+    "YOUTUBE",
+    "SUBSCRIPTION",
+    "MEMBERSHIP",
+    "FINANCE CHARGES",
+    "IGST-",
+    "CGST-",
+    "SGST-",
+    "GST-",
+)
 LOAN_KEYWORD_PATTERNS = (
     re.compile(r"\bBAJAJ(?:\s+HOUSING)?\b"),
     re.compile(r"\bPOONAWALLA\b"),
@@ -329,6 +357,14 @@ def parse_bank_statement(file_obj: BinaryIO, user=None, *, ocr_page_limit: int |
             continue
         transactions.append(transaction)
         previous_closing = transaction.closing_balance
+    if statement_kind == "credit_card_statement":
+        seen = {(item.transaction_date, item.raw_description, item.amount, item.direction) for item in transactions}
+        for transaction in _parse_credit_card_transactions(full_text.splitlines()):
+            key = (transaction.transaction_date, transaction.raw_description, transaction.amount, transaction.direction)
+            if key in seen:
+                continue
+            transactions.append(transaction)
+            seen.add(key)
 
     preview_transaction_count = len(transactions) if preview_only else 0
     if preview_only:
@@ -369,6 +405,7 @@ def parse_bank_statement(file_obj: BinaryIO, user=None, *, ocr_page_limit: int |
         field_names=["bank_name", "account_holder", "account_number", "statement_start", "statement_end"] + ([item.category for item in transactions[:6]] if transactions else []),
         confidence=confidence,
     )
+    confidence = round(max(0.0, min(float(confidence or 0), 0.99)), 2)
     parser_status = "parsed" if transactions and not preview_only else ("needs_review" if full_text.strip() else "failed")
 
     return StatementParseResult(
@@ -698,6 +735,39 @@ def _parse_transaction_group(group: str, previous_closing: float | None) -> Pars
     )
 
 
+def _parse_credit_card_transactions(lines: list[str]) -> list[ParsedTransaction]:
+    transactions: list[ParsedTransaction] = []
+    for raw_line in lines:
+        line = _normalize_space(raw_line)
+        if not line:
+            continue
+        for match in CARD_TXN_RE.finditer(line):
+            amount = _to_float(match.group("amount"))
+            if amount <= 0:
+                continue
+            description = _normalize_space(match.group("body"))
+            direction = "credit" if match.group("sign") == "+" else "debit"
+            details = classify_transaction_text(description, direction)
+            transactions.append(
+                ParsedTransaction(
+                    transaction_date=datetime.strptime(match.group("txn_date"), "%d/%m/%Y").date(),
+                    amount=amount,
+                    closing_balance=0.0,
+                    direction=details["direction"],
+                    classification=details["classification"],
+                    category=details["category"],
+                    payment_mode=details["payment_mode"],
+                    merchant=details["merchant"],
+                    description=details["description"],
+                    raw_description=details["raw_description"],
+                    external_reference=details["external_reference"],
+                    counterparty=details["counterparty"],
+                    company_name=details["company_name"],
+                )
+            )
+    return transactions
+
+
 def classify_transaction_text(description: str, direction: str) -> dict[str, str]:
     cleaned = _sanitize_description(description)
     normalized_direction = _infer_direction(cleaned, 0, None) if direction not in {"credit", "debit"} else direction
@@ -730,6 +800,11 @@ def _classify_transaction(description: str, direction: str) -> tuple[str, str]:
     if any(keyword in text for keyword in SUBSCRIPTION_KEYWORDS):
         return "expense", "subscription"
 
+    if _looks_like_wallet_mandate(text):
+        if any(keyword in text for keyword in ("NETFLIX", "SPOTIFY", "PRIME", "YOUTUBE", "GOOGLE PLAY", "PLAYSTORE", "SUBSCRIPTION", "MEMBERSHIP")):
+            return "expense", "subscription"
+        return "other", "transfer"
+
     if any(keyword in text for keyword in INVESTMENT_KEYWORDS):
         return "other", "investment"
 
@@ -752,7 +827,13 @@ def _classify_transaction(description: str, direction: str) -> tuple[str, str]:
 def _looks_like_loan_payment(text: str) -> bool:
     if any(keyword in text for keyword in LOAN_EXCLUSION_KEYWORDS):
         return False
+    if _looks_like_wallet_mandate(text):
+        return False
     return any(pattern.search(text) for pattern in LOAN_KEYWORD_PATTERNS)
+
+
+def _looks_like_wallet_mandate(text: str) -> bool:
+    return any(keyword in text for keyword in DIGITAL_WALLET_KEYWORDS) and any(keyword in text for keyword in MANDATE_KEYWORDS)
 
 
 def _infer_direction(description: str, closing_balance: float, previous_closing: float | None) -> str:
@@ -960,6 +1041,8 @@ def _extract_company_name(text: str) -> str:
     for keyword in ("AMAZON", "FLIPKART", "MYNTRA", "SWIGGY", "ZOMATO", "GROWW", "ZERODHA", "CRED", "JIO", "NETFLIX", "SPOTIFY", "GOOGLE PLAY", "PLAYSTORE", "YOUTUBE"):
         if keyword in upper:
             return "Google Play" if keyword in {"GOOGLE PLAY", "PLAYSTORE"} else keyword.title()
+    if any(keyword in upper for keyword in ("GOOGLE PAY", "GOOGLEPAY", "GPAY", "G PAY")):
+        return "Google Pay"
 
     merchant_guess = _extract_merchant(text)
     return merchant_guess[:255]

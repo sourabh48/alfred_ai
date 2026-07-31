@@ -1,12 +1,13 @@
 from collections import defaultdict
 
-from django.db.models import Sum
+from django.db.models import Count, Max, Sum
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes as perm_classes
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.models import Expense
 
 from .models import Budget
@@ -36,6 +37,58 @@ class BudgetDetailView(RetrieveUpdateDestroyAPIView):
 @perm_classes([IsAuthenticated])
 def get_budget_dashboard(request):
     """Return the active monthly budget plan plus AI-backed spending guidance."""
+    payload = materialize_payload(
+        namespace="budget-dashboard",
+        user_id=request.user.id,
+        revision=_budget_dashboard_revision(request.user),
+        ttl_seconds=60,
+        builder=lambda: _build_budget_dashboard_payload(request),
+    )
+    return Response(payload)
+
+
+def _budget_dashboard_revision(user) -> str:
+    today = timezone.localdate()
+    budget_meta = Budget.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        total_budget=Sum("inflation_adjusted"),
+        total_spent=Sum("spent"),
+    )
+    expense_meta = Expense.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_date=Max("transaction_date"),
+        total_amount=Sum("amount"),
+    )
+    profile_token = ":".join(
+        str(value or "")
+        for value in (
+            getattr(user, "monthly_income", ""),
+            getattr(user, "rent_or_emi", ""),
+            getattr(user, "city_type", ""),
+        )
+    )
+    return "|".join(
+        str(value or "")
+        for value in (
+            "budget-dashboard-v2",
+            today.strftime("%Y-%m-%d"),
+            budget_meta["count"],
+            budget_meta["max_id"],
+            budget_meta["total_budget"],
+            budget_meta["total_spent"],
+            expense_meta["count"],
+            expense_meta["max_id"],
+            expense_meta["latest_date"],
+            expense_meta["total_amount"],
+            profile_token,
+        )
+    )
+
+
+def _build_budget_dashboard_payload(request) -> dict:
+    """Build the active monthly budget plan plus AI-backed spending guidance."""
     from .services.budget_intelligence import budget_intelligence_service
 
     today = timezone.localdate()
@@ -115,29 +168,28 @@ def get_budget_dashboard(request):
         for budget in budgets[:6]
     ]
 
-    return Response(
-        {
-            "summary": {
-                "month": today.strftime("%B %Y"),
-                "total_budget": total_budget,
-                "total_spent": total_spent,
-                "total_remaining": total_remaining,
-                "percent_used": round((total_spent / total_budget * 100) if total_budget > 0 else 0, 1),
-                "fixed_obligations": round(float(suggestions.get("fixed_obligations", 0) or 0), 2),
-                "disposable_income": round(float(suggestions.get("disposable_income", 0) or 0), 2),
-                "tracked_categories": len(budget_data),
-            },
-            "plan": {
-                "id": active_plan.id,
-                "month": active_plan.month,
-                "base_budget": round(float(active_plan.base_budget or 0), 2),
-                "inflation_adjusted": round(float(active_plan.inflation_adjusted or 0), 2),
-                "spent": round(float(active_plan.spent or 0), 2),
-            } if active_plan else None,
-            "budget_history": budget_history,
-            "budgets": budget_data[:8],
-            "daily_affordability": daily_affordability,
-            "ai_suggestions": suggestions.get("recommendations", []),
-            "forecast": forecast.get("forecasts", []),
-        }
-    )
+    return {
+        "summary": {
+            "month": today.strftime("%B %Y"),
+            "total_budget": total_budget,
+            "total_spent": total_spent,
+            "total_remaining": total_remaining,
+            "percent_used": round((total_spent / total_budget * 100) if total_budget > 0 else 0, 1),
+            "fixed_obligations": round(float(suggestions.get("fixed_obligations", 0) or 0), 2),
+            "disposable_income": round(float(suggestions.get("disposable_income", 0) or 0), 2),
+            "tracked_categories": len(budget_data),
+        },
+        "plan": {
+            "id": active_plan.id,
+            "month": active_plan.month,
+            "base_budget": round(float(active_plan.base_budget or 0), 2),
+            "inflation_adjusted": round(float(active_plan.inflation_adjusted or 0), 2),
+            "spent": round(float(active_plan.spent or 0), 2),
+        } if active_plan else None,
+        "budget_history": budget_history,
+        "budgets": budget_data[:8],
+        "daily_affordability": daily_affordability,
+        "ai_suggestions": suggestions.get("recommendations", []),
+        "forecast": forecast.get("forecasts", []),
+        "financial_baseline": suggestions.get("financial_baseline") or daily_affordability.get("financial_baseline") or forecast.get("financial_baseline") or {},
+    }

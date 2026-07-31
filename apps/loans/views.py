@@ -10,22 +10,101 @@ from rest_framework.decorators import api_view, parser_classes, permission_class
 from rest_framework import status
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Count, Max, Sum
 from datetime import date
 
+from alfred_ai.services.materialized_cache import materialize_payload
+from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
+from apps.investments.models import Investment
 from alfred_ai.services import record_parser_learning
 from apps.reports.services import operational_logging_service
 from apps.loans.services.loan_pdf_parser import loan_pdf_parser
 from apps.loans.services import loan_closure_parser, loan_foreclosure_service, loan_intelligence_service
 from apps.reports.services import reporting_service
 
-from .models import Loan, LoanClosureDocument, LoanImportDocument
+from .models import Loan, LoanClosureDocument, LoanImportDocument, LoanPaymentHistory
 from .serializers import LoanClosureDocumentSerializer, LoanImportDocumentSerializer, LoanSerializer
 
 
 def _json_safe(payload):
     return json.loads(json.dumps(payload, cls=DjangoJSONEncoder))
+
+
+def _loan_dashboard_revision(user) -> str:
+    loan_meta = Loan.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_update=Max("updated_at"),
+        total_principal=Sum("principal"),
+        total_balance=Sum("remaining_balance"),
+    )
+    payment_meta = LoanPaymentHistory.objects.filter(loan__user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_payment=Max("payment_date"),
+        total_amount=Sum("amount"),
+    )
+    import_meta = LoanImportDocument.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_import=Max("created_at"),
+    )
+    closure_meta = LoanClosureDocument.objects.filter(loan__user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_update=Max("updated_at"),
+    )
+    investment_meta = Investment.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_update=Max("updated_at"),
+        total_value=Sum("current_value"),
+    )
+    expense_meta = Expense.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_expense=Max("transaction_date"),
+        total_amount=Sum("amount"),
+    )
+    profile_token = ":".join(
+        str(value or "")
+        for value in (
+            getattr(user, "monthly_income", ""),
+            getattr(user, "rent_or_emi", ""),
+            getattr(user, "city_type", ""),
+        )
+    )
+    return "|".join(
+        str(value or "")
+        for value in (
+            "loan-dashboard-v2",
+            loan_meta["count"],
+            loan_meta["max_id"],
+            loan_meta["latest_update"],
+            loan_meta["total_principal"],
+            loan_meta["total_balance"],
+            payment_meta["count"],
+            payment_meta["max_id"],
+            payment_meta["latest_payment"],
+            payment_meta["total_amount"],
+            import_meta["count"],
+            import_meta["max_id"],
+            import_meta["latest_import"],
+            closure_meta["count"],
+            closure_meta["max_id"],
+            closure_meta["latest_update"],
+            investment_meta["count"],
+            investment_meta["max_id"],
+            investment_meta["latest_update"],
+            investment_meta["total_value"],
+            expense_meta["count"],
+            expense_meta["max_id"],
+            expense_meta["latest_expense"],
+            expense_meta["total_amount"],
+            profile_token,
+        )
+    )
 
 
 def _loan_import_parser_status(parsed: dict) -> str:
@@ -65,6 +144,8 @@ def _create_loan_import_document(*, request, upload_file, parsed: dict, created_
                 "document_type": parsed.get("document_type") or "",
                 "confidence": float(parsed.get("confidence") or 0),
                 "loans": parsed.get("loans") or [],
+                "parser_notes": parsed.get("parser_notes") or "",
+                **(parsed.get("payload") or {}),
             }
         ),
         summary=_loan_import_summary(parsed, created_loans),
@@ -101,36 +182,50 @@ class LoanSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        intelligence = build_financial_intelligence(request.user)
-        return Response(
-            {
-                "summary": intelligence["loan_portfolio"],
-                "balance_sheet": {
-                    "total_liabilities": intelligence["balance_sheet"]["total_liabilities"],
-                    "pending_foreclosure_excluded_balance": intelligence["balance_sheet"]["pending_foreclosure_excluded_balance"],
-                    "summary": intelligence["balance_sheet"]["summary"],
-                },
-                "behavior": {
-                    "stress_score": intelligence["summary"]["stress_score"],
-                    "debt_service_ratio": intelligence["summary"]["debt_service_ratio"],
-                    "coach_tone": intelligence["behavior"]["coach_tone"],
-                },
-                "chart": {
-                    "labels": intelligence["charts"]["debt_labels"],
-                    "values": intelligence["charts"]["debt_values"],
-                },
-                "recent_imports": LoanImportDocumentSerializer(
-                    LoanImportDocument.objects.filter(user=request.user).prefetch_related("linked_loans")[:8],
-                    many=True,
-                    context={"request": request},
-                ).data,
-                "recent_closures": LoanClosureDocumentSerializer(
-                    LoanClosureDocument.objects.filter(loan__user=request.user).select_related("loan", "foreclosure_snapshot")[:6],
-                    many=True,
-                    context={"request": request},
-                ).data,
-            }
+        payload = materialize_payload(
+            namespace="loan-summary",
+            user_id=request.user.id,
+            revision=_loan_dashboard_revision(request.user),
+            ttl_seconds=60,
+            builder=lambda: _build_loan_summary_payload(request),
         )
+        return Response(payload)
+
+
+def _build_loan_summary_payload(request) -> dict:
+    intelligence = build_financial_intelligence(request.user)
+    return {
+        "summary": intelligence["loan_portfolio"],
+        "balance_sheet": {
+            "total_liabilities": intelligence["balance_sheet"]["total_liabilities"],
+            "pending_foreclosure_balance": intelligence["balance_sheet"].get(
+                "pending_foreclosure_balance",
+                intelligence["balance_sheet"].get("pending_foreclosure_excluded_balance", 0.0),
+            ),
+            "pending_foreclosure_excluded_balance": intelligence["balance_sheet"]["pending_foreclosure_excluded_balance"],
+            "summary": intelligence["balance_sheet"]["summary"],
+        },
+        "behavior": {
+            "stress_score": intelligence["summary"]["stress_score"],
+            "financial_stress_score": intelligence["summary"].get("financial_stress_score", intelligence["summary"]["stress_score"]),
+            "debt_service_ratio": intelligence["summary"]["debt_service_ratio"],
+            "coach_tone": intelligence["behavior"]["coach_tone"],
+        },
+        "chart": {
+            "labels": intelligence["charts"]["debt_labels"],
+            "values": intelligence["charts"]["debt_values"],
+        },
+        "recent_imports": LoanImportDocumentSerializer(
+            LoanImportDocument.objects.filter(user=request.user).prefetch_related("linked_loans")[:8],
+            many=True,
+            context={"request": request},
+        ).data,
+        "recent_closures": LoanClosureDocumentSerializer(
+            LoanClosureDocument.objects.filter(loan__user=request.user).select_related("loan", "foreclosure_snapshot")[:6],
+            many=True,
+            context={"request": request},
+        ).data,
+    }
 
 
 class LoanImportDocumentListView(ListAPIView):
@@ -465,9 +560,14 @@ def detect_loans_from_expenses(request):
 def loan_metrics(request):
     """Get comprehensive loan metrics."""
     try:
-        metrics = loan_intelligence_service.calculate_loan_metrics(request.user)
-
-        return Response(metrics)
+        payload = materialize_payload(
+            namespace="loan-metrics",
+            user_id=request.user.id,
+            revision=_loan_dashboard_revision(request.user),
+            ttl_seconds=60,
+            builder=lambda: loan_intelligence_service.calculate_loan_metrics(request.user),
+        )
+        return Response(payload)
 
     except Exception as e:
         return Response(
@@ -481,108 +581,110 @@ def loan_metrics(request):
 def calculate_networth(request):
     """Calculate user's net worth across all financial assets."""
     try:
-        intelligence = build_financial_intelligence(request.user)
-        balance_sheet = intelligence["balance_sheet"]
-        from apps.investments.models import Investment
-        from apps.expenses.models import BankAccount
-
-        # Assets
-        # 1. Cash in bank accounts
-        total_cash = BankAccount.objects.filter(
-            user=request.user,
-            is_active=True
-        ).aggregate(total=Sum('current_balance'))['total'] or 0
-
-        # 2. Investments
-        total_investments = Investment.objects.filter(
-            user=request.user
-        ).aggregate(total=Sum('current_value'))['total'] or 0
-
-        # Calculate total assets
-        total_assets = total_cash + total_investments
-
-        # Liabilities
-        total_debt = balance_sheet["total_liabilities"]
-
-        # Net Worth = Assets - Liabilities
-        net_worth = total_assets - total_debt
-
-        # Get breakdown
-        assets_breakdown = {
-            "cash": round(total_cash, 2),
-            "investments": round(total_investments, 2),
-            "total": round(total_assets, 2)
-        }
-
-        liabilities_breakdown = {
-            "loans": round(total_debt, 2),
-            "pending_foreclosure_excluded_balance": round(balance_sheet["pending_foreclosure_excluded_balance"], 2),
-            "total": round(total_debt, 2)
-        }
-
-        # Get investment breakdown by type
-        investment_by_type = {}
-        for inv in Investment.objects.filter(user=request.user):
-            asset_type = inv.get_asset_type_display()
-            if asset_type not in investment_by_type:
-                investment_by_type[asset_type] = 0
-            investment_by_type[asset_type] += inv.current_value
-
-        # Get loan breakdown by type
-        loan_by_type = {}
-        for loan in Loan.objects.filter(user=request.user).exclude(status__in=["foreclosed", "closed", "prepaid"]):
-            loan_type = loan.get_loan_type_display()
-            if loan_type not in loan_by_type:
-                loan_by_type[loan_type] = 0
-            loan_by_type[loan_type] += (loan.remaining_balance or 0)
-
-        # Calculate debt-to-asset ratio
-        debt_to_asset_ratio = (total_debt / total_assets * 100) if total_assets > 0 else 0
-
-        # Financial health assessment
-        if net_worth > 1000000:
-            health_status = "Excellent"
-            message = "Strong financial position with healthy net worth"
-        elif net_worth > 500000:
-            health_status = "Good"
-            message = "Good financial health, continue building wealth"
-        elif net_worth > 100000:
-            health_status = "Fair"
-            message = "Moderate net worth, focus on increasing assets"
-        elif net_worth > 0:
-            health_status = "Needs Improvement"
-            message = "Low net worth, reduce debt and increase savings"
-        else:
-            health_status = "Critical"
-            message = "Negative net worth - debt exceeds assets. Urgent action needed"
-
-        return Response({
-            "net_worth": round(net_worth, 2),
-            "assets": assets_breakdown,
-            "liabilities": liabilities_breakdown,
-            "investment_breakdown": {k: round(v, 2) for k, v in investment_by_type.items()},
-            "loan_breakdown": {k: round(v, 2) for k, v in loan_by_type.items()},
-            "metrics": {
-                "debt_to_asset_ratio": round(debt_to_asset_ratio, 2),
-                "asset_allocation": {
-                    "cash_percentage": round((total_cash / total_assets * 100) if total_assets > 0 else 0, 2),
-                    "investment_percentage": round((total_investments / total_assets * 100) if total_assets > 0 else 0, 2),
-                }
-            },
-            "health": {
-                "status": health_status,
-                "message": message
-            },
-            "insights": [
-                f"Your net worth is INR {net_worth:,.0f}",
-                f"Total assets: INR {total_assets:,.0f}",
-                f"Total liabilities: INR {total_debt:,.0f}",
-                f"Debt-to-Asset ratio: {debt_to_asset_ratio:.1f}%"
-            ]
-        })
+        payload = materialize_payload(
+            namespace="loan-networth",
+            user_id=request.user.id,
+            revision=_loan_dashboard_revision(request.user),
+            ttl_seconds=60,
+            builder=lambda: _build_networth_payload(request.user),
+        )
+        return Response(payload)
 
     except Exception as e:
         return Response(
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+def _build_networth_payload(user) -> dict:
+    intelligence = build_financial_intelligence(user)
+    balance_sheet = intelligence["balance_sheet"]
+    total_assets = round(float(balance_sheet.get("total_assets", 0) or 0), 2)
+    total_debt = round(float(balance_sheet.get("total_liabilities", 0) or 0), 2)
+    net_worth = round(float(balance_sheet.get("net_worth", 0) or 0), 2)
+
+    asset_rows = balance_sheet.get("assets") or []
+    liability_rows = balance_sheet.get("liabilities") or []
+
+    asset_lookup = {str(item.get("label") or ""): round(float(item.get("amount", 0) or 0), 2) for item in asset_rows}
+    liability_lookup = {str(item.get("label") or ""): round(float(item.get("amount", 0) or 0), 2) for item in liability_rows}
+
+    assets_breakdown = {
+        "cash": asset_lookup.get("Cash and bank balances", 0.0),
+        "investments": asset_lookup.get("Investments", 0.0),
+        "home_property_acquisition_cost": asset_lookup.get("Home property acquisition-cost base (proxy)", 0.0),
+        "utility_and_income_supporting_vehicles": asset_lookup.get("Utility and income-supporting vehicles", 0.0),
+        "total": total_assets,
+    }
+
+    liabilities_breakdown = {
+        "loans": liability_lookup.get("Open loan liabilities", 0.0),
+        "pending_foreclosure_balance": round(
+            balance_sheet.get("pending_foreclosure_balance", balance_sheet.get("pending_foreclosure_excluded_balance", 0.0)),
+            2,
+        ),
+        "pending_foreclosure_excluded_balance": round(balance_sheet.get("pending_foreclosure_excluded_balance", 0.0), 2),
+        "credit_card_liability": liability_lookup.get("Credit card liability", 0.0),
+        "lifestyle_vehicle_burden": liability_lookup.get("Lifestyle vehicle burden", 0.0),
+        "total": total_debt,
+    }
+
+    investment_by_type = {}
+    for inv in Investment.objects.filter(user=user):
+        asset_type = inv.get_asset_type_display()
+        if asset_type not in investment_by_type:
+            investment_by_type[asset_type] = 0
+        investment_by_type[asset_type] += inv.current_value
+
+    loan_by_type = {}
+    for loan in Loan.objects.filter(user=user).exclude(status__in=["foreclosed", "closed", "prepaid"]):
+        loan_type = loan.get_loan_type_display()
+        if loan_type not in loan_by_type:
+            loan_by_type[loan_type] = 0
+        loan_by_type[loan_type] += (loan.remaining_balance or 0)
+
+    debt_to_asset_ratio = (total_debt / total_assets * 100) if total_assets > 0 else 0
+
+    if net_worth > 1000000:
+        health_status = "Excellent"
+        message = "Strong financial position with healthy net worth"
+    elif net_worth > 500000:
+        health_status = "Good"
+        message = "Good financial health, continue building wealth"
+    elif net_worth > 100000:
+        health_status = "Fair"
+        message = "Moderate net worth, focus on increasing assets"
+    elif net_worth > 0:
+        health_status = "Needs Improvement"
+        message = "Low net worth, reduce debt and increase savings"
+    else:
+        health_status = "Critical"
+        message = "Negative net worth - debt exceeds assets. Urgent action needed"
+
+    return {
+        "net_worth": net_worth,
+        "assets": assets_breakdown,
+        "liabilities": liabilities_breakdown,
+        "investment_breakdown": {k: round(v, 2) for k, v in investment_by_type.items()},
+        "loan_breakdown": {k: round(v, 2) for k, v in loan_by_type.items()},
+        "metrics": {
+            "debt_to_asset_ratio": round(debt_to_asset_ratio, 2),
+            "asset_allocation": {
+                "cash_percentage": round((assets_breakdown["cash"] / total_assets * 100) if total_assets > 0 else 0, 2),
+                "investment_percentage": round((assets_breakdown["investments"] / total_assets * 100) if total_assets > 0 else 0, 2),
+                "home_property_percentage": round((assets_breakdown["home_property_acquisition_cost"] / total_assets * 100) if total_assets > 0 else 0, 2),
+                "vehicle_asset_percentage": round((assets_breakdown["utility_and_income_supporting_vehicles"] / total_assets * 100) if total_assets > 0 else 0, 2),
+            }
+        },
+        "health": {
+            "status": health_status,
+            "message": message
+        },
+        "insights": [
+            f"Your net worth is INR {net_worth:,.0f}",
+            f"Total assets: INR {total_assets:,.0f}",
+            f"Total liabilities: INR {total_debt:,.0f}",
+            f"Debt-to-Asset ratio: {debt_to_asset_ratio:.1f}%"
+        ]
+    }

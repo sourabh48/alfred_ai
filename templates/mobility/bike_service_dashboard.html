@@ -41,19 +41,20 @@
                             <option value="other">Other</option>
                         </select>
                     </div>
-                    <div class="col-md-12">
+                    <div class="col-md-6">
+                        <label class="form-label" for="bikeCatalogMakeSelect">Make / Brand</label>
+                        <input id="bikeCatalogMakeSelect" name="make" class="form-control" list="bikeCatalogMakeOptions" placeholder="Choose or type a make">
+                        <datalist id="bikeCatalogMakeOptions"></datalist>
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label" for="bikeCatalogSelect">Official Catalog Model</label>
-                        <select id="bikeCatalogSelect" class="form-select">
-                            <option value="">Choose a known model or leave blank for custom</option>
+                        <select id="bikeCatalogSelect" class="form-select" disabled>
+                            <option value="">Choose a make first</option>
                         </select>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="bikeProfileDisplayName">Vehicle Name</label>
                         <input id="bikeProfileDisplayName" name="display_name" class="form-control" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="bikeProfileMake">Make</label>
-                        <input id="bikeProfileMake" name="make" class="form-control" placeholder="Honda, Royal Enfield, Suzuki">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="bikeProfileModelName">Model Name</label>
@@ -558,7 +559,14 @@
             <div id="bikeServiceHistorySummary" class="data-stack"></div>
         </div>
     </div>
-    <div class="col-xl-8">
+    <div class="col-xl-4">
+        <div class="surface-card surface-card-accent h-100">
+            <h2 class="page-section-title">Route Wear And Service Buffer</h2>
+            <p class="page-section-copy mb-3">Trip logs, route conditions, and open faults are folded into the next-service cost and component watch list.</p>
+            <div id="bikeRouteWearPanel" class="data-stack"></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
         <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Parts And Performance Impact</h2>
             <p class="page-section-copy mb-3">How the parts changed in service history affect performance, reliability, mileage, and safety for the active vehicle.</p>
@@ -665,5 +673,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/bike_service.js?v=3.3"></script>
+<script src="/static/js/bike_service.js?v=3.5"></script>
 {% endblock %}

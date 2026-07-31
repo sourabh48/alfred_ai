@@ -5,6 +5,7 @@ from datetime import timedelta
 import os
 
 from django.db import transaction
+from django.db.models import Count, Max, Sum
 from django.utils.text import slugify
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
@@ -12,9 +13,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from alfred_ai.services import record_parser_learning
+from alfred_ai.services.materialized_cache import materialize_payload
+from apps.expenses.models import Expense
+from apps.family.models import Dependent
+from apps.investments.models import Investment
 from apps.reports.services import operational_logging_service
-from .models import CreditReportUpload, CreditScore, CreditScoreFactor
+from .models import CreditReportUpload, CreditScore, CreditScoreFactor, VerifiedExternalInsight
 from .services import verified_intelligence
+from .services.verified_intelligence import freshness_snapshot
+from .services.credit_loan_sync import sync_credit_report_loans
 from .services.credit_report_parser import credit_report_parser
 from .services.credit_score_tracker import credit_score_service
 from apps.loans.models import Loan
@@ -32,6 +39,87 @@ def _query_float(request, key, default):
         return float(default)
 
 
+def _request_params_token(request, keys) -> str:
+    return ":".join(f"{key}={request.query_params.get(key, '')}" for key in keys)
+
+
+def _integration_dashboard_revision(user) -> str:
+    expense_meta = Expense.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_date=Max("transaction_date"),
+        total_amount=Sum("amount"),
+    )
+    loan_meta = Loan.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_update=Max("updated_at"),
+        total_balance=Sum("remaining_balance"),
+    )
+    investment_meta = Investment.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_update=Max("updated_at"),
+        total_value=Sum("current_value"),
+    )
+    dependent_meta = Dependent.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"))
+    score_meta = CreditScore.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_score=Max("fetched_at"),
+    )
+    upload_meta = CreditReportUpload.objects.filter(user=user).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_update=Max("updated_at"),
+    )
+    evidence_meta = VerifiedExternalInsight.objects.filter(is_active=True).aggregate(
+        count=Count("id"),
+        max_id=Max("id"),
+        latest_verified=Max("verified_at"),
+    )
+    profile_token = ":".join(
+        str(value or "")
+        for value in (
+            getattr(user, "age", ""),
+            getattr(user, "city", ""),
+            getattr(user, "city_type", ""),
+            getattr(user, "monthly_income", ""),
+            getattr(user, "rent_or_emi", ""),
+        )
+    )
+    return "|".join(
+        str(value or "")
+        for value in (
+            "integrations-dashboard-v2",
+            expense_meta["count"],
+            expense_meta["max_id"],
+            expense_meta["latest_date"],
+            expense_meta["total_amount"],
+            loan_meta["count"],
+            loan_meta["max_id"],
+            loan_meta["latest_update"],
+            loan_meta["total_balance"],
+            investment_meta["count"],
+            investment_meta["max_id"],
+            investment_meta["latest_update"],
+            investment_meta["total_value"],
+            dependent_meta["count"],
+            dependent_meta["max_id"],
+            score_meta["count"],
+            score_meta["max_id"],
+            score_meta["latest_score"],
+            upload_meta["count"],
+            upload_meta["max_id"],
+            upload_meta["latest_update"],
+            evidence_meta["count"],
+            evidence_meta["max_id"],
+            evidence_meta["latest_verified"],
+            profile_token,
+        )
+    )
+
+
 def _metro_city(city: str) -> bool:
     return slugify(city or "") in {"mumbai", "delhi", "new-delhi", "bangalore", "bengaluru", "chennai", "hyderabad", "kolkata"}
 
@@ -43,13 +131,31 @@ def _get_source_upload(score):
         return None
 
 
-def _freshness_snapshot(items):
-    active = [item for item in items if item]
-    stale_after_values = [item.get("stale_after") for item in active if item.get("stale_after")]
+def _dedupe_evidence(items):
+    seen = set()
+    result = []
+    for item in items or []:
+        if not item:
+            continue
+        key = (
+            item.get("source_url", ""),
+            item.get("verified_at", ""),
+            item.get("title", "") or item.get("source_name", ""),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(item)
+    return result
+
+
+def _grounding_payload(*, history, evidence=None, notes=None):
+    evidence_items = _dedupe_evidence(evidence or [])
     return {
-        "tracked_records": len(active),
-        "fresh_records": sum(1 for item in active if item.get("status") == "fresh"),
-        "next_stale_after": min(stale_after_values) if stale_after_values else "",
+        "history": history,
+        "evidence": evidence_items,
+        "freshness": freshness_snapshot(evidence_items),
+        "notes": notes or [],
     }
 
 
@@ -107,6 +213,7 @@ def _serialize_credit_report_upload(upload):
         "score": upload.parsed_credit_score.score if upload.parsed_credit_score else 0,
         "loan_accounts": extracted_payload.get("loan_accounts", []),
         "loan_account_overview": extracted_payload.get("loan_account_overview", {}),
+        "loan_sync": extracted_payload.get("loan_sync", {}),
     }
 
 
@@ -397,6 +504,16 @@ def upload_credit_report(request):
             report_date=parsed.payload.get("report_date") or None,
         )
         credit_score = _persist_uploaded_credit_score(request.user, report_upload, parsed, effective_bureau)
+        loan_sync = sync_credit_report_loans(user=request.user, report_upload=report_upload)
+        report_upload.extracted_payload = {
+            **(report_upload.extracted_payload or {}),
+            "loan_sync": loan_sync,
+        }
+        if loan_sync.get("processed_accounts"):
+            report_upload.summary = (
+                f"{report_upload.summary} {loan_sync.get('summary', '').strip()}".strip()
+            )[:1000]
+        report_upload.save(update_fields=["extracted_payload", "summary", "updated_at"])
         record_parser_learning(
             user=request.user,
             scope="credit_report",
@@ -432,6 +549,7 @@ def upload_credit_report(request):
             "message": "Credit report uploaded and parsed." if credit_score else "Credit report uploaded. Review the extracted result before relying on it.",
             "upload": _serialize_credit_report_upload(report_upload),
             "score": _serialize_credit_score(credit_score) if credit_score else None,
+            "loan_sync": (report_upload.extracted_payload or {}).get("loan_sync", {}),
         },
         status=201,
     )
@@ -441,16 +559,30 @@ def upload_credit_report(request):
 @permission_classes([IsAuthenticated])
 def recommendation_overview(request):
     """Expose product recommendation engines to the frontend dashboard."""
-    loan_amount = _query_float(request, "loan_amount", 0)
+    revision = "|".join(
+        (
+            _integration_dashboard_revision(request.user),
+            _request_params_token(request, ["investment_amount", "time_horizon"]),
+        )
+    )
+    payload = materialize_payload(
+        namespace="recommendation-overview",
+        user_id=request.user.id,
+        revision=revision,
+        ttl_seconds=120,
+        builder=lambda: _build_recommendation_overview_payload(request),
+    )
+    return Response(payload)
+
+
+def _build_recommendation_overview_payload(request) -> dict:
+    """Build product recommendation engines for the frontend dashboard."""
     investment_amount = _query_float(request, "investment_amount", 0)
     time_horizon = request.query_params.get("time_horizon", "long_term")
     market = verified_intelligence.market_snapshot()
+    inflation = verified_intelligence.world_bank_indicator("FP.CPI.TOTL.ZG", "India inflation rate")
     profile = recommendation_engine.build_user_profile(request.user)
-    credit_cards = recommendation_engine.recommend_credit_cards(request.user)
-    loans = recommendation_engine.recommend_loans(
-        request.user,
-        loan_amount=loan_amount or None,
-    )
+    financial_baseline = profile.get("financial_baseline", {})
     investments = recommendation_engine.recommend_investments(
         request.user,
         investment_amount=investment_amount or None,
@@ -458,36 +590,165 @@ def recommendation_overview(request):
     )
     insurance = recommendation_engine.recommend_insurance(request.user)
 
-    return Response(
-        {
-            "profile": profile,
-            "credit_cards": credit_cards,
-            "loans": loans,
-            "investments": investments,
-            "insurance": insurance,
-            "grounding": {
-                "history": {
-                    "monthly_income": profile.get("income", 0),
-                    "monthly_expenses": round(profile.get("monthly_expenses", 0), 2),
-                    "savings_rate": round(profile.get("savings_rate", 0), 2),
-                    "dti_ratio": round(profile.get("dti_ratio", 0), 2),
-                    "tracked_personas": profile.get("persona", []),
-                },
-                "evidence": [market.evidence],
-                "freshness": _freshness_snapshot([market.evidence]),
-                "notes": [
-                    "Recommendations are grounded in current user history plus verified external market context where relevant.",
-                    "Product matching is still rule-driven and evidence-blended, not a claim of institution-approved suitability.",
-                ],
-            },
-        }
+    investments_grounding = _grounding_payload(
+        history={
+            "monthly_income": round(profile.get("income", 0), 2),
+            "monthly_expenses": round(profile.get("monthly_expenses", 0), 2),
+            "monthly_savings": round(profile.get("monthly_savings", 0), 2),
+            "savings_rate": round(profile.get("savings_rate", 0), 2),
+            "risk_appetite": profile.get("risk_appetite", ""),
+            "available_amount": round(investments.get("your_profile", {}).get("available_amount", 0), 2),
+            "time_horizon": investments.get("your_profile", {}).get("time_horizon", time_horizon),
+            "recommendation_count": len(investments.get("recommendations", [])),
+        },
+        evidence=[market.evidence, inflation.evidence],
+        notes=[
+            "Investment matching is grounded in your savings capacity, persona, and risk appetite, then contextualized with verified market and inflation evidence.",
+            "External evidence shapes market posture and real-return context, not a guarantee that any product will outperform.",
+        ],
     )
+    insurance_grounding = _grounding_payload(
+        history={
+            "monthly_income": round(profile.get("income", 0), 2),
+            "dependents": int(profile.get("dependents", 0) or 0),
+            "age": int(profile.get("age", 0) or 0),
+            "essential_recommendations": sum(1 for item in insurance.get("recommendations", []) if item.get("is_essential")),
+            "total_annual_premium": round(insurance.get("total_annual_premium", 0), 2),
+        },
+        evidence=[inflation.evidence],
+        notes=[
+            "Insurance matching is grounded in household dependence, age, and affordability. Verified inflation evidence is attached only as protection-cost context.",
+            "Coverage suggestions remain planning guidance, not insurer underwriting approval or premium quotes.",
+        ],
+    )
+    credit_cards_grounding = _grounding_payload(
+        history={
+            "monthly_income": round(profile.get("income", 0), 2),
+            "monthly_expenses": round(profile.get("monthly_expenses", 0), 2),
+            "savings_rate": round(profile.get("savings_rate", 0), 2),
+            "dti_ratio": round(profile.get("dti_ratio", 0), 2),
+            "policy_state": "disabled",
+        },
+        evidence=[inflation.evidence],
+        notes=[
+            "Credit-card recommendations are intentionally disabled for this workspace, so no card ranking or acquisition advice is produced.",
+            "The evidence contract is retained to distinguish a policy suppression from missing user data.",
+        ],
+    )
+    personal_loans_grounding = _grounding_payload(
+        history={
+            "monthly_income": round(profile.get("income", 0), 2),
+            "recurring_emi_burden": round(financial_baseline.get("recurring_emi_burden", 0), 2),
+            "debt_burden_ratio": round(profile.get("dti_ratio", 0), 2),
+            "liquid_runway_months": round(financial_baseline.get("liquid_runway_months", 0), 2),
+            "policy_state": "disabled",
+        },
+        evidence=[market.evidence, inflation.evidence],
+        notes=[
+            "Personal-loan recommendations are intentionally disabled for this workspace, so no borrowing shortlist is produced.",
+            "Market and inflation evidence is attached only to document the suppressed decision context.",
+        ],
+    )
+    investments = {**investments, "grounding": investments_grounding}
+    insurance = {**insurance, "grounding": insurance_grounding}
+    combined_evidence = _dedupe_evidence(
+        [
+            *investments_grounding["evidence"],
+            *insurance_grounding["evidence"],
+            *credit_cards_grounding["evidence"],
+            *personal_loans_grounding["evidence"],
+        ]
+    )
+
+    return {
+        "profile": profile,
+        "financial_baseline": financial_baseline,
+        "credit_cards": {
+            "enabled": False,
+            "recommendations": [],
+            "message": "Credit card suggestions are disabled for this workspace.",
+            "grounding": credit_cards_grounding,
+        },
+        "loans": {
+            "enabled": False,
+            "recommendations": [],
+            "message": "Personal loan suggestions are disabled for this workspace.",
+            "grounding": personal_loans_grounding,
+        },
+        "investments": investments,
+        "insurance": insurance,
+        "disabled_modules": [
+            {"key": "credit_cards", "label": "Credit cards", "reason": "Suppressed by product preference for this workspace."},
+            {"key": "personal_loans", "label": "Personal loans", "reason": "Suppressed by product preference for this workspace."},
+        ],
+        "grounding": {
+            "history": {
+                "monthly_income": profile.get("income", 0),
+                "monthly_expenses": round(profile.get("monthly_expenses", 0), 2),
+                "savings_rate": round(profile.get("savings_rate", 0), 2),
+                "dti_ratio": round(profile.get("dti_ratio", 0), 2),
+                "tracked_personas": profile.get("persona", []),
+            },
+            "evidence": combined_evidence,
+            "freshness": freshness_snapshot(combined_evidence),
+            "modules": [
+                {
+                    "key": "investments",
+                    "label": "Investment stack",
+                    "freshness": investments_grounding["freshness"],
+                    "evidence_count": len(investments_grounding["evidence"]),
+                },
+                {
+                    "key": "insurance",
+                    "label": "Insurance coverage",
+                    "freshness": insurance_grounding["freshness"],
+                    "evidence_count": len(insurance_grounding["evidence"]),
+                },
+                {
+                    "key": "credit_cards",
+                    "label": "Credit cards",
+                    "freshness": credit_cards_grounding["freshness"],
+                    "evidence_count": len(credit_cards_grounding["evidence"]),
+                    "status": "disabled",
+                },
+                {
+                    "key": "personal_loans",
+                    "label": "Personal loans",
+                    "freshness": personal_loans_grounding["freshness"],
+                    "evidence_count": len(personal_loans_grounding["evidence"]),
+                    "status": "disabled",
+                },
+            ],
+            "notes": [
+                "Recommendations are grounded in current user history plus verified external market context where relevant.",
+                "Product matching is still rule-driven and evidence-blended, not a claim of institution-approved suitability.",
+            ],
+        },
+    }
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def tax_optimizer_overview(request):
     """Return a user-ready tax dashboard based on current profile defaults."""
+    revision = "|".join(
+        (
+            _integration_dashboard_revision(request.user),
+            _request_params_token(request, ["annual_income", "basic_salary", "hra_received", "rent_paid", "metro"]),
+        )
+    )
+    payload = materialize_payload(
+        namespace="tax-optimizer-overview",
+        user_id=request.user.id,
+        revision=revision,
+        ttl_seconds=120,
+        builder=lambda: _build_tax_optimizer_overview_payload(request),
+    )
+    return Response(payload)
+
+
+def _build_tax_optimizer_overview_payload(request) -> dict:
+    """Build a user-ready tax dashboard based on current profile defaults."""
     annual_income = _query_float(
         request,
         "annual_income",
@@ -522,42 +783,40 @@ def tax_optimizer_overview(request):
     ppf_reference = verified_intelligence.ppf_reference()
     evidence_items = [tax_regime.evidence, nps_reference.evidence, ppf_reference.evidence]
 
-    return Response(
-        {
+    return {
+        "annual_income": annual_income,
+        "inputs": {
             "annual_income": annual_income,
-            "inputs": {
-                "annual_income": annual_income,
-                "basic_salary": basic_salary,
-                "hra_received": hra_received,
-                "rent_paid": rent_paid,
-                "metro": metro_city,
-            },
-            "deductions": deductions,
-            "regime_comparison": tax_optimizer.compare_regimes(annual_income, deductions),
-            "tax_savings": tax_optimizer.suggest_tax_saving_investments(request.user),
-            "hra": tax_optimizer.calculate_hra_exemption(
-                basic_salary=basic_salary,
-                hra_received=hra_received,
-                rent_paid=rent_paid,
-                metro_city=metro_city,
-            ),
-            "home_loan": home_loan_benefits,
-            "deduction_catalog": [
-                {
-                    "section": section,
-                    "name": value["name"],
-                    "max_limit": value["max_limit"],
-                    "instruments": value["instruments"],
-                }
-                for section, value in tax_optimizer.DEDUCTIONS.items()
+            "basic_salary": basic_salary,
+            "hra_received": hra_received,
+            "rent_paid": rent_paid,
+            "metro": metro_city,
+        },
+        "deductions": deductions,
+        "regime_comparison": tax_optimizer.compare_regimes(annual_income, deductions),
+        "tax_savings": tax_optimizer.suggest_tax_saving_investments(request.user),
+        "hra": tax_optimizer.calculate_hra_exemption(
+            basic_salary=basic_salary,
+            hra_received=hra_received,
+            rent_paid=rent_paid,
+            metro_city=metro_city,
+        ),
+        "home_loan": home_loan_benefits,
+        "deduction_catalog": [
+            {
+                "section": section,
+                "name": value["name"],
+                "max_limit": value["max_limit"],
+                "instruments": value["instruments"],
+            }
+            for section, value in tax_optimizer.DEDUCTIONS.items()
+        ],
+        "tax_evidence": {
+            "evidence": evidence_items,
+            "freshness": freshness_snapshot(evidence_items),
+            "notes": [
+                "Tax guidance is grounded in stored user deductions plus official reference sources for regime and instrument treatment.",
+                "This overview is still planning guidance, not a substitute for a chartered accountant or filed return review.",
             ],
-            "tax_evidence": {
-                "evidence": evidence_items,
-                "freshness": _freshness_snapshot(evidence_items),
-                "notes": [
-                    "Tax guidance is grounded in stored user deductions plus official reference sources for regime and instrument treatment.",
-                    "This overview is still planning guidance, not a substitute for a chartered accountant or filed return review.",
-                ],
-            },
-        }
-    )
+        },
+    }

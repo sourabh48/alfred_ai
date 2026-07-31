@@ -223,6 +223,139 @@ class DocumentReviewAndRetryTests(TestCase):
         scopes = {item["scope"] for item in response.json()["results"]}
         self.assertIn("recruiter_document", scopes)
 
+    def test_review_queue_exposes_ocr_overlay_artifacts_for_resume_documents(self):
+        CareerResume.objects.create(
+            user=self.user,
+            uploaded_file=SimpleUploadedFile("resume.pdf", b"%PDF-1.4 fake", content_type="application/pdf"),
+            file_name="resume.pdf",
+            parser_status="needs_review",
+            parse_confidence=0.41,
+            extracted_text="Sourabh Sarkar Java Backend Developer",
+            summary="Resume retained for review.",
+            extracted_payload={
+                "role": "Java Backend Developer",
+                "skills": ["Java", "Spring Boot"],
+                "extraction_method": "rapidocr_image",
+                "raw_text_excerpt": "Sourabh Sarkar Java Backend Developer",
+                "extraction_review": {
+                    "field_candidates": [
+                        {
+                            "field_type": "role",
+                            "field_name": "role",
+                            "label": "Role",
+                            "value": "Java Backend Developer",
+                            "confidence": 0.96,
+                            "source": "rapidocr_image",
+                            "page": 1,
+                        }
+                    ],
+                    "ocr_pages": [
+                        {
+                            "page": 1,
+                            "width": 1200,
+                            "height": 1700,
+                            "preview": "Sourabh Sarkar Java Backend Developer",
+                            "line_count": 2,
+                            "regions": [
+                                {
+                                    "text": "Java Backend Developer",
+                                    "confidence": 0.96,
+                                    "bbox": [[12, 40], [260, 40], [260, 72], [12, 72]],
+                                    "origin": "rapidocr_image",
+                                }
+                            ],
+                        }
+                    ],
+                    "recovery_steps": [{"step": "image_bytes_fallback", "status": "recovered"}],
+                    "attempts": [{"method": "rapidocr_image", "quality": 0.84}],
+                },
+            },
+        )
+
+        response = self.client.get("/api/documents/review-queue/")
+
+        self.assertEqual(response.status_code, 200)
+        item = next(entry for entry in response.json()["results"] if entry["scope"] == "resume_document")
+        self.assertEqual(item["review_artifacts"]["extraction_method"], "rapidocr_image")
+        self.assertEqual(item["review_artifacts"]["ocr_pages"][0]["page"], 1)
+        self.assertEqual(item["review_artifacts"]["recovery_steps"][0]["step"], "image_bytes_fallback")
+        self.assertIn("Java Backend Developer", item["review_artifacts"]["raw_text_excerpt"])
+        self.assertEqual(item["review_artifacts"]["field_candidates"][0]["value"], "Java Backend Developer")
+
+    def test_review_queue_promotes_accepted_corrections_into_overlay_candidates(self):
+        CareerResume.objects.create(
+            user=self.user,
+            uploaded_file=SimpleUploadedFile("resume.pdf", b"%PDF-1.4 fake", content_type="application/pdf"),
+            file_name="resume.pdf",
+            parser_status="needs_review",
+            parse_confidence=0.41,
+            extracted_text="Sourabh Sarkar Jav Backend Devel0per",
+            summary="Resume retained for review.",
+            extracted_payload={
+                "role": "Jav Backend Devel0per",
+                "accepted_corrections": {
+                    "role": "Java Backend Developer",
+                    "skills": ["Java", "Spring Boot"],
+                },
+                "background_retry": {
+                    "retry_count": 2,
+                    "state": "needs_review",
+                    "resolution": "still_needs_review",
+                },
+                "extraction_review": {
+                    "best_method": "rapidocr_image",
+                    "raw_text_excerpt": "Sourabh Sarkar Jav Backend Devel0per",
+                    "field_candidates": [
+                        {
+                            "field_type": "role",
+                            "field_name": "role",
+                            "label": "Role",
+                            "value": "Jav Backend Devel0per",
+                            "confidence": 0.42,
+                            "source": "rapidocr_image",
+                            "page": 1,
+                        }
+                    ],
+                    "ocr_pages": [
+                        {
+                            "page": 1,
+                            "width": 1200,
+                            "height": 1700,
+                            "preview": "Sourabh Sarkar Java Backend Developer",
+                            "line_count": 2,
+                            "regions": [
+                                {
+                                    "text": "Java Backend Developer",
+                                    "confidence": 0.42,
+                                    "bbox": [[12, 40], [260, 40], [260, 72], [12, 72]],
+                                    "origin": "rapidocr_image",
+                                }
+                            ],
+                        }
+                    ],
+                },
+            },
+        )
+
+        response = self.client.get("/api/documents/review-queue/")
+
+        self.assertEqual(response.status_code, 200)
+        item = next(entry for entry in response.json()["results"] if entry["scope"] == "resume_document")
+        artifacts = item["review_artifacts"]
+        accepted_candidates = [
+            candidate
+            for candidate in artifacts["field_candidates"]
+            if candidate.get("source") == "accepted_correction"
+        ]
+        self.assertEqual({candidate["field_name"] for candidate in accepted_candidates}, {"role", "skills"})
+        self.assertTrue(all(candidate["accepted"] for candidate in accepted_candidates))
+        self.assertIn("role", artifacts["ocr_pages"][0]["regions"][0]["field_matches"])
+        self.assertTrue(artifacts["ocr_pages"][0]["regions"][0]["needs_correction"])
+        self.assertEqual(artifacts["overlay_summary"]["accepted_correction_count"], 2)
+        self.assertEqual(artifacts["overlay_summary"]["retry_count"], 2)
+        self.assertEqual(artifacts["overlay_summary"]["retry_resolution"], "still_needs_review")
+        self.assertEqual(artifacts["overlay_summary"]["low_confidence_regions"], 1)
+
     def test_statement_retry_creates_internal_retry_ticket_when_still_unresolved(self):
         upload = StatementUpload.objects.create(
             user=self.user,
@@ -389,6 +522,12 @@ class DocumentReviewAndRetryTests(TestCase):
         self.assertEqual(record.parsed_payload["service_payload"]["labour_items"][0]["description"], "Periodic Service Labour")
         self.assertEqual(record.parsed_payload["service_payload"]["line_item_count"], 2)
         self.assertEqual(record.parsed_payload["service_payload"]["systems_impacted"], ["brakes", "engine"])
+        self.assertEqual(record.parsed_payload["review_trace"]["review_queue_resolution"], "accepted_correction")
+        self.assertIn("service_center", record.parsed_payload["review_trace"]["corrected_fields"])
+        self.assertEqual(
+            record.parsed_payload["review_trace"]["accepted_corrections"]["service_center"],
+            "Jagadamba Automobiles",
+        )
 
     def test_retry_endpoint_supports_loan_documents(self):
         upload = LoanImportDocument.objects.create(
@@ -928,6 +1067,87 @@ class DocumentReviewAndRetryTests(TestCase):
                 event_type="retry_document",
             ).exists()
         )
+
+    def test_vehicle_retry_updates_existing_service_record_review_trace_without_new_service_payload(self):
+        profile = BikeProfile.objects.create(
+            user=self.user,
+            display_name="Honda Activa 6G",
+            model_name="Activa 6G",
+            vehicle_type="scooter",
+            bike_class="scooter",
+            vehicle_number="KA01AB1234",
+        )
+        document = BikeDocument.objects.create(
+            user=self.user,
+            bike_profile=profile,
+            bike_name=profile.display_name,
+            vehicle_number=profile.vehicle_number,
+            document_type="invoice",
+            document_file=SimpleUploadedFile("invoice.pdf", b"%PDF-1.4 fake", content_type="application/pdf"),
+            parser_status="needs_review",
+            parse_confidence=0.31,
+            extracted_payload={
+                "service_payload": {"service_center": "Old Workshop", "cost": 1850.0},
+                "background_retry": {"retry_count": 0},
+                "extraction_review": {
+                    "best_method": "rapidocr_image",
+                    "ocr_pages": [{"page": 1, "preview": "blurred invoice", "regions": []}],
+                },
+            },
+        )
+        record = BikeServiceRecord.objects.create(
+            user=self.user,
+            bike_profile=profile,
+            bike_name=profile.display_name,
+            service_date="2026-03-20",
+            service_center="Old Workshop",
+            cost=1850.0,
+            source_document=document,
+            source_mode="bill_import",
+            parsed_payload={"service_payload": {"service_center": "Old Workshop", "cost": 1850.0}},
+        )
+
+        parsed = ParsedDocument(
+            document_type="invoice",
+            title="Invoice EDGE-2002",
+            confidence=0.54,
+            fields={
+                "issuer": "Jagadamba Automobiles",
+                "document_number": "EDGE-2002",
+                "vehicle_number": "KA01AB1234",
+            },
+            parser_status="needs_review",
+            parser_notes="Invoice still needs review after retry.",
+            source_text="Blurred invoice text",
+            service_payload={},
+            review_payload={
+                "extraction_method": "rapidocr_image",
+                "extraction_review": {
+                    "best_method": "rapidocr_image",
+                    "ocr_pages": [{"page": 1, "preview": "blurred invoice", "regions": []}],
+                    "recovery_steps": [{"step": "image_bytes_fallback", "status": "recovered"}],
+                },
+            },
+        )
+
+        with patch("alfred_ai.services.document_review.bike_document_ai.parse", return_value=parsed), patch(
+            "alfred_ai.services.document_review.bike_document_ai.verify_relevance",
+            return_value={"accepted": True, "score": 0.76, "reasons": ["Vehicle number matched."]},
+        ):
+            response = self.client.post(
+                "/api/documents/review-queue/retry/",
+                data={"scope": "vehicle_document", "id": document.id},
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        record.refresh_from_db()
+        self.assertEqual(record.service_center, "Old Workshop")
+        self.assertEqual(record.parsed_payload["review_trace"]["document_parser_status"], "needs_review")
+        self.assertEqual(record.parsed_payload["review_trace"]["background_retry"]["retry_count"], 1)
+        self.assertEqual(record.parsed_payload["review_trace"]["background_retry"]["resolution"], "still_needs_review")
+        self.assertEqual(record.parsed_payload["review_trace"]["extraction_method"], "rapidocr_image")
+        self.assertEqual(record.parsed_payload["review_trace"]["extraction_review"]["ocr_pages"][0]["page"], 1)
 
     def test_document_diagnostics_endpoint_and_client_log_capture(self):
         response = self.client.post(

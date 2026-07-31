@@ -29,6 +29,7 @@ def _is_local_runtime(argv: list[str] | None = None) -> bool:
         "runserver",
         "shell",
         "showmigrations",
+        "bootstrap_training_samples",
         "test",
     }
 

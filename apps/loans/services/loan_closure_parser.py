@@ -37,6 +37,10 @@ class LoanClosureParser:
             "overdue_charges": self._extract_amount_for_labels(normalized, ["OVERDUE CHARGES", "PENALTY", "PENAL CHARGES", "LATE PAYMENT CHARGES"]),
             "total_amount_payable": self._extract_total_amount(normalized),
             "matched_keyword": self._extract_keyword(normalized),
+            "extraction_method": extracted.method,
+            "extraction_notes": extracted.notes[:6],
+            "raw_text_excerpt": " ".join(extracted_text.split())[:600],
+            "extraction_review": extracted.review_payload,
         }
         payload["closure_amount"] = payload["total_amount_payable"]
         payload["closure_date"] = payload["effective_closure_date"] or payload["statement_date"]
@@ -135,7 +139,7 @@ class LoanClosureParser:
             pattern = rf"{re.escape(label)}\s*[:.]?\s*{amount_pattern}"
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return float(match.group(1).replace(",", ""))
+                return self._parse_amount(match.group(1))
         return 0.0
 
     def _extract_total_amount(self, text: str) -> float:
@@ -146,7 +150,7 @@ class LoanClosureParser:
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return float(match.group(1).replace(",", ""))
+                return self._parse_amount(match.group(1))
         total_from_components = sum(
             value or 0
             for value in [
@@ -158,6 +162,15 @@ class LoanClosureParser:
             ]
         )
         return round(total_from_components, 2) if total_from_components else 0.0
+
+    def _parse_amount(self, value: str) -> float:
+        cleaned = re.sub(r"[^0-9.]", "", value or "")
+        if not any(char.isdigit() for char in cleaned):
+            return 0.0
+        try:
+            return float(cleaned)
+        except ValueError:
+            return 0.0
 
     def _extract_date_for_labels(self, text: str, labels: list[str]) -> str:
         patterns = [rf"{re.escape(label)}\s*[:.]?\s*([0-9]{{1,2}}[/-][0-9]{{1,2}}[/-][0-9]{{2,4}})" for label in labels]

@@ -23,7 +23,7 @@ from apps.loans.services.loan_pdf_parser import loan_pdf_parser
 from apps.loans.services import loan_foreclosure_service
 from apps.loans.services.loan_closure_parser import loan_closure_parser
 from apps.mobility.models import BikeDocument, BikeServiceRecord
-from apps.mobility.services import bike_document_ai, bike_service_intelligence, build_document_payload, build_service_record_payload
+from apps.mobility.services import bike_document_ai, bike_service_intelligence, build_document_payload, build_service_record_payload, merge_nested_payload
 from apps.reports.models import SystemTicket
 from apps.reports.services import operational_logging_service, reporting_service
 
@@ -97,6 +97,13 @@ REVIEW_FIELD_SCHEMAS = {
         {"name": "next_service_date", "label": "Next Service Date", "type": "date"},
         {"name": "next_service_km", "label": "Next Service Km", "type": "number"},
         {"name": "extracted_work_summary", "label": "Work Summary", "type": "text"},
+        {"name": "parts_items", "label": "Parts Items JSON", "type": "json"},
+        {"name": "labour_items", "label": "Labour Items JSON", "type": "json"},
+        {"name": "customer_voice_items", "label": "Customer Voice JSON", "type": "json"},
+        {"name": "systems_impacted", "label": "Impacted Systems JSON", "type": "json"},
+        {"name": "total_customer_amount", "label": "Total Customer Amount", "type": "number"},
+        {"name": "parts_customer_amount", "label": "Parts Customer Amount", "type": "number"},
+        {"name": "labour_customer_amount", "label": "Labour Customer Amount", "type": "number"},
         {"name": "review_note", "label": "Review Note", "type": "text"},
     ],
     "resume_document": [
@@ -1434,34 +1441,42 @@ def _delete_orphan_investments(previous_investments: list[Investment], current_i
 
 def _refresh_imported_service_records(document: BikeDocument, parsed) -> None:
     service_payload = parsed.service_payload or {}
-    if not service_payload:
+    records = list(document.imported_service_records.all())
+    if not service_payload and not records:
         return
 
     issue_date = _parse_date(service_payload.get("service_date")) or timezone.localdate()
-    records = list(document.imported_service_records.all())
     for record in records:
-        record.service_date = issue_date
-        record.odometer_km = int(service_payload.get("odometer_km") or record.odometer_km or 0)
-        record.service_type = service_payload.get("service_type") or record.service_type
-        record.cost = float(service_payload.get("cost") or record.cost or 0)
-        record.service_center = service_payload.get("service_center") or record.service_center
-        record.next_service_date = _parse_date(service_payload.get("next_service_date")) or record.next_service_date
-        record.next_service_km = service_payload.get("next_service_km") or record.next_service_km
-        record.extracted_work_summary = service_payload.get("extracted_work_summary") or record.extracted_work_summary
-        record.parsed_payload = _merge_non_empty_payload(record.parsed_payload, build_service_record_payload(parsed, service_payload))
-        record.save(
-            update_fields=[
-                "service_date",
-                "odometer_km",
-                "service_type",
-                "cost",
-                "service_center",
-                "next_service_date",
-                "next_service_km",
-                "extracted_work_summary",
-                "parsed_payload",
-            ]
+        update_fields = ["parsed_payload"]
+        if service_payload:
+            record.service_date = issue_date
+            record.odometer_km = int(service_payload.get("odometer_km") or record.odometer_km or 0)
+            record.service_type = service_payload.get("service_type") or record.service_type
+            record.cost = float(service_payload.get("cost") or record.cost or 0)
+            record.service_center = service_payload.get("service_center") or record.service_center
+            record.next_service_date = _parse_date(service_payload.get("next_service_date")) or record.next_service_date
+            record.next_service_km = service_payload.get("next_service_km") or record.next_service_km
+            record.extracted_work_summary = service_payload.get("extracted_work_summary") or record.extracted_work_summary
+            update_fields.extend(
+                [
+                    "service_date",
+                    "odometer_km",
+                    "service_type",
+                    "cost",
+                    "service_center",
+                    "next_service_date",
+                    "next_service_km",
+                    "extracted_work_summary",
+                ]
+            )
+        record.parsed_payload = build_service_record_payload(
+            parsed,
+            service_payload,
+            existing=record.parsed_payload,
+            document=document,
+            document_payload=document.extracted_payload,
         )
+        record.save(update_fields=update_fields)
 
 
 def _parse_jsonish_correction(value):
@@ -1483,6 +1498,7 @@ def _parse_jsonish_correction(value):
 
 def _apply_vehicle_service_payload_corrections(service_payload: dict, corrections: dict) -> dict:
     updated = dict(service_payload or {})
+    corrected_keys = {key for key, value in (corrections or {}).items() if value not in ("", None, [], {})}
     structured_fields = (
         "parts_items",
         "labour_items",
@@ -1497,6 +1513,17 @@ def _apply_vehicle_service_payload_corrections(service_payload: dict, correction
         "customer_voice_summary",
         "advisor_name",
         "advisor_contact",
+        "service_advisor_name",
+        "service_advisor_contact",
+        "customer_name",
+        "service_consultant",
+        "invoice_kind",
+        "service_center_contact",
+        "service_center_mobile",
+        "service_center_email",
+        "service_center_website",
+        "service_center_address",
+        "job_card_number",
     )
     numeric_fields = (
         "line_item_count",
@@ -1509,8 +1536,13 @@ def _apply_vehicle_service_payload_corrections(service_payload: dict, correction
         "parts_tax_total",
         "part_tax_total",
         "labour_tax_total",
+        "parts_taxable_amount",
         "part_taxable_total",
+        "labour_taxable_amount",
         "labour_taxable_total",
+        "total_tax_amount",
+        "total_amount",
+        "total_customer_amount",
     )
 
     for field in structured_fields:
@@ -1521,6 +1553,15 @@ def _apply_vehicle_service_payload_corrections(service_payload: dict, correction
     for field in scalar_fields:
         if corrections.get(field):
             updated[field] = str(corrections.get(field)).strip()
+
+    if corrections.get("advisor_name") and not updated.get("service_advisor_name"):
+        updated["service_advisor_name"] = str(corrections.get("advisor_name")).strip()
+    if corrections.get("advisor_contact") and not updated.get("service_advisor_contact"):
+        updated["service_advisor_contact"] = str(corrections.get("advisor_contact")).strip()
+    if corrections.get("service_advisor_name") and not updated.get("advisor_name"):
+        updated["advisor_name"] = str(corrections.get("service_advisor_name")).strip()
+    if corrections.get("service_advisor_contact") and not updated.get("advisor_contact"):
+        updated["advisor_contact"] = str(corrections.get("service_advisor_contact")).strip()
 
     for field in numeric_fields:
         if corrections.get(field) in ("", None):
@@ -1540,6 +1581,33 @@ def _apply_vehicle_service_payload_corrections(service_payload: dict, correction
         and not updated.get("line_item_count")
     ):
         updated["line_item_count"] = len(updated.get("parts_items") or []) + len(updated.get("labour_items") or [])
+
+    invoice_enrichment = bike_document_ai._derive_invoice_enrichment(  # pylint: disable=protected-access
+        updated.get("parts_items") or [],
+        updated.get("labour_items") or [],
+        updated.get("customer_voice_items") or [],
+    )
+    for key, value in invoice_enrichment.items():
+        if key in corrected_keys and updated.get(key) not in ("", None, [], {}):
+            continue
+        if value not in ("", None, [], {}):
+            updated[key] = value
+    if updated.get("parts_total_amount") in ("", None, 0) and updated.get("parts_customer_amount") not in ("", None, 0):
+        updated["parts_total_amount"] = updated.get("parts_customer_amount")
+    if updated.get("labour_total_amount") in ("", None, 0) and updated.get("labour_customer_amount") not in ("", None, 0):
+        updated["labour_total_amount"] = updated.get("labour_customer_amount")
+    if updated.get("total_customer_amount") in ("", None, 0):
+        combined_customer_amount = float(updated.get("parts_customer_amount") or 0) + float(updated.get("labour_customer_amount") or 0)
+        if combined_customer_amount:
+            updated["total_customer_amount"] = round(combined_customer_amount, 2)
+    if updated.get("total_amount") in ("", None, 0):
+        combined_total_amount = float(updated.get("parts_total_amount") or 0) + float(updated.get("labour_total_amount") or 0)
+        if combined_total_amount:
+            updated["total_amount"] = round(combined_total_amount, 2)
+    if updated.get("cost") in ("", None, 0) and updated.get("total_customer_amount") not in ("", None, 0):
+        updated["cost"] = updated.get("total_customer_amount")
+    if updated.get("total_customer_amount") in ("", None, 0) and updated.get("cost") not in ("", None, 0):
+        updated["total_customer_amount"] = updated.get("cost")
     return updated
 
 
@@ -1584,6 +1652,7 @@ def _serialize_statement(upload: StatementUpload) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=payload.get("raw_text_excerpt", "")),
         "review_fields": REVIEW_FIELD_SCHEMAS["statement_document"],
         "created_at": upload.uploaded_at.isoformat(),
         "priority_rank": _priority_rank(upload.parser_status, upload.parse_confidence),
@@ -1609,6 +1678,7 @@ def _serialize_loan(document: LoanImportDocument) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text),
         "review_fields": REVIEW_FIELD_SCHEMAS["loan_document"],
         "created_at": document.created_at.isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -1643,6 +1713,7 @@ def _serialize_loan_closure(document: LoanClosureDocument) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text),
         "review_fields": REVIEW_FIELD_SCHEMAS["loan_closure_document"],
         "created_at": (document.updated_at or document.created_at).isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -1677,6 +1748,7 @@ def _serialize_investment(document: InvestmentImportDocument) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text),
         "review_fields": REVIEW_FIELD_SCHEMAS["investment_document"],
         "created_at": document.updated_at.isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -1709,9 +1781,17 @@ def _serialize_vehicle(document: BikeDocument) -> dict:
             "next_service_date": service_payload.get("next_service_date", ""),
             "next_service_km": service_payload.get("next_service_km", ""),
             "extracted_work_summary": service_payload.get("extracted_work_summary", ""),
+            "parts_items": service_payload.get("parts_items", []),
+            "labour_items": service_payload.get("labour_items", []),
+            "customer_voice_items": service_payload.get("customer_voice_items", []),
+            "systems_impacted": service_payload.get("systems_impacted", []),
+            "total_customer_amount": service_payload.get("total_customer_amount", service_payload.get("cost", "")),
+            "parts_customer_amount": service_payload.get("parts_customer_amount", ""),
+            "labour_customer_amount": service_payload.get("labour_customer_amount", ""),
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.source_text),
         "review_fields": REVIEW_FIELD_SCHEMAS["vehicle_document"],
         "created_at": document.updated_at.isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -1735,6 +1815,7 @@ def _serialize_resume(resume: CareerResume) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=resume.extracted_text),
         "review_fields": REVIEW_FIELD_SCHEMAS["resume_document"],
         "created_at": resume.updated_at.isoformat(),
         "priority_rank": _priority_rank(resume.parser_status, resume.parse_confidence),
@@ -1762,6 +1843,7 @@ def _serialize_recruiter(analysis: CareerJobAnalysis) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=analysis.extracted_text),
         "review_fields": REVIEW_FIELD_SCHEMAS["recruiter_document"],
         "created_at": (analysis.updated_at or analysis.created_at).isoformat(),
         "priority_rank": _priority_rank(analysis.parser_status, analysis.parse_confidence),
@@ -1786,6 +1868,7 @@ def _serialize_credit(upload: CreditReportUpload) -> dict:
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
+        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=upload.extracted_text),
         "review_fields": REVIEW_FIELD_SCHEMAS["credit_report"],
         "created_at": upload.updated_at.isoformat(),
         "priority_rank": _priority_rank(upload.parser_status, upload.parse_confidence),
@@ -1797,6 +1880,284 @@ def _accepted_corrections_payload(payload: dict | None) -> dict:
     return {
         key: value
         for key, value in corrections.items()
+        if value not in ("", None, [], {})
+    }
+
+
+def _review_field_label(field_name: str) -> str:
+    normalized = str(field_name or "").strip()
+    for fields in REVIEW_FIELD_SCHEMAS.values():
+        for field in fields:
+            if field.get("name") == normalized:
+                return str(field.get("label") or normalized)
+    return normalized.replace("_", " ").title()
+
+
+def _review_candidate_value(value) -> str:
+    if value in ("", None, [], {}):
+        return ""
+    if isinstance(value, (list, dict)):
+        try:
+            return json.dumps(value, ensure_ascii=True, sort_keys=True, default=str)[:500]
+        except TypeError:
+            return str(value)[:500]
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value).strip()[:500]
+
+
+def _normalize_review_candidate(item: dict) -> dict:
+    if not isinstance(item, dict):
+        return {}
+    value = _review_candidate_value(item.get("value"))
+    if not value:
+        return {}
+    try:
+        confidence = round(max(0.0, min(1.0, float(item.get("confidence") or 0))), 2)
+    except (TypeError, ValueError):
+        confidence = 0.0
+    page = item.get("page")
+    bbox = []
+    for point in list(item.get("bbox") or [])[:4]:
+        if not isinstance(point, (list, tuple)) or len(point) < 2:
+            continue
+        try:
+            bbox.append([round(float(point[0]), 1), round(float(point[1]), 1)])
+        except (TypeError, ValueError):
+            continue
+    normalized = {
+        "field_type": str(item.get("field_type") or item.get("field_name") or "candidate")[:80],
+        "field_name": str(item.get("field_name") or "")[:80],
+        "label": str(item.get("label") or _review_field_label(item.get("field_name", "")) or "Candidate")[:80],
+        "value": value,
+        "confidence": confidence,
+        "source": str(item.get("source") or "")[:80],
+        "context": str(item.get("context") or "")[:220],
+    }
+    if page not in ("", None):
+        try:
+            normalized["page"] = int(page)
+        except (TypeError, ValueError):
+            pass
+    if bbox:
+        normalized["bbox"] = bbox
+    if item.get("accepted"):
+        normalized["accepted"] = True
+    return {
+        key: value
+        for key, value in normalized.items()
+        if value not in ("", None, [], {})
+    }
+
+
+def _accepted_correction_candidates(payload: dict | None) -> list[dict]:
+    candidates = []
+    for field_name, value in _accepted_corrections_payload(payload).items():
+        candidates.append(
+            {
+                "field_type": "accepted_correction",
+                "field_name": field_name,
+                "label": _review_field_label(field_name),
+                "value": value,
+                "confidence": 1.0,
+                "source": "accepted_correction",
+                "context": "Accepted reviewer value retained for parser learning and retry comparison.",
+                "accepted": True,
+            }
+        )
+    return candidates
+
+
+def _merge_review_field_candidates(source: dict, extraction_review: dict) -> list[dict]:
+    merged = [
+        *list(source.get("field_candidates") or []),
+        *list(extraction_review.get("field_candidates") or []),
+        *_accepted_correction_candidates(source),
+    ]
+    normalized = []
+    seen = set()
+    for item in merged:
+        candidate = _normalize_review_candidate(item)
+        if not candidate:
+            continue
+        key = (
+            candidate.get("field_name") or candidate.get("field_type"),
+            candidate.get("value"),
+            candidate.get("source"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(candidate)
+    normalized.sort(
+        key=lambda item: (
+            not bool(item.get("accepted")),
+            item.get("field_type") == "low_confidence_text",
+            -float(item.get("confidence") or 0),
+            item.get("field_name") or item.get("field_type") or "",
+        )
+    )
+    return normalized[:20]
+
+
+def _annotate_review_ocr_pages(ocr_pages: list[dict], field_candidates: list[dict]) -> list[dict]:
+    accepted_candidates = [
+        candidate
+        for candidate in field_candidates
+        if candidate.get("accepted") and candidate.get("field_name") and candidate.get("value")
+    ]
+    annotated_pages = []
+    for page in list(ocr_pages or [])[:6]:
+        page_copy = dict(page or {})
+        page_number = page_copy.get("page")
+        page_fields = sorted(
+            {
+                candidate.get("field_name")
+                for candidate in field_candidates
+                if candidate.get("page") == page_number and candidate.get("field_name")
+            }
+        )
+        annotated_regions = []
+        for region in list(page_copy.get("regions") or [])[:10]:
+            region_copy = dict(region or {})
+            region_text = str(region_copy.get("text") or "").lower()
+            field_matches = []
+            for candidate in accepted_candidates:
+                candidate_value = str(candidate.get("value") or "").lower()
+                if candidate_value and candidate_value in region_text:
+                    field_matches.append(candidate.get("field_name"))
+            if field_matches:
+                region_copy["field_matches"] = sorted(set(field_matches))
+            try:
+                region_confidence = float(region_copy.get("confidence") or 0)
+            except (TypeError, ValueError):
+                region_confidence = 0
+            if 0 < region_confidence < 0.55:
+                region_copy["needs_correction"] = True
+            annotated_regions.append(region_copy)
+        page_copy["regions"] = annotated_regions
+        if page_fields:
+            page_copy["candidate_fields"] = page_fields
+        annotated_pages.append(page_copy)
+    return annotated_pages
+
+
+def _review_overlay_summary(
+    *,
+    ocr_pages: list[dict],
+    field_candidates: list[dict],
+    corrected_fields: list[str],
+    retry_outcome: dict,
+    invoice_summary: dict,
+) -> dict:
+    region_count = sum(len(page.get("regions") or []) for page in ocr_pages)
+    low_confidence_regions = 0
+    for page in ocr_pages:
+        for region in page.get("regions") or []:
+            try:
+                confidence = float(region.get("confidence") or 0)
+            except (TypeError, ValueError):
+                confidence = 0
+            if 0 < confidence < 0.55:
+                low_confidence_regions += 1
+    summary = {
+        "page_count": len(ocr_pages),
+        "region_count": region_count,
+        "low_confidence_regions": low_confidence_regions,
+        "field_candidate_count": len(field_candidates),
+        "accepted_correction_count": len(corrected_fields),
+        "retry_count": retry_outcome.get("retry_count"),
+        "retry_resolution": retry_outcome.get("resolution"),
+        "invoice_edge_rows": invoice_summary.get("recovered_edge_rows"),
+    }
+    return {
+        key: value
+        for key, value in summary.items()
+        if value not in ("", None, [], {})
+    }
+
+
+def _review_artifacts_payload(payload: dict | None, *, fallback_excerpt: str = "") -> dict:
+    source = dict(payload or {})
+    extraction_review = dict(source.get("extraction_review") or {})
+    excerpt = str(source.get("raw_text_excerpt") or extraction_review.get("raw_text_excerpt") or fallback_excerpt or "").strip()
+    extraction_notes = source.get("extraction_notes") or source.get("raw_notes") or []
+    if isinstance(extraction_notes, str):
+        extraction_notes = [extraction_notes]
+    field_candidates = _merge_review_field_candidates(source, extraction_review)
+    ocr_pages = _annotate_review_ocr_pages(list(extraction_review.get("ocr_pages") or []), field_candidates)
+    retry_outcome = {
+        key: value
+        for key, value in dict(source.get("background_retry") or {}).items()
+        if value not in ("", None, [], {})
+    }
+    corrected_fields = sorted(
+        key
+        for key, value in dict(source.get("accepted_corrections") or {}).items()
+        if value not in ("", None, [], {})
+    )
+    invoice_summary = {
+        key: value
+        for key, value in {
+            "line_item_count": (source.get("service_payload") or {}).get("line_item_count"),
+            "parts_item_count": (source.get("service_payload") or {}).get("parts_item_count"),
+            "labour_item_count": (source.get("service_payload") or {}).get("labour_item_count"),
+            "systems_impacted": (source.get("service_payload") or {}).get("systems_impacted"),
+            "recovered_edge_rows": (source.get("invoice_review") or {}).get("recovered_edge_rows"),
+            "compact_ocr_rows": (source.get("invoice_review") or {}).get("compact_ocr_rows"),
+        }.items()
+        if value not in ("", None, [], {})
+    }
+    artifacts = {
+        "extraction_method": source.get("extraction_method") or extraction_review.get("best_method") or "",
+        "extraction_notes": list(extraction_notes)[:6],
+        "raw_text_excerpt": excerpt[:600],
+        "ocr_pages": ocr_pages,
+        "field_candidates": field_candidates,
+        "recovery_steps": list(extraction_review.get("recovery_steps") or [])[:8],
+        "attempts": list(extraction_review.get("attempts") or [])[:8],
+        "attempted_variants": list(extraction_review.get("attempted_variants") or [])[:8],
+        "retry_outcome": retry_outcome,
+        "review_resolution": source.get("review_queue_resolution", ""),
+        "corrected_fields": corrected_fields,
+        "invoice_summary": invoice_summary,
+        "overlay_summary": _review_overlay_summary(
+            ocr_pages=ocr_pages,
+            field_candidates=field_candidates,
+            corrected_fields=corrected_fields,
+            retry_outcome=retry_outcome,
+            invoice_summary=invoice_summary,
+        ),
+    }
+    return {
+        key: value
+        for key, value in artifacts.items()
+        if value not in ("", None, [], {})
+    }
+
+
+def _vehicle_document_parse_fields(document: BikeDocument, payload: dict | None, service_payload: dict | None = None) -> dict:
+    source = dict(payload or {})
+    service_data = dict(service_payload or source.get("service_payload") or {})
+    return {
+        key: value
+        for key, value in {
+            "detected_document_type": source.get("detected_document_type") or document.document_type,
+            "document_type": document.document_type,
+            "document_number": document.document_number or source.get("document_number", ""),
+            "issuer": document.issuer or source.get("issuer", ""),
+            "vehicle_number": document.vehicle_number or source.get("vehicle_number", ""),
+            "issue_date": document.issue_date.isoformat() if document.issue_date else source.get("issue_date", ""),
+            "expiry_date": document.expiry_date.isoformat() if document.expiry_date else source.get("expiry_date", ""),
+            "job_card_number": service_data.get("job_card_number", ""),
+            "invoice_kind": service_data.get("invoice_kind", ""),
+            "customer_name": service_data.get("customer_name", ""),
+            "service_consultant": service_data.get("service_consultant", ""),
+            "service_advisor_name": service_data.get("service_advisor_name") or service_data.get("advisor_name", ""),
+            "service_advisor_contact": service_data.get("service_advisor_contact") or service_data.get("advisor_contact", ""),
+            "service_center_name": service_data.get("service_center", "") or source.get("service_center_name", ""),
+            "total_customer_amount": service_data.get("total_customer_amount") or service_data.get("cost") or document.premium_amount or 0,
+        }.items()
         if value not in ("", None, [], {})
     }
 
@@ -2052,6 +2413,8 @@ def _apply_vehicle_correction(user, document_id: int, corrections: dict) -> dict
             "line_item_count",
         )
     )
+    if service_payload.get("cost") not in ("", None, 0):
+        document.premium_amount = float(service_payload.get("cost") or 0)
     document.parse_confidence = max(document.parse_confidence, 0.78 if len(accepted) >= 3 or has_service_data else 0.62)
     document.parser_status = "parsed" if document.document_number or has_service_data else "needs_review"
     document.parser_notes = " ".join(filter(None, [document.parser_notes, corrections.get("review_note", "")])).strip()
@@ -2064,6 +2427,7 @@ def _apply_vehicle_correction(user, document_id: int, corrections: dict) -> dict
             "vehicle_number",
             "issue_date",
             "expiry_date",
+            "premium_amount",
             "parse_confidence",
             "parser_status",
             "parser_notes",
@@ -2071,14 +2435,16 @@ def _apply_vehicle_correction(user, document_id: int, corrections: dict) -> dict
         ]
     )
     bike_service_intelligence.hydrate_document(document)
-    if service_payload:
-        _refresh_imported_service_records(
-            document,
-            SimpleNamespace(
-                fields={**payload, **service_payload},
-                service_payload=service_payload,
-            ),
-        )
+    _refresh_imported_service_records(
+        document,
+        SimpleNamespace(
+            fields=_vehicle_document_parse_fields(document, payload, service_payload),
+            service_payload=service_payload,
+            parser_status=document.parser_status,
+            confidence=document.parse_confidence,
+            parser_notes=document.parser_notes,
+        ),
+    )
     record_parser_correction(
         user=user,
         scope="vehicle_document",

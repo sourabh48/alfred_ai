@@ -1,11 +1,14 @@
 import json
 import os
 import shutil
+import tempfile
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.management import call_command
 from django.test import TestCase
 
 from apps.behavioral.models import BehavioralSignal
@@ -19,19 +22,87 @@ from apps.mobility.models import BikeProfile, BikeServiceRecord
 from apps.relationship.models import RelationshipProfile
 
 
-ARTIFACT_DIRS = [
-    Path("ml_models/alfred/salary_model"),
-    Path("ml_models/alfred/expense_lstm"),
-    Path("ml_models/alfred/burnout_rf"),
-    Path("ml_models/alfred/risk_classifier"),
-    Path("ml_models/alfred/parser_confidence"),
-    Path("ml_models/alfred/relationship_model"),
-    Path("ml_models/alfred/service_cost_predictor"),
-]
+class _InMemoryModelRegistry:
+    def __init__(self):
+        self.registry = {}
+
+    def update(self, model_name, version, metadata=None):
+        self.registry[model_name] = {
+            "version": version,
+            "metadata": metadata or {},
+        }
+
+
+class TrainingSampleBootstrapCommandTests(TestCase):
+    def test_bootstrap_training_samples_collects_supervised_minimums_idempotently(self):
+        output = StringIO()
+        call_command("bootstrap_training_samples", "--allow-non-debug", stdout=output)
+
+        user_model = get_user_model()
+        self.assertGreaterEqual(user_model.objects.filter(monthly_income__gt=0).count(), 8)
+        self.assertGreaterEqual(Expense.objects.count(), 28)
+        self.assertGreaterEqual(BehavioralSignal.objects.count(), 12)
+        self.assertEqual(
+            {1 if item.work_hours > 10 else 0 for item in BehavioralSignal.objects.all()},
+            {0, 1},
+        )
+        self.assertGreaterEqual(DocumentParserLearningMemory.objects.count(), 12)
+        self.assertGreaterEqual(self._parser_memory_class_count(), 2)
+        self.assertGreaterEqual(RelationshipProfile.objects.filter(compatibility_score__gt=0).count(), 8)
+        self.assertGreaterEqual(BikeServiceRecord.objects.filter(cost__gt=0).count(), 10)
+
+        counts_after_first_run = {
+            "income_users": user_model.objects.filter(monthly_income__gt=0).count(),
+            "expenses": Expense.objects.count(),
+            "behavioral": BehavioralSignal.objects.count(),
+            "parser_memory": DocumentParserLearningMemory.objects.count(),
+            "relationships": RelationshipProfile.objects.filter(compatibility_score__gt=0).count(),
+            "services": BikeServiceRecord.objects.filter(cost__gt=0).count(),
+        }
+        call_command("bootstrap_training_samples", "--allow-non-debug", stdout=StringIO())
+        self.assertEqual(
+            counts_after_first_run,
+            {
+                "income_users": user_model.objects.filter(monthly_income__gt=0).count(),
+                "expenses": Expense.objects.count(),
+                "behavioral": BehavioralSignal.objects.count(),
+                "parser_memory": DocumentParserLearningMemory.objects.count(),
+                "relationships": RelationshipProfile.objects.filter(compatibility_score__gt=0).count(),
+                "services": BikeServiceRecord.objects.filter(cost__gt=0).count(),
+            },
+        )
+        self.assertIn("bootstrap complete", output.getvalue())
+
+    def _parser_memory_class_count(self):
+        labels = set()
+        for item in DocumentParserLearningMemory.objects.all():
+            success_weight = item.successful_count + item.retry_success_count + item.correction_count
+            failure_weight = item.failed_count + item.retry_failure_count + item.review_count
+            labels.add(1 if success_weight >= max(failure_weight, 1) else 0)
+        return len(labels)
 
 
 class MLTrainingOrchestratorTests(TestCase):
     def setUp(self):
+        self.artifact_root = Path(tempfile.mkdtemp(prefix="alfred-ml-tests-"))
+        self.addCleanup(lambda: shutil.rmtree(self.artifact_root, ignore_errors=True))
+        self.registry = _InMemoryModelRegistry()
+        registry_patch = patch("apps.ml_engine.training.orchestrator.model_registry", self.registry)
+        registry_patch.start()
+        self.addCleanup(registry_patch.stop)
+        for target, relative_path in [
+            ("apps.ml_engine.training.train_salary.MODEL_PATH", "salary_model/model.pkl"),
+            ("apps.ml_engine.training.train_expense_lstm.MODEL_PATH", "expense_lstm/model.pkl"),
+            ("apps.ml_engine.training.train_burnout_rf.MODEL_PATH", "burnout_rf/model.pkl"),
+            ("apps.ml_engine.training.train_risk_classifier.MODEL_PATH", "risk_classifier/model.pkl"),
+            ("apps.ml_engine.training.train_parser_confidence.MODEL_PATH", "parser_confidence/model.pkl"),
+            ("apps.ml_engine.training.train_relationship.MODEL_PATH", "relationship_model/model.pkl"),
+            ("apps.ml_engine.training.train_service_cost.MODEL_PATH", "service_cost_predictor/model.pkl"),
+        ]:
+            path_patch = patch(target, str(self.artifact_root / relative_path))
+            path_patch.start()
+            self.addCleanup(path_patch.stop)
+
         user_model = get_user_model()
         self.user = user_model.objects.create_user(
             username="ml_primary",
@@ -137,13 +208,6 @@ class MLTrainingOrchestratorTests(TestCase):
                 },
             )
 
-        self.addCleanup(self._cleanup_artifacts)
-
-    def _cleanup_artifacts(self):
-        for directory in ARTIFACT_DIRS:
-            if directory.exists():
-                shutil.rmtree(directory, ignore_errors=True)
-
     def _assert_training_outcome(self, *, state, result_item, minimum_confidence: float, artifact_expected: bool):
         runtime_ready, _ = training_runtime_status()
         if runtime_ready:
@@ -208,6 +272,7 @@ class MLTrainingOrchestratorTests(TestCase):
     def test_should_bootstrap_training_respects_command_and_flag(self):
         self.assertFalse(should_bootstrap_training(["manage.py", "test"]))
         self.assertFalse(should_bootstrap_training(["manage.py", "migrate"]))
+        self.assertFalse(should_bootstrap_training(["manage.py", "bootstrap_training_samples"]))
         with patch.dict(os.environ, {"RUN_MAIN": "true"}, clear=False):
             self.assertTrue(should_bootstrap_training(["manage.py", "runserver"]))
         with self.settings(ALFRED_AUTO_TRAIN_ON_STARTUP=False):
@@ -267,6 +332,13 @@ class MLTrainingOrchestratorTests(TestCase):
 
         self.assertIn("overall_progress", snapshot)
         self.assertGreaterEqual(snapshot["total_models"], 1)
+        self.assertIn("maturity", snapshot)
+        self.assertGreaterEqual(snapshot["maturity"]["active_heuristic_fallbacks"], 1)
+        first_model = snapshot["models"][0]
+        self.assertIn("minimum_samples", first_model)
+        self.assertIn("data_gap", first_model)
+        self.assertIn("maturity_level", first_model)
+        self.assertIn("fallback_mode", first_model)
 
     def test_training_cycle_skips_when_trainer_import_is_blocked(self):
         with patch(

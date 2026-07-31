@@ -33,6 +33,9 @@ class Loan(models.Model):
     emi = models.FloatField()
     tenure_months = models.PositiveIntegerField(default=12)
     remaining_balance = models.FloatField(null=True, blank=True)
+    home_purchase_price = models.FloatField(default=0)
+    home_down_payment = models.FloatField(default=0)
+    home_other_upfront_payments = models.FloatField(default=0)
     start_date = models.DateField()
     closed_on = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -93,6 +96,43 @@ class Loan(models.Model):
             return 100.0
         paid = self.principal - (self.remaining_balance or self.principal)
         return min(100.0, (paid / self.principal) * 100)
+
+    @property
+    def resolved_home_purchase_price(self) -> float:
+        if self.loan_type != "home":
+            return 0.0
+        purchase_price = max(float(self.home_purchase_price or 0), 0.0)
+        if purchase_price > 0:
+            return round(purchase_price, 2)
+        financed_amount = max(float(self.principal or 0), 0.0)
+        down_payment = max(float(self.home_down_payment or 0), 0.0)
+        return round(financed_amount + down_payment, 2) if (financed_amount or down_payment) else 0.0
+
+    @property
+    def resolved_home_down_payment(self) -> float:
+        if self.loan_type != "home":
+            return 0.0
+        financed_amount = max(float(self.principal or 0), 0.0)
+        purchase_price = max(float(self.home_purchase_price or 0), 0.0)
+        if purchase_price > 0:
+            return round(max(purchase_price - financed_amount, 0.0), 2)
+        return round(max(float(self.home_down_payment or 0), 0.0), 2)
+
+    @property
+    def resolved_home_other_upfront_payments(self) -> float:
+        if self.loan_type != "home":
+            return 0.0
+        return round(max(float(self.home_other_upfront_payments or 0), 0.0), 2)
+
+    @property
+    def resolved_home_upfront_cash_invested(self) -> float:
+        return round(self.resolved_home_down_payment + self.resolved_home_other_upfront_payments, 2)
+
+    @property
+    def resolved_home_property_acquisition_cost(self) -> float:
+        if self.loan_type != "home":
+            return 0.0
+        return round(self.resolved_home_purchase_price + self.resolved_home_other_upfront_payments, 2)
 
 
 class LoanPaymentHistory(models.Model):

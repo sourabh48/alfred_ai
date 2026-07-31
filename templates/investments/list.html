@@ -6,8 +6,8 @@
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
             <div class="alfred-chip mb-3">Portfolio health and allocation control</div>
-            <h1 class="alfred-hero-title">Track each holding, measure diversification, and understand how the portfolio compounds from here.</h1>
-            <p class="alfred-hero-copy">ALFRED combines your registered positions with allocation and growth projections so you can see return, risk, and balance in one place.</p>
+            <h1 class="alfred-hero-title">Track each holding, measure diversification, and review a proof-backed short-horizon fund watchlist without leaving the portfolio workspace.</h1>
+            <p class="alfred-hero-copy">ALFRED combines your registered positions with allocation, growth projections, and an internet-backed watchlist that explains why a fund is being surfaced instead of asking you to trust a black box.</p>
         </div>
         <div class="surface-card" style="min-width: 260px;">
             <p class="metric-kicker">Portfolio Value</p>
@@ -23,6 +23,25 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
+            <h2 class="page-section-title">Import Portfolio PDF</h2>
+            <p class="page-section-copy mb-3">Upload broker holdings, mutual fund statements, or portfolio PDFs. Alfred will extract positions and update matching holdings when it can verify them.</p>
+            <div class="row g-3 align-items-end mb-4">
+                <div class="col-lg-8">
+                    <label class="form-label" for="investmentPdfFiles">Portfolio PDFs</label>
+                    <input id="investmentPdfFiles" type="file" class="form-control" accept=".pdf,application/pdf" multiple>
+                </div>
+                <div class="col-lg-4 d-grid">
+                    <button id="uploadInvestmentPdfBtn" class="btn btn-dark" type="button">Import PDFs</button>
+                </div>
+            </div>
+            <div id="investmentImportStatus" class="mb-4"></div>
+            <div class="mb-4">
+                <h3 class="h6 fw-bold mb-3">Recent PDF Imports</h3>
+                <div id="investmentImportList" class="data-stack stack-scroll stack-scroll-sm">
+                    <div class="empty-state">No portfolio imports tracked yet.</div>
+                </div>
+            </div>
+
             <h2 class="page-section-title">Add Position</h2>
             <p class="page-section-copy mb-3">Register each investment so ALFRED can calculate allocation, SIP exposure, and risk concentration.</p>
             <form id="investmentForm" class="soft-grid">
@@ -46,6 +65,10 @@
                     <div class="col-md-6">
                         <label class="form-label" for="investmentInstitution">Institution</label>
                         <input id="investmentInstitution" name="institution" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="investmentAccountNumber">Account / Folio</label>
+                        <input id="investmentAccountNumber" name="account_number" class="form-control" placeholder="Folio, demat, or broker account">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="investmentRisk">Risk Level</label>
@@ -104,6 +127,37 @@
     </div>
 </section>
 
+<section class="surface-card mb-4" id="investmentWatchlistSection">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+        <div>
+            <h2 class="page-section-title mb-1">Short-Horizon Fund Watchlist</h2>
+            <p class="page-section-copy mb-0">A transparent 1-2 month watchlist built from official AMFI NAV data, current market regime, and your current portfolio mix. This is a watchlist, not a guaranteed return promise.</p>
+        </div>
+        <div class="surface-card surface-card--compact investment-watchlist-hero">
+            <p class="metric-kicker">Watchlist Mode</p>
+            <div class="metric-value" id="investmentWatchlistMode">Unavailable</div>
+            <p class="metric-caption mb-0" id="investmentWatchlistSummary">Waiting for verified market data.</p>
+        </div>
+    </div>
+    <div class="soft-grid three-up mb-4" id="investmentWatchlistCards">
+        <div class="empty-state">No watchlist candidates yet.</div>
+    </div>
+    <div class="row g-4">
+        <div class="col-xl-5">
+            <div class="surface-card h-100">
+                <h3 class="h6 fw-bold mb-3">How Alfred Scores It</h3>
+                <div id="investmentWatchlistAlgorithm"></div>
+            </div>
+        </div>
+        <div class="col-xl-7">
+            <div class="surface-card h-100">
+                <h3 class="h6 fw-bold mb-3">Evidence and Proof</h3>
+                <ul class="insight-list" id="investmentWatchlistEvidence"></ul>
+            </div>
+        </div>
+    </div>
+</section>
+
 <section class="surface-card">
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
@@ -130,5 +184,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.2"></script>
+<script src="/static/js/investments.js?v=2.5"></script>
 {% endblock %}
