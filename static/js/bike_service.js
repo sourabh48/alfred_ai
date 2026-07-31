@@ -51,21 +51,16 @@ document.addEventListener("DOMContentLoaded", () => {
     Alfred.enableLiveRefresh("bike-service-live", loadBikeServiceDashboard, { rootId: "bikeServiceRoot", interactionHoldMs: 4500 });
 });
 
-function loadBikeServiceDashboard() {
+function loadBikeServiceDashboard(options = {}) {
     return Alfred.fetchJSON("/api/mobility/bike-service-dashboard/")
         .then(data => {
             const selectedMake = document.getElementById("bikeCatalogMakeSelect")?.value || "";
-            const selectedCatalogKey = document.getElementById("bikeCatalogSelect")?.value || "";
             const catalogLocked = isBikeCatalogInteractionActive();
             const profileEditorLocked = isBikeProfileEditorDirty();
             const summary = data.summary || {};
             const profile = data.bike_profile || {};
             bikeState.profiles = data.bike_profiles || [];
-            if (!catalogLocked) {
-                bikeState.catalog = data.bike_catalog || [];
-                bikeState.catalogRequestKey = "";
-            }
-            bikeState.catalogManufacturers = data.bike_catalog_manufacturers || buildCatalogManufacturersFromModels(bikeState.catalog);
+            bikeState.catalogManufacturers = data.bike_catalog_manufacturers || bikeState.catalogManufacturers || [];
             showBikeServiceAlert("", "secondary");
             renderBikeServiceHero(summary);
             renderBikeHeroSignals(summary, profile, data.pending_tasks || []);
@@ -86,11 +81,11 @@ function loadBikeServiceDashboard() {
             renderBikeDocuments(data.bike_documents || []);
             renderBikeConditions(data.bike_conditions || []);
             if (!catalogLocked) {
-                hydrateBikeCatalogManufacturers(selectedMake, selectedCatalogKey);
+                hydrateBikeCatalogManufacturers(selectedMake, "", { hydrateModels: false });
             }
             hydrateBikeProfileSelectors();
             hydrateTravelPlanOptions(data.travel_plans || []);
-            if (!profileEditorLocked) {
+            if (!options.live && !profileEditorLocked) {
                 syncBikeProfileEditor();
             }
             renderBikeCharts(data.charts || {});
@@ -785,7 +780,7 @@ function isBikeProfileEditorDirty() {
     return form.dataset.userEditing === "true" || form.contains(document.activeElement);
 }
 
-function hydrateBikeCatalogManufacturers(preferredMake = "", preferredCatalogKey = "") {
+function hydrateBikeCatalogManufacturers(preferredMake = "", preferredCatalogKey = "", options = {}) {
     const makeInput = document.getElementById("bikeCatalogMakeSelect");
     if (!makeInput) {
         return Promise.resolve([]);
@@ -796,6 +791,9 @@ function hydrateBikeCatalogManufacturers(preferredMake = "", preferredCatalogKey
     renderCatalogMakeOptions(manufacturers, nextMake);
     if (makeInput.value !== nextMake) {
         makeInput.value = nextMake;
+    }
+    if (options.hydrateModels === false) {
+        return Promise.resolve(bikeState.catalog);
     }
     return hydrateBikeCatalog({ preferredCatalogKey });
 }

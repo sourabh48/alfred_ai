@@ -130,6 +130,15 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn("isBikeCatalogInteractionActive", script)
         self.assertIn("bikeCatalogFetchToken", script)
         self.assertIn("profileEditorLocked", script)
+        self.assertIn("hydrateModels: false", script)
+
+        dashboard_refresh_block = script[
+            script.index("function loadBikeServiceDashboard"):
+            script.index("function renderBikeServiceHero")
+        ]
+        self.assertNotIn("bikeState.catalogRequestKey = \"\";", dashboard_refresh_block)
+        self.assertNotIn("bikeState.catalog = data.bike_catalog", dashboard_refresh_block)
+        self.assertNotIn("hydrateBikeCatalog(", dashboard_refresh_block)
 
     def test_document_center_exposes_chatgpt_import_provision(self):
         html = self._fetch_text("/documents/")
