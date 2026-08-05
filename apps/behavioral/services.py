@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import DISCRETIONARY_CATEGORIES, build_financial_intelligence
 from apps.integrations.services import verified_intelligence
-from apps.integrations.services.verified_intelligence import freshness_snapshot
+from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 
 from .models import BehavioralSignal
 
@@ -190,20 +190,18 @@ def _behavioral_grounding(linked_data: dict, *, notes: list[str], planning_conte
         "evidence": evidence,
         "freshness": freshness,
         "external_context": planning_context.get("payload", {}),
-        "proof_contract": _behavioral_proof_contract(freshness),
+        "proof_contract": _behavioral_proof_contract(evidence, freshness),
         "notes": [*notes, *planning_context.get("notes", [])],
     }
 
 
-def _behavioral_proof_contract(freshness: dict) -> dict:
-    return {
-        "complete": bool(freshness.get("proof_complete")),
-        "required_sources": ["World Bank", "Yahoo Finance"],
-        "tracked_records": freshness.get("tracked_records", 0),
-        "stale_or_due_records": freshness.get("stale_or_due_records", 0),
-        "missing_source_records": freshness.get("missing_source_records", 0),
-        "missing_freshness_records": freshness.get("missing_freshness_records", 0),
-    }
+def _behavioral_proof_contract(evidence: list[dict], freshness: dict) -> dict:
+    return proof_contract_payload(
+        evidence_items=evidence,
+        freshness=freshness,
+        required_sources=["World Bank", "Yahoo Finance"],
+        advisory_surface="behavioral",
+    )
 
 
 def _build_linked_behavior_data(user) -> dict:

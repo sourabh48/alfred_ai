@@ -12,7 +12,7 @@ import feedparser
 import requests
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Max, Min, Q
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -90,6 +90,161 @@ def freshness_snapshot(items: list[dict]) -> dict:
     }
 
 
+ADVISORY_PROOF_REQUIRED_FEATURES = (
+    "source_url",
+    "stale_after",
+    "scheduled_refresh",
+    "circuit_breaker",
+    "stale_fallback",
+)
+ADVISORY_REFRESH_CONTRACT = {
+    "scheduled_refresh": "refresh_due_records",
+    "stale_after_required": True,
+    "source_url_required": True,
+    "circuit_breaker": True,
+    "stale_fallback": True,
+}
+ADVISORY_PROOF_SURFACE_CONTRACTS = (
+    {
+        "key": "recommendation_overview",
+        "label": "Recommendation overview",
+        "surface_type": "recommendation",
+        "payload_path": "apps.integrations.views._build_recommendation_overview_payload",
+        "required_sources": ["Yahoo Finance", "World Bank"],
+        "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
+    },
+    {
+        "key": "investment_summary",
+        "label": "Investment summary and watchlist",
+        "surface_type": "recommendation",
+        "payload_path": "apps.investments.views._investment_summary_payload",
+        "required_sources": ["Yahoo Finance", "World Bank"],
+        "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
+    },
+    {
+        "key": "travel_advisor_preview",
+        "label": "Travel advisor preview",
+        "surface_type": "recommendation",
+        "payload_path": "apps.mobility.services.travel_advisor.TravelAdvisorService.build_advice",
+        "required_sources": ["OpenStreetMap Nominatim"],
+        "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
+    },
+    {
+        "key": "risk_outlook",
+        "label": "Risk outlook",
+        "surface_type": "recommendation",
+        "payload_path": "apps.risk.services.risk_intelligence.RiskIntelligenceService.build_outlook",
+        "required_sources": ["World Bank"],
+        "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
+    },
+    {
+        "key": "relationship_alignment",
+        "label": "Relationship alignment",
+        "surface_type": "relationship-adjacent",
+        "payload_path": "apps.relationship.services.relationship_intelligence.build_relationship_alignment",
+        "required_sources": ["Yahoo Finance", "World Bank"],
+        "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
+    },
+    {
+        "key": "behavioral_fingerprint",
+        "label": "Behavioral fingerprint",
+        "surface_type": "relationship-adjacent",
+        "payload_path": "apps.behavioral.services.build_behavioral_fingerprint",
+        "required_sources": ["Yahoo Finance", "World Bank"],
+        "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
+    },
+    {
+        "key": "behavioral_stress",
+        "label": "Behavioral stress advisor",
+        "surface_type": "relationship-adjacent",
+        "payload_path": "apps.behavioral.services.build_behavioral_stress",
+        "required_sources": ["Yahoo Finance", "World Bank"],
+        "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
+    },
+    {
+        "key": "family_growth",
+        "label": "Family growth planning",
+        "surface_type": "relationship-adjacent",
+        "payload_path": "apps.family.views._family_growth_payload",
+        "required_sources": ["India Post", "NPS Trust"],
+        "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
+    },
+    {
+        "key": "tax_optimizer",
+        "label": "Tax optimizer",
+        "surface_type": "recommendation",
+        "payload_path": "apps.integrations.views._build_tax_optimizer_overview_payload",
+        "required_sources": ["Income Tax Department", "India Post", "NPS Trust"],
+        "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
+    },
+)
+
+
+def _normalize_evidence_items(evidence_items) -> list[dict]:
+    if isinstance(evidence_items, dict):
+        return [evidence_items]
+    return [item for item in evidence_items or [] if isinstance(item, dict)]
+
+
+def proof_contract_payload(*, evidence_items, freshness=None, required_sources=None, advisory_surface: str = "") -> dict:
+    evidence = _normalize_evidence_items(evidence_items)
+    freshness = freshness or freshness_snapshot(evidence)
+    required_sources = list(required_sources or [])
+    observed_sources = sorted(
+        {
+            str(item.get("source_name") or "").strip()
+            for item in evidence
+            if str(item.get("source_name") or "").strip()
+        }
+    )
+    missing_required_sources = [source for source in required_sources if source not in observed_sources]
+    return {
+        "complete": bool(freshness.get("proof_complete")) and not missing_required_sources,
+        "advisory_surface": advisory_surface,
+        "required_sources": required_sources,
+        "observed_sources": observed_sources,
+        "tracked_records": freshness.get("tracked_records", 0),
+        "fresh_records": freshness.get("fresh_records", 0),
+        "stale_or_due_records": freshness.get("stale_or_due_records", 0),
+        "missing_source_records": freshness.get("missing_source_records", 0),
+        "missing_freshness_records": freshness.get("missing_freshness_records", 0),
+        "missing_required_sources": missing_required_sources,
+        "refresh_contract": dict(ADVISORY_REFRESH_CONTRACT),
+    }
+
+
+def advisory_proof_contract_snapshot() -> dict:
+    surfaces = []
+    for contract in ADVISORY_PROOF_SURFACE_CONTRACTS:
+        contract_features = list(contract.get("contract_features", []))
+        missing_features = [feature for feature in ADVISORY_PROOF_REQUIRED_FEATURES if feature not in contract_features]
+        surfaces.append(
+            {
+                **contract,
+                "missing_contract_features": missing_features,
+                "complete": not missing_features,
+            }
+        )
+    covered_surface_count = sum(1 for surface in surfaces if surface["complete"])
+    return {
+        "required_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
+        "surface_count": len(surfaces),
+        "covered_surface_count": covered_surface_count,
+        "uncovered_surface_count": len(surfaces) - covered_surface_count,
+        "scheduled_refresh": ADVISORY_REFRESH_CONTRACT["scheduled_refresh"],
+        "healthy": covered_surface_count == len(surfaces),
+        "new_signal_rule": "Do not add a new recommendation or relationship-adjacent signal unless it declares required sources, source URLs, stale-after deadlines, scheduled refresh, stale fallback, and circuit-breaker behavior.",
+        "summary": (
+            f"{covered_surface_count}/{len(surfaces)} recommendation or relationship-adjacent surface(s) declare the full proof contract."
+        ),
+        "surfaces": surfaces,
+    }
+
+
+def _iso_or_empty(value) -> str:
+    return value.isoformat() if value else ""
+
+
 class VerifiedIntelligenceService:
     USER_AGENT = "AlfredAI/1.0 (verified-intelligence)"
     CIRCUIT_FAILURE_THRESHOLD = 3
@@ -109,7 +264,7 @@ class VerifiedIntelligenceService:
             verified_at__lt=now - timedelta(days=retention_days),
         ).delete()
 
-    def world_bank_indicator(self, indicator_code: str, title: str, stale_days: int = 30) -> InsightResult:
+    def world_bank_indicator(self, indicator_code: str, title: str, stale_days: int = 30, *, force: bool = False) -> InsightResult:
         endpoint = f"https://api.worldbank.org/v2/country/IND/indicator/{indicator_code}"
         cache_key = f"world-bank:{indicator_code}"
         return self._use_or_refresh(
@@ -120,9 +275,10 @@ class VerifiedIntelligenceService:
             source_url=f"{endpoint}?format=json&per_page=8",
             ttl=timedelta(days=stale_days),
             fetcher=lambda: self._fetch_world_bank(endpoint, title),
+            force=force,
         )
 
-    def market_snapshot(self, stale_hours: int = 12) -> InsightResult:
+    def market_snapshot(self, stale_hours: int = 12, *, force: bool = False) -> InsightResult:
         return self._use_or_refresh(
             scope="market",
             cache_key="india-equity-volatility",
@@ -131,9 +287,10 @@ class VerifiedIntelligenceService:
             source_url="https://finance.yahoo.com/quote/%5ENSEI/",
             ttl=timedelta(hours=stale_hours),
             fetcher=self._fetch_market_snapshot,
+            force=force,
         )
 
-    def geocode_destination(self, destination: str, stale_days: int = 30) -> InsightResult:
+    def geocode_destination(self, destination: str, stale_days: int = 30, *, force: bool = False) -> InsightResult:
         slug = slugify(destination) or "destination"
         source_url = "https://nominatim.openstreetmap.org/search"
         return self._use_or_refresh(
@@ -145,9 +302,10 @@ class VerifiedIntelligenceService:
             ttl=timedelta(days=stale_days),
             query=destination,
             fetcher=lambda: self._fetch_geocode(destination),
+            force=force,
         )
 
-    def offbeat_suggestions(self, destination: str, stale_days: int = 14) -> InsightResult:
+    def offbeat_suggestions(self, destination: str, stale_days: int = 14, *, force: bool = False) -> InsightResult:
         slug = slugify(destination) or "destination"
         source_url = "https://nominatim.openstreetmap.org/search"
         return self._use_or_refresh(
@@ -159,9 +317,10 @@ class VerifiedIntelligenceService:
             ttl=timedelta(days=stale_days),
             query=destination,
             fetcher=lambda: self._fetch_offbeat(destination),
+            force=force,
         )
 
-    def weather_snapshot(self, latitude: float, longitude: float, start_date: date, end_date: date, stale_hours: int = 8) -> InsightResult:
+    def weather_snapshot(self, latitude: float, longitude: float, start_date: date, end_date: date, stale_hours: int = 8, *, force: bool = False) -> InsightResult:
         cache_key = f"weather:{latitude:.3f}:{longitude:.3f}:{start_date.isoformat()}:{end_date.isoformat()}"
         source_url = "https://api.open-meteo.com/v1/forecast"
         return self._use_or_refresh(
@@ -172,9 +331,10 @@ class VerifiedIntelligenceService:
             source_url=source_url,
             ttl=timedelta(hours=stale_hours),
             fetcher=lambda: self._fetch_weather(latitude, longitude, start_date, end_date),
+            force=force,
         )
 
-    def google_news_search(self, query: str, stale_hours: int = 8) -> InsightResult:
+    def google_news_search(self, query: str, stale_hours: int = 8, *, force: bool = False) -> InsightResult:
         slug = slugify(query)[:120] or "news"
         feed_url = f"https://news.google.com/rss/search?q={quote_plus(query)}&hl=en-IN&gl=IN&ceid=IN:en"
         return self._use_or_refresh(
@@ -186,9 +346,10 @@ class VerifiedIntelligenceService:
             ttl=timedelta(hours=stale_hours),
             query=query,
             fetcher=lambda: self._fetch_google_news(feed_url, query),
+            force=force,
         )
 
-    def remotive_jobs(self, search_term: str, stale_hours: int = 8) -> InsightResult:
+    def remotive_jobs(self, search_term: str, stale_hours: int = 8, *, force: bool = False) -> InsightResult:
         slug = slugify(search_term)[:120] or "jobs"
         source_url = "https://remotive.com/api/remote-jobs"
         return self._use_or_refresh(
@@ -200,9 +361,10 @@ class VerifiedIntelligenceService:
             ttl=timedelta(hours=stale_hours),
             query=search_term,
             fetcher=lambda: self._fetch_remotive_jobs(search_term),
+            force=force,
         )
 
-    def arbeitnow_jobs(self, search_term: str, stale_hours: int = 8) -> InsightResult:
+    def arbeitnow_jobs(self, search_term: str, stale_hours: int = 8, *, force: bool = False) -> InsightResult:
         slug = slugify(search_term)[:120] or "jobs"
         source_url = "https://www.arbeitnow.com/api/job-board-api"
         return self._use_or_refresh(
@@ -214,9 +376,10 @@ class VerifiedIntelligenceService:
             ttl=timedelta(hours=stale_hours),
             query=search_term,
             fetcher=lambda: self._fetch_arbeitnow_jobs(search_term),
+            force=force,
         )
 
-    def remoteok_jobs(self, search_term: str, stale_hours: int = 8) -> InsightResult:
+    def remoteok_jobs(self, search_term: str, stale_hours: int = 8, *, force: bool = False) -> InsightResult:
         slug = slugify(search_term)[:120] or "jobs"
         source_url = "https://remoteok.com/api"
         return self._use_or_refresh(
@@ -228,9 +391,10 @@ class VerifiedIntelligenceService:
             ttl=timedelta(hours=stale_hours),
             query=search_term,
             fetcher=lambda: self._fetch_remoteok_jobs(search_term),
+            force=force,
         )
 
-    def tax_regime_reference(self, stale_days: int = 45) -> InsightResult:
+    def tax_regime_reference(self, stale_days: int = 45, *, force: bool = False) -> InsightResult:
         return self._static_reference(
             scope="tax",
             cache_key="india-income-tax-regimes",
@@ -247,9 +411,10 @@ class VerifiedIntelligenceService:
             },
             summary="Official income tax regime reference payload for current slab and standard-deduction comparisons.",
             notes="This record is source-backed and refreshed on a slower cadence because tax slab references do not change intraday.",
+            force=force,
         )
 
-    def nps_tax_reference(self, stale_days: int = 45) -> InsightResult:
+    def nps_tax_reference(self, stale_days: int = 45, *, force: bool = False) -> InsightResult:
         return self._static_reference(
             scope="tax",
             cache_key="india-nps-tax-benefit",
@@ -264,9 +429,10 @@ class VerifiedIntelligenceService:
             },
             summary="Official NPS Trust reference for additional 80CCD(1B) tax-benefit tracking.",
             notes="Use this as a policy reference only; final eligibility still depends on the user's filed tax profile.",
+            force=force,
         )
 
-    def ppf_reference(self, stale_days: int = 45) -> InsightResult:
+    def ppf_reference(self, stale_days: int = 45, *, force: bool = False) -> InsightResult:
         return self._static_reference(
             scope="tax",
             cache_key="india-ppf-reference",
@@ -281,6 +447,7 @@ class VerifiedIntelligenceService:
             },
             summary="Official India Post reference for PPF contribution treatment under long-term tax-saving planning.",
             notes="PPF is tracked here as an official reference input for Alfred's deduction catalog and planning guidance.",
+            force=force,
         )
 
     def macro_context(self) -> dict:
@@ -326,6 +493,7 @@ class VerifiedIntelligenceService:
         payload: dict,
         summary: str,
         notes: str,
+        force: bool = False,
     ) -> InsightResult:
         return self._use_or_refresh(
             scope=scope,
@@ -335,16 +503,17 @@ class VerifiedIntelligenceService:
             source_url=source_url,
             ttl=ttl,
             fetcher=lambda: (payload, summary, notes),
+            force=force,
         )
 
-    def _use_or_refresh(self, scope: str, cache_key: str, title: str, source_name: str, source_url: str, ttl: timedelta, fetcher, query: str = "") -> InsightResult:
+    def _use_or_refresh(self, scope: str, cache_key: str, title: str, source_name: str, source_url: str, ttl: timedelta, fetcher, query: str = "", force: bool = False) -> InsightResult:
         self.cleanup_stale()
         record = (
             VerifiedExternalInsight.objects.filter(scope=scope, cache_key=cache_key, source_url=source_url, is_active=True)
             .order_by("-verified_at", "-id")
             .first()
         )
-        if record and record.is_fresh:
+        if record and record.is_fresh and not force:
             return InsightResult(record.payload, self._serialize_evidence(record), True)
 
         if self._circuit_is_open(scope, cache_key, source_url):
@@ -352,7 +521,12 @@ class VerifiedIntelligenceService:
             if record:
                 if record.status == "fresh":
                     record.status = "stale"
-                    record.save(update_fields=["status"])
+                self._record_refresh_observation(
+                    record,
+                    "skipped",
+                    note,
+                    record_status=record.status,
+                )
                 return InsightResult(record.payload, self._serialize_evidence(record, note), True)
             return InsightResult(
                 {},
@@ -368,7 +542,12 @@ class VerifiedIntelligenceService:
             if record:
                 if record.status == "fresh":
                     record.status = "stale"
-                    record.save(update_fields=["status"])
+                self._record_refresh_observation(
+                    record,
+                    "failed",
+                    f"{exc} {breaker_note}".strip(),
+                    record_status=record.status,
+                )
                 return InsightResult(record.payload, self._serialize_evidence(record, breaker_note), True)
             failed = self._store(
                 scope=scope,
@@ -405,6 +584,7 @@ class VerifiedIntelligenceService:
         self.cleanup_stale()
         now = timezone.now()
         batch_size = batch_size or self.REFRESH_BATCH_SIZE
+        health_before = self.refresh_health_snapshot(now=now)
         candidates = list(
             VerifiedExternalInsight.objects.filter(is_active=True)
             .filter(Q(status="stale") | Q(stale_after__lte=now + timedelta(hours=self.STALE_LOOKAHEAD_HOURS)))
@@ -416,10 +596,19 @@ class VerifiedIntelligenceService:
         skipped = 0
         failed = 0
         seen = set()
+        per_scope = {}
+        records = []
         for record in candidates:
             key = (record.scope, record.cache_key, record.source_url)
             if key in seen:
                 skipped += 1
+                self._record_refresh_observation(
+                    record,
+                    "skipped",
+                    "Duplicate active source record skipped within the same refresh batch.",
+                )
+                self._increment_refresh_scope(per_scope, record.scope, "skipped", processed=False)
+                records.append(self._refresh_record_outcome(record, "skipped", "duplicate_source"))
                 continue
             seen.add(key)
             processed += 1
@@ -430,6 +619,10 @@ class VerifiedIntelligenceService:
                 skipped += 1
             else:
                 failed += 1
+            self._increment_refresh_scope(per_scope, record.scope, outcome)
+            records.append(self._refresh_record_outcome(record, outcome))
+
+        health_after = self.refresh_health_snapshot()
 
         return {
             "processed": processed,
@@ -437,19 +630,97 @@ class VerifiedIntelligenceService:
             "skipped": skipped,
             "failed": failed,
             "batch_size": batch_size,
+            "started_at": now.isoformat(),
+            "completed_at": timezone.now().isoformat(),
+            "watchlist_before": health_before["watchlist_records"],
+            "watchlist_after": health_after["watchlist_records"],
+            "last_refresh_attempt_at": health_after["last_refresh_attempt_at"],
+            "last_refresh_success_at": health_after["last_refresh_success_at"],
+            "per_scope": [per_scope[key] for key in sorted(per_scope)],
+            "records": records,
+        }
+
+    def refresh_health_snapshot(self, now=None) -> dict:
+        now = now or timezone.now()
+        active = VerifiedExternalInsight.objects.filter(is_active=True)
+        watchlist_filter = Q(status__in=["stale", "failed", "rejected"]) | Q(stale_after__lte=now)
+        watchlist = active.filter(watchlist_filter)
+        fresh = active.filter(status="fresh", stale_after__gt=now)
+        due = active.filter(status="fresh", stale_after__lte=now)
+        status_counts = {item["status"]: item["count"] for item in active.values("status").annotate(count=Count("id"))}
+
+        last_attempt = active.exclude(last_refresh_attempt_at__isnull=True).aggregate(value=Max("last_refresh_attempt_at"))["value"]
+        last_success = active.exclude(last_refresh_success_at__isnull=True).aggregate(value=Max("last_refresh_success_at"))["value"]
+        legacy_success = fresh.aggregate(value=Max("verified_at"))["value"]
+        if legacy_success and (not last_success or legacy_success > last_success):
+            last_success = legacy_success
+
+        per_scope = []
+        for scope in sorted(active.order_by().values_list("scope", flat=True).distinct()):
+            scoped = active.filter(scope=scope)
+            scoped_watchlist = scoped.filter(watchlist_filter)
+            scoped_fresh = scoped.filter(status="fresh", stale_after__gt=now)
+            scope_last_attempt = scoped.exclude(last_refresh_attempt_at__isnull=True).aggregate(value=Max("last_refresh_attempt_at"))["value"]
+            scope_last_success = scoped.exclude(last_refresh_success_at__isnull=True).aggregate(value=Max("last_refresh_success_at"))["value"]
+            scope_legacy_success = scoped_fresh.aggregate(value=Max("verified_at"))["value"]
+            if scope_legacy_success and (not scope_last_success or scope_legacy_success > scope_last_success):
+                scope_last_success = scope_legacy_success
+            per_scope.append(
+                {
+                    "scope": scope,
+                    "active_records": scoped.count(),
+                    "fresh_records": scoped_fresh.count(),
+                    "watchlist_records": scoped_watchlist.count(),
+                    "due_records": scoped.filter(status="fresh", stale_after__lte=now).count(),
+                    "stale_records": scoped.filter(status="stale").count(),
+                    "failed_records": scoped.filter(status="failed").count(),
+                    "rejected_records": scoped.filter(status="rejected").count(),
+                    "last_refresh_attempt_at": _iso_or_empty(scope_last_attempt),
+                    "last_refresh_success_at": _iso_or_empty(scope_last_success),
+                }
+            )
+
+        next_due_at = fresh.aggregate(value=Min("stale_after"))["value"]
+        oldest_watchlist_at = watchlist.aggregate(value=Min("stale_after"))["value"]
+        active_count = active.count()
+        watchlist_count = watchlist.count()
+        return {
+            "active_records": active_count,
+            "fresh_records": fresh.count(),
+            "watchlist_records": watchlist_count,
+            "due_records": due.count(),
+            "stale_records": status_counts.get("stale", 0),
+            "failed_records": status_counts.get("failed", 0),
+            "rejected_records": status_counts.get("rejected", 0),
+            "last_refresh_attempt_at": _iso_or_empty(last_attempt),
+            "last_refresh_success_at": _iso_or_empty(last_success),
+            "next_due_at": _iso_or_empty(next_due_at),
+            "oldest_watchlist_stale_after": _iso_or_empty(oldest_watchlist_at),
+            "per_scope": per_scope,
+            "healthy": active_count > 0 and watchlist_count == 0,
+            "summary": (
+                f"{fresh.count()}/{active_count} active evidence record(s) are fresh; "
+                f"{watchlist_count} stale, failed, rejected, or due record(s) are on the watchlist."
+            ),
         }
 
     def guardrail_snapshot(self) -> dict:
+        proof_contract = advisory_proof_contract_snapshot()
+        refresh_health = self.refresh_health_snapshot()
         return {
             "circuit_failure_threshold": self.CIRCUIT_FAILURE_THRESHOLD,
             "circuit_open_minutes": self.CIRCUIT_OPEN_MINUTES,
             "refresh_batch_size": self.REFRESH_BATCH_SIZE,
             "stale_lookahead_hours": self.STALE_LOOKAHEAD_HOURS,
+            "proof_contract": proof_contract,
+            "refresh_health": refresh_health,
             "fault_tolerance": [
                 "Repeated upstream failures trip a circuit breaker before more external calls are attempted.",
                 "If a verified record already exists, Alfred falls back to the latest stored payload instead of failing the dashboard outright.",
                 "Scheduled refresh is batch-limited so one bad source cannot overload the whole refresh cycle.",
+                "Refresh health exposes processed, refreshed, skipped, failed, per-scope watchlist, last-attempt, and last-success outcomes.",
                 "Stale cleanup only removes failed or inactive records after retention windows instead of deleting active evidence aggressively.",
+                proof_contract["new_signal_rule"],
             ],
         }
 
@@ -485,6 +756,10 @@ class VerifiedIntelligenceService:
             fetched_at=now,
             verified_at=now,
             stale_after=now + ttl,
+            last_refresh_attempt_at=now,
+            last_refresh_success_at=now if status == "fresh" else None,
+            last_refresh_status="refreshed" if status == "fresh" else status,
+            last_refresh_error="" if status == "fresh" else notes[:1000],
             notes=notes,
             is_active=True,
         )
@@ -499,6 +774,10 @@ class VerifiedIntelligenceService:
             "fetched_at": record.fetched_at.isoformat(),
             "verified_at": record.verified_at.isoformat(),
             "stale_after": record.stale_after.isoformat(),
+            "last_refresh_attempt_at": _iso_or_empty(record.last_refresh_attempt_at),
+            "last_refresh_success_at": _iso_or_empty(record.last_refresh_success_at),
+            "last_refresh_status": record.last_refresh_status,
+            "last_refresh_error": record.last_refresh_error,
             "query": record.query,
             "notes": " ".join(part for part in [record.notes, extra_note] if part).strip(),
         }
@@ -513,6 +792,10 @@ class VerifiedIntelligenceService:
             "fetched_at": "",
             "verified_at": "",
             "stale_after": "",
+            "last_refresh_attempt_at": "",
+            "last_refresh_success_at": "",
+            "last_refresh_status": status,
+            "last_refresh_error": notes,
             "query": query,
             "notes": notes,
         }
@@ -521,44 +804,122 @@ class VerifiedIntelligenceService:
         try:
             if record.scope == "macro" and record.cache_key.startswith("world-bank:"):
                 indicator = record.cache_key.split(":", 1)[1]
-                self.world_bank_indicator(indicator, record.title)
-                return "refreshed"
+                return self._run_refresh_adapter(record, lambda: self.world_bank_indicator(indicator, record.title, force=True))
             if record.scope == "market" and record.cache_key == "india-equity-volatility":
-                self.market_snapshot()
-                return "refreshed"
+                return self._run_refresh_adapter(record, lambda: self.market_snapshot(force=True))
             if record.scope == "travel" and record.cache_key.startswith("geocode:") and record.query:
-                self.geocode_destination(record.query)
-                return "refreshed"
+                return self._run_refresh_adapter(record, lambda: self.geocode_destination(record.query, force=True))
             if record.scope == "travel" and record.cache_key.startswith("offbeat:") and record.query:
-                self.offbeat_suggestions(record.query)
-                return "refreshed"
+                return self._run_refresh_adapter(record, lambda: self.offbeat_suggestions(record.query, force=True))
             if record.scope == "travel" and record.cache_key.startswith("weather:"):
                 _, latitude, longitude, start_date, end_date = record.cache_key.split(":")
-                self.weather_snapshot(float(latitude), float(longitude), date.fromisoformat(start_date), date.fromisoformat(end_date))
-                return "refreshed"
+                return self._run_refresh_adapter(
+                    record,
+                    lambda: self.weather_snapshot(float(latitude), float(longitude), date.fromisoformat(start_date), date.fromisoformat(end_date), force=True),
+                )
             if record.scope == "news" and record.query:
-                self.google_news_search(record.query)
-                return "refreshed"
+                return self._run_refresh_adapter(record, lambda: self.google_news_search(record.query, force=True))
             if record.scope == "jobs" and record.query:
                 if record.cache_key.startswith("arbeitnow:"):
-                    self.arbeitnow_jobs(record.query)
+                    return self._run_refresh_adapter(record, lambda: self.arbeitnow_jobs(record.query, force=True))
                 elif record.cache_key.startswith("remoteok:"):
-                    self.remoteok_jobs(record.query)
-                else:
-                    self.remotive_jobs(record.query)
-                return "refreshed"
+                    return self._run_refresh_adapter(record, lambda: self.remoteok_jobs(record.query, force=True))
+                return self._run_refresh_adapter(record, lambda: self.remotive_jobs(record.query, force=True))
             if record.scope == "tax" and record.cache_key == "india-income-tax-regimes":
-                self.tax_regime_reference()
-                return "refreshed"
+                return self._run_refresh_adapter(record, lambda: self.tax_regime_reference(force=True))
             if record.scope == "tax" and record.cache_key == "india-nps-tax-benefit":
-                self.nps_tax_reference()
-                return "refreshed"
+                return self._run_refresh_adapter(record, lambda: self.nps_tax_reference(force=True))
             if record.scope == "tax" and record.cache_key == "india-ppf-reference":
-                self.ppf_reference()
-                return "refreshed"
-        except Exception:
+                return self._run_refresh_adapter(record, lambda: self.ppf_reference(force=True))
+        except Exception as exc:
+            fallback_status = "stale" if record.status == "fresh" else record.status
+            self._record_refresh_observation(record, "failed", str(exc), record_status=fallback_status)
             return "failed"
+        self._record_refresh_observation(record, "skipped", "No refresh adapter is registered for this evidence record.")
         return "skipped"
+
+    def _run_refresh_adapter(self, record: VerifiedExternalInsight, refresh_call) -> str:
+        try:
+            result = refresh_call()
+        except Exception as exc:
+            fallback_status = "stale" if record.status == "fresh" else record.status
+            self._record_refresh_observation(record, "failed", str(exc), record_status=fallback_status)
+            return "failed"
+        outcome, note = self._refresh_outcome_from_result(result)
+        if outcome == "refreshed":
+            self._record_refresh_observation(record, "refreshed", "", success=True)
+        elif outcome == "skipped":
+            self._record_refresh_observation(record, "skipped", note)
+        else:
+            fallback_status = "stale" if record.status == "fresh" else record.status
+            self._record_refresh_observation(record, "failed", note, record_status=fallback_status)
+        return outcome
+
+    def _refresh_outcome_from_result(self, result) -> tuple[str, str]:
+        if not isinstance(result, InsightResult):
+            return "refreshed", ""
+        evidence = result.evidence or {}
+        status = evidence.get("status") or ""
+        notes = evidence.get("notes") or evidence.get("summary") or ""
+        if status == "fresh":
+            return ("skipped" if result.cached else "refreshed"), notes
+        if "circuit breaker" in notes.lower() or "paused by the circuit" in notes.lower():
+            return "skipped", notes
+        return "failed", notes
+
+    def _record_refresh_observation(
+        self,
+        record: VerifiedExternalInsight,
+        refresh_status: str,
+        error_message: str = "",
+        *,
+        success: bool = False,
+        record_status: str | None = None,
+    ) -> None:
+        now = timezone.now()
+        record.last_refresh_attempt_at = now
+        record.last_refresh_status = refresh_status[:32]
+        record.last_refresh_error = "" if refresh_status == "refreshed" else (error_message or "")[:1000]
+        update_fields = ["last_refresh_attempt_at", "last_refresh_status", "last_refresh_error"]
+        if success:
+            record.last_refresh_success_at = now
+            update_fields.append("last_refresh_success_at")
+        if record_status:
+            record.status = record_status
+            update_fields.append("status")
+        record.save(update_fields=update_fields)
+
+    def _increment_refresh_scope(self, per_scope: dict, scope: str, outcome: str, *, processed: bool = True) -> None:
+        bucket = per_scope.setdefault(
+            scope,
+            {
+                "scope": scope,
+                "processed": 0,
+                "refreshed": 0,
+                "skipped": 0,
+                "failed": 0,
+            },
+        )
+        if processed:
+            bucket["processed"] += 1
+        if outcome == "refreshed":
+            bucket["refreshed"] += 1
+        elif outcome == "failed":
+            bucket["failed"] += 1
+        elif outcome == "skipped":
+            bucket["skipped"] += 1
+        else:
+            bucket["failed"] += 1
+
+    def _refresh_record_outcome(self, record: VerifiedExternalInsight, outcome: str, reason: str = "") -> dict:
+        return {
+            "id": record.id,
+            "scope": record.scope,
+            "cache_key": record.cache_key,
+            "source_name": record.source_name,
+            "status": outcome,
+            "reason": reason or record.last_refresh_error,
+        }
 
     def _circuit_cache_key(self, scope: str, cache_key: str, source_url: str) -> str:
         digest = hashlib.sha256(f"{scope}|{cache_key}|{source_url}".encode("utf-8")).hexdigest()[:24]

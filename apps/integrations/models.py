@@ -251,6 +251,10 @@ class VerifiedExternalInsight(models.Model):
     fetched_at = models.DateTimeField(default=timezone.now)
     verified_at = models.DateTimeField(default=timezone.now)
     stale_after = models.DateTimeField()
+    last_refresh_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_refresh_success_at = models.DateTimeField(null=True, blank=True)
+    last_refresh_status = models.CharField(max_length=32, blank=True)
+    last_refresh_error = models.TextField(blank=True)
     notes = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
 
@@ -260,6 +264,7 @@ class VerifiedExternalInsight(models.Model):
             models.Index(fields=["scope", "cache_key", "status"]),
             models.Index(fields=["user", "scope", "cache_key"]),
             models.Index(fields=["stale_after", "status"]),
+            models.Index(fields=["last_refresh_attempt_at", "last_refresh_status"], name="integration_last_re_8c70a1_idx"),
         ]
 
     def __str__(self):

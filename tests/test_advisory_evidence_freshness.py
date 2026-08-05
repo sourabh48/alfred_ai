@@ -72,6 +72,9 @@ class AdvisoryEvidenceFreshnessTests(TestCase):
         payload = response.json()
         self.assertEqual(payload["evidence_freshness"]["tracked_records"], 3)
         self.assertEqual(payload["evidence_freshness"]["fresh_records"], 3)
+        self.assertTrue(payload["proof_contract"]["complete"])
+        self.assertEqual(payload["proof_contract"]["refresh_contract"]["scheduled_refresh"], "refresh_due_records")
+        self.assertIn("OpenStreetMap Nominatim", payload["proof_contract"]["observed_sources"])
 
     def test_risk_outlook_exposes_evidence_freshness(self):
         with patch(
@@ -109,6 +112,8 @@ class AdvisoryEvidenceFreshnessTests(TestCase):
             payload["evidence_freshness"]["tracked_records"],
         )
         self.assertEqual(payload["grounding"]["freshness"], payload["evidence_freshness"])
+        self.assertTrue(payload["grounding"]["proof_contract"]["complete"])
+        self.assertEqual(payload["grounding"]["proof_contract"]["refresh_contract"]["scheduled_refresh"], "refresh_due_records")
         self.assertEqual(payload["grounding"]["history"]["tracked_snapshots"], 0)
         self.assertIn("External evidence grounds market and macro pressure only", payload["grounding"]["notes"][1])
 

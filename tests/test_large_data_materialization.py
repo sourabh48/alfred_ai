@@ -1,11 +1,20 @@
 from datetime import date
+from pathlib import Path
+import re
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import Client, TestCase
 from django.utils import timezone
 
+from alfred_ai.services.materialized_cache import (
+    MATERIALIZED_PAYLOAD_REGISTRY,
+    invalidate_user_materialized_payloads,
+    materialize_payload,
+    materialized_cache_health_snapshot,
+)
 from apps.behavioral.models import BehavioralSignal
 from apps.budgets.models import Budget
 from apps.career.models import CareerProfile
@@ -75,6 +84,8 @@ class LargeDataMaterializationTests(TestCase):
         self.assertEqual(refreshed.status_code, 200)
         self.assertFalse(refreshed.json()["_materialized"]["cached"])
         self.assertNotEqual(first_key, refreshed.json()["_materialized"]["cache_key"])
+        self.assertEqual(refreshed.json()["_materialized"]["invalidation_reason"], "revision_changed")
+        self.assertTrue(refreshed.json()["_materialized"]["stale_regenerated"])
 
     def test_evidence_heavy_dashboards_return_materialized_hits(self):
         with patch(
@@ -132,6 +143,121 @@ class LargeDataMaterializationTests(TestCase):
                 "tax-optimizer-overview",
             )
 
+    def test_materialized_metadata_standardizes_hit_miss_ttl_revision_and_latency(self):
+        first = materialize_payload(
+            namespace="budget-dashboard",
+            user_id=self.user.id,
+            revision="metadata-standard",
+            ttl_seconds=60,
+            builder=lambda: {"value": 1},
+        )
+        second = materialize_payload(
+            namespace="budget-dashboard",
+            user_id=self.user.id,
+            revision="metadata-standard",
+            ttl_seconds=60,
+            builder=lambda: {"value": 2},
+        )
+
+        first_meta = first["_materialized"]
+        second_meta = second["_materialized"]
+        self.assertFalse(first_meta["cached"])
+        self.assertEqual(first_meta["cache_status"], "miss")
+        self.assertEqual(first_meta["invalidation_reason"], "cold_start")
+        self.assertEqual(first_meta["ttl_seconds"], 60)
+        self.assertTrue(first_meta["generated_at"])
+        self.assertTrue(first_meta["expires_at"])
+        self.assertTrue(first_meta["served_at"])
+        self.assertTrue(first_meta["revision_key"])
+        self.assertEqual(first_meta["revision"], first_meta["revision_key"])
+        self.assertGreaterEqual(first_meta["generation_latency_ms"], 0)
+
+        self.assertEqual(second["value"], 1)
+        self.assertTrue(second_meta["cached"])
+        self.assertEqual(second_meta["cache_status"], "hit")
+        self.assertEqual(second_meta["cache_key"], first_meta["cache_key"])
+        self.assertEqual(second_meta["generated_at"], first_meta["generated_at"])
+        self.assertEqual(second_meta["expires_at"], first_meta["expires_at"])
+        self.assertEqual(second_meta["revision_key"], first_meta["revision_key"])
+        self.assertGreaterEqual(second_meta["generation_latency_ms"], 0)
+
+        health = materialized_cache_health_snapshot()
+        namespace = _namespace_row(health, "budget-dashboard")
+        self.assertEqual(namespace["requests"], 2)
+        self.assertEqual(namespace["hits"], 1)
+        self.assertEqual(namespace["misses"], 1)
+        self.assertEqual(namespace["hit_rate_pct"], 50.0)
+        self.assertEqual(namespace["observed_ttl_seconds"], 60)
+        self.assertEqual(namespace["last_cache_status"], "hit")
+
+    def test_revision_regeneration_and_user_invalidation_are_observable(self):
+        first = materialize_payload(
+            namespace="budget-dashboard",
+            user_id=self.user.id,
+            revision="revision-one",
+            ttl_seconds=60,
+            builder=lambda: {"value": 1},
+        )
+        regenerated = materialize_payload(
+            namespace="budget-dashboard",
+            user_id=self.user.id,
+            revision="revision-two",
+            ttl_seconds=60,
+            builder=lambda: {"value": 2},
+        )
+
+        self.assertFalse(regenerated["_materialized"]["cached"])
+        self.assertEqual(regenerated["_materialized"]["invalidation_reason"], "revision_changed")
+        self.assertTrue(regenerated["_materialized"]["stale_regenerated"])
+        health = materialized_cache_health_snapshot()
+        namespace = _namespace_row(health, "budget-dashboard")
+        self.assertEqual(namespace["stale_regenerations"], 1)
+        self.assertGreaterEqual(namespace["average_generation_latency_ms"], 0)
+
+        invalidate_user_materialized_payloads(self.user.id, reason="test_reset")
+        after_invalidation = materialized_cache_health_snapshot()
+        namespace = _namespace_row(after_invalidation, "budget-dashboard")
+        self.assertEqual(namespace["invalidations"], 1)
+        self.assertEqual(namespace["last_invalidation_reason"], "test_reset")
+        self.assertTrue(namespace["last_invalidation_at"])
+        self.assertEqual(after_invalidation["last_invalidation_reason"], "test_reset")
+        self.assertIsNone(cache.get(first["_materialized"]["cache_key"]))
+        self.assertIsNone(cache.get(regenerated["_materialized"]["cache_key"]))
+
+    def test_cache_health_snapshot_registers_all_materialized_namespaces(self):
+        materialize_payload(
+            namespace="budget-dashboard",
+            user_id=self.user.id,
+            revision="registry-check",
+            ttl_seconds=60,
+            builder=lambda: {"value": 1},
+        )
+
+        health = materialized_cache_health_snapshot()
+        registry_namespaces = {item["namespace"] for item in MATERIALIZED_PAYLOAD_REGISTRY}
+        snapshot_namespaces = {item["namespace"] for item in health["namespaces"]}
+
+        self.assertEqual(health["registered_namespace_count"], len(registry_namespaces))
+        self.assertTrue(registry_namespaces.issubset(snapshot_namespaces))
+        self.assertGreaterEqual(health["configured_ttl_coverage_pct"], 100.0)
+        self.assertFalse(health["production_mature"])
+        self.assertTrue(health["observability_ready"])
+        self.assertIn("materialized namespace(s) have runtime telemetry", health["summary"])
+
+    def test_cache_namespace_registry_matches_materialized_payload_call_sites(self):
+        source_namespaces = set()
+        for root_name in ("alfred_ai", "apps"):
+            for path in (Path(settings.BASE_DIR) / root_name).rglob("*.py"):
+                if path.name == "materialized_cache.py":
+                    continue
+                text = path.read_text(encoding="utf-8")
+                if "materialize_payload(" not in text:
+                    continue
+                source_namespaces.update(re.findall(r"namespace\s*=\s*[\"']([^\"']+)[\"']", text))
+
+        registry_namespaces = {item["namespace"] for item in MATERIALIZED_PAYLOAD_REGISTRY}
+        self.assertEqual(registry_namespaces, source_namespaces)
+
     def _assert_materialized_hit(self, path: str, namespace: str):
         first = self.client.get(path)
         second = self.client.get(path)
@@ -142,8 +268,18 @@ class LargeDataMaterializationTests(TestCase):
         second_meta = second.json()["_materialized"]
         self.assertEqual(first_meta["namespace"], namespace)
         self.assertFalse(first_meta["cached"])
+        self.assertEqual(first_meta["cache_status"], "miss")
         self.assertTrue(second_meta["cached"])
+        self.assertEqual(second_meta["cache_status"], "hit")
         self.assertEqual(first_meta["cache_key"], second_meta["cache_key"])
+        for meta in (first_meta, second_meta):
+            self.assertEqual(meta["revision"], meta["revision_key"])
+            self.assertTrue(meta["generated_at"])
+            self.assertTrue(meta["expires_at"])
+            self.assertTrue(meta["served_at"])
+            self.assertGreater(meta["ttl_seconds"], 0)
+            self.assertIn(meta["invalidation_reason"], {"cold_start", "revision_changed", "expired", "cache_hit"})
+            self.assertGreaterEqual(meta["generation_latency_ms"], 0)
 
     def _seed_history(self):
         Budget.objects.create(
@@ -241,3 +377,7 @@ def _insight(source_name: str):
             self.evidence = _evidence(source_name)
 
     return DummyInsight()
+
+
+def _namespace_row(snapshot: dict, namespace: str) -> dict:
+    return next(item for item in snapshot["namespaces"] if item["namespace"] == namespace)

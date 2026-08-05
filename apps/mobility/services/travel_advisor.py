@@ -5,7 +5,7 @@ from datetime import date
 from apps.mobility.models import BikeProfile
 from apps.mobility.services.bike_service_intelligence import bike_service_intelligence
 from apps.integrations.services import verified_intelligence
-from apps.integrations.services.verified_intelligence import freshness_snapshot
+from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 
 
 class TravelAdvisorService:
@@ -34,6 +34,7 @@ class TravelAdvisorService:
 
         feasibility = self._feasibility_message(per_day_budget, weather, transport_mode, duration_days)
         bike_readiness = self._bike_readiness(primary_bike, bike_summary)
+        evidence_freshness = freshness_snapshot(evidence)
 
         return {
             "destination_match": destination_match or {"display_name": destination, "latitude": None, "longitude": None},
@@ -50,7 +51,13 @@ class TravelAdvisorService:
                 "service_buffer": bike_readiness["suggested_service_buffer"],
             },
             "evidence": evidence,
-            "evidence_freshness": freshness_snapshot(evidence),
+            "evidence_freshness": evidence_freshness,
+            "proof_contract": proof_contract_payload(
+                evidence_items=evidence,
+                freshness=evidence_freshness,
+                required_sources=["OpenStreetMap Nominatim"] if destination else [],
+                advisory_surface="travel_advisor_preview",
+            ),
         }
 
     def _weather(self, location: dict, start_date: date, end_date: date, evidence: list[dict]) -> dict:

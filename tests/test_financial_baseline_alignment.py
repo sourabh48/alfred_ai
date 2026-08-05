@@ -323,6 +323,8 @@ class FinancialBaselineAlignmentTests(TestCase):
         self.assertEqual(family_payload["total_liabilities"], baseline["total_liabilities"])
         self.assertEqual(family_payload["grounding"]["history"]["current_net_worth"], baseline["net_worth"])
         self.assertEqual(family_payload["grounding"]["freshness"]["tracked_records"], 2)
+        self.assertTrue(family_payload["grounding"]["proof_contract"]["complete"])
+        self.assertEqual(family_payload["grounding"]["proof_contract"]["refresh_contract"]["scheduled_refresh"], "refresh_due_records")
 
     def test_credit_travel_and_alfred_brain_read_canonical_financial_baseline(self):
         Loan.objects.create(

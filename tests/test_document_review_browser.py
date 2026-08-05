@@ -1,18 +1,23 @@
+import json
 import os
+import tempfile
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.test import Client
 
+from apps.expenses.models import StatementUpload
 from apps.mobility.models import BikeDocument, BikeProfile, BikeServiceRecord
 
 
 RUN_BROWSER_TESTS = os.environ.get("ALFRED_RUN_BROWSER_TESTS", "").lower() in {"1", "true", "yes"}
 
 
-@unittest.skipUnless(RUN_BROWSER_TESTS, "Set ALFRED_RUN_BROWSER_TESTS=true to run Selenium document-review browser tests.")
+@unittest.skipUnless(RUN_BROWSER_TESTS, "Set ALFRED_RUN_BROWSER_TESTS=true to run Selenium browser workflow tests.")
 class DocumentReviewBrowserTests(StaticLiveServerTestCase):
     @classmethod
     def setUpClass(cls):
@@ -22,6 +27,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
             from selenium.common.exceptions import WebDriverException
             from selenium.common.exceptions import StaleElementReferenceException
             from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import Select
             from selenium.webdriver.support import expected_conditions as EC
             from selenium.webdriver.support.ui import WebDriverWait
         except ImportError as exc:
@@ -29,11 +35,13 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
 
         cls.By = By
         cls.EC = EC
+        cls.Select = Select
         cls.StaleElementReferenceException = StaleElementReferenceException
         cls.WebDriverWait = WebDriverWait
         cls.WebDriverException = WebDriverException
         cls.selenium = cls._create_driver(webdriver)
         cls.selenium.set_window_size(1440, 1200)
+        cls.selenium.set_script_timeout(18)
         cls.wait = WebDriverWait(cls.selenium, 18)
 
     @classmethod
@@ -74,6 +82,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         )
         if chrome_binary:
             chrome.binary_location = chrome_binary
+        chrome.set_capability("goog:loggingPrefs", {"browser": "ALL"})
 
         edge = EdgeOptions()
         for argument in (
@@ -91,8 +100,15 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         )
         if edge_binary:
             edge.binary_location = edge_binary
+        edge.set_capability("goog:loggingPrefs", {"browser": "ALL"})
 
-        return (("Chrome", chrome), ("Edge", edge))
+        candidates = (("Chrome", chrome), ("Edge", edge))
+        preferred = os.environ.get("ALFRED_BROWSER", "").strip().lower()
+        if preferred:
+            candidates = tuple((name, options) for name, options in candidates if name.lower() == preferred)
+            if not candidates:
+                raise unittest.SkipTest("ALFRED_BROWSER must be Chrome or Edge for Selenium browser tests.")
+        return candidates
 
     @staticmethod
     def _first_existing(*paths):
@@ -223,6 +239,27 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
             source_mode="bill_import",
         )
 
+    def tearDown(self):
+        self._disable_live_refresh_timers()
+        super().tearDown()
+
+    def run(self, result=None):
+        if result is None:
+            return super().run(result)
+        failures_before = len(result.failures)
+        errors_before = len(result.errors)
+        super().run(result)
+        if len(result.failures) > failures_before or len(result.errors) > errors_before:
+            self._capture_browser_artifacts()
+        return result
+
+    def test_login_statement_upload_vehicle_setup_and_dashboard_refresh_browser_workflow(self):
+        self._login_browser()
+
+        self._prove_dashboard_live_refresh()
+        self._upload_statement_from_document_center()
+        self._submit_vehicle_setup_form()
+
     def test_vehicle_invoice_overlay_candidate_buttons_fill_and_save_correction(self):
         self._login_browser()
         self._install_review_queue_harness()
@@ -309,6 +346,242 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self.selenium.find_element(self.By.ID, "id_password").send_keys("Pass12345!")
         self.selenium.find_element(self.By.CSS_SELECTOR, "button[type='submit']").click()
         self.wait.until(lambda driver: driver.execute_script("return document.body.dataset.authenticated") == "true")
+        self._install_authenticated_session_cookie()
+
+    def _install_authenticated_session_cookie(self):
+        client = Client()
+        client.force_login(self.user)
+        self.selenium.get(f"{self.live_server_url}/dashboard/")
+        self.selenium.add_cookie(
+            {
+                "name": settings.SESSION_COOKIE_NAME,
+                "value": client.cookies[settings.SESSION_COOKIE_NAME].value,
+                "path": "/",
+            }
+        )
+        self.selenium.get(f"{self.live_server_url}/dashboard/")
+        self.wait.until(lambda driver: driver.execute_script("return document.body.dataset.authenticated") == "true")
+
+    def _prove_dashboard_live_refresh(self):
+        self.selenium.get(f"{self.live_server_url}/dashboard/")
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, "dashboardRoot")))
+        self.wait.until(lambda driver: driver.execute_script("return Boolean(window.Alfred && window.loadDashboard);"))
+
+        result = self.selenium.execute_async_script(
+            """
+            const done = arguments[arguments.length - 1];
+            window.Chart = window.Chart || function() {
+                this.destroy = function() {};
+            };
+            const originalFetchJSON = window.Alfred.fetchJSON;
+            const urls = [];
+            window.Alfred.fetchJSON = function(url, options = {}) {
+                urls.push(String(url));
+                return originalFetchJSON(url, options);
+            };
+            Promise.resolve(window.loadDashboard({ live: true }))
+                .then(() => done({
+                    ok: true,
+                    urls,
+                    healthScore: document.getElementById("healthScoreValue")?.textContent || "",
+                }))
+                .catch(error => done({ ok: false, error: error.message || String(error), urls }));
+            """
+        )
+        self.assertTrue(result["ok"], result)
+        self.assertIn("/api/expenses/dashboard/", result["urls"])
+        self.wait.until(lambda driver: driver.find_element(self.By.ID, "dashboardRoot").is_displayed())
+
+    def _upload_statement_from_document_center(self):
+        self._install_statement_upload_harness()
+
+        upload_path = ""
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as statement:
+                statement.write(b"%PDF-1.7 truncated browser statement")
+                upload_path = statement.name
+
+            self.Select(self.selenium.find_element(self.By.ID, "documentStatementKind")).select_by_value("bank_statement")
+            self.selenium.find_element(self.By.ID, "documentStatementFile").send_keys(upload_path)
+            submit = self.selenium.find_element(self.By.CSS_SELECTOR, "#documentStatementForm button[type='submit']")
+            self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center'});", submit)
+            try:
+                submit.click()
+            except self.WebDriverException:
+                self.selenium.execute_script("arguments[0].click();", submit)
+
+            file_name = Path(upload_path).name
+            self.wait.until(lambda driver: StatementUpload.objects.filter(user=self.user, file_name=file_name).exists())
+            upload = StatementUpload.objects.get(user=self.user, file_name=file_name)
+            self.assertIn(upload.parser_status, {"parsed", "needs_review", "failed"})
+        finally:
+            if upload_path:
+                try:
+                    Path(upload_path).unlink(missing_ok=True)
+                except PermissionError:
+                    pass
+
+    def _install_statement_upload_harness(self):
+        self.wait.until(lambda driver: driver.execute_script("return Boolean(window.Alfred)"))
+        self.selenium.execute_script(
+            """
+            document.body.innerHTML = `
+                <main class="container-fluid alfred-layout">
+                    <section id="documentCenterRoot"></section>
+                    <form id="documentStatementForm" class="soft-grid" enctype="multipart/form-data">
+                        <select id="documentStatementKind" name="statement_kind" class="form-select">
+                            <option value="">Auto detect</option>
+                            <option value="bank_statement">Bank Statement</option>
+                            <option value="credit_card_statement">Credit Card Statement</option>
+                            <option value="loan_statement">Loan Statement</option>
+                            <option value="investment_statement">Investment Statement</option>
+                            <option value="other_statement">Other Statement</option>
+                        </select>
+                        <input id="documentStatementFile" name="statement" type="file" class="form-control" accept=".pdf,application/pdf" multiple required>
+                        <div id="documentStatementFeedback" class="d-none alert mb-0"></div>
+                        <button class="btn btn-primary" type="submit">Upload Statements</button>
+                    </form>
+                </main>
+            `;
+            window.__statementUploadHarnessReady = false;
+            window.__statementUploadHarnessError = "";
+            const installHarness = () => {
+                try {
+                    window.loadDocumentCenter = function() {
+                        window.__statementUploadRefreshCalled = true;
+                        return Promise.resolve();
+                    };
+                    const handler = window.submitStatementUpload || submitStatementUpload;
+                    document.getElementById("documentStatementForm").addEventListener("submit", handler);
+                    window.__statementUploadHarnessReady = true;
+                } catch (error) {
+                    window.__statementUploadHarnessError = error.message || String(error);
+                }
+            };
+            if (typeof submitStatementUpload === "function") {
+                installHarness();
+            } else {
+                const script = document.createElement("script");
+                script.src = "/static/js/documents.js?v=2.3";
+                script.onload = installHarness;
+                script.onerror = () => { window.__statementUploadHarnessError = "documents.js failed to load"; };
+                document.head.appendChild(script);
+            }
+            """
+        )
+        self.wait.until(
+            lambda driver: driver.execute_script(
+                "return window.__statementUploadHarnessReady === true || Boolean(window.__statementUploadHarnessError);"
+            )
+        )
+        error = self.selenium.execute_script("return window.__statementUploadHarnessError || '';")
+        if error:
+            self.fail(error)
+
+    def _submit_vehicle_setup_form(self):
+        self.selenium.get(f"{self.live_server_url}/bike-service/")
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, "bikeProfileForm")))
+        self.wait.until(lambda driver: driver.execute_script("return Boolean(window.Alfred && window.submitBikeProfile);"))
+        self.selenium.execute_script("window.Alfred.disableLiveRefresh && window.Alfred.disableLiveRefresh('bike-service-live');")
+
+        display_name = "Selenium Honda Dio"
+        self.Select(self.selenium.find_element(self.By.ID, "bikeProfileVehicleType")).select_by_value("scooter")
+        self._replace_field("bikeCatalogMakeSelect", "Honda")
+        self._replace_field("bikeProfileDisplayName", display_name)
+        self._replace_field("bikeProfileModelName", "Dio")
+        self._replace_field("bikeProfileVehicleNumber", "KA05BR1234")
+        self.Select(self.selenium.find_element(self.By.ID, "bikeProfileClass")).select_by_value("scooter")
+        self._replace_field("bikeProfileMileage", "48")
+
+        submit = self.selenium.find_element(self.By.ID, "bikeProfileSubmit")
+        self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center'});", submit)
+        try:
+            submit.click()
+        except self.WebDriverException:
+            self.selenium.execute_script("arguments[0].click();", submit)
+
+        self.wait.until(lambda driver: BikeProfile.objects.filter(user=self.user, display_name=display_name).exists())
+        profile = BikeProfile.objects.get(user=self.user, display_name=display_name)
+        self.assertEqual(profile.make, "Honda")
+        self.assertEqual(profile.model_name, "Dio")
+        self.assertEqual(profile.vehicle_type, "scooter")
+
+    def _replace_field(self, element_id, value):
+        element = self.wait.until(self.EC.presence_of_element_located((self.By.ID, element_id)))
+        element.clear()
+        element.send_keys(value)
+
+    def _capture_browser_artifacts(self):
+        driver = getattr(self, "selenium", None)
+        if not driver:
+            return
+
+        artifact_dir = Path(os.environ.get("ALFRED_BROWSER_ARTIFACT_DIR", "artifacts/browser"))
+        if not artifact_dir.is_absolute():
+            artifact_dir = Path.cwd() / artifact_dir
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        safe_name = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in self.id())[-150:]
+        stem = f"{timestamp}-{safe_name}"
+        notes = []
+
+        try:
+            driver.save_screenshot(str(artifact_dir / f"{stem}.png"))
+        except Exception as exc:
+            notes.append(f"screenshot failed: {exc}")
+
+        try:
+            (artifact_dir / f"{stem}.html").write_text(driver.page_source or "", encoding="utf-8")
+        except Exception as exc:
+            notes.append(f"page source failed: {exc}")
+
+        try:
+            browser_logs = driver.get_log("browser")
+            (artifact_dir / f"{stem}.browser.log").write_text(
+                "\n".join(json.dumps(item, sort_keys=True) for item in browser_logs),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            notes.append(f"browser log unavailable: {exc}")
+
+        metadata = {
+            "test": self.id(),
+            "captured_at_utc": datetime.now(timezone.utc).isoformat(),
+            "current_url": "",
+            "title": "",
+            "notes": notes,
+        }
+        try:
+            metadata["current_url"] = driver.current_url
+            metadata["title"] = driver.title
+        except Exception as exc:
+            metadata["notes"].append(f"metadata failed: {exc}")
+        try:
+            (artifact_dir / f"{stem}.json").write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
+        except Exception:
+            return
+
+    def _disable_live_refresh_timers(self):
+        driver = getattr(self, "selenium", None)
+        if not driver:
+            return
+        try:
+            driver.execute_script(
+                """
+                if (window.Alfred && window.Alfred.disableLiveRefresh) {
+                    [
+                        "dashboard-live",
+                        "documents-live",
+                        "bike-service-live",
+                        "project-details-live",
+                        "expenses-live",
+                    ].forEach(key => window.Alfred.disableLiveRefresh(key));
+                }
+                """
+            )
+        except Exception:
+            return
 
     def _install_review_queue_harness(self):
         self.wait.until(lambda driver: driver.execute_script("return Boolean(window.Alfred)"))

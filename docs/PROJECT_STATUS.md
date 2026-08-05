@@ -18,6 +18,7 @@
 - project-details learning progress now refreshes live through a dedicated JSON endpoint instead of only on full page loads
 - project-details in-progress progress bars now bind to named learning tracks instead of sorted positions, preventing progress drift as module maturity changes
 - live-refresh pages now use interaction guards and selective DOM updates so active forms and dropdowns are not torn down every second
+- browser interaction coverage now has a dedicated Selenium runner, a CI browser workflow, `browser_regression_summary.json` proof records, and failure artifacts for screenshots, page HTML, metadata, and browser logs where supported
 - heavy finance, mobility, bike-service, and career dashboard reads now use cache-aware materialized payloads keyed to data revisions
 - investment summary, allocation, and growth reads now also use cache-aware materialized payloads keyed to portfolio revision
 - the shared `tests/` package is now discoverable by default so the normal `manage.py test` command runs the suite instead of silently skipping it
@@ -116,7 +117,7 @@
 - visual OCR overlays and richer field-level review inputs for unknown or messy document formats
 - deeper verification for more user-entered data outside mobility
 - stronger test coverage
-- broader live-browser verification across more pages even after the interaction-safe refresh changes
+- broader live-browser verification across more pages after the Selenium runner keeps recording required-browser Chrome or Edge runs with zero skipped browser tests in local and CI jobs
 - official bureau integrations with consent flow if real CIBIL/Experian/Equifax/CRIF pulls are required
 - broader live job-source coverage beyond the current Remotive feed and current public-page adapters
 - richer market/career/risk modeling than the current lightweight signal blending
@@ -128,7 +129,7 @@
 
 ## Risks Remaining
 
-- browser-only issues can still exist where no live frontend interaction pass was run
+- browser-only issues can still exist where no driver-backed Selenium pass was recorded; normal test runs still skip browser tests unless `ALFRED_RUN_BROWSER_TESTS=true`, and full UI maturity still needs repeated no-skip browser summaries from local or CI jobs
 - selective fragment refresh now prevents most interaction resets, but any remaining page that still swaps whole DOM blocks in-browser could regress until it gets the same treatment
 - some external sources are authoritative APIs, but market data still relies on Yahoo Finance
 - multiple-vehicle support is structurally improved, but some naming remains bike-centric in code paths for backward compatibility

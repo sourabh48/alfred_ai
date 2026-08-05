@@ -20,30 +20,33 @@ ALFRED is a Django application that turns personal financial records into one wo
 | Loans and foreclosure reconciliation | Working |
 | Credit report upload and tradeline sync | Working |
 | Investments manual + PDF intake | Working |
-| Career source coverage | 88% - current resume, recruiter/JD, multi-feed jobs, job-page adapter, and geography-aware compensation scope is implemented, but real salary/outcome breadth still needs growth |
-| Shared document review / retry flow | 91% - parser confidence, schema-aware OCR candidates, ChatGPT context import, cross-family unknown-layout fixtures, accepted correction outcomes, retry learning, tougher service-invoice recovery, and Selenium-proven vehicle OCR correction are implemented; long-tail layouts and more browser paths still need real samples |
-| External proof and freshness | 90% - required-source proof contracts, freshness metadata, circuit breakers, stale fallback, and scheduled-refresh contracts are active; due/stale evidence still needs refresh monitoring |
-| UI polish and responsive shell | 58% - live-server smoke coverage, static/form contracts, the guarded vehicle catalog picker, and Selenium vehicle invoice/OCR overlay correction are active; broader browser interaction coverage still needs expansion |
-| Mobility vehicle catalog and service intelligence | 88% - supported India consumer-vehicle seed scope has 80 source-linked models across 32 manufacturers, route-aware wear guidance, and service-cost learning; not exhaustive |
+| Career source coverage | 88% - current resume, recruiter/JD, multi-feed jobs, job-page adapter, geography-aware compensation, specialty-source gap policy, and salary-bearing outcome tracking are implemented, but accepted/rejected salary outcome breadth still needs growth |
+| Shared document review / retry flow | 91% - parser confidence, schema-aware OCR candidates, ChatGPT context import, cross-family unknown-layout fixtures, accepted correction outcomes, retry learning, tougher service-invoice recovery, and Selenium-proven vehicle OCR correction are implemented; real unknown layouts and validated correction outcomes must keep growing before field-level learning is mature |
+| External proof and freshness | 90% - required-source proof contracts now cover current recommendation and relationship-adjacent surfaces, freshness metadata, circuit breakers, stale fallback, scheduled-refresh contracts, and refresh-health observability; due/stale evidence still needs healthy scheduled runs and source upkeep |
+| UI polish and responsive shell | 70-72% - live-server smoke coverage, static/form contracts, login, statement upload, vehicle setup, dashboard live refresh, core form wiring, the guarded vehicle catalog picker, a dedicated Selenium runner, CI browser workflow, run-summary proof, and browser failure artifacts are active; the higher value appears only after a required-browser no-skip summary is recorded, and full UI maturity still depends on repeated healthy driver-backed execution plus broader real interaction depth |
+| Mobility vehicle catalog and service intelligence | 88% - supported India consumer-vehicle seed scope has 80 source-linked models across 32 manufacturers, route-aware wear guidance, source-refresh policy tracking, and service-cost learning; long-tail models, condition snapshots, and resolved/costed issue outcomes still need real usage growth |
 | ML-assisted features | 76% - production-ready supervised model counts exclude the planned future RL learner; broader ML maturity is capped by confidence, data volume, artifact freshness, and heuristic fallbacks |
-| Production hardening | 84% - heavy dashboard materialization exists for the current app scope; production cache sizing, TTL tuning, and observability remain open |
+| Production hardening | 88% - heavy dashboard materialization and cache health observability cover the current app scope; production cache sizing and TTL tuning still need real traffic |
 
 ## Verification Snapshot
 
-Last verified locally on 31 July 2026.
+Last verified locally on 5 August 2026.
 
 | Scope | Verified state |
 | --- | --- |
 | Project tracker | Broad product areas now stay in In Progress until implementation, data maturity, and browser verification are all strong enough |
 | Scope completion | 80% in the current local snapshot; this is the average maturity across active broad product scopes |
 | Verified complete checks | Backend/API regression baseline, vehicle make/model picker fix, and supervised model refresh are the only 100% entries |
-| Vehicle maintenance learning | 88% - current catalog, route-aware maintenance, service-cost learning, and brand-filtered selection are implemented, but long-tail models, source upkeep automation, condition snapshots, and real issue outcomes still matter |
+| Vehicle maintenance learning | 88% - current catalog, route-aware maintenance, service-cost learning, source freshness metadata, and brand-filtered selection are implemented, but long-tail models, source upkeep automation, condition snapshots, and real issue outcomes still matter |
 | Vehicle catalog UI | One Make / Brand combobox submits the actual `make` value; Official Catalog Model is populated only after a make is selected and is guarded from live-refresh re-render while the user is choosing |
 | Catalog API | `/api/mobility/bike-models/catalog/` supports `vehicle_type` plus `make`, `brand`, or `manufacturer` filters |
 | ChatGPT context import | `/api/reports/chatgpt-imports/` and the document center accept pasted transcripts or ChatGPT JSON exports, then store detected module evidence for review |
 | Document OCR correction | Generic OCR candidates are mapped into scope-specific correction fields across statement, loan, loan-closure, investment, vehicle, resume, recruiter, and credit-report families; vehicle service invoices also recover label-collapsed compact rows such as embedded `Qty`, `Hrs`, `Amount`, and currency tokens |
 | Model training | 7/7 production-ready supervised model states are fresh and ready; 1 planned future RL learner is excluded from production-ready ML and supervised coverage |
-| Evidence watchlist | 1 stale, failed, rejected, or due verified evidence record in the current local data snapshot |
+| Advisory proof contracts | Current recommendation and relationship-adjacent surfaces declare source URL, stale-after, scheduled refresh, stale fallback, and circuit-breaker requirements before any new signal can be treated as mature |
+| Evidence watchlist | Project Details reports live stale, failed, rejected, and due verified evidence with per-scope refresh health, last attempt, and last success timestamps |
+| Materialized cache health | Project Details reports registered cache namespaces, hit/miss counts, TTL metadata, stale regeneration, invalidation reason, revision key, and generation latency |
+| Browser coverage | Project Details reports Selenium-gated interaction workflows, the dedicated runner, CI workflow, `browser_regression_summary.json`, screenshots/log artifacts, and always-on live-server contracts for login, uploads, dashboard refresh, vehicle setup, and core forms without calling the UI fully mature |
 
 The live tracker now separates narrow verified checks from broad product maturity. A 100% entry means that exact check is closed; it does not imply the surrounding product area is fully mature.
 
@@ -90,6 +93,7 @@ The live tracker now separates narrow verified checks from broad product maturit
 - focuses on investments and insurance for this workspace
 - credit card and personal loan suggestions are intentionally suppressed
 - all short-horizon fund watchlist items are ranked candidates, not guaranteed return claims
+- new recommendation or relationship-adjacent signals must extend the proof contract before they are counted as mature
 
 ## Home Loan Note
 
@@ -125,11 +129,14 @@ celery -A alfred_ai worker -l info
 celery -A alfred_ai beat -l info
 ```
 
+`refresh_verified_external_intelligence` calls `refresh_due_records`, which now records processed, refreshed, skipped, failed, per-scope watchlist, last-attempt, and last-success outcomes for Project Details.
+
 ## Large Data Hardening
 
 - budget, loan, net-worth, behavioral, risk, recommendation, tax, career, family, relationship, investment, and mobility dashboard payloads use cache-aware materialized summaries
-- materialized payloads include `_materialized` metadata with cache hit status, revision, generation time, and TTL
-- remaining production work is environment-specific cache sizing, TTL tuning, and observability
+- materialized payloads include `_materialized` metadata with cache hit/miss status, revision key, generation time, expiration time, TTL, invalidation reason, stale-regeneration flag, and generation latency
+- Project Details aggregates cache hit rate, stale regeneration, invalidation count, average generation latency, TTL coverage, and per-namespace status
+- remaining production work is environment-specific cache sizing and TTL tuning under real payload volume and concurrency
 
 ## ML Runtime
 
@@ -152,7 +159,7 @@ celery -A alfred_ai beat -l info
 - live official bureau pulls still need real partner integrations
 - market appreciation and property sale timing are not auto-guessed from the internet
 - deployment choices such as production database, cache, workers, and host settings still need environment-specific setup
-- full browser automation is not installed in this local environment; UI regression coverage currently uses Django live-server rendering, static-asset checks, form-contract checks, and backend/API functional tests
+- browser interaction coverage is implemented, but full UI maturity is gated until the dedicated Selenium runner repeatedly records Chrome or Edge runs without skipped browser tests or runner failures
 
 ## Test Commands
 
@@ -166,6 +173,28 @@ For focused UI and vehicle-service coverage:
 ```bash
 python manage.py test tests.test_live_ui_contracts tests.test_mobility_vehicle_dashboard tests.test_mobility_endpoint_contracts tests.test_project_details_live
 ```
+
+For Selenium-backed browser coverage, normal Django test runs keep the browser suite explicitly skipped unless `ALFRED_RUN_BROWSER_TESTS=true`:
+
+```bash
+python manage.py test tests.test_document_review_browser
+```
+
+To run the real browser job locally with Chrome and require driver-backed execution:
+
+```bash
+python scripts/run_browser_regressions.py --browser Chrome --require-browser
+```
+
+Use Edge instead when that is the installed browser:
+
+```bash
+python scripts/run_browser_regressions.py --browser Edge --require-browser
+```
+
+On browser failures, Selenium writes screenshots, page HTML, browser logs where supported, and metadata under `artifacts/browser` by default. Override it with `--artifact-dir path/to/artifacts` or `ALFRED_BROWSER_ARTIFACT_DIR`.
+
+Every browser runner invocation also writes `artifacts/browser/browser_regression_summary.json`. Project Details uses that file to show whether the latest required-browser local or CI run was driver-backed, how many Selenium tests were skipped, and whether the browser proof gate is recorded.
 
 For focused finance coverage:
 
