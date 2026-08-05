@@ -186,19 +186,30 @@ function renderBrowserCoverage(browserCoverage) {
     if (!container) {
         return;
     }
-    const health = browserCoverage.driver_run_health || {};
+    const proofSummary = browserCoverage.proof_summary || {};
+    const localProofs = Array.isArray(browserCoverage.local_proofs) ? browserCoverage.local_proofs : [];
+    const ciProofs = Array.isArray(browserCoverage.ci_proofs) ? browserCoverage.ci_proofs : [];
     const chips = [
         browserCoverage.implementation_status || "Implemented",
         browserCoverage.maturity_status || "Browser-driver gated",
-        `summary | ${browserCoverage.summary_artifact || health.summary_path || "not recorded"}`,
+        `CI summary | ${browserCoverage.ci_summary_artifact || "not recorded"}`,
         `artifacts | ${browserCoverage.artifact_dir || "artifacts/browser"}`,
         `workflow | ${browserCoverage.ci_workflow || ".github/workflows/browser-regression.yml"}`,
     ];
+    const proofRows = [...localProofs, ...ciProofs].map(proof => `
+        <div class="data-row">
+            <div class="data-label">${Alfred.escapeHtml(`${proof.expected_run_context === "ci" ? "CI" : "Local"} browser proof | ${proof.label || ""}`)}</div>
+            <div class="data-value">${Alfred.escapeHtml(proof.state || "missing")} <span class="muted small">${Alfred.escapeHtml(`${proof.summary_path || ""} | skips ${proof.skipped_count ?? "not recorded"}`)}</span></div>
+        </div>
+    `).join("");
     Alfred.setHTMLIfChanged(container, `
         <h3 class="compact-section-title">Browser Driver Proof</h3>
-        <p class="page-section-copy mb-2">${Alfred.escapeHtml(health.summary || "No browser regression summary has been recorded yet.")}</p>
+        <p class="page-section-copy mb-2">${Alfred.escapeHtml(proofSummary.summary || "No browser regression summary has been recorded yet.")}</p>
         <div class="chip-row">
             ${chips.map(item => `<span class="chip-neutral">${Alfred.escapeHtml(item)}</span>`).join("")}
+        </div>
+        <div class="data-stack mt-3">
+            ${proofRows || `<div class="empty-state">No browser proof lanes are configured yet.</div>`}
         </div>
     `);
 }

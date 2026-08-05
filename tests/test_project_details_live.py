@@ -7,23 +7,173 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import Client, TestCase
+from django.test import Client, SimpleTestCase, TestCase
 from django.utils import timezone
 
+from alfred_ai.project_details import _browser_regression_proof_snapshot
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.career.models import CareerResumeLearningMemory
 from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
 from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord
 
 
+def _browser_summary_payload(
+    *,
+    status: str = "passed",
+    browser: str = "Chrome",
+    run_context: str = "local",
+    skipped_count: int = 0,
+    tests_run_count: int = 2,
+    runner_return_code: int = 0,
+    require_browser: bool = True,
+    run_browser_tests_env: str = "true",
+    driver_backed_success: bool | None = None,
+) -> dict:
+    if driver_backed_success is None:
+        driver_backed_success = (
+            status == "passed"
+            and skipped_count == 0
+            and tests_run_count > 0
+            and runner_return_code == 0
+            and require_browser
+            and run_browser_tests_env.lower() in {"1", "true", "yes"}
+        )
+    return {
+        "summary_version": 1,
+        "status": status,
+        "browser": browser,
+        "run_context": run_context,
+        "require_browser": require_browser,
+        "run_browser_tests_env": run_browser_tests_env,
+        "runner_return_code": runner_return_code,
+        "return_code": 0 if runner_return_code == 0 else runner_return_code,
+        "skipped_count": skipped_count,
+        "tests_run_count": tests_run_count,
+        "tests_found_count": tests_run_count,
+        "driver_backed_success": driver_backed_success,
+        "duration_seconds": 14.8,
+        "finished_at_utc": "2026-08-05T01:00:00+00:00",
+    }
+
+
+class BrowserRegressionProofSnapshotTests(SimpleTestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        root = Path(self.tempdir.name)
+        self.local_chrome_summary_path = root / "local-chrome.json"
+        self.local_edge_summary_path = root / "local-edge.json"
+        self.ci_chrome_summary_path = root / "ci-chrome.json"
+        self.env = patch.dict(
+            os.environ,
+            {
+                "ALFRED_BROWSER_REGRESSION_SUMMARY": "",
+                "ALFRED_BROWSER_LOCAL_CHROME_SUMMARY": str(self.local_chrome_summary_path),
+                "ALFRED_BROWSER_LOCAL_EDGE_SUMMARY": str(self.local_edge_summary_path),
+                "ALFRED_BROWSER_CI_CHROME_SUMMARY": str(self.ci_chrome_summary_path),
+            },
+            clear=False,
+        )
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+        self.tempdir.cleanup()
+
+    def test_missing_browser_summary_state(self):
+        snapshot = _browser_regression_proof_snapshot()
+
+        self.assertEqual(snapshot["state"], "missing")
+        self.assertFalse(snapshot["local_gate_recorded"])
+        self.assertFalse(snapshot["ci_gate_recorded"])
+        self.assertTrue(all(proof["state"] == "missing" for proof in snapshot["proofs"]))
+
+    def test_failed_browser_summary_state(self):
+        self.local_chrome_summary_path.write_text(
+            json.dumps(
+                _browser_summary_payload(
+                    status="failed",
+                    runner_return_code=1,
+                    driver_backed_success=False,
+                )
+            ),
+            encoding="utf-8",
+        )
+
+        snapshot = _browser_regression_proof_snapshot()
+
+        self.assertEqual(snapshot["state"], "failed")
+        self.assertEqual(snapshot["local_proofs"][0]["state"], "failed")
+        self.assertIn("runner returned non-zero", snapshot["local_proofs"][0]["blockers"])
+        self.assertFalse(snapshot["local_gate_recorded"])
+        self.assertFalse(snapshot["ci_gate_recorded"])
+
+    def test_skipped_browser_summary_state(self):
+        self.ci_chrome_summary_path.write_text(
+            json.dumps(
+                _browser_summary_payload(
+                    status="skipped",
+                    run_context="ci",
+                    skipped_count=2,
+                    runner_return_code=2,
+                    driver_backed_success=False,
+                )
+            ),
+            encoding="utf-8",
+        )
+
+        snapshot = _browser_regression_proof_snapshot()
+
+        self.assertEqual(snapshot["state"], "skipped")
+        self.assertEqual(snapshot["ci_proofs"][0]["state"], "skipped")
+        self.assertIn("browser tests skipped", snapshot["ci_proofs"][0]["blockers"])
+        self.assertFalse(snapshot["local_gate_recorded"])
+        self.assertFalse(snapshot["ci_gate_recorded"])
+
+    def test_local_passed_browser_summary_state_does_not_close_ci_gate(self):
+        self.local_edge_summary_path.write_text(
+            json.dumps(_browser_summary_payload(browser="Edge")),
+            encoding="utf-8",
+        )
+
+        snapshot = _browser_regression_proof_snapshot()
+
+        self.assertEqual(snapshot["state"], "local_passed")
+        self.assertTrue(snapshot["local_gate_recorded"])
+        self.assertFalse(snapshot["ci_gate_recorded"])
+        self.assertEqual(snapshot["latest_accepted"]["label"], "Local Edge")
+        self.assertIn("CI Chrome proof is still missing", snapshot["summary"])
+
+    def test_ci_passed_browser_summary_state_closes_ci_proof_without_full_ui_maturity(self):
+        self.ci_chrome_summary_path.write_text(
+            json.dumps(_browser_summary_payload(run_context="ci")),
+            encoding="utf-8",
+        )
+
+        snapshot = _browser_regression_proof_snapshot()
+
+        self.assertEqual(snapshot["state"], "ci_passed")
+        self.assertFalse(snapshot["local_gate_recorded"])
+        self.assertTrue(snapshot["ci_gate_recorded"])
+        self.assertFalse(snapshot["full_ui_mature"])
+        self.assertEqual(snapshot["latest_accepted"]["label"], "CI Chrome")
+        self.assertIn("CI Chrome browser proof is recorded", snapshot["summary"])
+
+
 class ProjectDetailsLiveTests(TestCase):
     def setUp(self):
         cache.clear()
         self.browser_summary_tempdir = tempfile.TemporaryDirectory()
-        self.browser_summary_path = Path(self.browser_summary_tempdir.name) / "browser_regression_summary.json"
+        self.local_chrome_summary_path = Path(self.browser_summary_tempdir.name) / "local-chrome.json"
+        self.local_edge_summary_path = Path(self.browser_summary_tempdir.name) / "local-edge.json"
+        self.ci_chrome_summary_path = Path(self.browser_summary_tempdir.name) / "ci-chrome.json"
         self.browser_summary_env = patch.dict(
             os.environ,
-            {"ALFRED_BROWSER_REGRESSION_SUMMARY": str(self.browser_summary_path)},
+            {
+                "ALFRED_BROWSER_REGRESSION_SUMMARY": "",
+                "ALFRED_BROWSER_LOCAL_CHROME_SUMMARY": str(self.local_chrome_summary_path),
+                "ALFRED_BROWSER_LOCAL_EDGE_SUMMARY": str(self.local_edge_summary_path),
+                "ALFRED_BROWSER_CI_CHROME_SUMMARY": str(self.ci_chrome_summary_path),
+            },
             clear=False,
         )
         self.browser_summary_env.start()
@@ -189,7 +339,10 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertContains(response, "Cache Health By Namespace")
         self.assertContains(response, "Browser Driver Proof")
         self.assertContains(response, "Browser-driver gated")
-        self.assertContains(response, "No driver-backed browser regression summary has been recorded yet")
+        self.assertContains(response, "No local or CI driver-backed browser proof has been recorded yet")
+        self.assertContains(response, "Local browser proof")
+        self.assertContains(response, "CI browser proof")
+        self.assertContains(response, "CI summary")
         self.assertContains(response, "browser_regression_summary.json")
         self.assertContains(response, "login, document-center statement upload, vehicle setup submission, dashboard live refresh")
         self.assertContains(response, "full UI maturity is still not claimed")
@@ -278,10 +431,16 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertFalse(browser_coverage["full_ui_mature"])
         self.assertEqual(browser_coverage["execution_command"], "python scripts/run_browser_regressions.py --browser Chrome --require-browser")
         self.assertEqual(browser_coverage["edge_execution_command"], "python scripts/run_browser_regressions.py --browser Edge --require-browser")
+        self.assertEqual(browser_coverage["ci_execution_command"], "python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome")
         self.assertEqual(browser_coverage["ci_workflow"], ".github/workflows/browser-regression.yml")
         self.assertEqual(browser_coverage["artifact_dir"], "artifacts/browser")
-        self.assertTrue(browser_coverage["summary_artifact"].endswith("browser_regression_summary.json"))
+        self.assertEqual(len(browser_coverage["local_proofs"]), 2)
+        self.assertEqual(len(browser_coverage["ci_proofs"]), 1)
+        self.assertFalse(browser_coverage["proof_summary"]["local_gate_recorded"])
+        self.assertFalse(browser_coverage["proof_summary"]["ci_gate_recorded"])
+        self.assertEqual(browser_coverage["proof_summary"]["state"], "missing")
         self.assertIn("zero skipped browser tests", browser_coverage["remaining_gate"])
+        self.assertIn("CI Chrome proof", browser_coverage["remaining_gate"])
         browser_health = browser_coverage["driver_run_health"]
         self.assertEqual(browser_health["status"], "not_recorded")
         self.assertFalse(browser_health["maturity_gate_recorded"])
@@ -291,7 +450,8 @@ class ProjectDetailsLiveTests(TestCase):
         browser_metric = next(item for item in payload["operational_metrics"] if item["label"] == "Browser Coverage")
         self.assertEqual(browser_metric["value"], "70%")
         self.assertIn("run-summary proof", browser_metric["copy"])
-        self.assertIn("latest driver status: not_recorded", browser_metric["copy"])
+        self.assertIn("local proof: not accepted", browser_metric["copy"])
+        self.assertIn("CI Chrome proof: not accepted", browser_metric["copy"])
         self.assertIn(
             "Keep source links fresh, add long-tail models from real usage, and collect more condition snapshots plus issue outcomes before treating maintenance learning as mature.",
             payload["next_steps"],
@@ -302,27 +462,7 @@ class ProjectDetailsLiveTests(TestCase):
         )
 
     def test_project_details_surfaces_recorded_driver_backed_browser_run_without_full_ui_maturity(self):
-        self.browser_summary_path.write_text(
-            json.dumps(
-                {
-                    "summary_version": 1,
-                    "status": "passed",
-                    "browser": "Chrome",
-                    "run_context": "local",
-                    "require_browser": True,
-                    "run_browser_tests_env": "true",
-                    "runner_return_code": 0,
-                    "return_code": 0,
-                    "skipped_count": 0,
-                    "tests_run_count": 2,
-                    "tests_found_count": 2,
-                    "driver_backed_success": True,
-                    "duration_seconds": 14.8,
-                    "finished_at_utc": "2026-08-05T01:00:00+00:00",
-                }
-            ),
-            encoding="utf-8",
-        )
+        self.local_chrome_summary_path.write_text(json.dumps(_browser_summary_payload()), encoding="utf-8")
         self.client.force_login(self.superuser)
 
         payload = self.client.get("/api/project-details/").json()
@@ -333,8 +473,11 @@ class ProjectDetailsLiveTests(TestCase):
         browser_metric = next(item for item in payload["operational_metrics"] if item["label"] == "Browser Coverage")
 
         self.assertEqual(browser_coverage["progress"], 72)
-        self.assertEqual(browser_coverage["maturity_status"], "Driver proof recorded")
+        self.assertEqual(browser_coverage["maturity_status"], "Local proof recorded; CI gated")
         self.assertFalse(browser_coverage["full_ui_mature"])
+        self.assertTrue(browser_coverage["proof_summary"]["local_gate_recorded"])
+        self.assertFalse(browser_coverage["proof_summary"]["ci_gate_recorded"])
+        self.assertEqual(browser_coverage["proof_summary"]["state"], "local_passed")
         self.assertTrue(browser_health["recorded"])
         self.assertTrue(browser_health["maturity_gate_recorded"])
         self.assertEqual(browser_health["status"], "passed")
@@ -342,13 +485,46 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertEqual(browser_health["run_context"], "local")
         self.assertEqual(browser_health["skipped_count"], 0)
         self.assertEqual(browser_health["runner_return_code"], 0)
-        self.assertIn("Driver-backed proof is recorded", browser_health["summary"])
+        self.assertIn("This proof lane is accepted", browser_health["summary"])
         self.assertEqual(browser_track["progress"], 72)
-        self.assertEqual(browser_track["maturity_status"], "Driver proof recorded")
+        self.assertEqual(browser_track["maturity_status"], "Local proof recorded; CI gated")
         self.assertTrue(any("latest browser run: passed via local" in signal for signal in browser_track["signals"]))
         self.assertTrue(any("recorded browser skips: 0" in signal for signal in browser_track["signals"]))
+        self.assertTrue(any("local browser proof: recorded" in signal for signal in browser_track["signals"]))
+        self.assertTrue(any("CI Chrome proof: not accepted" in signal for signal in browser_track["signals"]))
         self.assertEqual(browser_metric["value"], "72%")
-        self.assertIn("latest driver status: passed", browser_metric["copy"])
+        self.assertIn("local proof: recorded", browser_metric["copy"])
+        self.assertIn("CI Chrome proof: not accepted", browser_metric["copy"])
+
+    def test_project_details_surfaces_ci_driver_backed_browser_run_as_ci_aware_progress(self):
+        self.local_edge_summary_path.write_text(
+            json.dumps(_browser_summary_payload(browser="Edge")),
+            encoding="utf-8",
+        )
+        self.ci_chrome_summary_path.write_text(
+            json.dumps(_browser_summary_payload(run_context="ci")),
+            encoding="utf-8",
+        )
+        self.client.force_login(self.superuser)
+
+        payload = self.client.get("/api/project-details/").json()
+        browser_coverage = payload["browser_coverage"]
+        in_progress_by_title = {item["title"]: item for item in payload["in_progress_tracks"]}
+        browser_track = in_progress_by_title["Browser/UI regression coverage"]
+        browser_metric = next(item for item in payload["operational_metrics"] if item["label"] == "Browser Coverage")
+
+        self.assertEqual(browser_coverage["progress"], 74)
+        self.assertEqual(browser_coverage["maturity_status"], "CI proof recorded")
+        self.assertFalse(browser_coverage["full_ui_mature"])
+        self.assertTrue(browser_coverage["proof_summary"]["local_gate_recorded"])
+        self.assertTrue(browser_coverage["proof_summary"]["ci_gate_recorded"])
+        self.assertEqual(browser_coverage["proof_summary"]["state"], "ci_passed")
+        self.assertEqual(browser_coverage["ci_proofs"][0]["state"], "passed")
+        self.assertEqual(browser_track["progress"], 74)
+        self.assertEqual(browser_track["maturity_status"], "CI proof recorded")
+        self.assertTrue(any("CI Chrome proof: recorded" in signal for signal in browser_track["signals"]))
+        self.assertEqual(browser_metric["value"], "74%")
+        self.assertIn("CI Chrome proof: recorded", browser_metric["copy"])
 
     def test_in_progress_tracks_follow_named_learning_tracks_not_sorted_positions(self):
         self.client.force_login(self.superuser)
@@ -446,11 +622,13 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertTrue(any("Selenium-gated workflow" in signal for signal in browser_track["signals"]))
         self.assertTrue(any("runner: python scripts/run_browser_regressions.py" in signal for signal in browser_track["signals"]))
         self.assertTrue(any("edge runner: python scripts/run_browser_regressions.py" in signal for signal in browser_track["signals"]))
+        self.assertTrue(any("CI runner: python scripts/run_browser_regressions.py" in signal for signal in browser_track["signals"]))
         self.assertTrue(any("artifacts: artifacts/browser" in signal for signal in browser_track["signals"]))
-        self.assertTrue(any("browser_regression_summary.json" in signal for signal in browser_track["signals"]))
+        self.assertTrue(any("browser_regression_summary.ci-chrome.json" in signal for signal in browser_track["signals"]))
         self.assertTrue(any("latest browser run: not_recorded" in signal for signal in browser_track["signals"]))
         self.assertTrue(any("full UI maturity is still not claimed" in signal for signal in browser_track["signals"]))
-        self.assertTrue(any("browser_regression_summary.json" in gate for gate in browser_track["maturity_gates"]))
+        self.assertTrue(any("browser_regression_summary.local-" in gate for gate in browser_track["maturity_gates"]))
+        self.assertTrue(any("browser_regression_summary.ci-chrome.json" in gate for gate in browser_track["maturity_gates"]))
         self.assertTrue(any("no skipped browser tests" in gate for gate in browser_track["maturity_gates"]))
         self.assertTrue(any("fails required-browser jobs" in gate for gate in browser_track["maturity_gates"]))
         self.assertTrue(any("screenshots, page HTML, metadata, and browser logs" in gate for gate in browser_track["maturity_gates"]))

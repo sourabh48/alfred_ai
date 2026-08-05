@@ -26,6 +26,34 @@ from .internal_clock import clock_snapshot
 
 
 BROWSER_REGRESSION_SUMMARY_FILENAME = "browser_regression_summary.json"
+BROWSER_REGRESSION_PROOF_SPECS = (
+    {
+        "key": "local_chrome",
+        "label": "Local Chrome",
+        "browser": "Chrome",
+        "run_context": "local",
+        "env": "ALFRED_BROWSER_LOCAL_CHROME_SUMMARY",
+        "default_path": "artifacts/browser/browser_regression_summary.local-chrome.json",
+        "fallback_env": "ALFRED_BROWSER_REGRESSION_SUMMARY",
+        "fallback_path": "artifacts/browser/browser_regression_summary.json",
+    },
+    {
+        "key": "local_edge",
+        "label": "Local Edge",
+        "browser": "Edge",
+        "run_context": "local",
+        "env": "ALFRED_BROWSER_LOCAL_EDGE_SUMMARY",
+        "default_path": "artifacts/browser-edge/browser_regression_summary.local-edge.json",
+    },
+    {
+        "key": "ci_chrome",
+        "label": "CI Chrome",
+        "browser": "Chrome",
+        "run_context": "ci",
+        "env": "ALFRED_BROWSER_CI_CHROME_SUMMARY",
+        "default_path": "artifacts/browser/browser_regression_summary.ci-chrome.json",
+    },
+)
 
 
 def _bounded_percent(value: float, *, default: int = 0) -> int:
@@ -43,16 +71,33 @@ def _progress(current: float, target: float, *, floor: int = 10, ceiling: int = 
     return _bounded_percent(max(floor, min(ceiling, round(floor + ((ceiling - floor) * ratio)))))
 
 
-def _browser_regression_summary_path() -> Path:
-    configured_path = os.environ.get("ALFRED_BROWSER_REGRESSION_SUMMARY", "").strip()
-    if configured_path:
-        path = Path(configured_path)
-    else:
-        artifact_dir = Path(os.environ.get("ALFRED_BROWSER_ARTIFACT_DIR", "artifacts/browser"))
-        path = artifact_dir / BROWSER_REGRESSION_SUMMARY_FILENAME
+def _project_path(path_value: str | Path) -> Path:
+    path = Path(path_value)
     if path.is_absolute():
         return path
     return Path(settings.BASE_DIR) / path
+
+
+def _browser_regression_summary_path(spec: dict | None = None) -> Path:
+    if spec is None:
+        spec = BROWSER_REGRESSION_PROOF_SPECS[0]
+    configured_path = os.environ.get(spec.get("env", ""), "").strip()
+    if configured_path:
+        return _project_path(configured_path)
+    default_path = _project_path(spec.get("default_path") or f"artifacts/browser/{BROWSER_REGRESSION_SUMMARY_FILENAME}")
+    if default_path.exists():
+        return default_path
+    fallback_env = spec.get("fallback_env")
+    if fallback_env:
+        fallback_configured = os.environ.get(fallback_env, "").strip()
+        if fallback_configured:
+            return _project_path(fallback_configured)
+    fallback_path = spec.get("fallback_path")
+    if fallback_path:
+        resolved_fallback = _project_path(fallback_path)
+        if resolved_fallback.exists():
+            return resolved_fallback
+    return default_path
 
 
 def _project_relative_path(path: Path) -> str:
@@ -69,26 +114,42 @@ def _as_int(value, default: int = 0) -> int:
         return default
 
 
-def _browser_regression_health_snapshot() -> dict:
-    path = _browser_regression_summary_path()
+def _browser_regression_health_snapshot(spec: dict | None = None) -> dict:
+    spec = spec or BROWSER_REGRESSION_PROOF_SPECS[0]
+    path = _browser_regression_summary_path(spec)
     summary_path = _project_relative_path(path)
+    label = spec.get("label") or "Browser"
+    expected_browser = str(spec.get("browser") or "").lower()
+    expected_context = str(spec.get("run_context") or "").lower()
     default = {
+        "key": spec.get("key") or "browser",
+        "label": label,
         "summary_path": summary_path,
         "summary_filename": BROWSER_REGRESSION_SUMMARY_FILENAME,
         "recorded": False,
         "maturity_gate_recorded": False,
+        "state": "missing",
         "status": "not_recorded",
         "browser": "not recorded",
         "run_context": "not recorded",
+        "expected_browser": spec.get("browser") or "",
+        "expected_run_context": spec.get("run_context") or "",
         "finished_at_utc": "",
         "duration_seconds": None,
         "skipped_count": None,
         "tests_run_count": None,
+        "tests_found_count": None,
         "runner_return_code": None,
         "driver_backed_success": False,
+        "browser_matches": False,
+        "context_matches": False,
         "require_browser": False,
+        "proof_label": "",
+        "artifact_contract": {},
+        "artifact_inventory": [],
+        "blockers": ["summary missing"],
         "summary": (
-            f"No driver-backed browser regression summary has been recorded yet; run "
+            f"No {label} browser regression summary has been recorded yet; run "
             f"`python scripts/run_browser_regressions.py --browser Chrome --require-browser` "
             f"to create {summary_path}."
         ),
@@ -101,7 +162,9 @@ def _browser_regression_health_snapshot() -> dict:
         default.update(
             {
                 "recorded": True,
+                "state": "failed",
                 "status": "invalid",
+                "blockers": ["summary unreadable"],
                 "summary": f"Browser regression summary is present but unreadable: {exc}",
             }
         )
@@ -109,31 +172,64 @@ def _browser_regression_health_snapshot() -> dict:
 
     skipped_count = _as_int(payload.get("skipped_count"), 0)
     tests_run_count = _as_int(payload.get("tests_run_count"), 0)
+    tests_found_count = _as_int(payload.get("tests_found_count"), 0)
     runner_return_code = _as_int(payload.get("runner_return_code"), 1)
+    browser = str(payload.get("browser") or "not recorded")
+    run_context = str(payload.get("run_context") or "not recorded")
+    browser_matches = not expected_browser or browser.lower() == expected_browser
+    context_matches = not expected_context or run_context.lower() == expected_context
+    require_browser = bool(payload.get("require_browser"))
+    run_browser_tests_env = str(payload.get("run_browser_tests_env", "")).lower()
     driver_backed_success = bool(payload.get("driver_backed_success")) and skipped_count == 0 and tests_run_count > 0
     maturity_gate_recorded = (
         driver_backed_success
         and runner_return_code == 0
-        and bool(payload.get("require_browser"))
-        and str(payload.get("run_browser_tests_env", "")).lower() in {"1", "true", "yes"}
+        and require_browser
+        and run_browser_tests_env in {"1", "true", "yes"}
+        and browser_matches
+        and context_matches
     )
-    browser = str(payload.get("browser") or "not recorded")
-    run_context = str(payload.get("run_context") or "not recorded")
     finished_at = str(payload.get("finished_at_utc") or "")
     status = str(payload.get("status") or ("passed" if maturity_gate_recorded else "failed"))
+    blockers = []
+    if runner_return_code != 0:
+        blockers.append("runner returned non-zero")
+    if skipped_count:
+        blockers.append("browser tests skipped")
+    if tests_run_count <= 0:
+        blockers.append("no browser tests ran")
+    if not require_browser:
+        blockers.append("required-browser mode was not used")
+    if run_browser_tests_env not in {"1", "true", "yes"}:
+        blockers.append("ALFRED_RUN_BROWSER_TESTS was not enabled")
+    if not browser_matches:
+        blockers.append(f"expected {spec.get('browser')} but summary recorded {browser}")
+    if not context_matches:
+        blockers.append(f"expected {spec.get('run_context')} but summary recorded {run_context}")
+    if not blockers and not maturity_gate_recorded:
+        blockers.append("driver-backed proof did not meet the maturity contract")
+    if maturity_gate_recorded:
+        state = "passed"
+    elif skipped_count:
+        state = "skipped"
+    elif status == "not_recorded":
+        state = "missing"
+    else:
+        state = "failed"
     summary = (
-        f"Latest {run_context} {browser} browser run recorded {status} with "
+        f"{label} proof read {summary_path}: latest {run_context} {browser} browser run recorded {status} with "
         f"{skipped_count} skipped test(s), {tests_run_count} test(s) run, and runner return code {runner_return_code}."
     )
     if maturity_gate_recorded:
-        summary += " Driver-backed proof is recorded; full UI maturity still needs repeated healthy local/CI runs and broader interaction depth."
+        summary += " This proof lane is accepted."
     else:
-        summary += " Driver-backed proof is not accepted until the summary shows a required-browser run with zero skips and a zero runner return code."
+        summary += " This proof lane is not accepted until the expected context/browser, required-browser mode, zero skips, and zero runner failures are recorded."
 
     return {
         **default,
         "recorded": True,
         "maturity_gate_recorded": maturity_gate_recorded,
+        "state": state,
         "status": status,
         "browser": browser,
         "run_context": run_context,
@@ -141,10 +237,61 @@ def _browser_regression_health_snapshot() -> dict:
         "duration_seconds": payload.get("duration_seconds"),
         "skipped_count": skipped_count,
         "tests_run_count": tests_run_count,
+        "tests_found_count": tests_found_count,
         "runner_return_code": runner_return_code,
         "driver_backed_success": driver_backed_success,
-        "require_browser": bool(payload.get("require_browser")),
+        "browser_matches": browser_matches,
+        "context_matches": context_matches,
+        "require_browser": require_browser,
+        "proof_label": str(payload.get("proof_label") or ""),
+        "artifact_contract": dict(payload.get("artifact_contract") or {}),
+        "artifact_inventory": list(payload.get("artifact_inventory") or []),
+        "blockers": blockers,
         "summary": summary,
+    }
+
+
+def _browser_regression_proof_snapshot() -> dict:
+    proofs = [_browser_regression_health_snapshot(spec) for spec in BROWSER_REGRESSION_PROOF_SPECS]
+    local_proofs = [proof for proof in proofs if proof["expected_run_context"] == "local"]
+    ci_proofs = [proof for proof in proofs if proof["expected_run_context"] == "ci"]
+    local_gate_recorded = any(proof["maturity_gate_recorded"] for proof in local_proofs)
+    ci_gate_recorded = any(proof["maturity_gate_recorded"] for proof in ci_proofs)
+    recorded_proofs = [proof for proof in proofs if proof["recorded"]]
+    accepted_proofs = [proof for proof in proofs if proof["maturity_gate_recorded"]]
+    latest_recorded = max(recorded_proofs, key=lambda item: item.get("finished_at_utc") or "") if recorded_proofs else proofs[0]
+    latest_accepted = max(accepted_proofs, key=lambda item: item.get("finished_at_utc") or "") if accepted_proofs else None
+    if ci_gate_recorded:
+        state = "ci_passed"
+    elif local_gate_recorded:
+        state = "local_passed"
+    elif any(proof["state"] == "failed" for proof in proofs):
+        state = "failed"
+    elif any(proof["state"] == "skipped" for proof in proofs):
+        state = "skipped"
+    else:
+        state = "missing"
+    if ci_gate_recorded:
+        summary = "CI Chrome browser proof is recorded with zero skipped tests; full UI maturity still needs repeated healthy CI runs and broader browser interaction depth."
+    elif local_gate_recorded:
+        summary = "Local Chrome or Edge browser proof is recorded, but CI Chrome proof is still missing before the driver-backed browser maturity gate can be treated as CI-healthy."
+    elif state == "skipped":
+        summary = "A browser proof summary was recorded with skipped Selenium tests, so required-browser maturity remains gated."
+    elif state == "failed":
+        summary = "A browser proof summary was recorded but did not pass the required browser contract."
+    else:
+        summary = "No local or CI driver-backed browser proof has been recorded yet."
+    return {
+        "state": state,
+        "summary": summary,
+        "local_gate_recorded": local_gate_recorded,
+        "ci_gate_recorded": ci_gate_recorded,
+        "full_ui_mature": False,
+        "proofs": proofs,
+        "local_proofs": local_proofs,
+        "ci_proofs": ci_proofs,
+        "latest_recorded": latest_recorded,
+        "latest_accepted": latest_accepted or latest_recorded,
     }
 
 
@@ -495,19 +642,31 @@ def project_details_payload(guardrails: dict) -> dict:
     )
     ml_maturity_progress = _bounded_percent(model_training.get("overall_progress", 0))
 
-    browser_run_health = _browser_regression_health_snapshot()
-    browser_ui_progress = 72 if browser_run_health["maturity_gate_recorded"] else 70
+    browser_proof = _browser_regression_proof_snapshot()
+    browser_ui_progress = 74 if browser_proof["ci_gate_recorded"] else 72 if browser_proof["local_gate_recorded"] else 70
+    if browser_proof["ci_gate_recorded"]:
+        browser_maturity_status = "CI proof recorded"
+    elif browser_proof["local_gate_recorded"]:
+        browser_maturity_status = "Local proof recorded; CI gated"
+    else:
+        browser_maturity_status = "Browser-driver gated"
     browser_coverage = {
         "progress": browser_ui_progress,
         "implementation_status": "Implemented",
-        "maturity_status": "Driver proof recorded" if browser_run_health["maturity_gate_recorded"] else "Browser-driver gated",
+        "maturity_status": browser_maturity_status,
         "full_ui_mature": False,
         "execution_command": "python scripts/run_browser_regressions.py --browser Chrome --require-browser",
         "edge_execution_command": "python scripts/run_browser_regressions.py --browser Edge --require-browser",
+        "ci_execution_command": "python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome",
         "ci_workflow": ".github/workflows/browser-regression.yml",
         "artifact_dir": "artifacts/browser",
-        "summary_artifact": browser_run_health["summary_path"],
-        "driver_run_health": browser_run_health,
+        "summary_artifact": browser_proof["latest_accepted"]["summary_path"],
+        "ci_summary_artifact": browser_proof["ci_proofs"][0]["summary_path"] if browser_proof["ci_proofs"] else "",
+        "local_summary_artifacts": [proof["summary_path"] for proof in browser_proof["local_proofs"]],
+        "driver_run_health": browser_proof["latest_accepted"],
+        "proof_summary": browser_proof,
+        "local_proofs": browser_proof["local_proofs"],
+        "ci_proofs": browser_proof["ci_proofs"],
         "selenium_workflows": [
             "login authentication",
             "dashboard live refresh",
@@ -525,7 +684,7 @@ def project_details_payload(guardrails: dict) -> dict:
         ],
         "remaining_gate": (
             "Selenium coverage is implemented, but UI maturity stays gated until required-browser local and CI "
-            "runs keep recording zero skipped browser tests, zero runner failures, and useful failure artifacts."
+            "runs keep recording zero skipped browser tests, zero runner failures, CI Chrome proof, and useful failure artifacts."
         ),
     }
     document_scope_progress = min(max(_bounded_percent(document_track.get("progress", 0)), 91), 94)
@@ -639,8 +798,8 @@ def project_details_payload(guardrails: dict) -> dict:
             "value": f"{browser_ui_progress}%",
             "copy": (
                 f"Selenium runner, CI workflow, failure artifacts, and run-summary proof are tracked; "
-                f"latest driver status: {browser_run_health['status']} with "
-                f"{browser_run_health['skipped_count'] if browser_run_health['skipped_count'] is not None else 'no'} recorded skip count."
+                f"local proof: {'recorded' if browser_proof['local_gate_recorded'] else 'not accepted'}, "
+                f"CI Chrome proof: {'recorded' if browser_proof['ci_gate_recorded'] else 'not accepted'}."
             ),
         },
         {
@@ -683,7 +842,7 @@ def project_details_payload(guardrails: dict) -> dict:
         "Pasted ChatGPT dashboard context is retained as reviewable source material before any live ALFRED records are changed.",
         "Heavy dashboards use revision-keyed materialized API payloads for budget, loan, net-worth, behavioral, risk, recommendation, tax, career, family, relationship, investment, and mobility paths.",
         "Materialized cache telemetry reports hit/miss, TTL, revision, invalidation reason, and generation latency by dashboard namespace before large-data maturity is raised.",
-        "Browser UI maturity remains gated: the Selenium runner and CI workflow can prove selected interactions with screenshots/logs on failure and a browser_regression_summary.json proof record, while live-server contracts keep login, uploads, dashboard refresh, vehicle setup, and form wiring covered by default.",
+        "Browser UI maturity remains gated: local Chrome/Edge and CI Chrome proof records are tracked separately, the Selenium runner and CI workflow can prove selected interactions with screenshots/logs on failure and browser_regression_summary.json records, while live-server contracts keep login, uploads, dashboard refresh, vehicle setup, and form wiring covered by default.",
     ]
 
     in_progress_tracks = [
@@ -692,9 +851,9 @@ def project_details_payload(guardrails: dict) -> dict:
             "progress": browser_ui_progress,
             "detail": (
                 "Django live-server rendering, static-asset checks, upload/form contracts, a dedicated Selenium runner, "
-                "CI browser workflow, failure artifacts, run-summary proof, and gated Selenium workflows now cover login, "
+                "CI browser workflow, failure artifacts, local Chrome/Edge proof, CI Chrome proof, run-summary proof, and gated Selenium workflows now cover login, "
                 "document-center statement upload, vehicle setup submission, dashboard live refresh, and the vehicle invoice/OCR overlay correction path. "
-                f"{browser_run_health['summary']}"
+                f"{browser_proof['summary']}"
             ),
             "maturity_status": browser_coverage["maturity_status"],
             "signals": [
@@ -702,15 +861,20 @@ def project_details_payload(guardrails: dict) -> dict:
                 f"{len(browser_coverage['live_server_contracts'])} live-server contract group(s)",
                 f"runner: {browser_coverage['execution_command']}",
                 f"edge runner: {browser_coverage['edge_execution_command']}",
+                f"CI runner: {browser_coverage['ci_execution_command']}",
                 f"artifacts: {browser_coverage['artifact_dir']}",
-                f"summary: {browser_coverage['summary_artifact']}",
-                f"latest browser run: {browser_run_health['status']} via {browser_run_health['run_context']}",
-                f"recorded browser skips: {browser_run_health['skipped_count'] if browser_run_health['skipped_count'] is not None else 'not recorded'}",
+                f"CI summary: {browser_coverage['ci_summary_artifact']}",
+                "CI summary filename: browser_regression_summary.ci-chrome.json",
+                f"local browser proof: {'recorded' if browser_proof['local_gate_recorded'] else 'not accepted'}",
+                f"CI Chrome proof: {'recorded' if browser_proof['ci_gate_recorded'] else 'not accepted'}",
+                f"latest browser run: {browser_proof['latest_recorded']['status']} via {browser_proof['latest_recorded']['run_context']}",
+                f"recorded browser skips: {browser_proof['latest_recorded']['skipped_count'] if browser_proof['latest_recorded']['skipped_count'] is not None else 'not recorded'}",
                 "login, statement upload, vehicle setup, dashboard refresh, and core form submissions are named",
                 "full UI maturity is still not claimed",
             ],
             "maturity_gates": [
-                "Selenium or equivalent browser-driver execution records browser_regression_summary.json in CI or an explicit local browser job with no skipped browser tests.",
+                "Local Chrome or Edge browser execution records browser_regression_summary.local-*.json with no skipped browser tests.",
+                "CI Chrome execution records browser_regression_summary.ci-chrome.json from the browser-regression workflow with no skipped browser tests.",
                 "The dedicated runner fails required-browser jobs when Selenium tests are skipped.",
                 "Live-server/static contracts keep covering the same workflows whenever browser drivers are unavailable.",
                 "Failure artifacts keep screenshots, page HTML, metadata, and browser logs available for failed browser runs.",

@@ -4,11 +4,14 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - ".github/workflows/browser-regression.yml"
       - "alfred_ai/**"
       - "apps/**"
       - "static/**"
       - "templates/**"
       - "tests/test_document_review_browser.py"
+      - "tests/test_browser_regression_runner.py"
+      - "tests/test_live_ui_contracts.py"
       - "scripts/run_browser_regressions.py"
       - "requirements.txt"
 
@@ -38,7 +41,7 @@ jobs:
         env:
           ALFRED_RUN_BROWSER_TESTS: "true"
           ALFRED_BROWSER_ARTIFACT_DIR: artifacts/browser
-        run: python scripts/run_browser_regressions.py --browser Chrome --require-browser
+        run: python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome
 
       - name: Upload browser artifacts
         if: always()

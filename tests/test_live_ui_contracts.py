@@ -313,8 +313,15 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn("runner_return_code", runner)
         self.assertIn("browser_regression_summary.json", runner)
         self.assertIn("tests_run_count", runner)
+        self.assertIn("proof_label", runner)
+        self.assertIn("artifact_contract", runner)
+        self.assertIn("failure_artifact_suffixes", runner)
 
-        self.assertIn("scripts/run_browser_regressions.py --browser Chrome --require-browser", workflow)
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("pull_request:", workflow)
+        self.assertIn(".github/workflows/browser-regression.yml", workflow)
+        self.assertIn("tests/test_browser_regression_runner.py", workflow)
+        self.assertIn("scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome", workflow)
         self.assertIn('ALFRED_RUN_BROWSER_TESTS: "true"', workflow)
         self.assertIn("browser-actions/setup-chrome", workflow)
         self.assertIn("actions/upload-artifact", workflow)
@@ -326,6 +333,8 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn("ALFRED_RUN_BROWSER_TESTS=true", readme)
         self.assertIn("ALFRED_BROWSER_ARTIFACT_DIR", browser_tests)
         self.assertIn("save_screenshot", browser_tests)
+        self.assertIn(".html", browser_tests)
+        self.assertIn(".browser.log", browser_tests)
         self.assertIn('get_log("browser")', browser_tests)
 
     def test_vehicle_setup_has_single_make_control_and_brand_filtered_model_picker(self):

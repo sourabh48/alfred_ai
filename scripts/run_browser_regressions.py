@@ -47,6 +47,10 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Return a non-zero status if Selenium tests are skipped, useful for CI browser jobs.",
     )
+    parser.add_argument(
+        "--proof-label",
+        help="Optional stable label for the browser proof summary, for example ci-chrome.",
+    )
     return parser.parse_args()
 
 
@@ -70,6 +74,8 @@ def main() -> int:
     print(f"ALFRED_BROWSER={env.get('ALFRED_BROWSER', 'Chrome then Edge')}")
     print(f"ALFRED_BROWSER_ARTIFACT_DIR={env['ALFRED_BROWSER_ARTIFACT_DIR']}")
 
+    run_context = current_run_context()
+    proof_label = args.proof_label or default_proof_label(args.browser or "Chrome then Edge", run_context)
     started_at = datetime.now(timezone.utc)
     started_perf = time.monotonic()
     process = subprocess.Popen(
@@ -103,6 +109,8 @@ def main() -> int:
         finished_at=finished_at,
         duration_seconds=time.monotonic() - started_perf,
         run_browser_tests_env=env["ALFRED_RUN_BROWSER_TESTS"],
+        run_context=run_context,
+        proof_label=proof_label,
     )
     summary_path = write_summary(artifact_dir, summary)
     print(f"Browser regression summary: {summary_path}")
@@ -128,6 +136,8 @@ def build_run_summary(
     finished_at: datetime,
     duration_seconds: float,
     run_browser_tests_env: str,
+    run_context: str | None = None,
+    proof_label: str | None = None,
 ) -> dict:
     skipped = skipped_count(output)
     tests_found = tests_found_count(output)
@@ -153,6 +163,13 @@ def build_run_summary(
         "test_labels": list(test_labels),
         "browser": browser,
         "artifact_dir": str(artifact_dir),
+        "artifact_contract": {
+            "summary_filename": SUMMARY_FILENAME,
+            "labeled_summary_filename": labeled_summary_filename(proof_label) if proof_label else "",
+            "failure_artifact_suffixes": [".png", ".html", ".browser.log", ".json"],
+            "upload_path": str(artifact_dir),
+        },
+        "artifact_inventory": collect_artifact_inventory(artifact_dir),
         "require_browser": require_browser,
         "run_browser_tests_env": run_browser_tests_env,
         "return_code": return_code,
@@ -161,7 +178,8 @@ def build_run_summary(
         "tests_run_count": tests_run,
         "skipped_count": skipped,
         "driver_backed_success": driver_backed_success,
-        "run_context": "ci" if os.environ.get("GITHUB_ACTIONS") == "true" else "local",
+        "run_context": run_context or current_run_context(),
+        "proof_label": proof_label or "",
         "started_at_utc": started_at.isoformat(),
         "finished_at_utc": finished_at.isoformat(),
         "duration_seconds": round(duration_seconds, 3),
@@ -172,7 +190,40 @@ def write_summary(artifact_dir: Path, summary: dict) -> Path:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     summary_path = artifact_dir / SUMMARY_FILENAME
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+    proof_label = str(summary.get("proof_label") or "").strip()
+    if proof_label:
+        labeled_path = artifact_dir / labeled_summary_filename(proof_label)
+        labeled_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
     return summary_path
+
+
+def current_run_context() -> str:
+    return "ci" if os.environ.get("GITHUB_ACTIONS") == "true" else "local"
+
+
+def default_proof_label(browser: str, run_context: str) -> str:
+    safe_browser = re.sub(r"[^a-z0-9]+", "-", str(browser or "browser").lower()).strip("-")
+    return f"{run_context}-{safe_browser or 'browser'}"
+
+
+def labeled_summary_filename(proof_label: str) -> str:
+    safe_label = re.sub(r"[^a-zA-Z0-9._-]+", "-", str(proof_label or "").strip()).strip(".-")
+    return f"browser_regression_summary.{safe_label or 'unlabeled'}.json"
+
+
+def collect_artifact_inventory(artifact_dir: Path) -> list[dict]:
+    if not artifact_dir.exists():
+        return []
+    artifacts = []
+    for path in sorted(artifact_dir.iterdir()):
+        if not path.is_file():
+            continue
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        artifacts.append({"file_name": path.name, "size_bytes": stat.st_size})
+    return artifacts
 
 
 def skipped_count(output: str) -> int:

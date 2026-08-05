@@ -23,7 +23,7 @@ ALFRED is a Django application that turns personal financial records into one wo
 | Career source coverage | 88% - current resume, recruiter/JD, multi-feed jobs, job-page adapter, geography-aware compensation, specialty-source gap policy, and salary-bearing outcome tracking are implemented, but accepted/rejected salary outcome breadth still needs growth |
 | Shared document review / retry flow | 91% - parser confidence, schema-aware OCR candidates, ChatGPT context import, cross-family unknown-layout fixtures, accepted correction outcomes, retry learning, tougher service-invoice recovery, and Selenium-proven vehicle OCR correction are implemented; real unknown layouts and validated correction outcomes must keep growing before field-level learning is mature |
 | External proof and freshness | 90% - required-source proof contracts now cover current recommendation and relationship-adjacent surfaces, freshness metadata, circuit breakers, stale fallback, scheduled-refresh contracts, and refresh-health observability; due/stale evidence still needs healthy scheduled runs and source upkeep |
-| UI polish and responsive shell | 70-72% - live-server smoke coverage, static/form contracts, login, statement upload, vehicle setup, dashboard live refresh, core form wiring, the guarded vehicle catalog picker, a dedicated Selenium runner, CI browser workflow, run-summary proof, and browser failure artifacts are active; the higher value appears only after a required-browser no-skip summary is recorded, and full UI maturity still depends on repeated healthy driver-backed execution plus broader real interaction depth |
+| UI polish and responsive shell | 70/72/74% - live-server smoke coverage, static/form contracts, login, statement upload, vehicle setup, dashboard live refresh, core form wiring, the guarded vehicle catalog picker, a dedicated Selenium runner, CI browser workflow, run-summary proof, and browser failure artifacts are active; 72% requires local Chrome or Edge no-skip proof, 74% requires CI Chrome no-skip proof, and full UI maturity still depends on repeated healthy driver-backed execution plus broader real interaction depth |
 | Mobility vehicle catalog and service intelligence | 88% - supported India consumer-vehicle seed scope has 80 source-linked models across 32 manufacturers, route-aware wear guidance, source-refresh policy tracking, and service-cost learning; long-tail models, condition snapshots, and resolved/costed issue outcomes still need real usage growth |
 | ML-assisted features | 76% - production-ready supervised model counts exclude the planned future RL learner; broader ML maturity is capped by confidence, data volume, artifact freshness, and heuristic fallbacks |
 | Production hardening | 88% - heavy dashboard materialization and cache health observability cover the current app scope; production cache sizing and TTL tuning still need real traffic |
@@ -46,7 +46,7 @@ Last verified locally on 5 August 2026.
 | Advisory proof contracts | Current recommendation and relationship-adjacent surfaces declare source URL, stale-after, scheduled refresh, stale fallback, and circuit-breaker requirements before any new signal can be treated as mature |
 | Evidence watchlist | Project Details reports live stale, failed, rejected, and due verified evidence with per-scope refresh health, last attempt, and last success timestamps |
 | Materialized cache health | Project Details reports registered cache namespaces, hit/miss counts, TTL metadata, stale regeneration, invalidation reason, revision key, and generation latency |
-| Browser coverage | Project Details reports Selenium-gated interaction workflows, the dedicated runner, CI workflow, `browser_regression_summary.json`, screenshots/log artifacts, and always-on live-server contracts for login, uploads, dashboard refresh, vehicle setup, and core forms without calling the UI fully mature |
+| Browser coverage | Project Details reports Selenium-gated interaction workflows, the dedicated runner, CI workflow, local Chrome/Edge proof, CI Chrome proof, `browser_regression_summary.json`, screenshots/log artifacts, and always-on live-server contracts for login, uploads, dashboard refresh, vehicle setup, and core forms without calling the UI fully mature |
 
 The live tracker now separates narrow verified checks from broad product maturity. A 100% entry means that exact check is closed; it does not imply the surrounding product area is fully mature.
 
@@ -159,7 +159,7 @@ celery -A alfred_ai beat -l info
 - live official bureau pulls still need real partner integrations
 - market appreciation and property sale timing are not auto-guessed from the internet
 - deployment choices such as production database, cache, workers, and host settings still need environment-specific setup
-- browser interaction coverage is implemented, but full UI maturity is gated until the dedicated Selenium runner repeatedly records Chrome or Edge runs without skipped browser tests or runner failures
+- browser interaction coverage is implemented, but full UI maturity is gated until the dedicated Selenium runner repeatedly records local Chrome or Edge and CI Chrome runs without skipped browser tests or runner failures
 
 ## Test Commands
 
@@ -194,7 +194,7 @@ python scripts/run_browser_regressions.py --browser Edge --require-browser
 
 On browser failures, Selenium writes screenshots, page HTML, browser logs where supported, and metadata under `artifacts/browser` by default. Override it with `--artifact-dir path/to/artifacts` or `ALFRED_BROWSER_ARTIFACT_DIR`.
 
-Every browser runner invocation also writes `artifacts/browser/browser_regression_summary.json`. Project Details uses that file to show whether the latest required-browser local or CI run was driver-backed, how many Selenium tests were skipped, and whether the browser proof gate is recorded.
+Every browser runner invocation also writes `artifacts/browser/browser_regression_summary.json` plus a labeled proof file such as `browser_regression_summary.local-chrome.json`, `browser_regression_summary.local-edge.json`, or `browser_regression_summary.ci-chrome.json`. Project Details separates local Chrome/Edge proof from CI Chrome proof so local success does not overstate CI maturity.
 
 For focused finance coverage:
 
