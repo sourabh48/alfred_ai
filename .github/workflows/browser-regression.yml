@@ -32,6 +32,37 @@ jobs:
       - name: Set up Chrome
         uses: browser-actions/setup-chrome@v1
 
+      - name: Prepare browser artifact directory
+        run: |
+          mkdir -p artifacts/browser
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path("artifacts/browser/ci-setup.json").write_text(
+              json.dumps(
+                  {
+                      "github_actions": os.environ.get("GITHUB_ACTIONS"),
+                      "event_name": os.environ.get("GITHUB_EVENT_NAME"),
+                      "workflow": os.environ.get("GITHUB_WORKFLOW"),
+                      "run_id": os.environ.get("GITHUB_RUN_ID"),
+                      "sha": os.environ.get("GITHUB_SHA"),
+                      "ref": os.environ.get("GITHUB_REF"),
+                      "head_ref": os.environ.get("GITHUB_HEAD_REF"),
+                  },
+                  indent=2,
+                  sort_keys=True,
+              ),
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Install browser system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y portaudio19-dev
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
