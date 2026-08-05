@@ -26,6 +26,7 @@ from .internal_clock import clock_snapshot
 
 
 BROWSER_REGRESSION_SUMMARY_FILENAME = "browser_regression_summary.json"
+CI_BROWSER_PROOF_ALLOWED_EVENTS = {"pull_request", "workflow_dispatch"}
 BROWSER_REGRESSION_PROOF_SPECS = (
     {
         "key": "local_chrome",
@@ -56,6 +57,18 @@ BROWSER_REGRESSION_PROOF_SPECS = (
 )
 
 
+DOCUMENT_CORRECTION_FAMILY_LABELS = {
+    "statement_document": "statements",
+    "loan_document": "loans",
+    "loan_closure_document": "loan closures",
+    "investment_document": "investments",
+    "vehicle_document": "vehicles",
+    "resume_document": "resumes",
+    "recruiter_document": "recruiter/JD intake",
+    "credit_report": "credit reports",
+}
+
+
 def _bounded_percent(value: float, *, default: int = 0) -> int:
     try:
         numeric = float(value)
@@ -69,6 +82,14 @@ def _progress(current: float, target: float, *, floor: int = 10, ceiling: int = 
         return _bounded_percent(floor)
     ratio = max(0.0, min(current / target, 1.0))
     return _bounded_percent(max(floor, min(ceiling, round(floor + ((ceiling - floor) * ratio)))))
+
+
+def _accepted_document_correction_scopes() -> set[str]:
+    return set(
+        DocumentParserLearningMemory.objects.filter(correction_count__gt=0)
+        .values_list("scope", flat=True)
+        .distinct()
+    )
 
 
 def _project_path(path_value: str | Path) -> Path:
@@ -114,6 +135,37 @@ def _as_int(value, default: int = 0) -> int:
         return default
 
 
+def _ci_browser_proof_metadata_blockers(payload: dict, spec: dict, artifact_contract: dict, proof_label: str) -> list[str]:
+    if str(spec.get("run_context") or "").lower() != "ci":
+        return []
+    blockers = []
+    github_actions = dict(payload.get("github_actions") or {})
+    if github_actions.get("enabled") is not True:
+        blockers.append("GitHub Actions metadata missing")
+    required_fields = {
+        "event_name": "GitHub event",
+        "workflow": "GitHub workflow",
+        "run_id": "GitHub run id",
+        "repository": "GitHub repository",
+        "sha": "GitHub commit SHA",
+    }
+    for field, label in required_fields.items():
+        if not str(github_actions.get(field) or "").strip():
+            blockers.append(f"{label} missing")
+    event_name = str(github_actions.get("event_name") or "").strip()
+    if event_name and event_name not in CI_BROWSER_PROOF_ALLOWED_EVENTS:
+        blockers.append(f"GitHub event {event_name} is not an accepted browser proof trigger")
+    branch_ref = str(github_actions.get("head_ref") or github_actions.get("ref_name") or github_actions.get("ref") or "").strip()
+    if not branch_ref:
+        blockers.append("GitHub branch/ref missing")
+    expected_labeled_summary = "browser_regression_summary.ci-chrome.json"
+    if proof_label != "ci-chrome":
+        blockers.append("CI proof label is not ci-chrome")
+    if str(artifact_contract.get("labeled_summary_filename") or "") != expected_labeled_summary:
+        blockers.append(f"CI summary filename is not {expected_labeled_summary}")
+    return blockers
+
+
 def _browser_regression_health_snapshot(spec: dict | None = None) -> dict:
     spec = spec or BROWSER_REGRESSION_PROOF_SPECS[0]
     path = _browser_regression_summary_path(spec)
@@ -145,6 +197,7 @@ def _browser_regression_health_snapshot(spec: dict | None = None) -> dict:
         "context_matches": False,
         "require_browser": False,
         "proof_label": "",
+        "github_actions": {},
         "artifact_contract": {},
         "artifact_inventory": [],
         "blockers": ["summary missing"],
@@ -180,6 +233,10 @@ def _browser_regression_health_snapshot(spec: dict | None = None) -> dict:
     context_matches = not expected_context or run_context.lower() == expected_context
     require_browser = bool(payload.get("require_browser"))
     run_browser_tests_env = str(payload.get("run_browser_tests_env", "")).lower()
+    proof_label = str(payload.get("proof_label") or "")
+    artifact_contract = dict(payload.get("artifact_contract") or {})
+    github_actions = dict(payload.get("github_actions") or {})
+    ci_metadata_blockers = _ci_browser_proof_metadata_blockers(payload, spec, artifact_contract, proof_label)
     driver_backed_success = bool(payload.get("driver_backed_success")) and skipped_count == 0 and tests_run_count > 0
     maturity_gate_recorded = (
         driver_backed_success
@@ -188,6 +245,7 @@ def _browser_regression_health_snapshot(spec: dict | None = None) -> dict:
         and run_browser_tests_env in {"1", "true", "yes"}
         and browser_matches
         and context_matches
+        and not ci_metadata_blockers
     )
     finished_at = str(payload.get("finished_at_utc") or "")
     status = str(payload.get("status") or ("passed" if maturity_gate_recorded else "failed"))
@@ -206,6 +264,7 @@ def _browser_regression_health_snapshot(spec: dict | None = None) -> dict:
         blockers.append(f"expected {spec.get('browser')} but summary recorded {browser}")
     if not context_matches:
         blockers.append(f"expected {spec.get('run_context')} but summary recorded {run_context}")
+    blockers.extend(ci_metadata_blockers)
     if not blockers and not maturity_gate_recorded:
         blockers.append("driver-backed proof did not meet the maturity contract")
     if maturity_gate_recorded:
@@ -223,7 +282,10 @@ def _browser_regression_health_snapshot(spec: dict | None = None) -> dict:
     if maturity_gate_recorded:
         summary += " This proof lane is accepted."
     else:
-        summary += " This proof lane is not accepted until the expected context/browser, required-browser mode, zero skips, and zero runner failures are recorded."
+        summary += " This proof lane is not accepted until the expected context/browser, required-browser mode, zero skips, zero runner failures, and any required CI metadata are recorded."
+    if expected_context == "ci":
+        run_url = str(github_actions.get("run_url") or "").strip()
+        summary += f" GitHub Actions run: {run_url or 'not recorded'}."
 
     return {
         **default,
@@ -243,8 +305,9 @@ def _browser_regression_health_snapshot(spec: dict | None = None) -> dict:
         "browser_matches": browser_matches,
         "context_matches": context_matches,
         "require_browser": require_browser,
-        "proof_label": str(payload.get("proof_label") or ""),
-        "artifact_contract": dict(payload.get("artifact_contract") or {}),
+        "proof_label": proof_label,
+        "github_actions": github_actions,
+        "artifact_contract": artifact_contract,
         "artifact_inventory": list(payload.get("artifact_inventory") or []),
         "blockers": blockers,
         "summary": summary,
@@ -358,9 +421,13 @@ def _build_learning_snapshot(now) -> dict:
     job_analyses = CareerJobAnalysis.objects.count()
     credit_report_uploads = CreditReportUpload.objects.count()
     parser_correction_memories = DocumentParserLearningMemory.objects.filter(correction_count__gt=0).count()
-    parser_correction_scopes = (
-        DocumentParserLearningMemory.objects.filter(correction_count__gt=0).values("scope").distinct().count()
-    )
+    parser_correction_scope_names = _accepted_document_correction_scopes()
+    parser_correction_scopes = len(parser_correction_scope_names)
+    missing_parser_family_labels = [
+        label
+        for scope, label in DOCUMENT_CORRECTION_FAMILY_LABELS.items()
+        if scope not in parser_correction_scope_names
+    ]
 
     verified_evidence = VerifiedExternalInsight.objects.filter(is_active=True).count()
     fresh_evidence = VerifiedExternalInsight.objects.filter(is_active=True).filter(
@@ -444,7 +511,10 @@ def _build_learning_snapshot(now) -> dict:
                 f"{recruiter_documents} recruiter/JD intake records",
                 f"{vehicle_documents} vehicle documents stored",
                 f"{parser_correction_memories} accepted parser-correction memories",
-                f"{parser_correction_scopes} document families with accepted corrections",
+                f"{parser_correction_scopes}/{len(DOCUMENT_CORRECTION_FAMILY_LABELS)} document families with accepted corrections",
+                "missing accepted correction families: "
+                + (", ".join(missing_parser_family_labels[:4]) if missing_parser_family_labels else "none")
+                + ("..." if len(missing_parser_family_labels) > 4 else ""),
             ],
             "blocker_label": "Completion gate",
             "blocker": "The current review workflow is stronger for supported layouts; live maturity still depends on more real samples from unknown and long-tail document layouts plus browser interaction proof beyond the vehicle invoice/OCR correction path.",
@@ -631,11 +701,28 @@ def project_details_payload(guardrails: dict) -> dict:
     evidence_watchlist_count = int(refresh_health.get("watchlist_records", evidence_watchlist.count()) or 0)
     evidence_fresh_count = int(refresh_health.get("fresh_records", 0) or 0)
     evidence_active_count = int(refresh_health.get("active_records", 0) or 0)
+    evidence_due_count = int(refresh_health.get("due_records", 0) or 0)
+    evidence_scheduled_candidate_count = int(refresh_health.get("scheduled_candidate_records", 0) or 0)
+    evidence_scheduled_batch_size = int(refresh_health.get("scheduled_refresh_batch_size", guardrails.get("refresh_batch_size", 0)) or 0)
+    evidence_capacity_gap = int(refresh_health.get("capacity_gap_records", 0) or 0)
+    scheduled_refresh_healthy = bool(refresh_health.get("scheduled_refresh_healthy", refresh_health.get("healthy")))
     cache_health = materialized_cache_health_snapshot()
     catalog_summary = catalog_coverage_summary()
     catalog_refresh = _catalog_source_refresh_health(catalog_summary, now)
     career_source_summary = career_source_coverage_summary()
     career_outcome_summary = career_opportunity_outcome_summary(CareerJobAnalysis.objects.all())
+    document_correction_scope_names = _accepted_document_correction_scopes()
+    document_missing_family_labels = [
+        label
+        for scope, label in DOCUMENT_CORRECTION_FAMILY_LABELS.items()
+        if scope not in document_correction_scope_names
+    ]
+    vehicle_condition_snapshots = BikeConditionSnapshot.objects.count()
+    vehicle_resolved_issue_outcomes = BikeIssueReport.objects.filter(status="resolved").count()
+    vehicle_costed_issue_outcomes = (
+        BikeIssueReport.objects.filter(status="resolved").exclude(actual_cost__isnull=True).count()
+    )
+    vehicle_service_records = BikeServiceRecord.objects.count()
     model_training = learning_snapshot["model_training"]
     supervised_training_progress = _bounded_percent(
         model_training.get("supervised_training_progress", model_training.get("overall_progress", 0))
@@ -673,6 +760,7 @@ def project_details_payload(guardrails: dict) -> dict:
             "document-center statement upload",
             "vehicle setup form submission",
             "vehicle invoice/OCR overlay correction",
+            "statement review correction",
         ],
         "live_server_contracts": [
             "login POST form and CSRF controls",
@@ -684,16 +772,23 @@ def project_details_payload(guardrails: dict) -> dict:
         ],
         "remaining_gate": (
             "Selenium coverage is implemented, but UI maturity stays gated until required-browser local and CI "
-            "runs keep recording zero skipped browser tests, zero runner failures, CI Chrome proof, and useful failure artifacts."
+            "runs keep recording zero skipped browser tests, zero runner failures, GitHub Actions-backed CI Chrome proof, and useful failure artifacts."
         ),
     }
     document_scope_progress = min(max(_bounded_percent(document_track.get("progress", 0)), 91), 94)
     vehicle_scope_progress = min(max(_bounded_percent(vehicle_track.get("progress", 0)), 88), 92)
     career_scope_progress = min(max(_bounded_percent(career_track.get("progress", 0)), 88), 92)
     evidence_scope_progress = min(max(_bounded_percent(evidence_track.get("progress", 0)), 90 if evidence_watchlist_count == 0 else 0), 93)
+    if not scheduled_refresh_healthy:
+        evidence_scope_progress = min(evidence_scope_progress, 88)
     if not proof_contract_healthy:
         evidence_scope_progress = min(evidence_scope_progress, 88)
-    large_data_scope_progress = 88 if cache_health.get("observability_ready") else 84
+    if cache_health.get("traffic_sample_ready"):
+        large_data_scope_progress = 90
+    elif cache_health.get("observability_ready"):
+        large_data_scope_progress = 88
+    else:
+        large_data_scope_progress = 84
 
     next_steps = [
         "Keep adding real unknown document layouts to the field-correction suite and promote confirmed correction outcomes back into parser-learning evidence.",
@@ -740,6 +835,10 @@ def project_details_payload(guardrails: dict) -> dict:
         risks.append(
             f"{evidence_watchlist_count} verified external evidence records are stale, failed, rejected, or due for refresh."
         )
+    if evidence_capacity_gap:
+        risks.append(
+            f"Verified evidence refresh has a {evidence_capacity_gap}-record scheduled candidate gap beyond the current batch capacity."
+        )
     if cache_health.get("unobserved_namespace_count"):
         risks.append(
             f"{cache_health['unobserved_namespace_count']} materialized dashboard namespace(s) still need runtime traffic before cache telemetry is representative."
@@ -781,7 +880,8 @@ def project_details_payload(guardrails: dict) -> dict:
             "value": f"{evidence_fresh_count}/{evidence_active_count}",
             "copy": (
                 f"Fresh active records; last attempt {refresh_health.get('last_refresh_attempt_at') or 'not recorded'}, "
-                f"last success {refresh_health.get('last_refresh_success_at') or 'not recorded'}."
+                f"last success {refresh_health.get('last_refresh_success_at') or 'not recorded'}; "
+                f"{evidence_scheduled_candidate_count} candidate(s) measured against batch {evidence_scheduled_batch_size}."
             ),
         },
         {
@@ -852,7 +952,7 @@ def project_details_payload(guardrails: dict) -> dict:
             "detail": (
                 "Django live-server rendering, static-asset checks, upload/form contracts, a dedicated Selenium runner, "
                 "CI browser workflow, failure artifacts, local Chrome/Edge proof, CI Chrome proof, run-summary proof, and gated Selenium workflows now cover login, "
-                "document-center statement upload, vehicle setup submission, dashboard live refresh, and the vehicle invoice/OCR overlay correction path. "
+                "document-center statement upload, vehicle setup submission, dashboard live refresh, vehicle invoice/OCR overlay correction, and statement review correction. "
                 f"{browser_proof['summary']}"
             ),
             "maturity_status": browser_coverage["maturity_status"],
@@ -867,6 +967,7 @@ def project_details_payload(guardrails: dict) -> dict:
                 "CI summary filename: browser_regression_summary.ci-chrome.json",
                 f"local browser proof: {'recorded' if browser_proof['local_gate_recorded'] else 'not accepted'}",
                 f"CI Chrome proof: {'recorded' if browser_proof['ci_gate_recorded'] else 'not accepted'}",
+                f"CI GitHub Actions metadata: {'recorded' if browser_proof['ci_gate_recorded'] else 'not accepted'}",
                 f"latest browser run: {browser_proof['latest_recorded']['status']} via {browser_proof['latest_recorded']['run_context']}",
                 f"recorded browser skips: {browser_proof['latest_recorded']['skipped_count'] if browser_proof['latest_recorded']['skipped_count'] is not None else 'not recorded'}",
                 "login, statement upload, vehicle setup, dashboard refresh, and core form submissions are named",
@@ -874,7 +975,7 @@ def project_details_payload(guardrails: dict) -> dict:
             ],
             "maturity_gates": [
                 "Local Chrome or Edge browser execution records browser_regression_summary.local-*.json with no skipped browser tests.",
-                "CI Chrome execution records browser_regression_summary.ci-chrome.json from the browser-regression workflow with no skipped browser tests.",
+                "CI Chrome execution records browser_regression_summary.ci-chrome.json from the browser-regression workflow with GitHub Actions metadata and no skipped browser tests.",
                 "The dedicated runner fails required-browser jobs when Selenium tests are skipped.",
                 "Live-server/static contracts keep covering the same workflows whenever browser drivers are unavailable.",
                 "Failure artifacts keep screenshots, page HTML, metadata, and browser logs available for failed browser runs.",
@@ -885,12 +986,20 @@ def project_details_payload(guardrails: dict) -> dict:
         {
             "title": "Document OCR and correction maturity",
             "progress": document_scope_progress,
-            "detail": "Parser confidence, low-confidence queues, accepted corrections, ChatGPT context import, retry-fed learning, schema-aware OCR overlay candidates, degraded service-invoice recovery, cross-family unknown-layout fixtures, accepted correction memory outcomes, and Selenium-proven vehicle OCR overlay correction are implemented across the current document families.",
+            "detail": "Parser confidence, low-confidence queues, accepted corrections, ChatGPT context import, retry-fed learning, schema-aware OCR overlay candidates, degraded service-invoice recovery, cross-family unknown-layout fixtures, accepted correction memory outcomes, and Selenium-proven vehicle plus statement correction interactions are implemented across the current document families.",
+            "maturity_status": "Real-layout gated",
+            "signals": [
+                f"{len(document_correction_scope_names)}/{len(DOCUMENT_CORRECTION_FAMILY_LABELS)} required document family correction memory scope(s)",
+                "missing correction memory families: "
+                + (", ".join(document_missing_family_labels[:4]) if document_missing_family_labels else "none")
+                + ("..." if len(document_missing_family_labels) > 4 else ""),
+                "browser correction paths: vehicle invoice/OCR overlay and statement review correction",
+            ],
             "next_focus": "Keep adding real unknown layouts and validated correction outcomes before treating field-level maintenance learning as mature across every document family.",
             "maturity_gates": [
                 "Real unknown layouts keep arriving across every document family, not only the current fixtures.",
                 "Accepted corrections produce validated parser-learning outcomes per family before field-level learning is treated as mature.",
-                "Browser interaction proof expands beyond the vehicle invoice/OCR overlay path.",
+                "Browser interaction proof keeps expanding from the vehicle invoice/OCR overlay path into more document-family review flows.",
             ],
         },
         {
@@ -902,6 +1011,15 @@ def project_details_payload(guardrails: dict) -> dict:
                 f"{catalog_refresh['last_checked_on']} ({catalog_refresh['age_days']} days old; {catalog_refresh['refresh_policy_days']}-day source refresh policy; next due {catalog_refresh['next_due_on']}), "
                 "brand-filtered model selection, and route-aware service-cost actions."
             ),
+            "maturity_status": "Usage-gated",
+            "signals": [
+                f"{vehicle_service_records} service log(s)",
+                f"{vehicle_condition_snapshots} condition snapshot(s)",
+                f"{vehicle_resolved_issue_outcomes} resolved issue outcome(s)",
+                f"{vehicle_costed_issue_outcomes} actual-cost issue outcome(s)",
+                f"{catalog_summary['source_checked_coverage_pct']}% source links checked",
+                catalog_refresh["summary"],
+            ],
             "next_focus": "Keep source links fresh, add long-tail models from real usage, and collect more condition snapshots plus issue outcomes before treating maintenance learning as mature.",
             "maturity_gates": [
                 "Official source links stay within the configured refresh policy.",
@@ -918,6 +1036,16 @@ def project_details_payload(guardrails: dict) -> dict:
                 f"{career_source_summary['candidate_specialty_source_count']} candidate specialty sources gated by role/geography gaps, and "
                 f"{career_outcome_summary['salary_bearing_outcome_count']} salary-bearing accepted/rejected outcome(s)."
             ),
+            "maturity_status": "Outcome-gated",
+            "signals": [
+                f"{career_source_summary['configured_feed_count']} configured live job feed(s)",
+                f"{career_source_summary['job_page_adapter_count']} job-page adapter(s)",
+                f"{career_outcome_summary['validated_outcome_count']} validated salary-bearing outcome(s)",
+                f"{career_outcome_summary['accepted_count']} accepted outcome(s)",
+                f"{career_outcome_summary['rejected_count']} rejected outcome(s)",
+                f"{career_outcome_summary['unvalidated_outcome_count']} outcome(s) missing salary/source/location proof",
+                "outcome contract: " + ", ".join(career_outcome_summary.get("validation_contract") or []),
+            ],
             "next_focus": "Add specialty sources only where real users expose role/geography gaps, then validate more salary-bearing outcomes from accepted or rejected opportunities.",
             "maturity_gates": [
                 "Specialty sources are added only after real users expose role or geography gaps.",
@@ -930,13 +1058,24 @@ def project_details_payload(guardrails: dict) -> dict:
             "progress": evidence_scope_progress,
             "detail": (
                 "Current advisory surfaces expose source URLs, freshness counters, stale/due status, stale fallback, circuit-breaker metadata, "
-                f"scheduled-refresh contracts, and required-source proof contracts; {proof_covered_surface_count}/{proof_surface_count} registered recommendation or relationship-adjacent surfaces declare the full contract."
+                f"scheduled-refresh contracts, and required-source proof contracts; {proof_covered_surface_count}/{proof_surface_count} registered recommendation or relationship-adjacent surfaces declare the full contract. "
+                f"Scheduled refresh currently sees {evidence_scheduled_candidate_count} candidate(s) inside the lookahead, batch capacity {evidence_scheduled_batch_size}, and capacity gap {evidence_capacity_gap}."
+            ),
+            "maturity_status": (
+                "Refresh healthy"
+                if scheduled_refresh_healthy and proof_contract_healthy and not evidence_watchlist_count and not evidence_capacity_gap
+                else "Refresh gated"
             ),
             "next_focus": "Keep scheduled refresh healthy and extend the proof contract before adding any new recommendation or relationship-adjacent signal.",
             "signals": [
                 f"{proof_covered_surface_count}/{proof_surface_count} proof-contract surfaces covered",
                 f"scheduled refresh: {scheduled_refresh_name}",
                 f"{evidence_watchlist_count} evidence record(s) on the watchlist",
+                f"{evidence_due_count} evidence record(s) due now",
+                f"{evidence_scheduled_candidate_count} scheduled refresh candidate(s)",
+                f"scheduled refresh capacity: {evidence_scheduled_batch_size}",
+                f"scheduled capacity gap: {evidence_capacity_gap}",
+                f"scheduled refresh health: {'healthy' if scheduled_refresh_healthy else 'not healthy'}",
                 refresh_health.get("summary", "Refresh health snapshot unavailable."),
                 f"last attempt: {refresh_health.get('last_refresh_attempt_at') or 'not recorded'}",
                 f"last success: {refresh_health.get('last_refresh_success_at') or 'not recorded'}",
@@ -956,15 +1095,20 @@ def project_details_payload(guardrails: dict) -> dict:
                 f"{cache_health['registered_namespace_count']} cache-backed namespace(s) are registered, "
                 f"{cache_health['observed_namespace_count']} have runtime telemetry, and production maturity remains capped until sizing and TTL behavior are proven under real traffic."
             ),
+            "maturity_status": "Production-traffic gated",
             "next_focus": "Tune production cache sizing, TTLs, and invalidation thresholds against real traffic before calling this fully mature at scale.",
             "signals": [
                 f"{cache_health['registered_namespace_count']} registered materialized namespace(s)",
                 f"{cache_health['observed_namespace_count']} namespace(s) with runtime telemetry",
+                f"{cache_health['unobserved_namespace_count']} namespace(s) without runtime telemetry",
                 f"{cache_health['hit_rate_pct']}% cache hit rate across {cache_health['total_requests']} request(s)",
                 f"{cache_health['average_generation_latency_ms']} ms average generation latency",
                 f"{cache_health['stale_regeneration_count']} stale regeneration(s)",
                 f"{cache_health['invalidation_count']} invalidation(s)",
                 f"last invalidation: {cache_health.get('last_invalidation_reason') or 'not recorded'}",
+                f"configured TTL ready: {'yes' if cache_health.get('configured_ttl_ready') else 'no'}",
+                f"runtime telemetry ready: {'yes' if cache_health.get('runtime_telemetry_ready') else 'no'}",
+                f"traffic sample ready: {'yes' if cache_health.get('traffic_sample_ready') else 'no'}",
             ],
             "maturity_gates": [
                 "Production cache sizing is validated against real payload volume and concurrency.",
@@ -981,6 +1125,15 @@ def project_details_payload(guardrails: dict) -> dict:
                 f"{model_training.get('supervised_fresh_models', 0)}/{model_training.get('trainable_models', 0)} trainable models fresh; "
                 "production-ready ML maturity excludes the planned future RL learner and still includes confidence, freshness, skipped model state, and heuristic fallback risk."
             ),
+            "maturity_status": "Training-gated",
+            "signals": [
+                f"{model_training.get('ready_models', 0)} ready model state(s)",
+                f"{model_training.get('fresh_models', 0)} fresh artifact(s)",
+                f"{model_training.get('supervised_fresh_models', 0)}/{model_training.get('trainable_models', 0)} trainable supervised artifact(s) fresh",
+                f"{model_training.get('skipped_models', 0)} skipped model state(s)",
+                f"{model_training.get('planned_models', 0)} planned future model(s) excluded from production-ready ML",
+                f"{model_training.get('average_confidence', 0)} average confidence estimate",
+            ],
             "next_focus": "Keep supervised artifacts fresh, collect more accepted outcomes, and do not count the planned future RL learner as production-ready ML.",
             "maturity_gates": [
                 "Supervised artifacts stay fresh within their configured retraining windows.",
@@ -1038,7 +1191,14 @@ def project_details_payload(guardrails: dict) -> dict:
             {"label": "Learning Maturity", "value": f"{learning_snapshot['overall_progress']}%", "copy": "Adaptive-system maturity from live data coverage and freshness."},
             {"label": "Developer Escalations", "value": developer_escalations.count(), "copy": "High-severity items still waiting on superuser developers."},
             {"label": "Evidence Watchlist", "value": evidence_watchlist_count, "copy": "Verified external records that are stale, failed, rejected, or due now."},
-            {"label": "Evidence Refresh", "value": f"{evidence_fresh_count}/{evidence_active_count}", "copy": "Fresh active records after the latest recorded refresh attempts."},
+            {
+                "label": "Evidence Refresh",
+                "value": f"{evidence_fresh_count}/{evidence_active_count}",
+                "copy": (
+                    "Fresh active records after the latest recorded refresh attempts; "
+                    f"scheduled health {'healthy' if scheduled_refresh_healthy else 'not healthy'}."
+                ),
+            },
             {"label": "Proof Contracts", "value": f"{proof_covered_surface_count}/{proof_surface_count}", "copy": "Current recommendation and relationship-adjacent surfaces with full proof coverage."},
         ],
         "operational_metrics": operational_metrics,

@@ -111,6 +111,7 @@ def main() -> int:
         run_browser_tests_env=env["ALFRED_RUN_BROWSER_TESTS"],
         run_context=run_context,
         proof_label=proof_label,
+        github_actions=github_actions_metadata(),
     )
     summary_path = write_summary(artifact_dir, summary)
     print(f"Browser regression summary: {summary_path}")
@@ -138,6 +139,7 @@ def build_run_summary(
     run_browser_tests_env: str,
     run_context: str | None = None,
     proof_label: str | None = None,
+    github_actions: dict | None = None,
 ) -> dict:
     skipped = skipped_count(output)
     tests_found = tests_found_count(output)
@@ -180,6 +182,7 @@ def build_run_summary(
         "driver_backed_success": driver_backed_success,
         "run_context": run_context or current_run_context(),
         "proof_label": proof_label or "",
+        "github_actions": github_actions if github_actions is not None else github_actions_metadata(),
         "started_at_utc": started_at.isoformat(),
         "finished_at_utc": finished_at.isoformat(),
         "duration_seconds": round(duration_seconds, 3),
@@ -199,6 +202,29 @@ def write_summary(artifact_dir: Path, summary: dict) -> Path:
 
 def current_run_context() -> str:
     return "ci" if os.environ.get("GITHUB_ACTIONS") == "true" else "local"
+
+
+def github_actions_metadata() -> dict:
+    enabled = os.environ.get("GITHUB_ACTIONS") == "true"
+    metadata = {
+        "enabled": enabled,
+        "event_name": os.environ.get("GITHUB_EVENT_NAME", ""),
+        "workflow": os.environ.get("GITHUB_WORKFLOW", ""),
+        "run_id": os.environ.get("GITHUB_RUN_ID", ""),
+        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
+        "repository": os.environ.get("GITHUB_REPOSITORY", ""),
+        "sha": os.environ.get("GITHUB_SHA", ""),
+        "ref": os.environ.get("GITHUB_REF", ""),
+        "ref_name": os.environ.get("GITHUB_REF_NAME", ""),
+        "head_ref": os.environ.get("GITHUB_HEAD_REF", ""),
+        "base_ref": os.environ.get("GITHUB_BASE_REF", ""),
+        "server_url": os.environ.get("GITHUB_SERVER_URL", "https://github.com"),
+    }
+    if metadata["server_url"] and metadata["repository"] and metadata["run_id"]:
+        metadata["run_url"] = f"{metadata['server_url'].rstrip('/')}/{metadata['repository']}/actions/runs/{metadata['run_id']}"
+    else:
+        metadata["run_url"] = ""
+    return metadata
 
 
 def default_proof_label(browser: str, run_context: str) -> str:

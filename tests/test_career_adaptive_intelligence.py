@@ -10,6 +10,7 @@ from django.test import Client, TestCase
 from django.utils import timezone
 
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, CareerResumeLearningMemory
+from apps.career.services.job_intelligence import job_intelligence
 from apps.expenses.models import StatementUpload
 from apps.integrations.models import CreditScore
 from apps.mobility.models import BikeDocument, BikeProfile
@@ -449,6 +450,83 @@ class CareerAdaptiveIntelligenceTests(TestCase):
         self.assertEqual(dashboard_summary["salary_bearing_outcome_count"], 2)
         self.assertEqual(dashboard_summary["accepted_count"], 1)
         self.assertEqual(dashboard_summary["rejected_count"], 1)
+
+    def test_opportunity_outcome_summary_counts_only_validated_salary_source_location_decisions(self):
+        valid = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/valid",
+            company="Valid Co",
+            job_title="Data Analyst",
+            location="Bengaluru, Karnataka, India",
+            extracted_payload={
+                "opportunity_outcome": {
+                    "outcome": "accepted",
+                    "salary_bearing": True,
+                    "salary_min_annual": 1800000,
+                    "salary_max_annual": 2200000,
+                    "salary_mid_annual": 2000000,
+                    "source_url": "https://example.com/jobs/valid",
+                    "location": "Bengaluru, Karnataka, India",
+                    "country": "India",
+                    "state": "Karnataka",
+                    "city": "Bengaluru",
+                }
+            },
+        )
+        missing_source = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/missing-source",
+            company="Missing Source Co",
+            job_title="Data Analyst",
+            location="Bengaluru, Karnataka, India",
+            extracted_payload={
+                "opportunity_outcome": {
+                    "outcome": "rejected",
+                    "salary_bearing": True,
+                    "salary_min_annual": 1600000,
+                    "salary_max_annual": 1800000,
+                    "salary_mid_annual": 1700000,
+                    "source_url": "",
+                    "location": "Bengaluru, Karnataka, India",
+                }
+            },
+        )
+        missing_location = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/missing-location",
+            company="Missing Location Co",
+            job_title="Data Analyst",
+            location="",
+            extracted_payload={
+                "opportunity_outcome": {
+                    "outcome": "accepted",
+                    "salary_bearing": True,
+                    "salary_min_annual": 2000000,
+                    "salary_max_annual": 2400000,
+                    "salary_mid_annual": 2200000,
+                    "source_url": "https://example.com/jobs/missing-location",
+                    "location": "",
+                }
+            },
+        )
+
+        summary = job_intelligence.opportunity_outcome_learning_summary(
+            CareerJobAnalysis.objects.filter(id__in=[valid.id, missing_source.id, missing_location.id])
+        )
+
+        self.assertEqual(summary["outcome_count"], 3)
+        self.assertEqual(summary["salary_bearing_outcome_count"], 1)
+        self.assertEqual(summary["validated_outcome_count"], 1)
+        self.assertEqual(summary["unvalidated_outcome_count"], 2)
+        self.assertEqual(summary["accepted_count"], 1)
+        self.assertEqual(summary["rejected_count"], 0)
+        self.assertEqual(
+            summary["validation_contract"],
+            ["accepted_or_rejected_decision", "salary_range", "source_url", "location_match"],
+        )
 
 
 class UserDataIsolationTests(TestCase):

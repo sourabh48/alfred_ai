@@ -241,8 +241,24 @@ class LargeDataMaterializationTests(TestCase):
         self.assertTrue(registry_namespaces.issubset(snapshot_namespaces))
         self.assertGreaterEqual(health["configured_ttl_coverage_pct"], 100.0)
         self.assertFalse(health["production_mature"])
+        self.assertTrue(health["configured_ttl_ready"])
         self.assertTrue(health["observability_ready"])
+        self.assertFalse(health["runtime_telemetry_ready"])
+        self.assertFalse(health["traffic_sample_ready"])
+        self.assertGreater(health["unobserved_namespace_count"], 0)
+        self.assertTrue(any("runtime telemetry" in blocker for blocker in health["maturity_blockers"]))
         self.assertIn("materialized namespace(s) have runtime telemetry", health["summary"])
+
+    def test_cache_health_snapshot_keeps_observability_gate_closed_without_runtime_traffic(self):
+        health = materialized_cache_health_snapshot()
+
+        self.assertEqual(health["observed_namespace_count"], 0)
+        self.assertEqual(health["unobserved_namespace_count"], health["registered_namespace_count"])
+        self.assertTrue(health["configured_ttl_ready"])
+        self.assertFalse(health["observability_ready"])
+        self.assertFalse(health["runtime_telemetry_ready"])
+        self.assertFalse(health["traffic_sample_ready"])
+        self.assertTrue(any("runtime telemetry" in blocker for blocker in health["maturity_blockers"]))
 
     def test_cache_namespace_registry_matches_materialized_payload_call_sites(self):
         source_namespaces = set()

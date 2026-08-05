@@ -14,6 +14,7 @@ from alfred_ai.project_details import _browser_regression_proof_snapshot
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.career.models import CareerResumeLearningMemory
 from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
+from apps.integrations.services import verified_intelligence
 from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord
 
 
@@ -28,6 +29,9 @@ def _browser_summary_payload(
     require_browser: bool = True,
     run_browser_tests_env: str = "true",
     driver_backed_success: bool | None = None,
+    github_actions: dict | None = None,
+    proof_label: str | None = None,
+    artifact_contract: dict | None = None,
 ) -> dict:
     if driver_backed_success is None:
         driver_backed_success = (
@@ -38,6 +42,21 @@ def _browser_summary_payload(
             and require_browser
             and run_browser_tests_env.lower() in {"1", "true", "yes"}
         )
+    if github_actions is None:
+        github_actions = _github_actions_payload() if run_context == "ci" else {}
+    if proof_label is None:
+        proof_label = "ci-chrome" if run_context == "ci" else f"local-{browser.lower()}"
+    if artifact_contract is None:
+        artifact_contract = {
+            "summary_filename": "browser_regression_summary.json",
+            "labeled_summary_filename": (
+                "browser_regression_summary.ci-chrome.json"
+                if proof_label == "ci-chrome"
+                else f"browser_regression_summary.{proof_label}.json"
+            ),
+            "failure_artifact_suffixes": [".png", ".html", ".browser.log", ".json"],
+            "upload_path": "artifacts/browser",
+        }
     return {
         "summary_version": 1,
         "status": status,
@@ -45,6 +64,9 @@ def _browser_summary_payload(
         "run_context": run_context,
         "require_browser": require_browser,
         "run_browser_tests_env": run_browser_tests_env,
+        "proof_label": proof_label,
+        "github_actions": github_actions,
+        "artifact_contract": artifact_contract,
         "runner_return_code": runner_return_code,
         "return_code": 0 if runner_return_code == 0 else runner_return_code,
         "skipped_count": skipped_count,
@@ -53,6 +75,24 @@ def _browser_summary_payload(
         "driver_backed_success": driver_backed_success,
         "duration_seconds": 14.8,
         "finished_at_utc": "2026-08-05T01:00:00+00:00",
+    }
+
+
+def _github_actions_payload() -> dict:
+    return {
+        "enabled": True,
+        "event_name": "pull_request",
+        "workflow": "Browser Regression",
+        "run_id": "123456789",
+        "run_attempt": "1",
+        "repository": "sourabh48/alfred_ai",
+        "sha": "f12d062614f87fbc9be411245d28563e60ef8193",
+        "ref": "refs/pull/1/merge",
+        "ref_name": "1/merge",
+        "head_ref": "agent/browser-regression-maturity-gate",
+        "base_ref": "master",
+        "server_url": "https://github.com",
+        "run_url": "https://github.com/sourabh48/alfred_ai/actions/runs/123456789",
     }
 
 
@@ -143,6 +183,19 @@ class BrowserRegressionProofSnapshotTests(SimpleTestCase):
         self.assertEqual(snapshot["latest_accepted"]["label"], "Local Edge")
         self.assertIn("CI Chrome proof is still missing", snapshot["summary"])
 
+    def test_ci_labeled_browser_summary_without_github_metadata_does_not_close_ci_gate(self):
+        self.ci_chrome_summary_path.write_text(
+            json.dumps(_browser_summary_payload(run_context="ci", github_actions={})),
+            encoding="utf-8",
+        )
+
+        snapshot = _browser_regression_proof_snapshot()
+
+        self.assertEqual(snapshot["state"], "failed")
+        self.assertFalse(snapshot["ci_gate_recorded"])
+        self.assertIn("GitHub Actions metadata missing", snapshot["ci_proofs"][0]["blockers"])
+        self.assertIn("GitHub run id missing", snapshot["ci_proofs"][0]["blockers"])
+
     def test_ci_passed_browser_summary_state_closes_ci_proof_without_full_ui_maturity(self):
         self.ci_chrome_summary_path.write_text(
             json.dumps(_browser_summary_payload(run_context="ci")),
@@ -157,6 +210,7 @@ class BrowserRegressionProofSnapshotTests(SimpleTestCase):
         self.assertFalse(snapshot["full_ui_mature"])
         self.assertEqual(snapshot["latest_accepted"]["label"], "CI Chrome")
         self.assertIn("CI Chrome browser proof is recorded", snapshot["summary"])
+        self.assertEqual(snapshot["ci_proofs"][0]["github_actions"]["run_id"], "123456789")
 
 
 class ProjectDetailsLiveTests(TestCase):
@@ -345,6 +399,7 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertContains(response, "CI summary")
         self.assertContains(response, "browser_regression_summary.json")
         self.assertContains(response, "login, document-center statement upload, vehicle setup submission, dashboard live refresh")
+        self.assertContains(response, "statement review correction")
         self.assertContains(response, "full UI maturity is still not claimed")
         self.assertContains(response, "before new advisory signals ship")
         self.assertContains(response, "Real unknown layouts keep arriving across every document family")
@@ -352,6 +407,7 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertContains(response, "The proof contract registry covers every current recommendation and relationship-adjacent surface before new signals are added")
         self.assertContains(response, "Every new recommendation or relationship-adjacent signal ships with required-source proof contracts")
         self.assertContains(response, "Production cache sizing is validated against real payload volume and concurrency")
+        self.assertContains(response, "Production-traffic gated")
         self.assertContains(response, "The planned future RL learner remains planned-only")
 
     def test_project_details_progress_values_are_bounded_integer_percentages(self):
@@ -420,7 +476,15 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertGreaterEqual(cache_health["registered_namespace_count"], 20)
         self.assertEqual(cache_health["observed_namespace_count"], 1)
         self.assertEqual(cache_health["hit_rate_pct"], 50.0)
+        self.assertTrue(cache_health["configured_ttl_ready"])
+        self.assertTrue(cache_health["observability_ready"])
+        self.assertFalse(cache_health["runtime_telemetry_ready"])
+        self.assertFalse(cache_health["traffic_sample_ready"])
         self.assertFalse(cache_health["production_mature"])
+        large_data_track = in_progress_by_title["Large-data hardening"]
+        self.assertEqual(large_data_track["progress"], 88)
+        self.assertEqual(large_data_track["maturity_status"], "Production-traffic gated")
+        self.assertIn("runtime telemetry ready: no", large_data_track["signals"])
         cache_metric = next(item for item in payload["operational_metrics"] if item["label"] == "Cache Health")
         self.assertEqual(cache_metric["value"], f"{cache_health['observed_namespace_count']}/{cache_health['registered_namespace_count']}")
         self.assertIn("stale regeneration", cache_metric["copy"])
@@ -460,6 +524,80 @@ class ProjectDetailsLiveTests(TestCase):
             "Keep supervised artifacts fresh, collect more accepted outcomes, and do not count the planned future RL learner as production-ready ML.",
             payload["next_steps"],
         )
+
+    def test_project_details_surfaces_evidence_refresh_capacity_gate(self):
+        now = timezone.now()
+        evidence_records = [
+            {
+                "scope": "news",
+                "cache_key": "google-news:market",
+                "title": "Market News",
+                "source_name": "Google News RSS",
+                "source_url": "https://news.google.com/rss/search?q=market",
+                "query": "market",
+                "status": "stale",
+                "stale_after": now - timedelta(hours=1),
+            },
+            {
+                "scope": "jobs",
+                "cache_key": "remotive:python",
+                "title": "Python Jobs",
+                "source_name": "Remotive Jobs API",
+                "source_url": "https://remotive.com/api/remote-jobs",
+                "query": "python",
+                "status": "fresh",
+                "stale_after": now - timedelta(minutes=10),
+            },
+            {
+                "scope": "tax",
+                "cache_key": "india-income-tax-regimes",
+                "title": "Tax Reference",
+                "source_name": "Income Tax Department",
+                "source_url": "https://www.incometax.gov.in/iec/foportal/",
+                "query": "",
+                "status": "failed",
+                "stale_after": now + timedelta(days=30),
+            },
+        ]
+        for index, record in enumerate(evidence_records):
+            VerifiedExternalInsight.objects.create(
+                **record,
+                summary="Evidence refresh test record",
+                payload={"index": index},
+                checksum=f"refresh-{index}",
+                fetched_at=now - timedelta(hours=4),
+                verified_at=now - timedelta(hours=4),
+                is_active=True,
+            )
+        self.client.force_login(self.superuser)
+
+        with patch.object(verified_intelligence, "REFRESH_BATCH_SIZE", 2):
+            payload = self.client.get("/api/project-details/").json()
+
+        refresh_health = payload["guardrails"]["refresh_health"]
+        self.assertEqual(refresh_health["watchlist_records"], 3)
+        self.assertEqual(refresh_health["due_records"], 1)
+        self.assertEqual(refresh_health["scheduled_candidate_records"], 3)
+        self.assertEqual(refresh_health["scheduled_refresh_batch_size"], 2)
+        self.assertEqual(refresh_health["capacity_gap_records"], 1)
+        self.assertFalse(refresh_health["scheduled_refresh_healthy"])
+        self.assertFalse(refresh_health["healthy"])
+        self.assertIn("candidate gap", refresh_health["summary"])
+
+        in_progress_by_title = {item["title"]: item for item in payload["in_progress_tracks"]}
+        evidence_track = in_progress_by_title["Evidence freshness and proof rigor"]
+        self.assertEqual(evidence_track["maturity_status"], "Refresh gated")
+        self.assertLessEqual(evidence_track["progress"], 88)
+        self.assertIn("capacity gap 1", evidence_track["detail"])
+        self.assertIn("3 scheduled refresh candidate(s)", evidence_track["signals"])
+        self.assertIn("scheduled refresh capacity: 2", evidence_track["signals"])
+        self.assertIn("scheduled capacity gap: 1", evidence_track["signals"])
+        self.assertIn("scheduled refresh health: not healthy", evidence_track["signals"])
+
+        refresh_card = next(item for item in payload["summary_cards"] if item["label"] == "Evidence Refresh")
+        self.assertIn("scheduled health not healthy", refresh_card["copy"])
+        refresh_metric = next(item for item in payload["operational_metrics"] if item["label"] == "Evidence Refresh Health")
+        self.assertIn("3 candidate(s) measured against batch 2", refresh_metric["copy"])
 
     def test_project_details_surfaces_recorded_driver_backed_browser_run_without_full_ui_maturity(self):
         self.local_chrome_summary_path.write_text(json.dumps(_browser_summary_payload()), encoding="utf-8")
@@ -611,7 +749,7 @@ class ProjectDetailsLiveTests(TestCase):
         }
         self.assertTrue(expected_active.issubset(set(in_progress_by_title)))
         self.assertEqual(in_progress_by_title["Browser/UI regression coverage"]["progress"], 70)
-        self.assertEqual(in_progress_by_title["Large-data hardening"]["progress"], 88)
+        self.assertEqual(in_progress_by_title["Large-data hardening"]["progress"], 84)
         self.assertGreaterEqual(in_progress_by_title["Document OCR and correction maturity"]["progress"], 91)
         browser_track = in_progress_by_title["Browser/UI regression coverage"]
         self.assertIn("Selenium", browser_track["detail"])
@@ -632,33 +770,47 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertTrue(any("no skipped browser tests" in gate for gate in browser_track["maturity_gates"]))
         self.assertTrue(any("fails required-browser jobs" in gate for gate in browser_track["maturity_gates"]))
         self.assertTrue(any("screenshots, page HTML, metadata, and browser logs" in gate for gate in browser_track["maturity_gates"]))
-        self.assertIn("cross-family unknown-layout", in_progress_by_title["Document OCR and correction maturity"]["detail"])
+        self.assertIn("statement review correction", browser_track["detail"])
+        document_track = in_progress_by_title["Document OCR and correction maturity"]
+        self.assertEqual(document_track["maturity_status"], "Real-layout gated")
+        self.assertIn("cross-family unknown-layout", document_track["detail"])
+        self.assertTrue(any("required document family correction memory scope" in signal for signal in document_track["signals"]))
+        self.assertTrue(any("browser correction paths" in signal for signal in document_track["signals"]))
         self.assertTrue(
             any(
                 "Accepted corrections produce validated parser-learning outcomes" in gate
-                for gate in in_progress_by_title["Document OCR and correction maturity"]["maturity_gates"]
+                for gate in document_track["maturity_gates"]
             )
         )
-        self.assertGreaterEqual(in_progress_by_title["Vehicle catalog and maintenance depth"]["progress"], 88)
-        self.assertLess(in_progress_by_title["Vehicle catalog and maintenance depth"]["progress"], 100)
-        self.assertIn("2026-07-31", in_progress_by_title["Vehicle catalog and maintenance depth"]["detail"])
-        self.assertIn("45-day source refresh policy", in_progress_by_title["Vehicle catalog and maintenance depth"]["detail"])
+        vehicle_track = in_progress_by_title["Vehicle catalog and maintenance depth"]
+        self.assertEqual(vehicle_track["maturity_status"], "Usage-gated")
+        self.assertGreaterEqual(vehicle_track["progress"], 88)
+        self.assertLess(vehicle_track["progress"], 100)
+        self.assertIn("2026-07-31", vehicle_track["detail"])
+        self.assertIn("45-day source refresh policy", vehicle_track["detail"])
+        self.assertTrue(any("condition snapshot" in signal for signal in vehicle_track["signals"]))
+        self.assertTrue(any("actual-cost issue outcome" in signal for signal in vehicle_track["signals"]))
         self.assertTrue(
             any(
                 "real user demand" in gate
-                for gate in in_progress_by_title["Vehicle catalog and maintenance depth"]["maturity_gates"]
+                for gate in vehicle_track["maturity_gates"]
             )
         )
         self.assertEqual(learning_by_title["Vehicle maintenance learning"]["blocker_label"], "Remaining maturity")
-        self.assertIn("salary-bearing accepted/rejected", in_progress_by_title["Career source and compensation breadth"]["detail"])
+        career_track = in_progress_by_title["Career source and compensation breadth"]
+        self.assertEqual(career_track["maturity_status"], "Outcome-gated")
+        self.assertIn("salary-bearing accepted/rejected", career_track["detail"])
+        self.assertTrue(any("validated salary-bearing outcome" in signal for signal in career_track["signals"]))
+        self.assertTrue(any("outcome contract:" in signal for signal in career_track["signals"]))
         self.assertTrue(
             any(
                 "Specialty sources are added only after real users expose role or geography gaps" in gate
-                for gate in in_progress_by_title["Career source and compensation breadth"]["maturity_gates"]
+                for gate in career_track["maturity_gates"]
             )
         )
         self.assertIn("required-source proof contracts", in_progress_by_title["Evidence freshness and proof rigor"]["detail"])
         self.assertIn("registered recommendation or relationship-adjacent surfaces declare the full contract", in_progress_by_title["Evidence freshness and proof rigor"]["detail"])
+        self.assertEqual(in_progress_by_title["Evidence freshness and proof rigor"]["maturity_status"], "Refresh healthy")
         self.assertIn("scheduled refresh: refresh_due_records", in_progress_by_title["Evidence freshness and proof rigor"]["signals"])
         self.assertTrue(any("active evidence record(s) are fresh" in signal for signal in in_progress_by_title["Evidence freshness and proof rigor"]["signals"]))
         self.assertTrue(any(signal.startswith("last attempt:") for signal in in_progress_by_title["Evidence freshness and proof rigor"]["signals"]))
@@ -681,17 +833,23 @@ class ProjectDetailsLiveTests(TestCase):
                 for gate in in_progress_by_title["Large-data hardening"]["maturity_gates"]
             )
         )
-        self.assertTrue(any("registered materialized namespace" in signal for signal in in_progress_by_title["Large-data hardening"]["signals"]))
-        self.assertTrue(any("cache hit rate" in signal for signal in in_progress_by_title["Large-data hardening"]["signals"]))
-        self.assertTrue(any("generation latency" in signal for signal in in_progress_by_title["Large-data hardening"]["signals"]))
-        self.assertIn("excludes the planned future RL learner", in_progress_by_title["ML maturity and training lifecycle"]["detail"])
+        large_data_track = in_progress_by_title["Large-data hardening"]
+        self.assertEqual(large_data_track["maturity_status"], "Production-traffic gated")
+        self.assertTrue(any("registered materialized namespace" in signal for signal in large_data_track["signals"]))
+        self.assertTrue(any("cache hit rate" in signal for signal in large_data_track["signals"]))
+        self.assertTrue(any("generation latency" in signal for signal in large_data_track["signals"]))
+        self.assertIn("runtime telemetry ready: no", large_data_track["signals"])
+        ml_track = in_progress_by_title["ML maturity and training lifecycle"]
+        self.assertEqual(ml_track["maturity_status"], "Training-gated")
+        self.assertIn("excludes the planned future RL learner", ml_track["detail"])
+        self.assertTrue(any("planned future model" in signal for signal in ml_track["signals"]))
         self.assertTrue(
             any(
                 "planned-only" in gate
-                for gate in in_progress_by_title["ML maturity and training lifecycle"]["maturity_gates"]
+                for gate in ml_track["maturity_gates"]
             )
         )
-        self.assertEqual(in_progress_by_title["ML maturity and training lifecycle"]["progress"], round(payload["learning_snapshot"]["model_training"]["overall_progress"]))
+        self.assertEqual(ml_track["progress"], round(payload["learning_snapshot"]["model_training"]["overall_progress"]))
         self.assertEqual(completed_by_title["Backend/API regression baseline"]["progress"], 100)
         self.assertEqual(completed_by_title["Vehicle make/model picker fix"]["progress"], 100)
         self.assertNotIn("Vehicle catalog and maintenance depth", completed_by_title)

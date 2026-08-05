@@ -437,10 +437,21 @@ def materialized_cache_health_snapshot() -> dict:
 
     registered_count = len(registry)
     observed_count = sum(1 for item in namespace_rows if item["requests"] > 0)
+    unobserved_count = max(registered_count - observed_count, 0)
+    configured_ttl_ready = registered_count > 0 and configured_ttl_count == registered_count
+    runtime_telemetry_ready = registered_count > 0 and observed_count == registered_count
+    traffic_sample_ready = runtime_telemetry_ready and total_requests >= registered_count * 2
+    maturity_blockers = []
+    if not configured_ttl_ready:
+        maturity_blockers.append("not every registered namespace has a configured TTL")
+    if unobserved_count:
+        maturity_blockers.append(f"{unobserved_count} registered namespace(s) do not have runtime telemetry")
+    if not traffic_sample_ready:
+        maturity_blockers.append("namespace traffic sample is not broad enough for production cache sizing")
     return {
         "registered_namespace_count": registered_count,
         "observed_namespace_count": observed_count,
-        "unobserved_namespace_count": max(registered_count - observed_count, 0),
+        "unobserved_namespace_count": unobserved_count,
         "total_requests": total_requests,
         "hits": total_hits,
         "misses": total_misses,
@@ -461,7 +472,11 @@ def materialized_cache_health_snapshot() -> dict:
         "last_invalidation_namespace": last_invalidation["namespace"],
         "last_generated_at": last_generated_at,
         "last_served_at": last_served_at,
-        "observability_ready": registered_count > 0 and configured_ttl_count == registered_count,
+        "configured_ttl_ready": configured_ttl_ready,
+        "observability_ready": configured_ttl_ready and observed_count > 0,
+        "runtime_telemetry_ready": runtime_telemetry_ready,
+        "traffic_sample_ready": traffic_sample_ready,
+        "maturity_blockers": maturity_blockers,
         "production_mature": False,
         "summary": (
             f"{observed_count}/{registered_count} materialized namespace(s) have runtime telemetry; "

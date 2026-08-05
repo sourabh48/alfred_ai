@@ -222,6 +222,126 @@ class VerifiedIntelligenceCircuitBreakerTests(TestCase):
         self.assertEqual(result["refreshed"], 1)
         self.assertEqual(result["batch_size"], 1)
         self.assertEqual(news_mock.call_count + jobs_mock.call_count, 1)
+        self.assertEqual(result["candidate_records"], 2)
+        self.assertEqual(result["capacity_gap_records"], 1)
+        self.assertTrue(result["batch_limited"])
+
+    def test_refresh_health_snapshot_reports_capacity_gap_and_per_scope_state(self):
+        now = timezone.now()
+        with patch.object(verified_intelligence, "REFRESH_BATCH_SIZE", 2):
+            self._create_evidence(
+                scope="jobs",
+                cache_key="remotive:python",
+                source_name="Remotive Jobs API",
+                source_url="https://remotive.com/api/remote-jobs",
+                query="python",
+                status="fresh",
+                stale_after=now - timedelta(minutes=10),
+            )
+            self._create_evidence(
+                scope="news",
+                cache_key="google-news:market",
+                source_name="Google News RSS",
+                source_url="https://news.google.com/rss/search?q=market",
+                query="market",
+                status="stale",
+                stale_after=now - timedelta(hours=1),
+            )
+            self._create_evidence(
+                scope="market",
+                cache_key="india-equity-volatility",
+                source_name="Yahoo Finance",
+                source_url="https://finance.yahoo.com/quote/%5ENSEI/",
+                status="fresh",
+                stale_after=now + timedelta(hours=12),
+            )
+            self._create_evidence(
+                scope="macro",
+                cache_key="world-bank:FP.CPI.TOTL.ZG",
+                source_name="World Bank",
+                source_url="https://api.worldbank.org/v2/country/IND/indicator/FP.CPI.TOTL.ZG?format=json&per_page=8",
+                status="fresh",
+                stale_after=now + timedelta(days=30),
+            )
+            self._create_evidence(
+                scope="tax",
+                cache_key="india-income-tax-regimes",
+                source_name="Income Tax Department",
+                source_url="https://www.incometax.gov.in/iec/foportal/",
+                status="failed",
+                stale_after=now + timedelta(days=30),
+            )
+
+            health = verified_intelligence.refresh_health_snapshot(now=now)
+
+        self.assertEqual(health["active_records"], 5)
+        self.assertEqual(health["fresh_records"], 2)
+        self.assertEqual(health["watchlist_records"], 3)
+        self.assertEqual(health["due_records"], 1)
+        self.assertEqual(health["scheduled_candidate_records"], 3)
+        self.assertEqual(health["scheduled_refresh_batch_size"], 2)
+        self.assertEqual(health["capacity_gap_records"], 1)
+        self.assertTrue(health["batch_limited"])
+        self.assertFalse(health["freshness_healthy"])
+        self.assertFalse(health["scheduled_refresh_healthy"])
+        self.assertFalse(health["healthy"])
+        self.assertIn("candidate gap", health["summary"])
+
+        scopes = {item["scope"]: item for item in health["per_scope"]}
+        self.assertEqual(set(scopes), {"jobs", "macro", "market", "news", "tax"})
+        self.assertEqual(scopes["jobs"]["due_records"], 1)
+        self.assertEqual(scopes["news"]["stale_records"], 1)
+        self.assertEqual(scopes["tax"]["failed_records"], 1)
+        self.assertEqual(scopes["market"]["fresh_records"], 1)
+        self.assertEqual(scopes["macro"]["fresh_records"], 1)
+        self.assertEqual(scopes["jobs"]["scheduled_candidate_records"], 1)
+        self.assertEqual(scopes["news"]["scheduled_candidate_records"], 1)
+        self.assertEqual(scopes["tax"]["scheduled_candidate_records"], 1)
+
+    def test_refresh_due_records_reduces_watchlist_and_includes_failed_records(self):
+        now = timezone.now()
+        self._create_evidence(
+            scope="news",
+            cache_key="google-news:market",
+            source_name="Google News RSS",
+            source_url="https://news.google.com/rss/search?q=market&hl=en-IN&gl=IN&ceid=IN:en",
+            query="market",
+            status="stale",
+            stale_after=now - timedelta(hours=1),
+        )
+        self._create_evidence(
+            scope="jobs",
+            cache_key="remotive:python",
+            source_name="Remotive Jobs API",
+            source_url="https://remotive.com/api/remote-jobs",
+            query="python",
+            status="failed",
+            stale_after=now + timedelta(days=1),
+        )
+
+        with patch.object(
+            verified_intelligence,
+            "_fetch_google_news",
+            return_value=({"items": []}, "News refreshed.", "notes"),
+        ) as news_mock, patch.object(
+            verified_intelligence,
+            "_fetch_remotive_jobs",
+            return_value=({"jobs": []}, "Jobs refreshed.", "notes"),
+        ) as jobs_mock:
+            result = verified_intelligence.refresh_due_records(batch_size=2)
+
+        self.assertEqual(result["processed"], 2)
+        self.assertEqual(result["refreshed"], 2)
+        self.assertEqual(result["failed"], 0)
+        self.assertEqual(result["watchlist_before"], 2)
+        self.assertEqual(result["watchlist_after"], 0)
+        self.assertTrue(result["watchlist_reduced"])
+        self.assertEqual(result["candidate_records"], 2)
+        self.assertEqual(result["capacity_gap_records"], 0)
+        self.assertFalse(result["batch_limited"])
+        self.assertEqual(news_mock.call_count, 1)
+        self.assertEqual(jobs_mock.call_count, 1)
+        self.assertTrue(all(scope["watchlist_records"] == 0 for scope in result["per_scope_health"]))
 
     def test_refresh_due_records_routes_job_records_to_source_adapter(self):
         now = timezone.now()

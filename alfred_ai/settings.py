@@ -270,7 +270,7 @@ CELERY_BEAT_SCHEDULE = {
     "verified-intelligence-refresh": {
         "task": "apps.integrations.tasks.refresh_verified_external_intelligence",
         "schedule": timedelta(hours=6),
-        "args": (25,),
+        "args": (75,),
     },
     "verified-intelligence-cleanup": {
         "task": "apps.integrations.tasks.cleanup_verified_external_intelligence",

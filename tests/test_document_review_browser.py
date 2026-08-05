@@ -11,6 +11,7 @@ from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test import Client
 
 from apps.expenses.models import StatementUpload
+from apps.ml_engine.models import DocumentParserLearningMemory
 from apps.mobility.models import BikeDocument, BikeProfile, BikeServiceRecord
 
 
@@ -336,6 +337,182 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(
             self.record.parsed_payload["review_trace"]["accepted_corrections"]["service_center"],
             "Jagadamba Automobiles",
+        )
+
+    def test_statement_review_candidate_buttons_fill_and_save_correction(self):
+        self.statement_upload = self._create_unknown_statement_upload()
+        self._login_browser()
+        self._install_review_queue_harness()
+
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, "documentCenterRoot")))
+        self.wait.until(
+            lambda driver: "unknown-layout-bank-statement.pdf"
+            in driver.find_element(self.By.ID, "documentReviewQueue").text
+        )
+        self._open_review_summary("Review extraction evidence")
+        self._open_review_summary("Accept correction")
+
+        for field_name, value in (
+            ("bank_name", "HDFC Bank"),
+            ("account_holder", "Selenium User"),
+            ("account_number", "50100244137504"),
+            ("statement_start", "2026-03-01"),
+            ("statement_end", "2026-03-31"),
+        ):
+            self._click_candidate(field_name, value)
+            self.assertEqual(
+                self._review_field(field_name, scope="statement_document").get_attribute("value"),
+                value,
+            )
+
+        submit = self.wait.until(
+            self.EC.presence_of_element_located(
+                (
+                    self.By.XPATH,
+                    "//*[@id='documentReviewQueue']//form[contains(@id, 'review-form-statement_document')]//button[normalize-space()='Save Correction']",
+                )
+            )
+        )
+        self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center'});", submit)
+        self.selenium.execute_script(
+            """
+            arguments[0].closest("details").open = true;
+            window.submitDocumentCorrection(
+                { preventDefault: () => {}, currentTarget: arguments[0].form },
+                "statement_document",
+                arguments[1]
+            );
+            """,
+            submit,
+            self.statement_upload.pk,
+        )
+
+        self.wait.until(
+            lambda driver: StatementUpload.objects.get(pk=self.statement_upload.pk).parser_status == "parsed"
+            or driver.execute_script("return Boolean(window.__lastCorrectionError);")
+        )
+        correction_error = self.selenium.execute_script("return window.__lastCorrectionError || '';")
+        if correction_error:
+            correction_request = self.selenium.execute_script("return window.__lastCorrectionRequest || '';")
+            correction_result = self.selenium.execute_script("return window.__lastCorrectionResult || null;")
+            self.fail(
+                f"Statement correction POST failed: {correction_error}; request={correction_request}; result={correction_result}"
+            )
+
+        self.statement_upload.refresh_from_db()
+        accepted = self.statement_upload.extracted_payload["accepted_corrections"]
+        self.assertEqual(self.statement_upload.bank_name, "HDFC Bank")
+        self.assertEqual(self.statement_upload.account_holder, "Selenium User")
+        self.assertEqual(self.statement_upload.account_number, "50100244137504")
+        self.assertEqual(str(self.statement_upload.statement_start), "2026-03-01")
+        self.assertEqual(str(self.statement_upload.statement_end), "2026-03-31")
+        self.assertTrue(self.statement_upload.extracted_payload["review_queue_resolved"])
+        self.assertEqual(accepted["bank_name"], "HDFC Bank")
+
+        memory = DocumentParserLearningMemory.objects.get(
+            scope="statement_document",
+            last_resolution="accepted_correction",
+        )
+        self.assertTrue(
+            {"bank_name", "account_holder", "account_number", "statement_start", "statement_end"}.issubset(
+                set(memory.accepted_field_hints)
+            )
+        )
+
+    def _create_unknown_statement_upload(self):
+        return StatementUpload.objects.create(
+            user=self.user,
+            source="bank_statement",
+            file_name="unknown-layout-bank-statement.pdf",
+            parser_status="needs_review",
+            parse_confidence=0.22,
+            imported_count=1,
+            extracted_payload={
+                "extraction_method": "rapidocr_unknown_statement_layout",
+                "raw_text_excerpt": (
+                    "HDFC Bank Statement Selenium User AC 50100244137504 "
+                    "Period 01-03-2026 to 31-03-2026"
+                ),
+                "extraction_review": {
+                    "field_candidates": [
+                        {
+                            "field_type": "institution",
+                            "field_name": "bank",
+                            "label": "Institution",
+                            "value": "HDFC Bank",
+                            "confidence": 0.83,
+                            "source": "unknown_statement_ocr",
+                            "context": "HDFC Bank Statement",
+                            "page": 1,
+                        },
+                        {
+                            "field_type": "holder",
+                            "field_name": "holder",
+                            "label": "Holder",
+                            "value": "Selenium User",
+                            "confidence": 0.79,
+                            "source": "unknown_statement_ocr",
+                            "context": "Statement Selenium User",
+                            "page": 1,
+                        },
+                        {
+                            "field_type": "account no",
+                            "field_name": "acct-no",
+                            "label": "AC",
+                            "value": "50100244137504",
+                            "confidence": 0.76,
+                            "source": "unknown_statement_ocr",
+                            "context": "AC 50100244137504",
+                            "page": 1,
+                        },
+                        {
+                            "field_type": "from date",
+                            "field_name": "period start",
+                            "label": "Period Start",
+                            "value": "2026-03-01",
+                            "confidence": 0.74,
+                            "source": "unknown_statement_ocr",
+                            "context": "Period 01-03-2026",
+                            "page": 1,
+                        },
+                        {
+                            "field_type": "to date",
+                            "field_name": "period end",
+                            "label": "Period End",
+                            "value": "2026-03-31",
+                            "confidence": 0.74,
+                            "source": "unknown_statement_ocr",
+                            "context": "to 31-03-2026",
+                            "page": 1,
+                        },
+                    ],
+                    "ocr_pages": [
+                        {
+                            "page": 1,
+                            "width": 1000,
+                            "height": 1400,
+                            "preview": "HDFC Bank Statement Selenium User AC 50100244137504",
+                            "variant": "unknown_statement_layout",
+                            "regions": [
+                                {
+                                    "text": "HDFC Bank Statement Selenium User",
+                                    "confidence": 0.42,
+                                    "bbox": [[30, 95], [780, 95], [780, 135], [30, 135]],
+                                    "origin": "mobile_photo",
+                                },
+                                {
+                                    "text": "AC 50100244137504 Period 01-03-2026 to 31-03-2026",
+                                    "confidence": 0.39,
+                                    "bbox": [[32, 180], [880, 180], [880, 226], [32, 226]],
+                                    "origin": "mobile_photo",
+                                },
+                            ],
+                        }
+                    ],
+                    "recovery_steps": [{"step": "cross_family_unknown_layout", "status": "mapped"}],
+                    "attempts": [{"method": "rapidocr_unknown_statement_layout", "quality": 0.66}],
+                },
+            },
         )
 
     def _login_browser(self):
@@ -708,12 +885,12 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
                 f"Could not click candidate {field_name}={value}. Available buttons: {available}"
             ) from last_error
 
-    def _review_field(self, field_name):
+    def _review_field(self, field_name, *, scope="vehicle_document"):
         return self.wait.until(
             self.EC.presence_of_element_located(
                 (
                     self.By.CSS_SELECTOR,
-                    f'#documentReviewQueue form[id^="review-form-vehicle_document"] [name="{field_name}"]',
+                    f'#documentReviewQueue form[id^="review-form-{scope}"] [name="{field_name}"]',
                 )
             )
         )

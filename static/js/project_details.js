@@ -106,6 +106,16 @@ function renderGuardrails(guardrails) {
                     copy: `watchlist | ${refreshHealth.stale_records ?? 0} stale | ${refreshHealth.failed_records ?? 0} failed | ${refreshHealth.rejected_records ?? 0} rejected | ${refreshHealth.due_records ?? 0} due`,
                 },
                 {
+                    label: "Scheduled candidates",
+                    value: String(refreshHealth.scheduled_candidate_records ?? 0),
+                    copy: `${refreshHealth.stale_lookahead_hours ?? guardrails.stale_lookahead_hours ?? 0}h lookahead | batch ${refreshHealth.scheduled_refresh_batch_size ?? guardrails.refresh_batch_size ?? 0}`,
+                },
+                {
+                    label: "Capacity gap",
+                    value: String(refreshHealth.capacity_gap_records ?? 0),
+                    copy: refreshHealth.scheduled_refresh_healthy ? "scheduled refresh can drain the current candidate set" : "scheduled refresh is still gated",
+                },
+                {
                     label: "Last refresh attempt",
                     value: refreshHealth.last_refresh_attempt_at || "not recorded",
                     copy: `last success ${refreshHealth.last_refresh_success_at || "not recorded"}`,
@@ -148,7 +158,7 @@ function renderGuardrails(guardrails) {
             <p class="page-section-copy mb-2">${Alfred.escapeHtml(refreshHealth.summary || "No active evidence scopes tracked yet.")}</p>
             ${perScope.length ? `
                 <div class="chip-row">
-                    ${perScope.map(scope => `<span class="chip-neutral">${Alfred.escapeHtml(scope.scope || "")} | ${Alfred.escapeHtml(`${scope.fresh_records ?? 0}/${scope.active_records ?? 0}`)} fresh | ${Alfred.escapeHtml(String(scope.watchlist_records ?? 0))} watchlist</span>`).join("")}
+                    ${perScope.map(scope => `<span class="chip-neutral">${Alfred.escapeHtml(scope.scope || "")} | ${Alfred.escapeHtml(`${scope.fresh_records ?? 0}/${scope.active_records ?? 0}`)} fresh | ${Alfred.escapeHtml(String(scope.watchlist_records ?? 0))} watchlist | ${Alfred.escapeHtml(String(scope.scheduled_candidate_records ?? 0))} queued</span>`).join("")}
                 </div>
             ` : `<div class="empty-state">No active evidence scopes tracked yet.</div>`}
         `);

@@ -314,6 +314,8 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn("browser_regression_summary.json", runner)
         self.assertIn("tests_run_count", runner)
         self.assertIn("proof_label", runner)
+        self.assertIn("github_actions_metadata", runner)
+        self.assertIn("github_actions", runner)
         self.assertIn("artifact_contract", runner)
         self.assertIn("failure_artifact_suffixes", runner)
 
@@ -324,9 +326,13 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn("scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome", workflow)
         self.assertIn('ALFRED_RUN_BROWSER_TESTS: "true"', workflow)
         self.assertIn("browser-actions/setup-chrome", workflow)
+        self.assertIn("Validate CI browser proof summary", workflow)
+        self.assertIn("artifacts/browser/browser_regression_summary.ci-chrome.json", workflow)
+        self.assertIn("github.get(\"enabled\") is True", workflow)
+        self.assertIn('payload.get("skipped_count") == 0', workflow)
         self.assertIn("actions/upload-artifact", workflow)
         self.assertIn("artifacts/browser", workflow)
-        self.assertIn("if-no-files-found: warn", workflow)
+        self.assertIn("if-no-files-found: error", workflow)
 
         self.assertIn("python scripts/run_browser_regressions.py --browser Chrome --require-browser", readme)
         self.assertIn("browser_regression_summary.json", readme)

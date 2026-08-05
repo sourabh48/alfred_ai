@@ -249,7 +249,7 @@ class VerifiedIntelligenceService:
     USER_AGENT = "AlfredAI/1.0 (verified-intelligence)"
     CIRCUIT_FAILURE_THRESHOLD = 3
     CIRCUIT_OPEN_MINUTES = 20
-    REFRESH_BATCH_SIZE = 25
+    REFRESH_BATCH_SIZE = 75
     STALE_LOOKAHEAD_HOURS = 6
 
     def cleanup_stale(self, retention_days: int = 90) -> None:
@@ -583,12 +583,16 @@ class VerifiedIntelligenceService:
     def refresh_due_records(self, batch_size: int | None = None) -> dict:
         self.cleanup_stale()
         now = timezone.now()
-        batch_size = batch_size or self.REFRESH_BATCH_SIZE
+        batch_size = max(1, int(batch_size or self.REFRESH_BATCH_SIZE))
         health_before = self.refresh_health_snapshot(now=now)
+        candidate_filter = Q(status__in=["stale", "failed", "rejected"]) | Q(
+            stale_after__lte=now + timedelta(hours=self.STALE_LOOKAHEAD_HOURS)
+        )
+        candidate_queryset = VerifiedExternalInsight.objects.filter(is_active=True).filter(candidate_filter)
+        candidate_count = candidate_queryset.count()
+        capacity_gap = max(candidate_count - batch_size, 0)
         candidates = list(
-            VerifiedExternalInsight.objects.filter(is_active=True)
-            .filter(Q(status="stale") | Q(stale_after__lte=now + timedelta(hours=self.STALE_LOOKAHEAD_HOURS)))
-            .order_by("stale_after", "-verified_at", "-id")[:batch_size]
+            candidate_queryset.order_by("stale_after", "-verified_at", "-id")[:batch_size]
         )
 
         processed = 0
@@ -623,6 +627,8 @@ class VerifiedIntelligenceService:
             records.append(self._refresh_record_outcome(record, outcome))
 
         health_after = self.refresh_health_snapshot()
+        watchlist_before = health_before["watchlist_records"]
+        watchlist_after = health_after["watchlist_records"]
 
         return {
             "processed": processed,
@@ -630,13 +636,19 @@ class VerifiedIntelligenceService:
             "skipped": skipped,
             "failed": failed,
             "batch_size": batch_size,
+            "scheduled_refresh_batch_size": self.REFRESH_BATCH_SIZE,
+            "candidate_records": candidate_count,
+            "capacity_gap_records": capacity_gap,
+            "batch_limited": candidate_count > batch_size,
             "started_at": now.isoformat(),
             "completed_at": timezone.now().isoformat(),
-            "watchlist_before": health_before["watchlist_records"],
-            "watchlist_after": health_after["watchlist_records"],
+            "watchlist_before": watchlist_before,
+            "watchlist_after": watchlist_after,
+            "watchlist_reduced": watchlist_after < watchlist_before,
             "last_refresh_attempt_at": health_after["last_refresh_attempt_at"],
             "last_refresh_success_at": health_after["last_refresh_success_at"],
             "per_scope": [per_scope[key] for key in sorted(per_scope)],
+            "per_scope_health": health_after["per_scope"],
             "records": records,
         }
 
@@ -644,9 +656,12 @@ class VerifiedIntelligenceService:
         now = now or timezone.now()
         active = VerifiedExternalInsight.objects.filter(is_active=True)
         watchlist_filter = Q(status__in=["stale", "failed", "rejected"]) | Q(stale_after__lte=now)
+        scheduled_cutoff = now + timedelta(hours=self.STALE_LOOKAHEAD_HOURS)
+        scheduled_filter = Q(status__in=["stale", "failed", "rejected"]) | Q(stale_after__lte=scheduled_cutoff)
         watchlist = active.filter(watchlist_filter)
         fresh = active.filter(status="fresh", stale_after__gt=now)
         due = active.filter(status="fresh", stale_after__lte=now)
+        scheduled_candidates = active.filter(scheduled_filter)
         status_counts = {item["status"]: item["count"] for item in active.values("status").annotate(count=Count("id"))}
 
         last_attempt = active.exclude(last_refresh_attempt_at__isnull=True).aggregate(value=Max("last_refresh_attempt_at"))["value"]
@@ -660,6 +675,7 @@ class VerifiedIntelligenceService:
             scoped = active.filter(scope=scope)
             scoped_watchlist = scoped.filter(watchlist_filter)
             scoped_fresh = scoped.filter(status="fresh", stale_after__gt=now)
+            scoped_scheduled_candidates = scoped.filter(scheduled_filter)
             scope_last_attempt = scoped.exclude(last_refresh_attempt_at__isnull=True).aggregate(value=Max("last_refresh_attempt_at"))["value"]
             scope_last_success = scoped.exclude(last_refresh_success_at__isnull=True).aggregate(value=Max("last_refresh_success_at"))["value"]
             scope_legacy_success = scoped_fresh.aggregate(value=Max("verified_at"))["value"]
@@ -672,6 +688,7 @@ class VerifiedIntelligenceService:
                     "fresh_records": scoped_fresh.count(),
                     "watchlist_records": scoped_watchlist.count(),
                     "due_records": scoped.filter(status="fresh", stale_after__lte=now).count(),
+                    "scheduled_candidate_records": scoped_scheduled_candidates.count(),
                     "stale_records": scoped.filter(status="stale").count(),
                     "failed_records": scoped.filter(status="failed").count(),
                     "rejected_records": scoped.filter(status="rejected").count(),
@@ -680,27 +697,52 @@ class VerifiedIntelligenceService:
                 }
             )
 
-        next_due_at = fresh.aggregate(value=Min("stale_after"))["value"]
         oldest_watchlist_at = watchlist.aggregate(value=Min("stale_after"))["value"]
+        next_due_at = oldest_watchlist_at if oldest_watchlist_at else fresh.aggregate(value=Min("stale_after"))["value"]
         active_count = active.count()
+        fresh_count = fresh.count()
         watchlist_count = watchlist.count()
+        due_count = due.count()
+        scheduled_candidate_count = scheduled_candidates.count()
+        capacity_gap = max(scheduled_candidate_count - self.REFRESH_BATCH_SIZE, 0)
+        scheduled_refresh_healthy = active_count > 0 and watchlist_count == 0 and capacity_gap == 0
+        if capacity_gap:
+            capacity_summary = (
+                f" Scheduled refresh capacity is {self.REFRESH_BATCH_SIZE} record(s), "
+                f"leaving a {capacity_gap}-record candidate gap inside the {self.STALE_LOOKAHEAD_HOURS}-hour lookahead."
+            )
+        elif scheduled_candidate_count:
+            capacity_summary = (
+                f" {scheduled_candidate_count} record(s) are inside the {self.STALE_LOOKAHEAD_HOURS}-hour refresh lookahead "
+                f"and fit in the scheduled batch."
+            )
+        else:
+            capacity_summary = " No active records are due inside the scheduled refresh lookahead."
         return {
             "active_records": active_count,
-            "fresh_records": fresh.count(),
+            "fresh_records": fresh_count,
             "watchlist_records": watchlist_count,
-            "due_records": due.count(),
+            "due_records": due_count,
             "stale_records": status_counts.get("stale", 0),
             "failed_records": status_counts.get("failed", 0),
             "rejected_records": status_counts.get("rejected", 0),
+            "scheduled_candidate_records": scheduled_candidate_count,
+            "scheduled_refresh_batch_size": self.REFRESH_BATCH_SIZE,
+            "stale_lookahead_hours": self.STALE_LOOKAHEAD_HOURS,
+            "capacity_gap_records": capacity_gap,
+            "batch_limited": capacity_gap > 0,
+            "freshness_healthy": active_count > 0 and watchlist_count == 0,
+            "scheduled_refresh_healthy": scheduled_refresh_healthy,
             "last_refresh_attempt_at": _iso_or_empty(last_attempt),
             "last_refresh_success_at": _iso_or_empty(last_success),
             "next_due_at": _iso_or_empty(next_due_at),
             "oldest_watchlist_stale_after": _iso_or_empty(oldest_watchlist_at),
             "per_scope": per_scope,
-            "healthy": active_count > 0 and watchlist_count == 0,
+            "healthy": scheduled_refresh_healthy,
             "summary": (
-                f"{fresh.count()}/{active_count} active evidence record(s) are fresh; "
+                f"{fresh_count}/{active_count} active evidence record(s) are fresh; "
                 f"{watchlist_count} stale, failed, rejected, or due record(s) are on the watchlist."
+                f"{capacity_summary}"
             ),
         }
 
@@ -717,8 +759,8 @@ class VerifiedIntelligenceService:
             "fault_tolerance": [
                 "Repeated upstream failures trip a circuit breaker before more external calls are attempted.",
                 "If a verified record already exists, Alfred falls back to the latest stored payload instead of failing the dashboard outright.",
-                "Scheduled refresh is batch-limited so one bad source cannot overload the whole refresh cycle.",
-                "Refresh health exposes processed, refreshed, skipped, failed, per-scope watchlist, last-attempt, and last-success outcomes.",
+                "Scheduled refresh is batch-limited so one bad source cannot overload the whole refresh cycle, and health telemetry reports when the candidate set exceeds that capacity.",
+                "Refresh health exposes processed, refreshed, skipped, failed, per-scope watchlist, due, scheduled-candidate, last-attempt, and last-success outcomes.",
                 "Stale cleanup only removes failed or inactive records after retention windows instead of deleting active evidence aggressively.",
                 proof_contract["new_signal_rule"],
             ],
