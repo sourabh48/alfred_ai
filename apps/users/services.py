@@ -168,7 +168,7 @@ def clear_user_fed_data(user) -> dict:
 
     _delete_storage_files(file_names)
     _delete_generated_report_paths(generated_paths)
-    invalidate_user_materialized_payloads(user.id)
+    invalidate_user_materialized_payloads(user.id, reason="user_data_reset")
     summary["profile_fields_reset"] = True
     summary["account_preserved"] = True
     summary["materialized_caches_cleared"] = True

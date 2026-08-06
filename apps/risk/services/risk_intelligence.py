@@ -8,7 +8,7 @@ from apps.career.services import job_intelligence
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.family.models import Dependent
 from apps.integrations.services import verified_intelligence
-from apps.integrations.services.verified_intelligence import freshness_snapshot
+from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 from apps.mobility.services import bike_service_intelligence
 from apps.risk.models import RiskSignal
 
@@ -272,6 +272,12 @@ class RiskIntelligenceService:
                 },
                 "evidence": evidence,
                 "freshness": evidence_freshness,
+                "proof_contract": proof_contract_payload(
+                    evidence_items=evidence,
+                    freshness=evidence_freshness,
+                    required_sources=["World Bank"],
+                    advisory_surface="risk_outlook",
+                ),
                 "notes": [
                     "Risk Radar blends user-owned financial, behavioral, mobility, and manual risk snapshots with verified external context.",
                     "External evidence grounds market and macro pressure only; the final category scores remain bounded and deterministic.",

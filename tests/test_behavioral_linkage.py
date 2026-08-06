@@ -107,6 +107,7 @@ class BehavioralLinkageTests(TestCase):
         self.assertEqual(payload["grounding"]["freshness"]["tracked_records"], 2)
         self.assertTrue(payload["grounding"]["freshness"]["proof_complete"])
         self.assertTrue(payload["grounding"]["proof_contract"]["complete"])
+        self.assertEqual(payload["grounding"]["proof_contract"]["refresh_contract"]["scheduled_refresh"], "refresh_due_records")
         self.assertEqual(payload["grounding"]["history"]["transactions"], 24)
 
     def test_behavioral_stress_uses_transaction_history_without_manual_logs(self):
@@ -125,6 +126,7 @@ class BehavioralLinkageTests(TestCase):
         self.assertEqual(payload["grounding"]["history"]["transactions"], 24)
         self.assertEqual(payload["grounding"]["freshness"]["tracked_records"], 2)
         self.assertTrue(payload["grounding"]["proof_contract"]["complete"])
+        self.assertTrue(payload["grounding"]["proof_contract"]["refresh_contract"]["stale_fallback"])
 
     def test_behavioral_stress_blends_manual_logs_with_financial_pressure(self):
         self._seed_transaction_history()

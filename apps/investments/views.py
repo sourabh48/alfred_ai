@@ -14,6 +14,7 @@ from django.db import transaction
 from alfred_ai.services.materialized_cache import materialize_payload
 from alfred_ai.services import record_parser_learning
 from apps.reports.services import operational_logging_service
+from apps.integrations.services.verified_intelligence import proof_contract_payload
 from .services.portfolio_intelligence import portfolio_intelligence_service
 from .models import Investment, InvestmentImportDocument
 from .serializers import InvestmentImportDocumentSerializer, InvestmentSerializer
@@ -108,6 +109,8 @@ def _investment_summary_payload(user) -> dict:
     analysis = portfolio_intelligence_service.analyze_portfolio_risk(user)
     market_context = portfolio_intelligence_service.get_market_trends_and_suggestions(user)
     watchlist = portfolio_intelligence_service.build_short_horizon_watchlist(user)
+    evidence = market_context.get("evidence", [])
+    evidence_freshness = market_context.get("freshness", {})
 
     return {
         "summary": {
@@ -130,8 +133,14 @@ def _investment_summary_payload(user) -> dict:
                 "total_invested": round(total_invested, 2),
                 "monthly_sip": round(total_sip, 2),
             },
-            "evidence": market_context.get("evidence", []),
-            "freshness": market_context.get("freshness", {}),
+            "evidence": evidence,
+            "freshness": evidence_freshness,
+            "proof_contract": proof_contract_payload(
+                evidence_items=evidence,
+                freshness=evidence_freshness,
+                required_sources=["Yahoo Finance", "World Bank"],
+                advisory_surface="investment_summary",
+            ),
             "notes": [
                 "Portfolio guidance is grounded in user-held positions plus verified market and macro context.",
                 "Advice remains allocation guidance, not a claim of advisor-licensed suitability.",

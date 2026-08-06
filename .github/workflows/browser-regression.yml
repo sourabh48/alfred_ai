@@ -1,0 +1,112 @@
+name: Browser Regression
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/browser-regression.yml"
+      - "alfred_ai/**"
+      - "apps/**"
+      - "static/**"
+      - "templates/**"
+      - "tests/test_document_review_browser.py"
+      - "tests/test_browser_regression_runner.py"
+      - "tests/test_live_ui_contracts.py"
+      - "scripts/run_browser_regressions.py"
+      - "requirements.txt"
+
+jobs:
+  selenium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Prepare browser artifact directory
+        run: |
+          mkdir -p artifacts/browser
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path("artifacts/browser/ci-setup.json").write_text(
+              json.dumps(
+                  {
+                      "github_actions": os.environ.get("GITHUB_ACTIONS"),
+                      "event_name": os.environ.get("GITHUB_EVENT_NAME"),
+                      "workflow": os.environ.get("GITHUB_WORKFLOW"),
+                      "run_id": os.environ.get("GITHUB_RUN_ID"),
+                      "sha": os.environ.get("GITHUB_SHA"),
+                      "ref": os.environ.get("GITHUB_REF"),
+                      "head_ref": os.environ.get("GITHUB_HEAD_REF"),
+                  },
+                  indent=2,
+                  sort_keys=True,
+              ),
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Install browser system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y portaudio19-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+
+      - name: Run Selenium browser regressions
+        env:
+          ALFRED_RUN_BROWSER_TESTS: "true"
+          ALFRED_BROWSER_ARTIFACT_DIR: artifacts/browser
+        run: python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome
+
+      - name: Validate CI browser proof summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("artifacts/browser/browser_regression_summary.ci-chrome.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          github = payload.get("github_actions") or {}
+          contract = payload.get("artifact_contract") or {}
+          assert payload.get("browser") == "Chrome", payload
+          assert payload.get("run_context") == "ci", payload
+          assert payload.get("require_browser") is True, payload
+          assert payload.get("run_browser_tests_env") == "true", payload
+          assert payload.get("runner_return_code") == 0, payload
+          assert payload.get("tests_run_count", 0) > 0, payload
+          assert payload.get("skipped_count") == 0, payload
+          assert payload.get("driver_backed_success") is True, payload
+          assert payload.get("proof_label") == "ci-chrome", payload
+          assert contract.get("labeled_summary_filename") == "browser_regression_summary.ci-chrome.json", payload
+          assert github.get("enabled") is True, payload
+          assert github.get("run_id"), payload
+          assert github.get("workflow"), payload
+          assert github.get("repository"), payload
+          assert github.get("sha"), payload
+          assert github.get("event_name") in {"pull_request", "workflow_dispatch"}, payload
+          assert github.get("head_ref") or github.get("ref_name") or github.get("ref"), payload
+          PY
+
+      - name: Upload browser artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-regression-artifacts
+          path: artifacts/browser
+          if-no-files-found: error

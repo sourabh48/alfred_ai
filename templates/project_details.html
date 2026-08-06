@@ -55,13 +55,19 @@
                 <div class="progress alfred-progress">
                     <div class="progress-bar" id="projectDetailsOverallProgressBar" role="progressbar" style="width: {{ learning_snapshot.overall_progress }}%;" aria-valuenow="{{ learning_snapshot.overall_progress }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
+                <p class="metric-caption mb-0 mt-2" id="projectDetailsLearningCompletionSummary">{{ learning_snapshot.completion_summary }}</p>
             </div>
             <div class="learning-track-grid" id="projectDetailsLearningTracks">
                 {% for track in learning_snapshot.tracks %}
                 <div class="learning-track-card">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                         <div class="fw-semibold">{{ track.title }}</div>
-                        <span class="status-pill {% if track.progress >= 100 %}status-good{% else %}status-guarded{% endif %}">{{ track.progress }}%</span>
+                        <div class="d-flex flex-wrap justify-content-end gap-2">
+                            {% if track.maturity_status %}
+                            <span class="status-pill {% if track.blocked_by_real_data %}status-guarded{% else %}status-stable{% endif %}">{{ track.maturity_status }}</span>
+                            {% endif %}
+                            <span class="status-pill {% if track.progress >= 100 %}status-good{% else %}status-guarded{% endif %}">{{ track.progress }}%</span>
+                        </div>
                     </div>
                     <div class="progress alfred-progress mb-2">
                         <div class="progress-bar" role="progressbar" style="width: {{ track.progress }}%;" aria-valuenow="{{ track.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
@@ -72,6 +78,14 @@
                         <span class="chip-neutral">{{ signal }}</span>
                         {% endfor %}
                     </div>
+                    {% if track.completion_actions %}
+                    <div class="muted small mb-1"><strong>Completion actions:</strong></div>
+                    <ul class="completion-action-list mb-2">
+                        {% for action in track.completion_actions %}
+                        <li>{{ action }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
                     <div class="muted small"><strong>{{ track.blocker_label|default:"Still blocked by" }}:</strong> {{ track.blocker }}</div>
                 </div>
                 {% endfor %}
@@ -90,12 +104,31 @@
                 <div class="mini-card">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                         <div class="fw-semibold">{{ item.title }}</div>
-                        <span class="status-pill status-guarded">{{ item.progress }}%</span>
+                        <div class="d-flex flex-wrap justify-content-end gap-2">
+                            {% if item.maturity_status %}
+                            <span class="status-pill status-guarded">{{ item.maturity_status }}</span>
+                            {% endif %}
+                            <span class="status-pill status-guarded">{{ item.progress }}%</span>
+                        </div>
                     </div>
                     <div class="progress alfred-progress mb-2">
                         <div class="progress-bar" role="progressbar" style="width: {{ item.progress }}%;" aria-valuenow="{{ item.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
                     <div class="muted small mb-2">{{ item.detail }}</div>
+                    {% if item.signals %}
+                    <div class="chip-row mb-2">
+                        {% for signal in item.signals %}
+                        <span class="chip-neutral">{{ signal }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if item.maturity_gates %}
+                    <div class="chip-row mb-2">
+                        {% for gate in item.maturity_gates %}
+                        <span class="chip-neutral">{{ gate }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     <div class="muted small"><strong>Next focus:</strong> {{ item.next_focus }}</div>
                 </div>
                 {% endfor %}
@@ -240,7 +273,7 @@
         <div class="surface-card h-100">
             <h2 class="page-section-title">Operational Guardrails</h2>
             <p class="page-section-copy mb-3">Fault tolerance and rate-limiting rules currently protecting external intelligence and operational workflows.</p>
-            <div class="data-stack">
+            <div class="data-stack" id="projectDetailsGuardrailMetrics">
                 <div class="data-row">
                     <div class="data-label">Circuit threshold</div>
                     <div class="data-value">{{ guardrails.circuit_failure_threshold }} failures</div>
@@ -257,8 +290,94 @@
                     <div class="data-label">Refresh lookahead</div>
                     <div class="data-value">{{ guardrails.stale_lookahead_hours }} hours</div>
                 </div>
+                {% if guardrails.refresh_health %}
+                <div class="data-row">
+                    <div class="data-label">Refresh health</div>
+                    <div class="data-value">{{ guardrails.refresh_health.fresh_records }}/{{ guardrails.refresh_health.active_records }} <span class="muted small">fresh active evidence records</span></div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">Watchlist by state</div>
+                    <div class="data-value">{{ guardrails.refresh_health.watchlist_records }} <span class="muted small">watchlist | {{ guardrails.refresh_health.stale_records }} stale | {{ guardrails.refresh_health.failed_records }} failed | {{ guardrails.refresh_health.rejected_records }} rejected | {{ guardrails.refresh_health.due_records }} due</span></div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">Last refresh attempt</div>
+                    <div class="data-value">{{ guardrails.refresh_health.last_refresh_attempt_at|default:"not recorded" }} <span class="muted small">last success {{ guardrails.refresh_health.last_refresh_success_at|default:"not recorded" }}</span></div>
+                </div>
+                {% endif %}
+                {% if guardrails.proof_contract %}
+                <div class="data-row">
+                    <div class="data-label">Proof contract coverage</div>
+                    <div class="data-value">{{ guardrails.proof_contract.covered_surface_count }}/{{ guardrails.proof_contract.surface_count }} <span class="muted small">recommendation and relationship-adjacent surfaces</span></div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">Required refresh path</div>
+                    <div class="data-value">{{ guardrails.proof_contract.scheduled_refresh }} <span class="muted small">before new advisory signals ship</span></div>
+                </div>
+                {% endif %}
             </div>
-            <ul class="insight-list mt-4 mb-0">
+            {% if guardrails.proof_contract.surfaces %}
+            <div class="mt-4" id="projectDetailsProofContractBlock">
+                <h3 class="compact-section-title">Proof Contract Coverage</h3>
+                <p class="page-section-copy mb-2">{{ guardrails.proof_contract.summary }}</p>
+                <div class="chip-row">
+                    {% for surface in guardrails.proof_contract.surfaces %}
+                    <span class="chip-neutral">{{ surface.label }} | {{ surface.surface_type }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <div class="mt-4" id="projectDetailsRefreshScopeBlock">
+                <h3 class="compact-section-title">Evidence Refresh By Scope</h3>
+                <p class="page-section-copy mb-2">{{ guardrails.refresh_health.summary }}</p>
+                {% if guardrails.refresh_health.per_scope %}
+                <div class="chip-row">
+                    {% for scope in guardrails.refresh_health.per_scope %}
+                    <span class="chip-neutral">{{ scope.scope }} | {{ scope.fresh_records }}/{{ scope.active_records }} fresh | {{ scope.watchlist_records }} watchlist</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">No active evidence scopes tracked yet.</div>
+                {% endif %}
+            </div>
+            <div class="mt-4" id="projectDetailsCacheHealthBlock">
+                <h3 class="compact-section-title">Cache Health By Namespace</h3>
+                <p class="page-section-copy mb-2">{{ cache_health.summary }}</p>
+                {% if cache_health.namespaces %}
+                <div class="chip-row">
+                    {% for namespace in cache_health.namespaces %}
+                    <span class="chip-neutral">{{ namespace.namespace }} | {{ namespace.hit_rate_pct }}% hit | {{ namespace.average_generation_latency_ms }} ms | {{ namespace.last_cache_status }}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">No materialized cache namespaces are registered yet.</div>
+                {% endif %}
+            </div>
+            <div class="mt-4" id="projectDetailsBrowserCoverageBlock">
+                <h3 class="compact-section-title">Browser Driver Proof</h3>
+                <p class="page-section-copy mb-2">{{ browser_coverage.proof_summary.summary }}</p>
+                <div class="chip-row">
+                    <span class="chip-neutral">{{ browser_coverage.implementation_status }}</span>
+                    <span class="chip-neutral">{{ browser_coverage.maturity_status }}</span>
+                    <span class="chip-neutral">CI summary | {{ browser_coverage.ci_summary_artifact }}</span>
+                    <span class="chip-neutral">artifacts | {{ browser_coverage.artifact_dir }}</span>
+                    <span class="chip-neutral">workflow | {{ browser_coverage.ci_workflow }}</span>
+                </div>
+                <div class="data-stack mt-3">
+                    {% for proof in browser_coverage.local_proofs %}
+                    <div class="data-row">
+                        <div class="data-label">Local browser proof | {{ proof.label }}</div>
+                        <div class="data-value">{{ proof.state }} <span class="muted small">{{ proof.summary_path }} | skips {{ proof.skipped_count|default:"not recorded" }}</span></div>
+                    </div>
+                    {% endfor %}
+                    {% for proof in browser_coverage.ci_proofs %}
+                    <div class="data-row">
+                        <div class="data-label">CI browser proof | {{ proof.label }}</div>
+                        <div class="data-value">{{ proof.state }} <span class="muted small">{{ proof.summary_path }} | skips {{ proof.skipped_count|default:"not recorded" }}</span></div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <ul class="insight-list mt-4 mb-0" id="projectDetailsGuardrailFaults">
                 {% for item in guardrails.fault_tolerance %}
                 <li class="insight-item">{{ item }}</li>
                 {% endfor %}
@@ -320,5 +439,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/project_details.js?v=1.4"></script>
+<script src="/static/js/project_details.js?v=1.8"></script>
 {% endblock %}

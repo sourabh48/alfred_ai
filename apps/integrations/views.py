@@ -20,7 +20,7 @@ from apps.investments.models import Investment
 from apps.reports.services import operational_logging_service
 from .models import CreditReportUpload, CreditScore, CreditScoreFactor, VerifiedExternalInsight
 from .services import verified_intelligence
-from .services.verified_intelligence import freshness_snapshot
+from .services.verified_intelligence import freshness_snapshot, proof_contract_payload
 from .services.credit_loan_sync import sync_credit_report_loans
 from .services.credit_report_parser import credit_report_parser
 from .services.credit_score_tracker import credit_score_service
@@ -150,31 +150,11 @@ def _dedupe_evidence(items):
 
 
 def _proof_contract_payload(*, evidence_items, freshness, required_sources=None):
-    required_sources = list(required_sources or [])
-    observed_sources = sorted(
-        {
-            str(item.get("source_name") or "").strip()
-            for item in evidence_items
-            if str(item.get("source_name") or "").strip()
-        }
+    return proof_contract_payload(
+        evidence_items=evidence_items,
+        freshness=freshness,
+        required_sources=required_sources,
     )
-    missing_required_sources = [source for source in required_sources if source not in observed_sources]
-    return {
-        "complete": bool(freshness.get("proof_complete")) and not missing_required_sources,
-        "required_sources": required_sources,
-        "observed_sources": observed_sources,
-        "tracked_records": freshness.get("tracked_records", 0),
-        "fresh_records": freshness.get("fresh_records", 0),
-        "stale_or_due_records": freshness.get("stale_or_due_records", 0),
-        "missing_source_records": freshness.get("missing_source_records", 0),
-        "missing_freshness_records": freshness.get("missing_freshness_records", 0),
-        "missing_required_sources": missing_required_sources,
-        "refresh_contract": {
-            "scheduled_refresh": "refresh_due_records",
-            "stale_after_required": True,
-            "circuit_breaker": True,
-        },
-    }
 
 
 def _grounding_payload(*, history, evidence=None, notes=None, required_sources=None):
@@ -826,6 +806,7 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
     nps_reference = verified_intelligence.nps_tax_reference()
     ppf_reference = verified_intelligence.ppf_reference()
     evidence_items = [tax_regime.evidence, nps_reference.evidence, ppf_reference.evidence]
+    evidence_freshness = freshness_snapshot(evidence_items)
 
     return {
         "annual_income": annual_income,
@@ -857,7 +838,13 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
         ],
         "tax_evidence": {
             "evidence": evidence_items,
-            "freshness": freshness_snapshot(evidence_items),
+            "freshness": evidence_freshness,
+            "proof_contract": proof_contract_payload(
+                evidence_items=evidence_items,
+                freshness=evidence_freshness,
+                required_sources=["Income Tax Department", "India Post", "NPS Trust"],
+                advisory_surface="tax_optimizer",
+            ),
             "notes": [
                 "Tax guidance is grounded in stored user deductions plus official reference sources for regime and instrument treatment.",
                 "This overview is still planning guidance, not a substitute for a chartered accountant or filed return review.",

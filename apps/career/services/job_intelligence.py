@@ -914,7 +914,19 @@ class JobIntelligenceService:
             if isinstance(outcome, dict):
                 outcomes.append(outcome)
 
-        salary_bearing = [item for item in outcomes if item.get("salary_bearing") and (item.get("salary_min_annual") or item.get("salary_max_annual"))]
+        def has_valid_outcome_contract(item: dict) -> bool:
+            has_salary = bool(item.get("salary_bearing") and (item.get("salary_min_annual") or item.get("salary_max_annual")))
+            has_decision = item.get("outcome") in OPPORTUNITY_OUTCOME_STATUSES
+            has_source = bool(str(item.get("source_url") or "").strip())
+            has_location = bool(
+                str(item.get("location") or "").strip()
+                or str(item.get("city") or "").strip()
+                or str(item.get("state") or "").strip()
+                or str(item.get("country") or "").strip()
+            )
+            return has_salary and has_decision and has_source and has_location
+
+        salary_bearing = [item for item in outcomes if has_valid_outcome_contract(item)]
         accepted = [item for item in salary_bearing if item.get("outcome") == "accepted"]
         rejected = [item for item in salary_bearing if item.get("outcome") == "rejected"]
         source_urls = sorted({str(item.get("source_url") or "") for item in salary_bearing if item.get("source_url")})
@@ -949,6 +961,8 @@ class JobIntelligenceService:
             "maturity_status": maturity_status,
             "outcome_count": len(outcomes),
             "salary_bearing_outcome_count": len(salary_bearing),
+            "validated_outcome_count": len(salary_bearing),
+            "unvalidated_outcome_count": max(len(outcomes) - len(salary_bearing), 0),
             "accepted_count": len(accepted),
             "rejected_count": len(rejected),
             "minimum_salary_bearing_outcomes": minimum_salary_bearing,
@@ -959,6 +973,12 @@ class JobIntelligenceService:
             "source_count": len(source_urls),
             "source_urls": source_urls[:8],
             "geography_counts": dict(sorted(geography_counts.items())),
+            "validation_contract": [
+                "accepted_or_rejected_decision",
+                "salary_range",
+                "source_url",
+                "location_match",
+            ],
             "blocker": blocker,
             "summary": (
                 f"{len(salary_bearing)} salary-bearing accepted/rejected outcome(s) recorded "

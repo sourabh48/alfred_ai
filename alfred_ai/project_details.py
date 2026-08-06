@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
+import os
+from datetime import date, timedelta
+from pathlib import Path
 from statistics import mean
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
 
+from alfred_ai.services.materialized_cache import materialized_cache_health_snapshot
 from apps.career.models import CareerJobAnalysis, CareerResume, CareerResumeLearningMemory
 from apps.career.services.job_intelligence import career_opportunity_outcome_summary, career_source_coverage_summary
 from apps.expenses.models import Expense, StatementUpload
@@ -17,6 +23,50 @@ from apps.ml_engine.models import DocumentParserLearningMemory
 from apps.ml_engine.training.orchestrator import training_health_snapshot
 from apps.reports.models import ChatGPTImport, GeneratedReport, SystemTicket
 from .internal_clock import clock_snapshot
+
+
+BROWSER_REGRESSION_SUMMARY_FILENAME = "browser_regression_summary.json"
+CI_BROWSER_PROOF_ALLOWED_EVENTS = {"pull_request", "workflow_dispatch"}
+BROWSER_REGRESSION_PROOF_SPECS = (
+    {
+        "key": "local_chrome",
+        "label": "Local Chrome",
+        "browser": "Chrome",
+        "run_context": "local",
+        "env": "ALFRED_BROWSER_LOCAL_CHROME_SUMMARY",
+        "default_path": "artifacts/browser/browser_regression_summary.local-chrome.json",
+        "fallback_env": "ALFRED_BROWSER_REGRESSION_SUMMARY",
+        "fallback_path": "artifacts/browser/browser_regression_summary.json",
+    },
+    {
+        "key": "local_edge",
+        "label": "Local Edge",
+        "browser": "Edge",
+        "run_context": "local",
+        "env": "ALFRED_BROWSER_LOCAL_EDGE_SUMMARY",
+        "default_path": "artifacts/browser-edge/browser_regression_summary.local-edge.json",
+    },
+    {
+        "key": "ci_chrome",
+        "label": "CI Chrome",
+        "browser": "Chrome",
+        "run_context": "ci",
+        "env": "ALFRED_BROWSER_CI_CHROME_SUMMARY",
+        "default_path": "artifacts/browser/browser_regression_summary.ci-chrome.json",
+    },
+)
+
+
+DOCUMENT_CORRECTION_FAMILY_LABELS = {
+    "statement_document": "statements",
+    "loan_document": "loans",
+    "loan_closure_document": "loan closures",
+    "investment_document": "investments",
+    "vehicle_document": "vehicles",
+    "resume_document": "resumes",
+    "recruiter_document": "recruiter/JD intake",
+    "credit_report": "credit reports",
+}
 
 
 def _bounded_percent(value: float, *, default: int = 0) -> int:
@@ -34,9 +84,320 @@ def _progress(current: float, target: float, *, floor: int = 10, ceiling: int = 
     return _bounded_percent(max(floor, min(ceiling, round(floor + ((ceiling - floor) * ratio)))))
 
 
+def _accepted_document_correction_scopes() -> set[str]:
+    return set(
+        DocumentParserLearningMemory.objects.filter(correction_count__gt=0)
+        .values_list("scope", flat=True)
+        .distinct()
+    )
+
+
+def _project_path(path_value: str | Path) -> Path:
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    return Path(settings.BASE_DIR) / path
+
+
+def _browser_regression_summary_path(spec: dict | None = None) -> Path:
+    if spec is None:
+        spec = BROWSER_REGRESSION_PROOF_SPECS[0]
+    configured_path = os.environ.get(spec.get("env", ""), "").strip()
+    if configured_path:
+        return _project_path(configured_path)
+    default_path = _project_path(spec.get("default_path") or f"artifacts/browser/{BROWSER_REGRESSION_SUMMARY_FILENAME}")
+    if default_path.exists():
+        return default_path
+    fallback_env = spec.get("fallback_env")
+    if fallback_env:
+        fallback_configured = os.environ.get(fallback_env, "").strip()
+        if fallback_configured:
+            return _project_path(fallback_configured)
+    fallback_path = spec.get("fallback_path")
+    if fallback_path:
+        resolved_fallback = _project_path(fallback_path)
+        if resolved_fallback.exists():
+            return resolved_fallback
+    return default_path
+
+
+def _project_relative_path(path: Path) -> str:
+    try:
+        return path.relative_to(settings.BASE_DIR).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _as_int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _ci_browser_proof_metadata_blockers(payload: dict, spec: dict, artifact_contract: dict, proof_label: str) -> list[str]:
+    if str(spec.get("run_context") or "").lower() != "ci":
+        return []
+    blockers = []
+    github_actions = dict(payload.get("github_actions") or {})
+    if github_actions.get("enabled") is not True:
+        blockers.append("GitHub Actions metadata missing")
+    required_fields = {
+        "event_name": "GitHub event",
+        "workflow": "GitHub workflow",
+        "run_id": "GitHub run id",
+        "repository": "GitHub repository",
+        "sha": "GitHub commit SHA",
+    }
+    for field, label in required_fields.items():
+        if not str(github_actions.get(field) or "").strip():
+            blockers.append(f"{label} missing")
+    event_name = str(github_actions.get("event_name") or "").strip()
+    if event_name and event_name not in CI_BROWSER_PROOF_ALLOWED_EVENTS:
+        blockers.append(f"GitHub event {event_name} is not an accepted browser proof trigger")
+    branch_ref = str(github_actions.get("head_ref") or github_actions.get("ref_name") or github_actions.get("ref") or "").strip()
+    if not branch_ref:
+        blockers.append("GitHub branch/ref missing")
+    expected_labeled_summary = "browser_regression_summary.ci-chrome.json"
+    if proof_label != "ci-chrome":
+        blockers.append("CI proof label is not ci-chrome")
+    if str(artifact_contract.get("labeled_summary_filename") or "") != expected_labeled_summary:
+        blockers.append(f"CI summary filename is not {expected_labeled_summary}")
+    return blockers
+
+
+def _browser_regression_health_snapshot(spec: dict | None = None) -> dict:
+    spec = spec or BROWSER_REGRESSION_PROOF_SPECS[0]
+    path = _browser_regression_summary_path(spec)
+    summary_path = _project_relative_path(path)
+    label = spec.get("label") or "Browser"
+    expected_browser = str(spec.get("browser") or "").lower()
+    expected_context = str(spec.get("run_context") or "").lower()
+    default = {
+        "key": spec.get("key") or "browser",
+        "label": label,
+        "summary_path": summary_path,
+        "summary_filename": BROWSER_REGRESSION_SUMMARY_FILENAME,
+        "recorded": False,
+        "maturity_gate_recorded": False,
+        "state": "missing",
+        "status": "not_recorded",
+        "browser": "not recorded",
+        "run_context": "not recorded",
+        "expected_browser": spec.get("browser") or "",
+        "expected_run_context": spec.get("run_context") or "",
+        "finished_at_utc": "",
+        "duration_seconds": None,
+        "skipped_count": None,
+        "tests_run_count": None,
+        "tests_found_count": None,
+        "runner_return_code": None,
+        "driver_backed_success": False,
+        "browser_matches": False,
+        "context_matches": False,
+        "require_browser": False,
+        "proof_label": "",
+        "github_actions": {},
+        "artifact_contract": {},
+        "artifact_inventory": [],
+        "blockers": ["summary missing"],
+        "summary": (
+            f"No {label} browser regression summary has been recorded yet; run "
+            f"`python scripts/run_browser_regressions.py --browser Chrome --require-browser` "
+            f"to create {summary_path}."
+        ),
+    }
+    if not path.exists():
+        return default
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        default.update(
+            {
+                "recorded": True,
+                "state": "failed",
+                "status": "invalid",
+                "blockers": ["summary unreadable"],
+                "summary": f"Browser regression summary is present but unreadable: {exc}",
+            }
+        )
+        return default
+
+    skipped_count = _as_int(payload.get("skipped_count"), 0)
+    tests_run_count = _as_int(payload.get("tests_run_count"), 0)
+    tests_found_count = _as_int(payload.get("tests_found_count"), 0)
+    runner_return_code = _as_int(payload.get("runner_return_code"), 1)
+    browser = str(payload.get("browser") or "not recorded")
+    run_context = str(payload.get("run_context") or "not recorded")
+    browser_matches = not expected_browser or browser.lower() == expected_browser
+    context_matches = not expected_context or run_context.lower() == expected_context
+    require_browser = bool(payload.get("require_browser"))
+    run_browser_tests_env = str(payload.get("run_browser_tests_env", "")).lower()
+    proof_label = str(payload.get("proof_label") or "")
+    artifact_contract = dict(payload.get("artifact_contract") or {})
+    github_actions = dict(payload.get("github_actions") or {})
+    ci_metadata_blockers = _ci_browser_proof_metadata_blockers(payload, spec, artifact_contract, proof_label)
+    driver_backed_success = bool(payload.get("driver_backed_success")) and skipped_count == 0 and tests_run_count > 0
+    maturity_gate_recorded = (
+        driver_backed_success
+        and runner_return_code == 0
+        and require_browser
+        and run_browser_tests_env in {"1", "true", "yes"}
+        and browser_matches
+        and context_matches
+        and not ci_metadata_blockers
+    )
+    finished_at = str(payload.get("finished_at_utc") or "")
+    status = str(payload.get("status") or ("passed" if maturity_gate_recorded else "failed"))
+    blockers = []
+    if runner_return_code != 0:
+        blockers.append("runner returned non-zero")
+    if skipped_count:
+        blockers.append("browser tests skipped")
+    if tests_run_count <= 0:
+        blockers.append("no browser tests ran")
+    if not require_browser:
+        blockers.append("required-browser mode was not used")
+    if run_browser_tests_env not in {"1", "true", "yes"}:
+        blockers.append("ALFRED_RUN_BROWSER_TESTS was not enabled")
+    if not browser_matches:
+        blockers.append(f"expected {spec.get('browser')} but summary recorded {browser}")
+    if not context_matches:
+        blockers.append(f"expected {spec.get('run_context')} but summary recorded {run_context}")
+    blockers.extend(ci_metadata_blockers)
+    if not blockers and not maturity_gate_recorded:
+        blockers.append("driver-backed proof did not meet the maturity contract")
+    if maturity_gate_recorded:
+        state = "passed"
+    elif skipped_count:
+        state = "skipped"
+    elif status == "not_recorded":
+        state = "missing"
+    else:
+        state = "failed"
+    summary = (
+        f"{label} proof read {summary_path}: latest {run_context} {browser} browser run recorded {status} with "
+        f"{skipped_count} skipped test(s), {tests_run_count} test(s) run, and runner return code {runner_return_code}."
+    )
+    if maturity_gate_recorded:
+        summary += " This proof lane is accepted."
+    else:
+        summary += " This proof lane is not accepted until the expected context/browser, required-browser mode, zero skips, zero runner failures, and any required CI metadata are recorded."
+    if expected_context == "ci":
+        run_url = str(github_actions.get("run_url") or "").strip()
+        summary += f" GitHub Actions run: {run_url or 'not recorded'}."
+
+    return {
+        **default,
+        "recorded": True,
+        "maturity_gate_recorded": maturity_gate_recorded,
+        "state": state,
+        "status": status,
+        "browser": browser,
+        "run_context": run_context,
+        "finished_at_utc": finished_at,
+        "duration_seconds": payload.get("duration_seconds"),
+        "skipped_count": skipped_count,
+        "tests_run_count": tests_run_count,
+        "tests_found_count": tests_found_count,
+        "runner_return_code": runner_return_code,
+        "driver_backed_success": driver_backed_success,
+        "browser_matches": browser_matches,
+        "context_matches": context_matches,
+        "require_browser": require_browser,
+        "proof_label": proof_label,
+        "github_actions": github_actions,
+        "artifact_contract": artifact_contract,
+        "artifact_inventory": list(payload.get("artifact_inventory") or []),
+        "blockers": blockers,
+        "summary": summary,
+    }
+
+
+def _browser_regression_proof_snapshot() -> dict:
+    proofs = [_browser_regression_health_snapshot(spec) for spec in BROWSER_REGRESSION_PROOF_SPECS]
+    local_proofs = [proof for proof in proofs if proof["expected_run_context"] == "local"]
+    ci_proofs = [proof for proof in proofs if proof["expected_run_context"] == "ci"]
+    local_gate_recorded = any(proof["maturity_gate_recorded"] for proof in local_proofs)
+    ci_gate_recorded = any(proof["maturity_gate_recorded"] for proof in ci_proofs)
+    recorded_proofs = [proof for proof in proofs if proof["recorded"]]
+    accepted_proofs = [proof for proof in proofs if proof["maturity_gate_recorded"]]
+    latest_recorded = max(recorded_proofs, key=lambda item: item.get("finished_at_utc") or "") if recorded_proofs else proofs[0]
+    latest_accepted = max(accepted_proofs, key=lambda item: item.get("finished_at_utc") or "") if accepted_proofs else None
+    if ci_gate_recorded:
+        state = "ci_passed"
+    elif local_gate_recorded:
+        state = "local_passed"
+    elif any(proof["state"] == "failed" for proof in proofs):
+        state = "failed"
+    elif any(proof["state"] == "skipped" for proof in proofs):
+        state = "skipped"
+    else:
+        state = "missing"
+    if ci_gate_recorded:
+        summary = "CI Chrome browser proof is recorded with zero skipped tests; full UI maturity still needs repeated healthy CI runs and broader browser interaction depth."
+    elif local_gate_recorded:
+        summary = "Local Chrome or Edge browser proof is recorded, but CI Chrome proof is still missing before the driver-backed browser maturity gate can be treated as CI-healthy."
+    elif state == "skipped":
+        summary = "A browser proof summary was recorded with skipped Selenium tests, so required-browser maturity remains gated."
+    elif state == "failed":
+        summary = "A browser proof summary was recorded but did not pass the required browser contract."
+    else:
+        summary = "No local or CI driver-backed browser proof has been recorded yet."
+    return {
+        "state": state,
+        "summary": summary,
+        "local_gate_recorded": local_gate_recorded,
+        "ci_gate_recorded": ci_gate_recorded,
+        "full_ui_mature": False,
+        "proofs": proofs,
+        "local_proofs": local_proofs,
+        "ci_proofs": ci_proofs,
+        "latest_recorded": latest_recorded,
+        "latest_accepted": latest_accepted or latest_recorded,
+    }
+
+
+def _catalog_source_refresh_health(catalog_summary: dict, now) -> dict:
+    source_refresh = dict(catalog_summary.get("source_refresh") or {})
+    last_checked_on = str(source_refresh.get("last_checked_on") or "").strip()
+    try:
+        refresh_policy_days = int(source_refresh.get("refresh_policy_days") or 45)
+    except (TypeError, ValueError):
+        refresh_policy_days = 45
+    checked_date = None
+    if last_checked_on:
+        try:
+            checked_date = date.fromisoformat(last_checked_on)
+        except ValueError:
+            checked_date = None
+    if not checked_date:
+        return {
+            "status": "missing",
+            "last_checked_on": last_checked_on,
+            "age_days": None,
+            "refresh_policy_days": refresh_policy_days,
+            "next_due_on": "",
+            "summary": "source refresh date missing",
+        }
+    today = timezone.localdate(now)
+    age_days = max((today - checked_date).days, 0)
+    next_due_on = checked_date + timedelta(days=refresh_policy_days)
+    status = "fresh" if today <= next_due_on else "due"
+    return {
+        "status": status,
+        "last_checked_on": last_checked_on,
+        "age_days": age_days,
+        "refresh_policy_days": refresh_policy_days,
+        "next_due_on": next_due_on.isoformat(),
+        "summary": f"{status} within {refresh_policy_days}-day policy; checked {last_checked_on}; due {next_due_on.isoformat()}",
+    }
+
+
 def _build_learning_snapshot(now) -> dict:
     model_training = training_health_snapshot()
     catalog_summary = catalog_coverage_summary()
+    catalog_refresh = _catalog_source_refresh_health(catalog_summary, now)
     career_source_summary = career_source_coverage_summary()
     career_outcome_summary = career_opportunity_outcome_summary(CareerJobAnalysis.objects.all())
     transaction_count = Expense.objects.count()
@@ -60,9 +421,13 @@ def _build_learning_snapshot(now) -> dict:
     job_analyses = CareerJobAnalysis.objects.count()
     credit_report_uploads = CreditReportUpload.objects.count()
     parser_correction_memories = DocumentParserLearningMemory.objects.filter(correction_count__gt=0).count()
-    parser_correction_scopes = (
-        DocumentParserLearningMemory.objects.filter(correction_count__gt=0).values("scope").distinct().count()
-    )
+    parser_correction_scope_names = _accepted_document_correction_scopes()
+    parser_correction_scopes = len(parser_correction_scope_names)
+    missing_parser_family_labels = [
+        label
+        for scope, label in DOCUMENT_CORRECTION_FAMILY_LABELS.items()
+        if scope not in parser_correction_scope_names
+    ]
 
     verified_evidence = VerifiedExternalInsight.objects.filter(is_active=True).count()
     fresh_evidence = VerifiedExternalInsight.objects.filter(is_active=True).filter(
@@ -119,17 +484,26 @@ def _build_learning_snapshot(now) -> dict:
             "title": "Finance behavior learning",
             "progress": finance_progress,
             "detail": "Expense classification, emotional-spend scoring, anomaly detection, monthly timeline windows, and statement-linked loan recognition are learning from live transaction history.",
+            "maturity_status": "Correction-gated",
             "signals": [
                 f"{transaction_count} transactions",
                 f"{statement_upload_count} statement uploads",
                 f"{matched_loan_payments} loan payments linked",
             ],
+            "blocker_label": "Completion gate",
             "blocker": "Broader correction loops are still needed for non-perfect statement and transaction classifications.",
+            "blocked_by_real_data": True,
+            "completion_actions": [
+                "Review misclassified statement transactions and accept corrections that update classifier memory.",
+                "Keep original statement, parsed field, corrected value, and accepted category together for every correction outcome.",
+                "Re-run the finance ingestion regression once enough non-perfect imports have accepted corrections.",
+            ],
         },
         {
             "title": "Document intelligence",
             "progress": document_progress,
             "detail": "Statements, resumes, recruiter/JD intake, vehicle documents, credit reports, ChatGPT context imports, and loan PDFs now expose parser confidence, OCR overlay evidence, schema-aware correction candidates, cross-family unknown-layout fixtures, accepted correction memory outcomes, Selenium-proven correction interaction, and retry-fed learning traces where applicable.",
+            "maturity_status": "Real-layout gated",
             "signals": [
                 f"{statement_upload_count + vehicle_documents + resumes + recruiter_documents + credit_report_uploads} parser-tracked uploads",
                 f"{chatgpt_imports} ChatGPT context imports",
@@ -137,9 +511,19 @@ def _build_learning_snapshot(now) -> dict:
                 f"{recruiter_documents} recruiter/JD intake records",
                 f"{vehicle_documents} vehicle documents stored",
                 f"{parser_correction_memories} accepted parser-correction memories",
-                f"{parser_correction_scopes} document families with accepted corrections",
+                f"{parser_correction_scopes}/{len(DOCUMENT_CORRECTION_FAMILY_LABELS)} document families with accepted corrections",
+                "missing accepted correction families: "
+                + (", ".join(missing_parser_family_labels[:4]) if missing_parser_family_labels else "none")
+                + ("..." if len(missing_parser_family_labels) > 4 else ""),
             ],
+            "blocker_label": "Completion gate",
             "blocker": "The current review workflow is stronger for supported layouts; live maturity still depends on more real samples from unknown and long-tail document layouts plus browser interaction proof beyond the vehicle invoice/OCR correction path.",
+            "blocked_by_real_data": True,
+            "completion_actions": [
+                "Upload and resolve real unknown layouts for statements, loans, loan closures, investments, vehicles, resumes, recruiter messages, and credit reports.",
+                "Accept field corrections through the review queue until DocumentParserLearningMemory records validated outcomes by document family.",
+                "Expand browser interaction tests from vehicle invoice/OCR overlay correction into the remaining document-family review flows.",
+            ],
         },
         {
             "title": "Vehicle maintenance learning",
@@ -159,18 +543,27 @@ def _build_learning_snapshot(now) -> dict:
                 f"{catalog_summary['model_count']} official catalog models",
                 f"{catalog_summary['manufacturer_count']} manufacturers covered",
                 f"{catalog_summary['source_checked_coverage_pct']}% source links checked",
+                catalog_refresh["summary"],
             ],
+            "maturity_status": "Usage-gated",
             "blocker_label": "Remaining maturity" if mobility_scope_complete else "Still blocked by",
             "blocker": (
-                "Catalog depth is strong for the supported India seed scope, but it is not exhaustive; maturity still needs source-upkeep automation, long-tail models, denser condition snapshots, and more resolved/costed issue outcomes."
+                "Catalog depth is strong for the supported India seed scope, but it is not exhaustive; source links must remain inside the refresh policy, long-tail models should come from real usage gaps, and maturity still needs denser condition snapshots plus more resolved/costed issue outcomes."
                 if mobility_scope_complete
                 else "Catalog coverage still has required manufacturer, model, source, or maintenance-guidance gaps."
             ),
+            "blocked_by_real_data": True,
+            "completion_actions": [
+                "Keep official source links inside the configured refresh policy before raising catalog maturity.",
+                "Add long-tail vehicle models only from real user selections, support tickets, or verified usage gaps.",
+                "Record condition snapshots and resolve maintenance issues with actual cost outcomes for every high-demand model family.",
+            ],
         },
         {
             "title": "Career and market intelligence",
             "progress": career_progress,
             "detail": "Resume parsing, recruiter/JD intake, compensation benchmarking, public job-page parsing, multi-feed live openings, geography-aware salary evidence, specialty-source gap policy, and salary-bearing opportunity outcomes are tracked for the current source scope.",
+            "maturity_status": "Outcome-gated",
             "signals": [
                 f"{resumes} resumes",
                 f"{resume_learning_memories} learned parser memory signatures",
@@ -182,40 +575,73 @@ def _build_learning_snapshot(now) -> dict:
                 f"{career_source_summary['configured_feed_count']} live job-feed adapters",
                 f"{career_source_summary['job_page_adapter_count']} job-page adapters",
             ],
+            "blocker_label": "Completion gate",
             "blocker": "Current source breadth is complete; specialty-source additions stay gated on real role/geography gaps, and salary maturity still needs more accepted and rejected salary-bearing opportunity outcomes.",
+            "blocked_by_real_data": True,
+            "completion_actions": [
+                "Log accepted and rejected opportunities with salary-bearing evidence before increasing compensation-learning maturity.",
+                "Add specialty sources only after real users expose repeated role or geography gaps in current feeds.",
+                "Validate salary range, location match, and outcome decision together before counting an opportunity as learning evidence.",
+            ],
         },
         {
             "title": "Verified evidence refresh",
             "progress": evidence_progress,
             "detail": "Travel, career, risk, investment, tax, recommendation, relationship, family, and behavioral planning surfaces use proof-linked freshness metadata, circuit breakers, stale fallback, and scheduled refresh.",
+            "maturity_status": (
+                "Evidence missing" if verified_evidence == 0 else "Refresh due" if stale_evidence else "Refresh healthy"
+            ),
             "signals": [
                 f"{verified_evidence} verified records",
                 f"{fresh_evidence} fresh",
                 f"{stale_evidence} stale or failed",
             ],
+            "blocker_label": "Freshness gate",
             "blocker": (
                 "Current proof-enforcement scope is complete; freshness can dip when upstream evidence becomes stale or due and should be recovered by scheduled refresh."
                 if stale_evidence == 0
                 else "Freshness is currently held back by stale, failed, rejected, or due external evidence records."
             ),
+            "blocked_by_real_data": verified_evidence == 0 or stale_evidence > 0,
+            "completion_actions": [
+                "Keep scheduled refresh jobs running until active verified evidence is fresh or has an explicit stale fallback.",
+                "Extend proof contracts before adding any new recommendation or relationship-adjacent signal.",
+                "Track refresh outcome, circuit-breaker state, source URL, and stale-after deadline for every advisory surface.",
+            ],
         },
         {
             "title": "Model training lifecycle",
             "progress": _bounded_percent(model_training["overall_progress"]),
             "detail": "Supported models retrain only when runtime dependencies are healthy, data thresholds are met, and the refresh window is due; the displayed progress is the live model-state maturity score.",
+            "maturity_status": "Training-gated",
             "signals": [
                 f"{model_training['ready_models']} ready model states",
                 f"{model_training['fresh_models']} fresh artifacts",
                 f"{model_training['skipped_models']} skipped by data or implementation gates",
                 f"{model_training['average_confidence']} average confidence estimate",
             ],
+            "blocker_label": "Completion gate",
             "blocker": model_training["summary"],
+            "blocked_by_real_data": bool(model_training.get("skipped_models") or model_training.get("failed_models")),
+            "completion_actions": [
+                "Keep supervised artifacts inside their freshness windows and rerun training when refresh windows are due.",
+                "Collect accepted outcomes for supervised learners that are skipped by data thresholds.",
+                "Keep the planned future RL learner out of production-ready ML counts until it has a real deployment contract.",
+            ],
         },
     ]
 
     overall_progress = _bounded_percent(mean(track["progress"] for track in tracks)) if tracks else 0
+    data_gated_tracks = sum(1 for track in tracks if track.get("blocked_by_real_data"))
+    completion_action_count = sum(len(track.get("completion_actions", [])) for track in tracks)
     return {
         "overall_progress": overall_progress,
+        "data_gated_tracks": data_gated_tracks,
+        "completion_action_count": completion_action_count,
+        "completion_summary": (
+            f"{data_gated_tracks} adaptive track(s) are waiting on real accepted outcomes, fresh evidence, or production telemetry; "
+            f"{completion_action_count} completion actions are listed below so those gates can be closed without overclaiming maturity."
+        ),
         "summary": "ALFRED is adaptive across multiple modules, but this progress bar is a live maturity heuristic based on current data coverage, freshness, and training state, not a release-completion percentage. Several important paths still blend reviewed ML components with rule-based and evidence-backed heuristics.",
         "tracks": sorted(tracks, key=lambda item: item["progress"]),
         "implementation_state": {
@@ -266,28 +692,112 @@ def project_details_payload(guardrails: dict) -> dict:
     vehicle_track = learning_tracks_by_title.get("Vehicle maintenance learning", {})
     career_track = learning_tracks_by_title.get("Career and market intelligence", {})
     evidence_track = learning_tracks_by_title.get("Verified evidence refresh", {})
+    proof_contract_snapshot = dict(guardrails.get("proof_contract") or {})
+    refresh_health = dict(guardrails.get("refresh_health") or {})
+    proof_surface_count = int(proof_contract_snapshot.get("surface_count") or 0)
+    proof_covered_surface_count = int(proof_contract_snapshot.get("covered_surface_count") or 0)
+    proof_contract_healthy = bool(proof_contract_snapshot.get("healthy")) if proof_surface_count else False
+    scheduled_refresh_name = proof_contract_snapshot.get("scheduled_refresh") or "refresh_due_records"
+    evidence_watchlist_count = int(refresh_health.get("watchlist_records", evidence_watchlist.count()) or 0)
+    evidence_fresh_count = int(refresh_health.get("fresh_records", 0) or 0)
+    evidence_active_count = int(refresh_health.get("active_records", 0) or 0)
+    evidence_due_count = int(refresh_health.get("due_records", 0) or 0)
+    evidence_scheduled_candidate_count = int(refresh_health.get("scheduled_candidate_records", 0) or 0)
+    evidence_scheduled_batch_size = int(refresh_health.get("scheduled_refresh_batch_size", guardrails.get("refresh_batch_size", 0)) or 0)
+    evidence_capacity_gap = int(refresh_health.get("capacity_gap_records", 0) or 0)
+    scheduled_refresh_healthy = bool(refresh_health.get("scheduled_refresh_healthy", refresh_health.get("healthy")))
+    cache_health = materialized_cache_health_snapshot()
     catalog_summary = catalog_coverage_summary()
+    catalog_refresh = _catalog_source_refresh_health(catalog_summary, now)
     career_source_summary = career_source_coverage_summary()
     career_outcome_summary = career_opportunity_outcome_summary(CareerJobAnalysis.objects.all())
+    document_correction_scope_names = _accepted_document_correction_scopes()
+    document_missing_family_labels = [
+        label
+        for scope, label in DOCUMENT_CORRECTION_FAMILY_LABELS.items()
+        if scope not in document_correction_scope_names
+    ]
+    vehicle_condition_snapshots = BikeConditionSnapshot.objects.count()
+    vehicle_resolved_issue_outcomes = BikeIssueReport.objects.filter(status="resolved").count()
+    vehicle_costed_issue_outcomes = (
+        BikeIssueReport.objects.filter(status="resolved").exclude(actual_cost__isnull=True).count()
+    )
+    vehicle_service_records = BikeServiceRecord.objects.count()
     model_training = learning_snapshot["model_training"]
     supervised_training_progress = _bounded_percent(
         model_training.get("supervised_training_progress", model_training.get("overall_progress", 0))
     )
     ml_maturity_progress = _bounded_percent(model_training.get("overall_progress", 0))
 
-    browser_ui_progress = 58
+    browser_proof = _browser_regression_proof_snapshot()
+    browser_ui_progress = 74 if browser_proof["ci_gate_recorded"] else 72 if browser_proof["local_gate_recorded"] else 70
+    if browser_proof["ci_gate_recorded"]:
+        browser_maturity_status = "CI proof recorded"
+    elif browser_proof["local_gate_recorded"]:
+        browser_maturity_status = "Local proof recorded; CI gated"
+    else:
+        browser_maturity_status = "Browser-driver gated"
+    browser_coverage = {
+        "progress": browser_ui_progress,
+        "implementation_status": "Implemented",
+        "maturity_status": browser_maturity_status,
+        "full_ui_mature": False,
+        "execution_command": "python scripts/run_browser_regressions.py --browser Chrome --require-browser",
+        "edge_execution_command": "python scripts/run_browser_regressions.py --browser Edge --require-browser",
+        "ci_execution_command": "python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome",
+        "ci_workflow": ".github/workflows/browser-regression.yml",
+        "artifact_dir": "artifacts/browser",
+        "summary_artifact": browser_proof["latest_accepted"]["summary_path"],
+        "ci_summary_artifact": browser_proof["ci_proofs"][0]["summary_path"] if browser_proof["ci_proofs"] else "",
+        "local_summary_artifacts": [proof["summary_path"] for proof in browser_proof["local_proofs"]],
+        "driver_run_health": browser_proof["latest_accepted"],
+        "proof_summary": browser_proof,
+        "local_proofs": browser_proof["local_proofs"],
+        "ci_proofs": browser_proof["ci_proofs"],
+        "selenium_workflows": [
+            "login authentication",
+            "dashboard live refresh",
+            "document-center statement upload",
+            "vehicle setup form submission",
+            "vehicle invoice/OCR overlay correction",
+            "statement review correction",
+        ],
+        "live_server_contracts": [
+            "login POST form and CSRF controls",
+            "statement upload selectors and API endpoints",
+            "dashboard refresh root and API endpoint",
+            "expense form and timeline submission contracts",
+            "document-center upload and ChatGPT import contracts",
+            "vehicle setup, service, refill, issue, document, and condition form contracts",
+        ],
+        "remaining_gate": (
+            "Selenium coverage is implemented, but UI maturity stays gated until required-browser local and CI "
+            "runs keep recording zero skipped browser tests, zero runner failures, GitHub Actions-backed CI Chrome proof, and useful failure artifacts."
+        ),
+    }
     document_scope_progress = min(max(_bounded_percent(document_track.get("progress", 0)), 91), 94)
     vehicle_scope_progress = min(max(_bounded_percent(vehicle_track.get("progress", 0)), 88), 92)
     career_scope_progress = min(max(_bounded_percent(career_track.get("progress", 0)), 88), 92)
-    evidence_scope_progress = min(max(_bounded_percent(evidence_track.get("progress", 0)), 90 if not evidence_watchlist.exists() else 0), 93)
-    large_data_scope_progress = 84
+    evidence_scope_progress = min(max(_bounded_percent(evidence_track.get("progress", 0)), 90 if evidence_watchlist_count == 0 else 0), 93)
+    if not scheduled_refresh_healthy:
+        evidence_scope_progress = min(evidence_scope_progress, 88)
+    if not proof_contract_healthy:
+        evidence_scope_progress = min(evidence_scope_progress, 88)
+    if cache_health.get("traffic_sample_ready"):
+        large_data_scope_progress = 90
+    elif cache_health.get("observability_ready"):
+        large_data_scope_progress = 88
+    else:
+        large_data_scope_progress = 84
 
     next_steps = [
         "Keep adding real unknown document layouts to the field-correction suite and promote confirmed correction outcomes back into parser-learning evidence.",
+        "Keep source links fresh, add long-tail models from real usage, and collect more condition snapshots plus issue outcomes before treating maintenance learning as mature.",
+        "Add specialty sources only where real users expose role/geography gaps, then validate more salary-bearing outcomes from accepted or rejected opportunities.",
         "Keep verified evidence refresh jobs healthy across advisory surfaces and require proof contracts on any new recommendation or relationship-adjacent path.",
+        "Tune production cache TTLs, capacity, and invalidation thresholds against real traffic and payload volume.",
+        "Keep supervised artifacts fresh, collect more accepted outcomes, and do not count the planned future RL learner as production-ready ML.",
         "Extend browser-driven regression checks from the proven vehicle invoice/OCR correction path into login, statement upload, vehicle setup, dashboard refresh, and core form submissions.",
-        "Tune production cache TTLs, capacity, and dashboard invalidation observability as real history grows.",
-        "Maintain career feed freshness and add specialized sources only when real users expose target geography or role-family gaps.",
     ]
     improvements = [
         "maintain OCR confidence overlays, schema-aware correction candidates, ChatGPT context imports, and retry evidence in visual document review",
@@ -295,7 +805,7 @@ def project_details_payload(guardrails: dict) -> dict:
         "add user feedback loops so corrections can improve parser heuristics over time",
         "add portfolio and job-market alerting with freshness thresholds and proof links",
         "monitor salary benchmark source diversity, geography match level, and sample density in compensation views",
-        "add cache-hit, revision, and latency dashboards for the materialized summary layer",
+        "use materialized cache hit-rate, stale-regeneration, invalidation, revision, TTL, and latency telemetry to tune production capacity",
     ]
     avoid_items = [
         "uncontrolled background crawling without source allowlists",
@@ -321,9 +831,17 @@ def project_details_payload(guardrails: dict) -> dict:
         risks.append(
             f"{developer_escalations.filter(severity='high').count()} high-severity issues are waiting on developers as of {clock['clock_label']}."
         )
-    if evidence_watchlist.exists():
+    if evidence_watchlist_count:
         risks.append(
-            f"{evidence_watchlist.count()} verified external evidence records are stale, failed, rejected, or due for refresh."
+            f"{evidence_watchlist_count} verified external evidence records are stale, failed, rejected, or due for refresh."
+        )
+    if evidence_capacity_gap:
+        risks.append(
+            f"Verified evidence refresh has a {evidence_capacity_gap}-record scheduled candidate gap beyond the current batch capacity."
+        )
+    if cache_health.get("unobserved_namespace_count"):
+        risks.append(
+            f"{cache_health['unobserved_namespace_count']} materialized dashboard namespace(s) still need runtime traffic before cache telemetry is representative."
         )
     if loan_review_queue.exists():
         risks.append(
@@ -349,8 +867,40 @@ def project_details_payload(guardrails: dict) -> dict:
         },
         {
             "label": "Evidence Watchlist",
-            "value": evidence_watchlist.count(),
+            "value": evidence_watchlist_count,
             "copy": "Active external records that are stale, failed, rejected, or due now.",
+        },
+        {
+            "label": "Proof Contract Coverage",
+            "value": f"{proof_covered_surface_count}/{proof_surface_count}",
+            "copy": "Recommendation and relationship-adjacent surfaces covered before any new signal ships.",
+        },
+        {
+            "label": "Evidence Refresh Health",
+            "value": f"{evidence_fresh_count}/{evidence_active_count}",
+            "copy": (
+                f"Fresh active records; last attempt {refresh_health.get('last_refresh_attempt_at') or 'not recorded'}, "
+                f"last success {refresh_health.get('last_refresh_success_at') or 'not recorded'}; "
+                f"{evidence_scheduled_candidate_count} candidate(s) measured against batch {evidence_scheduled_batch_size}."
+            ),
+        },
+        {
+            "label": "Cache Health",
+            "value": f"{cache_health['observed_namespace_count']}/{cache_health['registered_namespace_count']}",
+            "copy": (
+                f"{cache_health['hit_rate_pct']}% hit rate; "
+                f"{cache_health['average_generation_latency_ms']} ms average generation; "
+                f"{cache_health['stale_regeneration_count']} stale regeneration(s)."
+            ),
+        },
+        {
+            "label": "Browser Coverage",
+            "value": f"{browser_ui_progress}%",
+            "copy": (
+                f"Selenium runner, CI workflow, failure artifacts, and run-summary proof are tracked; "
+                f"local proof: {'recorded' if browser_proof['local_gate_recorded'] else 'not accepted'}, "
+                f"CI Chrome proof: {'recorded' if browser_proof['ci_gate_recorded'] else 'not accepted'}."
+            ),
         },
         {
             "label": "Loan Review Queue",
@@ -384,23 +934,73 @@ def project_details_payload(guardrails: dict) -> dict:
         "Every support ticket is server-timestamped through the internal clock before it is stored or routed.",
         "Low and medium severity issues are auto-handled by ALFRED with a recorded resolution summary, while high severity stays with developers.",
         "External evidence paths keep circuit-breaker, stale-fallback, and scheduled-refresh guardrails instead of retrying blindly.",
+        proof_contract_snapshot.get(
+            "new_signal_rule",
+            "Do not add a new recommendation or relationship-adjacent signal until it has a complete proof contract.",
+        ),
         "Charts are expected to render only live API-backed data or an explicit empty-state message, not demo placeholders.",
         "Pasted ChatGPT dashboard context is retained as reviewable source material before any live ALFRED records are changed.",
         "Heavy dashboards use revision-keyed materialized API payloads for budget, loan, net-worth, behavioral, risk, recommendation, tax, career, family, relationship, investment, and mobility paths.",
+        "Materialized cache telemetry reports hit/miss, TTL, revision, invalidation reason, and generation latency by dashboard namespace before large-data maturity is raised.",
+        "Browser UI maturity remains gated: local Chrome/Edge and CI Chrome proof records are tracked separately, the Selenium runner and CI workflow can prove selected interactions with screenshots/logs on failure and browser_regression_summary.json records, while live-server contracts keep login, uploads, dashboard refresh, vehicle setup, and form wiring covered by default.",
     ]
 
     in_progress_tracks = [
         {
             "title": "Browser/UI regression coverage",
             "progress": browser_ui_progress,
-            "detail": "Django live-server page rendering, static-asset checks, form-contract checks, and a gated Selenium interaction pass now prove the vehicle invoice/OCR overlay correction workflow.",
-            "next_focus": "Keep Selenium available in local/CI browser jobs and extend coverage to login, statement upload, vehicle setup, dashboard refresh, and core form submissions.",
+            "detail": (
+                "Django live-server rendering, static-asset checks, upload/form contracts, a dedicated Selenium runner, "
+                "CI browser workflow, failure artifacts, local Chrome/Edge proof, CI Chrome proof, run-summary proof, and gated Selenium workflows now cover login, "
+                "document-center statement upload, vehicle setup submission, dashboard live refresh, vehicle invoice/OCR overlay correction, and statement review correction. "
+                f"{browser_proof['summary']}"
+            ),
+            "maturity_status": browser_coverage["maturity_status"],
+            "signals": [
+                f"{len(browser_coverage['selenium_workflows'])} Selenium-gated workflow(s)",
+                f"{len(browser_coverage['live_server_contracts'])} live-server contract group(s)",
+                f"runner: {browser_coverage['execution_command']}",
+                f"edge runner: {browser_coverage['edge_execution_command']}",
+                f"CI runner: {browser_coverage['ci_execution_command']}",
+                f"artifacts: {browser_coverage['artifact_dir']}",
+                f"CI summary: {browser_coverage['ci_summary_artifact']}",
+                "CI summary filename: browser_regression_summary.ci-chrome.json",
+                f"local browser proof: {'recorded' if browser_proof['local_gate_recorded'] else 'not accepted'}",
+                f"CI Chrome proof: {'recorded' if browser_proof['ci_gate_recorded'] else 'not accepted'}",
+                f"CI GitHub Actions metadata: {'recorded' if browser_proof['ci_gate_recorded'] else 'not accepted'}",
+                f"latest browser run: {browser_proof['latest_recorded']['status']} via {browser_proof['latest_recorded']['run_context']}",
+                f"recorded browser skips: {browser_proof['latest_recorded']['skipped_count'] if browser_proof['latest_recorded']['skipped_count'] is not None else 'not recorded'}",
+                "login, statement upload, vehicle setup, dashboard refresh, and core form submissions are named",
+                "full UI maturity is still not claimed",
+            ],
+            "maturity_gates": [
+                "Local Chrome or Edge browser execution records browser_regression_summary.local-*.json with no skipped browser tests.",
+                "CI Chrome execution records browser_regression_summary.ci-chrome.json from the browser-regression workflow with GitHub Actions metadata and no skipped browser tests.",
+                "The dedicated runner fails required-browser jobs when Selenium tests are skipped.",
+                "Live-server/static contracts keep covering the same workflows whenever browser drivers are unavailable.",
+                "Failure artifacts keep screenshots, page HTML, metadata, and browser logs available for failed browser runs.",
+                "More real unknown document layouts and form-correction outcomes remain covered before UI maturity is raised.",
+            ],
+            "next_focus": "Keep Selenium available in local/CI browser jobs, keep skip behavior explicit when drivers are absent, record no-skip browser summaries, and extend real browser interaction depth without adding new advisory signals.",
         },
         {
             "title": "Document OCR and correction maturity",
             "progress": document_scope_progress,
-            "detail": "Parser confidence, low-confidence queues, accepted corrections, ChatGPT context import, retry-fed learning, schema-aware OCR overlay candidates, degraded service-invoice recovery, cross-family unknown-layout fixtures, accepted correction memory outcomes, and Selenium-proven vehicle OCR overlay correction are implemented across the current document families.",
+            "detail": "Parser confidence, low-confidence queues, accepted corrections, ChatGPT context import, retry-fed learning, schema-aware OCR overlay candidates, degraded service-invoice recovery, cross-family unknown-layout fixtures, accepted correction memory outcomes, and Selenium-proven vehicle plus statement correction interactions are implemented across the current document families.",
+            "maturity_status": "Real-layout gated",
+            "signals": [
+                f"{len(document_correction_scope_names)}/{len(DOCUMENT_CORRECTION_FAMILY_LABELS)} required document family correction memory scope(s)",
+                "missing correction memory families: "
+                + (", ".join(document_missing_family_labels[:4]) if document_missing_family_labels else "none")
+                + ("..." if len(document_missing_family_labels) > 4 else ""),
+                "browser correction paths: vehicle invoice/OCR overlay and statement review correction",
+            ],
             "next_focus": "Keep adding real unknown layouts and validated correction outcomes before treating field-level maintenance learning as mature across every document family.",
+            "maturity_gates": [
+                "Real unknown layouts keep arriving across every document family, not only the current fixtures.",
+                "Accepted corrections produce validated parser-learning outcomes per family before field-level learning is treated as mature.",
+                "Browser interaction proof keeps expanding from the vehicle invoice/OCR overlay path into more document-family review flows.",
+            ],
         },
         {
             "title": "Vehicle catalog and maintenance depth",
@@ -408,9 +1008,24 @@ def project_details_payload(guardrails: dict) -> dict:
             "detail": (
                 f"Supported seed coverage is strong: {catalog_summary['model_count']} official catalog models across "
                 f"{catalog_summary['manufacturer_count']} manufacturers, source-linked guidance checked on "
-                f"{catalog_summary['source_refresh']['last_checked_on']}, brand-filtered model selection, and route-aware service-cost actions."
+                f"{catalog_refresh['last_checked_on']} ({catalog_refresh['age_days']} days old; {catalog_refresh['refresh_policy_days']}-day source refresh policy; next due {catalog_refresh['next_due_on']}), "
+                "brand-filtered model selection, and route-aware service-cost actions."
             ),
+            "maturity_status": "Usage-gated",
+            "signals": [
+                f"{vehicle_service_records} service log(s)",
+                f"{vehicle_condition_snapshots} condition snapshot(s)",
+                f"{vehicle_resolved_issue_outcomes} resolved issue outcome(s)",
+                f"{vehicle_costed_issue_outcomes} actual-cost issue outcome(s)",
+                f"{catalog_summary['source_checked_coverage_pct']}% source links checked",
+                catalog_refresh["summary"],
+            ],
             "next_focus": "Keep source links fresh, add long-tail models from real usage, and collect more condition snapshots plus issue outcomes before treating maintenance learning as mature.",
+            "maturity_gates": [
+                "Official source links stay within the configured refresh policy.",
+                "Long-tail vehicle models are added from real user demand and verified sources, not bulk catalog padding.",
+                "Condition snapshots and resolved or costed issue outcomes grow enough to validate maintenance recommendations.",
+            ],
         },
         {
             "title": "Career source and compensation breadth",
@@ -421,19 +1036,86 @@ def project_details_payload(guardrails: dict) -> dict:
                 f"{career_source_summary['candidate_specialty_source_count']} candidate specialty sources gated by role/geography gaps, and "
                 f"{career_outcome_summary['salary_bearing_outcome_count']} salary-bearing accepted/rejected outcome(s)."
             ),
+            "maturity_status": "Outcome-gated",
+            "signals": [
+                f"{career_source_summary['configured_feed_count']} configured live job feed(s)",
+                f"{career_source_summary['job_page_adapter_count']} job-page adapter(s)",
+                f"{career_outcome_summary['validated_outcome_count']} validated salary-bearing outcome(s)",
+                f"{career_outcome_summary['accepted_count']} accepted outcome(s)",
+                f"{career_outcome_summary['rejected_count']} rejected outcome(s)",
+                f"{career_outcome_summary['unvalidated_outcome_count']} outcome(s) missing salary/source/location proof",
+                "outcome contract: " + ", ".join(career_outcome_summary.get("validation_contract") or []),
+            ],
             "next_focus": "Add specialty sources only where real users expose role/geography gaps, then validate more salary-bearing outcomes from accepted or rejected opportunities.",
+            "maturity_gates": [
+                "Specialty sources are added only after real users expose role or geography gaps.",
+                "Accepted and rejected opportunity outcomes carry salary-bearing evidence.",
+                "Compensation maturity grows from validated outcomes, not just wider feed count.",
+            ],
         },
         {
             "title": "Evidence freshness and proof rigor",
             "progress": evidence_scope_progress,
-            "detail": "Current advisory surfaces expose source URLs, freshness counters, stale/due status, stale fallback, circuit-breaker metadata, scheduled-refresh contracts, and required-source proof contracts for recommendation and relationship-adjacent outputs.",
+            "detail": (
+                "Current advisory surfaces expose source URLs, freshness counters, stale/due status, stale fallback, circuit-breaker metadata, "
+                f"scheduled-refresh contracts, and required-source proof contracts; {proof_covered_surface_count}/{proof_surface_count} registered recommendation or relationship-adjacent surfaces declare the full contract. "
+                f"Scheduled refresh currently sees {evidence_scheduled_candidate_count} candidate(s) inside the lookahead, batch capacity {evidence_scheduled_batch_size}, and capacity gap {evidence_capacity_gap}."
+            ),
+            "maturity_status": (
+                "Refresh healthy"
+                if scheduled_refresh_healthy and proof_contract_healthy and not evidence_watchlist_count and not evidence_capacity_gap
+                else "Refresh gated"
+            ),
             "next_focus": "Keep scheduled refresh healthy and extend the proof contract before adding any new recommendation or relationship-adjacent signal.",
+            "signals": [
+                f"{proof_covered_surface_count}/{proof_surface_count} proof-contract surfaces covered",
+                f"scheduled refresh: {scheduled_refresh_name}",
+                f"{evidence_watchlist_count} evidence record(s) on the watchlist",
+                f"{evidence_due_count} evidence record(s) due now",
+                f"{evidence_scheduled_candidate_count} scheduled refresh candidate(s)",
+                f"scheduled refresh capacity: {evidence_scheduled_batch_size}",
+                f"scheduled capacity gap: {evidence_capacity_gap}",
+                f"scheduled refresh health: {'healthy' if scheduled_refresh_healthy else 'not healthy'}",
+                refresh_health.get("summary", "Refresh health snapshot unavailable."),
+                f"last attempt: {refresh_health.get('last_refresh_attempt_at') or 'not recorded'}",
+                f"last success: {refresh_health.get('last_refresh_success_at') or 'not recorded'}",
+            ],
+            "maturity_gates": [
+                "Scheduled refresh keeps active verified evidence inside freshness windows.",
+                "The proof contract registry covers every current recommendation and relationship-adjacent surface before new signals are added.",
+                "Every new recommendation or relationship-adjacent signal ships with required-source proof contracts, stale fallback, and circuit-breaker metadata.",
+                "No new advisory signal is treated as mature while proof links, source freshness, or refresh outcomes are missing.",
+            ],
         },
         {
             "title": "Large-data hardening",
             "progress": large_data_scope_progress,
-            "detail": "Heavy dashboards now use revision-keyed materialized payloads across the current high-traffic surfaces.",
-            "next_focus": "Add production cache sizing, TTL tuning, invalidation observability, and cache hit/latency dashboards before calling this fully mature at scale.",
+            "detail": (
+                "Heavy dashboards now use revision-keyed materialized payloads with cache metadata and namespace-level health telemetry. "
+                f"{cache_health['registered_namespace_count']} cache-backed namespace(s) are registered, "
+                f"{cache_health['observed_namespace_count']} have runtime telemetry, and production maturity remains capped until sizing and TTL behavior are proven under real traffic."
+            ),
+            "maturity_status": "Production-traffic gated",
+            "next_focus": "Tune production cache sizing, TTLs, and invalidation thresholds against real traffic before calling this fully mature at scale.",
+            "signals": [
+                f"{cache_health['registered_namespace_count']} registered materialized namespace(s)",
+                f"{cache_health['observed_namespace_count']} namespace(s) with runtime telemetry",
+                f"{cache_health['unobserved_namespace_count']} namespace(s) without runtime telemetry",
+                f"{cache_health['hit_rate_pct']}% cache hit rate across {cache_health['total_requests']} request(s)",
+                f"{cache_health['average_generation_latency_ms']} ms average generation latency",
+                f"{cache_health['stale_regeneration_count']} stale regeneration(s)",
+                f"{cache_health['invalidation_count']} invalidation(s)",
+                f"last invalidation: {cache_health.get('last_invalidation_reason') or 'not recorded'}",
+                f"configured TTL ready: {'yes' if cache_health.get('configured_ttl_ready') else 'no'}",
+                f"runtime telemetry ready: {'yes' if cache_health.get('runtime_telemetry_ready') else 'no'}",
+                f"traffic sample ready: {'yes' if cache_health.get('traffic_sample_ready') else 'no'}",
+            ],
+            "maturity_gates": [
+                "Production cache sizing is validated against real payload volume and concurrency.",
+                "TTL tuning and invalidation rules are observable per materialized dashboard namespace.",
+                "Cache hit rate, stale regeneration, revision churn, and latency remain visible in Project Details.",
+                "Large-data hardening stays below complete until real traffic proves cache capacity and freshness behavior.",
+            ],
         },
         {
             "title": "ML maturity and training lifecycle",
@@ -443,7 +1125,21 @@ def project_details_payload(guardrails: dict) -> dict:
                 f"{model_training.get('supervised_fresh_models', 0)}/{model_training.get('trainable_models', 0)} trainable models fresh; "
                 "production-ready ML maturity excludes the planned future RL learner and still includes confidence, freshness, skipped model state, and heuristic fallback risk."
             ),
+            "maturity_status": "Training-gated",
+            "signals": [
+                f"{model_training.get('ready_models', 0)} ready model state(s)",
+                f"{model_training.get('fresh_models', 0)} fresh artifact(s)",
+                f"{model_training.get('supervised_fresh_models', 0)}/{model_training.get('trainable_models', 0)} trainable supervised artifact(s) fresh",
+                f"{model_training.get('skipped_models', 0)} skipped model state(s)",
+                f"{model_training.get('planned_models', 0)} planned future model(s) excluded from production-ready ML",
+                f"{model_training.get('average_confidence', 0)} average confidence estimate",
+            ],
             "next_focus": "Keep supervised artifacts fresh, collect more accepted outcomes, and do not count the planned future RL learner as production-ready ML.",
+            "maturity_gates": [
+                "Supervised artifacts stay fresh within their configured retraining windows.",
+                "Accepted outcomes keep growing for supervised learners that depend on reviewed user decisions.",
+                "The planned future RL learner remains planned-only and excluded from production-ready ML counts until it has a real production contract.",
+            ],
         },
     ]
     scope_completion_progress = _bounded_percent(mean(track["progress"] for track in in_progress_tracks)) if in_progress_tracks else 100
@@ -494,7 +1190,16 @@ def project_details_payload(guardrails: dict) -> dict:
             {"label": "Scope Completion", "value": f"{scope_completion_progress}%", "copy": "Average maturity across active broad product scopes; capped where verification is incomplete."},
             {"label": "Learning Maturity", "value": f"{learning_snapshot['overall_progress']}%", "copy": "Adaptive-system maturity from live data coverage and freshness."},
             {"label": "Developer Escalations", "value": developer_escalations.count(), "copy": "High-severity items still waiting on superuser developers."},
-            {"label": "Evidence Watchlist", "value": evidence_watchlist.count(), "copy": "Verified external records that are stale, failed, rejected, or due now."},
+            {"label": "Evidence Watchlist", "value": evidence_watchlist_count, "copy": "Verified external records that are stale, failed, rejected, or due now."},
+            {
+                "label": "Evidence Refresh",
+                "value": f"{evidence_fresh_count}/{evidence_active_count}",
+                "copy": (
+                    "Fresh active records after the latest recorded refresh attempts; "
+                    f"scheduled health {'healthy' if scheduled_refresh_healthy else 'not healthy'}."
+                ),
+            },
+            {"label": "Proof Contracts", "value": f"{proof_covered_surface_count}/{proof_surface_count}", "copy": "Current recommendation and relationship-adjacent surfaces with full proof coverage."},
         ],
         "operational_metrics": operational_metrics,
         "learning_snapshot": learning_snapshot,
@@ -506,6 +1211,8 @@ def project_details_payload(guardrails: dict) -> dict:
         "avoid_items": avoid_items,
         "direction": direction,
         "guardrails": guardrails,
+        "cache_health": cache_health,
+        "browser_coverage": browser_coverage,
         "hardening_decisions": hardening_decisions,
         "report_library": [
             {"file_path": report.file_path, "created_at": report.created_at}

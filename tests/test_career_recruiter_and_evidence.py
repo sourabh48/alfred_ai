@@ -140,6 +140,8 @@ class CareerRecruiterAndEvidenceTests(TestCase):
         tax_payload = tax_response.json()
         self.assertEqual(tax_payload["tax_evidence"]["freshness"]["tracked_records"], 3)
         self.assertEqual(len(tax_payload["tax_evidence"]["evidence"]), 3)
+        self.assertTrue(tax_payload["tax_evidence"]["proof_contract"]["complete"])
+        self.assertEqual(tax_payload["tax_evidence"]["proof_contract"]["refresh_contract"]["scheduled_refresh"], "refresh_due_records")
 
     def test_parse_job_page_supports_workday_pages(self):
         response = Mock()

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.integrations.services import verified_intelligence
-from apps.integrations.services.verified_intelligence import freshness_snapshot
+from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 from apps.ml_engine.inference_adapters.relationship_model import relationship_model_predictor
 from apps.relationship.models import RelationshipProfile
 
@@ -18,6 +18,7 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
     baseline = resolve_canonical_financial_baseline(user)
     profile = RelationshipProfile.objects.filter(user=user).order_by("-id").first()
     if not profile:
+        empty_freshness = freshness_snapshot([])
         return RelationshipAlignment(
             {
                 "alignment_score": 0,
@@ -34,20 +35,13 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
                         "debt_pressure": 0.0,
                     },
                     "evidence": [],
-                    "freshness": freshness_snapshot([]),
-                    "proof_contract": {
-                        "complete": False,
-                        "required_sources": ["World Bank", "Yahoo Finance"],
-                        "tracked_records": 0,
-                        "stale_or_due_records": 0,
-                        "missing_source_records": 0,
-                        "missing_freshness_records": 0,
-                        "refresh_contract": {
-                            "scheduled_refresh": "refresh_due_records",
-                            "stale_after_required": True,
-                            "circuit_breaker": True,
-                        },
-                    },
+                    "freshness": empty_freshness,
+                    "proof_contract": proof_contract_payload(
+                        evidence_items=[],
+                        freshness=empty_freshness,
+                        required_sources=["World Bank", "Yahoo Finance"],
+                        advisory_surface="relationship_alignment",
+                    ),
                     "notes": [
                         "Relationship guidance is unavailable until a partner profile exists.",
                     ],
@@ -155,19 +149,12 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
                 "evidence": evidence_items,
                 "freshness": evidence_freshness,
                 "external_context": planning_payload,
-                "proof_contract": {
-                    "complete": bool(evidence_freshness.get("proof_complete")),
-                    "required_sources": ["World Bank", "Yahoo Finance"],
-                    "tracked_records": evidence_freshness.get("tracked_records", 0),
-                    "stale_or_due_records": evidence_freshness.get("stale_or_due_records", 0),
-                    "missing_source_records": evidence_freshness.get("missing_source_records", 0),
-                    "missing_freshness_records": evidence_freshness.get("missing_freshness_records", 0),
-                    "refresh_contract": {
-                        "scheduled_refresh": "refresh_due_records",
-                        "stale_after_required": True,
-                        "circuit_breaker": True,
-                    },
-                },
+                "proof_contract": proof_contract_payload(
+                    evidence_items=evidence_items,
+                    freshness=evidence_freshness,
+                    required_sources=["World Bank", "Yahoo Finance"],
+                    advisory_surface="relationship_alignment",
+                ),
                 "notes": [
                     "Relationship output is grounded in user-owned household cash-flow signals plus verified external affordability context.",
                     "External evidence contextualizes planning pressure, not emotional compatibility.",

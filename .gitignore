@@ -53,6 +53,7 @@ coverage.xml
 .ruff_cache/
 logs/
 reports/generated/
+artifacts/
 
 # =========================
 # Celery / Redis

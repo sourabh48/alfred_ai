@@ -4,7 +4,7 @@ from apps.integrations.services import verified_intelligence
 
 
 @shared_task
-def refresh_verified_external_intelligence(batch_size: int = 25):
+def refresh_verified_external_intelligence(batch_size: int | None = None):
     return verified_intelligence.refresh_due_records(batch_size=batch_size)
 
 

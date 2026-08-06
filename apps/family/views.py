@@ -7,7 +7,7 @@ from django.db.models import Count, Max
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.integrations.services import verified_intelligence
-from apps.integrations.services.verified_intelligence import freshness_snapshot
+from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 from .models import Dependent
 from .serializers import DependentSerializer
 
@@ -72,6 +72,7 @@ def _family_growth_payload(user, baseline: dict) -> dict:
     evidence = []
     for result in (verified_intelligence.ppf_reference(), verified_intelligence.nps_tax_reference()):
         evidence.append(result.evidence)
+    evidence_freshness = freshness_snapshot(evidence)
 
     projections = []
     for year in range(1, 11):
@@ -90,7 +91,13 @@ def _family_growth_payload(user, baseline: dict) -> dict:
             "dependents_count": dependents.count(),
         },
         "evidence": evidence,
-        "freshness": freshness_snapshot(evidence),
+        "freshness": evidence_freshness,
+        "proof_contract": proof_contract_payload(
+            evidence_items=evidence,
+            freshness=evidence_freshness,
+            required_sources=["India Post", "NPS Trust"],
+            advisory_surface="family_growth",
+        ),
         "notes": [
             "The 8 percent growth rate remains a planning heuristic, not a guaranteed return forecast.",
             "Official long-term savings references are attached as planning context, not as a recommendation to choose a specific product.",
