@@ -1,6 +1,9 @@
 from datetime import date
+import json
+import os
 from pathlib import Path
 import re
+import tempfile
 from unittest.mock import patch
 
 from django.conf import settings
@@ -11,10 +14,13 @@ from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import (
     MATERIALIZED_PAYLOAD_REGISTRY,
+    MATERIALIZED_TRAFFIC_PROOF_SOURCE,
     invalidate_user_materialized_payloads,
     materialize_payload,
     materialized_cache_health_snapshot,
+    validate_materialized_cache_traffic_proof,
 )
+from scripts.exercise_materialized_cache_traffic import run_materialized_cache_traffic_exercise
 from apps.behavioral.models import BehavioralSignal
 from apps.budgets.models import Budget
 from apps.career.models import CareerProfile
@@ -29,6 +35,14 @@ from apps.risk.models import RiskSignal
 class LargeDataMaterializationTests(TestCase):
     def setUp(self):
         cache.clear()
+        self.proof_tempdir = tempfile.TemporaryDirectory()
+        self.cache_proof_path = Path(self.proof_tempdir.name) / "materialized-cache-proof.json"
+        self.cache_proof_env = patch.dict(
+            os.environ,
+            {"ALFRED_MATERIALIZED_CACHE_TRAFFIC_PROOF": str(self.cache_proof_path)},
+            clear=False,
+        )
+        self.cache_proof_env.start()
         user_model = get_user_model()
         self.user = user_model.objects.create_user(
             username="large_data_user",
@@ -42,6 +56,8 @@ class LargeDataMaterializationTests(TestCase):
         self._seed_history()
 
     def tearDown(self):
+        self.cache_proof_env.stop()
+        self.proof_tempdir.cleanup()
         cache.clear()
 
     def test_financial_and_behavioral_dashboards_return_materialized_hits(self):
@@ -259,6 +275,88 @@ class LargeDataMaterializationTests(TestCase):
         self.assertFalse(health["runtime_telemetry_ready"])
         self.assertFalse(health["traffic_sample_ready"])
         self.assertTrue(any("runtime telemetry" in blocker for blocker in health["maturity_blockers"]))
+
+    def test_cache_traffic_proof_rejects_incomplete_namespace_telemetry(self):
+        payload = {
+            "summary_version": 1,
+            "source": MATERIALIZED_TRAFFIC_PROOF_SOURCE,
+            "registered_namespace_count": len(MATERIALIZED_PAYLOAD_REGISTRY),
+            "observed_namespace_count": 1,
+            "observed_namespaces": ["budget-dashboard"],
+            "total_requests": 2,
+            "hits": 1,
+            "misses": 1,
+            "hit_rate_pct": 50,
+            "observed_ttl_coverage_pct": 4.8,
+            "configured_ttl_coverage_pct": 100,
+            "stale_regeneration_count": 0,
+            "invalidation_count": 0,
+            "last_invalidation_reason": "",
+            "average_generation_latency_ms": 0,
+            "namespaces": [
+                {
+                    "namespace": "budget-dashboard",
+                    "configured_ttl_seconds": 60,
+                    "observed_ttl_seconds": 60,
+                    "ttl_observed": True,
+                    "requests": 2,
+                    "hits": 1,
+                    "misses": 1,
+                    "last_revision_key": "abc",
+                    "last_generated_at": "2026-08-05T00:00:00+00:00",
+                    "last_served_at": "2026-08-05T00:00:01+00:00",
+                    "average_generation_latency_ms": 0,
+                }
+            ],
+        }
+
+        validation = validate_materialized_cache_traffic_proof(payload, proof_path=str(self.cache_proof_path))
+
+        self.assertFalse(validation["accepted"])
+        self.assertIn("observed namespace count does not cover the full registry", validation["blockers"])
+        self.assertTrue(any("missing namespace telemetry" in blocker for blocker in validation["blockers"]))
+        self.assertIn("stale regeneration telemetry is missing", validation["blockers"])
+        self.assertIn("cache invalidation telemetry is missing", validation["blockers"])
+
+    def test_deterministic_cache_traffic_exercise_records_full_namespace_telemetry(self):
+        summary = run_materialized_cache_traffic_exercise(
+            user=self.user,
+            client=self.client,
+            proof_path=self.cache_proof_path,
+        )
+
+        self.assertTrue(self.cache_proof_path.exists())
+        saved = json.loads(self.cache_proof_path.read_text(encoding="utf-8"))
+        registry_namespaces = {item["namespace"] for item in MATERIALIZED_PAYLOAD_REGISTRY}
+        self.assertEqual(set(saved["observed_namespaces"]), registry_namespaces)
+        self.assertTrue(summary["validation"]["accepted"])
+        self.assertEqual(summary["validation"]["observed_namespace_count"], len(registry_namespaces))
+        self.assertEqual(summary["validation"]["registered_namespace_count"], len(registry_namespaces))
+
+        health = materialized_cache_health_snapshot()
+        self.assertTrue(health["traffic_proof_ready"])
+        self.assertTrue(health["runtime_telemetry_ready"])
+        self.assertTrue(health["traffic_sample_ready"])
+        self.assertFalse(health["production_mature"])
+        self.assertEqual(health["telemetry_source"], "traffic_proof")
+        self.assertEqual(health["observed_namespace_count"], len(registry_namespaces))
+        self.assertEqual(health["unobserved_namespace_count"], 0)
+        self.assertGreaterEqual(health["total_requests"], len(registry_namespaces) * 2)
+        self.assertGreater(health["hit_rate_pct"], 0)
+        self.assertEqual(health["observed_ttl_coverage_pct"], 100.0)
+        self.assertGreater(health["stale_regeneration_count"], 0)
+        self.assertGreater(health["invalidation_count"], 0)
+        self.assertEqual(health["last_invalidation_reason"], "staging_cache_traffic_proof")
+        for row in health["namespaces"]:
+            with self.subTest(namespace=row["namespace"]):
+                self.assertGreaterEqual(row["requests"], 2)
+                self.assertGreaterEqual(row["hits"], 1)
+                self.assertGreaterEqual(row["misses"], 1)
+                self.assertTrue(row["ttl_observed"])
+                self.assertGreater(row["observed_ttl_seconds"], 0)
+                self.assertTrue(row["last_revision_key"])
+                self.assertTrue(row["last_generated_at"])
+                self.assertTrue(row["last_served_at"])
 
     def test_cache_namespace_registry_matches_materialized_payload_call_sites(self):
         source_namespaces = set()

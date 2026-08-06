@@ -11,7 +11,11 @@ from django.test import Client, SimpleTestCase, TestCase
 from django.utils import timezone
 
 from alfred_ai.project_details import _browser_regression_proof_snapshot
-from alfred_ai.services.materialized_cache import materialize_payload
+from alfred_ai.services.materialized_cache import (
+    MATERIALIZED_PAYLOAD_REGISTRY,
+    MATERIALIZED_TRAFFIC_PROOF_SOURCE,
+    materialize_payload,
+)
 from apps.career.models import CareerResumeLearningMemory
 from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
 from apps.integrations.services import verified_intelligence
@@ -93,6 +97,60 @@ def _github_actions_payload() -> dict:
         "base_ref": "master",
         "server_url": "https://github.com",
         "run_url": "https://github.com/sourabh48/alfred_ai/actions/runs/123456789",
+    }
+
+
+def _materialized_cache_proof_payload() -> dict:
+    rows = []
+    for item in MATERIALIZED_PAYLOAD_REGISTRY:
+        namespace = item["namespace"]
+        rows.append(
+            {
+                "namespace": namespace,
+                "path": item["path"],
+                "owner": item["owner"],
+                "configured_ttl_seconds": item["ttl_seconds"],
+                "observed_ttl_seconds": item["ttl_seconds"],
+                "ttl_observed": True,
+                "requests": 2,
+                "hits": 1,
+                "misses": 1,
+                "hit_rate_pct": 50.0,
+                "stale_regenerations": 1 if namespace == "budget-dashboard" else 0,
+                "invalidations": 1,
+                "average_generation_latency_ms": 1.5,
+                "last_cache_status": "hit",
+                "last_revision_key": f"{namespace}-revision",
+                "last_generated_at": "2026-08-05T01:00:00+00:00",
+                "last_served_at": "2026-08-05T01:00:01+00:00",
+                "last_invalidation_at": "2026-08-05T01:00:02+00:00",
+                "last_invalidation_reason": "staging_cache_traffic_proof",
+            }
+        )
+    registered_count = len(MATERIALIZED_PAYLOAD_REGISTRY)
+    return {
+        "summary_version": 1,
+        "source": MATERIALIZED_TRAFFIC_PROOF_SOURCE,
+        "generated_at_utc": "2026-08-05T01:00:03+00:00",
+        "registered_namespace_count": registered_count,
+        "observed_namespace_count": registered_count,
+        "unobserved_namespace_count": 0,
+        "observed_namespaces": [item["namespace"] for item in MATERIALIZED_PAYLOAD_REGISTRY],
+        "total_requests": registered_count * 2,
+        "hits": registered_count,
+        "misses": registered_count,
+        "hit_rate_pct": 50.0,
+        "stale_regeneration_count": 1,
+        "invalidation_count": registered_count,
+        "average_generation_latency_ms": 1.5,
+        "configured_ttl_coverage_pct": 100.0,
+        "observed_ttl_coverage_pct": 100.0,
+        "last_invalidation_at": "2026-08-05T01:00:02+00:00",
+        "last_invalidation_namespace": "budget-dashboard",
+        "last_invalidation_reason": "staging_cache_traffic_proof",
+        "last_generated_at": "2026-08-05T01:00:00+00:00",
+        "last_served_at": "2026-08-05T01:00:01+00:00",
+        "namespaces": rows,
     }
 
 
@@ -220,6 +278,7 @@ class ProjectDetailsLiveTests(TestCase):
         self.local_chrome_summary_path = Path(self.browser_summary_tempdir.name) / "local-chrome.json"
         self.local_edge_summary_path = Path(self.browser_summary_tempdir.name) / "local-edge.json"
         self.ci_chrome_summary_path = Path(self.browser_summary_tempdir.name) / "ci-chrome.json"
+        self.cache_proof_summary_path = Path(self.browser_summary_tempdir.name) / "materialized-cache-proof.json"
         self.browser_summary_env = patch.dict(
             os.environ,
             {
@@ -227,6 +286,7 @@ class ProjectDetailsLiveTests(TestCase):
                 "ALFRED_BROWSER_LOCAL_CHROME_SUMMARY": str(self.local_chrome_summary_path),
                 "ALFRED_BROWSER_LOCAL_EDGE_SUMMARY": str(self.local_edge_summary_path),
                 "ALFRED_BROWSER_CI_CHROME_SUMMARY": str(self.ci_chrome_summary_path),
+                "ALFRED_MATERIALIZED_CACHE_TRAFFIC_PROOF": str(self.cache_proof_summary_path),
             },
             clear=False,
         )
@@ -524,6 +584,48 @@ class ProjectDetailsLiveTests(TestCase):
             "Keep supervised artifacts fresh, collect more accepted outcomes, and do not count the planned future RL learner as production-ready ML.",
             payload["next_steps"],
         )
+
+    def test_project_details_surfaces_cache_traffic_proof_without_full_large_data_maturity(self):
+        self.cache_proof_summary_path.write_text(
+            json.dumps(_materialized_cache_proof_payload()),
+            encoding="utf-8",
+        )
+        self.client.force_login(self.superuser)
+
+        payload = self.client.get("/api/project-details/").json()
+        cache_health = payload["cache_health"]
+        in_progress_by_title = {item["title"]: item for item in payload["in_progress_tracks"]}
+        completed_by_title = {item["title"]: item for item in payload["completed_tracks"]}
+        large_data_track = in_progress_by_title["Large-data hardening"]
+        cache_metric = next(item for item in payload["operational_metrics"] if item["label"] == "Cache Health")
+
+        self.assertEqual(cache_health["registered_namespace_count"], len(MATERIALIZED_PAYLOAD_REGISTRY))
+        self.assertEqual(cache_health["observed_namespace_count"], len(MATERIALIZED_PAYLOAD_REGISTRY))
+        self.assertEqual(cache_health["unobserved_namespace_count"], 0)
+        self.assertTrue(cache_health["traffic_proof_ready"])
+        self.assertTrue(cache_health["runtime_telemetry_ready"])
+        self.assertTrue(cache_health["traffic_sample_ready"])
+        self.assertFalse(cache_health["production_mature"])
+        self.assertEqual(cache_health["telemetry_source"], "traffic_proof")
+        self.assertEqual(cache_health["traffic_proof"]["state"], "accepted")
+        self.assertEqual(cache_health["traffic_proof"]["observed_namespace_count"], len(MATERIALIZED_PAYLOAD_REGISTRY))
+        self.assertEqual(cache_health["hit_rate_pct"], 50.0)
+        self.assertEqual(cache_health["observed_ttl_coverage_pct"], 100.0)
+        self.assertGreater(cache_health["stale_regeneration_count"], 0)
+        self.assertGreater(cache_health["invalidation_count"], 0)
+        self.assertEqual(cache_health["last_invalidation_reason"], "staging_cache_traffic_proof")
+
+        self.assertEqual(large_data_track["progress"], 90)
+        self.assertEqual(large_data_track["maturity_status"], "Staging traffic proof recorded; production gated")
+        self.assertTrue(any("traffic proof: accepted" in signal for signal in large_data_track["signals"]))
+        self.assertTrue(any("telemetry source: traffic_proof" in signal for signal in large_data_track["signals"]))
+        self.assertTrue(any("observed TTL coverage: 100.0%" in signal for signal in large_data_track["signals"]))
+        self.assertTrue(any("traffic proof path:" in signal for signal in large_data_track["signals"]))
+        self.assertIn("sustained real traffic", large_data_track["detail"])
+        self.assertIn("Large-data hardening", in_progress_by_title)
+        self.assertNotIn("Large-data hardening", completed_by_title)
+        self.assertEqual(cache_metric["value"], f"{len(MATERIALIZED_PAYLOAD_REGISTRY)}/{len(MATERIALIZED_PAYLOAD_REGISTRY)}")
+        self.assertIn("source traffic_proof", cache_metric["copy"])
 
     def test_project_details_surfaces_evidence_refresh_capacity_gate(self):
         now = timezone.now()

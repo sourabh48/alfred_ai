@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import materialized_cache_health_snapshot
+from alfred_ai.services.production_readiness import production_readiness_snapshot
 from apps.career.models import CareerJobAnalysis, CareerResume, CareerResumeLearningMemory
 from apps.career.services.job_intelligence import career_opportunity_outcome_summary, career_source_coverage_summary
 from apps.expenses.models import Expense, StatementUpload
@@ -775,6 +776,7 @@ def project_details_payload(guardrails: dict) -> dict:
             "runs keep recording zero skipped browser tests, zero runner failures, GitHub Actions-backed CI Chrome proof, and useful failure artifacts."
         ),
     }
+    production_readiness = production_readiness_snapshot(cache_health=cache_health, browser_coverage=browser_coverage)
     document_scope_progress = min(max(_bounded_percent(document_track.get("progress", 0)), 91), 94)
     vehicle_scope_progress = min(max(_bounded_percent(vehicle_track.get("progress", 0)), 88), 92)
     career_scope_progress = min(max(_bounded_percent(career_track.get("progress", 0)), 88), 92)
@@ -789,6 +791,10 @@ def project_details_payload(guardrails: dict) -> dict:
         large_data_scope_progress = 88
     else:
         large_data_scope_progress = 84
+    if cache_health.get("traffic_proof_ready"):
+        large_data_maturity_status = "Staging traffic proof recorded; production gated"
+    else:
+        large_data_maturity_status = "Production-traffic gated"
 
     next_steps = [
         "Keep adding real unknown document layouts to the field-correction suite and promote confirmed correction outcomes back into parser-learning evidence.",
@@ -796,6 +802,7 @@ def project_details_payload(guardrails: dict) -> dict:
         "Add specialty sources only where real users expose role/geography gaps, then validate more salary-bearing outcomes from accepted or rejected opportunities.",
         "Keep verified evidence refresh jobs healthy across advisory surfaces and require proof contracts on any new recommendation or relationship-adjacent path.",
         "Tune production cache TTLs, capacity, and invalidation thresholds against real traffic and payload volume.",
+        "Close production deployment gates for database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache telemetry.",
         "Keep supervised artifacts fresh, collect more accepted outcomes, and do not count the planned future RL learner as production-ready ML.",
         "Extend browser-driven regression checks from the proven vehicle invoice/OCR correction path into login, statement upload, vehicle setup, dashboard refresh, and core form submissions.",
     ]
@@ -843,9 +850,17 @@ def project_details_payload(guardrails: dict) -> dict:
         risks.append(
             f"{cache_health['unobserved_namespace_count']} materialized dashboard namespace(s) still need runtime traffic before cache telemetry is representative."
         )
+    elif cache_health.get("traffic_proof_ready") and not cache_health.get("production_mature"):
+        risks.append(
+            "Materialized cache traffic proof covers the registered namespaces, but sustained production sizing and TTL behavior are still not mature."
+        )
     if loan_review_queue.exists():
         risks.append(
             f"{loan_review_queue.count()} imported loan repayments still need manual review before they should influence debt conclusions."
+        )
+    if not production_readiness["ready"]:
+        risks.append(
+            f"Production deployment is still gated: {production_readiness['ready_check_count']}/{production_readiness['total_check_count']} readiness checks are ready."
         )
 
     operational_metrics = [
@@ -890,7 +905,8 @@ def project_details_payload(guardrails: dict) -> dict:
             "copy": (
                 f"{cache_health['hit_rate_pct']}% hit rate; "
                 f"{cache_health['average_generation_latency_ms']} ms average generation; "
-                f"{cache_health['stale_regeneration_count']} stale regeneration(s)."
+                f"{cache_health['stale_regeneration_count']} stale regeneration(s); "
+                f"source {cache_health.get('telemetry_source', 'live_cache')}."
             ),
         },
         {
@@ -900,6 +916,14 @@ def project_details_payload(guardrails: dict) -> dict:
                 f"Selenium runner, CI workflow, failure artifacts, and run-summary proof are tracked; "
                 f"local proof: {'recorded' if browser_proof['local_gate_recorded'] else 'not accepted'}, "
                 f"CI Chrome proof: {'recorded' if browser_proof['ci_gate_recorded'] else 'not accepted'}."
+            ),
+        },
+        {
+            "label": "Production Readiness",
+            "value": f"{production_readiness['progress']}%",
+            "copy": (
+                f"{production_readiness['ready_check_count']}/{production_readiness['total_check_count']} deployment check(s) ready; "
+                f"{len(production_readiness['blockers'])} blocker(s) remain."
             ),
         },
         {
@@ -943,6 +967,7 @@ def project_details_payload(guardrails: dict) -> dict:
         "Heavy dashboards use revision-keyed materialized API payloads for budget, loan, net-worth, behavioral, risk, recommendation, tax, career, family, relationship, investment, and mobility paths.",
         "Materialized cache telemetry reports hit/miss, TTL, revision, invalidation reason, and generation latency by dashboard namespace before large-data maturity is raised.",
         "Browser UI maturity remains gated: local Chrome/Edge and CI Chrome proof records are tracked separately, the Selenium runner and CI workflow can prove selected interactions with screenshots/logs on failure and browser_regression_summary.json records, while live-server contracts keep login, uploads, dashboard refresh, vehicle setup, and form wiring covered by default.",
+        "Production readiness remains blocked until database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache telemetry are proven in the deployment environment.",
     ]
 
     in_progress_tracks = [
@@ -1093,14 +1118,21 @@ def project_details_payload(guardrails: dict) -> dict:
             "detail": (
                 "Heavy dashboards now use revision-keyed materialized payloads with cache metadata and namespace-level health telemetry. "
                 f"{cache_health['registered_namespace_count']} cache-backed namespace(s) are registered, "
-                f"{cache_health['observed_namespace_count']} have runtime telemetry, and production maturity remains capped until sizing and TTL behavior are proven under real traffic."
+                f"{cache_health['observed_namespace_count']} have accepted live or staging traffic telemetry "
+                f"(live cache currently shows {cache_health.get('live_observed_namespace_count', cache_health['observed_namespace_count'])}), "
+                "and production maturity remains capped until sizing and TTL behavior are proven under sustained real traffic."
             ),
-            "maturity_status": "Production-traffic gated",
-            "next_focus": "Tune production cache sizing, TTLs, and invalidation thresholds against real traffic before calling this fully mature at scale.",
+            "maturity_status": large_data_maturity_status,
+            "next_focus": "Keep the staging traffic proof fresh, then tune production cache sizing, TTLs, and invalidation thresholds against sustained real traffic before calling this fully mature at scale.",
             "signals": [
                 f"{cache_health['registered_namespace_count']} registered materialized namespace(s)",
                 f"{cache_health['observed_namespace_count']} namespace(s) with runtime telemetry",
+                f"{cache_health.get('live_observed_namespace_count', cache_health['observed_namespace_count'])} live cache namespace(s) with runtime telemetry",
                 f"{cache_health['unobserved_namespace_count']} namespace(s) without runtime telemetry",
+                f"telemetry source: {cache_health.get('telemetry_source', 'live_cache')}",
+                f"traffic proof: {'accepted' if cache_health.get('traffic_proof_ready') else 'not accepted'}",
+                f"traffic proof path: {cache_health.get('traffic_proof', {}).get('path') or 'not recorded'}",
+                f"observed TTL coverage: {cache_health['observed_ttl_coverage_pct']}%",
                 f"{cache_health['hit_rate_pct']}% cache hit rate across {cache_health['total_requests']} request(s)",
                 f"{cache_health['average_generation_latency_ms']} ms average generation latency",
                 f"{cache_health['stale_regeneration_count']} stale regeneration(s)",
@@ -1200,6 +1232,11 @@ def project_details_payload(guardrails: dict) -> dict:
                 ),
             },
             {"label": "Proof Contracts", "value": f"{proof_covered_surface_count}/{proof_surface_count}", "copy": "Current recommendation and relationship-adjacent surfaces with full proof coverage."},
+            {
+                "label": "Deployment Readiness",
+                "value": f"{production_readiness['progress']}%",
+                "copy": production_readiness["summary"],
+            },
         ],
         "operational_metrics": operational_metrics,
         "learning_snapshot": learning_snapshot,
@@ -1213,6 +1250,7 @@ def project_details_payload(guardrails: dict) -> dict:
         "guardrails": guardrails,
         "cache_health": cache_health,
         "browser_coverage": browser_coverage,
+        "production_readiness": production_readiness,
         "hardening_decisions": hardening_decisions,
         "report_library": [
             {"file_path": report.file_path, "created_at": report.created_at}
