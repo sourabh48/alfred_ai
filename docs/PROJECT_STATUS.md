@@ -21,6 +21,8 @@
 - browser interaction coverage now has a dedicated Selenium runner, a CI browser workflow, separate local Chrome/Edge and CI Chrome `browser_regression_summary.json` proof records, and failure artifacts for screenshots, page HTML, metadata, and browser logs where supported
 - heavy finance, mobility, bike-service, and career dashboard reads now use cache-aware materialized payloads keyed to data revisions
 - investment summary, allocation, and growth reads now also use cache-aware materialized payloads keyed to portfolio revision
+- deterministic staging traffic now exercises all 21 registered materialized cache namespaces and records hit/miss, TTL, generation latency, stale regeneration, revision, and invalidation proof without marking production cache maturity complete
+- Project Details now exposes deployment-readiness status for production database, shared cache, Celery worker/beat, security settings, browser CI proof, and production-like cache telemetry
 - the shared `tests/` package is now discoverable by default so the normal `manage.py test` command runs the suite instead of silently skipping it
 - supported ML models now persist training state, run history, quality estimates, and freshness windows in the database
 - supported ML models can now auto-train on startup and on the scheduled nightly cycle when data thresholds and dependencies are healthy
@@ -126,6 +128,8 @@
 - broader upload-history coverage in the central document hub beyond the newly added saved loan-import trail
 - broader trainable-model coverage beyond the currently supported structured salary, expense, burnout, behavioral-risk, and parser-confidence paths
 - visual OCR review is still pending, but the parser learning loop now adapts from both repeated upload outcomes and accepted document-center corrections
+- production cache sizing, TTL tuning, and cache telemetry under sustained real traffic
+- production deployment proof for database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache traffic
 
 ## Risks Remaining
 
@@ -135,6 +139,8 @@
 - multiple-vehicle support is structurally improved, but some naming remains bike-centric in code paths for backward compatibility
 - job-link parsing is robust for many public pages, but some portals can still block direct fetches or hide content behind script/runtime layers
 - project-details is now dynamic from live operational data, but it is still not generated from a formal release registry
+- large-data hardening has deterministic staging proof for all registered cache namespaces, but production maturity still requires shared-cache telemetry under realistic concurrency and payload volume
+- production readiness remains deployment-gated even when local checks pass, because local sqlite, local-memory cache, and unproven workers are not production infrastructure
 - balance-sheet vehicle classification is heuristic and should still be reviewed against real ownership/use patterns where the financial treatment matters
 - auto-training is now safe and stateful, but several modules still remain heuristic, placeholder, or data-poor and should not be treated as fully learned systems yet
 - parser adaptation is materially stronger now, but "all document types without fail" is still not a truthful guarantee for arbitrary or severely degraded files

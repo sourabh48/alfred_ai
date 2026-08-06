@@ -19,6 +19,29 @@ class CeleryStartupTests(SimpleTestCase):
         self.assertEqual(schedule["task"], "apps.integrations.tasks.refresh_verified_external_intelligence")
         self.assertEqual(schedule["args"], (75,))
 
+    def test_batch_job_schedule_covers_training_retry_refresh_and_cleanup(self):
+        schedule = settings.CELERY_BEAT_SCHEDULE
+
+        self.assertEqual(
+            schedule["alfred-nightly-training"]["task"],
+            "apps.ml_engine.continual.tasks.run_global_training_cycle",
+        )
+        self.assertEqual(
+            schedule["statement-review-retry"]["task"],
+            "apps.expenses.tasks.retry_low_confidence_statement_uploads",
+        )
+        self.assertEqual(schedule["statement-review-retry"]["args"], (3,))
+        self.assertEqual(
+            schedule["verified-intelligence-refresh"]["task"],
+            "apps.integrations.tasks.refresh_verified_external_intelligence",
+        )
+        self.assertEqual(schedule["verified-intelligence-refresh"]["args"], (75,))
+        self.assertEqual(
+            schedule["verified-intelligence-cleanup"]["task"],
+            "apps.integrations.tasks.cleanup_verified_external_intelligence",
+        )
+        self.assertEqual(schedule["verified-intelligence-cleanup"]["args"], (90,))
+
     def test_cleanup_memory_task_skips_when_optional_memory_engine_is_missing(self):
         result = cleanup_memory_task()
 
