@@ -57,7 +57,10 @@ class LoanIntelligenceService:
             if matched_loan:
                 # Update existing loan
                 payment = self._create_payment_record(matched_loan, expense, match)
-                self._update_loan_from_payment(matched_loan, payment)
+                if payment.match_status == "matched":
+                    self._update_loan_from_payment(matched_loan, payment)
+                    payment.loan_effect_applied = True
+                    payment.save(update_fields=["loan_effect_applied"])
                 updated_loans.append(matched_loan)
                 new_payments.append(payment)
                 if payment.match_status == "review":
@@ -71,6 +74,10 @@ class LoanIntelligenceService:
                         expense,
                         {"confidence": 62.0, "reason": "Recurring EMI-like pattern detected from statement history."},
                     )
+                    if payment.match_status == "matched":
+                        self._update_loan_from_payment(new_loan, payment)
+                        payment.loan_effect_applied = True
+                        payment.save(update_fields=["loan_effect_applied"])
                     detected_loans.append(new_loan)
                     new_payments.append(payment)
                     review_payments.append(payment)

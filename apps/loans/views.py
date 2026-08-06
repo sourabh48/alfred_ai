@@ -14,6 +14,7 @@ from django.db.models import Count, Max, Sum
 from datetime import date
 
 from alfred_ai.services.materialized_cache import materialize_payload
+from alfred_ai.services.calculation_risk import calculation_risk_snapshot
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
 from apps.investments.models import Investment
@@ -21,6 +22,7 @@ from alfred_ai.services import record_parser_learning
 from apps.reports.services import operational_logging_service
 from apps.loans.services.loan_pdf_parser import loan_pdf_parser
 from apps.loans.services import loan_closure_parser, loan_foreclosure_service, loan_intelligence_service
+from apps.loans.services.payment_review import review_loan_payment_match, serialize_payment_review
 from apps.reports.services import reporting_service
 
 from .models import Loan, LoanClosureDocument, LoanImportDocument, LoanPaymentHistory
@@ -553,6 +555,33 @@ def detect_loans_from_expenses(request):
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@parser_classes([JSONParser, FormParser])
+def review_loan_payment(request, payment_id):
+    """Accept or reject a low-confidence loan repayment match."""
+    try:
+        payment = review_loan_payment_match(
+            user=request.user,
+            payment_id=payment_id,
+            decision=request.data.get("decision"),
+            reviewer=request.user,
+            notes=(request.data.get("notes") or "").strip(),
+        )
+        return Response(
+            {
+                "success": True,
+                "payment": serialize_payment_review(payment),
+                "calculation_risk": calculation_risk_snapshot(),
+            },
+            status=status.HTTP_200_OK,
+        )
+    except LoanPaymentHistory.DoesNotExist:
+        return Response({"detail": "Loan payment review row not found."}, status=status.HTTP_404_NOT_FOUND)
+    except ValueError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])

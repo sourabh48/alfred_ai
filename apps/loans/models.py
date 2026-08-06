@@ -139,6 +139,7 @@ class LoanPaymentHistory(models.Model):
     MATCH_STATUS_CHOICES = [
         ("matched", "Matched"),
         ("review", "Needs Review"),
+        ("rejected", "Rejected"),
     ]
 
     loan = models.ForeignKey(Loan, on_delete=models.CASCADE, related_name="payment_history")
@@ -157,6 +158,7 @@ class LoanPaymentHistory(models.Model):
     detection_reason = models.CharField(max_length=255, blank=True)
     matched_reference = models.CharField(max_length=120, blank=True)
     match_status = models.CharField(max_length=20, choices=MATCH_STATUS_CHOICES, default="matched")
+    loan_effect_applied = models.BooleanField(default=False)
     expense_reference = models.ForeignKey(
         "expenses.Expense",
         on_delete=models.SET_NULL,

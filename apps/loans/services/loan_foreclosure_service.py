@@ -622,6 +622,7 @@ class LoanForeclosureService:
                 detection_reason="Reconciled foreclosure payment from document and statement match.",
                 matched_reference=(expense.external_reference or "")[:120],
                 match_status="matched",
+                loan_effect_applied=True,
                 expense_reference=expense,
             )
             created_payment_ids.append(payment.id)

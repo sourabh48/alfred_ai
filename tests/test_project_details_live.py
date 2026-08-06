@@ -279,6 +279,7 @@ class ProjectDetailsLiveTests(TestCase):
         self.local_edge_summary_path = Path(self.browser_summary_tempdir.name) / "local-edge.json"
         self.ci_chrome_summary_path = Path(self.browser_summary_tempdir.name) / "ci-chrome.json"
         self.cache_proof_summary_path = Path(self.browser_summary_tempdir.name) / "materialized-cache-proof.json"
+        self.evidence_refresh_proof_path = Path(self.browser_summary_tempdir.name) / "evidence-refresh-proof.json"
         self.browser_summary_env = patch.dict(
             os.environ,
             {
@@ -287,6 +288,7 @@ class ProjectDetailsLiveTests(TestCase):
                 "ALFRED_BROWSER_LOCAL_EDGE_SUMMARY": str(self.local_edge_summary_path),
                 "ALFRED_BROWSER_CI_CHROME_SUMMARY": str(self.ci_chrome_summary_path),
                 "ALFRED_MATERIALIZED_CACHE_TRAFFIC_PROOF": str(self.cache_proof_summary_path),
+                "ALFRED_VERIFIED_EVIDENCE_REFRESH_PROOF": str(self.evidence_refresh_proof_path),
             },
             clear=False,
         )
@@ -522,8 +524,20 @@ class ProjectDetailsLiveTests(TestCase):
         )
         scope_card = next(item for item in payload["summary_cards"] if item["label"] == "Scope Completion")
         self.assertTrue(scope_card["value"].endswith("%"))
+        self.assertIn("deployment readiness is excluded", scope_card["copy"])
+        self.assertTrue(payload["scope_completion"]["production_readiness_excluded"])
+        production_blocker_card = next(item for item in payload["summary_cards"] if item["label"] == "Production Blockers")
+        self.assertEqual(production_blocker_card["value"], f"{payload['production_readiness']['blocker_percent']}%")
         in_progress_card = next(item for item in payload["summary_cards"] if item["label"] == "In-Progress Tracks")
         self.assertEqual(in_progress_card["value"], len(payload["in_progress_tracks"]))
+        self.assertIn("production blockers are tracked separately", in_progress_card["copy"])
+        self.assertNotIn("Deployment Readiness", in_progress_by_title)
+        self.assertNotIn("Production Blockers", in_progress_by_title)
+        expected_scope_progress = int(
+            round(sum(item["progress"] for item in payload["in_progress_tracks"]) / len(payload["in_progress_tracks"]))
+        )
+        self.assertEqual(payload["scope_completion"]["progress"], expected_scope_progress)
+        self.assertEqual(scope_card["value"], f"{expected_scope_progress}%")
         proof_card = next(item for item in payload["summary_cards"] if item["label"] == "Proof Contracts")
         self.assertEqual(proof_card["value"], f"{proof_contract['covered_surface_count']}/{proof_contract['surface_count']}")
         refresh_health = payload["guardrails"]["refresh_health"]
@@ -700,6 +714,48 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertIn("scheduled health not healthy", refresh_card["copy"])
         refresh_metric = next(item for item in payload["operational_metrics"] if item["label"] == "Evidence Refresh Health")
         self.assertIn("3 candidate(s) measured against batch 2", refresh_metric["copy"])
+
+    def test_project_details_surfaces_evidence_refresh_proof_artifact(self):
+        now = timezone.now()
+        VerifiedExternalInsight.objects.create(
+            scope="news",
+            cache_key="google-news:market",
+            title="Market News",
+            source_name="Google News RSS",
+            source_url="https://news.google.com/rss/search?q=market",
+            query="market",
+            summary="Fresh evidence",
+            payload={"items": []},
+            checksum="market",
+            status="fresh",
+            fetched_at=now,
+            verified_at=now,
+            stale_after=now + timedelta(hours=8),
+            is_active=True,
+        )
+        verified_intelligence.write_refresh_proof(
+            {
+                "processed": 1,
+                "refreshed": 1,
+                "skipped": 0,
+                "failed": 0,
+                "watchlist_before": 1,
+                "watchlist_after": 0,
+                "capacity_gap_records": 0,
+            },
+            proof_path=self.evidence_refresh_proof_path,
+        )
+        self.client.force_login(self.superuser)
+
+        payload = self.client.get("/api/project-details/").json()
+
+        self.assertTrue(payload["guardrails"]["refresh_proof"]["accepted"])
+        in_progress_by_title = {item["title"]: item for item in payload["in_progress_tracks"]}
+        evidence_track = in_progress_by_title["Evidence freshness and proof rigor"]
+        self.assertIn("refresh proof: accepted", evidence_track["signals"])
+        self.assertIn(f"refresh proof path: {self.evidence_refresh_proof_path}", evidence_track["signals"])
+        refresh_metric = next(item for item in payload["operational_metrics"] if item["label"] == "Evidence Refresh Health")
+        self.assertIn("proof accepted", refresh_metric["copy"])
 
     def test_project_details_surfaces_recorded_driver_backed_browser_run_without_full_ui_maturity(self):
         self.local_chrome_summary_path.write_text(json.dumps(_browser_summary_payload()), encoding="utf-8")

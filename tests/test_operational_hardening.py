@@ -1,4 +1,6 @@
 from datetime import date, timedelta
+import tempfile
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
@@ -9,9 +11,11 @@ from django.utils import timezone
 from apps.integrations.models import VerifiedExternalInsight
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import (
+    EVIDENCE_REFRESH_PROOF_SOURCE,
     advisory_proof_contract_snapshot,
     freshness_snapshot,
     InsightResult,
+    load_evidence_refresh_proof,
     proof_contract_payload,
 )
 from apps.reports.models import SystemTicket
@@ -618,6 +622,40 @@ class VerifiedIntelligenceCircuitBreakerTests(TestCase):
         self.assertEqual(health["watchlist_records"], 0)
         self.assertEqual(len(health_scopes), len(set(health_scopes)))
         self.assertTrue(all(scope["last_refresh_success_at"] for scope in health["per_scope"]))
+
+    def test_refresh_due_records_can_write_accepted_refresh_proof(self):
+        now = timezone.now()
+        self._create_evidence(
+            scope="news",
+            cache_key="google-news:market",
+            source_name="Google News RSS",
+            source_url="https://news.google.com/rss/search?q=market&hl=en-IN&gl=IN&ceid=IN:en",
+            query="market",
+            status="stale",
+            stale_after=now - timedelta(hours=1),
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir, patch.object(
+            verified_intelligence,
+            "_fetch_google_news",
+            return_value=({"items": []}, "News refreshed.", "notes"),
+        ):
+            proof_path = Path(tempdir) / "evidence-refresh-proof.json"
+            result = verified_intelligence.refresh_due_records(
+                batch_size=1,
+                write_proof=True,
+                proof_path=proof_path,
+            )
+            loaded = load_evidence_refresh_proof(proof_path)
+
+        proof = result["refresh_proof"]
+        self.assertEqual(proof["source"], EVIDENCE_REFRESH_PROOF_SOURCE)
+        self.assertEqual(proof["validation"]["state"], "accepted")
+        self.assertEqual(proof["validation"]["fresh_records"], 1)
+        self.assertEqual(proof["validation"]["watchlist_records"], 0)
+        self.assertTrue(loaded["accepted"])
+        self.assertEqual(loaded["path"], str(proof_path))
+        self.assertIn("Accepted evidence refresh proof", loaded["summary"])
 
 
 class ProjectDetailsDashboardTests(TestCase):

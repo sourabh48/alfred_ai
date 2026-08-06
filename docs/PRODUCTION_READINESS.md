@@ -7,7 +7,10 @@ ALFRED is not production-ready until environment-backed checks are green. The ap
 - Large-data hardening is at 90% in Project Details after deterministic staging traffic exercised all 21 materialized cache namespaces.
 - Browser/UI regression coverage is implemented, but full UI maturity remains gated on repeated no-skip local Chrome or Edge and CI Chrome summaries.
 - Batch jobs are implemented through Celery worker and beat schedules for ML training, statement retry, verified-intelligence refresh, and verified-intelligence cleanup.
+- Verified evidence refresh can be exercised manually with `python scripts/refresh_verified_evidence.py --require-healthy`, which writes `artifacts/evidence/verified_evidence_refresh_summary.json` for Project Details.
+- Production deployment readiness can be probed with `python scripts/run_production_readiness_probe.py --require-ready`, which writes `artifacts/ops/production_readiness_summary.json` for Project Details.
 - Project Details now exposes a Deployment Readiness card and `production_readiness` payload. It remains gated until production database, shared cache, Celery runtime, security settings, browser CI, and production-like cache traffic are all proven.
+- Project Details keeps product Scope Completion separate from deployment readiness and shows Production Blockers as their own percentage.
 
 ## Required For Production
 
@@ -61,6 +64,7 @@ Project Details reads `artifacts/ops/production_readiness_summary.json` by defau
 
 - `source: production_deployment_probe`
 - `environment: production`
+- required production environment variables with `ALFRED_LOCAL_RUNTIME=false` and `DEBUG=false`
 - database engine, usable connection, and current migrations
 - shared cache backend and read/write health
 - Redis-backed Celery worker ping, beat schedule health, and required scheduled task count
@@ -69,3 +73,5 @@ Project Details reads `artifacts/ops/production_readiness_summary.json` by defau
 - production-like shared-cache traffic covering every materialized namespace
 
 Staging cache proof can move Large-data hardening to 90%, but it does not close production readiness by itself.
+
+Run the deployment probe only after the production web process can load settings, migrations are applied, the Redis-backed cache is configured, Celery worker and beat are running, browser-regression CI has produced `browser_regression_summary.ci-chrome.json`, and materialized cache telemetry has been exercised against the shared cache.

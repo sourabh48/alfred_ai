@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
 
+from alfred_ai.services.calculation_risk import calculation_risk_snapshot
 from alfred_ai.services.materialized_cache import materialized_cache_health_snapshot
 from alfred_ai.services.production_readiness import production_readiness_snapshot
 from apps.career.models import CareerJobAnalysis, CareerResume, CareerResumeLearningMemory
@@ -695,6 +696,7 @@ def project_details_payload(guardrails: dict) -> dict:
     evidence_track = learning_tracks_by_title.get("Verified evidence refresh", {})
     proof_contract_snapshot = dict(guardrails.get("proof_contract") or {})
     refresh_health = dict(guardrails.get("refresh_health") or {})
+    refresh_proof = dict(guardrails.get("refresh_proof") or {})
     proof_surface_count = int(proof_contract_snapshot.get("surface_count") or 0)
     proof_covered_surface_count = int(proof_contract_snapshot.get("covered_surface_count") or 0)
     proof_contract_healthy = bool(proof_contract_snapshot.get("healthy")) if proof_surface_count else False
@@ -795,6 +797,7 @@ def project_details_payload(guardrails: dict) -> dict:
         large_data_maturity_status = "Staging traffic proof recorded; production gated"
     else:
         large_data_maturity_status = "Production-traffic gated"
+    calculation_risk = calculation_risk_snapshot(guardrails=guardrails)
 
     next_steps = [
         "Keep adding real unknown document layouts to the field-correction suite and promote confirmed correction outcomes back into parser-learning evidence.",
@@ -805,6 +808,7 @@ def project_details_payload(guardrails: dict) -> dict:
         "Close production deployment gates for database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache telemetry.",
         "Keep supervised artifacts fresh, collect more accepted outcomes, and do not count the planned future RL learner as production-ready ML.",
         "Extend browser-driven regression checks from the proven vehicle invoice/OCR correction path into login, statement upload, vehicle setup, dashboard refresh, and core form submissions.",
+        "Clear calculation review queues and validate salary, vehicle-cost, and stale-evidence outcomes before raising calculation maturity.",
     ]
     improvements = [
         "maintain OCR confidence overlays, schema-aware correction candidates, ChatGPT context imports, and retry evidence in visual document review",
@@ -858,6 +862,10 @@ def project_details_payload(guardrails: dict) -> dict:
         risks.append(
             f"{loan_review_queue.count()} imported loan repayments still need manual review before they should influence debt conclusions."
         )
+    if calculation_risk["blockers"]:
+        risks.append(
+            f"Calculation maturity is {calculation_risk['overall_progress']}% and still gated by {len(calculation_risk['blockers'])} blocker(s)."
+        )
     if not production_readiness["ready"]:
         risks.append(
             f"Production deployment is still gated: {production_readiness['ready_check_count']}/{production_readiness['total_check_count']} readiness checks are ready."
@@ -896,7 +904,8 @@ def project_details_payload(guardrails: dict) -> dict:
             "copy": (
                 f"Fresh active records; last attempt {refresh_health.get('last_refresh_attempt_at') or 'not recorded'}, "
                 f"last success {refresh_health.get('last_refresh_success_at') or 'not recorded'}; "
-                f"{evidence_scheduled_candidate_count} candidate(s) measured against batch {evidence_scheduled_batch_size}."
+                f"{evidence_scheduled_candidate_count} candidate(s) measured against batch {evidence_scheduled_batch_size}; "
+                f"proof {'accepted' if refresh_proof.get('accepted') else refresh_proof.get('state', 'missing')}."
             ),
         },
         {
@@ -924,6 +933,23 @@ def project_details_payload(guardrails: dict) -> dict:
             "copy": (
                 f"{production_readiness['ready_check_count']}/{production_readiness['total_check_count']} deployment check(s) ready; "
                 f"{len(production_readiness['blockers'])} blocker(s) remain."
+            ),
+        },
+        {
+            "label": "Production Blockers",
+            "value": f"{production_readiness['blocker_percent']}%",
+            "copy": (
+                f"{production_readiness['blocker_count']}/{production_readiness['total_check_count']} deployment blocker(s) remain; "
+                "excluded from Scope Completion and Learning Maturity."
+            ),
+        },
+        {
+            "label": "Calculation Maturity",
+            "value": f"{calculation_risk['overall_progress']}%",
+            "copy": (
+                f"{calculation_risk['manual_review_queue_count']} review-gated item(s); "
+                f"{calculation_risk['dependency_counts']['heuristic_paths']} heuristic path(s); "
+                f"{calculation_risk['dependency_counts']['stale_or_due_external_records']} stale or due external record(s)."
             ),
         },
         {
@@ -968,6 +994,7 @@ def project_details_payload(guardrails: dict) -> dict:
         "Materialized cache telemetry reports hit/miss, TTL, revision, invalidation reason, and generation latency by dashboard namespace before large-data maturity is raised.",
         "Browser UI maturity remains gated: local Chrome/Edge and CI Chrome proof records are tracked separately, the Selenium runner and CI workflow can prove selected interactions with screenshots/logs on failure and browser_regression_summary.json records, while live-server contracts keep login, uploads, dashboard refresh, vehicle setup, and form wiring covered by default.",
         "Production readiness remains blocked until database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache telemetry are proven in the deployment environment.",
+        "Calculation-critical paths are audited separately as verified, review-gated, heuristic, or external-data-sensitive before maturity is raised.",
     ]
 
     in_progress_tracks = [
@@ -1104,6 +1131,8 @@ def project_details_payload(guardrails: dict) -> dict:
                 refresh_health.get("summary", "Refresh health snapshot unavailable."),
                 f"last attempt: {refresh_health.get('last_refresh_attempt_at') or 'not recorded'}",
                 f"last success: {refresh_health.get('last_refresh_success_at') or 'not recorded'}",
+                f"refresh proof: {'accepted' if refresh_proof.get('accepted') else refresh_proof.get('state', 'missing')}",
+                f"refresh proof path: {refresh_proof.get('path') or 'not recorded'}",
             ],
             "maturity_gates": [
                 "Scheduled refresh keeps active verified evidence inside freshness windows.",
@@ -1174,7 +1203,6 @@ def project_details_payload(guardrails: dict) -> dict:
             ],
         },
     ]
-    scope_completion_progress = _bounded_percent(mean(track["progress"] for track in in_progress_tracks)) if in_progress_tracks else 100
     auto_training_track = {
         "title": "Supervised model refresh",
         "progress": supervised_training_progress,
@@ -1214,12 +1242,13 @@ def project_details_payload(guardrails: dict) -> dict:
                 "next_focus": "Collect the missing minimum samples for skipped supervised models, then rerun the forced training cycle.",
             }
         )
+    scope_completion_progress = _bounded_percent(mean(track["progress"] for track in in_progress_tracks)) if in_progress_tracks else 100
 
     return {
         "clock": clock,
         "summary_cards": [
-            {"label": "In-Progress Tracks", "value": len(in_progress_tracks), "copy": "Major workstreams still actively evolving."},
-            {"label": "Scope Completion", "value": f"{scope_completion_progress}%", "copy": "Average maturity across active broad product scopes; capped where verification is incomplete."},
+            {"label": "In-Progress Tracks", "value": len(in_progress_tracks), "copy": "Product workstreams still evolving; production blockers are tracked separately."},
+            {"label": "Scope Completion", "value": f"{scope_completion_progress}%", "copy": "Product-track maturity only; deployment readiness is excluded and shown in separate production cards."},
             {"label": "Learning Maturity", "value": f"{learning_snapshot['overall_progress']}%", "copy": "Adaptive-system maturity from live data coverage and freshness."},
             {"label": "Developer Escalations", "value": developer_escalations.count(), "copy": "High-severity items still waiting on superuser developers."},
             {"label": "Evidence Watchlist", "value": evidence_watchlist_count, "copy": "Verified external records that are stale, failed, rejected, or due now."},
@@ -1237,7 +1266,32 @@ def project_details_payload(guardrails: dict) -> dict:
                 "value": f"{production_readiness['progress']}%",
                 "copy": production_readiness["summary"],
             },
+            {
+                "label": "Production Blockers",
+                "value": f"{production_readiness['blocker_percent']}%",
+                "copy": (
+                    f"{production_readiness['blocker_count']}/{production_readiness['total_check_count']} deployment blocker(s) remain; "
+                    "this is excluded from Scope Completion."
+                ),
+            },
+            {
+                "label": "Calculation Maturity",
+                "value": f"{calculation_risk['overall_progress']}%",
+                "copy": calculation_risk["summary"],
+            },
         ],
+        "scope_completion": {
+            "progress": scope_completion_progress,
+            "production_readiness_excluded": True,
+            "production_readiness_progress": production_readiness["progress"],
+            "production_blocker_percent": production_readiness["blocker_percent"],
+            "production_blocker_count": production_readiness["blocker_count"],
+            "production_total_check_count": production_readiness["total_check_count"],
+            "summary": (
+                f"Scope Completion is {scope_completion_progress}% across product tracks only; "
+                f"Deployment Readiness is {production_readiness['progress']}% and Production Blockers are {production_readiness['blocker_percent']}% separately."
+            ),
+        },
         "operational_metrics": operational_metrics,
         "learning_snapshot": learning_snapshot,
         "in_progress_tracks": in_progress_tracks,
@@ -1249,6 +1303,7 @@ def project_details_payload(guardrails: dict) -> dict:
         "direction": direction,
         "guardrails": guardrails,
         "cache_health": cache_health,
+        "calculation_risk": calculation_risk,
         "browser_coverage": browser_coverage,
         "production_readiness": production_readiness,
         "hardening_decisions": hardening_decisions,

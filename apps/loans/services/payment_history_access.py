@@ -43,6 +43,8 @@ def fetch_payment_history_rows(
     expense_reference_ids=None,
     require_expense_reference: bool = False,
     include_loan_fields: bool = False,
+    include_review: bool = False,
+    include_rejected: bool = False,
 ) -> list[dict]:
     direct_columns = loan_payment_history_columns()
     value_fields = [
@@ -54,6 +56,13 @@ def fetch_payment_history_rows(
         value_fields.extend(RELATED_VALUE_FIELDS)
 
     queryset = LoanPaymentHistory.objects.filter(loan__user=user)
+    if "match_status" in direct_columns:
+        allowed_statuses = ["matched"]
+        if include_review:
+            allowed_statuses.append("review")
+        if include_rejected:
+            allowed_statuses.append("rejected")
+        queryset = queryset.filter(match_status__in=allowed_statuses)
     if require_expense_reference:
         queryset = queryset.filter(expense_reference__isnull=False)
     if expense_reference_ids is not None:

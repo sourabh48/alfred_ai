@@ -22,7 +22,7 @@ ALFRED is a Django application that turns personal financial records into one wo
 | Investments manual + PDF intake | Working |
 | Career source coverage | 88% - current resume, recruiter/JD, multi-feed jobs, job-page adapter, geography-aware compensation, specialty-source gap policy, and salary-bearing outcome tracking are implemented, but accepted/rejected salary outcome breadth still needs growth |
 | Shared document review / retry flow | 91% - parser confidence, schema-aware OCR candidates, ChatGPT context import, cross-family unknown-layout fixtures, accepted correction outcomes, retry learning, tougher service-invoice recovery, and Selenium-proven vehicle OCR correction are implemented; real unknown layouts and validated correction outcomes must keep growing before field-level learning is mature |
-| External proof and freshness | 88% - required-source proof contracts now cover current recommendation and relationship-adjacent surfaces, freshness metadata, circuit breakers, stale fallback, scheduled-refresh contracts, and refresh-health observability; source upkeep still needs healthy scheduled runs over time |
+| External proof and freshness | 93% - required-source proof contracts now cover current recommendation and relationship-adjacent surfaces, freshness metadata, circuit breakers, stale fallback, scheduled-refresh contracts, refresh-health observability, 40/40 fresh active evidence records, and an accepted verified-evidence refresh proof; source upkeep still needs healthy scheduled runs over time |
 | UI polish and responsive shell | 74% - live-server smoke coverage, static/form contracts, login, statement upload, vehicle setup, dashboard live refresh, core form wiring, the guarded vehicle catalog picker, a dedicated Selenium runner, CI browser workflow, run-summary proof, and browser failure artifacts are active; full UI maturity still depends on repeated healthy driver-backed execution plus broader real interaction depth |
 | Mobility vehicle catalog and service intelligence | 88% - supported India consumer-vehicle seed scope has 80 source-linked models across 32 manufacturers, route-aware wear guidance, source-refresh policy tracking, and service-cost learning; long-tail models, condition snapshots, and resolved/costed issue outcomes still need real usage growth |
 | ML-assisted features | 87% - production-ready supervised model counts exclude the planned future RL learner; broader ML maturity is capped by confidence, data volume, artifact freshness, and heuristic fallbacks |
@@ -34,8 +34,9 @@ Last verified locally on 6 August 2026.
 
 | Scope | Verified state |
 | --- | --- |
-| Project tracker | Broad product areas now stay in In Progress until implementation, data maturity, and browser verification are all strong enough |
-| Scope completion | 87% in the current local snapshot; this is the average maturity across active broad product scopes |
+| Project tracker | Broad product areas now stay in In Progress until implementation, data maturity, and browser verification are strong enough; production blockers are tracked separately |
+| Scope completion | 87% in the current local snapshot; this is the average maturity across active product scopes and excludes deployment readiness |
+| Deployment readiness | 11% ready with 89% production blockers remaining in the current local snapshot; shown separately from product scope completion and proven with `python scripts/run_production_readiness_probe.py --require-ready` |
 | Verified complete checks | Backend/API regression baseline, vehicle make/model picker fix, and supervised model refresh are the only 100% entries |
 | Vehicle maintenance learning | 88% - current catalog, route-aware maintenance, service-cost learning, source freshness metadata, and brand-filtered selection are implemented, but long-tail models, source upkeep automation, condition snapshots, and real issue outcomes still matter |
 | Vehicle catalog UI | One Make / Brand combobox submits the actual `make` value; Official Catalog Model is populated only after a make is selected and is guarded from live-refresh re-render while the user is choosing |
@@ -132,6 +133,14 @@ celery -A alfred_ai beat -l info
 `refresh_verified_external_intelligence` calls `refresh_due_records`, which now records processed, refreshed, skipped, failed, per-scope watchlist, last-attempt, and last-success outcomes for Project Details.
 
 Production deployments must run both Celery worker and Celery beat processes with Redis or another supported broker. The schedules are already implemented; production maturity depends on those processes staying healthy outside local Django requests.
+
+Run the same verified-evidence refresh path manually and write an auditable proof artifact:
+
+```bash
+python scripts/refresh_verified_evidence.py --require-healthy
+```
+
+The proof defaults to `artifacts/evidence/verified_evidence_refresh_summary.json` and is surfaced in Project Details without adding any new advisory signal.
 
 ## Large Data Hardening
 
