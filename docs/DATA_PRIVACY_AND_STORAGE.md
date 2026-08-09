@@ -61,9 +61,10 @@ Use these controls before allowing real users:
 The safest production operating model is:
 
 1. Developers push code to GitHub.
-2. GitHub Actions deploys to EC2 by SSH.
-3. EC2 pulls code and restarts containers.
-4. Developers do not receive production `.env`, database credentials, Redis credentials, S3 credentials, or shell access unless explicitly approved.
+2. GitHub Actions assumes a narrow AWS role through OIDC.
+3. GitHub Actions uses AWS Systems Manager Run Command to start the deploy.
+4. EC2 pulls code over HTTPS and restarts containers.
+5. Developers do not receive production `.env`, database credentials, Redis credentials, S3 credentials, or shell access unless explicitly approved.
 
 This does not make ALFRED zero-knowledge. It prevents routine developer access to raw uploaded files and production secrets.
 
