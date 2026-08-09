@@ -36,6 +36,7 @@ class AwsDeployPipelineContractTests(SimpleTestCase):
         self.assertIn("git fetch origin", script)
         self.assertIn("git checkout --detach \"$COMMIT_SHA\"", script)
         self.assertIn("git pull --ff-only", script)
+        self.assertIn("git config --global --add safe.directory \"$DEPLOY_DIR\"", script)
         self.assertIn("has uncommitted changes", script)
         self.assertNotIn("git reset --hard", script)
         self.assertIn("docker compose -f", script)

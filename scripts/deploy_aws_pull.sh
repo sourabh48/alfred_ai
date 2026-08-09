@@ -14,6 +14,12 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "$1 is required on the EC2 host"
 }
 
+configure_git_safe_directory() {
+  if [ -d "$DEPLOY_DIR/.git" ] && ! git config --global --get-all safe.directory | grep -Fx -- "$DEPLOY_DIR" >/dev/null 2>&1; then
+    git config --global --add safe.directory "$DEPLOY_DIR"
+  fi
+}
+
 DEPLOY_DIR="${ALFRED_DEPLOY_DIR:-/opt/alfred}"
 REPO_URL="${ALFRED_REPO_URL:-}"
 BRANCH="${ALFRED_BRANCH:-master}"
@@ -27,6 +33,7 @@ REQUIRE_READINESS="${ALFRED_REQUIRE_READINESS:-false}"
 require_command git
 require_command docker
 require_command curl
+configure_git_safe_directory
 
 if ! docker compose version >/dev/null 2>&1; then
   fail "docker compose plugin is required on the EC2 host"
