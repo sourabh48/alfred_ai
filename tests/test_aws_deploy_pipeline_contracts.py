@@ -50,6 +50,7 @@ class AwsDeployPipelineContractTests(SimpleTestCase):
         self.assertIn("docker compose -f", script)
         self.assertIn("build --pull", script)
         self.assertIn("up -d --remove-orphans", script)
+        self.assertIn("logs --tail=120 web worker beat", script)
         self.assertIn("python manage.py check", script)
         self.assertIn("python manage.py makemigrations --check --dry-run", script)
         self.assertIn("/health/live/", script)

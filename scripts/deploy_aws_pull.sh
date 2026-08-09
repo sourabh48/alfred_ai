@@ -78,12 +78,21 @@ fi
 export ALFRED_RUNTIME_ENV_FILE="$ENV_FILE"
 
 COMPOSE=(docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE")
+BUILD_LOG="$(mktemp /tmp/alfred-build.XXXXXX.log)"
 
 log "building containers"
-"${COMPOSE[@]}" build --pull
+if ! "${COMPOSE[@]}" build --pull >"$BUILD_LOG" 2>&1; then
+  cat "$BUILD_LOG" >&2 || true
+  fail "container build failed"
+fi
+tail -n 80 "$BUILD_LOG" || true
 
 log "starting web, worker, and beat"
-"${COMPOSE[@]}" up -d --remove-orphans
+if ! "${COMPOSE[@]}" up -d --remove-orphans; then
+  "${COMPOSE[@]}" ps || true
+  "${COMPOSE[@]}" logs --tail=120 web worker beat || true
+  fail "docker compose startup failed"
+fi
 
 log "running Django deployment checks inside the web container"
 "${COMPOSE[@]}" exec -T web python manage.py check
