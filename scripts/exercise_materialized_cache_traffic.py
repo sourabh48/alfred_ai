@@ -117,6 +117,7 @@ def run_materialized_cache_traffic_exercise(
     client = client or Client()
     client.force_login(user)
     allowed_hosts = sorted({*getattr(settings, "ALLOWED_HOSTS", []), "testserver", "localhost", "127.0.0.1"})
+    request_kwargs = _secure_request_kwargs(settings)
     endpoint_results: list[dict] = []
     internal_results: list[dict] = []
 
@@ -124,8 +125,14 @@ def run_materialized_cache_traffic_exercise(
         for target in MATERIALIZED_ENDPOINT_TARGETS:
             statuses = []
             for _ in range(max(int(repetitions), 2)):
-                response = client.get(target["path"])
+                response = client.get(target["path"], **request_kwargs)
                 statuses.append(response.status_code)
+                if 300 <= response.status_code < 400:
+                    raise RuntimeError(
+                        f"{target['namespace']} traffic request redirected at {target['path']} "
+                        f"with HTTP {response.status_code} to {response.get('Location', '')!r}; "
+                        "cache traffic proof must exercise the materialized view path"
+                    )
                 if response.status_code >= 400:
                     raise RuntimeError(
                         f"{target['namespace']} traffic request failed at {target['path']} "
@@ -196,6 +203,16 @@ def run_materialized_cache_traffic_exercise(
     if not validation["accepted"]:
         raise RuntimeError(f"Materialized cache traffic proof was not accepted: {validation['blockers']}")
     return summary
+
+
+def _secure_request_kwargs(settings) -> dict:
+    kwargs: dict[str, Any] = {"secure": True}
+    proxy_header = getattr(settings, "SECURE_PROXY_SSL_HEADER", None)
+    if isinstance(proxy_header, (tuple, list)) and len(proxy_header) == 2:
+        header_name, header_value = proxy_header
+        if isinstance(header_name, str) and header_name.startswith("HTTP_") and header_value:
+            kwargs[header_name] = header_value
+    return kwargs
 
 
 def ensure_cache_probe_data(user) -> None:

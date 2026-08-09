@@ -9,7 +9,7 @@ from unittest.mock import patch
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import (
@@ -357,6 +357,23 @@ class LargeDataMaterializationTests(TestCase):
                 self.assertTrue(row["last_revision_key"])
                 self.assertTrue(row["last_generated_at"])
                 self.assertTrue(row["last_served_at"])
+
+    @override_settings(
+        SECURE_SSL_REDIRECT=True,
+        SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_PROTO", "https"),
+    )
+    def test_cache_traffic_exercise_uses_secure_requests_when_ssl_redirect_is_enabled(self):
+        summary = run_materialized_cache_traffic_exercise(
+            user=self.user,
+            client=self.client,
+            proof_path=self.cache_proof_path,
+        )
+
+        self.assertTrue(summary["validation"]["accepted"])
+        for target in summary["endpoint_targets"]:
+            with self.subTest(namespace=target["namespace"]):
+                self.assertTrue(target["status_codes"])
+                self.assertTrue(all(status == 200 for status in target["status_codes"]))
 
     def test_cache_namespace_registry_matches_materialized_payload_call_sites(self):
         source_namespaces = set()
