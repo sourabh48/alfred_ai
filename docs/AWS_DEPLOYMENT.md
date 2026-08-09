@@ -126,7 +126,8 @@ Use [AWS Pull Deployment Pipeline](AWS_DEPLOY_PIPELINE.md) when you want develop
 - `scripts/deploy_aws_pull.sh`
 - `docker-compose.aws-free-tier.yml` for strict Free Tier
 - `docker-compose.aws.yml` for external managed PostgreSQL/Redis
-- GitHub Actions SSH secrets
-- a read-only GitHub deploy key stored on EC2
+- GitHub OIDC with a narrow AWS deploy role
+- AWS Systems Manager Run Command to trigger the EC2-side deploy
+- HTTPS Git pull from EC2
 
 This closes the code-delivery path only. It does not close production readiness until the runtime proof contract is accepted.
