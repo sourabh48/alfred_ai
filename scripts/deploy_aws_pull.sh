@@ -30,6 +30,8 @@ HEALTH_URL="${ALFRED_HEALTH_URL:-http://127.0.0.1:8000/health/}"
 RUN_READINESS_PROBE="${ALFRED_RUN_READINESS_PROBE:-false}"
 REQUIRE_READINESS="${ALFRED_REQUIRE_READINESS:-false}"
 
+export HOME="${HOME:-/root}"
+
 require_command git
 require_command docker
 require_command curl
