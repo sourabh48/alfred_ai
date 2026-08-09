@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 from alfred_ai.pagination import OptionalPageNumberPagination
 from alfred_ai.services import record_parser_learning
 from alfred_ai.services.materialized_cache import materialize_payload
+from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.reports.services import operational_logging_service
 from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto
 from .serializers import (
@@ -392,7 +393,14 @@ class BikeDocumentUploadView(APIView):
                     "document_type": document.document_type,
                 },
             )
-        return Response(BikeDocumentSerializer(document, context={"request": request}).data, status=status.HTTP_201_CREATED)
+        raw_file_retention = purge_uploaded_file_after_extraction(
+            document,
+            "document_file",
+            reason="vehicle_document_extraction_complete",
+        )
+        payload = BikeDocumentSerializer(document, context={"request": request}).data
+        payload["raw_file_retention"] = raw_file_retention
+        return Response(payload, status=status.HTTP_201_CREATED)
 
 
 class BikeConditionSnapshotListCreateView(ListCreateAPIView):
@@ -559,10 +567,16 @@ class BikeServiceImportView(APIView):
                 message="Service bill was imported, but parser confidence stayed below the trusted threshold.",
                 payload={"parse_confidence": document.parse_confidence, "parser_notes": document.parser_notes},
             )
+        raw_file_retention = purge_uploaded_file_after_extraction(
+            document,
+            "document_file",
+            reason="vehicle_service_document_extraction_complete",
+        )
         return Response(
             {
                 "document": BikeDocumentSerializer(document, context={"request": request}).data,
                 "service_record": BikeServiceRecordSerializer(service_record, context={"request": request}).data,
+                "raw_file_retention": raw_file_retention,
             },
             status=status.HTTP_201_CREATED,
         )

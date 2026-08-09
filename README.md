@@ -160,6 +160,25 @@ python scripts/exercise_materialized_cache_traffic.py
 
 ALFRED is not production-ready until the deployment environment proves database, shared cache, worker, browser-regression, security, and production-like cache-traffic health. See [Production Readiness](docs/PRODUCTION_READINESS.md).
 
+For AWS, start with [AWS Deployment Guide](docs/AWS_DEPLOYMENT.md). The repo includes:
+
+- `config/aws.env.example` for AWS production env values.
+- `config/docker-compose.env.example` for local Docker validation.
+- `Dockerfile` for the Django/Celery image.
+- `docker-compose.aws-local.yml` for a local PostgreSQL + Redis + web + Celery worker + Celery beat stack.
+- `docker-compose.aws.yml` for an EC2 deployment that uses external PostgreSQL and Redis.
+- `.github/workflows/aws-deploy.yml` plus `scripts/deploy_aws_pull.sh` for GitHub-to-EC2 pull deployment.
+
+Run the local production-style stack:
+
+```bash
+docker compose -f docker-compose.aws-local.yml up --build
+```
+
+This local stack validates the dependency shape, but it does not close Project Details Deployment Readiness because HTTPS, real AWS runtime, CI browser proof, and production-like cache traffic still need deployed proof.
+
+For user-data handling, see [Data Privacy And Storage](docs/DATA_PRIVACY_AND_STORAGE.md). Production envs should set `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true` so extraction-only raw documents are removed from Django storage after parsing.
+
 ## ML Runtime
 
 - Alfred prefers `scikit-learn` for supported tabular training tasks when the machine allows it.

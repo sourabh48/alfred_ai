@@ -19,6 +19,7 @@ from .views import (
     document_review_retry_api_view,
     client_operational_log_api_view,
     health_api_view,
+    project_details_career_outcome_view,
     project_details_view,
     project_details_api_view,
     signup_view,
@@ -53,6 +54,7 @@ urlpatterns = [
     path("api/documents/diagnostics/", document_diagnostics_api_view, name="document_diagnostics_api"),
     path("api/operational/logs/client/", client_operational_log_api_view, name="client_operational_log_api"),
     path("project-details/", project_details_view, name="project_details"),
+    path("project-details/career-outcomes/", project_details_career_outcome_view, name="project_details_career_outcome"),
     path("api/project-details/", project_details_api_view, name="project_details_api"),
     path("ai/insights/", insights_view, name="ai_insights"),
 

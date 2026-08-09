@@ -35,6 +35,7 @@ REQUIRED_PRODUCTION_ENV_VARS = (
     "CACHE_BACKEND",
     "CACHE_LOCATION",
     "REDIS_URL",
+    "ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true",
 )
 
 
@@ -731,6 +732,8 @@ def production_readiness_snapshot(*, cache_health: dict | None = None, browser_c
     total_count = len(checks)
     progress = int(round((ready_count / total_count) * 100)) if total_count else 0
     blockers = [item["label"] for item in checks if not item["ready"]]
+    ready_checks = [item for item in checks if item["ready"]]
+    blocked_checks = [item for item in checks if not item["ready"]]
     blocker_count = len(blockers)
     blocker_percent = int(round((blocker_count / total_count) * 100)) if total_count else 0
     manual_tasks = [item["manual_task"] for item in checks if item["manual_task"]]
@@ -744,7 +747,10 @@ def production_readiness_snapshot(*, cache_health: dict | None = None, browser_c
         "total_check_count": total_count,
         "blocker_count": blocker_count,
         "blockers": blockers,
+        "ready_checks": ready_checks,
+        "blocked_checks": blocked_checks,
         "manual_tasks": manual_tasks,
+        "manual_task_count": len(manual_tasks),
         "required_env_vars": list(REQUIRED_PRODUCTION_ENV_VARS),
         "probe_command": PRODUCTION_READINESS_PROBE_COMMAND,
         "deployment_proof": proof,

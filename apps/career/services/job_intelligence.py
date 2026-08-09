@@ -88,6 +88,12 @@ SALARY_BLOCK_RE = re.compile(
     re.IGNORECASE,
 )
 OPPORTUNITY_OUTCOME_STATUSES = {"accepted", "rejected"}
+OPPORTUNITY_OUTCOME_VALIDATION_CONTRACT = [
+    "accepted_or_rejected_decision",
+    "salary_range",
+    "source_url",
+    "location_match",
+]
 JOB_FEED_ADAPTERS = (
     {
         "name": "Remotive Jobs API",
@@ -870,8 +876,31 @@ class JobIntelligenceService:
         if not annual_min and not annual_max:
             raise ValueError("Accepted or rejected opportunities must include salary evidence before they count toward outcome learning.")
 
+        source_url = str(
+            payload.get("source_url")
+            or snapshot.get("source_url")
+            or snapshot.get("job_url")
+            or getattr(analysis, "job_url", "")
+            or ""
+        ).strip()
+        parsed_source_url = urlparse(source_url)
+        if parsed_source_url.scheme not in {"http", "https"} or not parsed_source_url.netloc:
+            raise ValueError("Accepted or rejected opportunities must include a valid source URL before they count toward outcome learning.")
+
         now = timezone.now()
         location = str(payload.get("location") or getattr(analysis, "location", "") or snapshot.get("location", "") or "").strip()
+        if not location:
+            location = ", ".join(
+                part
+                for part in [
+                    str(payload.get("city") or snapshot.get("city") or "").strip(),
+                    str(payload.get("state") or snapshot.get("state") or "").strip(),
+                    str(payload.get("country") or snapshot.get("country") or "").strip(),
+                ]
+                if part
+            )
+        if not location:
+            raise ValueError("Accepted or rejected opportunities must include a location before they count toward outcome learning.")
         location_meta = self._location_hierarchy(location)
         currency = (
             payload.get("salary_currency")
@@ -894,7 +923,7 @@ class JobIntelligenceService:
             "decided_at": str(payload.get("decided_at") or now.date().isoformat()),
             "recorded_at": now.isoformat(),
             "source_kind": str(payload.get("source_kind") or snapshot.get("source_kind") or "manual_outcome"),
-            "source_url": str(payload.get("source_url") or getattr(analysis, "job_url", "") or ""),
+            "source_url": source_url,
             "apply_url": str(payload.get("apply_url") or getattr(analysis, "apply_url", "") or ""),
             "company": str(payload.get("company") or getattr(analysis, "company", "") or snapshot.get("company", "") or ""),
             "job_title": str(payload.get("job_title") or payload.get("title") or getattr(analysis, "job_title", "") or snapshot.get("title", "") or ""),
@@ -906,6 +935,30 @@ class JobIntelligenceService:
             "rejection_reason": str(payload.get("rejection_reason") or "").strip()[:600],
         }
 
+    def opportunity_outcome_contract_status(self, item: dict | None) -> dict:
+        item = item if isinstance(item, dict) else {}
+        has_salary = bool(item.get("salary_bearing") and (item.get("salary_min_annual") or item.get("salary_max_annual")))
+        has_decision = item.get("outcome") in OPPORTUNITY_OUTCOME_STATUSES
+        has_source = bool(str(item.get("source_url") or "").strip())
+        has_location = bool(
+            str(item.get("location") or "").strip()
+            or str(item.get("city") or "").strip()
+            or str(item.get("state") or "").strip()
+            or str(item.get("country") or "").strip()
+        )
+        fields = {
+            "accepted_or_rejected_decision": has_decision,
+            "salary_range": has_salary,
+            "source_url": has_source,
+            "location_match": has_location,
+        }
+        missing = [key for key in OPPORTUNITY_OUTCOME_VALIDATION_CONTRACT if not fields[key]]
+        return {
+            "valid": not missing,
+            "fields": fields,
+            "missing": missing,
+        }
+
     def opportunity_outcome_learning_summary(self, analyses) -> dict:
         outcomes = []
         for analysis in analyses:
@@ -915,16 +968,7 @@ class JobIntelligenceService:
                 outcomes.append(outcome)
 
         def has_valid_outcome_contract(item: dict) -> bool:
-            has_salary = bool(item.get("salary_bearing") and (item.get("salary_min_annual") or item.get("salary_max_annual")))
-            has_decision = item.get("outcome") in OPPORTUNITY_OUTCOME_STATUSES
-            has_source = bool(str(item.get("source_url") or "").strip())
-            has_location = bool(
-                str(item.get("location") or "").strip()
-                or str(item.get("city") or "").strip()
-                or str(item.get("state") or "").strip()
-                or str(item.get("country") or "").strip()
-            )
-            return has_salary and has_decision and has_source and has_location
+            return self.opportunity_outcome_contract_status(item)["valid"]
 
         salary_bearing = [item for item in outcomes if has_valid_outcome_contract(item)]
         accepted = [item for item in salary_bearing if item.get("outcome") == "accepted"]
@@ -938,10 +982,13 @@ class JobIntelligenceService:
         minimum_salary_bearing = 8
         minimum_accepted = 3
         minimum_rejected = 3
+        remaining_salary_bearing = max(minimum_salary_bearing - len(salary_bearing), 0)
+        remaining_accepted = max(minimum_accepted - len(accepted), 0)
+        remaining_rejected = max(minimum_rejected - len(rejected), 0)
         maturity_ready = (
-            len(salary_bearing) >= minimum_salary_bearing
-            and len(accepted) >= minimum_accepted
-            and len(rejected) >= minimum_rejected
+            remaining_salary_bearing == 0
+            and remaining_accepted == 0
+            and remaining_rejected == 0
         )
         if maturity_ready:
             maturity_status = "mature"
@@ -949,9 +996,9 @@ class JobIntelligenceService:
         elif salary_bearing:
             maturity_status = "collecting"
             blocker = (
-                f"Need {max(minimum_salary_bearing - len(salary_bearing), 0)} more salary-bearing outcome(s), "
-                f"{max(minimum_accepted - len(accepted), 0)} more accepted outcome(s), and "
-                f"{max(minimum_rejected - len(rejected), 0)} more rejected outcome(s)."
+                f"Need {remaining_salary_bearing} more salary-bearing outcome(s), "
+                f"{remaining_accepted} more accepted outcome(s), and "
+                f"{remaining_rejected} more rejected outcome(s)."
             )
         else:
             maturity_status = "not_started"
@@ -968,17 +1015,16 @@ class JobIntelligenceService:
             "minimum_salary_bearing_outcomes": minimum_salary_bearing,
             "minimum_accepted_outcomes": minimum_accepted,
             "minimum_rejected_outcomes": minimum_rejected,
+            "remaining_salary_bearing_outcomes": remaining_salary_bearing,
+            "remaining_accepted_outcomes": remaining_accepted,
+            "remaining_rejected_outcomes": remaining_rejected,
+            "maturity_ready": maturity_ready,
             "accepted_salary_mid_median": self._median_salary_mid(accepted),
             "rejected_salary_mid_median": self._median_salary_mid(rejected),
             "source_count": len(source_urls),
             "source_urls": source_urls[:8],
             "geography_counts": dict(sorted(geography_counts.items())),
-            "validation_contract": [
-                "accepted_or_rejected_decision",
-                "salary_range",
-                "source_url",
-                "location_match",
-            ],
+            "validation_contract": OPPORTUNITY_OUTCOME_VALIDATION_CONTRACT,
             "blocker": blocker,
             "summary": (
                 f"{len(salary_bearing)} salary-bearing accepted/rejected outcome(s) recorded "

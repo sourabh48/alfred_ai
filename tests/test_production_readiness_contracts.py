@@ -87,18 +87,72 @@ class ProductionReadinessContractTests(SimpleTestCase):
     def test_readme_and_production_doc_keep_production_maturity_gated(self):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         production = (REPO_ROOT / "docs" / "PRODUCTION_READINESS.md").read_text(encoding="utf-8")
+        aws = (REPO_ROOT / "docs" / "AWS_DEPLOYMENT.md").read_text(encoding="utf-8")
 
         self.assertIn("Production hardening | 90%", readme)
         self.assertIn("all 21 registered materialized namespaces", readme)
         self.assertIn("python scripts/exercise_materialized_cache_traffic.py", readme)
+        self.assertIn("AWS Deployment Guide", readme)
+        self.assertIn("docker-compose.aws-local.yml", readme)
+        self.assertIn("Data Privacy And Storage", readme)
+        self.assertIn("ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true", readme)
         self.assertIn("ALFRED is not production-ready", production)
+        self.assertIn("AWS Deployment Guide", production)
         self.assertIn("Celery worker and beat", production)
         self.assertIn("local-memory cache is only for development", production)
         self.assertIn("sustained production-like cache telemetry", production)
         self.assertIn("Required Environment Variables", production)
         self.assertIn("ALFRED_PRODUCTION_DEPLOYMENT_PROOF", production)
+        self.assertIn("ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION", production)
         self.assertIn("source: production_deployment_probe", production)
         self.assertIn("python scripts/run_production_readiness_probe.py --require-ready", production)
+        self.assertIn("Production Blocker Checklist", production)
+        self.assertIn("Production database config", production)
+        self.assertIn("Shared cache config", production)
+        self.assertIn("Celery worker and beat proof", production)
+        self.assertIn("Amazon EC2", aws)
+        self.assertIn("Amazon RDS for PostgreSQL", aws)
+        self.assertIn("db.t3.micro", aws)
+        self.assertIn("db.t4g.micro", aws)
+        self.assertIn("ElastiCache", aws)
+        self.assertIn("Self-managed Redis on EC2 first", aws)
+        self.assertIn("Blocker-To-Proof Checklist", aws)
+        self.assertIn("Do not raise Deployment Readiness to 100%", aws)
+
+    def test_aws_env_and_docker_contracts_cover_web_postgres_redis_and_celery(self):
+        dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+        compose = (REPO_ROOT / "docker-compose.aws-local.yml").read_text(encoding="utf-8")
+        aws_env = (REPO_ROOT / "config" / "aws.env.example").read_text(encoding="utf-8")
+        compose_env = (REPO_ROOT / "config" / "docker-compose.env.example").read_text(encoding="utf-8")
+        requirements = (REPO_ROOT / "requirements.txt").read_text(encoding="utf-8")
+
+        self.assertIn("gunicorn", dockerfile)
+        self.assertIn("postgresql-client", dockerfile)
+        self.assertIn("redis-tools", dockerfile)
+        self.assertIn("gunicorn==", requirements)
+        self.assertIn("psycopg[binary]==", requirements)
+
+        for service in ("postgres:", "redis:", "web:", "worker:", "beat:"):
+            with self.subTest(service=service):
+                self.assertIn(service, compose)
+
+        self.assertIn("python manage.py migrate", compose)
+        self.assertIn("python manage.py collectstatic --noinput", compose)
+        self.assertIn("celery -A alfred_ai worker", compose)
+        self.assertIn("celery -A alfred_ai beat", compose)
+        self.assertIn("django.core.cache.backends.redis.RedisCache", aws_env)
+        self.assertIn("DB_ENGINE=django.db.backends.postgresql", aws_env)
+        self.assertIn("ALFRED_LOCAL_RUNTIME=false", aws_env)
+        self.assertIn("DEBUG=false", aws_env)
+        self.assertIn("SECURE_SSL_REDIRECT=true", aws_env)
+        self.assertIn("SESSION_COOKIE_SECURE=true", aws_env)
+        self.assertIn("CSRF_COOKIE_SECURE=true", aws_env)
+        self.assertIn("ALFRED_PRODUCTION_DEPLOYMENT_PROOF", aws_env)
+        self.assertIn("ALFRED_MATERIALIZED_CACHE_TRAFFIC_PROOF", aws_env)
+        self.assertIn("ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true", aws_env)
+        self.assertIn("SECURE_SSL_REDIRECT=false", compose_env)
+        self.assertIn("ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true", compose_env)
+        self.assertIn("This is intentionally not accepted as production proof", compose_env)
 
     def test_sonarqube_is_not_part_of_current_production_contract(self):
         removed_paths = (
@@ -145,6 +199,9 @@ class ProductionReadinessContractTests(SimpleTestCase):
         self.assertLess(snapshot["progress"], 100)
         self.assertEqual(snapshot["blocker_count"], len(snapshot["blockers"]))
         self.assertEqual(snapshot["blocker_percent"], 100)
+        self.assertEqual(snapshot["ready_checks"], [])
+        self.assertEqual(len(snapshot["blocked_checks"]), snapshot["blocker_count"])
+        self.assertEqual(snapshot["manual_task_count"], snapshot["blocker_count"])
         self.assertEqual(snapshot["maturity_status"], "Deployment proof gated")
         self.assertIn("Production database config", snapshot["blockers"])
         self.assertIn("Shared cache config", snapshot["blockers"])
@@ -286,6 +343,7 @@ class ProductionReadinessContractTests(SimpleTestCase):
                     "CACHE_BACKEND": "django.core.cache.backends.redis.RedisCache",
                     "CACHE_LOCATION": "rediss://redis.example.com:6379/1",
                     "REDIS_URL": "rediss://redis.example.com:6379/0",
+                    "ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION": "true",
                 },
                 clear=True,
             ):
@@ -325,6 +383,9 @@ class ProductionReadinessProjectDetailsTests(TestCase):
         self.assertFalse(readiness["ready"])
         self.assertLess(readiness["progress"], 100)
         self.assertEqual(readiness["blocker_count"], len(readiness["blockers"]))
+        self.assertEqual(len(readiness["ready_checks"]), readiness["ready_check_count"])
+        self.assertEqual(len(readiness["blocked_checks"]), readiness["blocker_count"])
+        self.assertEqual(readiness["manual_task_count"], readiness["blocker_count"])
         self.assertGreater(readiness["blocker_percent"], 0)
         self.assertIn("Deployment proof gated", readiness["maturity_status"])
         self.assertIn("Production database config", readiness["blockers"])
@@ -341,6 +402,19 @@ class ProductionReadinessProjectDetailsTests(TestCase):
         self.assertIn("deployment readiness is excluded", scope_card["copy"])
         self.assertTrue(payload["scope_completion"]["production_readiness_excluded"])
         self.assertEqual(payload["scope_completion"]["production_blocker_percent"], readiness["blocker_percent"])
+        self.assertEqual(
+            payload["scope_completion"]["remaining_product_gate_count"],
+            len(payload["scope_completion"]["remaining_product_gates"]),
+        )
+        for value in (
+            readiness["progress"],
+            readiness["blocker_percent"],
+            payload["scope_completion"]["progress"],
+        ):
+            with self.subTest(progress=value):
+                self.assertIsInstance(value, int)
+                self.assertGreaterEqual(value, 0)
+                self.assertLessEqual(value, 100)
         production_metric = next(item for item in payload["operational_metrics"] if item["label"] == "Production Readiness")
         self.assertEqual(production_metric["value"], f"{readiness['progress']}%")
         production_blocker_metric = next(item for item in payload["operational_metrics"] if item["label"] == "Production Blockers")

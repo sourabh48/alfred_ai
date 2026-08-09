@@ -413,6 +413,14 @@ class CareerAdaptiveIntelligenceTests(TestCase):
         self.assertEqual(accepted_analysis.extracted_payload["opportunity_outcome"]["outcome"], "accepted")
         self.assertTrue(accepted_analysis.extracted_payload["opportunity_outcome"]["salary_bearing"])
         self.assertEqual(accepted_analysis.extracted_payload["opportunity_outcome"]["salary_min_annual"], 2400000)
+        self.assertEqual(
+            accepted_analysis.extracted_payload["opportunity_outcome"]["source_url"],
+            "https://example.com/jobs/accepted",
+        )
+        self.assertEqual(
+            accepted_analysis.extracted_payload["opportunity_outcome"]["location"],
+            "Bengaluru, Karnataka, India",
+        )
         summary = rejected_response.json()["opportunity_outcome_learning"]
         self.assertEqual(summary["salary_bearing_outcome_count"], 2)
         self.assertEqual(summary["accepted_count"], 1)
@@ -450,6 +458,98 @@ class CareerAdaptiveIntelligenceTests(TestCase):
         self.assertEqual(dashboard_summary["salary_bearing_outcome_count"], 2)
         self.assertEqual(dashboard_summary["accepted_count"], 1)
         self.assertEqual(dashboard_summary["rejected_count"], 1)
+
+    def test_career_job_outcome_endpoint_rejects_incomplete_salary_source_location_contract(self):
+        missing_source = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="",
+            company="Missing Source Co",
+            job_title="Data Analyst",
+            location="Bengaluru, Karnataka, India",
+            extracted_payload={"job_snapshot": {"location": "Bengaluru, Karnataka, India"}},
+        )
+        missing_location = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/missing-location",
+            company="Missing Location Co",
+            job_title="Data Analyst",
+            location="",
+            extracted_payload={"job_snapshot": {"location": ""}},
+        )
+        missing_salary = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/missing-salary",
+            company="Missing Salary Co",
+            job_title="Data Analyst",
+            location="Bengaluru, Karnataka, India",
+        )
+
+        missing_source_response = self.client.post(
+            f"/api/career/job-analyses/{missing_source.id}/outcome/",
+            data=json.dumps({"outcome": "accepted", "salary_text": "INR 20-24 LPA"}),
+            content_type="application/json",
+        )
+        missing_location_response = self.client.post(
+            f"/api/career/job-analyses/{missing_location.id}/outcome/",
+            data=json.dumps({"outcome": "rejected", "salary_text": "INR 18-22 LPA"}),
+            content_type="application/json",
+        )
+        missing_salary_response = self.client.post(
+            f"/api/career/job-analyses/{missing_salary.id}/outcome/",
+            data=json.dumps({"outcome": "accepted"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(missing_source_response.status_code, 400)
+        self.assertIn("source URL", missing_source_response.json()["detail"])
+        self.assertEqual(missing_location_response.status_code, 400)
+        self.assertIn("location", missing_location_response.json()["detail"])
+        self.assertEqual(missing_salary_response.status_code, 400)
+        self.assertIn("salary evidence", missing_salary_response.json()["detail"])
+        for analysis in [missing_source, missing_location, missing_salary]:
+            analysis.refresh_from_db()
+            self.assertNotIn("opportunity_outcome", analysis.extracted_payload)
+
+        summary = job_intelligence.opportunity_outcome_learning_summary(
+            CareerJobAnalysis.objects.filter(id__in=[missing_source.id, missing_location.id, missing_salary.id])
+        )
+        self.assertEqual(summary["outcome_count"], 0)
+        self.assertEqual(summary["validated_outcome_count"], 0)
+
+    def test_career_job_outcome_endpoint_accepts_structured_location_contract(self):
+        analysis = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/structured-location",
+            company="Structured Location Co",
+            job_title="Data Analyst",
+            location="",
+        )
+
+        response = self.client.post(
+            f"/api/career/job-analyses/{analysis.id}/outcome/",
+            data=json.dumps(
+                {
+                    "outcome": "accepted",
+                    "salary_text": "INR 21-25 LPA",
+                    "city": "Bengaluru",
+                    "state": "Karnataka",
+                    "country": "India",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        analysis.refresh_from_db()
+        outcome = analysis.extracted_payload["opportunity_outcome"]
+        self.assertEqual(outcome["location"], "Bengaluru, Karnataka, India")
+        self.assertEqual(outcome["city"], "Bengaluru")
+        self.assertEqual(outcome["state"], "Karnataka")
+        self.assertEqual(outcome["country"], "India")
 
     def test_opportunity_outcome_summary_counts_only_validated_salary_source_location_decisions(self):
         valid = CareerJobAnalysis.objects.create(

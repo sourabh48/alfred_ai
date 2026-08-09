@@ -21,6 +21,7 @@ function loadProjectDetails() {
             renderGuardrails(payload.guardrails || {});
             renderCacheHealth(payload.cache_health || {});
             renderBrowserCoverage(payload.browser_coverage || {});
+            renderDeploymentReadiness(payload.production_readiness || {});
             renderLearningSnapshot(payload.learning_snapshot || {});
             renderInProgressTracks(payload.in_progress_tracks || []);
             renderCompletedTracks(payload.completed_tracks || []);
@@ -220,6 +221,31 @@ function renderBrowserCoverage(browserCoverage) {
         </div>
         <div class="data-stack mt-3">
             ${proofRows || `<div class="empty-state">No browser proof lanes are configured yet.</div>`}
+        </div>
+    `);
+}
+
+function renderDeploymentReadiness(readiness) {
+    const container = document.getElementById("projectDetailsDeploymentReadinessBlock");
+    if (!container) {
+        return;
+    }
+    const checks = Array.isArray(readiness.checks) ? readiness.checks : [];
+    Alfred.setHTMLIfChanged(container, `
+        <h3 class="compact-section-title">Deployment Readiness Contract</h3>
+        <p class="page-section-copy mb-2">${Alfred.escapeHtml(readiness.summary || "Production readiness proof has not been recorded yet.")}</p>
+        <div class="chip-row mb-3">
+            <span class="chip-neutral">${Alfred.escapeHtml(String(readiness.ready_check_count ?? 0))}/${Alfred.escapeHtml(String(readiness.total_check_count ?? 0))} ready</span>
+            <span class="chip-neutral">${Alfred.escapeHtml(String(readiness.blocker_count ?? 0))} blocker(s)</span>
+            <span class="chip-neutral">${Alfred.escapeHtml(readiness.deployment_proof_path || "")}</span>
+        </div>
+        <div class="data-stack">
+            ${checks.length ? checks.map(check => `
+                <div class="data-row">
+                    <div class="data-label">${Alfred.escapeHtml(check.label || "")}</div>
+                    <div class="data-value">${Alfred.escapeHtml(check.status || "")} <span class="muted small">${Alfred.escapeHtml(check.manual_task || check.detail || "")}</span></div>
+                </div>
+            `).join("") : `<div class="empty-state">No production readiness checks are registered yet.</div>`}
         </div>
     `);
 }

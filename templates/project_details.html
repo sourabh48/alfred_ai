@@ -28,6 +28,123 @@
     </div>
 </section>
 
+{% if messages %}
+<div class="mb-4">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} mb-2" role="alert">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<section class="row g-4 mb-4" id="careerOutcomeEntry">
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Career Outcome Entry</h2>
+            <p class="page-section-copy mb-3">Superuser-only capture for real accepted and rejected opportunities that can raise compensation maturity.</p>
+            <form method="post" action="{% url 'project_details_career_outcome' %}" id="careerOutcomeEntryForm">
+                {% csrf_token %}
+                {% if career_outcome_form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">{{ career_outcome_form.non_field_errors|join:" " }}</div>
+                {% endif %}
+                <div class="mb-3">
+                    <label class="form-label" for="{{ career_outcome_form.analysis.id_for_label }}">Job analysis</label>
+                    {{ career_outcome_form.analysis }}
+                    {% for error in career_outcome_form.analysis.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ career_outcome_form.outcome.id_for_label }}">Decision</label>
+                        {{ career_outcome_form.outcome }}
+                        {% for error in career_outcome_form.outcome.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ career_outcome_form.salary_text.id_for_label }}">Salary text</label>
+                        {{ career_outcome_form.salary_text }}
+                        {% for error in career_outcome_form.salary_text.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ career_outcome_form.salary_min.id_for_label }}">Salary minimum</label>
+                        {{ career_outcome_form.salary_min }}
+                        {% for error in career_outcome_form.salary_min.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ career_outcome_form.salary_max.id_for_label }}">Salary maximum</label>
+                        {{ career_outcome_form.salary_max }}
+                        {% for error in career_outcome_form.salary_max.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ career_outcome_form.salary_currency.id_for_label }}">Currency</label>
+                        {{ career_outcome_form.salary_currency }}
+                        {% for error in career_outcome_form.salary_currency.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ career_outcome_form.salary_period.id_for_label }}">Period</label>
+                        {{ career_outcome_form.salary_period }}
+                        {% for error in career_outcome_form.salary_period.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="form-label" for="{{ career_outcome_form.source_url.id_for_label }}">Source URL</label>
+                    {{ career_outcome_form.source_url }}
+                    {% for error in career_outcome_form.source_url.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="mt-3">
+                    <label class="form-label" for="{{ career_outcome_form.location.id_for_label }}">Location</label>
+                    {{ career_outcome_form.location }}
+                    {% for error in career_outcome_form.location.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="mt-3">
+                    <label class="form-label" for="{{ career_outcome_form.notes.id_for_label }}">Accepted notes</label>
+                    {{ career_outcome_form.notes }}
+                    {% for error in career_outcome_form.notes.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="mt-3">
+                    <label class="form-label" for="{{ career_outcome_form.rejection_reason.id_for_label }}">Rejected reason</label>
+                    {{ career_outcome_form.rejection_reason }}
+                    {% for error in career_outcome_form.rejection_reason.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <button class="btn btn-primary mt-3" type="submit">Save Outcome</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <h2 class="page-section-title">Career Outcome Maturity Gate</h2>
+            <p class="page-section-copy mb-3">{{ career_outcome_entry.summary.blocker }}</p>
+            <div class="data-stack mb-3">
+                <div class="data-row">
+                    <div class="data-label">Validated outcomes</div>
+                    <div class="data-value">{{ career_outcome_entry.summary.validated_outcome_count }}/{{ career_outcome_entry.required_total }} <span class="muted small">accepted {{ career_outcome_entry.summary.accepted_count }}/{{ career_outcome_entry.required_accepted }} | rejected {{ career_outcome_entry.summary.rejected_count }}/{{ career_outcome_entry.required_rejected }}</span></div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">Remaining gate</div>
+                    <div class="data-value">{{ career_outcome_entry.remaining_total }} <span class="muted small">total | {{ career_outcome_entry.remaining_accepted }} accepted | {{ career_outcome_entry.remaining_rejected }} rejected</span></div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">Unvalidated outcomes</div>
+                    <div class="data-value">{{ career_outcome_entry.summary.unvalidated_outcome_count }} <span class="muted small">missing salary, source URL, location, or decision proof</span></div>
+                </div>
+            </div>
+            <div class="stack-scroll stack-scroll-sm">
+                {% if career_outcome_entry.recent_outcomes %}
+                <div class="data-stack">
+                    {% for item in career_outcome_entry.recent_outcomes %}
+                    <div class="data-row">
+                        <div class="data-label">#{{ item.id }} | {{ item.user }} | {{ item.outcome|default:"no outcome" }}</div>
+                        <div class="data-value">
+                            {{ item.job_title|default:"Untitled role" }} <span class="muted small">{{ item.company|default:"Unknown company" }} | {% if item.counts_toward_maturity %}counts toward maturity{% else %}missing {{ item.contract_missing|join:", " }}{% endif %}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">No job analyses are available for outcome entry yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
@@ -377,6 +494,20 @@
                     {% endfor %}
                 </div>
             </div>
+            <div class="mt-4" id="projectDetailsDeploymentReadinessBlock">
+                <h3 class="compact-section-title">Deployment Readiness Contract</h3>
+                <p class="page-section-copy mb-2">{{ production_readiness.summary }}</p>
+                <div class="data-stack">
+                    {% for check in production_readiness.checks %}
+                    <div class="data-row">
+                        <div class="data-label">{{ check.label }}</div>
+                        <div class="data-value">
+                            {{ check.status }} <span class="muted small">{{ check.manual_task|default:check.detail }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
             <ul class="insight-list mt-4 mb-0" id="projectDetailsGuardrailFaults">
                 {% for item in guardrails.fault_tolerance %}
                 <li class="insight-item">{{ item }}</li>
@@ -439,5 +570,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/project_details.js?v=1.8"></script>
+<script src="/static/js/project_details.js?v=1.9"></script>
 {% endblock %}

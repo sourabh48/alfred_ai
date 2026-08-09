@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import Loan, LoanClosureDocument, LoanPaymentHistory
-from .services.payment_review import review_loan_payment_match
+from .services.payment_review import reject_subscription_false_positive_match, review_loan_payment_match
 
 
 @admin.register(Loan)
@@ -37,7 +37,7 @@ class LoanPaymentHistoryAdmin(admin.ModelAdmin):
     )
     list_filter = ("match_status", "loan_effect_applied", "is_auto_detected")
     search_fields = ("loan__lender", "detection_reason", "matched_reference")
-    actions = ("accept_review_matches", "reject_review_matches")
+    actions = ("accept_review_matches", "reject_review_matches", "reject_subscription_false_positive_matches")
 
     @admin.action(description="Accept selected review-gated loan payments")
     def accept_review_matches(self, request, queryset):
@@ -66,6 +66,22 @@ class LoanPaymentHistoryAdmin(admin.ModelAdmin):
             )
             count += 1
         self.message_user(request, f"Rejected {count} loan payment review row(s).")
+
+    @admin.action(description="Reject selected subscription false-positive loan payments")
+    def reject_subscription_false_positive_matches(self, request, queryset):
+        count = 0
+        for payment in queryset.select_related("loan", "expense_reference"):
+            try:
+                reject_subscription_false_positive_match(
+                    user=payment.loan.user,
+                    payment_id=payment.id,
+                    reviewer=request.user,
+                    notes="Rejected from Django admin as subscription false positive.",
+                )
+            except ValueError:
+                continue
+            count += 1
+        self.message_user(request, f"Rejected {count} subscription false-positive loan payment row(s).")
 
 
 @admin.register(LoanClosureDocument)

@@ -1,6 +1,7 @@
 import json
 import logging
 
+from django.contrib import messages
 from django.contrib.auth import login
 from django.shortcuts import render
 from django.shortcuts import redirect
@@ -10,8 +11,10 @@ from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
 from django.core.serializers.json import DjangoJSONEncoder
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
+from apps.career.forms import CareerOpportunityOutcomeForm
 from apps.integrations.services import verified_intelligence
 from apps.ml_engine.runtime_control import build_runtime_status
 from apps.reports.services import operational_logging_service
@@ -206,7 +209,7 @@ def project_details_view(request):
     return render(
         request,
         "project_details.html",
-        project_details_payload(verified_intelligence.guardrail_snapshot()),
+        _project_details_context(),
     )
 
 
@@ -218,6 +221,39 @@ def project_details_api_view(request):
         project_details_payload(verified_intelligence.guardrail_snapshot()),
         encoder=DjangoJSONEncoder,
     )
+
+
+def _project_details_context(*, career_outcome_form=None) -> dict:
+    context = project_details_payload(verified_intelligence.guardrail_snapshot())
+    context["career_outcome_form"] = career_outcome_form or CareerOpportunityOutcomeForm()
+    return context
+
+
+@login_required
+@require_http_methods(["POST"])
+def project_details_career_outcome_view(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied("Career outcome entry is restricted to superusers.")
+
+    form = CareerOpportunityOutcomeForm(request.POST)
+    if not form.is_valid():
+        return render(
+            request,
+            "project_details.html",
+            _project_details_context(career_outcome_form=form),
+            status=400,
+        )
+
+    analysis = form.save()
+    contract_status = form.contract_status or {}
+    messages.success(
+        request,
+        (
+            f"Career outcome saved for job analysis #{analysis.id}; "
+            f"maturity contract {'valid' if contract_status.get('valid') else 'not valid'}."
+        ),
+    )
+    return redirect(f"{reverse('project_details')}#careerOutcomeEntry")
 
 @login_required
 def credit_score_view(request):

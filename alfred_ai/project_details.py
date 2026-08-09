@@ -15,7 +15,11 @@ from alfred_ai.services.calculation_risk import calculation_risk_snapshot
 from alfred_ai.services.materialized_cache import materialized_cache_health_snapshot
 from alfred_ai.services.production_readiness import production_readiness_snapshot
 from apps.career.models import CareerJobAnalysis, CareerResume, CareerResumeLearningMemory
-from apps.career.services.job_intelligence import career_opportunity_outcome_summary, career_source_coverage_summary
+from apps.career.services.job_intelligence import (
+    career_opportunity_outcome_summary,
+    career_source_coverage_summary,
+    job_intelligence,
+)
 from apps.expenses.models import Expense, StatementUpload
 from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
 from apps.loans.models import LoanClosureDocument, LoanPaymentHistory
@@ -92,6 +96,42 @@ def _accepted_document_correction_scopes() -> set[str]:
         .values_list("scope", flat=True)
         .distinct()
     )
+
+
+def _career_outcome_entry_payload(career_outcome_summary: dict) -> dict:
+    recent_outcomes = []
+    analyses = CareerJobAnalysis.objects.select_related("user").order_by("-updated_at", "-id")[:12]
+    for analysis in analyses:
+        payload = analysis.extracted_payload if isinstance(analysis.extracted_payload, dict) else {}
+        outcome = payload.get("opportunity_outcome")
+        outcome = outcome if isinstance(outcome, dict) else {}
+        contract = job_intelligence.opportunity_outcome_contract_status(outcome)
+        recent_outcomes.append(
+            {
+                "id": analysis.id,
+                "user": getattr(analysis.user, "username", ""),
+                "job_title": analysis.job_title or "",
+                "company": analysis.company or "",
+                "location": analysis.location or outcome.get("location", ""),
+                "source_url": outcome.get("source_url") or analysis.job_url or "",
+                "outcome": outcome.get("outcome", ""),
+                "salary_min_annual": outcome.get("salary_min_annual", 0),
+                "salary_max_annual": outcome.get("salary_max_annual", 0),
+                "contract_valid": contract["valid"],
+                "contract_missing": contract["missing"],
+                "counts_toward_maturity": contract["valid"],
+            }
+        )
+    return {
+        "summary": career_outcome_summary,
+        "required_total": career_outcome_summary.get("minimum_salary_bearing_outcomes", 8),
+        "required_accepted": career_outcome_summary.get("minimum_accepted_outcomes", 3),
+        "required_rejected": career_outcome_summary.get("minimum_rejected_outcomes", 3),
+        "remaining_total": career_outcome_summary.get("remaining_salary_bearing_outcomes", 0),
+        "remaining_accepted": career_outcome_summary.get("remaining_accepted_outcomes", 0),
+        "remaining_rejected": career_outcome_summary.get("remaining_rejected_outcomes", 0),
+        "recent_outcomes": recent_outcomes,
+    }
 
 
 def _project_path(path_value: str | Path) -> Path:
@@ -573,6 +613,11 @@ def _build_learning_snapshot(now) -> dict:
                 f"{career_outcome_summary['salary_bearing_outcome_count']} salary-bearing outcomes",
                 f"{career_outcome_summary['accepted_count']} accepted outcomes",
                 f"{career_outcome_summary['rejected_count']} rejected outcomes",
+                (
+                    f"remaining outcome gate: {career_outcome_summary['remaining_salary_bearing_outcomes']} total, "
+                    f"{career_outcome_summary['remaining_accepted_outcomes']} accepted, "
+                    f"{career_outcome_summary['remaining_rejected_outcomes']} rejected"
+                ),
                 f"{fresh_evidence} fresh evidence records",
                 f"{career_source_summary['configured_feed_count']} live job-feed adapters",
                 f"{career_source_summary['job_page_adapter_count']} job-page adapters",
@@ -581,7 +626,7 @@ def _build_learning_snapshot(now) -> dict:
             "blocker": "Current source breadth is complete; specialty-source additions stay gated on real role/geography gaps, and salary maturity still needs more accepted and rejected salary-bearing opportunity outcomes.",
             "blocked_by_real_data": True,
             "completion_actions": [
-                "Log accepted and rejected opportunities with salary-bearing evidence before increasing compensation-learning maturity.",
+                "Use the superuser Career Outcome Entry form to log real accepted and rejected opportunities with salary-bearing evidence.",
                 "Add specialty sources only after real users expose repeated role or geography gaps in current feeds.",
                 "Validate salary range, location match, and outcome decision together before counting an opportunity as learning evidence.",
             ],
@@ -714,6 +759,7 @@ def project_details_payload(guardrails: dict) -> dict:
     catalog_refresh = _catalog_source_refresh_health(catalog_summary, now)
     career_source_summary = career_source_coverage_summary()
     career_outcome_summary = career_opportunity_outcome_summary(CareerJobAnalysis.objects.all())
+    career_outcome_entry = _career_outcome_entry_payload(career_outcome_summary)
     document_correction_scope_names = _accepted_document_correction_scopes()
     document_missing_family_labels = [
         label
@@ -1095,13 +1141,18 @@ def project_details_payload(guardrails: dict) -> dict:
                 f"{career_outcome_summary['validated_outcome_count']} validated salary-bearing outcome(s)",
                 f"{career_outcome_summary['accepted_count']} accepted outcome(s)",
                 f"{career_outcome_summary['rejected_count']} rejected outcome(s)",
+                (
+                    f"remaining: {career_outcome_summary['remaining_salary_bearing_outcomes']} total, "
+                    f"{career_outcome_summary['remaining_accepted_outcomes']} accepted, "
+                    f"{career_outcome_summary['remaining_rejected_outcomes']} rejected"
+                ),
                 f"{career_outcome_summary['unvalidated_outcome_count']} outcome(s) missing salary/source/location proof",
                 "outcome contract: " + ", ".join(career_outcome_summary.get("validation_contract") or []),
             ],
-            "next_focus": "Add specialty sources only where real users expose role/geography gaps, then validate more salary-bearing outcomes from accepted or rejected opportunities.",
+            "next_focus": "Use Career Outcome Entry for real accepted/rejected salary-bearing opportunities, and add specialty sources only where real users expose role/geography gaps.",
             "maturity_gates": [
                 "Specialty sources are added only after real users expose role or geography gaps.",
-                "Accepted and rejected opportunity outcomes carry salary-bearing evidence.",
+                "Accepted and rejected opportunity outcomes carry salary, source URL, location, and decision proof.",
                 "Compensation maturity grows from validated outcomes, not just wider feed count.",
             ],
         },
@@ -1243,12 +1294,29 @@ def project_details_payload(guardrails: dict) -> dict:
             }
         )
     scope_completion_progress = _bounded_percent(mean(track["progress"] for track in in_progress_tracks)) if in_progress_tracks else 100
+    remaining_product_gates = [
+        {
+            "title": track["title"],
+            "progress": _bounded_percent(track.get("progress", 0)),
+            "maturity_status": track.get("maturity_status", ""),
+            "next_focus": track.get("next_focus") or track.get("blocker") or "",
+        }
+        for track in in_progress_tracks
+        if _bounded_percent(track.get("progress", 0)) < 100
+    ]
 
     return {
         "clock": clock,
         "summary_cards": [
             {"label": "In-Progress Tracks", "value": len(in_progress_tracks), "copy": "Product workstreams still evolving; production blockers are tracked separately."},
-            {"label": "Scope Completion", "value": f"{scope_completion_progress}%", "copy": "Product-track maturity only; deployment readiness is excluded and shown in separate production cards."},
+            {
+                "label": "Scope Completion",
+                "value": f"{scope_completion_progress}%",
+                "copy": (
+                    f"Product-track maturity only; {len(remaining_product_gates)} product gate(s) remain. "
+                    "deployment readiness is excluded and shown in separate production cards."
+                ),
+            },
             {"label": "Learning Maturity", "value": f"{learning_snapshot['overall_progress']}%", "copy": "Adaptive-system maturity from live data coverage and freshness."},
             {"label": "Developer Escalations", "value": developer_escalations.count(), "copy": "High-severity items still waiting on superuser developers."},
             {"label": "Evidence Watchlist", "value": evidence_watchlist_count, "copy": "Verified external records that are stale, failed, rejected, or due now."},
@@ -1287,9 +1355,11 @@ def project_details_payload(guardrails: dict) -> dict:
             "production_blocker_percent": production_readiness["blocker_percent"],
             "production_blocker_count": production_readiness["blocker_count"],
             "production_total_check_count": production_readiness["total_check_count"],
+            "remaining_product_gate_count": len(remaining_product_gates),
+            "remaining_product_gates": remaining_product_gates,
             "summary": (
                 f"Scope Completion is {scope_completion_progress}% across product tracks only; "
-                f"Deployment Readiness is {production_readiness['progress']}% and Production Blockers are {production_readiness['blocker_percent']}% separately."
+                f"deployment readiness is {production_readiness['progress']}% and Production Blockers are {production_readiness['blocker_percent']}% separately."
             ),
         },
         "operational_metrics": operational_metrics,
@@ -1306,6 +1376,7 @@ def project_details_payload(guardrails: dict) -> dict:
         "calculation_risk": calculation_risk,
         "browser_coverage": browser_coverage,
         "production_readiness": production_readiness,
+        "career_outcome_entry": career_outcome_entry,
         "hardening_decisions": hardening_decisions,
         "report_library": [
             {"file_path": report.file_path, "created_at": report.created_at}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
 from apps.loans.models import Loan, LoanPaymentHistory
@@ -8,6 +9,16 @@ from apps.reports.services import operational_logging_service
 
 
 VALID_REVIEW_DECISIONS = {"accept", "reject"}
+SUBSCRIPTION_FALSE_POSITIVE_KEYWORDS = (
+    "GOOGLE PLAY",
+    "PLAYSTORE",
+    "GOOGLE INDIA DIGITAL",
+    "NETFLIX",
+    "SPOTIFY",
+    "YOUTUBE",
+    "SUBSCRIPTION",
+    "MEMBERSHIP",
+)
 
 
 def serialize_payment_review(payment: LoanPaymentHistory) -> dict:
@@ -101,6 +112,7 @@ def review_loan_payment_match(
         message = "Loan payment review row rejected and excluded from calculation confidence."
 
     payment.save(update_fields=["match_status", "loan_effect_applied", "detection_reason"])
+    _sync_loan_from_applied_matches(payment.loan)
     operational_logging_service.log(
         user=user,
         module="loans",
@@ -119,6 +131,58 @@ def review_loan_payment_match(
             "notes": notes,
             "loan_effect_applied": payment.loan_effect_applied,
             "expense_reference_id": payment.expense_reference_id,
+        },
+    )
+    return payment
+
+
+@transaction.atomic
+def reject_subscription_false_positive_match(
+    *,
+    payment_id: int,
+    user=None,
+    reviewer=None,
+    notes: str = "",
+) -> LoanPaymentHistory:
+    queryset = (
+        LoanPaymentHistory.objects.select_for_update()
+        .select_related("loan", "expense_reference")
+        .filter(id=payment_id)
+    )
+    if user is not None:
+        queryset = queryset.filter(loan__user=user)
+    payment = queryset.first()
+    if payment is None:
+        raise LoanPaymentHistory.DoesNotExist("Loan payment row not found.")
+    if payment.match_status == "rejected":
+        return payment
+    if not _is_subscription_false_positive(payment):
+        raise ValueError("Only auto-detected subscription false-positive loan payments can be rejected here.")
+
+    if payment.loan_effect_applied:
+        _reverse_payment_from_loan(payment.loan, payment)
+    payment.loan_effect_applied = False
+    payment.match_status = "rejected"
+    _append_review_note(payment, "Rejected as subscription false positive", notes)
+    payment.save(update_fields=["match_status", "loan_effect_applied", "detection_reason"])
+    _sync_loan_from_applied_matches(payment.loan)
+    operational_logging_service.log(
+        user=payment.loan.user,
+        module="loans",
+        category="api",
+        scope="loan_payment_review",
+        event_type="loan_payment_subscription_false_positive_rejected",
+        severity="info",
+        document_id=payment.id,
+        file_name="",
+        message="Subscription false-positive loan payment excluded from debt confidence.",
+        payload={
+            "payment_id": payment.id,
+            "loan_id": payment.loan_id,
+            "reviewer_id": getattr(reviewer, "id", None),
+            "notes": notes,
+            "expense_reference_id": payment.expense_reference_id,
+            "expense_category": getattr(payment.expense_reference, "category", ""),
         },
     )
     return payment
@@ -171,6 +235,9 @@ def _reverse_payment_from_loan(loan: Loan, payment: LoanPaymentHistory) -> None:
     current_balance = float(loan.remaining_balance if loan.remaining_balance is not None else 0)
     loan.remaining_balance = round(max(current_balance + principal_paid, 0), 2)
     loan.total_paid = round(max(float(loan.total_paid or 0) - float(payment.amount or 0), 0), 2)
+    remaining_applied_count = (
+        LoanPaymentHistory.objects.filter(loan=loan, loan_effect_applied=True).exclude(id=payment.id).count()
+    )
     latest_applied = (
         LoanPaymentHistory.objects.filter(loan=loan, loan_effect_applied=True, match_status="matched")
         .exclude(id=payment.id)
@@ -178,7 +245,15 @@ def _reverse_payment_from_loan(loan: Loan, payment: LoanPaymentHistory) -> None:
         .first()
     )
     loan.last_payment_date = latest_applied.payment_date if latest_applied else None
-    if loan.status in {"closed", "prepaid"} and loan.remaining_balance > 100:
+    if loan.auto_detected and remaining_applied_count == 0:
+        loan.remaining_balance = 0
+        loan.total_paid = 0
+        loan.is_active = False
+        loan.status = "closed"
+        loan.closed_on = payment.payment_date
+        note = "Auto-detected loan excluded after review rejected all applied payment evidence."
+        loan.notes = f"{loan.notes}\n{note}".strip() if loan.notes else note
+    elif loan.status in {"closed", "prepaid"} and loan.remaining_balance > 100:
         loan.status = "active"
         loan.is_active = True
         loan.closed_on = None
@@ -190,6 +265,7 @@ def _reverse_payment_from_loan(loan: Loan, payment: LoanPaymentHistory) -> None:
             "is_active",
             "status",
             "closed_on",
+            "notes",
             "updated_at",
         ]
     )
@@ -197,3 +273,71 @@ def _reverse_payment_from_loan(loan: Loan, payment: LoanPaymentHistory) -> None:
 
 def _principal_paid(payment: LoanPaymentHistory) -> float:
     return round(float(payment.principal_paid or payment.principal_component or 0), 2)
+
+
+def _sync_loan_from_applied_matches(loan: Loan) -> bool:
+    latest_applied = (
+        LoanPaymentHistory.objects.filter(loan=loan, loan_effect_applied=True, match_status="matched")
+        .order_by("-payment_date", "-id")
+        .first()
+    )
+    if latest_applied is None:
+        return False
+
+    total_paid = (
+        LoanPaymentHistory.objects.filter(loan=loan, loan_effect_applied=True, match_status="matched")
+        .aggregate(total=Sum("amount"))
+        .get("total")
+        or 0
+    )
+    loan.last_payment_date = latest_applied.payment_date
+    loan.total_paid = round(float(total_paid or 0), 2)
+    if latest_applied.remaining_balance is not None:
+        loan.remaining_balance = max(round(float(latest_applied.remaining_balance or 0), 2), 0)
+
+    if float(loan.remaining_balance or 0) <= 100:
+        loan.is_active = False
+        loan.status = "closed"
+        loan.closed_on = latest_applied.payment_date
+        loan.remaining_balance = 0
+    elif loan.status in {"closed", "prepaid"}:
+        loan.is_active = True
+        loan.status = "active"
+        loan.closed_on = None
+
+    loan.save(
+        update_fields=[
+            "last_payment_date",
+            "total_paid",
+            "remaining_balance",
+            "is_active",
+            "status",
+            "closed_on",
+            "updated_at",
+        ]
+    )
+    return True
+
+
+def _is_subscription_false_positive(payment: LoanPaymentHistory) -> bool:
+    expense = payment.expense_reference
+    if expense is None:
+        return False
+    if not (payment.is_auto_detected or payment.loan.auto_detected):
+        return False
+    if (expense.category or "").lower() != "subscription":
+        return False
+
+    text = " ".join(
+        part for part in [
+            expense.description,
+            expense.raw_description,
+            expense.external_reference,
+            expense.company_name,
+            expense.merchant,
+            expense.counterparty,
+            payment.loan.lender,
+        ]
+        if part
+    ).upper()
+    return any(keyword in text for keyword in SUBSCRIPTION_FALSE_POSITIVE_KEYWORDS)

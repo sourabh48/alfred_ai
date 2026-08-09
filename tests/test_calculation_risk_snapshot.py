@@ -17,6 +17,7 @@ from apps.expenses.services.financial_intelligence import build_financial_intell
 from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
 from apps.investments.models import Investment, InvestmentImportDocument
 from apps.loans.models import Loan, LoanClosureDocument, LoanImportDocument, LoanPaymentHistory
+from apps.ml_engine.models import AdaptiveModelState
 from apps.mobility.models import BikeDocument, BikeIssueReport, BikeProfile
 from apps.reports.models import OperationalLog
 
@@ -208,6 +209,148 @@ class CalculationRiskSnapshotTests(TestCase):
         self.assertEqual(heuristic["career_salary_projection"]["status"], "heuristic_fallback")
         self.assertIn("salary predictor is not fresh and ready", " ".join(snapshot["blockers"]))
         self.assertEqual(snapshot["salary_outcome_summary"]["maturity_status"], "not_started")
+
+    def test_salary_outcome_contract_excludes_incomplete_records_from_project_details_maturity(self):
+        valid = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/valid-salary-outcome",
+            company="Valid Co",
+            job_title="Data Analyst",
+            location="Bengaluru, Karnataka, India",
+            extracted_payload={
+                "opportunity_outcome": {
+                    "outcome": "accepted",
+                    "salary_bearing": True,
+                    "salary_min_annual": 1800000,
+                    "salary_max_annual": 2200000,
+                    "salary_mid_annual": 2000000,
+                    "source_url": "https://example.com/jobs/valid-salary-outcome",
+                    "location": "Bengaluru, Karnataka, India",
+                }
+            },
+        )
+        invalid = CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/invalid-salary-outcome",
+            company="Invalid Co",
+            job_title="Data Analyst",
+            location="",
+            extracted_payload={
+                "opportunity_outcome": {
+                    "outcome": "rejected",
+                    "salary_bearing": True,
+                    "salary_min_annual": 1600000,
+                    "salary_max_annual": 1900000,
+                    "salary_mid_annual": 1750000,
+                    "source_url": "https://example.com/jobs/invalid-salary-outcome",
+                    "location": "",
+                }
+            },
+        )
+
+        snapshot = calculation_risk_snapshot(guardrails=_guardrails())
+        payload = project_details_payload(_guardrails())
+        career_track = next(
+            item for item in payload["in_progress_tracks"] if item["title"] == "Career source and compensation breadth"
+        )
+
+        self.assertEqual(snapshot["salary_outcome_summary"]["outcome_count"], 2)
+        self.assertEqual(snapshot["salary_outcome_summary"]["validated_outcome_count"], 1)
+        self.assertEqual(snapshot["salary_outcome_summary"]["unvalidated_outcome_count"], 1)
+        self.assertEqual(snapshot["salary_outcome_summary"]["accepted_count"], 1)
+        self.assertEqual(snapshot["salary_outcome_summary"]["rejected_count"], 0)
+        self.assertEqual(snapshot["critical_path_progress"]["career_salary_projection"], 72)
+        self.assertTrue(any("1 validated salary-bearing outcome" in signal for signal in career_track["signals"]))
+        self.assertTrue(any("1 outcome(s) missing salary/source/location proof" in signal for signal in career_track["signals"]))
+        self.assertIn(valid.job_url, snapshot["salary_outcome_summary"]["source_urls"])
+        self.assertNotIn(invalid.job_url, snapshot["salary_outcome_summary"]["source_urls"])
+
+    def test_salary_projection_progress_moves_only_after_valid_outcome_minimum_and_fresh_model(self):
+        AdaptiveModelState.objects.create(
+            model_key="salary_predictor",
+            display_name="Salary Predictor",
+            status="ready",
+            sample_count=8,
+            quality_score=81,
+            confidence_estimate=78,
+            next_refresh_due_at=timezone.now() + timedelta(hours=12),
+        )
+        for index in range(7):
+            outcome = "accepted" if index < 3 else "rejected"
+            salary_min = 1800000 + (index * 10000)
+            salary_max = salary_min + 250000
+            CareerJobAnalysis.objects.create(
+                user=self.user,
+                source_name="manual-test",
+                job_url=f"https://example.com/jobs/outcome-{index}",
+                company=f"Outcome Co {index}",
+                job_title="Data Analyst",
+                location="Bengaluru, Karnataka, India",
+                extracted_payload={
+                    "opportunity_outcome": {
+                        "outcome": outcome,
+                        "salary_bearing": True,
+                        "salary_min_annual": salary_min,
+                        "salary_max_annual": salary_max,
+                        "salary_mid_annual": (salary_min + salary_max) / 2,
+                        "source_url": f"https://example.com/jobs/outcome-{index}",
+                        "location": "Bengaluru, Karnataka, India",
+                    }
+                },
+            )
+        CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/missing-source-proof",
+            company="Missing Source Co",
+            job_title="Data Analyst",
+            location="Bengaluru, Karnataka, India",
+            extracted_payload={
+                "opportunity_outcome": {
+                    "outcome": "rejected",
+                    "salary_bearing": True,
+                    "salary_min_annual": 1900000,
+                    "salary_max_annual": 2200000,
+                    "salary_mid_annual": 2050000,
+                    "source_url": "",
+                    "location": "Bengaluru, Karnataka, India",
+                }
+            },
+        )
+
+        before = calculation_risk_snapshot(guardrails=_guardrails())
+        self.assertEqual(before["salary_outcome_summary"]["validated_outcome_count"], 7)
+        self.assertEqual(before["salary_outcome_summary"]["maturity_status"], "collecting")
+        self.assertEqual(before["critical_path_progress"]["career_salary_projection"], 72)
+
+        CareerJobAnalysis.objects.create(
+            user=self.user,
+            source_name="manual-test",
+            job_url="https://example.com/jobs/outcome-7",
+            company="Outcome Co 7",
+            job_title="Data Analyst",
+            location="Bengaluru, Karnataka, India",
+            extracted_payload={
+                "opportunity_outcome": {
+                    "outcome": "rejected",
+                    "salary_bearing": True,
+                    "salary_min_annual": 2100000,
+                    "salary_max_annual": 2400000,
+                    "salary_mid_annual": 2250000,
+                    "source_url": "https://example.com/jobs/outcome-7",
+                    "location": "Bengaluru, Karnataka, India",
+                }
+            },
+        )
+
+        after = calculation_risk_snapshot(guardrails=_guardrails())
+        self.assertEqual(after["salary_outcome_summary"]["validated_outcome_count"], 8)
+        self.assertEqual(after["salary_outcome_summary"]["accepted_count"], 3)
+        self.assertEqual(after["salary_outcome_summary"]["rejected_count"], 5)
+        self.assertEqual(after["salary_outcome_summary"]["maturity_status"], "mature")
+        self.assertEqual(after["critical_path_progress"]["career_salary_projection"], 88)
 
     def test_stale_evidence_marks_external_data_sensitive_calculations(self):
         now = timezone.now()

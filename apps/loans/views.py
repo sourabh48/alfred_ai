@@ -15,6 +15,7 @@ from datetime import date
 
 from alfred_ai.services.materialized_cache import materialize_payload
 from alfred_ai.services.calculation_risk import calculation_risk_snapshot
+from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
 from apps.investments.models import Investment
@@ -380,8 +381,14 @@ def import_loan_pdf(request):
                         "parse_confidence": upload_record.parse_confidence,
                         "document_type": upload_record.document_type,
                         "linked_loans": len(created_loans),
-                    },
-                )
+                        },
+                    )
+
+            raw_file_retention = purge_uploaded_file_after_extraction(
+                upload_record,
+                "uploaded_file",
+                reason="loan_document_extraction_complete",
+            )
 
         return Response({
             "success": True,
@@ -390,6 +397,7 @@ def import_loan_pdf(request):
             "parse_confidence": parsed["confidence"],
             "loans": LoanSerializer(created_loans, many=True).data,
             "upload": LoanImportDocumentSerializer(upload_record, context={"request": request}).data,
+            "raw_file_retention": raw_file_retention,
         }, status=status.HTTP_201_CREATED)
 
     except Exception as e:
@@ -427,6 +435,11 @@ def import_loan_pdf(request):
                         message="Loan document upload hit a parser failure and was kept for review.",
                         payload={"error": str(e)},
                     )
+                    raw_file_retention = purge_uploaded_file_after_extraction(
+                        upload_record,
+                        "uploaded_file",
+                        reason="loan_document_parser_failure_cleanup",
+                    )
                 return Response(
                     {
                         "success": False,
@@ -435,6 +448,7 @@ def import_loan_pdf(request):
                         "parse_confidence": 0,
                         "loans": [],
                         "upload": LoanImportDocumentSerializer(upload_record, context={"request": request}).data,
+                        "raw_file_retention": raw_file_retention,
                     },
                     status=status.HTTP_201_CREATED,
                 )
@@ -488,6 +502,11 @@ def payoff_loan(request, pk):
             parser_status=closure_document.parser_status,
             confidence=closure_document.parse_confidence,
         )
+        raw_file_retention = purge_uploaded_file_after_extraction(
+            closure_document,
+            "uploaded_file",
+            reason="loan_closure_document_extraction_complete",
+        )
 
         if closure_document.verification_status != "verified":
             reporting_service.create_system_ticket(
@@ -505,6 +524,7 @@ def payoff_loan(request, pk):
                 {
                     "detail": closure_document.verification_notes,
                     "document": LoanClosureDocumentSerializer(closure_document, context={"request": request}).data,
+                    "raw_file_retention": raw_file_retention,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -514,6 +534,7 @@ def payoff_loan(request, pk):
             "message": result.message,
             "loan": LoanSerializer(result.loan).data,
             "document": LoanClosureDocumentSerializer(closure_document, context={"request": request}).data,
+            "raw_file_retention": raw_file_retention,
             "reconciliation": {
                 "status": getattr(result.snapshot, "reconciliation_status", "unmatched"),
                 "matched_payment_total": getattr(result.snapshot, "matched_payment_total", 0),
