@@ -4,8 +4,7 @@ import logging
 import sys
 
 from django.db import transaction
-from django.db.models import Case, F, FloatField, Q, Sum, Value, When
-from django.db.models.functions import Coalesce, TruncMonth, TruncQuarter, TruncYear
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
@@ -19,6 +18,13 @@ from alfred_ai.services import record_parser_learning
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction, raw_upload_cleanup_enabled
 from .models import BankAccount, Expense, StatementUpload
 from .serializers import BankAccountSerializer, ExpenseSerializer, StatementUploadSerializer
+from .services.cashflow_treatment import (
+    add_expense_to_cashflow_bucket,
+    classify_cashflow,
+    empty_cashflow_bucket,
+    rounded_cashflow_bucket,
+    summarize_cashflow,
+)
 from .services.financial_intelligence import DISCRETIONARY_CATEGORIES, build_financial_intelligence
 from .services.statement_import import parse_bank_statement, summarize_transactions
 from .services.statement_lifecycle import apply_parsed_statement_upload, delete_statement_upload, queue_statement_retry, retry_statement_upload
@@ -33,11 +39,7 @@ from apps.loans.services import loan_intelligence_service
 
 logger = logging.getLogger(__name__)
 
-FLOW_GRANULARITY_TRUNC_MAP = {
-    "monthly": TruncMonth,
-    "quarterly": TruncQuarter,
-    "yearly": TruncYear,
-}
+FLOW_GRANULARITIES = {"monthly", "quarterly", "yearly"}
 
 
 def _is_unwanted_expense(expense: Expense) -> bool:
@@ -66,77 +68,31 @@ def _build_monthly_window(expenses: list[Expense]) -> dict:
     else:
         reference_date = timezone.localdate()
 
-    buckets: dict[tuple[int, int], dict] = defaultdict(
-        lambda: {
-            "expense_total": 0.0,
-            "loan_total": 0.0,
-            "other_total": 0.0,
-            "income_total": 0.0,
-            "outflow_total": 0.0,
-            "unwanted_total": 0.0,
-            "count": 0,
-        }
-    )
+    buckets: dict[tuple[int, int], dict] = defaultdict(empty_cashflow_bucket)
 
     for expense in expenses:
         bucket = buckets[_month_key(expense.transaction_date)]
-        if expense.direction == "credit":
-            bucket["income_total"] += expense.amount
-        elif expense.classification == "expense":
-            bucket["expense_total"] += expense.amount
-            bucket["outflow_total"] += expense.amount
-        elif expense.classification == "loan":
-            bucket["loan_total"] += expense.amount
-            bucket["outflow_total"] += expense.amount
-        else:
-            bucket["other_total"] += expense.amount
-            bucket["outflow_total"] += expense.amount
+        add_expense_to_cashflow_bucket(bucket, expense)
         if _is_unwanted_expense(expense):
             bucket["unwanted_total"] += expense.amount
-        bucket["count"] += 1
 
     reference_key = _month_key(reference_date)
     previous_key = _shift_month_key(reference_key, -1)
-    reference_bucket = buckets.get(reference_key, {})
-    previous_bucket = buckets.get(previous_key, {})
+    reference_bucket = buckets.get(reference_key, empty_cashflow_bucket())
+    previous_bucket = buckets.get(previous_key, empty_cashflow_bucket())
     ordered_keys = sorted(buckets.keys())
     recent_keys = ordered_keys[-6:] if ordered_keys else [reference_key]
 
     return {
         "reference_month": _month_label(reference_key),
         "previous_month": _month_label(previous_key),
-        "current": {
-            "expense_total": round(reference_bucket.get("expense_total", 0.0), 2),
-            "loan_total": round(reference_bucket.get("loan_total", 0.0), 2),
-            "other_total": round(reference_bucket.get("other_total", 0.0), 2),
-            "income_total": round(reference_bucket.get("income_total", 0.0), 2),
-            "outflow_total": round(reference_bucket.get("outflow_total", 0.0), 2),
-            "unwanted_total": round(reference_bucket.get("unwanted_total", 0.0), 2),
-            "net_total": round(reference_bucket.get("income_total", 0.0) - reference_bucket.get("outflow_total", 0.0), 2),
-            "transaction_count": int(reference_bucket.get("count", 0)),
-        },
-        "previous": {
-            "expense_total": round(previous_bucket.get("expense_total", 0.0), 2),
-            "loan_total": round(previous_bucket.get("loan_total", 0.0), 2),
-            "other_total": round(previous_bucket.get("other_total", 0.0), 2),
-            "income_total": round(previous_bucket.get("income_total", 0.0), 2),
-            "outflow_total": round(previous_bucket.get("outflow_total", 0.0), 2),
-            "unwanted_total": round(previous_bucket.get("unwanted_total", 0.0), 2),
-            "net_total": round(previous_bucket.get("income_total", 0.0) - previous_bucket.get("outflow_total", 0.0), 2),
-            "transaction_count": int(previous_bucket.get("count", 0)),
-        },
+        "current": rounded_cashflow_bucket(reference_bucket),
+        "previous": rounded_cashflow_bucket(previous_bucket),
         "window": [
             {
+                **rounded_cashflow_bucket(buckets[month_key]),
                 "key": f"{month_key[0]}-{month_key[1]:02d}",
                 "label": _month_label(month_key),
-                "expense_total": round(buckets[month_key]["expense_total"], 2),
-                "loan_total": round(buckets[month_key]["loan_total"], 2),
-                "other_total": round(buckets[month_key]["other_total"], 2),
-                "income_total": round(buckets[month_key]["income_total"], 2),
-                "outflow_total": round(buckets[month_key]["outflow_total"], 2),
-                "unwanted_total": round(buckets[month_key]["unwanted_total"], 2),
-                "net_total": round(buckets[month_key]["income_total"] - buckets[month_key]["outflow_total"], 2),
-                "transaction_count": int(buckets[month_key]["count"]),
             }
             for month_key in recent_keys
         ],
@@ -216,15 +172,22 @@ def _dispatch_statement_retry(upload_id: int, ocr_page_limit: int) -> None:
         )
 
 
-def _flow_bucket_label(value, granularity: str) -> str:
-    if value is None:
-        return ""
-    if granularity == "quarterly":
-        quarter = ((value.month - 1) // 3) + 1
-        return f"Q{quarter} {value.year}"
+def _flow_period_key(value: date, granularity: str):
     if granularity == "yearly":
-        return str(value.year)
-    return value.strftime("%b %Y")
+        return value.year
+    if granularity == "quarterly":
+        return value.year, ((value.month - 1) // 3) + 1
+    return value.year, value.month
+
+
+def _flow_period_label(key, granularity: str) -> str:
+    if granularity == "yearly":
+        return str(key)
+    if granularity == "quarterly":
+        year, quarter = key
+        return f"Q{quarter} {year}"
+    year, month = key
+    return date(year, month, 1).strftime("%b %Y")
 
 
 def _parse_timeline_limit(raw_value) -> int:
@@ -373,10 +336,7 @@ class ExpenseTimelineView(APIView):
 
         grouped: dict[str, list[dict]] = defaultdict(list)
         summary = {
-            "expense_total": 0.0,
-            "loan_total": 0.0,
-            "other_total": 0.0,
-            "income_total": 0.0,
+            **empty_cashflow_bucket(),
             "emotional_total": 0.0,
             "unwanted_total": 0.0,
             "unwanted_count": 0,
@@ -385,14 +345,7 @@ class ExpenseTimelineView(APIView):
         }
 
         for expense in expenses:
-            if expense.direction == "credit":
-                summary["income_total"] += expense.amount
-            elif expense.classification == "expense":
-                summary["expense_total"] += expense.amount
-            elif expense.classification == "loan":
-                summary["loan_total"] += expense.amount
-            else:
-                summary["other_total"] += expense.amount
+            add_expense_to_cashflow_bucket(summary, expense)
             if expense.direction == "debit" and expense.is_emotional:
                 summary["emotional_total"] += expense.amount
             if _is_unwanted_expense(expense):
@@ -402,12 +355,20 @@ class ExpenseTimelineView(APIView):
         for payload in serializer.data:
             grouped[payload["transaction_date"]].append(payload)
 
+        visible_treatments = {
+            expense.id: classify_cashflow(expense)
+            for expense in visible_expenses
+        }
         timeline = [
             {
                 "date": date_value,
                 "items": items,
                 "day_total": round(
-                    sum(item["amount"] for item in items if item["direction"] == "debit"),
+                    sum(
+                        item["amount"]
+                        for item in items
+                        if visible_treatments.get(item["id"]) and visible_treatments[item["id"]].counts_cashflow_outflow
+                    ),
                     2,
                 ),
             }
@@ -415,24 +376,14 @@ class ExpenseTimelineView(APIView):
         ]
 
         latest_upload = StatementUpload.objects.filter(user=request.user).first()
-        filtered_expense_total = round(
-            sum(item.amount for item in filtered_expenses if item.direction == "debit" and item.classification == "expense"),
-            2,
-        )
-        filtered_loan_total = round(
-            sum(item.amount for item in filtered_expenses if item.direction == "debit" and item.classification == "loan"),
-            2,
-        )
-        filtered_other_total = round(
-            sum(item.amount for item in filtered_expenses if item.direction == "debit" and item.classification == "other"),
-            2,
-        )
-        filtered_outflow_total = round(sum(item.amount for item in filtered_expenses if item.direction == "debit"), 2)
-        filtered_credit_total = round(sum(item.amount for item in filtered_expenses if item.direction == "credit"), 2)
+        filtered_cashflow = rounded_cashflow_bucket(summarize_cashflow(filtered_expenses))
 
         return Response(
             {
-                "summary": {key: round(value, 2) if isinstance(value, float) else value for key, value in summary.items()},
+                "summary": {
+                    key: round(value, 2) if isinstance(value, float) else value
+                    for key, value in summary.items()
+                },
                 "timeline": timeline,
                 "timeline_meta": {
                     **applied_filters,
@@ -440,11 +391,18 @@ class ExpenseTimelineView(APIView):
                     "total_matching_count": len(filtered_expenses),
                     "visible_count": len(visible_expenses),
                     "has_more": len(filtered_expenses) > len(visible_expenses),
-                    "filtered_expense_total": filtered_expense_total,
-                    "filtered_loan_total": filtered_loan_total,
-                    "filtered_other_total": filtered_other_total,
-                    "filtered_outflow_total": filtered_outflow_total,
-                    "filtered_credit_total": filtered_credit_total,
+                    "filtered_expense_total": filtered_cashflow["expense_total"],
+                    "filtered_loan_total": filtered_cashflow["loan_total"],
+                    "filtered_other_total": filtered_cashflow["other_total"],
+                    "filtered_outflow_total": filtered_cashflow["outflow_total"],
+                    "filtered_credit_total": filtered_cashflow["bank_credit_total"],
+                    "filtered_income_total": filtered_cashflow["income_total"],
+                    "filtered_bank_debit_total": filtered_cashflow["bank_debit_total"],
+                    "filtered_transfer_in_total": filtered_cashflow["transfer_in_total"],
+                    "filtered_transfer_out_total": filtered_cashflow["transfer_out_total"],
+                    "filtered_credit_card_payment_total": filtered_cashflow["credit_card_payment_total"],
+                    "filtered_investment_total": filtered_cashflow["investment_total"],
+                    "filtered_review_required_total": filtered_cashflow["review_required_total"],
                 },
                 "latest_upload": StatementUploadSerializer(latest_upload).data if latest_upload else None,
                 "monthly_window": monthly_window,
@@ -458,67 +416,45 @@ class ExpenseChartView(APIView):
 
     def get(self, request):
         granularity = (request.query_params.get("granularity") or "monthly").strip().lower()
-        trunc_fn = FLOW_GRANULARITY_TRUNC_MAP.get(granularity, TruncMonth)
-        if granularity not in FLOW_GRANULARITY_TRUNC_MAP:
+        if granularity not in FLOW_GRANULARITIES:
             granularity = "monthly"
 
-        queryset = (
-            Expense.objects.filter(user=request.user)
-            .annotate(period=trunc_fn("transaction_date"))
-            .values("period")
-            .annotate(
-                expense_total=Coalesce(
-                    Sum(
-                        Case(
-                            When(direction="debit", classification="expense", then=F("amount")),
-                            default=Value(0.0),
-                            output_field=FloatField(),
-                        )
-                    ),
-                    0.0,
-                ),
-                loan_total=Coalesce(
-                    Sum(
-                        Case(
-                            When(direction="debit", classification="loan", then=F("amount")),
-                            default=Value(0.0),
-                            output_field=FloatField(),
-                        )
-                    ),
-                    0.0,
-                ),
-                other_total=Coalesce(
-                    Sum(
-                        Case(
-                            When(direction="debit", classification="other", then=F("amount")),
-                            default=Value(0.0),
-                            output_field=FloatField(),
-                        )
-                    ),
-                    0.0,
-                ),
-                income_total=Coalesce(
-                    Sum(
-                        Case(
-                            When(direction="credit", then=F("amount")),
-                            default=Value(0.0),
-                            output_field=FloatField(),
-                        )
-                    ),
-                    0.0,
-                ),
+        buckets: dict = defaultdict(empty_cashflow_bucket)
+        for expense in Expense.objects.filter(user=request.user).only(
+            "amount",
+            "classification",
+            "category",
+            "direction",
+            "merchant",
+            "description",
+            "raw_description",
+            "counterparty",
+            "company_name",
+            "transaction_date",
+        ):
+            add_expense_to_cashflow_bucket(
+                buckets[_flow_period_key(expense.transaction_date, granularity)],
+                expense,
             )
-            .order_by("period")
-        )
+
+        ordered_keys = sorted(buckets.keys())
 
         return Response(
             {
                 "granularity": granularity,
-                "labels": [_flow_bucket_label(item["period"], granularity) for item in queryset if item["period"]],
-                "expense_values": [round(item["expense_total"], 2) for item in queryset],
-                "loan_values": [round(item["loan_total"], 2) for item in queryset],
-                "other_values": [round(item["other_total"], 2) for item in queryset],
-                "income_values": [round(item["income_total"], 2) for item in queryset],
+                "labels": [_flow_period_label(key, granularity) for key in ordered_keys],
+                "expense_values": [round(buckets[key]["expense_total"], 2) for key in ordered_keys],
+                "loan_values": [round(buckets[key]["loan_total"], 2) for key in ordered_keys],
+                "other_values": [round(buckets[key]["other_total"], 2) for key in ordered_keys],
+                "income_values": [round(buckets[key]["income_total"], 2) for key in ordered_keys],
+                "outflow_values": [round(buckets[key]["outflow_total"], 2) for key in ordered_keys],
+                "bank_debit_values": [round(buckets[key]["bank_debit_total"], 2) for key in ordered_keys],
+                "bank_credit_values": [round(buckets[key]["bank_credit_total"], 2) for key in ordered_keys],
+                "transfer_in_values": [round(buckets[key]["transfer_in_total"], 2) for key in ordered_keys],
+                "transfer_out_values": [round(buckets[key]["transfer_out_total"], 2) for key in ordered_keys],
+                "credit_card_payment_values": [round(buckets[key]["credit_card_payment_total"], 2) for key in ordered_keys],
+                "investment_values": [round(buckets[key]["investment_total"], 2) for key in ordered_keys],
+                "review_required_values": [round(buckets[key]["review_required_total"], 2) for key in ordered_keys],
             }
         )
 

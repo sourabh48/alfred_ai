@@ -39,6 +39,7 @@ class FamilyAccountLink(models.Model):
     invite_code_hint = models.CharField(max_length=16, blank=True)
     share_profile_summary = models.BooleanField(default=True)
     share_dependents = models.BooleanField(default=True)
+    share_financial_summary = models.BooleanField(default=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
     expires_at = models.DateTimeField()
     accepted_at = models.DateTimeField(null=True, blank=True)

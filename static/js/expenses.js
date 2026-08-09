@@ -175,10 +175,10 @@ function renderSummary(summary) {
     }
 
     const cards = [
-        { key: "expense", label: "Expense Spend", value: summary.expense_total, tone: "primary" },
+        { key: "expense", label: "Direct Spend", value: summary.expense_total, tone: "primary" },
         { key: "loan", label: "Loan Payments", value: summary.loan_total, tone: "danger" },
-        { key: "other", label: "Other Outflows", value: summary.other_total, tone: "secondary" },
-        { key: "income", label: "Income / Credits", value: summary.income_total, tone: "success" },
+        { key: "other", label: "Other Cashflow", value: summary.other_total, tone: "secondary" },
+        { key: "income", label: "Verified Income", value: summary.income_total, tone: "success", meta: `${formatCurrency(summary.transfer_in_total || 0)} transfer credits excluded` },
         { key: "unwanted", label: "Potential Unwanted", value: summary.unwanted_total, tone: "warning", meta: `${summary.unwanted_count || 0} flagged entries` },
     ];
 
@@ -243,9 +243,9 @@ function renderMonthlyWindow(windowData) {
 
     Alfred.setHTMLIfChanged(summaryTarget, [
         {
-            label: "Current outflow",
+            label: "Cash-flow outflow",
             value: formatCurrency(currentOutflow),
-            meta: `${formatCurrency(current.expense_total || 0)} direct expenses`,
+            meta: `${formatCurrency(current.bank_debit_total || 0)} raw bank debits`,
         },
         {
             label: "Previous month",
@@ -260,7 +260,7 @@ function renderMonthlyWindow(windowData) {
         {
             label: "Net flow",
             value: formatCurrency(current.net_total || 0),
-            meta: `${formatCurrency(current.income_total || 0)} credits this month`,
+            meta: `${formatCurrency(current.income_total || 0)} verified income this month`,
         },
     ].map(item => `
         <div class="hero-signal">
@@ -288,7 +288,7 @@ function renderMonthlyWindow(windowData) {
                     <span class="status-pill ${item.net_total >= 0 ? "status-low" : "status-high"}">${item.net_total >= 0 ? "Positive" : "Tight"}</span>
                 </div>
                 <div class="window-card-value">${formatCurrency(itemOutflow)}</div>
-                <div class="window-card-meta">Outflow | ${Alfred.formatNumber(Number(item.transaction_count || 0), 0)} transactions</div>
+                <div class="window-card-meta">Cashflow | ${Alfred.formatNumber(Number(item.transaction_count || 0), 0)} transactions</div>
                 <div class="window-card-strip mt-3">
                     <div class="window-card-fill" style="width: ${unwantedShare}%;"></div>
                 </div>
@@ -582,15 +582,15 @@ function renderTimeline(timeline, meta = {}) {
             summaryLabel = "Filtered Expense Total";
             summaryValue = filteredExpenseTotal;
         } else if (filteredOutflowTotal > 0) {
-            summaryLabel = "Filtered Spend Total";
+            summaryLabel = "Filtered Cashflow Total";
             summaryValue = filteredOutflowTotal;
         } else if (filteredCreditTotal > 0) {
-            summaryLabel = "Filtered Credit Total";
+            summaryLabel = "Filtered Bank Credit Total";
             summaryValue = filteredCreditTotal;
         }
 
         const breakdown = [
-            `Expense ${formatCurrency(filteredExpenseTotal)}`,
+            `Direct ${formatCurrency(filteredExpenseTotal)}`,
             `Loan ${formatCurrency(filteredLoanTotal)}`,
             `Other ${formatCurrency(filteredOtherTotal)}`,
         ];

@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
@@ -19,6 +20,7 @@ from .services import (
     build_family_link_snapshot,
     create_family_link_invite,
     family_context_user_ids,
+    family_financial_user_ids,
     revoke_family_link,
 )
 
@@ -113,14 +115,16 @@ def family_growth(request):
 
 def _family_growth_revision(user, baseline: dict) -> str:
     context_user_ids = family_context_user_ids(user)
+    financial_user_ids = family_financial_user_ids(user)
     dependent_meta = Dependent.objects.filter(user_id__in=context_user_ids).aggregate(count=Count("id"), max_id=Max("id"), max_age=Max("age"))
     link_meta = FamilyAccountLink.objects.filter(status=FamilyAccountLink.STATUS_ACCEPTED).filter(
-        linked_user_id__in=context_user_ids
+        linked_user_id__in=set(context_user_ids) | set(financial_user_ids)
     ).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
     return "|".join(
         str(value or "")
         for value in [
             ",".join(str(item) for item in context_user_ids),
+            ",".join(str(item) for item in financial_user_ids),
             dependent_meta["count"],
             dependent_meta["max_id"],
             dependent_meta["max_age"],
@@ -137,13 +141,15 @@ def _family_growth_revision(user, baseline: dict) -> str:
 
 def _family_growth_payload(user, baseline: dict) -> dict:
     context_user_ids = family_context_user_ids(user)
+    financial_summary = _family_financial_summary(user, own_baseline=baseline)
+    family_baseline = financial_summary["family_financial_baseline"]
     dependents = Dependent.objects.filter(user_id__in=context_user_ids)
     own_dependents_count = Dependent.objects.filter(user=user).count()
     link_snapshot = build_family_link_snapshot(user)
-    total_assets = float(baseline.get("total_assets", 0) or 0)
-    total_liabilities = float(baseline.get("total_liabilities", 0) or 0)
-    current_net_worth = float(baseline.get("net_worth", 0) or 0)
-    savings_capacity = float(baseline.get("savings_capacity", 0) or 0)
+    total_assets = float(family_baseline.get("total_assets", 0) or 0)
+    total_liabilities = float(family_baseline.get("total_liabilities", 0) or 0)
+    current_net_worth = float(family_baseline.get("net_worth", 0) or 0)
+    savings_capacity = float(family_baseline.get("savings_capacity", 0) or 0)
     evidence = []
     for result in (verified_intelligence.ppf_reference(), verified_intelligence.nps_tax_reference()):
         evidence.append(result.evidence)
@@ -167,6 +173,7 @@ def _family_growth_payload(user, baseline: dict) -> dict:
             "own_dependents_count": own_dependents_count,
             "linked_family_account_count": link_snapshot["accepted_link_count"],
             "linked_family_dependent_count": link_snapshot["shared_dependent_count"],
+            "linked_family_financial_account_count": max(0, family_baseline["member_count"] - 1),
         },
         "evidence": evidence,
         "freshness": evidence_freshness,
@@ -190,15 +197,19 @@ def _family_growth_payload(user, baseline: dict) -> dict:
         "own_dependents_count": own_dependents_count,
         "linked_family_account_count": link_snapshot["accepted_link_count"],
         "linked_family_dependent_count": link_snapshot["shared_dependent_count"],
+        "linked_family_financial_account_count": max(0, family_baseline["member_count"] - 1),
         "shared_family_context": {
             "family_context_user_count": link_snapshot["family_context_user_count"],
             "linked_user_count": link_snapshot["linked_user_count"],
+            "financial_member_count": family_baseline["member_count"],
             "share_dependents": True,
-            "financial_baseline_scope": "current_user_only",
+            "financial_baseline_scope": "accepted_family_financial_summary",
         },
         "growth_rate": 8.0,
         "projection_basis": "heuristic_8_percent_compound_projection",
-        "financial_baseline": baseline,
+        "financial_baseline": family_baseline,
+        "own_financial_baseline": baseline,
+        "family_financial_members": financial_summary["members"],
         "projections": projections,
         "grounding": grounding,
         "evidence_freshness": grounding["freshness"],
@@ -209,6 +220,68 @@ def _family_growth_payload(user, baseline: dict) -> dict:
             "Consider increasing SIP investments for faster growth",
             "Emergency fund should cover 6 months of expenses",
         ],
+    }
+
+
+def _family_financial_summary(user, *, own_baseline: dict) -> dict:
+    user_model = get_user_model()
+    users_by_id = {
+        item.id: item
+        for item in user_model.objects.filter(id__in=family_financial_user_ids(user)).order_by("id")
+    }
+    totals = {
+        "monthly_income": 0.0,
+        "savings_capacity": 0.0,
+        "total_assets": 0.0,
+        "total_liabilities": 0.0,
+        "net_worth": 0.0,
+    }
+    members = []
+
+    for user_id in family_financial_user_ids(user):
+        member = users_by_id.get(user_id)
+        if not member:
+            continue
+        member_baseline = own_baseline if member.id == user.id else resolve_canonical_financial_baseline(member)
+        member_summary = _family_member_financial_summary(
+            requesting_user=user,
+            member=member,
+            baseline=member_baseline,
+        )
+        members.append(member_summary)
+        for key in totals:
+            totals[key] += float(member_summary.get(key, 0) or 0)
+
+    family_baseline = {
+        "scope": "accepted_family_financial_summary",
+        "member_count": len(members),
+        "monthly_income": round(totals["monthly_income"], 2),
+        "savings_capacity": round(totals["savings_capacity"], 2),
+        "total_assets": round(totals["total_assets"], 2),
+        "total_liabilities": round(totals["total_liabilities"], 2),
+        "net_worth": round(totals["total_assets"] - totals["total_liabilities"], 2),
+    }
+    return {
+        "family_financial_baseline": family_baseline,
+        "members": members,
+    }
+
+
+def _family_member_financial_summary(*, requesting_user, member, baseline: dict) -> dict:
+    full_name = f"{member.first_name} {member.last_name}".strip()
+    return {
+        "user_id": member.id,
+        "username": member.username,
+        "display_name": full_name or member.username,
+        "role": "self" if member.id == requesting_user.id else "linked",
+        "city": member.city,
+        "country": member.country,
+        "monthly_income": round(float(baseline.get("monthly_income", 0) or 0), 2),
+        "savings_capacity": round(float(baseline.get("savings_capacity", 0) or 0), 2),
+        "total_assets": round(float(baseline.get("total_assets", 0) or 0), 2),
+        "total_liabilities": round(float(baseline.get("total_liabilities", 0) or 0), 2),
+        "net_worth": round(float(baseline.get("net_worth", 0) or 0), 2),
+        "source": "canonical_financial_baseline",
     }
 
 

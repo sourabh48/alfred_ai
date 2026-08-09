@@ -164,7 +164,7 @@ function resetDependentForm() {
     const form = document.getElementById("settingsDependentForm");
     form.reset();
     form.elements.id.value = "";
-    document.getElementById("settingsDependentSubmitBtn").textContent = "Save";
+    document.getElementById("settingsDependentSubmitBtn").textContent = "Add";
     document.getElementById("settingsDependentCancelBtn").classList.add("d-none");
 }
 
@@ -184,7 +184,8 @@ function renderFamilyContextSummary(snapshot = {}) {
     Alfred.setTextIfChanged("settingsFamilyContextCount", Alfred.formatNumber(snapshot.family_context_user_count || 1, 0));
     Alfred.setTextIfChanged("settingsLinkedAccountCount", Alfred.formatNumber(snapshot.accepted_link_count || 0, 0));
     Alfred.setTextIfChanged("settingsSharedDependentCount", Alfred.formatNumber(snapshot.shared_dependent_count || 0, 0));
-    Alfred.setTextIfChanged("settingsLinkStatus", snapshot.accepted_link_count ? "Linked" : "Private");
+    const financialCount = Number(snapshot.family_financial_user_count || snapshot.family_context_user_count || 1);
+    Alfred.setTextIfChanged("settingsLinkStatus", snapshot.accepted_link_count ? `Linked | ${Alfred.formatNumber(financialCount, 0)} financial profile${financialCount === 1 ? "" : "s"}` : "Private");
 }
 
 function renderFamilyLinks(snapshot = {}) {
@@ -206,6 +207,7 @@ function renderFamilyLinks(snapshot = {}) {
                 profile.city || "",
                 profile.country || "",
                 `${Alfred.formatNumber(profile.dependent_count || 0, 0)} dependent${Number(profile.dependent_count || 0) === 1 ? "" : "s"}`,
+                link.share_financial_summary ? "financial summary shared" : "",
             ].filter(Boolean).join(" | ")
             : `Expires ${formatSettingsDateTime(link.expires_at)}`;
         return `

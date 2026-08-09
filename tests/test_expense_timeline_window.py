@@ -135,3 +135,101 @@ class ExpenseTimelineWindowTests(TestCase):
         self.assertEqual(payload["timeline_meta"]["filtered_other_total"], 1500.0)
         self.assertEqual(payload["timeline_meta"]["filtered_outflow_total"], 1500.0)
         self.assertEqual(payload["timeline_meta"]["filtered_credit_total"], 0.0)
+
+    def test_timeline_cashflow_excludes_transfers_and_review_gates_large_other_debits(self):
+        Expense.objects.create(
+            user=self.user,
+            amount=60000,
+            classification="other",
+            category="transfer",
+            payment_mode="BANK",
+            merchant="Family transfer",
+            description="Transfer from family",
+            raw_description="TRANSFER FROM FAMILY",
+            transaction_date=date(2026, 3, 12),
+            direction="credit",
+            source="manual",
+        )
+        Expense.objects.create(
+            user=self.user,
+            amount=10000,
+            classification="other",
+            category="transfer",
+            payment_mode="BANK",
+            merchant="Self transfer",
+            description="Transfer to own account",
+            raw_description="TRANSFER TO OWN ACCOUNT",
+            transaction_date=date(2026, 3, 12),
+            direction="debit",
+            source="manual",
+        )
+        Expense.objects.create(
+            user=self.user,
+            amount=20000,
+            classification="other",
+            category="credit_card",
+            payment_mode="BANK",
+            merchant="Card payment",
+            description="Credit card settlement",
+            raw_description="CREDIT CARD SETTLEMENT",
+            transaction_date=date(2026, 3, 13),
+            direction="debit",
+            source="manual",
+        )
+        Expense.objects.create(
+            user=self.user,
+            amount=5000,
+            classification="other",
+            category="investment",
+            payment_mode="BANK",
+            merchant="Mutual fund",
+            description="SIP",
+            raw_description="SIP",
+            transaction_date=date(2026, 3, 14),
+            direction="debit",
+            source="manual",
+        )
+        Expense.objects.create(
+            user=self.user,
+            amount=7000,
+            classification="loan",
+            category="loan",
+            payment_mode="BANK",
+            merchant="Loan EMI",
+            description="EMI",
+            raw_description="EMI",
+            transaction_date=date(2026, 3, 15),
+            direction="debit",
+            source="manual",
+        )
+        Expense.objects.create(
+            user=self.user,
+            amount=80000,
+            classification="expense",
+            category="other",
+            payment_mode="BANK",
+            merchant="Self cheque",
+            description="Self Chq Paid",
+            raw_description="SELF CHQ PAID",
+            transaction_date=date(2026, 3, 16),
+            direction="debit",
+            source="manual",
+        )
+
+        response = self.client.get("/api/expenses/timeline/")
+
+        self.assertEqual(response.status_code, 200)
+        current = response.json()["monthly_window"]["current"]
+        self.assertEqual(current["income_total"], 25000.0)
+        self.assertEqual(current["bank_credit_total"], 85000.0)
+        self.assertEqual(current["transfer_in_total"], 60000.0)
+        self.assertEqual(current["transfer_out_total"], 10000.0)
+        self.assertEqual(current["expense_total"], 4000.0)
+        self.assertEqual(current["other_total"], 1500.0)
+        self.assertEqual(current["loan_total"], 7000.0)
+        self.assertEqual(current["credit_card_payment_total"], 20000.0)
+        self.assertEqual(current["investment_total"], 5000.0)
+        self.assertEqual(current["review_required_total"], 80000.0)
+        self.assertEqual(current["bank_debit_total"], 127500.0)
+        self.assertEqual(current["outflow_total"], 37500.0)
+        self.assertEqual(current["net_total"], -12500.0)

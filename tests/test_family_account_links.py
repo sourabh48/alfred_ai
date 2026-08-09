@@ -62,6 +62,8 @@ class FamilyAccountLinkTests(TestCase):
         self.assertContains(response, 'id="accountProfileForm"')
         self.assertContains(response, 'id="settingsDependentForm"')
         self.assertContains(response, 'id="settingsAcceptInviteForm"')
+        self.assertContains(response, "Manual Dependents")
+        self.assertContains(response, "Linked spouse/family data is populated from linked accounts above.")
         self.assertContains(response, "/static/js/settings.js")
 
     def test_family_link_code_is_one_time_output_and_hash_stored(self):
@@ -104,7 +106,9 @@ class FamilyAccountLinkTests(TestCase):
         payload = response.json()
         self.assertEqual(payload["accepted_link_count"], 1)
         self.assertEqual(payload["linked_user_count"], 1)
+        self.assertEqual(payload["family_financial_user_count"], 2)
         self.assertEqual(payload["shared_dependent_count"], 1)
+        self.assertTrue(payload["links"][0]["share_financial_summary"])
         self.assertEqual(payload["links"][0]["linked_profile"]["username"], "family_owner")
         self.assertNotIn("monthly_income", payload["links"][0]["linked_profile"])
 
@@ -176,7 +180,7 @@ class FamilyAccountLinkTests(TestCase):
         link = FamilyAccountLink.objects.get(id=link_id)
         self.assertEqual(link.status, FamilyAccountLink.STATUS_REVOKED)
 
-    def test_family_growth_uses_linked_dependents_without_linked_money_fields(self):
+    def test_family_growth_uses_linked_dependents_and_accepted_financial_summary(self):
         Dependent.objects.create(user=self.owner, name="Owner Child", age=7, relation="Child")
         Dependent.objects.create(user=self.member, name="Member Parent", age=67, relation="Parent")
         invite_response = self.owner_client.post(
@@ -191,13 +195,24 @@ class FamilyAccountLinkTests(TestCase):
             content_type="application/json",
         )
 
-        baseline = {
+        owner_baseline = {
             "total_assets": 500000,
             "total_liabilities": 100000,
             "net_worth": 400000,
             "savings_capacity": 25000,
+            "monthly_income": 120000,
         }
-        with patch("apps.family.views.resolve_canonical_financial_baseline", return_value=baseline), patch(
+        member_baseline = {
+            "total_assets": 250000,
+            "total_liabilities": 100000,
+            "net_worth": 150000,
+            "savings_capacity": 15000,
+            "monthly_income": 85000,
+        }
+        def baseline_for(user):
+            return owner_baseline if user.id == self.owner.id else member_baseline
+
+        with patch("apps.family.views.resolve_canonical_financial_baseline", side_effect=baseline_for), patch(
             "apps.family.views.verified_intelligence.ppf_reference",
             return_value=SimpleNamespace(evidence=_fresh_evidence("India Post")),
         ), patch(
@@ -212,6 +227,65 @@ class FamilyAccountLinkTests(TestCase):
         self.assertEqual(payload["own_dependents_count"], 1)
         self.assertEqual(payload["linked_family_account_count"], 1)
         self.assertEqual(payload["linked_family_dependent_count"], 1)
-        self.assertEqual(payload["financial_baseline"], baseline)
-        self.assertEqual(payload["shared_family_context"]["financial_baseline_scope"], "current_user_only")
-        self.assertNotIn("linked_monthly_income", json.dumps(payload))
+        self.assertEqual(payload["linked_family_financial_account_count"], 1)
+        self.assertEqual(payload["financial_baseline"]["scope"], "accepted_family_financial_summary")
+        self.assertEqual(payload["financial_baseline"]["member_count"], 2)
+        self.assertEqual(payload["financial_baseline"]["total_assets"], 750000.0)
+        self.assertEqual(payload["financial_baseline"]["total_liabilities"], 200000.0)
+        self.assertEqual(payload["financial_baseline"]["net_worth"], 550000.0)
+        self.assertEqual(payload["financial_baseline"]["savings_capacity"], 40000.0)
+        self.assertEqual(payload["financial_baseline"]["monthly_income"], 205000.0)
+        self.assertEqual(payload["own_financial_baseline"], owner_baseline)
+        self.assertEqual(payload["shared_family_context"]["financial_baseline_scope"], "accepted_family_financial_summary")
+        self.assertEqual(payload["shared_family_context"]["financial_member_count"], 2)
+        self.assertEqual(len(payload["family_financial_members"]), 2)
+        self.assertEqual({item["role"] for item in payload["family_financial_members"]}, {"self", "linked"})
+
+    def test_family_growth_respects_financial_summary_sharing_flag(self):
+        invite_response = self.owner_client.post(
+            "/api/family/account-links/",
+            data=json.dumps({}),
+            content_type="application/json",
+        )
+        code = invite_response.json()["invite"]["invite_code"]
+        self.member_client.post(
+            "/api/family/account-links/accept/",
+            data=json.dumps({"invite_code": code}),
+            content_type="application/json",
+        )
+        link = FamilyAccountLink.objects.get()
+        link.share_financial_summary = False
+        link.save(update_fields=["share_financial_summary", "updated_at"])
+
+        owner_baseline = {
+            "total_assets": 500000,
+            "total_liabilities": 100000,
+            "net_worth": 400000,
+            "savings_capacity": 25000,
+            "monthly_income": 120000,
+        }
+        member_baseline = {
+            "total_assets": 250000,
+            "total_liabilities": 100000,
+            "net_worth": 150000,
+            "savings_capacity": 15000,
+            "monthly_income": 85000,
+        }
+
+        def baseline_for(user):
+            return owner_baseline if user.id == self.owner.id else member_baseline
+
+        with patch("apps.family.views.resolve_canonical_financial_baseline", side_effect=baseline_for), patch(
+            "apps.family.views.verified_intelligence.ppf_reference",
+            return_value=SimpleNamespace(evidence=_fresh_evidence("India Post")),
+        ), patch(
+            "apps.family.views.verified_intelligence.nps_tax_reference",
+            return_value=SimpleNamespace(evidence=_fresh_evidence("NPS Trust")),
+        ):
+            response = self.owner_client.get("/api/family/growth/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["financial_baseline"]["member_count"], 1)
+        self.assertEqual(payload["financial_baseline"]["net_worth"], 400000.0)
+        self.assertEqual(payload["linked_family_financial_account_count"], 0)

@@ -485,6 +485,34 @@ class CanonicalFinancialBaselineEdgeCaseTests(TestCase):
         self.assertEqual(observed_baseline["income_source"], "observed_credit_inflow")
         self.assertEqual(observed_baseline["metric_states"]["monthly_income"]["status"], "observed")
 
+    def test_baseline_excludes_transfers_and_review_gated_debits_from_variable_spend(self):
+        user = self._create_user("cashflow_treatment_baseline")
+        for month in (1, 2, 3):
+            self._expense(user, amount=50000, month=month, direction="credit", category="income", raw="SALARY ACME ANALYTICS")
+            self._expense(user, amount=90000, month=month, direction="credit", classification="other", category="transfer", raw="FAMILY TRANSFER")
+            self._expense(user, amount=10000, month=month, category="food", raw="GROCERIES")
+            self._expense(user, amount=2000, month=month, classification="other", category="other", raw="SMALL CASH OUTFLOW")
+            self._expense(user, amount=40000, month=month, classification="other", category="transfer", raw="SELF TRANSFER")
+            self._expense(user, amount=5000, month=month, classification="other", category="credit_card", raw="CARD PAYMENT")
+            self._expense(user, amount=3000, month=month, classification="other", category="investment", raw="SIP INVESTMENT")
+            self._expense(user, amount=80000, month=month, category="other", raw="SELF CHQ PAID")
+
+        baseline = resolve_canonical_financial_baseline(user)
+        intelligence = build_financial_intelligence(user)
+
+        self.assertEqual(baseline["monthly_income"], 50000.0)
+        self.assertEqual(baseline["observed_average_monthly_inflow"], 50000.0)
+        self.assertEqual(baseline["observed_average_monthly_variable_spend"], 12000.0)
+        self.assertEqual(baseline["observed_average_monthly_total_outflow"], 20000.0)
+        self.assertEqual(baseline["current_month_variable_spend"], 12000.0)
+        self.assertEqual(baseline["current_month_total_outflow"], 20000.0)
+        self.assertEqual(baseline["savings_capacity"], 38000.0)
+        self.assertEqual(intelligence["summary"]["current_month_income"], 50000.0)
+        self.assertEqual(intelligence["summary"]["current_month_outflow"], 20000.0)
+        self.assertEqual(intelligence["summary"]["current_month_transfer_in"], 90000.0)
+        self.assertEqual(intelligence["summary"]["current_month_transfer_out"], 40000.0)
+        self.assertEqual(intelligence["summary"]["current_month_review_required"], 80000.0)
+
     def test_missing_records_and_no_income_are_marked_unavailable(self):
         user = self._create_user("missing_financial_records")
         baseline = resolve_canonical_financial_baseline(user)

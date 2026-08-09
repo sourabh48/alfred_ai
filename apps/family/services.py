@@ -136,6 +136,15 @@ def family_context_user_ids(user) -> list[int]:
     return sorted(user_ids)
 
 
+def family_financial_user_ids(user) -> list[int]:
+    user_ids = {user.id}
+    for link in accepted_family_links_for_user(user).select_related("created_by", "linked_user"):
+        other_user_id = link.linked_user_id if link.created_by_id == user.id else link.created_by_id
+        if other_user_id and link.share_financial_summary:
+            user_ids.add(other_user_id)
+    return sorted(user_ids)
+
+
 def accepted_family_links_for_user(user):
     return FamilyAccountLink.objects.filter(
         Q(created_by=user) | Q(linked_user=user),
@@ -163,6 +172,7 @@ def build_family_link_snapshot(user) -> dict:
         "own_dependent_count": own_dependent_count,
         "shared_dependent_count": max(0, dependent_count - own_dependent_count),
         "family_context_user_count": len(family_context_user_ids(user)),
+        "family_financial_user_count": len(family_financial_user_ids(user)),
     }
 
 
@@ -190,6 +200,7 @@ def _serialize_family_link(user, link: FamilyAccountLink) -> dict:
         "revoked_at": link.revoked_at.isoformat() if link.revoked_at else None,
         "share_profile_summary": link.share_profile_summary,
         "share_dependents": link.share_dependents,
+        "share_financial_summary": link.share_financial_summary,
         "linked_user_id": linked_user.id if linked_user else None,
         "linked_profile": _safe_user_summary(linked_user) if linked_user and link.share_profile_summary else None,
     }

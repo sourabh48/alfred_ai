@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.models import BankAccount, Expense
+from apps.expenses.services.cashflow_treatment import classify_cashflow
 from apps.integrations.models import CreditReportUpload
 from apps.investments.models import Investment
 from apps.loans.models import Loan, LoanForeclosureSnapshot, LoanPaymentHistory
@@ -120,15 +121,20 @@ def _build_financial_intelligence_uncached(user) -> dict:
     current_bucket = monthly_buckets.get(current_key, _empty_month_bucket())
     previous_bucket = monthly_buckets.get(previous_key, _empty_month_bucket())
 
-    debit_expenses = [item for item in expenses if item.direction == "debit"]
-    income_entries = [item for item in expenses if item.direction == "credit"]
-    debt_entries = [item for item in debit_expenses if item.classification == "loan" or item.category == "credit_card"]
+    treated_expenses = [(item, classify_cashflow(item)) for item in expenses]
+    debit_expenses = [item for item, treatment in treated_expenses if treatment.counts_cashflow_outflow]
+    income_entries = [item for item, treatment in treated_expenses if treatment.counts_income]
+    debt_entries = [item for item, treatment in treated_expenses if treatment.counts_debt_service]
 
     income_total = sum(item.amount for item in income_entries)
     debit_total = sum(item.amount for item in debit_expenses)
-    expense_total = sum(item.amount for item in debit_expenses if item.classification == "expense")
-    loan_total = sum(item.amount for item in debit_expenses if item.classification == "loan")
-    other_total = sum(item.amount for item in debit_expenses if item.classification == "other")
+    expense_total = sum(item.amount for item, treatment in treated_expenses if treatment.counts_direct_expense)
+    loan_total = sum(item.amount for item, treatment in treated_expenses if treatment.bucket == "loan")
+    other_total = sum(
+        item.amount
+        for item, treatment in treated_expenses
+        if treatment.bucket in {"other", "credit_card_payment", "investment"}
+    )
     discretionary_total = sum(item.amount for item in debit_expenses if item.category in DISCRETIONARY_CATEGORIES)
     savings_rate = ((income_total - debit_total) / income_total) if income_total else 0.0
     loan_ratio = (loan_total / debit_total) if debit_total else 0.0
@@ -142,9 +148,14 @@ def _build_financial_intelligence_uncached(user) -> dict:
     recent_transactions = _serialize_recent_transactions(expenses, transaction_relationships)
     manual_loans = _serialize_loans(loans, today)
     debt_trend = _build_debt_trend(monthly_buckets)
-    monthly_outflows = [bucket["expense"] + bucket["loan"] + bucket["other"] for _, bucket in sorted(monthly_buckets.items())]
+    monthly_outflows = [bucket["outflow"] for _, bucket in sorted(monthly_buckets.items())]
     monthly_stress = [
-        _build_monthly_stress_score(bucket["expense"], bucket["loan"], bucket["other"], bucket["income"])
+        _build_monthly_stress_score(
+            bucket["expense"],
+            bucket["loan"] + bucket["credit_card_payment"],
+            bucket["other"] + bucket["investment"],
+            bucket["income"],
+        )
         for _, bucket in sorted(monthly_buckets.items())
     ]
     avg_monthly_outflow = mean(monthly_outflows) if monthly_outflows else 0.0
@@ -188,7 +199,15 @@ def _build_financial_intelligence_uncached(user) -> dict:
                 "current_month_expense": round(current_bucket["expense"], 2),
                 "current_month_loans": round(current_bucket["loan"], 2),
                 "current_month_other": round(current_bucket["other"], 2),
-                "current_month_net": round(current_bucket["income"] - (current_bucket["expense"] + current_bucket["loan"] + current_bucket["other"]), 2),
+                "current_month_credit_card_payments": round(current_bucket["credit_card_payment"], 2),
+                "current_month_investments": round(current_bucket["investment"], 2),
+                "current_month_review_required": round(current_bucket["review_required"], 2),
+                "current_month_transfer_in": round(current_bucket["transfer_in"], 2),
+                "current_month_transfer_out": round(current_bucket["transfer_out"], 2),
+                "current_month_bank_credit": round(current_bucket["bank_credit"], 2),
+                "current_month_bank_debit": round(current_bucket["bank_debit"], 2),
+                "current_month_outflow": round(current_bucket["outflow"], 2),
+                "current_month_net": round(current_bucket["income"] - current_bucket["outflow"], 2),
                 "monthly_expense_delta": round(current_bucket["expense"] - previous_bucket["expense"], 2),
                 "financial_health_score": round(health_score, 1),
                 "stability_score": round(stability_score, 1),
@@ -212,6 +231,14 @@ def _build_financial_intelligence_uncached(user) -> dict:
                 "monthly_loan_values": [round(bucket["loan"], 2) for _, bucket in sorted(monthly_buckets.items())],
                 "monthly_other_values": [round(bucket["other"], 2) for _, bucket in sorted(monthly_buckets.items())],
                 "monthly_income_values": [round(bucket["income"], 2) for _, bucket in sorted(monthly_buckets.items())],
+                "monthly_outflow_values": [round(bucket["outflow"], 2) for _, bucket in sorted(monthly_buckets.items())],
+                "monthly_bank_debit_values": [round(bucket["bank_debit"], 2) for _, bucket in sorted(monthly_buckets.items())],
+                "monthly_bank_credit_values": [round(bucket["bank_credit"], 2) for _, bucket in sorted(monthly_buckets.items())],
+                "monthly_transfer_in_values": [round(bucket["transfer_in"], 2) for _, bucket in sorted(monthly_buckets.items())],
+                "monthly_transfer_out_values": [round(bucket["transfer_out"], 2) for _, bucket in sorted(monthly_buckets.items())],
+                "monthly_credit_card_payment_values": [round(bucket["credit_card_payment"], 2) for _, bucket in sorted(monthly_buckets.items())],
+                "monthly_investment_values": [round(bucket["investment"], 2) for _, bucket in sorted(monthly_buckets.items())],
+                "monthly_review_required_values": [round(bucket["review_required"], 2) for _, bucket in sorted(monthly_buckets.items())],
                 "category_labels": [item["label"] for item in category_distribution],
                 "category_values": [item["amount"] for item in category_distribution],
                 "debt_labels": debt_trend["labels"],
@@ -558,12 +585,10 @@ def _build_canonical_financial_baseline_uncached(
         (_decimal_amount(bucket["expense"]) + _decimal_amount(bucket["other"])) for bucket in recent_buckets
     )
     observed_average_monthly_total_outflow_amount = _decimal_average(
-        (_decimal_amount(bucket["expense"]) + _decimal_amount(bucket["loan"]) + _decimal_amount(bucket["other"])) for bucket in recent_buckets
+        _decimal_amount(bucket["outflow"]) for bucket in recent_buckets
     )
     current_month_variable_spend_amount = _decimal_amount(current_bucket["expense"]) + _decimal_amount(current_bucket["other"])
-    current_month_total_outflow_amount = (
-        _decimal_amount(current_bucket["expense"]) + _decimal_amount(current_bucket["loan"]) + _decimal_amount(current_bucket["other"])
-    )
+    current_month_total_outflow_amount = _decimal_amount(current_bucket["outflow"])
 
     profile = CareerProfile.objects.filter(user=user).first()
     latest_resume = CareerResume.objects.filter(user=user).order_by("-updated_at", "-id").first()
@@ -691,7 +716,8 @@ def _build_canonical_financial_baseline_uncached(
             observed_status,
             "recent_transaction_history",
             "observed_average_monthly_variable_spend",
-            inputs=["expense.debit", "expense.other"],
+            inputs=["expense.direct_debit", "expense.uncategorized_cashflow_debit"],
+            note="Transfers, investments, card settlements, and review-gated large other debits are separated from variable living spend.",
         ),
         "savings_capacity": _baseline_metric_state(
             "derived" if monthly_income_amount > 0 and recent_buckets else "unavailable",
@@ -791,21 +817,57 @@ def _build_monthly_buckets(expenses: list[Expense]) -> dict[tuple[int, int], dic
     for item in expenses:
         key = (item.transaction_date.year, item.transaction_date.month)
         bucket = buckets[key]
+        treatment = classify_cashflow(item)
+        amount = float(item.amount or 0)
         if item.direction == "credit":
-            bucket["income"] += item.amount
-        elif item.classification == "expense":
-            bucket["expense"] += item.amount
-        elif item.classification == "loan":
-            bucket["loan"] += item.amount
+            bucket["bank_credit"] += amount
+        elif item.direction == "debit":
+            bucket["bank_debit"] += amount
+
+        if treatment.bucket == "income":
+            bucket["income"] += amount
+        elif treatment.bucket == "transfer_in":
+            bucket["transfer_in"] += amount
+        elif treatment.bucket == "other_credit":
+            bucket["other_credit"] += amount
+        elif treatment.bucket == "expense":
+            bucket["expense"] += amount
+        elif treatment.bucket == "loan":
+            bucket["loan"] += amount
+        elif treatment.bucket == "credit_card_payment":
+            bucket["credit_card_payment"] += amount
+        elif treatment.bucket == "investment":
+            bucket["investment"] += amount
+        elif treatment.bucket == "transfer_out":
+            bucket["transfer_out"] += amount
+        elif treatment.bucket == "review_required":
+            bucket["review_required"] += amount
         else:
-            bucket["other"] += item.amount
+            bucket["other"] += amount
+        if treatment.counts_cashflow_outflow:
+            bucket["outflow"] += amount
         bucket["count"] += 1
 
     return buckets
 
 
 def _empty_month_bucket() -> dict:
-    return {"income": 0.0, "expense": 0.0, "loan": 0.0, "other": 0.0, "count": 0}
+    return {
+        "income": 0.0,
+        "transfer_in": 0.0,
+        "other_credit": 0.0,
+        "bank_credit": 0.0,
+        "expense": 0.0,
+        "loan": 0.0,
+        "credit_card_payment": 0.0,
+        "investment": 0.0,
+        "transfer_out": 0.0,
+        "other": 0.0,
+        "review_required": 0.0,
+        "bank_debit": 0.0,
+        "outflow": 0.0,
+        "count": 0,
+    }
 
 
 def _build_category_distribution(expenses: list[Expense]) -> list[dict]:

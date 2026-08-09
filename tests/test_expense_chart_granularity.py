@@ -110,3 +110,70 @@ class ExpenseChartGranularityTests(TestCase):
         payload = response.json()
         self.assertEqual(payload["granularity"], "monthly")
         self.assertEqual(payload["labels"], ["Jan 2025", "Feb 2025", "Apr 2025", "Jan 2026", "Mar 2026"])
+
+    def test_chart_uses_cashflow_treatment_not_raw_bank_movement(self):
+        Expense.objects.create(
+            user=self.user,
+            amount=1000,
+            classification="other",
+            category="transfer",
+            payment_mode="BANK",
+            merchant="Family transfer",
+            description="Transfer credit",
+            raw_description="TRANSFER CREDIT",
+            transaction_date=date(2026, 1, 25),
+            direction="credit",
+            source="manual",
+        )
+        Expense.objects.create(
+            user=self.user,
+            amount=2000,
+            classification="other",
+            category="transfer",
+            payment_mode="BANK",
+            merchant="Self transfer",
+            description="Transfer debit",
+            raw_description="TRANSFER DEBIT",
+            transaction_date=date(2026, 3, 12),
+            direction="debit",
+            source="manual",
+        )
+        Expense.objects.create(
+            user=self.user,
+            amount=300,
+            classification="other",
+            category="credit_card",
+            payment_mode="BANK",
+            merchant="Card payment",
+            description="Card payment",
+            raw_description="CARD PAYMENT",
+            transaction_date=date(2026, 3, 13),
+            direction="debit",
+            source="manual",
+        )
+        Expense.objects.create(
+            user=self.user,
+            amount=60000,
+            classification="expense",
+            category="other",
+            payment_mode="BANK",
+            merchant="Self cheque",
+            description="Self Chq Paid",
+            raw_description="SELF CHQ PAID",
+            transaction_date=date(2026, 3, 14),
+            direction="debit",
+            source="manual",
+        )
+
+        response = self.client.get("/api/expenses/chart/?granularity=yearly")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["income_values"], [0.0, 500.0])
+        self.assertEqual(payload["bank_credit_values"], [0.0, 1500.0])
+        self.assertEqual(payload["bank_debit_values"], [225.0, 62330.0])
+        self.assertEqual(payload["outflow_values"], [225.0, 330.0])
+        self.assertEqual(payload["transfer_in_values"], [0.0, 1000.0])
+        self.assertEqual(payload["transfer_out_values"], [0.0, 2000.0])
+        self.assertEqual(payload["credit_card_payment_values"], [0.0, 300.0])
+        self.assertEqual(payload["review_required_values"], [0.0, 60000.0])
