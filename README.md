@@ -160,12 +160,14 @@ python scripts/exercise_materialized_cache_traffic.py
 
 ALFRED is not production-ready until the deployment environment proves database, shared cache, worker, browser-regression, security, and production-like cache-traffic health. See [Production Readiness](docs/PRODUCTION_READINESS.md).
 
-For AWS, start with [AWS Deployment Guide](docs/AWS_DEPLOYMENT.md). The repo includes:
+For AWS, start with [AWS Free Tier Only Deployment](docs/AWS_FREE_TIER_ONLY.md) and [AWS Deployment Guide](docs/AWS_DEPLOYMENT.md). The repo includes:
 
+- `config/aws-free-tier.env.example` for the strict EC2-only Free Tier path.
 - `config/aws.env.example` for AWS production env values.
 - `config/docker-compose.env.example` for local Docker validation.
 - `Dockerfile` for the Django/Celery image.
 - `docker-compose.aws-local.yml` for a local PostgreSQL + Redis + web + Celery worker + Celery beat stack.
+- `docker-compose.aws-free-tier.yml` for an EC2-only AWS Free Tier deployment with Dockerized PostgreSQL and Redis.
 - `docker-compose.aws.yml` for an EC2 deployment that uses external PostgreSQL and Redis.
 - `.github/workflows/aws-deploy.yml` plus `scripts/deploy_aws_pull.sh` for GitHub-to-EC2 pull deployment.
 

@@ -2,7 +2,7 @@
 
 ALFRED is not production-ready until environment-backed checks are green. The application has core Django flows, cache materialization, browser regression wiring, Celery schedules, and supervised-model lifecycle checks, but production maturity still depends on deployment proof.
 
-For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md). It documents a low-cost EC2 + RDS PostgreSQL + Redis + Celery worker/beat setup and keeps AWS free-tier caveats separate from maturity claims.
+For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md) and [AWS Free Tier Only Deployment](AWS_FREE_TIER_ONLY.md). The strict Free Tier path uses one EC2 host with Dockerized PostgreSQL, Redis, Django, Celery worker, and Celery beat. Managed RDS or ElastiCache are opt-in only after account-specific Free Tier coverage is confirmed.
 
 ## Current State
 
@@ -83,7 +83,7 @@ Run the deployment probe only after the production web process can load settings
 
 | Project Details blocker | What closes it | Command or proof |
 | --- | --- | --- |
-| Production database config | Runtime env points Django at PostgreSQL, not SQLite | `DB_ENGINE=django.db.backends.postgresql` plus RDS connection settings |
+| Production database config | Runtime env points Django at PostgreSQL, not SQLite | `DB_ENGINE=django.db.backends.postgresql` plus PostgreSQL connection settings |
 | Shared cache config | Django cache uses Redis or another shared backend | `CACHE_BACKEND=django.core.cache.backends.redis.RedisCache` and `CACHE_LOCATION` |
 | Celery config | Broker/result backend use deployed Redis and required beat entries remain configured | `REDIS_URL` plus `python manage.py check` |
 | Production security config | Local runtime disabled, debug disabled, real secret, explicit hosts/origins, HTTPS redirect, secure cookies, and HSTS | `python scripts/run_production_readiness_probe.py --require-ready` |
@@ -93,4 +93,4 @@ Run the deployment probe only after the production web process can load settings
 | Production cache traffic proof | Shared-cache telemetry covers every registered materialized namespace under deployed traffic | `python scripts/exercise_materialized_cache_traffic.py --allow-live-external` then readiness probe |
 | Browser CI proof | GitHub browser-regression job writes CI Chrome summary with zero skipped Selenium tests | `artifacts/browser/browser_regression_summary.ci-chrome.json` |
 
-The Docker Compose file in the repo is a production-style local validation path. It proves the dependency shape but does not close production security or production runtime proof by itself.
+The local Docker Compose file proves the dependency shape but does not close production security or production runtime proof by itself. The strict Free Tier EC2 compose path can close runtime proof only after it runs on AWS with real PostgreSQL, Redis, Celery, browser CI, security, and cache traffic artifacts.
