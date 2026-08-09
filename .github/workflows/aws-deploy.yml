@@ -22,7 +22,7 @@ jobs:
   deploy:
     name: Deploy to EC2 by SSM Git pull
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Check out deployment script
@@ -94,7 +94,7 @@ jobs:
                   "chmod +x \"$tmp_script\"",
                   f"{exports} bash \"$tmp_script\"",
               ],
-              "executionTimeout": ["1800"],
+              "executionTimeout": ["2700"],
           }
           with open(output_path, "w", encoding="utf-8") as handle:
               json.dump(payload, handle)
@@ -110,7 +110,27 @@ jobs:
               --output text
           )"
           echo "SSM command: $command_id"
-          aws ssm wait command-executed --command-id "$command_id" --instance-id "$AWS_EC2_INSTANCE_ID" || true
+          terminal_status=""
+          for attempt in $(seq 1 270); do
+            status="$(
+              aws ssm get-command-invocation \
+                --command-id "$command_id" \
+                --instance-id "$AWS_EC2_INSTANCE_ID" \
+                --query "Status" \
+                --output text 2>/dev/null || true
+            )"
+            echo "SSM status attempt $attempt: ${status:-Unavailable}"
+            case "$status" in
+              Success|Failed|TimedOut|Cancelled|Cancelling)
+                terminal_status="$status"
+                break
+                ;;
+            esac
+            sleep 10
+          done
+          if [ -z "$terminal_status" ]; then
+            echo "SSM command did not finish within the GitHub polling window." >&2
+          fi
           aws ssm get-command-invocation \
             --command-id "$command_id" \
             --instance-id "$AWS_EC2_INSTANCE_ID" \
