@@ -46,6 +46,13 @@
             </ul>
         </div>
 
+        <div class="alfred-nav-section px-2">
+            <div class="alfred-nav-label px-2">Account</div>
+            <ul class="nav flex-column alfred-nav-list">
+                <li class="nav-item"><a class="nav-link {% if request.path == '/settings/' %}active{% endif %}" href="/settings/">Settings</a></li>
+            </ul>
+        </div>
+
         {% if request.user.is_superuser %}
         <div class="alfred-nav-section px-2">
             <div class="alfred-nav-label px-2">System</div>

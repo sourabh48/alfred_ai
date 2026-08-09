@@ -23,6 +23,27 @@ ALFRED is a Django monolith with module-oriented apps and template-driven dashbo
 - reports
 - integrations for credit/tax/recommendations
 
+Core money metrics are resolved through one canonical baseline service:
+
+- implementation: `apps/expenses/services/financial_intelligence.py::resolve_canonical_financial_baseline`
+- cache namespace: `financial-baseline`
+- consumers include budget intelligence, loan metrics, risk, relationship, family growth, career timing, integrations/tax defaults, and the Alfred financial brain
+
+The baseline keeps backward-compatible numeric fields while also returning `baseline_formulas`, `metric_states`, and `metric_provenance`.
+
+Canonical formulas:
+
+- `annual_income = monthly_income * 12`
+- `fixed_obligations = rent_burden + recurring_emi_burden`
+- `disposable_cash_flow = monthly_income - fixed_obligations`
+- `savings_capacity = monthly_income - fixed_obligations - observed_average_monthly_variable_spend`
+- `debt_burden_ratio = fixed_obligations / monthly_income * 100`
+- `essential_monthly_outflow = fixed_obligations + observed_average_monthly_variable_spend`
+- `liquid_runway_months = liquid_cash / essential_monthly_outflow`
+- `net_worth = total_assets - total_liabilities`
+
+Every canonical metric is tagged as `observed`, `user-reported`, `derived`, or `unavailable` so missing data is not silently treated as verified financial health. The current database schema still stores several monetary fields as floats; the resolver normalizes them with `Decimal` internally before returning rounded API values.
+
 ### Life Intelligence
 
 - career

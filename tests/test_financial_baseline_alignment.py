@@ -12,6 +12,7 @@ from apps.career.services import build_employment_income_signals
 from apps.career.views import _career_timing_payload
 from apps.expenses.models import BankAccount, Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence, resolve_canonical_financial_baseline
+from apps.investments.models import Investment
 from apps.loans.models import Loan
 from apps.ml_engine.services.recommendation_engine import recommendation_engine
 from apps.relationship.models import RelationshipProfile
@@ -125,7 +126,12 @@ class FinancialBaselineAlignmentTests(TestCase):
         self.assertEqual(baseline["baseline_savings_rate"], baseline["savings_rate"])
         self.assertEqual(baseline["debt_burden_ratio"], 40.0)
         self.assertEqual(baseline["liquid_cash"], 210000.0)
-        self.assertEqual(baseline["liquid_runway_months"], 5.25)
+        self.assertEqual(baseline["essential_monthly_outflow"], 62000.0)
+        self.assertEqual(baseline["liquid_runway_months"], 3.39)
+        self.assertEqual(baseline["annual_income"], 1200000.0)
+        self.assertEqual(baseline["baseline_formulas"]["net_worth"], "total_assets - total_liabilities")
+        self.assertEqual(baseline["metric_states"]["monthly_income"]["status"], "user-reported")
+        self.assertEqual(baseline["metric_states"]["savings_capacity"]["status"], "derived")
 
         intelligence = build_financial_intelligence(self.user)
         self.assertEqual(intelligence["baseline"]["monthly_income"], baseline["monthly_income"])
@@ -298,12 +304,22 @@ class FinancialBaselineAlignmentTests(TestCase):
         ), patch(
             "apps.integrations.views.verified_intelligence.world_bank_indicator",
             return_value=_insight({"latest_value": 4.8}, "World Bank"),
+        ), patch(
+            "apps.integrations.views.verified_intelligence.tax_regime_reference",
+            return_value=_insight({"regime": "reference"}, "Income Tax Department"),
+        ), patch(
+            "apps.integrations.views.verified_intelligence.nps_tax_reference",
+            return_value=_insight({"limit": 50000}, "NPS Trust"),
+        ), patch(
+            "apps.integrations.views.verified_intelligence.ppf_reference",
+            return_value=_insight({"limit": 150000}, "India Post"),
         ):
             budget_payload = self.client.get("/api/budgets/dashboard/").json()
             loan_metrics_payload = self.client.get("/api/loans/metrics/").json()
             risk_payload = self.client.get("/api/risk/outlook/").json()
             relationship_payload = self.client.get("/api/relationship/alignment/").json()
             recommendation_payload = self.client.get("/api/integrations/recommendations/overview/").json()
+            tax_payload = self.client.get("/api/integrations/tax/overview/").json()
             career_payload = self.client.get("/api/career/dashboard/").json()
             family_payload = self.client.get("/api/family/growth/").json()
 
@@ -316,6 +332,9 @@ class FinancialBaselineAlignmentTests(TestCase):
         self.assertEqual(relationship_payload["financial_baseline"]["savings_capacity"], baseline["savings_capacity"])
         self.assertEqual(recommendation_payload["financial_baseline"]["recurring_emi_burden"], baseline["recurring_emi_burden"])
         self.assertEqual(recommendation_payload["profile"]["income"], baseline["monthly_income"])
+        self.assertEqual(tax_payload["financial_baseline"]["monthly_income"], baseline["monthly_income"])
+        self.assertEqual(tax_payload["inputs"]["annual_income"], baseline["annual_income"])
+        self.assertEqual(tax_payload["inputs"]["rent_paid"], baseline["rent_burden"])
         self.assertEqual(career_payload["career_timing"]["financial_baseline"]["liquid_runway_months"], baseline["liquid_runway_months"])
         self.assertEqual(family_payload["financial_baseline"]["net_worth"], baseline["net_worth"])
         self.assertEqual(family_payload["current_net_worth"], baseline["net_worth"])
@@ -394,6 +413,155 @@ class FinancialBaselineAlignmentTests(TestCase):
         self.assertEqual(snapshot["financial_baseline"]["debt_burden_ratio"], baseline["debt_burden_ratio"])
         self.assertIn("High debt burden - consider restructuring", snapshot["health_score"]["contributing_factors"])
         self.assertTrue(any(item["action"] == "High Debt Burden" for item in snapshot["priority_actions"]))
+
+
+class CanonicalFinancialBaselineEdgeCaseTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.user_model = get_user_model()
+
+    def _create_user(self, username: str, *, monthly_income=0, rent_or_emi=0):
+        return self.user_model.objects.create_user(
+            username=username,
+            password="Pass12345!",
+            monthly_income=monthly_income,
+            rent_or_emi=rent_or_emi,
+        )
+
+    def _expense(self, user, *, amount, month, direction="debit", classification="expense", category="utilities", raw=""):
+        return Expense.objects.create(
+            user=user,
+            amount=amount,
+            classification=classification,
+            category=category,
+            payment_mode="BANK",
+            merchant=raw or f"{category} {month}",
+            description=raw,
+            raw_description=raw,
+            transaction_date=date(2026, month, 10),
+            direction=direction,
+            source="manual",
+        )
+
+    def _loan(self, user, *, emi, balance, status="active", active=True, loan_type="personal"):
+        return Loan.objects.create(
+            user=user,
+            lender=f"{loan_type.title()} Bank",
+            loan_type=loan_type,
+            principal=max(balance, 1),
+            interest_rate=10.0,
+            emi=emi,
+            tenure_months=36,
+            remaining_balance=balance,
+            start_date="2025-01-01",
+            is_active=active,
+            status=status,
+        )
+
+    def test_income_fallback_order_handles_salary_reported_ctc_and_observed_credits(self):
+        salary_user = self._create_user("salary_conflict", monthly_income=960000)
+        for month in (1, 2, 3):
+            self._expense(salary_user, amount=70000, month=month, direction="credit", category="income", raw="SALARY ACME ANALYTICS")
+
+        salary_baseline = resolve_canonical_financial_baseline(salary_user)
+        self.assertEqual(salary_baseline["monthly_income"], 70000.0)
+        self.assertEqual(salary_baseline["annual_income"], 840000.0)
+        self.assertEqual(salary_baseline["income_source"], "salary_credits")
+        self.assertEqual(salary_baseline["metric_states"]["monthly_income"]["status"], "observed")
+
+        ctc_user = self._create_user("annual_ctc_only", monthly_income=720000)
+        ctc_baseline = resolve_canonical_financial_baseline(ctc_user)
+        self.assertEqual(ctc_baseline["monthly_income"], 60000.0)
+        self.assertEqual(ctc_baseline["annual_income"], 720000.0)
+        self.assertEqual(ctc_baseline["income_source"], "reported_annual_ctc")
+        self.assertEqual(ctc_baseline["metric_states"]["monthly_income"]["status"], "user-reported")
+
+        observed_user = self._create_user("observed_credit_only")
+        for month in (1, 2, 3):
+            self._expense(observed_user, amount=42000, month=month, direction="credit", category="income", raw="UPI TRANSFER FAMILY SUPPORT")
+
+        observed_baseline = resolve_canonical_financial_baseline(observed_user)
+        self.assertEqual(observed_baseline["monthly_income"], 42000.0)
+        self.assertEqual(observed_baseline["income_source"], "observed_credit_inflow")
+        self.assertEqual(observed_baseline["metric_states"]["monthly_income"]["status"], "observed")
+
+    def test_missing_records_and_no_income_are_marked_unavailable(self):
+        user = self._create_user("missing_financial_records")
+        baseline = resolve_canonical_financial_baseline(user)
+
+        self.assertEqual(baseline["monthly_income"], 0.0)
+        self.assertEqual(baseline["fixed_obligations"], 0.0)
+        self.assertEqual(baseline["savings_capacity"], 0.0)
+        self.assertEqual(baseline["debt_burden_ratio"], 0.0)
+        self.assertEqual(baseline["metric_states"]["monthly_income"]["status"], "unavailable")
+        self.assertEqual(baseline["metric_states"]["savings_capacity"]["status"], "unavailable")
+        self.assertEqual(baseline["metric_states"]["debt_burden_ratio"]["status"], "unavailable")
+
+    def test_rent_multiple_emis_negative_savings_and_zero_liquidity_use_one_formula(self):
+        user = self._create_user("negative_savings", monthly_income=720000, rent_or_emi=20000)
+        self._loan(user, emi=12000, balance=240000)
+        self._loan(user, emi=10000, balance=180000)
+        BankAccount.objects.create(
+            user=user,
+            bank_name="Zero Bank",
+            account_number="zero001",
+            account_type="savings",
+            current_balance=0,
+            is_active=True,
+        )
+        for month in (1, 2, 3):
+            self._expense(user, amount=25000, month=month)
+
+        baseline = resolve_canonical_financial_baseline(user)
+
+        self.assertEqual(baseline["monthly_income"], 60000.0)
+        self.assertEqual(baseline["recurring_emi_burden"], 22000.0)
+        self.assertEqual(baseline["fixed_obligations"], 42000.0)
+        self.assertEqual(baseline["essential_monthly_outflow"], 67000.0)
+        self.assertEqual(baseline["savings_capacity"], -7000.0)
+        self.assertEqual(baseline["debt_burden_ratio"], 70.0)
+        self.assertEqual(baseline["liquid_cash"], 0.0)
+        self.assertEqual(baseline["liquid_runway_months"], 0.0)
+
+    def test_debt_free_zero_liabilities_and_asset_liability_changes_stay_consistent(self):
+        user = self._create_user("debt_free_assets", monthly_income=600000)
+        BankAccount.objects.create(
+            user=user,
+            bank_name="Cash Bank",
+            account_number="cash001",
+            account_type="savings",
+            current_balance=50000,
+            is_active=True,
+        )
+        investment = Investment.objects.create(
+            user=user,
+            asset_type="mutual_fund",
+            asset_name="Index Fund",
+            invested_amount=100000,
+            current_value=100000,
+            annual_return_rate=10,
+        )
+        baseline = resolve_canonical_financial_baseline(user)
+        self.assertEqual(baseline["total_assets"], 150000.0)
+        self.assertEqual(baseline["total_liabilities"], 0.0)
+        self.assertEqual(baseline["net_worth"], 150000.0)
+        self.assertEqual(baseline["metric_states"]["net_worth"]["status"], "derived")
+
+        self._loan(user, emi=15000, balance=300000)
+        self._loan(user, emi=0, balance=250000, status="foreclosure_pending", active=False)
+        cache.clear()
+        high_liability_baseline = resolve_canonical_financial_baseline(user)
+        self.assertEqual(high_liability_baseline["pending_foreclosure_balance"], 250000.0)
+        self.assertEqual(high_liability_baseline["total_liabilities"], 550000.0)
+        self.assertEqual(high_liability_baseline["net_worth"], -400000.0)
+
+        investment.current_value = 300000
+        investment.save(update_fields=["current_value"])
+        cache.clear()
+        changed_baseline = resolve_canonical_financial_baseline(user)
+        self.assertEqual(changed_baseline["total_assets"], 350000.0)
+        self.assertEqual(changed_baseline["total_liabilities"], 550000.0)
+        self.assertEqual(changed_baseline["net_worth"], -200000.0)
 
 
 def _insight(payload, source_name):

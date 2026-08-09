@@ -1,3 +1,5 @@
+import json
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.test import Client, TestCase
@@ -75,3 +77,62 @@ class UserProfileApiTests(TestCase):
         ):
             with self.subTest(field=field):
                 self.assertNotIn(field, payload)
+
+    def test_profile_api_allows_safe_profile_updates(self):
+        response = self.client.patch(
+            "/api/users/profile/",
+            data=json.dumps(
+                {
+                    "first_name": "Updated",
+                    "last_name": "User",
+                    "email": "updated@example.com",
+                    "monthly_income": 132000,
+                    "variable_income": 25000,
+                    "rent_or_emi": 41000,
+                    "city": "Pune",
+                    "country": "India",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.user.refresh_from_db()
+        self.assertEqual(payload["first_name"], "Updated")
+        self.assertEqual(payload["email"], "updated@example.com")
+        self.assertEqual(payload["monthly_income"], 132000.0)
+        self.assertEqual(self.user.city, "Pune")
+
+    def test_profile_api_rejects_negative_money_values(self):
+        response = self.client.patch(
+            "/api/users/profile/",
+            data=json.dumps({"monthly_income": -1}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.monthly_income, 125000)
+
+    def test_profile_api_ignores_auth_sensitive_updates(self):
+        response = self.client.patch(
+            "/api/users/profile/",
+            data=json.dumps(
+                {
+                    "username": "changed_username",
+                    "is_superuser": True,
+                    "is_staff": False,
+                    "password": "new-password",
+                    "email": "safe-change@example.com",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, "profile_user")
+        self.assertFalse(self.user.is_superuser)
+        self.assertTrue(self.user.is_staff)
+        self.assertEqual(self.user.email, "safe-change@example.com")

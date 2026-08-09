@@ -181,6 +181,11 @@ def dashboard_view(request):
 
 
 @login_required
+def account_settings_view(request):
+    return render(request, "settings/account.html")
+
+
+@login_required
 def documents_view(request):
     return render(request, "documents.html")
 

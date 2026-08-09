@@ -6,13 +6,14 @@ from pathlib import Path
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.db import transaction
+from django.db.models import Q
 
 from alfred_ai.services.materialized_cache import invalidate_user_materialized_payloads
 from apps.behavioral.models import BehavioralSignal
 from apps.budgets.models import Budget
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, CareerResumeLearningMemory
 from apps.expenses.models import BankAccount, Expense, StatementUpload
-from apps.family.models import Dependent
+from apps.family.models import Dependent, FamilyAccountLink
 from apps.integrations.models import CreditReportUpload, CreditScore, EmailConnection, VerifiedExternalInsight
 from apps.investments.models import Investment, InvestmentImportDocument
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument, LoanPaymentHistory
@@ -76,6 +77,13 @@ def clear_user_fed_data(user) -> dict:
     trip_photo_qs = TripPhoto.objects.filter(user=user)
     bike_document_qs = BikeDocument.objects.filter(user=user)
     generated_report_qs = GeneratedReport.objects.filter(user=user)
+    family_link_qs = FamilyAccountLink.objects.filter(Q(created_by=user) | Q(linked_user=user))
+    linked_family_user_ids = set()
+    for link in family_link_qs.only("created_by_id", "linked_user_id"):
+        if link.created_by_id and link.created_by_id != user.id:
+            linked_family_user_ids.add(link.created_by_id)
+        if link.linked_user_id and link.linked_user_id != user.id:
+            linked_family_user_ids.add(link.linked_user_id)
 
     file_names = []
     file_names.extend(_collect_file_names(career_resume_qs, "uploaded_file"))
@@ -111,6 +119,7 @@ def clear_user_fed_data(user) -> dict:
         "operational_logs": OperationalLog.objects.filter(user=user).count(),
         "chatgpt_imports": ChatGPTImport.objects.filter(user=user).count(),
         "parser_memories": DocumentParserLearningMemory.objects.filter(user=user).count() + CareerResumeLearningMemory.objects.filter(user=user).count(),
+        "family_account_links": family_link_qs.count(),
     }
 
     with transaction.atomic():
@@ -150,6 +159,7 @@ def clear_user_fed_data(user) -> dict:
         BehavioralSignal.objects.filter(user=user).delete()
         Budget.objects.filter(user=user).delete()
         Dependent.objects.filter(user=user).delete()
+        family_link_qs.delete()
         RelationshipProfile.objects.filter(user=user).delete()
         RiskSignal.objects.filter(user=user).delete()
 
@@ -169,6 +179,8 @@ def clear_user_fed_data(user) -> dict:
     _delete_storage_files(file_names)
     _delete_generated_report_paths(generated_paths)
     invalidate_user_materialized_payloads(user.id, reason="user_data_reset")
+    for linked_user_id in linked_family_user_ids:
+        invalidate_user_materialized_payloads(linked_user_id, reason="family_link_user_data_reset")
     summary["profile_fields_reset"] = True
     summary["account_preserved"] = True
     summary["materialized_caches_cleared"] = True

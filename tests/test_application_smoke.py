@@ -28,6 +28,7 @@ class ApplicationSmokeTests(TestCase):
         page_paths = [
             "/",
             "/dashboard/",
+            "/settings/",
             "/documents/",
             "/expenses/",
             "/budgets/",

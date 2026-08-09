@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from datetime import date
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from math import log
 from statistics import mean, pstdev
 
@@ -31,6 +32,27 @@ DISCRETIONARY_CATEGORIES = {
     "entertainment",
 }
 RECURRING_CATEGORIES = {"loan", "utilities", "subscription", "rent", "bills", "credit_card"}
+MONEY_QUANT = Decimal("0.01")
+PERCENT_QUANT = Decimal("0.01")
+
+BASELINE_FORMULAS = {
+    "monthly_income": "Normalized reliable monthly income from salary credits, reported income, career salary, or observed credit inflow fallback.",
+    "annual_income": "monthly_income * 12",
+    "recurring_emi_burden": "Sum of active loan EMIs that still report an outstanding balance.",
+    "rent_burden": "User-reported monthly rent or housing obligation.",
+    "fixed_obligations": "rent_burden + recurring_emi_burden",
+    "disposable_cash_flow": "monthly_income - fixed_obligations",
+    "observed_average_monthly_variable_spend": "Three-month average of observed non-loan debit outflows.",
+    "savings_capacity": "monthly_income - fixed_obligations - observed_average_monthly_variable_spend",
+    "liquid_cash": "Positive active non-credit bank balances.",
+    "essential_monthly_outflow": "fixed_obligations + observed_average_monthly_variable_spend",
+    "liquid_runway_months": "liquid_cash / essential_monthly_outflow",
+    "total_assets": "Cash, investments, and recognized asset positions.",
+    "total_liabilities": "Open loan, pending foreclosure, credit, and recognized liability positions.",
+    "net_worth": "total_assets - total_liabilities",
+    "pending_foreclosure_balance": "Foreclosure-pending balances kept in liabilities until closure proof is accepted.",
+    "debt_burden_ratio": "fixed_obligations / monthly_income * 100",
+}
 
 
 def build_financial_intelligence(user) -> dict:
@@ -412,11 +434,67 @@ def _empty_intelligence() -> dict:
     }
 
 
+def _decimal_amount(value) -> Decimal:
+    if value in (None, ""):
+        return Decimal("0")
+    if isinstance(value, Decimal):
+        return value
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal("0")
+
+
+def _decimal_average(values) -> Decimal:
+    items = [_decimal_amount(value) for value in values]
+    if not items:
+        return Decimal("0")
+    return (sum(items, Decimal("0")) / Decimal(len(items))).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+
+
+def _money_float(value) -> float:
+    return float(_decimal_amount(value).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP))
+
+
+def _percent_float(value) -> float:
+    return float(_decimal_amount(value).quantize(PERCENT_QUANT, rounding=ROUND_HALF_UP))
+
+
+def _baseline_metric_state(status: str, source: str, formula_key: str, *, inputs: list[str] | None = None, note: str = "") -> dict:
+    return {
+        "status": status,
+        "source": source,
+        "formula": BASELINE_FORMULAS.get(formula_key, ""),
+        "inputs": inputs or [],
+        "note": note,
+    }
+
+
+def _income_metric_status(income_source: str) -> str:
+    if income_source == "salary_credits":
+        return "observed"
+    if income_source in {"reported_annual_ctc", "reported_monthly_income", "career_profile_last_salary"}:
+        return "user-reported"
+    if income_source == "observed_credit_inflow":
+        return "observed"
+    return "unavailable"
+
+
 def _empty_canonical_financial_baseline() -> dict:
+    metric_states = {
+        key: _baseline_metric_state(
+            "unavailable",
+            "not_evidenced",
+            key,
+            note="No reliable source is available yet.",
+        )
+        for key in BASELINE_FORMULAS
+    }
     return {
         "reference_month": timezone.localdate().strftime("%B %Y"),
         "sample_months": 0,
         "monthly_income": 0.0,
+        "annual_income": 0.0,
         "income_source": "not_evidenced",
         "income_source_summary": "ALFRED needs salary credits, a reported income baseline, or other credit history before it can set a monthly income baseline.",
         "supplemental_variable_income": 0.0,
@@ -435,12 +513,16 @@ def _empty_canonical_financial_baseline() -> dict:
         "baseline_savings_rate": 0.0,
         "savings_capacity_rate": 0.0,
         "liquid_cash": 0.0,
+        "essential_monthly_outflow": 0.0,
         "liquid_runway_months": 0.0,
         "pending_foreclosure_balance": 0.0,
         "total_assets": 0.0,
         "total_liabilities": 0.0,
         "net_worth": 0.0,
         "asset_liability_ratio": 0.0,
+        "baseline_formulas": BASELINE_FORMULAS,
+        "metric_states": metric_states,
+        "metric_provenance": metric_states,
     }
 
 
@@ -471,11 +553,17 @@ def _build_canonical_financial_baseline_uncached(
     current_key = (resolved_reference_date.year, resolved_reference_date.month)
     current_bucket = monthly_buckets.get(current_key, _empty_month_bucket())
 
-    observed_average_monthly_inflow = round(mean(bucket["income"] for bucket in recent_buckets), 2) if recent_buckets else 0.0
-    observed_average_monthly_variable_spend = round(mean((bucket["expense"] + bucket["other"]) for bucket in recent_buckets), 2) if recent_buckets else 0.0
-    observed_average_monthly_total_outflow = round(mean((bucket["expense"] + bucket["loan"] + bucket["other"]) for bucket in recent_buckets), 2) if recent_buckets else 0.0
-    current_month_variable_spend = round(current_bucket["expense"] + current_bucket["other"], 2)
-    current_month_total_outflow = round(current_bucket["expense"] + current_bucket["loan"] + current_bucket["other"], 2)
+    observed_average_monthly_inflow_amount = _decimal_average(bucket["income"] for bucket in recent_buckets)
+    observed_average_monthly_variable_spend_amount = _decimal_average(
+        (_decimal_amount(bucket["expense"]) + _decimal_amount(bucket["other"])) for bucket in recent_buckets
+    )
+    observed_average_monthly_total_outflow_amount = _decimal_average(
+        (_decimal_amount(bucket["expense"]) + _decimal_amount(bucket["loan"]) + _decimal_amount(bucket["other"])) for bucket in recent_buckets
+    )
+    current_month_variable_spend_amount = _decimal_amount(current_bucket["expense"]) + _decimal_amount(current_bucket["other"])
+    current_month_total_outflow_amount = (
+        _decimal_amount(current_bucket["expense"]) + _decimal_amount(current_bucket["loan"]) + _decimal_amount(current_bucket["other"])
+    )
 
     profile = CareerProfile.objects.filter(user=user).first()
     latest_resume = CareerResume.objects.filter(user=user).order_by("-updated_at", "-id").first()
@@ -483,74 +571,217 @@ def _build_canonical_financial_baseline_uncached(
 
     reported_income = income_signals.get("reported_income", {}) or {}
     salary_signal = income_signals.get("salary_credit_signal") or {}
-    profile_last_salary = float(getattr(profile, "last_salary", 0) or 0)
-    monthly_income = float(income_signals.get("monthly_cash_income", 0) or 0)
+    profile_last_salary = _decimal_amount(getattr(profile, "last_salary", 0) or 0)
+    monthly_income_amount = _decimal_amount(income_signals.get("monthly_cash_income", 0) or 0)
     income_source = "not_evidenced"
     income_source_summary = income_signals.get("source_summary") or ""
     if salary_signal:
         income_source = "salary_credits"
-    elif float(reported_income.get("value", 0) or 0) > 0:
+    elif _decimal_amount(reported_income.get("value", 0) or 0) > 0:
         income_source = "reported_annual_ctc" if reported_income.get("mode") == "annual_ctc" else "reported_monthly_income"
     elif profile_last_salary > 0:
         income_source = "career_profile_last_salary"
         income_source_summary = "Monthly income falls back to the last salary stored in the career profile because stronger salary signals are not available yet."
-    elif observed_average_monthly_inflow > 0:
-        monthly_income = observed_average_monthly_inflow
+    elif observed_average_monthly_inflow_amount > 0:
+        monthly_income_amount = observed_average_monthly_inflow_amount
         income_source = "observed_credit_inflow"
         income_source_summary = "Monthly income falls back to the recent average of observed credit inflows because a cleaner salary signal is not evidenced yet."
 
-    monthly_income = round(monthly_income, 2)
-    supplemental_variable_income = round(float(income_signals.get("variable_income", 0) or 0), 2)
-    rent_burden = round(float(getattr(user, "rent_or_emi", 0) or 0), 2)
+    monthly_income_amount = monthly_income_amount.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    annual_income_amount = (monthly_income_amount * Decimal("12")).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    supplemental_variable_income_amount = _decimal_amount(income_signals.get("variable_income", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    rent_burden_amount = _decimal_amount(getattr(user, "rent_or_emi", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
 
-    recurring_emi_burden = 0.0
+    recurring_emi_burden_amount = Decimal("0")
     for loan in loans:
         balance = _loan_reporting_balance(loan, today=today)
         if _loan_counts_toward_recurring_emi(loan, balance):
-            recurring_emi_burden += float(loan.emi or 0)
-    recurring_emi_burden = round(recurring_emi_burden, 2)
-    fixed_obligations = round(rent_burden + recurring_emi_burden, 2)
-    disposable_cash_flow = round(monthly_income - fixed_obligations, 2)
-    savings_capacity = round(monthly_income - fixed_obligations - observed_average_monthly_variable_spend, 2)
-    savings_rate = round(((savings_capacity / monthly_income) * 100) if monthly_income else 0.0, 2)
-    debt_burden_ratio = round(((fixed_obligations / monthly_income) * 100) if monthly_income else 0.0, 2)
+            recurring_emi_burden_amount += _decimal_amount(loan.emi or 0)
+    recurring_emi_burden_amount = recurring_emi_burden_amount.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    fixed_obligations_amount = (rent_burden_amount + recurring_emi_burden_amount).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    disposable_cash_flow_amount = (monthly_income_amount - fixed_obligations_amount).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    savings_capacity_amount = (
+        monthly_income_amount - fixed_obligations_amount - observed_average_monthly_variable_spend_amount
+    ).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    savings_rate_amount = (
+        (savings_capacity_amount / monthly_income_amount * Decimal("100")).quantize(PERCENT_QUANT, rounding=ROUND_HALF_UP)
+        if monthly_income_amount > 0
+        else Decimal("0")
+    )
+    debt_burden_ratio_amount = (
+        (fixed_obligations_amount / monthly_income_amount * Decimal("100")).quantize(PERCENT_QUANT, rounding=ROUND_HALF_UP)
+        if monthly_income_amount > 0
+        else Decimal("0")
+    )
 
     accounts = list(BankAccount.objects.filter(user=user, is_active=True))
-    liquid_cash = round(sum(max(float(account.current_balance or 0), 0.0) for account in accounts if account.account_type != "credit"), 2)
-    liquid_runway_months = round(
-        (liquid_cash / fixed_obligations) if fixed_obligations else ((liquid_cash / monthly_income) if monthly_income else 0.0),
-        2,
+    liquid_cash_amount = sum(
+        (
+            max(_decimal_amount(account.current_balance or 0), Decimal("0"))
+            for account in accounts
+            if account.account_type != "credit"
+        ),
+        Decimal("0"),
+    ).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    essential_monthly_outflow_amount = (fixed_obligations_amount + observed_average_monthly_variable_spend_amount).quantize(
+        MONEY_QUANT,
+        rounding=ROUND_HALF_UP,
+    )
+    liquid_runway_months_amount = (
+        (liquid_cash_amount / essential_monthly_outflow_amount).quantize(PERCENT_QUANT, rounding=ROUND_HALF_UP)
+        if essential_monthly_outflow_amount > 0
+        else Decimal("0")
     )
 
     resolved_balance_sheet = balance_sheet or _build_balance_sheet(user=user, loans=loans, payment_rows=payment_rows)
+    pending_foreclosure_balance_amount = _decimal_amount(
+        resolved_balance_sheet.get("pending_foreclosure_balance", resolved_balance_sheet.get("pending_foreclosure_excluded_balance", 0)) or 0
+    ).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    total_assets_amount = _decimal_amount(resolved_balance_sheet.get("total_assets", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    total_liabilities_amount = _decimal_amount(resolved_balance_sheet.get("total_liabilities", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    net_worth_amount = (total_assets_amount - total_liabilities_amount).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    asset_liability_ratio_amount = (
+        (total_assets_amount / total_liabilities_amount).quantize(PERCENT_QUANT, rounding=ROUND_HALF_UP)
+        if total_liabilities_amount > 0
+        else Decimal("0")
+    )
+    income_status = _income_metric_status(income_source)
+    observed_status = "observed" if recent_buckets else "unavailable"
+    balance_status = "derived" if total_assets_amount or total_liabilities_amount else "unavailable"
+    liquid_status = "observed" if accounts else "unavailable"
+    metric_states = {
+        "monthly_income": _baseline_metric_state(
+            income_status,
+            income_source,
+            "monthly_income",
+            inputs=["salary_credits", "reported_income", "career_profile_last_salary", "observed_credit_inflow"],
+            note=income_source_summary,
+        ),
+        "annual_income": _baseline_metric_state(
+            "derived" if monthly_income_amount > 0 else "unavailable",
+            "canonical_monthly_income",
+            "annual_income",
+            inputs=["monthly_income"],
+        ),
+        "recurring_emi_burden": _baseline_metric_state(
+            "derived",
+            "active_loans",
+            "recurring_emi_burden",
+            inputs=["loan.emi", "loan.status", "loan.remaining_balance"],
+        ),
+        "rent_burden": _baseline_metric_state(
+            "user-reported" if rent_burden_amount > 0 else "unavailable",
+            "user.rent_or_emi",
+            "rent_burden",
+            inputs=["user.rent_or_emi"],
+        ),
+        "fixed_obligations": _baseline_metric_state(
+            "derived",
+            "canonical_baseline",
+            "fixed_obligations",
+            inputs=["rent_burden", "recurring_emi_burden"],
+        ),
+        "disposable_cash_flow": _baseline_metric_state(
+            "derived" if monthly_income_amount > 0 else "unavailable",
+            "canonical_baseline",
+            "disposable_cash_flow",
+            inputs=["monthly_income", "fixed_obligations"],
+        ),
+        "observed_average_monthly_variable_spend": _baseline_metric_state(
+            observed_status,
+            "recent_transaction_history",
+            "observed_average_monthly_variable_spend",
+            inputs=["expense.debit", "expense.other"],
+        ),
+        "savings_capacity": _baseline_metric_state(
+            "derived" if monthly_income_amount > 0 and recent_buckets else "unavailable",
+            "canonical_baseline",
+            "savings_capacity",
+            inputs=["monthly_income", "fixed_obligations", "observed_average_monthly_variable_spend"],
+            note="Unavailable when income or observed spend history is missing; numeric zero is kept for backward-compatible clients.",
+        ),
+        "liquid_cash": _baseline_metric_state(
+            liquid_status,
+            "active_bank_accounts",
+            "liquid_cash",
+            inputs=["bank_account.current_balance", "bank_account.account_type"],
+        ),
+        "essential_monthly_outflow": _baseline_metric_state(
+            "derived" if essential_monthly_outflow_amount > 0 else "unavailable",
+            "canonical_baseline",
+            "essential_monthly_outflow",
+            inputs=["fixed_obligations", "observed_average_monthly_variable_spend"],
+        ),
+        "liquid_runway_months": _baseline_metric_state(
+            "derived" if essential_monthly_outflow_amount > 0 and accounts else "unavailable",
+            "canonical_baseline",
+            "liquid_runway_months",
+            inputs=["liquid_cash", "essential_monthly_outflow"],
+        ),
+        "pending_foreclosure_balance": _baseline_metric_state(
+            "derived" if pending_foreclosure_balance_amount > 0 else "unavailable",
+            "loan_balance_sheet",
+            "pending_foreclosure_balance",
+            inputs=["loan.status", "loan.remaining_balance"],
+        ),
+        "total_assets": _baseline_metric_state(
+            balance_status,
+            "balance_sheet",
+            "total_assets",
+            inputs=["bank_accounts", "investments", "recognized_asset_positions"],
+        ),
+        "total_liabilities": _baseline_metric_state(
+            balance_status,
+            "balance_sheet",
+            "total_liabilities",
+            inputs=["active_loans", "pending_foreclosures", "credit_balances", "recognized_liability_positions"],
+        ),
+        "net_worth": _baseline_metric_state(
+            "derived" if total_assets_amount or total_liabilities_amount else "unavailable",
+            "balance_sheet",
+            "net_worth",
+            inputs=["total_assets", "total_liabilities"],
+        ),
+        "debt_burden_ratio": _baseline_metric_state(
+            "derived" if monthly_income_amount > 0 else "unavailable",
+            "canonical_baseline",
+            "debt_burden_ratio",
+            inputs=["fixed_obligations", "monthly_income"],
+        ),
+    }
     return {
         "reference_month": resolved_reference_date.strftime("%B %Y"),
         "sample_months": len(recent_buckets),
-        "monthly_income": monthly_income,
+        "monthly_income": _money_float(monthly_income_amount),
+        "annual_income": _money_float(annual_income_amount),
         "income_source": income_source,
         "income_source_summary": income_source_summary or _empty_canonical_financial_baseline()["income_source_summary"],
-        "supplemental_variable_income": supplemental_variable_income,
-        "observed_average_monthly_inflow": observed_average_monthly_inflow,
-        "observed_average_monthly_variable_spend": observed_average_monthly_variable_spend,
-        "observed_average_monthly_total_outflow": observed_average_monthly_total_outflow,
-        "current_month_variable_spend": current_month_variable_spend,
-        "current_month_total_outflow": current_month_total_outflow,
-        "recurring_emi_burden": recurring_emi_burden,
-        "rent_burden": rent_burden,
-        "fixed_obligations": fixed_obligations,
-        "debt_burden_ratio": debt_burden_ratio,
-        "disposable_cash_flow": disposable_cash_flow,
-        "savings_capacity": savings_capacity,
-        "savings_rate": savings_rate,
-        "baseline_savings_rate": savings_rate,
-        "savings_capacity_rate": savings_rate,
-        "liquid_cash": liquid_cash,
-        "liquid_runway_months": liquid_runway_months,
-        "pending_foreclosure_balance": round(float(resolved_balance_sheet.get("pending_foreclosure_balance", resolved_balance_sheet.get("pending_foreclosure_excluded_balance", 0)) or 0), 2),
-        "total_assets": round(float(resolved_balance_sheet.get("total_assets", 0) or 0), 2),
-        "total_liabilities": round(float(resolved_balance_sheet.get("total_liabilities", 0) or 0), 2),
-        "net_worth": round(float(resolved_balance_sheet.get("net_worth", 0) or 0), 2),
-        "asset_liability_ratio": round(float(resolved_balance_sheet.get("asset_liability_ratio", 0) or 0), 2),
+        "supplemental_variable_income": _money_float(supplemental_variable_income_amount),
+        "observed_average_monthly_inflow": _money_float(observed_average_monthly_inflow_amount),
+        "observed_average_monthly_variable_spend": _money_float(observed_average_monthly_variable_spend_amount),
+        "observed_average_monthly_total_outflow": _money_float(observed_average_monthly_total_outflow_amount),
+        "current_month_variable_spend": _money_float(current_month_variable_spend_amount),
+        "current_month_total_outflow": _money_float(current_month_total_outflow_amount),
+        "recurring_emi_burden": _money_float(recurring_emi_burden_amount),
+        "rent_burden": _money_float(rent_burden_amount),
+        "fixed_obligations": _money_float(fixed_obligations_amount),
+        "debt_burden_ratio": _percent_float(debt_burden_ratio_amount),
+        "disposable_cash_flow": _money_float(disposable_cash_flow_amount),
+        "savings_capacity": _money_float(savings_capacity_amount),
+        "savings_rate": _percent_float(savings_rate_amount),
+        "baseline_savings_rate": _percent_float(savings_rate_amount),
+        "savings_capacity_rate": _percent_float(savings_rate_amount),
+        "liquid_cash": _money_float(liquid_cash_amount),
+        "essential_monthly_outflow": _money_float(essential_monthly_outflow_amount),
+        "liquid_runway_months": _percent_float(liquid_runway_months_amount),
+        "pending_foreclosure_balance": _money_float(pending_foreclosure_balance_amount),
+        "total_assets": _money_float(total_assets_amount),
+        "total_liabilities": _money_float(total_liabilities_amount),
+        "net_worth": _money_float(net_worth_amount),
+        "asset_liability_ratio": _percent_float(asset_liability_ratio_amount),
+        "baseline_formulas": BASELINE_FORMULAS,
+        "metric_states": metric_states,
+        "metric_provenance": metric_states,
     }
 
 

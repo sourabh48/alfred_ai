@@ -96,6 +96,7 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
     def test_authenticated_pages_render_over_live_http_with_static_assets(self):
         pages = [
             ("/dashboard/", ["dashboardRoot"]),
+            ("/settings/", ["accountSettingsRoot"]),
             ("/documents/", ["documentCenterRoot"]),
             ("/expenses/", ["expenseRoot"]),
             ("/career/", ["careerRoot"]),
@@ -297,6 +298,46 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
             'Alfred.fetchJSON("/api/mobility/bike-conditions/"',
         ):
             self.assertIn(expected, bike_script)
+
+    def test_settings_page_contracts_cover_profile_dependents_and_family_links(self):
+        html = self._fetch_text("/settings/")
+        parser = _AssetParser()
+        parser.feed(html)
+
+        self.assertIn("accountSettingsRoot", parser.ids)
+        self.assertIn("/static/js/settings.js", parser.static_assets)
+
+        profile_form = self._form_by_id(parser, "accountProfileForm")
+        self.assertTrue(
+            {
+                "first_name",
+                "last_name",
+                "email",
+                "city",
+                "country",
+                "monthly_income",
+                "variable_income",
+                "rent_or_emi",
+            }.issubset({control["name"] for control in profile_form["controls"]})
+        )
+
+        dependent_form = self._form_by_id(parser, "settingsDependentForm")
+        self.assertTrue({"id", "name", "age", "relation"}.issubset({control["name"] for control in dependent_form["controls"]}))
+
+        invite_form = self._form_by_id(parser, "settingsAcceptInviteForm")
+        self.assertTrue({"invite_code"}.issubset({control["name"] for control in invite_form["controls"]}))
+
+        script = self._fetch_text("/static/js/settings.js")
+        for expected in (
+            'Alfred.fetchJSON("/api/users/profile/")',
+            'Alfred.fetchJSON("/api/family/")',
+            'Alfred.fetchJSON("/api/family/account-links/")',
+            'Alfred.fetchJSON("/api/users/profile/",',
+            'Alfred.fetchJSON("/api/family/account-links/accept/",',
+            '`/api/family/account-links/${id}/revoke/`',
+            'const url = id ? `/api/family/${id}/` : "/api/family/";',
+        ):
+            self.assertIn(expected, script)
 
     def test_browser_regression_runner_and_ci_job_are_wired_to_selenium_suite(self):
         runner = (REPO_ROOT / "scripts" / "run_browser_regressions.py").read_text(encoding="utf-8")

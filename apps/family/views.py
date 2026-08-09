@@ -1,15 +1,26 @@
+from django.core.exceptions import ValidationError
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Count, Max
 
+from alfred_ai.services.materialized_cache import invalidate_user_materialized_payloads
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
-from .models import Dependent
+from .models import Dependent, FamilyAccountLink
 from .serializers import DependentSerializer
+from .services import (
+    accept_family_link_code,
+    build_family_link_snapshot,
+    create_family_link_invite,
+    family_context_user_ids,
+    revoke_family_link,
+)
 
 class DependentListCreateView(ListCreateAPIView):
     serializer_class = DependentSerializer
@@ -20,6 +31,7 @@ class DependentListCreateView(ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+        invalidate_user_materialized_payloads(self.request.user.id, reason="family_dependent_changed")
 
 class DependentDetailView(RetrieveUpdateDestroyAPIView):
     serializer_class = DependentSerializer
@@ -27,6 +39,58 @@ class DependentDetailView(RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Dependent.objects.filter(user=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
+        invalidate_user_materialized_payloads(self.request.user.id, reason="family_dependent_changed")
+
+    def perform_destroy(self, instance):
+        user_id = self.request.user.id
+        instance.delete()
+        invalidate_user_materialized_payloads(user_id, reason="family_dependent_changed")
+
+
+class FamilyAccountLinkListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(build_family_link_snapshot(request.user))
+
+    def post(self, request):
+        link, code = create_family_link_invite(request.user)
+        invalidate_user_materialized_payloads(request.user.id, reason="family_link_invite_created")
+        payload = build_family_link_snapshot(request.user)
+        payload["invite"] = _serialize_one_time_invite(link, code)
+        return Response(payload, status=status.HTTP_201_CREATED)
+
+
+class FamilyAccountLinkAcceptView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            link = accept_family_link_code(request.user, request.data.get("invite_code") or request.data.get("code") or "")
+        except ValidationError as exc:
+            return Response({"detail": _validation_detail(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        invalidate_user_materialized_payloads(request.user.id, reason="family_link_accepted")
+        invalidate_user_materialized_payloads(link.created_by_id, reason="family_link_accepted")
+        return Response(build_family_link_snapshot(request.user))
+
+
+class FamilyAccountLinkRevokeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            link = revoke_family_link(request.user, pk)
+        except ValidationError as exc:
+            return Response({"detail": _validation_detail(exc)}, status=status.HTTP_404_NOT_FOUND)
+        invalidate_user_materialized_payloads(request.user.id, reason="family_link_revoked")
+        if link.created_by_id and link.created_by_id != request.user.id:
+            invalidate_user_materialized_payloads(link.created_by_id, reason="family_link_revoked")
+        if link.linked_user_id and link.linked_user_id != request.user.id:
+            invalidate_user_materialized_payloads(link.linked_user_id, reason="family_link_revoked")
+        return Response(build_family_link_snapshot(request.user))
 
 
 @api_view(['GET'])
@@ -48,13 +112,21 @@ def family_growth(request):
 
 
 def _family_growth_revision(user, baseline: dict) -> str:
-    dependent_meta = Dependent.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_age=Max("age"))
+    context_user_ids = family_context_user_ids(user)
+    dependent_meta = Dependent.objects.filter(user_id__in=context_user_ids).aggregate(count=Count("id"), max_id=Max("id"), max_age=Max("age"))
+    link_meta = FamilyAccountLink.objects.filter(status=FamilyAccountLink.STATUS_ACCEPTED).filter(
+        linked_user_id__in=context_user_ids
+    ).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
     return "|".join(
         str(value or "")
         for value in [
+            ",".join(str(item) for item in context_user_ids),
             dependent_meta["count"],
             dependent_meta["max_id"],
             dependent_meta["max_age"],
+            link_meta["count"],
+            link_meta["max_id"],
+            link_meta["max_updated"],
             baseline.get("total_assets", 0),
             baseline.get("total_liabilities", 0),
             baseline.get("net_worth", 0),
@@ -64,7 +136,10 @@ def _family_growth_revision(user, baseline: dict) -> str:
 
 
 def _family_growth_payload(user, baseline: dict) -> dict:
-    dependents = Dependent.objects.filter(user=user)
+    context_user_ids = family_context_user_ids(user)
+    dependents = Dependent.objects.filter(user_id__in=context_user_ids)
+    own_dependents_count = Dependent.objects.filter(user=user).count()
+    link_snapshot = build_family_link_snapshot(user)
     total_assets = float(baseline.get("total_assets", 0) or 0)
     total_liabilities = float(baseline.get("total_liabilities", 0) or 0)
     current_net_worth = float(baseline.get("net_worth", 0) or 0)
@@ -89,6 +164,9 @@ def _family_growth_payload(user, baseline: dict) -> dict:
             "total_liabilities": round(total_liabilities, 2),
             "savings_capacity": round(savings_capacity, 2),
             "dependents_count": dependents.count(),
+            "own_dependents_count": own_dependents_count,
+            "linked_family_account_count": link_snapshot["accepted_link_count"],
+            "linked_family_dependent_count": link_snapshot["shared_dependent_count"],
         },
         "evidence": evidence,
         "freshness": evidence_freshness,
@@ -109,6 +187,15 @@ def _family_growth_payload(user, baseline: dict) -> dict:
         "total_assets": round(total_assets, 2),
         "total_liabilities": round(total_liabilities, 2),
         "dependents_count": dependents.count(),
+        "own_dependents_count": own_dependents_count,
+        "linked_family_account_count": link_snapshot["accepted_link_count"],
+        "linked_family_dependent_count": link_snapshot["shared_dependent_count"],
+        "shared_family_context": {
+            "family_context_user_count": link_snapshot["family_context_user_count"],
+            "linked_user_count": link_snapshot["linked_user_count"],
+            "share_dependents": True,
+            "financial_baseline_scope": "current_user_only",
+        },
         "growth_rate": 8.0,
         "projection_basis": "heuristic_8_percent_compound_projection",
         "financial_baseline": baseline,
@@ -123,3 +210,19 @@ def _family_growth_payload(user, baseline: dict) -> dict:
             "Emergency fund should cover 6 months of expenses",
         ],
     }
+
+
+def _serialize_one_time_invite(link: FamilyAccountLink, code: str) -> dict:
+    return {
+        "id": link.id,
+        "invite_code": code,
+        "expires_at": link.expires_at.isoformat(),
+        "status": link.status,
+        "stored_as": "sha256_hmac",
+    }
+
+
+def _validation_detail(exc: ValidationError) -> str:
+    if hasattr(exc, "messages"):
+        return " ".join(str(item) for item in exc.messages)
+    return str(exc)

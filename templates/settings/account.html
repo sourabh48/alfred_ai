@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<section class="alfred-hero fade-in" id="accountSettingsRoot">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="alfred-chip mb-3">Account and family context</div>
+            <h1 class="alfred-hero-title">Settings</h1>
+            <p class="alfred-hero-copy">Update your profile, household details, and secure family links from one place.</p>
+        </div>
+        <div class="surface-card" style="min-width: 260px;">
+            <p class="metric-kicker">Family Context</p>
+            <div class="metric-value" id="settingsFamilyContextCount">1</div>
+            <p class="metric-caption mb-1">Linked accounts: <span id="settingsLinkedAccountCount">0</span></p>
+            <p class="metric-caption mb-0">Shared dependents: <span id="settingsSharedDependentCount">0</span></p>
+        </div>
+    </div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <h2 class="page-section-title mb-1">User Information</h2>
+                    <p class="page-section-copy mb-0">Signed in as <strong id="settingsUsername">{{ request.user.username }}</strong></p>
+                </div>
+                <span class="status-pill status-stable" id="settingsProfileStatus">Ready</span>
+            </div>
+            <form id="accountProfileForm" class="soft-grid" data-live-refresh-hold="true">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="settingsFirstName">First Name</label>
+                        <input id="settingsFirstName" name="first_name" class="form-control" autocomplete="given-name">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="settingsLastName">Last Name</label>
+                        <input id="settingsLastName" name="last_name" class="form-control" autocomplete="family-name">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="settingsEmail">Email</label>
+                        <input id="settingsEmail" name="email" type="email" class="form-control" autocomplete="email">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="settingsCity">City</label>
+                        <input id="settingsCity" name="city" class="form-control" autocomplete="address-level2">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="settingsCountry">Country</label>
+                        <input id="settingsCountry" name="country" class="form-control" autocomplete="country-name">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="settingsMonthlyIncome">Monthly Income</label>
+                        <input id="settingsMonthlyIncome" name="monthly_income" type="number" min="0" step="0.01" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="settingsVariableIncome">Variable Income</label>
+                        <input id="settingsVariableIncome" name="variable_income" type="number" min="0" step="0.01" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="settingsRentOrEmi">Rent or EMI</label>
+                        <input id="settingsRentOrEmi" name="rent_or_emi" type="number" min="0" step="0.01" class="form-control">
+                    </div>
+                </div>
+                <div id="settingsProfileFeedback" class="d-none alert mb-0"></div>
+                <div>
+                    <button class="btn btn-primary" type="submit">Save Profile</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <h2 class="page-section-title mb-1">Family Account Link</h2>
+                    <p class="page-section-copy mb-0">Invite codes expire in <span id="settingsInviteTtlLabel">24 hours</span>.</p>
+                </div>
+                <span class="status-pill status-guarded" id="settingsLinkStatus">Private</span>
+            </div>
+
+            <div class="soft-grid">
+                <div class="d-flex flex-wrap gap-2">
+                    <button id="settingsGenerateInviteBtn" class="btn btn-primary" type="button">Generate Link Code</button>
+                    <button id="settingsRefreshLinksBtn" class="btn btn-outline-secondary" type="button">Refresh</button>
+                </div>
+                <div id="settingsInviteCodePanel" class="family-link-code-panel d-none">
+                    <p class="metric-kicker mb-2">One-Time Code</p>
+                    <div class="family-link-code" id="settingsInviteCode"></div>
+                    <p class="metric-caption mb-0" id="settingsInviteExpiry"></p>
+                </div>
+                <form id="settingsAcceptInviteForm" class="soft-grid" data-live-refresh-hold="true">
+                    <div>
+                        <label class="form-label" for="settingsInviteCodeInput">Accept Link Code</label>
+                        <input id="settingsInviteCodeInput" name="invite_code" class="form-control" placeholder="ALF-XXXX-XXXX" autocomplete="off">
+                    </div>
+                    <div id="settingsLinkFeedback" class="d-none alert mb-0"></div>
+                    <div>
+                        <button class="btn btn-outline-primary" type="submit">Connect Account</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="mt-4">
+                <h3 class="h6 fw-bold mb-3">Linked Accounts</h3>
+                <div class="data-stack" id="settingsLinkedAccountsList"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="surface-card">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+        <div>
+            <h2 class="page-section-title mb-1">Family Details</h2>
+            <p class="page-section-copy mb-0">Dependents owned by your account.</p>
+        </div>
+        <span class="status-pill status-stable" id="settingsDependentStatus">Ready</span>
+    </div>
+
+    <form id="settingsDependentForm" class="soft-grid mb-4" data-live-refresh-hold="true">
+        <input id="settingsDependentId" name="id" type="hidden">
+        <div class="row g-3">
+            <div class="col-md-5">
+                <label class="form-label" for="settingsDependentName">Name</label>
+                <input id="settingsDependentName" name="name" class="form-control" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="settingsDependentAge">Age</label>
+                <input id="settingsDependentAge" name="age" type="number" min="0" class="form-control" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="settingsDependentRelation">Relation</label>
+                <input id="settingsDependentRelation" name="relation" class="form-control" required>
+            </div>
+            <div class="col-md-2 d-flex align-items-end gap-2">
+                <button id="settingsDependentSubmitBtn" class="btn btn-primary w-100" type="submit">Save</button>
+            </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <button id="settingsDependentCancelBtn" class="btn btn-outline-secondary btn-sm d-none" type="button">Cancel Edit</button>
+        </div>
+        <div id="settingsDependentFeedback" class="d-none alert mb-0"></div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-alfred align-middle mb-0 metric-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Relation</th>
+                    <th class="text-end">Age</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="settingsDependentTableBody"></tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/settings.js?v=1.0"></script>
+{% endblock %}

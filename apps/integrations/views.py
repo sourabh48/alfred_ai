@@ -16,6 +16,7 @@ from alfred_ai.services import record_parser_learning
 from alfred_ai.services.materialized_cache import materialize_payload
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.expenses.models import Expense
+from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.family.models import Dependent
 from apps.investments.models import Investment
 from apps.reports.services import operational_logging_service
@@ -780,15 +781,16 @@ def tax_optimizer_overview(request):
 
 def _build_tax_optimizer_overview_payload(request) -> dict:
     """Build a user-ready tax dashboard based on current profile defaults."""
+    financial_baseline = resolve_canonical_financial_baseline(request.user)
     annual_income = _query_float(
         request,
         "annual_income",
-        (getattr(request.user, "monthly_income", 0) or 0) * 12,
+        financial_baseline.get("annual_income", 0) or 0,
     )
     deductions = tax_optimizer._calculate_current_deductions(request.user)
     basic_salary = _query_float(request, "basic_salary", annual_income / 24 if annual_income else 0)
     hra_received = _query_float(request, "hra_received", basic_salary * 0.4)
-    rent_paid = _query_float(request, "rent_paid", getattr(request.user, "rent_or_emi", 0) or basic_salary * 0.45)
+    rent_paid = _query_float(request, "rent_paid", financial_baseline.get("rent_burden", 0) or basic_salary * 0.45)
     metro_city = request.query_params.get("metro")
     if metro_city is None:
         metro_city = _metro_city(getattr(request.user, "city", ""))
@@ -817,6 +819,7 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
 
     return {
         "annual_income": annual_income,
+        "financial_baseline": financial_baseline,
         "inputs": {
             "annual_income": annual_income,
             "basic_salary": basic_salary,

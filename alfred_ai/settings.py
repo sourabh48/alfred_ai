@@ -303,6 +303,7 @@ ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION = env.bool(
     "ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION",
     default=not LOCAL_RUNTIME,
 )
+ALFRED_FAMILY_LINK_CODE_TTL_HOURS = env.int("ALFRED_FAMILY_LINK_CODE_TTL_HOURS", default=24)
 
 
 # ---------------------------------------------------------
@@ -320,10 +321,16 @@ LOGGING = {
             "datefmt": "%Y-%m-%dT%H:%M:%S%z",
         }
     },
+    "filters": {
+        "redact_routes": {
+            "()": "alfred_ai.services.logging_filters.RedactRouteFilter",
+        }
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "structured",
+            "filters": ["redact_routes"],
         }
     },
     "root": {

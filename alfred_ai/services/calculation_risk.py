@@ -120,6 +120,13 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
     due_external_count = int(refresh_health.get("due_records", stale_external_count) or 0)
     watchlist_external_count = int(refresh_health.get("watchlist_records", stale_external_count) or 0)
     scheduled_refresh_healthy = bool(refresh_health.get("scheduled_refresh_healthy", refresh_health.get("healthy", stale_external_count == 0)))
+    financial_baseline_review_gated = bool(
+        statement_review_count
+        or unreviewed_statement_transactions
+        or loan_repayment_review_count
+        or loan_closure_review_count
+        or foreclosure_reconciliation_review_count
+    )
 
     manual_review_queues = [
         _queue("Statement imports", "statement_import_review", statement_review_count),
@@ -163,6 +170,26 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
                 f"{imported_transaction_count} statement-derived transaction(s)",
             ],
             blockers=["Unreviewed statement imports can still distort buckets"] if statement_review_count else [],
+        ),
+        _entry(
+            key="canonical_financial_baseline",
+            label="Canonical financial baseline",
+            status="verified_formula_review_gated_data" if financial_baseline_review_gated else "verified",
+            progress=80 if financial_baseline_review_gated else 94,
+            code_path="apps/expenses/services/financial_intelligence.py::resolve_canonical_financial_baseline",
+            evidence=[
+                "One resolver owns monthly income, annual income, fixed obligations, disposable cash flow, savings capacity, debt burden, liquidity runway, and net worth",
+                "Resolver payload includes baseline_formulas plus metric_states/metric_provenance for observed, user-reported, derived, and unavailable values",
+            ],
+            blockers=[
+                blocker
+                for blocker in [
+                    "Unreviewed statement imports can distort observed spend/inflow" if statement_review_count or unreviewed_statement_transactions else "",
+                    "Review queued repayments before raising debt-confidence maturity" if loan_repayment_review_count else "",
+                    "Loan closure or foreclosure proof still needs review" if loan_closure_review_count or foreclosure_reconciliation_review_count else "",
+                ]
+                if blocker
+            ],
         ),
         _entry(
             key="loan_balance_and_foreclosure_liability",
@@ -350,6 +377,7 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
     ]
 
     critical_path_progress = {
+        "financial_baseline": 80 if financial_baseline_review_gated else 94,
         "cash_flow": 94 if statement_review_count == 0 and unreviewed_statement_transactions == 0 else 82,
         "debt_and_repayment_status": 90
         if loan_repayment_review_count == 0 and foreclosure_reconciliation_review_count == 0 and loan_closure_review_count == 0
@@ -392,6 +420,7 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
         ),
         "source_paths": [
             "apps/expenses/services/financial_intelligence.py",
+            "apps/expenses/services/financial_intelligence.py::resolve_canonical_financial_baseline",
             "apps/loans/services/loan_foreclosure_service.py",
             "apps/loans/services/payment_history_access.py",
             "apps/investments/views.py",

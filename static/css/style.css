@@ -677,6 +677,34 @@ h1, h2, h3, h4, h5, h6,
     padding: 0.9rem 0.75rem;
 }
 
+.family-link-code-panel {
+    padding: 1rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(24, 88, 214, 0.14);
+    background: rgba(24, 88, 214, 0.06);
+}
+
+.family-link-code {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.6rem;
+    padding: 0.5rem 0.8rem;
+    border-radius: 0.85rem;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(16, 37, 63, 0.1);
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.family-link-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
 .chip-row {
     display: flex;
     flex-wrap: wrap;

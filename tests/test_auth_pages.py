@@ -5,6 +5,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
 
+from alfred_ai.services.logging_filters import sanitize_log_record_value
+
 
 class AuthPageTests(TestCase):
     def setUp(self):
@@ -181,3 +183,17 @@ class SessionSecurityTests(TestCase):
         for forbidden in ("page_path", "page_url", "href", "src", "/dashboard/", "/documents/", "/reports/private/"):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, serialized)
+
+    def test_server_log_route_values_are_redacted_before_emission(self):
+        sanitized = sanitize_log_record_value(
+            (
+                "Not Found: /private/user/docs/statement.pdf",
+                {"next": "https://alfred.example.com/dashboard/", "safe": "kept"},
+            )
+        )
+
+        serialized = json.dumps(sanitized)
+        self.assertIn("[redacted-url]", serialized)
+        self.assertIn("kept", serialized)
+        self.assertNotIn("/private/user/docs/statement.pdf", serialized)
+        self.assertNotIn("https://alfred.example.com/dashboard/", serialized)

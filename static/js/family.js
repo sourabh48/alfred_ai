@@ -31,16 +31,19 @@ function loadFamilyDashboard() {
 function renderFamilyHero(growth) {
     document.getElementById("familyNetWorthValue").textContent = Alfred.formatCurrency(growth.current_net_worth || 0);
     document.getElementById("familyDependentCount").textContent = Alfred.formatNumber(growth.dependents_count || 0, 0);
-    document.getElementById("familyHeroCopy").textContent = `Projected growth rate ${Alfred.formatNumber(growth.growth_rate || 0)}%`;
+    const linkedAccounts = Number(growth.linked_family_account_count || 0);
+    document.getElementById("familyHeroCopy").textContent = linkedAccounts
+        ? `${Alfred.formatNumber(linkedAccounts, 0)} linked account${linkedAccounts === 1 ? "" : "s"} in family context`
+        : `Projected growth rate ${Alfred.formatNumber(growth.growth_rate || 0)}%`;
 }
 
 function renderFamilySummary(dependents, growth) {
     const yearTen = (growth.projections || []).at(-1);
     const cards = [
-        { title: "Dependents", value: Alfred.formatNumber(dependents.length, 0), copy: "Household members tracked" },
+        { title: "Dependents", value: Alfred.formatNumber(growth.dependents_count || dependents.length, 0), copy: "Household members tracked" },
+        { title: "Linked Accounts", value: Alfred.formatNumber(growth.linked_family_account_count || 0, 0), copy: "Accepted family links" },
         { title: "Current Net Worth", value: Alfred.formatCurrency(growth.current_net_worth || 0), copy: "Assets minus active debt" },
         { title: "10-Year Projection", value: Alfred.formatCurrency(yearTen?.projected_net_worth || 0), copy: "Projected household base in year 10" },
-        { title: "Growth Rate", value: `${Alfred.formatNumber(growth.growth_rate || 0)}%`, copy: "Assumed annual compounding rate" },
     ];
 
     document.getElementById("familySummaryCards").innerHTML = cards.map(card => `
