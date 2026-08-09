@@ -8,7 +8,7 @@
         <div class="alfred-nav-section px-2">
             <div class="alfred-nav-label px-2">Finance Core</div>
             <ul class="nav flex-column alfred-nav-list">
-                <li class="nav-item"><a class="nav-link {% if request.path == '/dashboard/' %}active{% endif %}" href="/dashboard/">Dashboard</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.path == '/' or request.path == '/dashboard/' %}active{% endif %}" href="/">Dashboard</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/documents/' %}active{% endif %}" href="/documents/">Documents</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/ai/insights/' %}active{% endif %}" href="/ai/insights/">Insights</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/expenses/' %}active{% endif %}" href="/expenses/">Expenses</a></li>

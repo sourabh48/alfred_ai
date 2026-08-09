@@ -1,8 +1,11 @@
 import json
 import logging
+import re
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
+from django.contrib.auth.forms import AuthenticationForm
 from django.shortcuts import render
 from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
@@ -23,6 +26,19 @@ from .services.document_review import apply_correction, build_review_queue, dele
 from .project_details import project_details_payload
 
 LOGGER = logging.getLogger("alfred.health")
+CLIENT_ROUTE_PAYLOAD_KEYS = {
+    "page_path",
+    "page_url",
+    "request_path",
+    "requested_path",
+    "current_path",
+    "current_url",
+    "href",
+    "src",
+}
+CLIENT_ROUTE_VALUE_PATTERN = re.compile(
+    r"https?://[^\s\"')<>]+|(?<![A-Za-z0-9])/(?:[A-Za-z0-9._~%!$&'()*+,;=:@-]+/?)+"
+)
 
 
 @require_http_methods(["GET"])
@@ -78,15 +94,50 @@ def health_api_view(request):
     )
 
 
+def index_view(request):
+    if request.user.is_authenticated:
+        return render(request, "dashboard.html")
+
+    form = AuthenticationForm(request, data=request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        login(request, form.get_user())
+        return redirect("index")
+
+    return render(
+        request,
+        "registration/login.html",
+        {
+            "form": form,
+            "hide_sidebar": True,
+            "hide_nav_auth_actions": True,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def session_ping_api_view(request):
+    request.session.modified = True
+    timeout_seconds = max(0, int(getattr(settings, "SESSION_COOKIE_AGE", 0) or 0))
+    warning_seconds = max(0, int(getattr(settings, "ALFRED_SESSION_WARNING_SECONDS", 0) or 0))
+    return JsonResponse(
+        {
+            "timeout_seconds": timeout_seconds,
+            "warning_seconds": min(warning_seconds, timeout_seconds) if timeout_seconds else 0,
+        },
+        encoder=DjangoJSONEncoder,
+    )
+
+
 def signup_view(request):
     if request.user.is_authenticated:
-        return redirect("dashboard")
+        return redirect("index")
 
     form = AlfredSignUpForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         user = form.save()
         login(request, user)
-        return redirect("dashboard")
+        return redirect("index")
 
     return render(
         request,
@@ -106,7 +157,6 @@ def not_found_view(request, exception):
         {
             "hide_sidebar": True,
             "hide_nav_auth_actions": True,
-            "requested_path": request.path,
             "exception": exception,
         },
         status=404,
@@ -196,10 +246,29 @@ def client_operational_log_api_view(request):
         severity=str(payload.get("severity") or "warning"),
         document_id=payload.get("document_id"),
         file_name=str(payload.get("file_name") or ""),
-        message=str(payload.get("message") or "Client issue logged."),
-        payload=payload.get("payload") or {},
+        message=_sanitize_client_operational_text(str(payload.get("message") or "Client issue logged.")),
+        payload=_sanitize_client_operational_payload(payload.get("payload") or {}),
     )
     return JsonResponse({"result": operational_logging_service.serialize(event)}, encoder=DjangoJSONEncoder)
+
+
+def _sanitize_client_operational_payload(value):
+    if isinstance(value, dict):
+        clean = {}
+        for key, item in value.items():
+            if str(key).lower() in CLIENT_ROUTE_PAYLOAD_KEYS:
+                continue
+            clean[key] = _sanitize_client_operational_payload(item)
+        return clean
+    if isinstance(value, list):
+        return [_sanitize_client_operational_payload(item) for item in value]
+    if isinstance(value, str):
+        return _sanitize_client_operational_text(value)
+    return value
+
+
+def _sanitize_client_operational_text(value: str) -> str:
+    return CLIENT_ROUTE_VALUE_PATTERN.sub("[redacted-url]", value)
 
 
 @login_required

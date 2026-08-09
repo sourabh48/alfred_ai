@@ -1,6 +1,6 @@
 <nav class="navbar alfred-navbar">
     <div class="container-fluid px-3 px-lg-4">
-        <a class="alfred-brand" href="{% url 'dashboard' %}">
+        <a class="alfred-brand" href="{% url 'index' %}">
             <span class="alfred-brand-mark">A</span>
             <span>
                 <strong>{{ ui_config.brand.name }}</strong>
@@ -21,6 +21,18 @@
             >
                 {{ ui_config.navigation.menu_label }}
             </button>
+            <div
+                id="alfredSessionTimer"
+                class="alfred-session-timer"
+                role="status"
+                aria-live="polite"
+                data-session-timer
+                hidden
+            >
+                <span class="alfred-session-dot" aria-hidden="true"></span>
+                <span class="alfred-session-label">Session</span>
+                <span class="alfred-session-countdown" data-session-countdown>--:--</span>
+            </div>
             <div class="alfred-nav-chip d-none d-sm-inline-flex">{{ ui_config.navigation.signed_in_prefix }} {{ request.user.username }}</div>
             <button id="navbarClearDataBtn" type="button" class="btn btn-outline-warning btn-sm rounded-pill px-3">{{ ui_config.navigation.remove_data_label }}</button>
             <form action="{% url 'logout' %}" method="post" class="m-0">

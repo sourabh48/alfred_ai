@@ -347,6 +347,135 @@ function escapeHtml(value) {
 }
 
 const clientIssueRegistry = new Map();
+const SESSION_REFRESH_THROTTLE_MS = 60000;
+
+function formatSessionCountdown(totalSeconds) {
+    const seconds = Math.max(0, Math.floor(Number(totalSeconds || 0)));
+    const minutes = Math.floor(seconds / 60);
+    const remainder = seconds % 60;
+    return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
+
+function installSessionSecurityTimer() {
+    if (window.__alfredSessionTimerInstalled || document.body.dataset.authenticated !== "true") {
+        return;
+    }
+
+    const timer = document.querySelector("[data-session-timer]");
+    const countdown = timer?.querySelector("[data-session-countdown]");
+    const timeoutSeconds = Number(document.body.dataset.sessionTimeoutSeconds || 0);
+    if (!timer || !countdown || !Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
+        return;
+    }
+
+    window.__alfredSessionTimerInstalled = true;
+    timer.hidden = false;
+
+    const warningSeconds = Math.max(0, Math.min(Number(document.body.dataset.sessionWarningSeconds || 0), timeoutSeconds));
+    const pingUrl = document.body.dataset.sessionPingUrl || "/api/session/ping/";
+    const logoutUrl = document.body.dataset.logoutUrl || "/logout/";
+    const loginUrl = document.body.dataset.loginUrl || "/login/";
+    const refreshThrottleMs = Math.min(SESSION_REFRESH_THROTTLE_MS, Math.max(15000, (timeoutSeconds * 1000) / 3));
+    let sessionTimeoutSeconds = timeoutSeconds;
+    let sessionWarningSeconds = warningSeconds;
+    let expiresAt = Date.now() + sessionTimeoutSeconds * 1000;
+    let lastRefreshAt = 0;
+    let expired = false;
+
+    function renderSessionState() {
+        const remainingSeconds = Math.ceil((expiresAt - Date.now()) / 1000);
+        countdown.textContent = formatSessionCountdown(remainingSeconds);
+        timer.classList.toggle("is-warning", remainingSeconds > 0 && remainingSeconds <= sessionWarningSeconds);
+        timer.classList.toggle("is-expired", remainingSeconds <= 0);
+        if (remainingSeconds <= 0) {
+            expireSession();
+        }
+    }
+
+    function applySessionPayload(payload = {}) {
+        const nextTimeout = Number(payload.timeout_seconds || sessionTimeoutSeconds);
+        const nextWarning = Number(payload.warning_seconds || sessionWarningSeconds);
+        if (Number.isFinite(nextTimeout) && nextTimeout > 0) {
+            sessionTimeoutSeconds = nextTimeout;
+        }
+        if (Number.isFinite(nextWarning) && nextWarning >= 0) {
+            sessionWarningSeconds = Math.min(nextWarning, sessionTimeoutSeconds);
+        }
+        expiresAt = Date.now() + sessionTimeoutSeconds * 1000;
+        renderSessionState();
+    }
+
+    function refreshSession() {
+        const now = Date.now();
+        if (expired || now - lastRefreshAt < refreshThrottleMs) {
+            return;
+        }
+        lastRefreshAt = now;
+        fetch(pingUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify({}),
+        })
+            .then(async response => {
+                if (response.redirected || response.status === 401 || response.status === 403) {
+                    expireSession();
+                    return null;
+                }
+                if (!response.ok) {
+                    return null;
+                }
+                return response.json().catch(() => null);
+            })
+            .then(payload => {
+                if (payload) {
+                    applySessionPayload(payload);
+                }
+            })
+            .catch(() => {});
+    }
+
+    function handleActivity() {
+        if (expired) {
+            return;
+        }
+        expiresAt = Date.now() + sessionTimeoutSeconds * 1000;
+        renderSessionState();
+        refreshSession();
+    }
+
+    function expireSession() {
+        if (expired) {
+            return;
+        }
+        expired = true;
+        timer.classList.add("is-expired");
+        countdown.textContent = "0:00";
+        fetch(logoutUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            keepalive: true,
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify({}),
+        }).finally(() => {
+            window.location.assign(loginUrl);
+        });
+    }
+
+    ["click", "keydown", "pointerdown", "touchstart"].forEach(eventName => {
+        document.addEventListener(eventName, handleActivity, { passive: true });
+    });
+    document.addEventListener("scroll", handleActivity, { capture: true, passive: true });
+
+    renderSessionState();
+    window.setInterval(renderSessionState, 1000);
+}
 
 const liveRefreshRegistry = new Map();
 const liveRefreshGuardRegistry = new WeakMap();
@@ -799,7 +928,7 @@ function installUserDataResetAction() {
         })
             .then(data => {
                 window.alert(data.detail || getUiConfig("prompts.remove_data_success", "Your Alfred data has been removed."));
-                window.location.assign(document.body.dataset.homeUrl || "/dashboard/");
+                window.location.assign(document.body.dataset.homeUrl || "/");
             })
             .catch(error => {
                 window.alert(error.message || getUiConfig("prompts.remove_data_failure", "Could not remove your Alfred data."));
@@ -938,8 +1067,7 @@ function logClientIssue(issue = {}) {
         file_name: issue.fileName || issue.file_name || "",
         message: issue.message || "Client issue logged.",
         payload: {
-            page_path: window.location.pathname,
-            page_url: window.location.href,
+            page_context: document.body.dataset.shellMode || "unknown",
             ...(issue.payload || {}),
         },
     };
@@ -950,7 +1078,7 @@ function logClientIssue(issue = {}) {
         payload.scope,
         payload.event_type,
         payload.message,
-        payload.payload.page_path,
+        payload.payload.page_context,
     ]);
     const now = Date.now();
     const lastSentAt = clientIssueRegistry.get(signature) || 0;
@@ -985,7 +1113,7 @@ function installClientDiagnostics() {
                 category: "visualization",
                 eventType: "asset_error",
                 severity: "warning",
-                message: `Asset failed to load: ${target.src || target.href || target.tagName || "unknown asset"}`,
+                message: `Asset failed to load: ${target.tagName || "unknown asset"}`,
             });
             return;
         }
@@ -996,7 +1124,7 @@ function installClientDiagnostics() {
             severity: "error",
             message: event.message || "Unhandled client runtime error.",
             payload: {
-                source: event.filename || "",
+                source: event.filename ? "browser-script" : "",
                 line: event.lineno || 0,
                 column: event.colno || 0,
             },
@@ -1015,6 +1143,7 @@ function installClientDiagnostics() {
 }
 
 installUserDataResetAction();
+installSessionSecurityTimer();
 installMlRuntimeBanner();
 installClientDiagnostics();
 syncShellOffsets();
@@ -1039,6 +1168,7 @@ window.Alfred = {
     showUploadProgress,
     lockLiveRefresh,
     logClientIssue,
+    installSessionSecurityTimer,
     setDisabledIfChanged,
     setHTMLIfChanged,
     setTextIfChanged,

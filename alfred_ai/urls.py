@@ -5,6 +5,7 @@ from django.urls import path, include
 from django.contrib.auth.views import LoginView, LogoutView
 from django.views.generic import RedirectView
 from .views import (
+    index_view,
     dashboard_view, insights_view,
     expenses_view, budgets_view, loans_view,
     investments_view, family_view, career_view,
@@ -19,6 +20,7 @@ from .views import (
     document_review_retry_api_view,
     client_operational_log_api_view,
     health_api_view,
+    session_ping_api_view,
     project_details_career_outcome_view,
     project_details_view,
     project_details_api_view,
@@ -29,7 +31,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/", health_api_view, name="health"),
     path("favicon.ico", RedirectView.as_view(url="/static/favicon.svg", permanent=True)),
-    path("", RedirectView.as_view(pattern_name="dashboard", permanent=False)),
+    path("", index_view, name="index"),
     path("signup/", signup_view, name="signup"),
     path(
         "login/",
@@ -52,6 +54,7 @@ urlpatterns = [
     path("api/documents/review-queue/retry/", document_review_retry_api_view, name="document_review_retry_api"),
     path("api/documents/items/<str:scope>/<int:pk>/", document_center_item_delete_api_view, name="document_center_item_delete_api"),
     path("api/documents/diagnostics/", document_diagnostics_api_view, name="document_diagnostics_api"),
+    path("api/session/ping/", session_ping_api_view, name="session_ping_api"),
     path("api/operational/logs/client/", client_operational_log_api_view, name="client_operational_log_api"),
     path("project-details/", project_details_view, name="project_details"),
     path("project-details/career-outcomes/", project_details_career_outcome_view, name="project_details_career_outcome"),

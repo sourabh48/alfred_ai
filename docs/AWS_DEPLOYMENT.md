@@ -51,6 +51,9 @@ Minimum required variables:
 - `CACHE_BACKEND=django.core.cache.backends.redis.RedisCache`
 - `CACHE_LOCATION`; strict Free Tier uses `redis://redis:6379/1`
 - `REDIS_URL`; strict Free Tier uses `redis://redis:6379/0`
+- `ALFRED_SESSION_TIMEOUT_SECONDS=1800`
+- `ALFRED_SESSION_WARNING_SECONDS=300`
+- `SESSION_EXPIRE_AT_BROWSER_CLOSE=true`
 - `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true`
 - `SECURE_PROXY_SSL_HEADER_ENABLED=true` when Django runs behind Caddy/Nginx TLS termination
 

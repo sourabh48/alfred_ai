@@ -12,7 +12,7 @@ DEFAULT_UI_CONFIG: dict[str, Any] = {
     "brand": {
         "name": "ALFRED",
         "tagline": "Personal Finance & Life Intelligence",
-        "home_path": "/dashboard/",
+        "home_path": "/",
     },
     "navigation": {
         "menu_label": "Menu",

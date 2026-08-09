@@ -26,6 +26,7 @@ class ApplicationSmokeTests(TestCase):
     def test_main_pages_render_for_authenticated_user(self):
         self.client.force_login(self.user)
         page_paths = [
+            "/",
             "/dashboard/",
             "/documents/",
             "/expenses/",

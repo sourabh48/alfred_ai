@@ -88,6 +88,63 @@ h1, h2, h3, h4, h5, h6,
     font-size: 0.85rem;
 }
 
+.alfred-session-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 7.5rem;
+    justify-content: center;
+    padding: 0.42rem 0.78rem;
+    border-radius: 999px;
+    color: #f7fbff;
+    background: rgba(20, 143, 99, 0.18);
+    border: 1px solid rgba(151, 235, 204, 0.35);
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.alfred-session-timer[hidden] {
+    display: none;
+}
+
+.alfred-session-timer.is-warning {
+    background: rgba(217, 121, 4, 0.2);
+    border-color: rgba(255, 196, 120, 0.46);
+}
+
+.alfred-session-timer.is-expired {
+    background: rgba(196, 74, 61, 0.24);
+    border-color: rgba(255, 160, 150, 0.5);
+}
+
+.alfred-session-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: #97ebcc;
+    box-shadow: 0 0 0 3px rgba(151, 235, 204, 0.16);
+}
+
+.alfred-session-timer.is-warning .alfred-session-dot {
+    background: #ffc478;
+    box-shadow: 0 0 0 3px rgba(255, 196, 120, 0.16);
+}
+
+.alfred-session-timer.is-expired .alfred-session-dot {
+    background: #ffa096;
+    box-shadow: 0 0 0 3px rgba(255, 160, 150, 0.16);
+}
+
+.alfred-session-label {
+    color: rgba(247, 251, 255, 0.78);
+    font-weight: 600;
+}
+
+.alfred-session-countdown {
+    font-variant-numeric: tabular-nums;
+}
+
 .alfred-sidebar {
     min-height: calc(100vh - 72px);
     padding: 1rem 0.75rem;
@@ -1790,6 +1847,15 @@ body.alfred-body {
 }
 
 @media (max-width: 767.98px) {
+    .alfred-session-label {
+        display: none;
+    }
+
+    .alfred-session-timer {
+        min-width: 4.4rem;
+        padding-inline: 0.65rem;
+    }
+
     .alfred-sidebar {
         top: var(--alfred-nav-height);
         height: calc(100vh - var(--alfred-nav-height));

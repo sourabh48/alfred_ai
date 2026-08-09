@@ -16,7 +16,7 @@ For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md) and [AWS Free Ti
 
 ## Required For Production
 
-- Run Django with `DEBUG=false`, a real `DJANGO_SECRET_KEY`, production `ALLOWED_HOSTS`, HTTPS, secure cookies, HSTS, and explicit CSRF/CORS origins.
+- Run Django with `DEBUG=false`, a real `DJANGO_SECRET_KEY`, production `ALLOWED_HOSTS`, HTTPS, secure cookies, HSTS, explicit CSRF/CORS origins, and a bounded authenticated-session timeout.
 - Use a production database such as PostgreSQL, run migrations, and configure backup and restore checks.
 - Use Redis or another shared cache backend for Django cache state and materialized dashboard telemetry; local-memory cache is only for development.
 - Run separate Celery worker and Celery beat processes with Redis broker/result backend.
@@ -39,6 +39,10 @@ For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md) and [AWS Free Ti
 | `CACHE_BACKEND` | Shared backend such as `django.core.cache.backends.redis.RedisCache` |
 | `CACHE_LOCATION` | Shared cache location, usually Redis |
 | `REDIS_URL` | Redis broker/result backend for Celery |
+| `ALFRED_SESSION_TIMEOUT_SECONDS` | Bounded authenticated idle timeout, recommended `1800` for production |
+| `ALFRED_SESSION_WARNING_SECONDS` | User-visible warning window, recommended `300` |
+| `SESSION_SAVE_EVERY_REQUEST` | `true`, so active authenticated requests refresh the idle timeout |
+| `SESSION_EXPIRE_AT_BROWSER_CLOSE` | `true` for production browser-close expiry |
 | `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION` | `true`, so raw uploaded documents are deleted after parser extraction |
 | `ALFRED_PRODUCTION_DEPLOYMENT_PROOF` | Optional path to the recorded production deployment proof JSON |
 | `ALFRED_MATERIALIZED_CACHE_TRAFFIC_PROOF` | Optional path to a cache traffic proof artifact |

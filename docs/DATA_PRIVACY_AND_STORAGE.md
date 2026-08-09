@@ -7,6 +7,7 @@ ALFRED handles bank statements, credit reports, loan documents, resumes, and veh
 - Email OAuth access and refresh tokens are encrypted before database save.
 - Raw uploaded documents are not treated as long-term records in production. `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true` deletes the uploaded binary from Django storage after parser extraction and records `raw_file_retention` metadata in the parsed payload.
 - Parsed fields remain in PostgreSQL because ALFRED needs them for dashboards, review queues, learning memory, and calculations.
+- Client-side operational diagnostics strip browser route URLs and route paths before storage.
 - True "developers cannot ever see user data" requires operational controls and, for raw documents, client-side encryption or local-only extraction. Server-side OCR/parsing means the server sees the file briefly during extraction.
 
 ## Production Default
