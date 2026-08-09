@@ -12,6 +12,8 @@ class CeleryStartupTests(SimpleTestCase):
         self.assertIn("apps.integrations.tasks.refresh_verified_external_intelligence", app.tasks)
         self.assertIn("apps.ml_engine.continual.tasks.run_global_training_cycle", app.tasks)
         self.assertIn("alfred_ai.celery_app.cleanup_memory_task", app.tasks)
+        self.assertIn("alfred_ai.tasks.production_probe_task", app.tasks)
+        self.assertIn("alfred_ai.tasks.production_beat_heartbeat", app.tasks)
 
     def test_verified_intelligence_refresh_schedule_can_drain_current_backlog_size(self):
         schedule = settings.CELERY_BEAT_SCHEDULE["verified-intelligence-refresh"]
@@ -41,6 +43,10 @@ class CeleryStartupTests(SimpleTestCase):
             "apps.integrations.tasks.cleanup_verified_external_intelligence",
         )
         self.assertEqual(schedule["verified-intelligence-cleanup"]["args"], (90,))
+        self.assertEqual(
+            schedule["production-readiness-heartbeat"]["task"],
+            "alfred_ai.tasks.production_beat_heartbeat",
+        )
 
     def test_cleanup_memory_task_skips_when_optional_memory_engine_is_missing(self):
         result = cleanup_memory_task()

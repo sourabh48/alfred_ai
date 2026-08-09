@@ -1,5 +1,7 @@
 import json
 import os
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -38,30 +40,51 @@ def _accepted_deployment_proof_payload() -> dict:
         },
         "database": {
             "engine": "django.db.backends.postgresql",
+            "postgresql_selected": True,
             "connection_usable": True,
+            "select_1_ok": True,
             "migrations_current": True,
+            "persistence_ok": True,
         },
         "cache": {
             "backend": "django.core.cache.backends.redis.RedisCache",
             "shared_backend": True,
+            "redis_backend": True,
+            "set_ok": True,
+            "get_ok": True,
+            "delete_ok": True,
             "read_write_ok": True,
         },
         "celery": {
             "broker_url": "rediss://redis.example.com:6379/0",
             "result_backend": "rediss://redis.example.com:6379/0",
+            "task_always_eager": False,
+            "broker_connected": True,
             "worker_ping_ok": True,
+            "worker_responded": True,
+            "task_executed": True,
+            "result_retrieved": True,
             "beat_schedule_ok": True,
-            "scheduled_task_count": 4,
+            "beat_heartbeat_fresh": True,
+            "scheduled_task_count": 5,
         },
         "security": {
             "debug": False,
             "allowed_hosts_configured": True,
             "secret_key_configured": True,
             "secure_cookies": True,
+            "session_cookie_httponly": True,
             "ssl_redirect": True,
             "hsts_seconds": 31536000,
             "csrf_trusted_origins_configured": True,
             "cors_restricted": True,
+            "content_type_nosniff": True,
+            "x_frame_options_configured": True,
+        },
+        "app": {
+            "static_configured": True,
+            "liveness_endpoint_configured": True,
+            "readiness_endpoint_configured": True,
         },
         "browser_ci": {
             "ci_chrome_no_skip": True,
@@ -156,13 +179,24 @@ class ProductionReadinessContractTests(SimpleTestCase):
         self.assertIn("celery -A alfred_ai worker", free_tier_compose)
         self.assertIn("celery -A alfred_ai beat", compose)
         self.assertIn("celery -A alfred_ai beat", free_tier_compose)
+        self.assertIn("/health/live/", compose)
+        self.assertIn("/health/live/", free_tier_compose)
+        self.assertIn("celery -A alfred_ai inspect ping", compose)
+        self.assertIn("celery -A alfred_ai inspect ping", free_tier_compose)
         self.assertIn("django.core.cache.backends.redis.RedisCache", aws_env)
         self.assertIn("DB_ENGINE=django.db.backends.postgresql", aws_env)
         self.assertIn("django.core.cache.backends.redis.RedisCache", free_tier_env)
         self.assertIn("DB_ENGINE=django.db.backends.postgresql", free_tier_env)
         self.assertIn("DB_HOST=postgres", free_tier_env)
+        self.assertIn("DB_CONN_MAX_AGE=60", free_tier_env)
         self.assertIn("CACHE_LOCATION=redis://redis:6379/1", free_tier_env)
+        self.assertIn("CACHE_KEY_PREFIX=alfred", free_tier_env)
+        self.assertIn("CACHE_DEFAULT_TIMEOUT=300", free_tier_env)
         self.assertIn("REDIS_URL=redis://redis:6379/0", free_tier_env)
+        self.assertIn("CELERY_BROKER_URL=redis://redis:6379/0", free_tier_env)
+        self.assertIn("CELERY_RESULT_BACKEND=redis://redis:6379/0", free_tier_env)
+        self.assertIn("CELERY_TASK_ALWAYS_EAGER=false", free_tier_env)
+        self.assertIn("ALFRED_CELERY_BEAT_HEARTBEAT_MAX_AGE_SECONDS=900", free_tier_env)
         self.assertIn("ALFRED_LOCAL_RUNTIME=false", aws_env)
         self.assertIn("ALFRED_LOCAL_RUNTIME=false", free_tier_env)
         self.assertIn("DEBUG=false", aws_env)
@@ -183,6 +217,76 @@ class ProductionReadinessContractTests(SimpleTestCase):
         self.assertIn("SECURE_SSL_REDIRECT=false", compose_env)
         self.assertIn("ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true", compose_env)
         self.assertIn("This is intentionally not accepted as production proof", compose_env)
+
+    def test_production_settings_reject_sqlite_and_local_cache_fallbacks(self):
+        env = {
+            **os.environ,
+            "PYTHONPATH": str(REPO_ROOT),
+            "DJANGO_SETTINGS_MODULE": "alfred_ai.settings",
+            "ALFRED_LOCAL_RUNTIME": "false",
+            "DEBUG": "false",
+            "DJANGO_SECRET_KEY": "production-secret",
+            "ALLOWED_HOSTS": "alfred.example.com",
+            "CSRF_TRUSTED_ORIGINS": "https://alfred.example.com",
+            "DB_ENGINE": "django.db.backends.sqlite3",
+            "DB_NAME": ":memory:",
+            "CACHE_BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "CACHE_LOCATION": "local",
+            "REDIS_URL": "redis://redis:6379/0",
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", "import alfred_ai.settings"],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=20,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Production mode requires PostgreSQL", result.stderr)
+
+    def test_production_settings_accept_postgres_and_redis_configuration(self):
+        env = {
+            **os.environ,
+            "PYTHONPATH": str(REPO_ROOT),
+            "DJANGO_SETTINGS_MODULE": "alfred_ai.settings",
+            "ALFRED_LOCAL_RUNTIME": "false",
+            "DEBUG": "false",
+            "DJANGO_SECRET_KEY": "production-secret",
+            "ALLOWED_HOSTS": "alfred.example.com",
+            "CSRF_TRUSTED_ORIGINS": "https://alfred.example.com",
+            "DB_ENGINE": "django.db.backends.postgresql",
+            "DB_NAME": "alfred",
+            "DB_USER": "alfred",
+            "DB_PASSWORD": "secret",
+            "DB_HOST": "postgres",
+            "DB_PORT": "5432",
+            "CACHE_BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "CACHE_LOCATION": "redis://redis:6379/1",
+            "REDIS_URL": "redis://redis:6379/0",
+            "CELERY_BROKER_URL": "redis://redis:6379/0",
+            "CELERY_RESULT_BACKEND": "redis://redis:6379/0",
+        }
+        code = (
+            "from django.conf import settings; "
+            "print(settings.DATABASES['default']['ENGINE']); "
+            "print(settings.CACHES['default']['BACKEND']); "
+            "print(settings.CELERY_TASK_ALWAYS_EAGER)"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=20,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("django.db.backends.postgresql", result.stdout)
+        self.assertIn("django.core.cache.backends.redis.RedisCache", result.stdout)
+        self.assertIn("False", result.stdout)
 
     def test_sonarqube_is_not_part_of_current_production_contract(self):
         removed_paths = (
@@ -259,6 +363,7 @@ class ProductionReadinessContractTests(SimpleTestCase):
         self.assertTrue(validation["sections"]["cache"]["ready"])
         self.assertTrue(validation["sections"]["celery"]["ready"])
         self.assertTrue(validation["sections"]["security"]["ready"])
+        self.assertTrue(validation["sections"]["app"]["ready"])
         self.assertTrue(validation["sections"]["browser_ci"]["ready"])
         self.assertTrue(validation["sections"]["cache_traffic"]["ready"])
 
@@ -279,6 +384,30 @@ class ProductionReadinessContractTests(SimpleTestCase):
         )
         self.assertIn(
             "browser CI proof must show GitHub Actions Chrome required-browser execution with zero skipped Selenium tests",
+            validation["blockers"],
+        )
+
+    def test_production_deployment_proof_rejects_celery_ping_without_task_and_beat_execution(self):
+        payload = _accepted_deployment_proof_payload()
+        payload["celery"].update(
+            {
+                "broker_connected": True,
+                "worker_ping_ok": True,
+                "worker_responded": False,
+                "task_executed": False,
+                "result_retrieved": False,
+                "beat_heartbeat_fresh": False,
+            }
+        )
+
+        validation = validate_production_deployment_proof(
+            payload,
+            proof_path="artifacts/ops/production_readiness_summary.json",
+        )
+
+        self.assertFalse(validation["accepted"])
+        self.assertIn(
+            "Celery proof must show Redis broker, worker response, task execution, result retrieval, beat schedule, and fresh beat heartbeat",
             validation["blockers"],
         )
 

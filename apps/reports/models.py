@@ -137,3 +137,19 @@ class OperationalLog(models.Model):
 
     def __str__(self):
         return f"{self.module} | {self.event_type} | {self.severity}"
+
+
+class ProductionProbeRecord(models.Model):
+    probe_id = models.CharField(max_length=64, unique=True)
+    payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["probe_id"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"production-probe | {self.probe_id}"

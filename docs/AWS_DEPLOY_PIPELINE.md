@@ -1,6 +1,6 @@
 # AWS Pull Deployment Pipeline
 
-This pipeline lets developers push code to GitHub, then GitHub Actions uses AWS Systems Manager to run an EC2-side deploy script. The EC2 host pulls the requested commit from GitHub, rebuilds the Docker services, runs Django checks, and verifies `/health/`.
+This pipeline lets developers push code to GitHub, then GitHub Actions uses AWS Systems Manager to run an EC2-side deploy script. The EC2 host pulls the requested commit from GitHub, rebuilds the Docker services, runs Django checks, verifies `/health/live/` and `/health/ready/`, then runs the strict production readiness probe.
 
 It does not store AWS access keys in GitHub. It uses GitHub OIDC to assume a narrow AWS role and SSM Run Command to reach the server. GitHub-hosted runners do not need inbound SSH access.
 
@@ -48,7 +48,8 @@ Add these in GitHub repository settings under Actions secrets:
 | `AWS_DEPLOY_DIR` | no | `/opt/alfred` |
 | `AWS_COMPOSE_FILE` | no | `docker-compose.aws-free-tier.yml` for strict Free Tier, or `docker-compose.aws.yml` for external PostgreSQL/Redis |
 | `AWS_ENV_FILE` | recommended | `/etc/alfred/alfred.env` |
-| `AWS_HEALTH_URL` | no | `http://127.0.0.1/health/` |
+| `AWS_HEALTH_URL` | no | `http://127.0.0.1/health/live/` |
+| `AWS_READY_URL` | no | `http://127.0.0.1/health/ready/` |
 
 The EC2 security group can keep SSH restricted to operator IP addresses. The GitHub workflow reaches the instance through SSM and pulls the public GitHub repository over HTTPS from EC2.
 
@@ -67,7 +68,8 @@ python manage.py check
 python manage.py makemigrations --check --dry-run
 ```
 
-8. The script waits until `/health/` responds successfully.
+8. The script waits until `/health/live/` and `/health/ready/` respond successfully.
+9. The script runs `python scripts/run_production_readiness_probe.py --require-ready`; deployment fails if required proof is missing or rejected.
 
 ## Important Safety Rules
 
@@ -77,7 +79,7 @@ python manage.py makemigrations --check --dry-run
 - Set `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true` in production so extraction-only raw documents are deleted after parsing.
 - Keep the EC2 checkout clean; the deploy script fails if there are uncommitted server-side changes.
 - Use GitHub PR checks before merging to the deploy branch.
-- Keep Project Details Deployment Readiness separate from successful deploys. A deploy only proves the app restarted; readiness still needs PostgreSQL, Redis, Celery runtime, browser CI, security, and cache traffic proof.
+- Keep Project Details Deployment Readiness separate from successful deploys. A successful deploy now also requires strict readiness proof, including PostgreSQL, Redis, Celery runtime, browser CI, security, and cache traffic proof.
 - For strict Free Tier, do not create RDS, ElastiCache, Application Load Balancer, NAT Gateway, Route 53, ECR, or S3 unless the AWS Billing and Free Tier console confirms zero-cost coverage or you explicitly accept the cost.
 
 ## Manual First Deploy
@@ -90,9 +92,11 @@ After secrets and EC2 setup are done, open GitHub Actions, choose `AWS Pull Depl
 - web/worker/beat containers running
 - Django check success
 - migration dry-run success
-- `/health/` success
+- `/health/live/` success
+- `/health/ready/` success
+- strict readiness probe success
 
-Then run the production readiness probe on EC2 after browser CI and cache traffic proof exist:
+If you need to inspect the production readiness probe manually after browser CI and cache traffic proof exist:
 
 ```bash
 cd /opt/alfred

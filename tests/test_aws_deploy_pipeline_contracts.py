@@ -26,6 +26,10 @@ class AwsDeployPipelineContractTests(SimpleTestCase):
         self.assertIn("for attempt in $(seq 1 270)", workflow)
         self.assertIn("https://github.com/${GITHUB_REPOSITORY}.git", workflow)
         self.assertIn('ALFRED_COMMIT_SHA="${GITHUB_SHA}"', workflow)
+        self.assertIn('"ALFRED_RUN_READINESS_PROBE": "true"', workflow)
+        self.assertIn('"ALFRED_REQUIRE_READINESS": "true"', workflow)
+        self.assertIn("/health/live/", workflow)
+        self.assertIn("/health/ready/", workflow)
         self.assertIn("scripts/deploy_aws_pull.sh", workflow)
         self.assertIn("/etc/alfred/alfred.env", workflow)
         self.assertNotIn("secrets.AWS_EC2_SSH_KEY", workflow)
@@ -48,7 +52,10 @@ class AwsDeployPipelineContractTests(SimpleTestCase):
         self.assertIn("up -d --remove-orphans", script)
         self.assertIn("python manage.py check", script)
         self.assertIn("python manage.py makemigrations --check --dry-run", script)
-        self.assertIn("/health/", script)
+        self.assertIn("/health/live/", script)
+        self.assertIn("/health/ready/", script)
+        self.assertIn('RUN_READINESS_PROBE="${ALFRED_RUN_READINESS_PROBE:-true}"', script)
+        self.assertIn('REQUIRE_READINESS="${ALFRED_REQUIRE_READINESS:-true}"', script)
         self.assertIn("run_production_readiness_probe.py", script)
 
     def test_aws_compose_uses_external_runtime_env_and_separate_processes(self):

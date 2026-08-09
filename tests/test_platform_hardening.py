@@ -263,6 +263,20 @@ class EmailConnectionTokenSecurityTests(TestCase):
 
 
 class HealthEndpointTests(TestCase):
+    def test_liveness_endpoint_does_not_probe_dependencies(self):
+        response = self.client.get("/health/live/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ok")
+
+    def test_readiness_endpoint_checks_database_and_cache(self):
+        response = self.client.get("/health/ready/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ready")
+        self.assertEqual(response.json()["checks"]["database"], "ok")
+        self.assertEqual(response.json()["checks"]["cache"], "ok")
+
     def test_health_endpoint_returns_ok_status(self):
         response = self.client.get("/health/")
 

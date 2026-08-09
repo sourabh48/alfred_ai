@@ -132,7 +132,7 @@ celery -A alfred_ai beat -l info
 
 `refresh_verified_external_intelligence` calls `refresh_due_records`, which now records processed, refreshed, skipped, failed, per-scope watchlist, last-attempt, and last-success outcomes for Project Details.
 
-Production deployments must run both Celery worker and Celery beat processes with Redis or another supported broker. The schedules are already implemented; production maturity depends on those processes staying healthy outside local Django requests.
+Production deployments must run both Celery worker and Celery beat processes with Redis or another supported broker. The schedules are already implemented; production maturity depends on those processes staying healthy outside local Django requests. The production readiness probe dispatches a safe Celery task and checks a beat heartbeat before counting runtime proof.
 
 Run the same verified-evidence refresh path manually and write an auditable proof artifact:
 
@@ -158,7 +158,7 @@ python scripts/exercise_materialized_cache_traffic.py
 
 ## Production Readiness
 
-ALFRED is not production-ready until the deployment environment proves database, shared cache, worker, browser-regression, security, and production-like cache-traffic health. See [Production Readiness](docs/PRODUCTION_READINESS.md).
+ALFRED is not production-ready until the deployment environment proves database, shared cache, worker, beat heartbeat, browser-regression, security, and production-like cache-traffic health. See [Production Readiness](docs/PRODUCTION_READINESS.md).
 
 For AWS, start with [AWS Free Tier Only Deployment](docs/AWS_FREE_TIER_ONLY.md) and [AWS Deployment Guide](docs/AWS_DEPLOYMENT.md). The repo includes:
 
@@ -170,6 +170,8 @@ For AWS, start with [AWS Free Tier Only Deployment](docs/AWS_FREE_TIER_ONLY.md) 
 - `docker-compose.aws-free-tier.yml` for an EC2-only AWS Free Tier deployment with Dockerized PostgreSQL and Redis.
 - `docker-compose.aws.yml` for an EC2 deployment that uses external PostgreSQL and Redis.
 - `.github/workflows/aws-deploy.yml` plus `scripts/deploy_aws_pull.sh` for GitHub-to-EC2 pull deployment.
+
+Runtime health is split between `/health/live/` for Django process liveness and `/health/ready/` for database/cache readiness. The EC2 pull deploy polls both and then runs `python scripts/run_production_readiness_probe.py --require-ready`.
 
 Run the local production-style stack:
 

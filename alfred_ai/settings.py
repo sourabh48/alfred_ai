@@ -62,6 +62,29 @@ def _default_hsts_seconds(local_runtime: bool) -> int:
     return 0 if local_runtime else 31536000
 
 
+def _is_postgresql_engine(engine: str) -> bool:
+    engine_lower = str(engine or "").lower()
+    return "postgresql" in engine_lower or "postgis" in engine_lower
+
+
+def _is_redis_cache_backend(backend: str) -> bool:
+    return "redis" in str(backend or "").lower()
+
+
+def _is_redis_url(value: str) -> bool:
+    return str(value or "").strip().lower().startswith(("redis://", "rediss://"))
+
+
+def _is_local_redis_url(value: str) -> bool:
+    lowered = str(value or "").strip().lower()
+    return "localhost" in lowered or "127.0.0.1" in lowered
+
+
+def _require_production(condition: bool, message: str) -> None:
+    if not LOCAL_RUNTIME and not condition:
+        raise ImproperlyConfigured(message)
+
+
 # ---------------------------------------------------------
 # CORE
 # ---------------------------------------------------------
@@ -208,16 +231,36 @@ ASGI_APPLICATION = "alfred_ai.asgi.application"
 # DATABASE
 # ---------------------------------------------------------
 
-DATABASES = {
-    "default": {
-        "ENGINE": env("DB_ENGINE", default="django.db.backends.sqlite3"),
-        "NAME": env("DB_NAME", default=str(BASE_DIR / "db.sqlite3")),
-        "USER": env("DB_USER", default=""),
-        "PASSWORD": env("DB_PASSWORD", default=""),
-        "HOST": env("DB_HOST", default=""),
-        "PORT": env("DB_PORT", default=""),
+DB_CONN_MAX_AGE = env.int("DB_CONN_MAX_AGE", default=60 if not LOCAL_RUNTIME else 0)
+DATABASE_URL = env("DATABASE_URL", default="")
+if DATABASE_URL:
+    DATABASES = {"default": env.db_url("DATABASE_URL")}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": env("DB_ENGINE", default="django.db.backends.sqlite3"),
+            "NAME": env("DB_NAME", default=str(BASE_DIR / "db.sqlite3")),
+            "USER": env("DB_USER", default=""),
+            "PASSWORD": env("DB_PASSWORD", default=""),
+            "HOST": env("DB_HOST", default=""),
+            "PORT": env("DB_PORT", default=""),
+        }
     }
-}
+
+DATABASES["default"]["CONN_MAX_AGE"] = DB_CONN_MAX_AGE
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool(
+    "DB_CONN_HEALTH_CHECKS",
+    default=not LOCAL_RUNTIME,
+)
+_require_production(
+    _is_postgresql_engine(DATABASES["default"].get("ENGINE", "")),
+    "Production mode requires PostgreSQL. Set DATABASE_URL or DB_ENGINE=django.db.backends.postgresql.",
+)
+if not DATABASE_URL:
+    _require_production(
+        all(str(DATABASES["default"].get(key) or "").strip() for key in ("NAME", "USER", "PASSWORD", "HOST")),
+        "Production PostgreSQL configuration requires DB_NAME, DB_USER, DB_PASSWORD, and DB_HOST.",
+    )
 
 
 # ---------------------------------------------------------
@@ -251,10 +294,32 @@ REST_FRAMEWORK = {
 # CACHE
 # ---------------------------------------------------------
 
+REDIS_URL = env("REDIS_URL", default="")
+CACHE_BACKEND = env(
+    "CACHE_BACKEND",
+    default="django.core.cache.backends.redis.RedisCache"
+    if (not LOCAL_RUNTIME and REDIS_URL)
+    else "django.core.cache.backends.locmem.LocMemCache",
+)
+CACHE_LOCATION = env("CACHE_LOCATION", default=REDIS_URL if (not LOCAL_RUNTIME and REDIS_URL) else "alfred-local-cache")
+CACHE_KEY_PREFIX = env("CACHE_KEY_PREFIX", default="alfred")
+CACHE_DEFAULT_TIMEOUT = env.int("CACHE_DEFAULT_TIMEOUT", default=300)
+
+_require_production(
+    _is_redis_cache_backend(CACHE_BACKEND),
+    "Production mode requires a Redis-backed shared Django cache. Set CACHE_BACKEND and CACHE_LOCATION/REDIS_URL.",
+)
+_require_production(
+    _is_redis_url(CACHE_LOCATION),
+    "Production mode requires CACHE_LOCATION to be a redis:// or rediss:// URL.",
+)
+
 CACHES = {
     "default": {
-        "BACKEND": env("CACHE_BACKEND", default="django.core.cache.backends.locmem.LocMemCache"),
-        "LOCATION": env("CACHE_LOCATION", default="alfred-local-cache"),
+        "BACKEND": CACHE_BACKEND,
+        "LOCATION": CACHE_LOCATION,
+        "KEY_PREFIX": CACHE_KEY_PREFIX,
+        "TIMEOUT": CACHE_DEFAULT_TIMEOUT,
     }
 }
 
@@ -266,14 +331,29 @@ CACHES = {
 # ---------------------------------------------
 # Celery Configuration
 # ---------------------------------------------
-CELERY_BROKER_URL = env("REDIS_URL", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = env("REDIS_URL", default="redis://localhost:6379/0")
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=REDIS_URL or "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=REDIS_URL or "redis://localhost:6379/0")
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+CELERY_TASK_EAGER_PROPAGATES = env.bool("CELERY_TASK_EAGER_PROPAGATES", default=False)
 
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 
 CELERY_TIMEZONE = "UTC"
+
+_require_production(
+    _is_redis_url(CELERY_BROKER_URL) and _is_redis_url(CELERY_RESULT_BACKEND),
+    "Production mode requires Redis Celery broker and result backend URLs.",
+)
+_require_production(
+    not _is_local_redis_url(CELERY_BROKER_URL) and not _is_local_redis_url(CELERY_RESULT_BACKEND),
+    "Production mode cannot use localhost Redis for Celery.",
+)
+_require_production(
+    not CELERY_TASK_ALWAYS_EAGER,
+    "Production mode cannot enable CELERY_TASK_ALWAYS_EAGER.",
+)
 
 CELERY_BEAT_SCHEDULE = {
     "alfred-nightly-training": {
@@ -295,7 +375,17 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": timedelta(hours=24),
         "args": (90,),
     },
+    "production-readiness-heartbeat": {
+        "task": "alfred_ai.tasks.production_beat_heartbeat",
+        "schedule": timedelta(minutes=5),
+    },
 }
+
+ALFRED_CELERY_PROBE_TIMEOUT_SECONDS = env.int("ALFRED_CELERY_PROBE_TIMEOUT_SECONDS", default=10)
+ALFRED_CELERY_BEAT_HEARTBEAT_MAX_AGE_SECONDS = env.int(
+    "ALFRED_CELERY_BEAT_HEARTBEAT_MAX_AGE_SECONDS",
+    default=900,
+)
 
 ALFRED_AUTO_TRAIN_ON_STARTUP = env.bool("ALFRED_AUTO_TRAIN_ON_STARTUP", default=True)
 ALFRED_AUTO_TRAIN_COOLDOWN_MINUTES = env.int("ALFRED_AUTO_TRAIN_COOLDOWN_MINUTES", default=45)

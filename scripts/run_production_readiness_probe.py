@@ -43,6 +43,24 @@ def run_probe(
     )
 
 
+def _section_statuses(validation: dict) -> dict:
+    sections = dict(validation.get("sections") or {})
+    statuses = {}
+    for name, section in sections.items():
+        section_payload = dict(section or {})
+        if section_payload.get("ready"):
+            statuses[name] = "PASS"
+        elif validation.get("recorded", True):
+            statuses[name] = "FAIL"
+        else:
+            statuses[name] = "BLOCKED"
+    if not sections:
+        statuses["proof"] = "BLOCKED"
+    if validation.get("accepted") and any(status != "PASS" for status in statuses.values()):
+        statuses["proof"] = "WARN"
+    return statuses
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Probe ALFRED production readiness and write a deployment proof JSON.")
     parser.add_argument("--proof-path", default=None, help="Output path for the production readiness proof JSON.")
@@ -73,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         "proof_path": result.get("proof_path", ""),
         "accepted": bool(validation.get("accepted")),
         "state": validation.get("state", ""),
+        "items": _section_statuses(validation),
         "summary": validation.get("summary", ""),
         "blockers": validation.get("blockers", []),
     }

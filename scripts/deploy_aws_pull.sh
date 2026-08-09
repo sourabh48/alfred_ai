@@ -26,9 +26,10 @@ BRANCH="${ALFRED_BRANCH:-master}"
 COMMIT_SHA="${ALFRED_COMMIT_SHA:-}"
 COMPOSE_FILE="${ALFRED_COMPOSE_FILE:-docker-compose.aws.yml}"
 ENV_FILE="${ALFRED_ENV_FILE:-/etc/alfred/alfred.env}"
-HEALTH_URL="${ALFRED_HEALTH_URL:-http://127.0.0.1:8000/health/}"
-RUN_READINESS_PROBE="${ALFRED_RUN_READINESS_PROBE:-false}"
-REQUIRE_READINESS="${ALFRED_REQUIRE_READINESS:-false}"
+HEALTH_URL="${ALFRED_HEALTH_URL:-http://127.0.0.1:8000/health/live/}"
+READY_URL="${ALFRED_READY_URL:-http://127.0.0.1:8000/health/ready/}"
+RUN_READINESS_PROBE="${ALFRED_RUN_READINESS_PROBE:-true}"
+REQUIRE_READINESS="${ALFRED_REQUIRE_READINESS:-true}"
 
 export HOME="${HOME:-/root}"
 
@@ -88,15 +89,28 @@ log "running Django deployment checks inside the web container"
 "${COMPOSE[@]}" exec -T web python manage.py check
 "${COMPOSE[@]}" exec -T web python manage.py makemigrations --check --dry-run
 
-log "checking health endpoint at $HEALTH_URL"
+log "checking liveness endpoint at $HEALTH_URL"
 for attempt in $(seq 1 30); do
   if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
-    log "health endpoint is healthy"
+    log "liveness endpoint is healthy"
     break
   fi
   if [ "$attempt" -eq 30 ]; then
     "${COMPOSE[@]}" ps
-    fail "health endpoint did not become healthy"
+    fail "liveness endpoint did not become healthy"
+  fi
+  sleep 2
+done
+
+log "checking readiness endpoint at $READY_URL"
+for attempt in $(seq 1 30); do
+  if curl -fsS "$READY_URL" >/dev/null 2>&1; then
+    log "readiness endpoint is healthy"
+    break
+  fi
+  if [ "$attempt" -eq 30 ]; then
+    "${COMPOSE[@]}" ps
+    fail "readiness endpoint did not become healthy"
   fi
   sleep 2
 done

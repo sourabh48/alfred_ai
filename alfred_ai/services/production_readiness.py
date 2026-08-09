@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import timezone as datetime_timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from django.conf import settings
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 
 PRODUCTION_DEPLOYMENT_PROOF_ENV = "ALFRED_PRODUCTION_DEPLOYMENT_PROOF"
@@ -20,6 +23,7 @@ REQUIRED_CELERY_SCHEDULE = {
     "statement-review-retry": "apps.expenses.tasks.retry_low_confidence_statement_uploads",
     "verified-intelligence-refresh": "apps.integrations.tasks.refresh_verified_external_intelligence",
     "verified-intelligence-cleanup": "apps.integrations.tasks.cleanup_verified_external_intelligence",
+    "production-readiness-heartbeat": "alfred_ai.tasks.production_beat_heartbeat",
 }
 REQUIRED_PRODUCTION_ENV_VARS = (
     "ALFRED_LOCAL_RUNTIME=false",
@@ -118,6 +122,7 @@ def _default_deployment_proof(*, path: str = "", recorded: bool = False, blocker
             "cache": {"ready": False},
             "celery": {"ready": False},
             "security": {"ready": False},
+            "app": {"ready": False},
             "browser_ci": {"ready": False},
             "cache_traffic": {"ready": False},
         },
@@ -160,21 +165,29 @@ def validate_production_deployment_proof(payload: dict, *, proof_path: str = "")
     database_ready = (
         bool(database_engine)
         and not _is_sqlite_backend(database_engine)
+        and _as_bool(database.get("postgresql_selected"))
         and _as_bool(database.get("connection_usable"))
+        and _as_bool(database.get("select_1_ok"))
         and _as_bool(database.get("migrations_current"))
+        and _as_bool(database.get("persistence_ok"))
     )
     if not database_ready:
-        blockers.append("database proof must use a non-sqlite backend with usable connection and current migrations")
+        blockers.append("database proof must use PostgreSQL with SELECT 1, current migrations, and safe persistence proof")
 
     cache = dict(payload.get("cache") or {})
     cache_backend = str(cache.get("backend") or "")
     cache_ready = (
         _is_shared_cache_backend(cache_backend)
+        and "redis" in cache_backend.lower()
         and _as_bool(cache.get("shared_backend"))
+        and _as_bool(cache.get("redis_backend"))
         and _as_bool(cache.get("read_write_ok"))
+        and _as_bool(cache.get("set_ok"))
+        and _as_bool(cache.get("get_ok"))
+        and _as_bool(cache.get("delete_ok"))
     )
     if not cache_ready:
-        blockers.append("cache proof must use a shared backend with read/write health")
+        blockers.append("cache proof must use Redis shared backend with write/read/delete health")
 
     celery = dict(payload.get("celery") or {})
     celery_broker = str(celery.get("broker_url") or "")
@@ -182,12 +195,18 @@ def validate_production_deployment_proof(payload: dict, *, proof_path: str = "")
     celery_ready = (
         _is_redis_url(celery_broker)
         and _is_redis_url(celery_result_backend)
+        and not _as_bool(celery.get("task_always_eager"))
+        and _as_bool(celery.get("broker_connected"))
         and _as_bool(celery.get("worker_ping_ok"))
+        and _as_bool(celery.get("worker_responded"))
+        and _as_bool(celery.get("task_executed"))
+        and _as_bool(celery.get("result_retrieved"))
         and _as_bool(celery.get("beat_schedule_ok"))
+        and _as_bool(celery.get("beat_heartbeat_fresh"))
         and _as_int(celery.get("scheduled_task_count")) >= len(REQUIRED_CELERY_SCHEDULE)
     )
     if not celery_ready:
-        blockers.append("Celery proof must show Redis broker, worker ping, beat schedule, and required task count")
+        blockers.append("Celery proof must show Redis broker, worker response, task execution, result retrieval, beat schedule, and fresh beat heartbeat")
 
     security = dict(payload.get("security") or {})
     security_ready = (
@@ -195,13 +214,25 @@ def validate_production_deployment_proof(payload: dict, *, proof_path: str = "")
         and _as_bool(security.get("allowed_hosts_configured"))
         and _as_bool(security.get("secret_key_configured"))
         and _as_bool(security.get("secure_cookies"))
+        and _as_bool(security.get("session_cookie_httponly"))
         and _as_bool(security.get("ssl_redirect"))
         and _as_int(security.get("hsts_seconds")) > 0
         and _as_bool(security.get("csrf_trusted_origins_configured"))
         and _as_bool(security.get("cors_restricted"))
+        and _as_bool(security.get("content_type_nosniff"))
+        and _as_bool(security.get("x_frame_options_configured"))
     )
     if not security_ready:
         blockers.append("security proof must show DEBUG=false, hosts, secret key, HTTPS redirect, secure cookies, HSTS, CSRF origins, and restricted CORS")
+
+    app = dict(payload.get("app") or {})
+    app_ready = (
+        _as_bool(app.get("static_configured"))
+        and _as_bool(app.get("liveness_endpoint_configured"))
+        and _as_bool(app.get("readiness_endpoint_configured"))
+    )
+    if not app_ready:
+        blockers.append("app proof must show static configuration plus liveness and readiness endpoints")
 
     browser_ci = dict(payload.get("browser_ci") or {})
     browser_ready = (
@@ -235,6 +266,7 @@ def validate_production_deployment_proof(payload: dict, *, proof_path: str = "")
         "cache": {"ready": cache_ready, **cache},
         "celery": {"ready": celery_ready, **celery},
         "security": {"ready": security_ready, **security},
+        "app": {"ready": app_ready, **app},
         "browser_ci": {"ready": browser_ready, **browser_ci},
         "cache_traffic": {"ready": cache_traffic_ready, **cache_traffic},
     }
@@ -277,13 +309,17 @@ def _required_env_contract_snapshot() -> dict:
     rows = []
     missing = []
     incorrect = []
+    database_url_present = bool(_env_value("DATABASE_URL"))
+    explicit_database_vars = {"DB_ENGINE", "DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST"}
     for requirement in REQUIRED_PRODUCTION_ENV_VARS:
         name, separator, expected = requirement.partition("=")
         value = _env_value(name)
-        present = bool(value)
+        present = bool(value) or (name in explicit_database_vars and database_url_present)
         matches_expected = True
         if separator:
             matches_expected = value.strip().lower() == expected.strip().lower()
+            if name in explicit_database_vars and database_url_present and not value:
+                matches_expected = True
         if not present:
             missing.append(name)
         elif not matches_expected:
@@ -294,6 +330,7 @@ def _required_env_contract_snapshot() -> dict:
                 "expected": expected if separator else "set",
                 "present": present,
                 "matches_expected": matches_expected,
+                "satisfied_by": "DATABASE_URL" if name in explicit_database_vars and database_url_present and not value else name,
             }
         )
     return {
@@ -310,18 +347,24 @@ def _required_env_contract_snapshot() -> dict:
 def _database_runtime_probe() -> dict:
     from django.db import connections
     from django.db.migrations.executor import MigrationExecutor
+    from apps.reports.models import ProductionProbeRecord
 
     database = dict(settings.DATABASES.get("default") or {})
     engine = str(database.get("ENGINE") or "")
+    probe_id = f"db-{uuid4().hex}"
     result = {
         "engine": engine,
+        "postgresql_selected": not _is_sqlite_backend(engine) and "postgresql" in engine.lower(),
         "name_configured": bool(database.get("NAME")),
         "host_configured": bool(database.get("HOST")),
         "connection_usable": False,
+        "select_1_ok": False,
         "migrations_current": False,
         "pending_migration_count": 0,
+        "persistence_ok": False,
         "connection_error": "",
         "migration_error": "",
+        "persistence_error": "",
     }
     try:
         connection = connections["default"]
@@ -329,6 +372,7 @@ def _database_runtime_probe() -> dict:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
+        result["select_1_ok"] = True
         result["connection_usable"] = bool(connection.is_usable())
     except Exception as exc:  # pragma: no cover - exercised through deployment environments.
         result["connection_error"] = f"{type(exc).__name__}: {exc}"
@@ -341,6 +385,23 @@ def _database_runtime_probe() -> dict:
         result["migrations_current"] = len(migration_plan) == 0
     except Exception as exc:  # pragma: no cover - depends on runtime database state.
         result["migration_error"] = f"{type(exc).__name__}: {exc}"
+
+    try:
+        ProductionProbeRecord.objects.create(
+            probe_id=probe_id,
+            payload={"created_by": "production_readiness_probe", "created_at": timezone.now().isoformat()},
+        )
+        connection.close()
+        connections["default"].ensure_connection()
+        persisted = ProductionProbeRecord.objects.get(probe_id=probe_id)
+        result["persistence_ok"] = persisted.payload.get("created_by") == "production_readiness_probe"
+    except Exception as exc:  # pragma: no cover - depends on runtime database state.
+        result["persistence_error"] = f"{type(exc).__name__}: {exc}"
+    finally:
+        try:
+            ProductionProbeRecord.objects.filter(probe_id=probe_id).delete()
+        except Exception:
+            pass
     return result
 
 
@@ -352,18 +413,30 @@ def _cache_runtime_probe() -> dict:
     location = str(cache_config.get("LOCATION") or "")
     probe_key = f"alfred:production-readiness-probe:{os.getpid()}"
     probe_value = timezone.now().isoformat()
+    set_ok = False
+    get_ok = False
+    delete_ok = False
     read_write_ok = False
     error = ""
     try:
         cache.set(probe_key, probe_value, 30)
-        read_write_ok = cache.get(probe_key) == probe_value
+        set_ok = True
+        get_ok = cache.get(probe_key) == probe_value
         cache.delete(probe_key)
+        delete_ok = cache.get(probe_key) is None
+        read_write_ok = set_ok and get_ok and delete_ok
     except Exception as exc:  # pragma: no cover - depends on runtime cache state.
         error = f"{type(exc).__name__}: {exc}"
     return {
         "backend": backend,
         "location_configured": bool(location),
         "shared_backend": _is_shared_cache_backend(backend),
+        "redis_backend": "redis" in backend.lower(),
+        "key_prefix": str(cache_config.get("KEY_PREFIX") or ""),
+        "timeout_seconds": _as_int(cache_config.get("TIMEOUT")),
+        "set_ok": set_ok,
+        "get_ok": get_ok,
+        "delete_ok": delete_ok,
         "read_write_ok": read_write_ok,
         "error": error,
     }
@@ -371,6 +444,8 @@ def _cache_runtime_probe() -> dict:
 
 def _celery_runtime_probe(*, ping_timeout: float = 1.0, ping_worker: bool = True) -> dict:
     from alfred_ai.celery_app import app as celery_app
+    from alfred_ai.tasks import CELERY_BEAT_HEARTBEAT_CACHE_KEY, production_probe_task
+    from django.core.cache import cache
 
     broker_url = str(getattr(settings, "CELERY_BROKER_URL", "") or "")
     result_backend = str(getattr(settings, "CELERY_RESULT_BACKEND", "") or "")
@@ -382,22 +457,90 @@ def _celery_runtime_probe(*, ping_timeout: float = 1.0, ping_worker: bool = True
     ]
     ping_responses = []
     ping_error = ""
+    broker_connected = False
+    broker_error = ""
+    task_executed = False
+    worker_responded = False
+    result_retrieved = False
+    task_error = ""
+    probe_id = f"celery-{uuid4().hex}"
+    task_result_payload: dict[str, Any] = {}
     if ping_worker:
+        try:
+            connection = celery_app.connection_for_write()
+            try:
+                connection.ensure_connection(max_retries=1)
+            finally:
+                connection.close()
+            broker_connected = True
+        except Exception as exc:  # pragma: no cover - depends on broker runtime.
+            broker_error = f"{type(exc).__name__}: {exc}"
         try:
             ping_responses = list(celery_app.control.ping(timeout=float(ping_timeout)) or [])
         except Exception as exc:  # pragma: no cover - depends on broker/worker runtime.
             ping_error = f"{type(exc).__name__}: {exc}"
+        if ping_responses:
+            worker_responded = True
+        if broker_connected:
+            try:
+                async_result = production_probe_task.delay(probe_id)
+                task_timeout = float(getattr(settings, "ALFRED_CELERY_PROBE_TIMEOUT_SECONDS", 10) or 10)
+                task_payload = async_result.get(timeout=task_timeout)
+                if isinstance(task_payload, dict):
+                    task_result_payload = dict(task_payload)
+                cached_ack = cache.get(f"alfred:production-readiness:celery-probe:{probe_id}") or {}
+                task_executed = (
+                    dict(task_result_payload).get("status") == "ok"
+                    and dict(task_result_payload).get("probe_id") == probe_id
+                )
+                result_retrieved = task_executed
+                if isinstance(cached_ack, dict) and cached_ack.get("probe_id") == probe_id:
+                    worker_responded = True
+                cache.delete(f"alfred:production-readiness:celery-probe:{probe_id}")
+            except Exception as exc:  # pragma: no cover - depends on worker runtime.
+                task_error = f"{type(exc).__name__}: {exc}"
+
+    heartbeat = dict(cache.get(CELERY_BEAT_HEARTBEAT_CACHE_KEY) or {})
+    heartbeat_at = str(heartbeat.get("worker_executed_at") or "")
+    heartbeat_age_seconds = None
+    heartbeat_fresh = False
+    if heartbeat_at:
+        parsed = parse_datetime(heartbeat_at)
+        if parsed is not None:
+            if timezone.is_naive(parsed):
+                parsed = timezone.make_aware(parsed, timezone=datetime_timezone.utc)
+            heartbeat_age_seconds = max(0, int((timezone.now() - parsed).total_seconds()))
+            max_age = _as_int(getattr(settings, "ALFRED_CELERY_BEAT_HEARTBEAT_MAX_AGE_SECONDS", 900), 900)
+            heartbeat_fresh = heartbeat_age_seconds <= max_age
     return {
         "broker_url": broker_url,
         "result_backend": result_backend,
+        "task_always_eager": bool(getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False)),
+        "broker_connected": broker_connected,
+        "broker_error": broker_error,
         "worker_ping_ok": bool(ping_responses),
         "worker_ping_response_count": len(ping_responses),
         "worker_ping_skipped": not ping_worker,
         "worker_ping_error": ping_error,
+        "worker_responded": worker_responded,
+        "task_executed": task_executed,
+        "result_retrieved": result_retrieved,
+        "probe_task_name": "alfred_ai.tasks.production_probe_task",
+        "probe_id": probe_id,
+        "task_result_status": str(task_result_payload.get("status") or ""),
+        "task_error": task_error,
         "beat_schedule_ok": not missing_schedules,
         "scheduled_task_count": len(schedule),
         "required_schedule_count": len(REQUIRED_CELERY_SCHEDULE),
         "missing_schedules": missing_schedules,
+        "beat_heartbeat_task": "alfred_ai.tasks.production_beat_heartbeat",
+        "beat_heartbeat_recorded": bool(heartbeat),
+        "beat_heartbeat_fresh": heartbeat_fresh,
+        "beat_heartbeat_age_seconds": heartbeat_age_seconds,
+        "beat_heartbeat_max_age_seconds": _as_int(
+            getattr(settings, "ALFRED_CELERY_BEAT_HEARTBEAT_MAX_AGE_SECONDS", 900),
+            900,
+        ),
     }
 
 
@@ -412,10 +555,45 @@ def _security_runtime_probe() -> dict:
         "secret_key_configured": bool(_env_value("DJANGO_SECRET_KEY")) and secret_key != "alfred-local-development-key",
         "secure_cookies": bool(getattr(settings, "SESSION_COOKIE_SECURE", False))
         and bool(getattr(settings, "CSRF_COOKIE_SECURE", False)),
+        "session_cookie_httponly": bool(getattr(settings, "SESSION_COOKIE_HTTPONLY", False)),
+        "session_cookie_samesite": str(getattr(settings, "SESSION_COOKIE_SAMESITE", "") or ""),
+        "csrf_cookie_samesite": str(getattr(settings, "CSRF_COOKIE_SAMESITE", "") or ""),
         "ssl_redirect": bool(getattr(settings, "SECURE_SSL_REDIRECT", False)),
         "hsts_seconds": _as_int(getattr(settings, "SECURE_HSTS_SECONDS", 0)),
+        "hsts_include_subdomains": bool(getattr(settings, "SECURE_HSTS_INCLUDE_SUBDOMAINS", False)),
+        "secure_proxy_ssl_header_configured": bool(getattr(settings, "SECURE_PROXY_SSL_HEADER", None)),
+        "content_type_nosniff": bool(getattr(settings, "SECURE_CONTENT_TYPE_NOSNIFF", False)),
+        "x_frame_options_configured": bool(str(getattr(settings, "X_FRAME_OPTIONS", "") or "").strip()),
         "csrf_trusted_origins_configured": bool(csrf_trusted_origins),
         "cors_restricted": not bool(getattr(settings, "CORS_ALLOW_ALL_ORIGINS", False)),
+    }
+
+
+def _app_runtime_probe() -> dict:
+    from django.urls import NoReverseMatch, reverse
+
+    liveness_path = ""
+    readiness_path = ""
+    liveness_configured = False
+    readiness_configured = False
+    endpoint_error = ""
+    try:
+        liveness_path = reverse("health_live")
+        readiness_path = reverse("health_ready")
+        liveness_configured = bool(liveness_path)
+        readiness_configured = bool(readiness_path)
+    except NoReverseMatch as exc:
+        endpoint_error = f"{type(exc).__name__}: {exc}"
+    return {
+        "static_url": str(getattr(settings, "STATIC_URL", "") or ""),
+        "static_root_configured": bool(str(getattr(settings, "STATIC_ROOT", "") or "")),
+        "static_configured": bool(str(getattr(settings, "STATIC_URL", "") or ""))
+        and bool(str(getattr(settings, "STATIC_ROOT", "") or "")),
+        "liveness_endpoint": liveness_path,
+        "readiness_endpoint": readiness_path,
+        "liveness_endpoint_configured": liveness_configured,
+        "readiness_endpoint_configured": readiness_configured,
+        "endpoint_error": endpoint_error,
     }
 
 
@@ -551,6 +729,7 @@ def build_production_deployment_probe_payload(
         "cache": _cache_runtime_probe(),
         "celery": _celery_runtime_probe(ping_timeout=celery_ping_timeout, ping_worker=ping_celery),
         "security": _security_runtime_probe(),
+        "app": _app_runtime_probe(),
         "browser_ci": _browser_ci_proof_section(summary_path=browser_summary_path),
         "cache_traffic": _cache_traffic_proof_section(proof_path=cache_traffic_proof_path),
     }
@@ -586,13 +765,19 @@ def _database_config_check() -> dict:
     database = dict(settings.DATABASES.get("default") or {})
     engine = str(database.get("ENGINE") or "")
     name = str(database.get("NAME") or "")
-    ready = bool(engine and name) and not _is_sqlite_backend(engine) and bool(_env_value("DB_ENGINE"))
+    database_url = _env_value("DATABASE_URL")
+    ready = (
+        bool(engine and name)
+        and not _is_sqlite_backend(engine)
+        and ("postgresql" in engine.lower() or "postgis" in engine.lower())
+        and (bool(database_url) or bool(_env_value("DB_ENGINE")))
+    )
     return _check_item(
         key="database_config",
         label="Production database config",
         ready=ready,
         detail=f"Database engine is {engine or 'not configured'}; local sqlite is not production-ready.",
-        manual_task="Configure PostgreSQL or another production database through DB_ENGINE, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, and DB_PORT, then run migrations.",
+        manual_task="Configure PostgreSQL through DATABASE_URL or DB_ENGINE, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, and DB_PORT, then run migrations.",
     )
 
 
@@ -600,13 +785,19 @@ def _cache_config_check() -> dict:
     cache_config = dict(settings.CACHES.get("default") or {})
     backend = str(cache_config.get("BACKEND") or "")
     location = str(cache_config.get("LOCATION") or "")
-    ready = _is_shared_cache_backend(backend) and bool(_env_value("CACHE_BACKEND")) and bool(_env_value("CACHE_LOCATION"))
+    ready = (
+        _is_shared_cache_backend(backend)
+        and "redis" in backend.lower()
+        and _is_redis_url(location)
+        and bool(_env_value("CACHE_BACKEND"))
+        and bool(_env_value("CACHE_LOCATION"))
+    )
     return _check_item(
         key="shared_cache_config",
         label="Shared cache config",
         ready=ready,
         detail=f"Cache backend is {backend or 'not configured'} at {location or 'not configured'}; local-memory cache is development-only.",
-        manual_task="Configure a shared cache backend such as django.core.cache.backends.redis.RedisCache with CACHE_BACKEND and CACHE_LOCATION.",
+        manual_task="Configure a shared Redis cache backend with CACHE_BACKEND, CACHE_LOCATION, CACHE_KEY_PREFIX, and CACHE_DEFAULT_TIMEOUT.",
     )
 
 
@@ -624,7 +815,8 @@ def _celery_config_check() -> dict:
         and _is_redis_url(result_backend)
         and not _is_localhost_url(broker_url)
         and not _is_localhost_url(result_backend)
-        and bool(_env_value("REDIS_URL"))
+        and (bool(_env_value("REDIS_URL")) or bool(_env_value("CELERY_BROKER_URL")))
+        and not bool(getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False))
         and not missing_tasks
     )
     detail = (
@@ -636,7 +828,7 @@ def _celery_config_check() -> dict:
         label="Celery config",
         ready=ready,
         detail=detail,
-        manual_task="Configure REDIS_URL to a deployed Redis instance and keep the training, retry, refresh, and cleanup beat schedules present.",
+        manual_task="Configure Redis-backed CELERY_BROKER_URL/CELERY_RESULT_BACKEND or REDIS_URL and keep training, retry, refresh, cleanup, and production heartbeat schedules present.",
     )
 
 
@@ -654,7 +846,10 @@ def _security_config_check() -> dict:
         and bool(getattr(settings, "SECURE_SSL_REDIRECT", False))
         and bool(getattr(settings, "SESSION_COOKIE_SECURE", False))
         and bool(getattr(settings, "CSRF_COOKIE_SECURE", False))
+        and bool(getattr(settings, "SESSION_COOKIE_HTTPONLY", False))
         and _as_int(getattr(settings, "SECURE_HSTS_SECONDS", 0)) > 0
+        and bool(getattr(settings, "SECURE_CONTENT_TYPE_NOSNIFF", False))
+        and bool(str(getattr(settings, "X_FRAME_OPTIONS", "") or "").strip())
         and not bool(getattr(settings, "CORS_ALLOW_ALL_ORIGINS", False))
         and bool(getattr(settings, "CSRF_TRUSTED_ORIGINS", []) or [])
     )

@@ -15,6 +15,7 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Auto-discover tasks across all installed apps
 app.autodiscover_tasks(lambda: [config.name for config in django_apps.get_app_configs()])
+import_module("alfred_ai.tasks")
 
 @app.task(bind=True)
 def debug_task(self):

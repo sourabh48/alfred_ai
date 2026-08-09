@@ -20,6 +20,8 @@ from .views import (
     document_review_retry_api_view,
     client_operational_log_api_view,
     health_api_view,
+    health_live_api_view,
+    health_ready_api_view,
     session_ping_api_view,
     account_settings_view,
     project_details_career_outcome_view,
@@ -31,6 +33,8 @@ from .views import (
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/", health_api_view, name="health"),
+    path("health/live/", health_live_api_view, name="health_live"),
+    path("health/ready/", health_ready_api_view, name="health_ready"),
     path("favicon.ico", RedirectView.as_view(url="/static/favicon.svg", permanent=True)),
     path("", index_view, name="index"),
     path("signup/", signup_view, name="signup"),

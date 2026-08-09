@@ -42,6 +42,50 @@ CLIENT_ROUTE_VALUE_PATTERN = re.compile(
 
 
 @require_http_methods(["GET"])
+def health_live_api_view(request):
+    return JsonResponse({"status": "ok"}, status=200, encoder=DjangoJSONEncoder)
+
+
+@require_http_methods(["GET"])
+def health_ready_api_view(request):
+    checks = {"database": "ok", "cache": "ok"}
+    status_code = 200
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except Exception:
+        checks["database"] = "error"
+        status_code = 503
+
+    try:
+        cache.set("alfred:readiness", "ok", timeout=30)
+        if cache.get("alfred:readiness") != "ok":
+            raise RuntimeError("cache probe mismatch")
+        cache.delete("alfred:readiness")
+    except Exception:
+        checks["cache"] = "error"
+        status_code = 503
+
+    if status_code != 200:
+        LOGGER.warning(
+            "readiness_check status=degraded database=%s cache=%s",
+            checks["database"],
+            checks["cache"],
+        )
+
+    return JsonResponse(
+        {
+            "status": "ready" if status_code == 200 else "not_ready",
+            "checks": checks,
+        },
+        status=status_code,
+        encoder=DjangoJSONEncoder,
+    )
+
+
+@require_http_methods(["GET"])
 def health_api_view(request):
     checks = {"database": "ok", "cache": "ok", "ml_runtime": "ok", "ml_startup_gate": "ok"}
     status_code = 200

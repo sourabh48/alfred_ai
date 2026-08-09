@@ -51,6 +51,8 @@ Minimum required variables:
 - `CACHE_BACKEND=django.core.cache.backends.redis.RedisCache`
 - `CACHE_LOCATION`; strict Free Tier uses `redis://redis:6379/1`
 - `REDIS_URL`; strict Free Tier uses `redis://redis:6379/0`
+- `CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND`; optional when both should equal `REDIS_URL`
+- `CELERY_TASK_ALWAYS_EAGER=false`
 - `ALFRED_SESSION_TIMEOUT_SECONDS=1800`
 - `ALFRED_SESSION_WARNING_SECONDS=300`
 - `SESSION_EXPIRE_AT_BROWSER_CLOSE=true`
@@ -80,6 +82,8 @@ Run local diagnostics:
 ```bash
 docker compose -f docker-compose.aws-local.yml exec web python manage.py check
 docker compose -f docker-compose.aws-local.yml exec web python manage.py makemigrations --check --dry-run
+docker compose -f docker-compose.aws-local.yml exec web curl -fsS http://127.0.0.1:8000/health/live/
+docker compose -f docker-compose.aws-local.yml exec web curl -fsS http://127.0.0.1:8000/health/ready/
 docker compose -f docker-compose.aws-local.yml exec web python scripts/exercise_materialized_cache_traffic.py --repetitions 3
 ```
 
@@ -109,9 +113,9 @@ The compose file intentionally disables HTTPS-only settings for `http://localhos
 | Shared cache config | Redis-backed `CACHE_BACKEND` and `CACHE_LOCATION` | `python manage.py check` plus readiness probe cache section |
 | Celery config | `REDIS_URL` points to deployed Redis and beat schedule remains present | `python manage.py check` plus readiness probe Celery section |
 | Production security config | `DEBUG=false`, HTTPS, secure cookies, HSTS, real hosts and CSRF origins | readiness probe security section |
-| Database runtime proof | migrations applied against PostgreSQL and connection usable | `python scripts/run_production_readiness_probe.py --require-ready` |
-| Shared cache runtime proof | Redis read/write probe succeeds | `python scripts/run_production_readiness_probe.py --require-ready` |
-| Celery worker and beat proof | worker responds to ping and beat schedule is loaded | `python scripts/run_production_readiness_probe.py --require-ready` |
+| Database runtime proof | migrations applied against PostgreSQL, `SELECT 1` succeeds, and an isolated probe record survives reconnect/read/delete | `python scripts/run_production_readiness_probe.py --require-ready` |
+| Shared cache runtime proof | Redis write/read/delete probe succeeds through Django cache | `python scripts/run_production_readiness_probe.py --require-ready` |
+| Celery worker and beat proof | worker responds to ping, safe probe task executes through broker/result backend, and beat heartbeat is fresh | `python scripts/run_production_readiness_probe.py --require-ready` |
 | Production cache traffic proof | all materialized namespaces exercised through shared Redis under deployed traffic | `python scripts/exercise_materialized_cache_traffic.py --allow-live-external` then readiness probe |
 | Browser CI proof | GitHub browser-regression workflow records zero skipped Selenium tests | `artifacts/browser/browser_regression_summary.ci-chrome.json` |
 

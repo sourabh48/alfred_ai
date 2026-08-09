@@ -8,7 +8,7 @@ For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md) and [AWS Free Ti
 
 - Large-data hardening is at 90% in Project Details after deterministic staging traffic exercised all 21 materialized cache namespaces.
 - Browser/UI regression coverage is implemented, but full UI maturity remains gated on repeated no-skip local Chrome or Edge and CI Chrome summaries.
-- Batch jobs are implemented through Celery worker and beat schedules for ML training, statement retry, verified-intelligence refresh, and verified-intelligence cleanup.
+- Batch jobs are implemented through Celery worker and beat schedules for ML training, statement retry, verified-intelligence refresh, verified-intelligence cleanup, and production heartbeat proof.
 - Verified evidence refresh can be exercised manually with `python scripts/refresh_verified_evidence.py --require-healthy`, which writes `artifacts/evidence/verified_evidence_refresh_summary.json` for Project Details.
 - Production deployment readiness can be probed with `python scripts/run_production_readiness_probe.py --require-ready`, which writes `artifacts/ops/production_readiness_summary.json` for Project Details.
 - Project Details now exposes a Deployment Readiness card and `production_readiness` payload. It remains gated until production database, shared cache, Celery runtime, security settings, browser CI, and production-like cache traffic are all proven.
@@ -20,6 +20,7 @@ For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md) and [AWS Free Ti
 - Use a production database such as PostgreSQL, run migrations, and configure backup and restore checks.
 - Use Redis or another shared cache backend for Django cache state and materialized dashboard telemetry; local-memory cache is only for development.
 - Run separate Celery worker and Celery beat processes with Redis broker/result backend.
+- Keep `/health/live/` for process liveness separate from `/health/ready/`, which checks database and shared-cache readiness.
 - Store media and generated artifacts in durable storage with access controls.
 - Keep browser-regression CI green with `ALFRED_RUN_BROWSER_TESTS=true`, zero skipped Selenium tests, and uploaded browser artifacts.
 - Record sustained production-like cache telemetry for all materialized namespaces under realistic concurrency and payload volume.
@@ -34,11 +35,14 @@ For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md) and [AWS Free Ti
 | `ALLOWED_HOSTS` | Explicit production hostnames |
 | `CSRF_TRUSTED_ORIGINS` | Explicit HTTPS origins |
 | `CORS_ALLOWED_ORIGINS` | Explicit origins when cross-origin browser access is required |
-| `DB_ENGINE` | Production backend such as `django.db.backends.postgresql` |
-| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | Production database connection settings |
+| `DATABASE_URL` | Optional single PostgreSQL connection URL |
+| `DB_ENGINE` | Production backend such as `django.db.backends.postgresql` when `DATABASE_URL` is not used |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | Production database connection settings when `DATABASE_URL` is not used |
 | `CACHE_BACKEND` | Shared backend such as `django.core.cache.backends.redis.RedisCache` |
 | `CACHE_LOCATION` | Shared cache location, usually Redis |
 | `REDIS_URL` | Redis broker/result backend for Celery |
+| `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND` | Optional explicit Celery URLs; default to `REDIS_URL` when omitted |
+| `CELERY_TASK_ALWAYS_EAGER` | Must be `false` in production |
 | `ALFRED_SESSION_TIMEOUT_SECONDS` | Bounded authenticated idle timeout, recommended `1800` for production |
 | `ALFRED_SESSION_WARNING_SECONDS` | User-visible warning window, recommended `300` |
 | `SESSION_SAVE_EVERY_REQUEST` | `true`, so active authenticated requests refresh the idle timeout |
@@ -64,6 +68,7 @@ The current beat schedule includes:
 - `apps.expenses.tasks.retry_low_confidence_statement_uploads` every 20 minutes.
 - `apps.integrations.tasks.refresh_verified_external_intelligence` every 6 hours.
 - `apps.integrations.tasks.cleanup_verified_external_intelligence` every 24 hours.
+- `alfred_ai.tasks.production_beat_heartbeat` every 5 minutes for safe beat runtime proof.
 
 ## Deployment Proof Contract
 
@@ -72,10 +77,11 @@ Project Details reads `artifacts/ops/production_readiness_summary.json` by defau
 - `source: production_deployment_probe`
 - `environment: production`
 - required production environment variables with `ALFRED_LOCAL_RUNTIME=false` and `DEBUG=false`
-- database engine, usable connection, and current migrations
-- shared cache backend and read/write health
-- Redis-backed Celery worker ping, beat schedule health, and required scheduled task count
-- `DEBUG=false`, configured hosts, production secret, HTTPS redirect, secure cookies, and HSTS
+- PostgreSQL engine, usable connection, `SELECT 1`, current migrations, and safe isolated persistence proof
+- Redis shared cache backend plus write/read/delete health
+- Redis-backed Celery broker connection, worker ping, safe task execution/result retrieval, beat schedule health, required scheduled task count, and fresh beat heartbeat
+- `DEBUG=false`, configured hosts, production secret, HTTPS redirect, secure/HttpOnly cookies, HSTS, CSRF origins, restricted CORS, and response hardening headers
+- static configuration plus configured `/health/live/` and `/health/ready/` endpoints
 - CI Chrome browser proof with zero skipped Selenium tests
 - production-like shared-cache traffic covering every materialized namespace
 
@@ -91,9 +97,9 @@ Run the deployment probe only after the production web process can load settings
 | Shared cache config | Django cache uses Redis or another shared backend | `CACHE_BACKEND=django.core.cache.backends.redis.RedisCache` and `CACHE_LOCATION` |
 | Celery config | Broker/result backend use deployed Redis and required beat entries remain configured | `REDIS_URL` plus `python manage.py check` |
 | Production security config | Local runtime disabled, debug disabled, real secret, explicit hosts/origins, HTTPS redirect, secure cookies, and HSTS | `python scripts/run_production_readiness_probe.py --require-ready` |
-| Database runtime proof | Deployed app can connect to PostgreSQL and migrations are current | readiness probe database section |
-| Shared cache runtime proof | Deployed app can write/read/delete through shared cache | readiness probe cache section |
-| Celery worker and beat proof | Worker ping succeeds and beat schedule includes training, retry, refresh, and cleanup | readiness probe Celery section |
+| Database runtime proof | Deployed app can connect to PostgreSQL, run `SELECT 1`, verify migrations, and create/read/delete an isolated probe record | readiness probe database section |
+| Shared cache runtime proof | Deployed app can write/read/delete through Redis shared cache | readiness probe cache section |
+| Celery worker and beat proof | Worker ping succeeds, a safe probe task executes through the worker/result backend, and beat heartbeat is fresh | readiness probe Celery section |
 | Production cache traffic proof | Shared-cache telemetry covers every registered materialized namespace under deployed traffic | `python scripts/exercise_materialized_cache_traffic.py --allow-live-external` then readiness probe |
 | Browser CI proof | GitHub browser-regression job writes CI Chrome summary with zero skipped Selenium tests | `artifacts/browser/browser_regression_summary.ci-chrome.json` |
 
