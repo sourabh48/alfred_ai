@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 
 from alfred_ai.pagination import OptionalPageNumberPagination
 from alfred_ai.services import record_parser_learning
+from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction, raw_upload_cleanup_enabled
 from .models import BankAccount, Expense, StatementUpload
 from .serializers import BankAccountSerializer, ExpenseSerializer, StatementUploadSerializer
 from .services.financial_intelligence import DISCRETIONARY_CATEGORIES, build_financial_intelligence
@@ -575,15 +576,34 @@ class ExpenseStatementImportView(APIView):
             confidence=parsed.confidence,
         )
         if not parsed.transactions or parsed.preview_only:
-            queue_statement_retry(upload, reason="partial_ocr_preview_parse" if parsed.preview_only else "initial_low_confidence_parse")
-            _dispatch_statement_retry(upload.id, 8)
+            if raw_upload_cleanup_enabled():
+                payload = dict(upload.extracted_payload or {})
+                payload["background_retry"] = {
+                    "state": "not_queued_raw_file_deleted",
+                    "reason": "raw upload deletion policy prevents background retry from retaining the source document",
+                    "updated_at": timezone.now().isoformat(),
+                }
+                upload.extracted_payload = payload
+                upload.save(update_fields=["extracted_payload"])
+            else:
+                queue_statement_retry(upload, reason="partial_ocr_preview_parse" if parsed.preview_only else "initial_low_confidence_parse")
+                _dispatch_statement_retry(upload.id, 8)
+        raw_file_retention = purge_uploaded_file_after_extraction(
+            upload,
+            "original_file",
+            reason="statement_import_extraction_complete",
+        )
 
         if not parsed.transactions:
             detail = f"Uploaded {statement_file.name}. Alfred classified it as {statement_kind.replace('_', ' ')} but could not confidently extract transactions yet."
             if parsed.parser_status == "failed":
                 detail = (
                     f"Uploaded {statement_file.name}. Alfred could not read this PDF cleanly, "
-                    "so the file was stored for review and queued for a deeper background retry instead of crashing the import."
+                    + (
+                        "so the raw file was deleted after the extraction attempt; re-upload a clearer copy if review needs the original."
+                        if raw_file_retention.get("deleted")
+                        else "so the file was stored for review and queued for a deeper background retry instead of crashing the import."
+                    )
                 )
             return Response(
                 {
@@ -593,6 +613,7 @@ class ExpenseStatementImportView(APIView):
                     "loan_detection": result.loan_detection,
                     "account": BankAccountSerializer(bank_account).data if bank_account else None,
                     "upload": StatementUploadSerializer(upload).data,
+                    "raw_file_retention": raw_file_retention,
                     "parser_notes": parsed.parser_notes,
                     "summary": {
                         "expense_total": 0.0,
@@ -613,7 +634,11 @@ class ExpenseStatementImportView(APIView):
                     "detail": (
                         f"Imported {result.new_import_count} OCR-preview transactions from {statement_file.name}. "
                         f"Alfred populated data from the first {processed_pages} of {total_pages} repaired page(s) "
-                        "and queued deeper background parsing for the remaining pages."
+                        + (
+                            "and deleted the raw file after extraction; re-upload is needed for deeper parsing."
+                            if raw_file_retention.get("deleted")
+                            else "and queued deeper background parsing for the remaining pages."
+                        )
                     ),
                     "imported_count": result.new_import_count,
                     "skipped_count": result.skipped_count,
@@ -625,6 +650,7 @@ class ExpenseStatementImportView(APIView):
                     },
                     "account": BankAccountSerializer(bank_account).data if bank_account else None,
                     "upload": StatementUploadSerializer(upload).data,
+                    "raw_file_retention": raw_file_retention,
                     "summary": {
                         key: round(value, 2) if isinstance(value, float) else value
                         for key, value in result.summary.items()
@@ -647,6 +673,7 @@ class ExpenseStatementImportView(APIView):
                 },
                 "account": BankAccountSerializer(bank_account).data if bank_account else None,
                 "upload": StatementUploadSerializer(upload).data,
+                "raw_file_retention": raw_file_retention,
                 "summary": {
                     key: round(value, 2) if isinstance(value, float) else value
                     for key, value in result.summary.items()

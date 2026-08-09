@@ -21,6 +21,18 @@ class LoanIntelligenceService:
         "SBI LOAN", "AXIS LOAN", "EMI", "LOAN", "FINCORP", "FINSERV",
         "BAJAJ HOUSING", "TATA CAPITAL", "FULLERTON", "MUTHOOT", "MANAPPURAM",
     ]
+    SUBSCRIPTION_PROTECTED_KEYWORDS = (
+        "GOOGLE PLAY",
+        "PLAYSTORE",
+        "GOOGLE INDIA DIGITAL",
+        "NETFLIX",
+        "SPOTIFY",
+        "YOUTUBE",
+        "SUBSCRIPTION",
+        "MEMBERSHIP",
+    )
+    WALLET_KEYWORDS = ("GOOGLE PAY", "GOOGLEPAY", "GPAY", "G PAY")
+    MANDATE_KEYWORDS = ("MANDATEEXECUTE", "AUTOPAY", "AUTO PAY", "EMANDATE", "E-MANDATE", "ENACH")
 
     def detect_loan_payments(self, user, expenses: Optional[List[Expense]] = None) -> Dict[str, any]:
         """
@@ -46,6 +58,8 @@ class LoanIntelligenceService:
         review_payments = []
 
         for expense in loan_expenses:
+            if self._looks_like_non_loan_subscription(expense):
+                continue
             # Check if payment is already linked
             if hasattr(expense, "linked_loan_payments") and expense.linked_loan_payments.exists():
                 continue
@@ -57,7 +71,10 @@ class LoanIntelligenceService:
             if matched_loan:
                 # Update existing loan
                 payment = self._create_payment_record(matched_loan, expense, match)
-                self._update_loan_from_payment(matched_loan, payment)
+                if payment.match_status == "matched":
+                    self._update_loan_from_payment(matched_loan, payment)
+                    payment.loan_effect_applied = True
+                    payment.save(update_fields=["loan_effect_applied"])
                 updated_loans.append(matched_loan)
                 new_payments.append(payment)
                 if payment.match_status == "review":
@@ -71,6 +88,10 @@ class LoanIntelligenceService:
                         expense,
                         {"confidence": 62.0, "reason": "Recurring EMI-like pattern detected from statement history."},
                     )
+                    if payment.match_status == "matched":
+                        self._update_loan_from_payment(new_loan, payment)
+                        payment.loan_effect_applied = True
+                        payment.save(update_fields=["loan_effect_applied"])
                     detected_loans.append(new_loan)
                     new_payments.append(payment)
                     review_payments.append(payment)
@@ -97,6 +118,13 @@ class LoanIntelligenceService:
 
     def match_expense_to_loan(self, user, expense: Expense) -> Dict[str, any]:
         """Match an expense to the most likely active loan and expose confidence metadata."""
+        if self._looks_like_non_loan_subscription(expense):
+            return {
+                "loan": None,
+                "confidence": 0.0,
+                "reason": "Subscription or wallet mandate signals excluded this expense from loan matching.",
+            }
+
         active_loans = list(Loan.objects.filter(user=user, is_active=True).order_by("-updated_at", "-id"))
         best_loan = None
         best_score = 0.0
@@ -115,6 +143,9 @@ class LoanIntelligenceService:
 
     def _create_loan_from_expense(self, user, expense: Expense) -> Optional[Loan]:
         """Auto-create loan from detected EMI pattern."""
+        if self._looks_like_non_loan_subscription(expense):
+            return None
+
         # Look for recurring payments (same merchant, similar amounts)
         similar_expenses = Expense.objects.filter(
             user=user,
@@ -342,6 +373,9 @@ class LoanIntelligenceService:
         }
 
     def _loan_match_score(self, loan: Loan, expense: Expense) -> tuple[float, str]:
+        if self._looks_like_non_loan_subscription(expense):
+            return 0.0, "Subscription or wallet mandate signals excluded this expense from loan matching."
+
         text = " ".join(
             part for part in [
                 expense.description,
@@ -385,6 +419,38 @@ class LoanIntelligenceService:
             reasons.append("Credit-card debt wording was detected.")
 
         return score, " ".join(reasons) if reasons else "Only weak signals matched this expense to the loan."
+
+    def _looks_like_non_loan_subscription(self, expense: Expense) -> bool:
+        text = " ".join(
+            part for part in [
+                expense.description,
+                expense.raw_description,
+                expense.external_reference,
+                expense.company_name,
+                expense.merchant,
+                expense.counterparty,
+            ]
+            if part
+        ).upper()
+
+        if not text:
+            return False
+
+        category_is_subscription = (expense.category or "").lower() == "subscription"
+        protected_subscription = any(keyword in text for keyword in self.SUBSCRIPTION_PROTECTED_KEYWORDS)
+        if protected_subscription and (
+            category_is_subscription
+            or any(keyword in text for keyword in self.MANDATE_KEYWORDS)
+            or "GOOGLE PLAY" in text
+            or "PLAYSTORE" in text
+        ):
+            return True
+
+        wallet_mandate = any(keyword in text for keyword in self.WALLET_KEYWORDS) and any(
+            keyword in text for keyword in self.MANDATE_KEYWORDS
+        )
+        strong_loan_signal = any(keyword in text for keyword in self.LOAN_KEYWORDS)
+        return wallet_mandate and not strong_loan_signal
 
 
 # Singleton instance

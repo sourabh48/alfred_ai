@@ -93,6 +93,7 @@ def build_financial_relationships(*, user, expenses, loans) -> tuple[dict, dict[
         user=user,
         require_expense_reference=True,
         include_loan_fields=True,
+        include_review=True,
     )
     snapshots = list(
         LoanForeclosureSnapshot.objects.select_related("loan")

@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 
 from alfred_ai.services import record_parser_learning
 from alfred_ai.services.materialized_cache import materialize_payload
+from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.expenses.models import BankAccount
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.integrations.services import verified_intelligence
@@ -392,6 +393,11 @@ class CareerResumeUploadView(APIView):
                     "summary": parsed.summary,
                 },
             )
+        raw_file_retention = purge_uploaded_file_after_extraction(
+            resume,
+            "uploaded_file",
+            reason="resume_extraction_complete",
+        )
         return Response(
             {
                 "detail": (
@@ -401,6 +407,7 @@ class CareerResumeUploadView(APIView):
                 ),
                 "resume": CareerResumeSerializer(resume, context={"request": request}).data,
                 "profile": CareerProfileSerializer(profile).data,
+                "raw_file_retention": raw_file_retention,
             },
             status=status.HTTP_201_CREATED,
         )

@@ -14,7 +14,9 @@ from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot
 from apps.loans.serializers import LoanSerializer
 from apps.loans.services.loan_closure_parser import loan_closure_parser
 from apps.loans.services.loan_foreclosure_service import loan_foreclosure_service
-from apps.reports.models import SystemTicket
+from apps.loans.services.loan_intelligence import loan_intelligence_service
+from apps.loans.services.payment_review import reject_subscription_false_positive_match, review_loan_payment_match
+from apps.reports.models import OperationalLog, SystemTicket
 
 
 class LoanLifecycleTests(TestCase):
@@ -81,6 +83,283 @@ class LoanLifecycleTests(TestCase):
         )
         loan_foreclosure_service._mark_foreclosure_pending(loan, snapshot)
         return snapshot
+
+    def test_loan_detection_skips_legacy_google_play_subscription_mandates(self):
+        loan = Loan.objects.create(
+            user=self.user,
+            loan_type="car",
+            lender="Google Play Store Mandateexecute",
+            loan_account_number="MANDATEEXECUTE",
+            principal=10000,
+            interest_rate=10,
+            emi=149,
+            tenure_months=24,
+            remaining_balance=10000,
+            start_date=timezone.localdate(),
+            auto_detected=True,
+        )
+        expense = Expense.objects.create(
+            user=self.user,
+            amount=149,
+            classification="loan",
+            category="loan",
+            payment_mode="UPI",
+            merchant="Google Play Store Mandateexecute",
+            description="Auto-classified as loan payment: UPI-GOOGLE PLAY STORE",
+            raw_description=(
+                "UPI-GOOGLE PLAY STORE-PLAYSTORE@AXISBANK "
+                "0000728141860925-UTIB0000553-728141860925-MANDATEEXECUTE"
+            ),
+            transaction_date=timezone.localdate(),
+            direction="debit",
+            source="bank_statement",
+            external_reference="MANDATEEXECUTE",
+            counterparty="Google Play Store Mandateexecute",
+            company_name="Google Play Store Mandateexecute",
+        )
+
+        result = loan_intelligence_service.detect_loan_payments(self.user)
+
+        self.assertEqual(result["new_payments"], 0)
+        self.assertEqual(result["review_payments"], 0)
+        self.assertFalse(LoanPaymentHistory.objects.filter(expense_reference=expense).exists())
+        self.assertFalse(SystemTicket.objects.filter(module="loans").exists())
+        loan.refresh_from_db()
+        self.assertEqual(loan.total_paid, 0)
+        self.assertEqual(loan.remaining_balance, 10000)
+
+    def test_rejecting_subscription_false_positive_keeps_auto_detected_loan_out_of_debt(self):
+        loan = Loan.objects.create(
+            user=self.user,
+            loan_type="car",
+            lender="Google Play Store Mandateexecute",
+            loan_account_number="MANDATEEXECUTE",
+            principal=3576,
+            interest_rate=10,
+            emi=149,
+            tenure_months=24,
+            remaining_balance=0,
+            start_date=timezone.localdate(),
+            status="closed",
+            is_active=False,
+            auto_detected=True,
+            total_paid=149,
+            last_payment_date=timezone.localdate(),
+        )
+        expense = Expense.objects.create(
+            user=self.user,
+            amount=149,
+            classification="expense",
+            category="subscription",
+            payment_mode="UPI",
+            merchant="Google Play",
+            description="Google Play subscription mandate",
+            raw_description=(
+                "UPI-GOOGLE PLAY-PLAYSTORE@AXISBANK-UTIB0000553 "
+                "0000417586101325-MANDATEEXECUTE"
+            ),
+            transaction_date=timezone.localdate(),
+            direction="debit",
+            source="bank_statement",
+            external_reference="MANDATEEXECUTE",
+            counterparty="Google Play",
+            company_name="Google Play",
+        )
+        payment = LoanPaymentHistory.objects.create(
+            loan=loan,
+            payment_date=expense.transaction_date,
+            amount=149,
+            principal_component=119.2,
+            interest_component=29.8,
+            principal_paid=119.2,
+            interest_paid=29.8,
+            remaining_balance=0,
+            is_auto_detected=True,
+            detection_confidence=62,
+            detection_reason="Recurring EMI-like pattern detected from statement history.",
+            matched_reference=expense.external_reference,
+            match_status="review",
+            loan_effect_applied=True,
+            expense_reference=expense,
+        )
+
+        response = self.client.post(
+            f"/api/loans/payment-history/{payment.id}/review/",
+            data=json.dumps({"decision": "reject", "notes": "Google Play subscription, not EMI."}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payment.refresh_from_db()
+        loan.refresh_from_db()
+        self.assertEqual(payment.match_status, "rejected")
+        self.assertFalse(payment.loan_effect_applied)
+        self.assertFalse(loan.is_active)
+        self.assertEqual(loan.status, "closed")
+        self.assertEqual(loan.remaining_balance, 0)
+        self.assertEqual(loan.total_paid, 0)
+        self.assertIn("excluded after review rejected", loan.notes)
+
+    def test_subscription_false_positive_rejects_historical_matched_payment(self):
+        loan = Loan.objects.create(
+            user=self.user,
+            loan_type="car",
+            lender="Google Play Playstore Axisbank Mandateexecute",
+            loan_account_number="MANDATEEXECUTE",
+            principal=3576,
+            interest_rate=10,
+            emi=149,
+            tenure_months=24,
+            remaining_balance=0,
+            start_date=timezone.localdate(),
+            status="closed",
+            is_active=False,
+            auto_detected=True,
+            total_paid=149,
+            last_payment_date=timezone.localdate(),
+        )
+        expense = Expense.objects.create(
+            user=self.user,
+            amount=149,
+            classification="expense",
+            category="subscription",
+            payment_mode="UPI",
+            merchant="Google Play",
+            description="Google Play subscription mandate",
+            raw_description="UPI-GOOGLE PLAY-PLAYSTORE@AXISBANK-UTIB0000553-MANDATEEXECUTE",
+            transaction_date=timezone.localdate(),
+            direction="debit",
+            source="bank_statement",
+            external_reference="MANDATEEXECUTE",
+            counterparty="Google Play",
+            company_name="Google Play",
+        )
+        payment = LoanPaymentHistory.objects.create(
+            loan=loan,
+            payment_date=expense.transaction_date,
+            amount=149,
+            principal_component=119.2,
+            interest_component=29.8,
+            principal_paid=119.2,
+            interest_paid=29.8,
+            remaining_balance=0,
+            is_auto_detected=True,
+            detection_confidence=82,
+            detection_reason="High-confidence historical match.",
+            matched_reference=expense.external_reference,
+            match_status="matched",
+            loan_effect_applied=True,
+            expense_reference=expense,
+        )
+
+        reject_subscription_false_positive_match(
+            user=self.user,
+            payment_id=payment.id,
+            reviewer=self.user,
+            notes="Google Play subscription, not EMI.",
+        )
+
+        payment.refresh_from_db()
+        loan.refresh_from_db()
+        self.assertEqual(payment.match_status, "rejected")
+        self.assertFalse(payment.loan_effect_applied)
+        self.assertFalse(loan.is_active)
+        self.assertEqual(loan.status, "closed")
+        self.assertEqual(loan.remaining_balance, 0)
+        self.assertTrue(
+            OperationalLog.objects.filter(
+                user=self.user,
+                scope="loan_payment_review",
+                event_type="loan_payment_subscription_false_positive_rejected",
+            ).exists()
+        )
+
+    def test_accepting_historical_applied_review_payment_refreshes_latest_loan_summary(self):
+        older_date = timezone.localdate() - timedelta(days=30)
+        latest_date = timezone.localdate()
+        loan = Loan.objects.create(
+            user=self.user,
+            loan_type="personal",
+            lender="Poonawalla Fincorp",
+            loan_account_number="POONAWALLA001",
+            principal=120000,
+            interest_rate=12,
+            emi=4423,
+            tenure_months=24,
+            remaining_balance=53076.36,
+            start_date=older_date,
+            status="active",
+            is_active=True,
+            total_paid=55249,
+            last_payment_date=older_date,
+        )
+        older_expense = Expense.objects.create(
+            user=self.user,
+            amount=4428,
+            classification="loan",
+            category="loan",
+            merchant="Poonawalla Fincorp",
+            description="Poonawalla EMI",
+            raw_description="UPI-POONAWALLA FINCORP EMI",
+            transaction_date=older_date,
+            direction="debit",
+            source="bank_statement",
+            external_reference="POONAWALLA-OLD",
+        )
+        latest_expense = Expense.objects.create(
+            user=self.user,
+            amount=50821,
+            classification="loan",
+            category="loan",
+            merchant="Poonawalla Fincorp",
+            description="Poonawalla large repayment",
+            raw_description="UPI-POONAWALLA FINCORP LARGE REPAYMENT",
+            transaction_date=latest_date,
+            direction="debit",
+            source="bank_statement",
+            external_reference="POONAWALLA-LARGE",
+        )
+        LoanPaymentHistory.objects.create(
+            loan=loan,
+            payment_date=older_date,
+            amount=4428,
+            principal_component=3500,
+            interest_component=928,
+            principal_paid=3500,
+            interest_paid=928,
+            remaining_balance=102608.6,
+            match_status="matched",
+            loan_effect_applied=True,
+            expense_reference=older_expense,
+        )
+        latest_payment = LoanPaymentHistory.objects.create(
+            loan=loan,
+            payment_date=latest_date,
+            amount=50821,
+            principal_component=49965.93,
+            interest_component=855.07,
+            principal_paid=49965.93,
+            interest_paid=855.07,
+            remaining_balance=52642.67,
+            match_status="review",
+            loan_effect_applied=True,
+            expense_reference=latest_expense,
+        )
+
+        review_loan_payment_match(
+            user=self.user,
+            payment_id=latest_payment.id,
+            decision="accept",
+            reviewer=self.user,
+            notes="Large repayment verified.",
+        )
+
+        loan.refresh_from_db()
+        latest_payment.refresh_from_db()
+        self.assertEqual(latest_payment.match_status, "matched")
+        self.assertEqual(loan.last_payment_date, latest_date)
+        self.assertEqual(loan.remaining_balance, 52642.67)
+        self.assertEqual(loan.total_paid, 55249.0)
 
     def test_consolidate_loans_creates_new_loan_and_closes_sources(self):
         loan_one = Loan.objects.create(

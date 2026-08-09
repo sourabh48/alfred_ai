@@ -4,12 +4,16 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone as datetime_timezone
 import hashlib
 import json
+import os
+from pathlib import Path
 import re
 from statistics import mean
+from typing import Any
 from urllib.parse import quote_plus
 
 import feedparser
 import requests
+from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Count, Max, Min, Q
@@ -26,6 +30,11 @@ class InsightResult:
     cached: bool
 
 
+EVIDENCE_REFRESH_PROOF_ENV = "ALFRED_VERIFIED_EVIDENCE_REFRESH_PROOF"
+EVIDENCE_REFRESH_PROOF_DEFAULT_PATH = "artifacts/evidence/verified_evidence_refresh_summary.json"
+EVIDENCE_REFRESH_PROOF_SOURCE = "verified_evidence_refresh_probe"
+
+
 JOB_SALARY_SNIPPET_RE = re.compile(
     r"(?:(?:INR|RS\.?|USD|\$)\s*)?\d[\d,]*(?:\.\d+)?\s*"
     r"(?:k|lpa|lakh|lakhs|crore|cr|million|m)?"
@@ -34,6 +43,149 @@ JOB_SALARY_SNIPPET_RE = re.compile(
     r"\s*(?:per\s+annum|per\s+year|/year|yearly|annual|annum|lpa|per\s+month|/month|monthly|month|pm)?",
     re.IGNORECASE,
 )
+
+
+def _project_path(path_value: str | Path) -> Path:
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    return Path(settings.BASE_DIR) / path
+
+
+def evidence_refresh_proof_path(proof_path: str | Path | None = None) -> Path:
+    if proof_path:
+        return _project_path(proof_path)
+    configured_path = os.environ.get(EVIDENCE_REFRESH_PROOF_ENV, "").strip()
+    if configured_path:
+        return _project_path(configured_path)
+    return _project_path(EVIDENCE_REFRESH_PROOF_DEFAULT_PATH)
+
+
+def _proof_default(*, path: str = "", recorded: bool = False, blockers: list[str] | None = None) -> dict:
+    return {
+        "path": path,
+        "recorded": recorded,
+        "accepted": False,
+        "state": "missing" if not recorded else "failed",
+        "blockers": blockers or ["evidence refresh proof artifact missing"],
+        "summary_version": 0,
+        "source": "",
+        "generated_at_utc": "",
+        "active_records": 0,
+        "fresh_records": 0,
+        "watchlist_records": 0,
+        "due_records": 0,
+        "failed_records": 0,
+        "capacity_gap_records": 0,
+        "processed": 0,
+        "refreshed": 0,
+        "skipped": 0,
+        "summary": "No accepted evidence refresh proof has been recorded.",
+    }
+
+
+def _as_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "ok", "ready", "passed"}
+
+
+def validate_evidence_refresh_proof(payload: dict, *, proof_path: str = "") -> dict:
+    if not isinstance(payload, dict):
+        return _proof_default(
+            path=proof_path,
+            recorded=True,
+            blockers=["evidence refresh proof artifact is not a JSON object"],
+        )
+
+    blockers: list[str] = []
+    source = str(payload.get("source") or "")
+    summary_version = _as_int(payload.get("summary_version"))
+    generated_at_utc = str(payload.get("generated_at_utc") or "")
+    refresh_result = dict(payload.get("refresh_result") or {})
+    refresh_health = dict(payload.get("refresh_health") or {})
+
+    active_records = _as_int(refresh_health.get("active_records"))
+    fresh_records = _as_int(refresh_health.get("fresh_records"))
+    watchlist_records = _as_int(refresh_health.get("watchlist_records"))
+    due_records = _as_int(refresh_health.get("due_records"))
+    failed_records = _as_int(refresh_result.get("failed"))
+    skipped_records = _as_int(refresh_result.get("skipped"))
+    processed_records = _as_int(refresh_result.get("processed"))
+    refreshed_records = _as_int(refresh_result.get("refreshed"))
+    capacity_gap_records = _as_int(refresh_health.get("capacity_gap_records", refresh_result.get("capacity_gap_records")))
+    scheduled_refresh_healthy = _as_bool(refresh_health.get("scheduled_refresh_healthy", refresh_health.get("healthy")))
+
+    if source != EVIDENCE_REFRESH_PROOF_SOURCE:
+        blockers.append(f"source is not {EVIDENCE_REFRESH_PROOF_SOURCE}")
+    if summary_version < 1:
+        blockers.append("summary_version is missing or unsupported")
+    if not generated_at_utc:
+        blockers.append("generated_at_utc is missing")
+    if active_records <= 0:
+        blockers.append("refresh proof must include at least one active evidence record")
+    if fresh_records != active_records:
+        blockers.append("not all active evidence records are fresh after refresh")
+    if watchlist_records:
+        blockers.append("watchlist records remain after refresh")
+    if due_records:
+        blockers.append("due records remain after refresh")
+    if failed_records:
+        blockers.append("refresh run recorded failed records")
+    if capacity_gap_records:
+        blockers.append("scheduled refresh capacity gap remains")
+    if not scheduled_refresh_healthy:
+        blockers.append("scheduled refresh health is not healthy after refresh")
+
+    accepted = not blockers
+    return {
+        "path": proof_path,
+        "recorded": True,
+        "accepted": accepted,
+        "state": "accepted" if accepted else "failed",
+        "blockers": blockers,
+        "summary_version": summary_version,
+        "source": source,
+        "generated_at_utc": generated_at_utc,
+        "active_records": active_records,
+        "fresh_records": fresh_records,
+        "watchlist_records": watchlist_records,
+        "due_records": due_records,
+        "failed_records": failed_records,
+        "capacity_gap_records": capacity_gap_records,
+        "processed": processed_records,
+        "refreshed": refreshed_records,
+        "skipped": skipped_records,
+        "summary": (
+            f"Accepted evidence refresh proof covers {fresh_records}/{active_records} fresh active record(s), "
+            f"{processed_records} processed, {refreshed_records} refreshed, {skipped_records} skipped, and zero failed records."
+            if accepted
+            else f"Evidence refresh proof is present but not accepted: {'; '.join(blockers[:3])}."
+        ),
+    }
+
+
+def load_evidence_refresh_proof(proof_path: str | Path | None = None) -> dict:
+    path = evidence_refresh_proof_path(proof_path)
+    path_label = str(path)
+    if not path.exists():
+        return _proof_default(path=path_label)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return _proof_default(
+            path=path_label,
+            recorded=True,
+            blockers=[f"evidence refresh proof artifact is unreadable: {exc}"],
+        )
+    return validate_evidence_refresh_proof(payload, proof_path=path_label)
 
 
 def _parse_stale_after(value):
@@ -580,7 +732,13 @@ class VerifiedIntelligenceService:
         )
         return InsightResult(payload, self._serialize_evidence(stored), False)
 
-    def refresh_due_records(self, batch_size: int | None = None) -> dict:
+    def refresh_due_records(
+        self,
+        batch_size: int | None = None,
+        *,
+        write_proof: bool = False,
+        proof_path: str | Path | None = None,
+    ) -> dict:
         self.cleanup_stale()
         now = timezone.now()
         batch_size = max(1, int(batch_size or self.REFRESH_BATCH_SIZE))
@@ -630,7 +788,7 @@ class VerifiedIntelligenceService:
         watchlist_before = health_before["watchlist_records"]
         watchlist_after = health_after["watchlist_records"]
 
-        return {
+        result = {
             "processed": processed,
             "refreshed": refreshed,
             "skipped": skipped,
@@ -651,6 +809,31 @@ class VerifiedIntelligenceService:
             "per_scope_health": health_after["per_scope"],
             "records": records,
         }
+        if write_proof or proof_path:
+            result["refresh_proof"] = self.write_refresh_proof(result, proof_path=proof_path)
+        return result
+
+    def write_refresh_proof(self, refresh_result: dict, *, proof_path: str | Path | None = None) -> dict:
+        path = evidence_refresh_proof_path(proof_path)
+        refresh_health = self.refresh_health_snapshot()
+        refresh_result_payload = {
+            key: value
+            for key, value in dict(refresh_result).items()
+            if key != "refresh_proof"
+        }
+        summary = {
+            "summary_version": 1,
+            "source": EVIDENCE_REFRESH_PROOF_SOURCE,
+            "generated_at_utc": timezone.now().isoformat(),
+            "refresh_result": refresh_result_payload,
+            "refresh_health": refresh_health,
+        }
+        validation = validate_evidence_refresh_proof(summary, proof_path=str(path))
+        summary["validation"] = validation
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(summary, indent=2, sort_keys=True, default=str), encoding="utf-8")
+        summary["proof_path"] = str(path)
+        return summary
 
     def refresh_health_snapshot(self, now=None) -> dict:
         now = now or timezone.now()
@@ -749,6 +932,7 @@ class VerifiedIntelligenceService:
     def guardrail_snapshot(self) -> dict:
         proof_contract = advisory_proof_contract_snapshot()
         refresh_health = self.refresh_health_snapshot()
+        refresh_proof = load_evidence_refresh_proof()
         return {
             "circuit_failure_threshold": self.CIRCUIT_FAILURE_THRESHOLD,
             "circuit_open_minutes": self.CIRCUIT_OPEN_MINUTES,
@@ -756,11 +940,13 @@ class VerifiedIntelligenceService:
             "stale_lookahead_hours": self.STALE_LOOKAHEAD_HOURS,
             "proof_contract": proof_contract,
             "refresh_health": refresh_health,
+            "refresh_proof": refresh_proof,
             "fault_tolerance": [
                 "Repeated upstream failures trip a circuit breaker before more external calls are attempted.",
                 "If a verified record already exists, Alfred falls back to the latest stored payload instead of failing the dashboard outright.",
                 "Scheduled refresh is batch-limited so one bad source cannot overload the whole refresh cycle, and health telemetry reports when the candidate set exceeds that capacity.",
                 "Refresh health exposes processed, refreshed, skipped, failed, per-scope watchlist, due, scheduled-candidate, last-attempt, and last-success outcomes.",
+                "The scheduled refresh runner can write an evidence-refresh proof artifact so healthy runs are auditable outside the database.",
                 "Stale cleanup only removes failed or inactive records after retention windows instead of deleting active evidence aggressively.",
                 proof_contract["new_signal_rule"],
             ],

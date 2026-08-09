@@ -14,6 +14,7 @@ from rest_framework.response import Response
 
 from alfred_ai.services import record_parser_learning
 from alfred_ai.services.materialized_cache import materialize_payload
+from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.expenses.models import Expense
 from apps.family.models import Dependent
 from apps.investments.models import Investment
@@ -557,6 +558,11 @@ def upload_credit_report(request):
                 },
             )
 
+    raw_file_retention = purge_uploaded_file_after_extraction(
+        report_upload,
+        "uploaded_file",
+        reason="credit_report_extraction_complete",
+    )
     return Response(
         {
             "success": True,
@@ -564,6 +570,7 @@ def upload_credit_report(request):
             "upload": _serialize_credit_report_upload(report_upload),
             "score": _serialize_credit_score(credit_score) if credit_score else None,
             "loan_sync": (report_upload.extracted_payload or {}).get("loan_sync", {}),
+            "raw_file_retention": raw_file_retention,
         },
         status=201,
     )

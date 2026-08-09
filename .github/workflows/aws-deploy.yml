@@ -1,0 +1,72 @@
+name: AWS Pull Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+concurrency:
+  group: aws-pull-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to EC2 by Git pull
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out deployment script
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        env:
+          AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+          AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+          AWS_EC2_SSH_KEY: ${{ secrets.AWS_EC2_SSH_KEY }}
+        run: |
+          test -n "$AWS_EC2_HOST"
+          test -n "$AWS_EC2_USER"
+          test -n "$AWS_EC2_SSH_KEY"
+
+      - name: Install SSH key
+        env:
+          AWS_EC2_SSH_KEY: ${{ secrets.AWS_EC2_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$AWS_EC2_SSH_KEY" > ~/.ssh/aws_ec2_deploy_key
+          chmod 600 ~/.ssh/aws_ec2_deploy_key
+
+      - name: Trust EC2 host key
+        env:
+          AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+          AWS_EC2_PORT: ${{ secrets.AWS_EC2_PORT }}
+        run: |
+          port="${AWS_EC2_PORT:-22}"
+          ssh-keyscan -p "$port" -H "$AWS_EC2_HOST" >> ~/.ssh/known_hosts
+
+      - name: Run EC2 pull deploy
+        env:
+          AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+          AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+          AWS_EC2_PORT: ${{ secrets.AWS_EC2_PORT }}
+          AWS_DEPLOY_DIR: ${{ secrets.AWS_DEPLOY_DIR }}
+          AWS_COMPOSE_FILE: ${{ secrets.AWS_COMPOSE_FILE }}
+          AWS_ENV_FILE: ${{ secrets.AWS_ENV_FILE }}
+          AWS_HEALTH_URL: ${{ secrets.AWS_HEALTH_URL }}
+        run: |
+          port="${AWS_EC2_PORT:-22}"
+          deploy_dir="${AWS_DEPLOY_DIR:-/opt/alfred}"
+          compose_file="${AWS_COMPOSE_FILE:-docker-compose.aws.yml}"
+          env_file="${AWS_ENV_FILE:-/etc/alfred/alfred.env}"
+          health_url="${AWS_HEALTH_URL:-http://127.0.0.1:8000/health/}"
+          repo_url="git@github.com:${GITHUB_REPOSITORY}.git"
+          ssh -i ~/.ssh/aws_ec2_deploy_key \
+            -p "$port" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$AWS_EC2_USER@$AWS_EC2_HOST" \
+            "ALFRED_REPO_URL='$repo_url' ALFRED_BRANCH='${GITHUB_REF_NAME}' ALFRED_COMMIT_SHA='${GITHUB_SHA}' ALFRED_DEPLOY_DIR='$deploy_dir' ALFRED_COMPOSE_FILE='$compose_file' ALFRED_ENV_FILE='$env_file' ALFRED_HEALTH_URL='$health_url' bash -s" \
+            < scripts/deploy_aws_pull.sh

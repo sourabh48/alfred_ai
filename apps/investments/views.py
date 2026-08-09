@@ -13,6 +13,7 @@ from django.db import transaction
 
 from alfred_ai.services.materialized_cache import materialize_payload
 from alfred_ai.services import record_parser_learning
+from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.reports.services import operational_logging_service
 from apps.integrations.services.verified_intelligence import proof_contract_payload
 from .services.portfolio_intelligence import portfolio_intelligence_service
@@ -288,12 +289,18 @@ def import_investment_pdf(request):
                 },
             )
 
+    raw_file_retention = purge_uploaded_file_after_extraction(
+        document,
+        "uploaded_file",
+        reason="investment_document_extraction_complete",
+    )
     return Response(
         {
             "success": True,
             "message": document.summary,
             "investments": InvestmentSerializer(linked_investments, many=True).data,
             "upload": InvestmentImportDocumentSerializer(document, context={"request": request}).data,
+            "raw_file_retention": raw_file_retention,
         },
         status=status.HTTP_201_CREATED,
     )

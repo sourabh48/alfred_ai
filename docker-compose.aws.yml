@@ -1,0 +1,46 @@
+name: alfred-aws
+
+services:
+  web:
+    build: .
+    env_file:
+      - ${ALFRED_RUNTIME_ENV_FILE:-.env}
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn alfred_ai.wsgi:application --bind 0.0.0.0:8000 --workers ${ALFRED_WEB_WORKERS:-2} --timeout ${ALFRED_WEB_TIMEOUT:-120}"
+    restart: unless-stopped
+    ports:
+      - "${ALFRED_WEB_PORT:-8000}:8000"
+    volumes:
+      - alfred_media:/app/media
+      - alfred_artifacts:/app/artifacts
+      - alfred_staticfiles:/app/staticfiles
+
+  worker:
+    build: .
+    env_file:
+      - ${ALFRED_RUNTIME_ENV_FILE:-.env}
+    command: celery -A alfred_ai worker -l info --concurrency ${ALFRED_WORKER_CONCURRENCY:-2}
+    restart: unless-stopped
+    depends_on:
+      - web
+    volumes:
+      - alfred_media:/app/media
+      - alfred_artifacts:/app/artifacts
+
+  beat:
+    build: .
+    env_file:
+      - ${ALFRED_RUNTIME_ENV_FILE:-.env}
+    command: celery -A alfred_ai beat -l info --schedule /app/artifacts/celerybeat-schedule
+    restart: unless-stopped
+    depends_on:
+      - web
+    volumes:
+      - alfred_artifacts:/app/artifacts
+
+volumes:
+  alfred_media:
+  alfred_artifacts:
+  alfred_staticfiles:

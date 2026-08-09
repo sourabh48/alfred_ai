@@ -2,12 +2,17 @@
 
 ALFRED is not production-ready until environment-backed checks are green. The application has core Django flows, cache materialization, browser regression wiring, Celery schedules, and supervised-model lifecycle checks, but production maturity still depends on deployment proof.
 
+For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md). It documents a low-cost EC2 + RDS PostgreSQL + Redis + Celery worker/beat setup and keeps AWS free-tier caveats separate from maturity claims.
+
 ## Current State
 
 - Large-data hardening is at 90% in Project Details after deterministic staging traffic exercised all 21 materialized cache namespaces.
 - Browser/UI regression coverage is implemented, but full UI maturity remains gated on repeated no-skip local Chrome or Edge and CI Chrome summaries.
 - Batch jobs are implemented through Celery worker and beat schedules for ML training, statement retry, verified-intelligence refresh, and verified-intelligence cleanup.
+- Verified evidence refresh can be exercised manually with `python scripts/refresh_verified_evidence.py --require-healthy`, which writes `artifacts/evidence/verified_evidence_refresh_summary.json` for Project Details.
+- Production deployment readiness can be probed with `python scripts/run_production_readiness_probe.py --require-ready`, which writes `artifacts/ops/production_readiness_summary.json` for Project Details.
 - Project Details now exposes a Deployment Readiness card and `production_readiness` payload. It remains gated until production database, shared cache, Celery runtime, security settings, browser CI, and production-like cache traffic are all proven.
+- Project Details keeps product Scope Completion separate from deployment readiness and shows Production Blockers as their own percentage.
 
 ## Required For Production
 
@@ -34,6 +39,7 @@ ALFRED is not production-ready until environment-backed checks are green. The ap
 | `CACHE_BACKEND` | Shared backend such as `django.core.cache.backends.redis.RedisCache` |
 | `CACHE_LOCATION` | Shared cache location, usually Redis |
 | `REDIS_URL` | Redis broker/result backend for Celery |
+| `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION` | `true`, so raw uploaded documents are deleted after parser extraction |
 | `ALFRED_PRODUCTION_DEPLOYMENT_PROOF` | Optional path to the recorded production deployment proof JSON |
 | `ALFRED_MATERIALIZED_CACHE_TRAFFIC_PROOF` | Optional path to a cache traffic proof artifact |
 
@@ -61,6 +67,7 @@ Project Details reads `artifacts/ops/production_readiness_summary.json` by defau
 
 - `source: production_deployment_probe`
 - `environment: production`
+- required production environment variables with `ALFRED_LOCAL_RUNTIME=false` and `DEBUG=false`
 - database engine, usable connection, and current migrations
 - shared cache backend and read/write health
 - Redis-backed Celery worker ping, beat schedule health, and required scheduled task count
@@ -69,3 +76,21 @@ Project Details reads `artifacts/ops/production_readiness_summary.json` by defau
 - production-like shared-cache traffic covering every materialized namespace
 
 Staging cache proof can move Large-data hardening to 90%, but it does not close production readiness by itself.
+
+Run the deployment probe only after the production web process can load settings, migrations are applied, the Redis-backed cache is configured, Celery worker and beat are running, browser-regression CI has produced `browser_regression_summary.ci-chrome.json`, and materialized cache telemetry has been exercised against the shared cache.
+
+## Production Blocker Checklist
+
+| Project Details blocker | What closes it | Command or proof |
+| --- | --- | --- |
+| Production database config | Runtime env points Django at PostgreSQL, not SQLite | `DB_ENGINE=django.db.backends.postgresql` plus RDS connection settings |
+| Shared cache config | Django cache uses Redis or another shared backend | `CACHE_BACKEND=django.core.cache.backends.redis.RedisCache` and `CACHE_LOCATION` |
+| Celery config | Broker/result backend use deployed Redis and required beat entries remain configured | `REDIS_URL` plus `python manage.py check` |
+| Production security config | Local runtime disabled, debug disabled, real secret, explicit hosts/origins, HTTPS redirect, secure cookies, and HSTS | `python scripts/run_production_readiness_probe.py --require-ready` |
+| Database runtime proof | Deployed app can connect to PostgreSQL and migrations are current | readiness probe database section |
+| Shared cache runtime proof | Deployed app can write/read/delete through shared cache | readiness probe cache section |
+| Celery worker and beat proof | Worker ping succeeds and beat schedule includes training, retry, refresh, and cleanup | readiness probe Celery section |
+| Production cache traffic proof | Shared-cache telemetry covers every registered materialized namespace under deployed traffic | `python scripts/exercise_materialized_cache_traffic.py --allow-live-external` then readiness probe |
+| Browser CI proof | GitHub browser-regression job writes CI Chrome summary with zero skipped Selenium tests | `artifacts/browser/browser_regression_summary.ci-chrome.json` |
+
+The Docker Compose file in the repo is a production-style local validation path. It proves the dependency shape but does not close production security or production runtime proof by itself.
