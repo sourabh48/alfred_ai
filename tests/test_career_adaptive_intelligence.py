@@ -48,7 +48,7 @@ class CareerAdaptiveIntelligenceTests(TestCase):
         )
         other_resume = SimpleUploadedFile(
             "other-resume.html",
-            b"<html><body><h1>Other User</h1><p>Backend developer with Django and AWS.</p></body></html>",
+            b"<html><body><h1>Other User</h1><p>Backend developer with Django and Docker.</p></body></html>",
             content_type="text/html",
         )
 

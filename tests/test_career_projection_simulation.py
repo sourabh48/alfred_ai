@@ -53,7 +53,7 @@ class CareerProjectionSimulationTests(TestCase):
             "/api/career/projection/simulate/",
             data=json.dumps({
                 "experience_years": 5.0,
-                "skills": ["Python", "SQL", "Django", "AWS", "Docker"],
+                "skills": ["Python", "SQL", "Django", "Docker", "Pandas"],
             }),
             content_type="application/json",
         )

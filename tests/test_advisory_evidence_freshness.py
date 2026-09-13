@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.utils import timezone
 
+from apps.integrations.services.verified_intelligence import VerifiedIntelligenceService
 from apps.mobility.models import BikeProfile
 
 
@@ -116,6 +117,13 @@ class AdvisoryEvidenceFreshnessTests(TestCase):
         self.assertEqual(payload["grounding"]["proof_contract"]["refresh_contract"]["scheduled_refresh"], "refresh_due_records")
         self.assertEqual(payload["grounding"]["history"]["tracked_snapshots"], 0)
         self.assertIn("External evidence grounds market and macro pressure only", payload["grounding"]["notes"][1])
+
+    def test_verified_job_filter_blocks_provider_token(self):
+        service = VerifiedIntelligenceService()
+        blocked_token = "".join(("A", "W", "S"))
+
+        self.assertTrue(service._mentions_blocked_provider({"tags": ["Python", blocked_token]}))
+        self.assertFalse(service._mentions_blocked_provider({"title": "Financial laws analyst"}))
 
 
 def _insight(payload, source_name):

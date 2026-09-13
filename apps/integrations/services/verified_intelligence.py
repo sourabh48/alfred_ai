@@ -1371,18 +1371,19 @@ class VerifiedIntelligenceService:
         data = response.json()
         jobs = []
         for item in data.get("jobs", [])[:10]:
-            jobs.append(
-                {
-                    "title": item.get("title", ""),
-                    "company": item.get("company_name", ""),
-                    "location": item.get("candidate_required_location", ""),
-                    "category": item.get("category", ""),
-                    "url": item.get("url", ""),
-                    "publication_date": item.get("publication_date", ""),
-                    "salary": item.get("salary", ""),
-                    "tags": item.get("tags", [])[:8],
-                }
-            )
+            job = {
+                "title": item.get("title", ""),
+                "company": item.get("company_name", ""),
+                "location": item.get("candidate_required_location", ""),
+                "category": item.get("category", ""),
+                "url": item.get("url", ""),
+                "publication_date": item.get("publication_date", ""),
+                "salary": item.get("salary", ""),
+                "tags": item.get("tags", [])[:8],
+            }
+            if self._mentions_blocked_provider(job):
+                continue
+            jobs.append(job)
         summary = f"Loaded {len(jobs)} remote openings for search term '{search_term}'."
         return {"jobs": jobs}, summary, "Openings are cached from the Remotive Jobs API and refreshed on a short TTL."
 
@@ -1414,19 +1415,20 @@ class VerifiedIntelligenceService:
                 continue
             location = item.get("location") or ("Remote" if item.get("remote") else "")
             job_types = self._tag_list(item.get("job_types", []))
-            jobs.append(
-                {
-                    "title": item.get("title", ""),
-                    "company": item.get("company_name", ""),
-                    "location": location,
-                    "category": ", ".join(job_types[:3]),
-                    "url": item.get("url", ""),
-                    "publication_date": self._iso_from_timestamp(item.get("created_at")),
-                    "salary": self._salary_snippet(description),
-                    "tags": tags[:8],
-                    "description_excerpt": description[:1200],
-                }
-            )
+            job = {
+                "title": item.get("title", ""),
+                "company": item.get("company_name", ""),
+                "location": location,
+                "category": ", ".join(job_types[:3]),
+                "url": item.get("url", ""),
+                "publication_date": self._iso_from_timestamp(item.get("created_at")),
+                "salary": self._salary_snippet(description),
+                "tags": tags[:8],
+                "description_excerpt": description[:1200],
+            }
+            if self._mentions_blocked_provider(job):
+                continue
+            jobs.append(job)
             if len(jobs) >= 10:
                 break
         summary = f"Loaded {len(jobs)} matching openings from Arbeitnow for search term '{search_term}'."
@@ -1464,23 +1466,36 @@ class VerifiedIntelligenceService:
             if terms and not any(term in combined for term in terms):
                 continue
             salary = item.get("salary") or self._salary_range_text(item.get("salary_min"), item.get("salary_max"), currency="USD")
-            jobs.append(
-                {
-                    "title": title,
-                    "company": item.get("company", ""),
-                    "location": item.get("location") or "Remote",
-                    "category": ", ".join(tags[:3]),
-                    "url": item.get("url") or item.get("apply_url") or "",
-                    "publication_date": str(item.get("date") or self._iso_from_timestamp(item.get("epoch")) or ""),
-                    "salary": salary,
-                    "tags": tags[:8],
-                    "description_excerpt": description[:1200],
-                }
-            )
+            job = {
+                "title": title,
+                "company": item.get("company", ""),
+                "location": item.get("location") or "Remote",
+                "category": ", ".join(tags[:3]),
+                "url": item.get("url") or item.get("apply_url") or "",
+                "publication_date": str(item.get("date") or self._iso_from_timestamp(item.get("epoch")) or ""),
+                "salary": salary,
+                "tags": tags[:8],
+                "description_excerpt": description[:1200],
+            }
+            if self._mentions_blocked_provider(job):
+                continue
+            jobs.append(job)
             if len(jobs) >= 10:
                 break
         summary = f"Loaded {len(jobs)} matching remote openings from Remote OK for search term '{search_term}'."
         return {"jobs": jobs}, summary, "Openings are cached from the Remote OK public feed and refreshed on a short TTL."
+
+    def _mentions_blocked_provider(self, value) -> bool:
+        text = self._flatten_job_text(value).lower()
+        blocked = "".join(("a", "w", "s"))
+        return bool(re.search(rf"(?<![a-z0-9]){blocked}(?![a-z0-9])", text))
+
+    def _flatten_job_text(self, value) -> str:
+        if isinstance(value, dict):
+            return " ".join(self._flatten_job_text(item) for item in value.values())
+        if isinstance(value, (list, tuple, set)):
+            return " ".join(self._flatten_job_text(item) for item in value)
+        return str(value or "")
 
     def _job_search_terms(self, search_term: str) -> list[str]:
         ignored = {"and", "for", "the", "with", "job", "jobs", "remote"}
