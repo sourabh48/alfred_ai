@@ -97,4 +97,5 @@ ios/
 # =========================
 config/alfred_ui.json
 config/*.local.json
+config/*.env
 !config/*.example.json

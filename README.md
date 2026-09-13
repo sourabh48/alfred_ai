@@ -111,7 +111,33 @@ python manage.py runserver
 
 Open `http://127.0.0.1:8000/`.
 
-## Optional Local Setup
+This native mode is useful for development. For regular local hosting with the database, cache, and background jobs running together, use Docker Compose.
+
+## Local Hosting
+
+ALFRED is local or LAN-hosted in this repo. The recommended always-on setup is local Docker Compose:
+
+```powershell
+Copy-Item config\local.env.example config\local.env
+docker compose -f docker-compose.local.yml up --build -d
+docker compose -f docker-compose.local.yml exec web python manage.py createsuperuser
+```
+
+Open `http://localhost:8000/`.
+
+For LAN access, add your host machine IP to `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, and `CORS_ALLOWED_ORIGINS` in `config\local.env`, then open `http://<host-ip>:8000/` from trusted devices.
+
+The local stack runs:
+
+- Django web
+- PostgreSQL
+- Redis
+- Celery worker
+- Celery beat
+
+See [Local Hosting](docs/LOCAL_HOSTING.md) for day-to-day commands, backup/restore, LAN access, and privacy notes.
+
+## Optional UI Setup
 
 Copy the UI config example if you want local wording or branding overrides:
 
@@ -132,7 +158,7 @@ celery -A alfred_ai beat -l info
 
 `refresh_verified_external_intelligence` calls `refresh_due_records`, which now records processed, refreshed, skipped, failed, per-scope watchlist, last-attempt, and last-success outcomes for Project Details.
 
-Production deployments must run both Celery worker and Celery beat processes with Redis or another supported broker. The schedules are already implemented; production maturity depends on those processes staying healthy outside local Django requests. The production readiness probe dispatches a safe Celery task and checks a beat heartbeat before counting runtime proof.
+Local hosted deployments must run both Celery worker and Celery beat processes with Redis or another supported broker. The Docker Compose local stack starts them automatically. The schedules are already implemented; maturity depends on those processes staying healthy outside local Django requests.
 
 Run the same verified-evidence refresh path manually and write an auditable proof artifact:
 
@@ -156,32 +182,27 @@ Run the deterministic materialized-cache traffic proof:
 python scripts/exercise_materialized_cache_traffic.py
 ```
 
-## Production Readiness
+## Hosting Readiness
 
-ALFRED is not production-ready until the deployment environment proves database, shared cache, worker, beat heartbeat, browser-regression, security, and production-like cache-traffic health. See [Production Readiness](docs/PRODUCTION_READINESS.md).
+ALFRED is not internet-production-ready until the deployment environment proves database, shared cache, worker, beat heartbeat, browser-regression, security, and production-like cache-traffic health. For local hosting, use [Local Hosting](docs/LOCAL_HOSTING.md). For strict public-production gates, see [Production Readiness](docs/PRODUCTION_READINESS.md).
 
-For AWS, start with [AWS Free Tier Only Deployment](docs/AWS_FREE_TIER_ONLY.md) and [AWS Deployment Guide](docs/AWS_DEPLOYMENT.md). The repo includes:
+The repo includes:
 
-- `config/aws-free-tier.env.example` for the strict EC2-only Free Tier path.
-- `config/aws.env.example` for AWS production env values.
-- `config/docker-compose.env.example` for local Docker validation.
+- `config/local.env.example` for the local hosting stack.
 - `Dockerfile` for the Django/Celery image.
-- `docker-compose.aws-local.yml` for a local PostgreSQL + Redis + web + Celery worker + Celery beat stack.
-- `docker-compose.aws-free-tier.yml` for an EC2-only AWS Free Tier deployment with Dockerized PostgreSQL and Redis.
-- `docker-compose.aws.yml` for an EC2 deployment that uses external PostgreSQL and Redis.
-- `.github/workflows/aws-deploy.yml` plus `scripts/deploy_aws_pull.sh` for GitHub-to-EC2 pull deployment.
+- `docker-compose.local.yml` for local PostgreSQL + Redis + web + Celery worker + Celery beat.
 
-Runtime health is split between `/health/live/` for Django process liveness and `/health/ready/` for database/cache readiness. The EC2 pull deploy polls both and then runs `python scripts/run_production_readiness_probe.py --require-ready`.
+Runtime health is split between `/health/live/` for Django process liveness and `/health/ready/` for database/cache readiness.
 
-Run the local production-style stack:
+Run the local hosting stack:
 
 ```bash
-docker compose -f docker-compose.aws-local.yml up --build
+docker compose -f docker-compose.local.yml up --build -d
 ```
 
-This local stack validates the dependency shape, but it does not close Project Details Deployment Readiness because HTTPS, real AWS runtime, CI browser proof, and production-like cache traffic still need deployed proof.
+This local stack validates the dependency shape and runs the background jobs locally. It does not claim public internet production readiness because HTTPS, public-domain security, CI browser proof, and sustained production-like cache traffic are separate gates.
 
-For user-data handling, see [Data Privacy And Storage](docs/DATA_PRIVACY_AND_STORAGE.md). Production envs should set `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true` so extraction-only raw documents are removed from Django storage after parsing.
+For user-data handling, see [Data Privacy And Storage](docs/DATA_PRIVACY_AND_STORAGE.md). Local hosted envs should keep `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true` so extraction-only raw documents are removed from Django storage after parsing.
 
 ## ML Runtime
 
@@ -203,7 +224,7 @@ For user-data handling, see [Data Privacy And Storage](docs/DATA_PRIVACY_AND_STO
 
 - live official bureau pulls still need real partner integrations
 - market appreciation and property sale timing are not auto-guessed from the internet
-- deployment choices such as production database, cache, workers, and host settings still need environment-specific setup
+- local host/LAN IP, database, cache, workers, and backup settings still need environment-specific setup
 - browser interaction coverage is implemented, but full UI maturity is gated until the dedicated Selenium runner repeatedly records local Chrome or Edge and CI Chrome runs without skipped browser tests or runner failures
 
 ## Test Commands

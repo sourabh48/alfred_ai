@@ -10,9 +10,9 @@ ALFRED handles bank statements, credit reports, loan documents, resumes, and veh
 - Client-side operational diagnostics strip browser route URLs and route paths before storage.
 - True "developers cannot ever see user data" requires operational controls and, for raw documents, client-side encryption or local-only extraction. Server-side OCR/parsing means the server sees the file briefly during extraction.
 
-## Production Default
+## Local Hosting Default
 
-AWS deployments must set:
+Local hosted deployments should keep:
 
 ```bash
 ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true
@@ -42,30 +42,27 @@ ALFRED keeps only the database records needed for product behavior:
 - vehicle document fields and service logs
 - parser status, confidence, and `raw_file_retention` audit metadata
 
-## AWS Storage Controls
+## Local Storage Controls
 
-Use these controls before allowing real users:
+Use these controls before entering real financial documents:
 
-- Enable RDS encryption at rest.
-- Keep RDS private, not publicly reachable.
-- Restrict database access to the app security group only.
-- Use Redis inside a private network/security group.
-- Do not grant developers production database credentials.
-- Keep EC2 SSH access limited to operators who need deployment access.
-- Store `/etc/alfred/alfred.env` outside the repo with `chmod 600`.
-- Enable EBS encryption on the EC2 volume.
-- If S3 is later used for media/artifacts, enable SSE-KMS, block public access, version/lifecycle policies, and least-privilege IAM.
-- Keep backups encrypted and access controlled.
+- Keep the ALFRED host machine on a trusted private network.
+- Do not expose port `8000` to the public internet.
+- Use Windows Firewall or router rules to allow only trusted LAN devices if another device needs access.
+- Keep `config/local.env` private and out of Git.
+- Use a strong `DJANGO_SECRET_KEY`.
+- Use a strong Windows account password and disk encryption where possible.
+- Back up PostgreSQL and the media/artifact volumes regularly.
+- Keep raw document deletion enabled unless you intentionally need retained source files.
+- Give each family member their own account and use the family-link code instead of sharing passwords.
 
 ## Developer Access Boundary
 
-The safest production operating model is:
+For local hosting, the safest operating model is:
 
-1. Developers push code to GitHub.
-2. GitHub Actions assumes a narrow AWS role through OIDC.
-3. GitHub Actions uses AWS Systems Manager Run Command to start the deploy.
-4. EC2 pulls code over HTTPS and restarts containers.
-5. Developers do not receive production `.env`, database credentials, Redis credentials, S3 credentials, or shell access unless explicitly approved.
+1. The owner runs the local machine and controls the Docker volumes.
+2. Developers do not receive `config/local.env`, database dumps, raw documents, or machine access unless explicitly approved.
+3. Updates are pulled from Git, then migrations and checks are run locally.
 
 This does not make ALFRED zero-knowledge. It prevents routine developer access to raw uploaded files and production secrets.
 

@@ -40,7 +40,7 @@ EXPECTED = {
                 "alfred_personality.py","alfred_safetylayer.py",
                 "alfred_preprocessor.py","alfred_registry.py"
             }, "folders": {}},
-            "loaders": {"files": {"__init__.py", "model_loader.py", "s3_loader.py"}, "folders": {}},
+            "loaders": {"files": {"__init__.py", "model_loader.py"}, "folders": {}},
             "continual": {"files": {"__init__.py","learning_scheduler.py","drift_monitor.py","trust_scoring.py"}, "folders": {}},
             "preprocessing": {"files": {"__init__.py","cleaner.py","validators.py"}, "folders": {}},
         }

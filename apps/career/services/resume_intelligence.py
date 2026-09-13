@@ -21,7 +21,7 @@ except Exception:  # pragma: no cover - optional runtime dependency
 
 SKILL_CATALOG = {
     "python", "sql", "excel", "power bi", "tableau", "django", "flask", "fastapi", "java", "javascript",
-    "typescript", "react", "node", "aws", "azure", "gcp", "docker", "kubernetes", "git", "linux",
+    "typescript", "react", "node", "azure", "gcp", "docker", "kubernetes", "git", "linux",
     "machine learning", "data analysis", "statistics", "forecasting", "pandas", "numpy", "scikit-learn",
     "nlp", "llm", "prompt engineering", "product management", "strategy", "finance", "risk", "operations",
     "analytics", "etl", "airflow", "spark", "hadoop", "salesforce", "seo", "content", "marketing",

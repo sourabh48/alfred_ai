@@ -1,8 +1,8 @@
 # Production Readiness
 
-ALFRED is not production-ready until environment-backed checks are green. The application has core Django flows, cache materialization, browser regression wiring, Celery schedules, and supervised-model lifecycle checks, but production maturity still depends on deployment proof.
+ALFRED is now being treated as a local or LAN-hosted application by default. For that path, follow [Local Hosting](LOCAL_HOSTING.md).
 
-For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md) and [AWS Free Tier Only Deployment](AWS_FREE_TIER_ONLY.md). The strict Free Tier path uses one EC2 host with Dockerized PostgreSQL, Redis, Django, Celery worker, and Celery beat. Managed RDS or ElastiCache are opt-in only after account-specific Free Tier coverage is confirmed.
+This document still defines the stricter public-production readiness gates. ALFRED should not be exposed to the public internet until environment-backed checks are green. The application has core Django flows, cache materialization, browser regression wiring, Celery schedules, and supervised-model lifecycle checks, but public-production maturity still depends on deployment proof.
 
 ## Current State
 
@@ -10,11 +10,11 @@ For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md) and [AWS Free Ti
 - Browser/UI regression coverage is implemented, but full UI maturity remains gated on repeated no-skip local Chrome or Edge and CI Chrome summaries.
 - Batch jobs are implemented through Celery worker and beat schedules for ML training, statement retry, verified-intelligence refresh, verified-intelligence cleanup, and production heartbeat proof.
 - Verified evidence refresh can be exercised manually with `python scripts/refresh_verified_evidence.py --require-healthy`, which writes `artifacts/evidence/verified_evidence_refresh_summary.json` for Project Details.
-- Production deployment readiness can be probed with `python scripts/run_production_readiness_probe.py --require-ready`, which writes `artifacts/ops/production_readiness_summary.json` for Project Details.
+- Public-production deployment readiness can be probed with `python scripts/run_production_readiness_probe.py --require-ready`, which writes `artifacts/ops/production_readiness_summary.json` for Project Details.
 - Project Details now exposes a Deployment Readiness card and `production_readiness` payload. It remains gated until production database, shared cache, Celery runtime, security settings, browser CI, and production-like cache traffic are all proven.
 - Project Details keeps product Scope Completion separate from deployment readiness and shows Production Blockers as their own percentage.
 
-## Required For Production
+## Required For Public Production
 
 - Run Django with `DEBUG=false`, a real `DJANGO_SECRET_KEY`, production `ALLOWED_HOSTS`, HTTPS, secure cookies, HSTS, explicit CSRF/CORS origins, and a bounded authenticated-session timeout.
 - Use a production database such as PostgreSQL, run migrations, and configure backup and restore checks.
@@ -25,7 +25,7 @@ For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md) and [AWS Free Ti
 - Keep browser-regression CI green with `ALFRED_RUN_BROWSER_TESTS=true`, zero skipped Selenium tests, and uploaded browser artifacts.
 - Record sustained production-like cache telemetry for all materialized namespaces under realistic concurrency and payload volume.
 
-## Required Environment Variables
+## Required Environment Variables For Public Production
 
 | Variable | Production expectation |
 | --- | --- |
@@ -51,7 +51,7 @@ For the AWS path, see [AWS Deployment Guide](AWS_DEPLOYMENT.md) and [AWS Free Ti
 | `ALFRED_PRODUCTION_DEPLOYMENT_PROOF` | Optional path to the recorded production deployment proof JSON |
 | `ALFRED_MATERIALIZED_CACHE_TRAFFIC_PROOF` | Optional path to a cache traffic proof artifact |
 
-The local defaults are intentionally convenient for development and tests. They are not production proof.
+The local defaults and `docker-compose.local.yml` are intentionally convenient for local/LAN hosting. They are not public-production proof.
 
 ## Batch Job Processes
 
@@ -70,7 +70,7 @@ The current beat schedule includes:
 - `apps.integrations.tasks.cleanup_verified_external_intelligence` every 24 hours.
 - `alfred_ai.tasks.production_beat_heartbeat` every 5 minutes for safe beat runtime proof.
 
-## Deployment Proof Contract
+## Public Deployment Proof Contract
 
 Project Details reads `artifacts/ops/production_readiness_summary.json` by default, or the path in `ALFRED_PRODUCTION_DEPLOYMENT_PROOF`. The proof must be generated from the deployed environment and include:
 
@@ -103,4 +103,4 @@ Run the deployment probe only after the production web process can load settings
 | Production cache traffic proof | Shared-cache telemetry covers every registered materialized namespace under deployed traffic | `python scripts/exercise_materialized_cache_traffic.py --allow-live-external` then readiness probe |
 | Browser CI proof | GitHub browser-regression job writes CI Chrome summary with zero skipped Selenium tests | `artifacts/browser/browser_regression_summary.ci-chrome.json` |
 
-The local Docker Compose file proves the dependency shape but does not close production security or production runtime proof by itself. The strict Free Tier EC2 compose path can close runtime proof only after it runs on AWS with real PostgreSQL, Redis, Celery, browser CI, security, and cache traffic artifacts.
+The local Docker Compose file proves the dependency shape and is the preferred local hosting path. It does not close public-production security or public-production runtime proof by itself.

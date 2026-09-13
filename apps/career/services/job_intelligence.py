@@ -18,7 +18,7 @@ from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot
 
 JOB_SKILLS = {
-    "python", "sql", "excel", "power bi", "tableau", "django", "react", "node", "aws", "azure", "gcp",
+    "python", "sql", "excel", "power bi", "tableau", "django", "react", "node", "azure", "gcp",
     "docker", "kubernetes", "machine learning", "data analysis", "statistics", "forecasting", "finance",
     "risk", "operations", "analytics", "etl", "airflow", "product management", "strategy", "communication",
     "java", "javascript", "typescript", "spark", "pandas", "scikit-learn", "fastapi", "postgresql",
@@ -27,8 +27,8 @@ EXPERIENCE_RE = re.compile(r"(\d+(?:\.\d+)?)\+?\s+(?:years?|yrs?)", re.IGNORECAS
 ROLE_STUDY_TRACKS = {
     "analyst": ["sql", "statistics", "power bi", "tableau", "python"],
     "data": ["python", "sql", "statistics", "machine learning", "pandas"],
-    "engineer": ["python", "docker", "aws", "system design", "kubernetes"],
-    "developer": ["python", "django", "react", "docker", "aws"],
+    "engineer": ["python", "docker", "system design", "kubernetes", "linux"],
+    "developer": ["python", "django", "react", "docker", "postgresql"],
     "product": ["product management", "strategy", "analytics", "communication"],
     "finance": ["finance", "excel", "risk", "forecasting", "sql"],
 }

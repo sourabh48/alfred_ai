@@ -1,22 +1,20 @@
-name: alfred-aws-free-tier
+name: alfred-local
 
 services:
   postgres:
     image: postgres:16-alpine
-    env_file:
-      - ${ALFRED_RUNTIME_ENV_FILE:-/etc/alfred/alfred.env}
     environment:
-      POSTGRES_DB: ${DB_NAME:-alfred}
-      POSTGRES_USER: ${DB_USER:-alfred}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: alfred
+      POSTGRES_USER: alfred
+      POSTGRES_PASSWORD: alfred-local-postgres-password
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-alfred} -d ${DB_NAME:-alfred}"]
+      test: ["CMD-SHELL", "pg_isready -U alfred -d alfred"]
       interval: 10s
       timeout: 5s
       retries: 8
     restart: unless-stopped
     volumes:
-      - alfred_postgres:/var/lib/postgresql/data
+      - alfred_local_postgres:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -28,12 +26,12 @@ services:
       retries: 8
     restart: unless-stopped
     volumes:
-      - alfred_redis:/data
+      - alfred_local_redis:/data
 
   web:
     build: .
     env_file:
-      - ${ALFRED_RUNTIME_ENV_FILE:-/etc/alfred/alfred.env}
+      - ${ALFRED_LOCAL_ENV_FILE:-config/local.env}
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
@@ -52,14 +50,14 @@ services:
     ports:
       - "${ALFRED_WEB_PORT:-8000}:8000"
     volumes:
-      - alfred_media:/app/media
-      - alfred_artifacts:/app/artifacts
-      - alfred_staticfiles:/app/staticfiles
+      - alfred_local_media:/app/media
+      - alfred_local_artifacts:/app/artifacts
+      - alfred_local_staticfiles:/app/staticfiles
 
   worker:
     build: .
     env_file:
-      - ${ALFRED_RUNTIME_ENV_FILE:-/etc/alfred/alfred.env}
+      - ${ALFRED_LOCAL_ENV_FILE:-config/local.env}
     command: celery -A alfred_ai worker -l info --concurrency ${ALFRED_WORKER_CONCURRENCY:-1}
     depends_on:
       postgres:
@@ -73,13 +71,13 @@ services:
       retries: 5
     restart: unless-stopped
     volumes:
-      - alfred_media:/app/media
-      - alfred_artifacts:/app/artifacts
+      - alfred_local_media:/app/media
+      - alfred_local_artifacts:/app/artifacts
 
   beat:
     build: .
     env_file:
-      - ${ALFRED_RUNTIME_ENV_FILE:-/etc/alfred/alfred.env}
+      - ${ALFRED_LOCAL_ENV_FILE:-config/local.env}
     command: celery -A alfred_ai beat -l info --schedule /app/artifacts/celerybeat-schedule
     depends_on:
       postgres:
@@ -93,11 +91,11 @@ services:
       retries: 5
     restart: unless-stopped
     volumes:
-      - alfred_artifacts:/app/artifacts
+      - alfred_local_artifacts:/app/artifacts
 
 volumes:
-  alfred_postgres:
-  alfred_redis:
-  alfred_media:
-  alfred_artifacts:
-  alfred_staticfiles:
+  alfred_local_postgres:
+  alfred_local_redis:
+  alfred_local_media:
+  alfred_local_artifacts:
+  alfred_local_staticfiles:
