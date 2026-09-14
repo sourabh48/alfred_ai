@@ -265,6 +265,11 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn('document.getElementById("timelineFilterForm").addEventListener("submit", applyTimelineFilters)', expenses_script)
         self.assertIn('Alfred.enableLiveRefresh("expenses-live", refreshExpenseWorkspace, { rootId: "expenseRoot" })', expenses_script)
         self.assertIn('const url = expenseId ? `/api/expenses/${expenseId}/` : "/api/expenses/";', expenses_script)
+        self.assertIn("const itemNet = Number(item.net_total || 0);", expenses_script)
+        self.assertIn("Net flow |", expenses_script)
+        self.assertIn("Outflow ${formatCurrency(itemOutflow)}", expenses_script)
+        self.assertIn('if (!isPartial) {\n        return "";\n    }', expenses_script)
+        self.assertLess(expenses_script.index("function statementPreviewInfo"), expenses_script.index("function getUiConfig"))
 
         bike_html = self._fetch_text("/bike-service/")
         bike_parser = _AssetParser()

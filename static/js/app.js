@@ -349,6 +349,10 @@ function escapeHtml(value) {
 const clientIssueRegistry = new Map();
 const SESSION_REFRESH_THROTTLE_MS = 60000;
 
+function clientBackgroundTasksDisabled() {
+    return navigator.webdriver === true || document.body.dataset.disableClientBackgroundTasks === "true";
+}
+
 function formatSessionCountdown(totalSeconds) {
     const seconds = Math.max(0, Math.floor(Number(totalSeconds || 0)));
     const minutes = Math.floor(seconds / 60);
@@ -357,7 +361,11 @@ function formatSessionCountdown(totalSeconds) {
 }
 
 function installSessionSecurityTimer() {
-    if (window.__alfredSessionTimerInstalled || document.body.dataset.authenticated !== "true") {
+    if (
+        clientBackgroundTasksDisabled()
+        || window.__alfredSessionTimerInstalled
+        || document.body.dataset.authenticated !== "true"
+    ) {
         return;
     }
 
@@ -942,7 +950,7 @@ function installUserDataResetAction() {
 
 function installMlRuntimeBanner() {
     const host = document.getElementById("alfredMlRuntimeBannerHost");
-    if (!host || document.body.dataset.authenticated !== "true") {
+    if (!host || clientBackgroundTasksDisabled() || document.body.dataset.authenticated !== "true") {
         return;
     }
 

@@ -242,6 +242,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
 
     def tearDown(self):
         self._disable_live_refresh_timers()
+        self._park_browser_between_tests()
         super().tearDown()
 
     def run(self, result=None):
@@ -757,6 +758,16 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
                 }
                 """
             )
+        except Exception:
+            return
+
+    def _park_browser_between_tests(self):
+        driver = getattr(self, "selenium", None)
+        if not driver:
+            return
+        try:
+            driver.get("about:blank")
+            driver.delete_all_cookies()
         except Exception:
             return
 

@@ -26,6 +26,7 @@
 - the shared `tests/` package is now discoverable by default so the normal `manage.py test` command runs the suite instead of silently skipping it
 - supported ML models now persist training state, run history, quality estimates, and freshness windows in the database
 - supported ML models can now auto-train on startup and on the scheduled nightly cycle when data thresholds and dependencies are healthy
+- project status now treats local/LAN hosting as the only active operating path; provider-specific deployment leftovers have been removed from tracked source, IDE metadata, artifacts, and local cached evidence
 
 ### Vehicle and Mobility
 
@@ -58,6 +59,7 @@
 - recommendation and tax advisory outputs now expose freshness-backed evidence blocks and explicit grounding notes instead of opaque summaries
 - investment guidance now exposes verified market and macro proof, freshness metadata, and materialized portfolio payloads
 - relationship alignment now exposes factors, grounding notes, and freshness-backed proof instead of a fixed placeholder score
+- verified external job feeds now filter blocked cloud-provider skill tokens before storing career evidence, and prior matching local cached job-evidence rows were purged
 
 ### Risk and Career
 
@@ -129,7 +131,7 @@
 - broader trainable-model coverage beyond the currently supported structured salary, expense, burnout, behavioral-risk, and parser-confidence paths
 - visual OCR review is still pending, but the parser learning loop now adapts from both repeated upload outcomes and accepted document-center corrections
 - local host/LAN setup validation, backup routine, and sustained local cache telemetry under real usage
-- public-production deployment proof for database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache traffic if internet hosting is restored later
+- any future public internet deployment would require an explicit new decision plus fresh readiness proof for database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache traffic
 
 ## Risks Remaining
 
@@ -140,7 +142,7 @@
 - job-link parsing is robust for many public pages, but some portals can still block direct fetches or hide content behind script/runtime layers
 - project-details is now dynamic from live operational data, but it is still not generated from a formal release registry
 - large-data hardening has deterministic staging proof for all registered cache namespaces, but production maturity still requires shared-cache telemetry under realistic concurrency and payload volume
-- public-production readiness remains deployment-gated even when local checks pass; local Docker hosting is the active path and should use PostgreSQL, Redis, worker, and beat rather than SQLite/local-memory cache
+- public-production readiness remains inactive and decision-gated even when local checks pass; local Docker hosting is the active path and should use PostgreSQL, Redis, worker, and beat rather than SQLite/local-memory cache
 - balance-sheet vehicle classification is heuristic and should still be reviewed against real ownership/use patterns where the financial treatment matters
 - auto-training is now safe and stateful, but several modules still remain heuristic, placeholder, or data-poor and should not be treated as fully learned systems yet
 - parser adaptation is materially stronger now, but "all document types without fail" is still not a truthful guarantee for arbitrary or severely degraded files

@@ -2,10 +2,9 @@
 Tax Optimization Engine
 Smart tax-saving suggestions for Indian Income Tax
 """
-from datetime import datetime, timedelta
+from datetime import date
 from typing import Dict, List, Optional
 from django.utils import timezone
-from django.db.models import Sum
 
 
 class TaxOptimizerService:
@@ -431,9 +430,10 @@ class TaxOptimizerService:
     def _calculate_current_deductions(self, user) -> Dict[str, float]:
         """Calculate user's current tax deductions from their financial data."""
         from apps.investments.models import Investment
-        from apps.loans.models import Loan
+        from apps.loans.models import Loan, LoanPaymentHistory
 
         deductions = {}
+        fy_start, fy_end = self._current_financial_year_bounds()
 
         # 80C - Approximate from tagged tax-saving instruments already tracked in portfolio.
         qualifying_tokens = ("elss", "ppf", "nsc", "tax saver", "nps")
@@ -443,15 +443,33 @@ class TaxOptimizerService:
             if any(token in name for token in qualifying_tokens):
                 investments_80c += investment.current_value or investment.invested_amount or 0
 
-        deductions['80C'] = min(investments_80c, 150000)
+        home_loans = Loan.objects.filter(user=user, loan_type='home')
+        home_principal_paid = 0.0
+        home_interest_paid = 0.0
+        for payment in LoanPaymentHistory.objects.filter(
+            loan__in=home_loans,
+            payment_date__gte=fy_start,
+            payment_date__lte=fy_end,
+        ).exclude(match_status="rejected").only(
+            "principal_paid",
+            "principal_component",
+            "interest_paid",
+            "interest_component",
+        ):
+            home_principal_paid += float(payment.principal_paid or payment.principal_component or 0)
+            home_interest_paid += float(payment.interest_paid or payment.interest_component or 0)
 
-        # 24 - Home loan interest (mock for now)
-        home_loans = Loan.objects.filter(user=user, loan_type='home', is_active=True)
-        if home_loans.exists():
-            # Estimate interest component (simplified)
-            deductions['24B'] = 200000  # Mock value
+        deductions['80C'] = round(min(investments_80c + home_principal_paid, 150000), 2)
+
+        if home_interest_paid > 0:
+            deductions['24B'] = round(min(home_interest_paid, 200000), 2)
 
         return deductions
+
+    def _current_financial_year_bounds(self, today: date | None = None) -> tuple[date, date]:
+        today = today or timezone.localdate()
+        start_year = today.year if today.month >= 4 else today.year - 1
+        return date(start_year, 4, 1), date(start_year + 1, 3, 31)
 
     def _generate_comparison_points(self, old_tax: Dict, new_tax: Dict) -> List[str]:
         """Generate key comparison points between regimes."""

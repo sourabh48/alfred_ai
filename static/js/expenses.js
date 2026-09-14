@@ -278,6 +278,7 @@ function renderMonthlyWindow(windowData) {
 
     Alfred.setHTMLIfChanged(railTarget, items.map(item => {
         const itemOutflow = Number(item.outflow_total || 0);
+        const itemNet = Number(item.net_total || 0);
         const itemIncome = Number(item.income_total || 0);
         const itemUnwanted = Number(item.unwanted_total || 0);
         const unwantedShare = itemOutflow ? Math.min(100, Math.round((itemUnwanted / itemOutflow) * 100)) : 0;
@@ -285,15 +286,16 @@ function renderMonthlyWindow(windowData) {
             <article class="window-card">
                 <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                     <div class="fw-semibold">${escapeHtml(item.label || "")}</div>
-                    <span class="status-pill ${item.net_total >= 0 ? "status-low" : "status-high"}">${item.net_total >= 0 ? "Positive" : "Tight"}</span>
+                    <span class="status-pill ${itemNet >= 0 ? "status-low" : "status-high"}">${itemNet >= 0 ? "Positive" : "Tight"}</span>
                 </div>
-                <div class="window-card-value">${formatCurrency(itemOutflow)}</div>
-                <div class="window-card-meta">Cashflow | ${Alfred.formatNumber(Number(item.transaction_count || 0), 0)} transactions</div>
+                <div class="window-card-value">${formatCurrency(itemNet)}</div>
+                <div class="window-card-meta">Net flow | ${Alfred.formatNumber(Number(item.transaction_count || 0), 0)} transactions</div>
                 <div class="window-card-strip mt-3">
                     <div class="window-card-fill" style="width: ${unwantedShare}%;"></div>
                 </div>
                 <div class="window-card-detail mt-3">
                     <span>Income ${formatCurrency(itemIncome)}</span>
+                    <span>Outflow ${formatCurrency(itemOutflow)}</span>
                     <span>Unwanted ${formatCurrency(itemUnwanted)}</span>
                 </div>
             </article>
@@ -943,12 +945,9 @@ function statementPreviewInfo(upload) {
     const progress = payload.ocr_progress || {};
     const isPartial = Boolean(payload.preview_only || progress.is_partial);
     if (!isPartial) {
-    return "";
-}
+        return "";
+    }
 
-function getUiConfig(path, fallback = "") {
-    return Alfred.getUiConfig(path, fallback);
-}
     const importedCount = Number(upload?.imported_count || payload.preview_transaction_count || 0);
     const processedPages = Number(progress.processed_pages || 0);
     const totalPages = Number(progress.total_pages || processedPages || 0);
@@ -965,6 +964,10 @@ function getUiConfig(path, fallback = "") {
         parts.push(`${processedPages}/${totalPages || processedPages} pages processed`);
     }
     return `Partial OCR import | ${parts.join(" | ")}`;
+}
+
+function getUiConfig(path, fallback = "") {
+    return Alfred.getUiConfig(path, fallback);
 }
 
 function escapeHtml(value) {

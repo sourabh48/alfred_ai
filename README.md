@@ -30,7 +30,7 @@ ALFRED is a Django application that turns personal financial records into one wo
 
 ## Verification Snapshot
 
-Last verified locally on 6 August 2026.
+Last verified locally on 14 September 2026.
 
 | Scope | Verified state |
 | --- | --- |
@@ -48,6 +48,8 @@ Last verified locally on 6 August 2026.
 | Evidence watchlist | Project Details reports live stale, failed, rejected, and due verified evidence with per-scope refresh health, last attempt, and last success timestamps |
 | Materialized cache health | Project Details reports registered cache namespaces, hit/miss counts, TTL metadata, stale regeneration, invalidation reason, revision key, generation latency, and deterministic staging traffic proof for all 21 registered namespaces |
 | Browser coverage | Project Details reports Selenium-gated interaction workflows, the dedicated runner, CI workflow, local Chrome/Edge proof, CI Chrome proof, `browser_regression_summary.json`, screenshots/log artifacts, and always-on live-server contracts for login, uploads, dashboard refresh, vehicle setup, and core forms without calling the UI fully mature |
+| Local hosting posture | Local/LAN hosting remains the only active operating path; provider-specific deployment leftovers were removed from tracked source, artifacts/IDE metadata, and local cached evidence |
+| Career evidence hygiene | External job feeds now filter blocked cloud-provider skill tokens before caching verified career evidence |
 
 The live tracker now separates narrow verified checks from broad product maturity. A 100% entry means that exact check is closed; it does not imply the surrounding product area is fully mature.
 

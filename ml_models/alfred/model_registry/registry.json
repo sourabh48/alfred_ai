@@ -1,6 +1,6 @@
 {
     "parser_confidence_calibrator": {
-        "version": "2026-08-04T22:13:21.196218+00:00",
+        "version": "2026-09-14T20:48:10.488948+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 100.0,
@@ -33,36 +33,36 @@
         }
     },
     "expense_forecaster": {
-        "version": "2026-08-04T22:13:19.909467+00:00",
+        "version": "2026-09-14T20:48:09.623529+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 0.0,
             "confidence_estimate": 40.0,
-            "sample_count": 1734,
+            "sample_count": 1739,
             "artifact_path": "ml_models/alfred/expense_lstm/model.pkl",
-            "notes": "Windowed expense forecaster trained on 1734 expense rows with holdout MAE 8951.69 and relative error 8.09."
+            "notes": "Windowed expense forecaster trained on 1739 expense rows with holdout MAE 9380.07 and relative error 8.07."
         }
     },
     "burnout_rf": {
-        "version": "2026-08-04T22:13:20.314514+00:00",
+        "version": "2026-09-14T20:48:09.985515+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 100.0,
-            "confidence_estimate": 72.0,
-            "sample_count": 12,
+            "confidence_estimate": 73.75,
+            "sample_count": 15,
             "artifact_path": "ml_models/alfred/burnout_rf/model.pkl",
-            "notes": "Burnout regressor trained on 12 behavioral rows with holdout MAE 0.00."
+            "notes": "Burnout regressor trained on 15 behavioral rows with holdout MAE 0.00."
         }
     },
     "risk_classifier": {
-        "version": "2026-08-04T22:13:20.738863+00:00",
+        "version": "2026-09-14T20:48:10.241573+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 100.0,
-            "confidence_estimate": 76.0,
-            "sample_count": 12,
+            "confidence_estimate": 77.5,
+            "sample_count": 15,
             "artifact_path": "ml_models/alfred/risk_classifier/model.pkl",
-            "notes": "Risk classifier trained on 12 behavioral rows with holdout accuracy 1.00."
+            "notes": "Risk classifier trained on 15 behavioral rows with holdout accuracy 1.00."
         }
     },
     "service_cost_predictor": {
@@ -77,7 +77,7 @@
         }
     },
     "rl_agent": {
-        "version": "2026-08-09T09:08:51.765872+00:00",
+        "version": "2026-09-14T21:49:33.101042+00:00",
         "metadata": {
             "status": "skipped",
             "quality_score": 0.0,

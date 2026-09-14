@@ -1080,6 +1080,8 @@ h1, h2, h3, h4, h5, h6,
 }
 
 .window-card {
+    display: grid;
+    align-content: start;
     padding: 1rem;
     border-radius: 1.05rem;
     border: 1px solid rgba(16, 37, 63, 0.08);
@@ -1094,6 +1096,7 @@ h1, h2, h3, h4, h5, h6,
     font-size: 1.35rem;
     font-weight: 700;
     line-height: 1.05;
+    overflow-wrap: anywhere;
 }
 
 .window-card-meta {
@@ -1119,10 +1122,18 @@ h1, h2, h3, h4, h5, h6,
 .window-card-detail {
     display: flex;
     justify-content: space-between;
-    gap: 1rem;
+    flex-wrap: wrap;
+    gap: 0.45rem 1rem;
     color: var(--alfred-muted);
     font-size: 0.82rem;
     font-weight: 600;
+    line-height: 1.35;
+}
+
+.window-card-detail span {
+    flex: 1 1 7.5rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .project-hero-signal {

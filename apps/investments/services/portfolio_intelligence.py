@@ -193,15 +193,109 @@ class PortfolioIntelligenceService:
         Scrape user's email for investment-related communications.
         Looks for broker statements, mutual fund updates, etc.
         """
-        # This would integrate with IMAP to fetch emails
-        # For security, requires user's explicit email credentials
-        # Implementation placeholder - requires OAuth2 or app-specific passwords
+        from apps.integrations.services.email_integration import email_integration_service
 
-        return {
-            "success": False,
-            "message": "Email scraping requires user authentication setup",
-            "instructions": "Please use PDF upload for now",
-        }
+        email_config = email_config or {}
+        try:
+            days_back = max(1, min(int(email_config.get("days_back") or 30), 365))
+        except (TypeError, ValueError):
+            days_back = 30
+        connected_here = False
+        if email_config.get("imap_server") and email_config.get("email_address") and email_config.get("password"):
+            connection = email_integration_service.connect_imap(
+                email_address=email_config["email_address"],
+                password=email_config["password"],
+                imap_server=email_config["imap_server"],
+                port=int(email_config.get("port") or 993),
+            )
+            if not connection.get("success"):
+                error = connection.get("error", "Email connection failed.")
+                return {
+                    "success": False,
+                    "message": error,
+                    "imported": 0,
+                    "updated": 0,
+                    "scanned": 0,
+                    "parsed_files": [],
+                    "errors": [error],
+                }
+            connected_here = True
+
+        try:
+            scan = email_integration_service.scan_financial_emails(user, days_back=days_back)
+            if scan.get("error"):
+                return {
+                    "success": False,
+                    "message": scan["error"],
+                    "imported": 0,
+                    "updated": 0,
+                    "scanned": 0,
+                    "parsed_files": [],
+                    "errors": [scan["error"]],
+                }
+
+            investment_messages = [
+                *scan.get("investment_statements", []),
+                *scan.get("mutual_fund_statements", []),
+            ]
+            imported = 0
+            updated = 0
+            errors = []
+            parsed_files = []
+            supported_extensions = {".pdf", ".txt", ".csv"}
+
+            for message in investment_messages:
+                attachments = list(message.get("attachments") or [])
+                for index, attachment in enumerate(attachments):
+                    filename = attachment.get("filename") or f"investment-attachment-{index + 1}.pdf"
+                    extension = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+                    if extension and extension not in supported_extensions:
+                        continue
+
+                    file_obj = None
+                    if attachment.get("data"):
+                        from io import BytesIO
+
+                        file_obj = BytesIO(attachment["data"])
+                        file_obj.name = filename
+                    elif message.get("id"):
+                        file_obj = email_integration_service.download_statement(message["id"], index)
+
+                    if file_obj is None:
+                        errors.append(f"{filename}: attachment could not be downloaded")
+                        continue
+
+                    result = self.parse_portfolio_pdf(file_obj, user=user, filename=filename)
+                    imported += int(result.get("created") or 0)
+                    updated += int(result.get("updated") or 0)
+                    parsed_files.append(
+                        {
+                            "filename": filename,
+                            "parser_status": result.get("parser_status", ""),
+                            "confidence": result.get("confidence", 0),
+                            "created": result.get("created", 0),
+                            "updated": result.get("updated", 0),
+                        }
+                    )
+                    if not result.get("success"):
+                        errors.append(f"{filename}: {result.get('error', 'parse failed')}")
+
+            return {
+                "success": not errors,
+                "message": (
+                    f"Scanned {len(investment_messages)} investment email(s); imported {imported} and updated {updated} holding(s)."
+                    if investment_messages
+                    else "No investment statement emails were found in the selected window."
+                ),
+                "scanned": len(investment_messages),
+                "imported": imported,
+                "updated": updated,
+                "parsed_files": parsed_files,
+                "errors": errors,
+            }
+        finally:
+            if connected_here:
+                email_integration_service.disconnect()
 
     def analyze_portfolio_risk(self, user) -> Dict[str, any]:
         """Analyze portfolio risk profile and diversification."""
