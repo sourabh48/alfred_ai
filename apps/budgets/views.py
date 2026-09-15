@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.models import Expense
+from apps.expenses.services.cashflow_treatment import variable_spend_rows
 
 from .models import Budget
 from .serializers import BudgetSerializer
@@ -89,12 +90,12 @@ def _budget_dashboard_revision(user) -> str:
 
 def _build_budget_dashboard_payload(request) -> dict:
     """Build the active monthly budget plan plus AI-backed spending guidance."""
-    from .services.budget_intelligence import budget_intelligence_service
+    from .services.budget_intelligence import budget_intelligence_service, current_budget_plan
 
     today = timezone.localdate()
     start_of_month = today.replace(day=1)
     budgets = list(Budget.objects.filter(user=request.user).order_by("-id"))
-    active_plan = budgets[0] if budgets else None
+    active_plan = current_budget_plan(request.user, today=today, budgets=budgets)
     monthly_expenses = Expense.objects.filter(
         user=request.user,
         transaction_date__gte=start_of_month,
@@ -102,8 +103,8 @@ def _build_budget_dashboard_payload(request) -> dict:
         direction="debit",
     )
     spent_by_category = defaultdict(float)
-    for item in monthly_expenses.values("category").annotate(total=Sum("amount")):
-        spent_by_category[item["category"]] = float(item["total"] or 0)
+    for expense, amount in variable_spend_rows(monthly_expenses, monthly_housing=request.user.rent_or_emi):
+        spent_by_category[expense.category] += float(amount)
 
     try:
         suggestions = budget_intelligence_service.suggest_budget(request.user) or {}
@@ -114,19 +115,15 @@ def _build_budget_dashboard_payload(request) -> dict:
         daily_affordability = {}
         forecast = {}
 
-    plan_limit = float(
-        getattr(active_plan, "inflation_adjusted", 0)
-        or getattr(active_plan, "base_budget", 0)
-        or suggestions.get("disposable_income", 0)
-        or 0
-    )
-    actual_spent = float(monthly_expenses.aggregate(total=Sum("amount"))["total"] or 0)
+    plan_limit = float(active_plan.inflation_adjusted if active_plan else suggestions.get("disposable_income", 0) or 0)
+    actual_spent = sum(spent_by_category.values())
     total_budget = round(plan_limit, 2)
     total_spent = round(actual_spent, 2)
     total_remaining = round(total_budget - total_spent, 2)
 
     category_labels = dict(Expense.CATEGORY_CHOICES)
     category_suggestions = suggestions.get("category_budgets", {})
+    suggested_total = sum(float(item.get("suggested", 0) or 0) for item in category_suggestions.values())
     categories = set(category_suggestions.keys()) | set(spent_by_category.keys())
     hidden_categories = {"income", "transfer", "loan", "credit_card", "investment"}
     budget_data = []
@@ -134,6 +131,7 @@ def _build_budget_dashboard_payload(request) -> dict:
         if category in hidden_categories:
             continue
         suggested_limit = float(category_suggestions.get(category, {}).get("suggested", 0) or 0)
+        suggested_limit = suggested_limit / suggested_total * plan_limit if suggested_total else 0
         historical_avg = float(category_suggestions.get(category, {}).get("historical_avg", 0) or 0)
         spent = round(spent_by_category.get(category, 0.0), 2)
         percent_used = round((spent / suggested_limit * 100) if suggested_limit > 0 else 0, 1)
@@ -187,7 +185,7 @@ def _build_budget_dashboard_payload(request) -> dict:
             "spent": round(float(active_plan.spent or 0), 2),
         } if active_plan else None,
         "budget_history": budget_history,
-        "budgets": budget_data[:8],
+        "budgets": budget_data,
         "daily_affordability": daily_affordability,
         "ai_suggestions": suggestions.get("recommendations", []),
         "forecast": forecast.get("forecasts", []),

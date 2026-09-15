@@ -130,6 +130,12 @@ class ExpenseSerializer(serializers.ModelSerializer):
             )
         return attrs
 
+    def validate_bank_account(self, value):
+        user = getattr(self.context.get("request"), "user", None)
+        if value is not None and (not user or value.user_id != user.pk):
+            raise serializers.ValidationError("Choose one of your own bank accounts.")
+        return value
+
     def validate_amount(self, value):
         if value <= 0:
             raise serializers.ValidationError("Amount must be greater than zero.")

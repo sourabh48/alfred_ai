@@ -1,11 +1,15 @@
 # Local/LAN completion audit
 
 Audit started: 15 September 2026. Continued: 16 September 2026 (Asia/Kolkata).
-Baseline commit: `c31de65`; results cover the local working tree.
+Initial baseline commit: `c31de65`. Sample-user continuation baseline: `a20435e`;
+results cover the local working tree.
 
-**Result:** code verification passed: 365 non-browser tests and all three real
-Edge browser workflows. Runtime acceptance remains open because Docker is
-unavailable; real-data model validation and fresh CI Chrome proof also remain.
+**Result:** requirements are **not all accepted**. The current working tree
+passed **373 non-browser tests and all six Edge workflows**. The sample-user
+continuation fixed additional arithmetic, cache, ownership and presentation
+defects. Runtime acceptance remains open because
+Docker is unavailable; real-data model validation and fresh CI Chrome proof also
+remain.
 
 This checklist compares the README, project tracker, architecture and status notes
 with implementation and recorded verification. Implementation, test results,
@@ -19,6 +23,9 @@ outside this audit.
 | --- | --- | --- |
 | Accounts, family sharing and operational access | Implemented | Included in backend suite; browser login covered |
 | Statement intake and financial consistency | Implemented | Deduplication/calculation regressions in backend suite; real-page statement correction passes |
+| Budgets, daily guidance and financial baseline | Corrected in sample audit | Housing counted once, eligible spending aligned, current-month plan selected, forecast calendar corrected; independent arithmetic and edit tests |
+| Sample-user values and readable output | Verified for core finance scenario | Signup plus 20 transactions through APIs; dashboard, budgets, loans, investments, empty and older-history browser checks; see [sample audit](USER_DATA_ACCEPTANCE.md) |
+| Account ownership and derived-data refresh | Corrected in sample audit | Foreign account/loan links rejected; edits/deletes refresh cached user and consent-linked family views; in-flight invalidation regression |
 | Loan consolidation and foreclosure reconciliation | Implemented | Lifecycle, cross-module calculations and linked retry records covered by regressions |
 | Uploaded credit reports and loan synchronization | Implemented | Extraction/synchronization and retry regressions present; live bureau API remains absent |
 | Investment PDF and email intake | Implemented | Partial/reordered holding retries preserve values and links; live mailbox requires configured access |
@@ -26,13 +33,74 @@ outside this audit.
 | Raw-upload retention and retry behavior | Implemented | Missing/purged original-file cases tested across all seven file scopes; retained corrections remain usable |
 | Career, vehicle and advisory evidence | Implemented with heuristic/data limits | Outcome, freshness and failure-recovery contracts covered by regressions; fresh real outcomes still required |
 | Supervised ML quality and freshness | Training implemented | Readiness gates enforced and regressions pass; poor expense quality, tiny datasets and proxy targets remain blockers |
-| Browser interactions and CI | Runner/workflow implemented | Current local Edge pass recorded; fresh CI Chrome and wider interaction coverage remain |
+| Browser interactions and CI | Runner/workflow implemented | Local Edge suite expanded from three to six workflows; fresh CI Chrome and wider interaction coverage remain |
 | Local stack and background jobs | Compose configuration implemented | Configuration fixes and verification helper complete; Docker unavailable, so runtime remains unverified |
 | Backup, restore and restart recovery | Instructions exist | Safe backup/isolated-restore helper and 19 unit tests complete; live restore and host restart drill still required |
 | Cache performance | All 21 groups have staging proof | Isolated synthetic workload covers 21/21 namespaces; Redis, concurrent load and runtime tuning remain |
-| Documentation and completion tracking | Partly stale | README/model claims, local commands and OCR status reconciled; this audit records remaining limits |
+| Documentation and completion tracking | Reconciled | README/model claims, local commands, OCR/future scope and tracker next steps updated; percentages remain maturity estimates |
+
+## Remaining requirements and their acceptance conditions
+
+| Priority / area | What is left | Evidence needed to close it |
+| --- | --- | --- |
+| Local runtime | Docker/Compose unavailable on this host | Start local PostgreSQL, Redis, web, worker and beat; pass `scripts/local_stack_ops.py verify` |
+| Recovery | Live backup/restore and host restart persistence untested | Paired backup, successful isolated database/file restore, restart and verify records/files remain |
+| LAN operation | A second device has not been tested | Trusted second-device login and API access, with the intended local firewall/bind configuration |
+| Scheduled work | Contract tests exist; sustained actual scheduled outcomes are unverified | Observe worker/beat evidence refresh, cleanup and permitted training across scheduled cycles |
+| CI and browser breadth | Local Edge proof exists; fresh CI Chrome and wider form/device coverage are missing | Current-change CI Chrome with no skips; extend document-family/forms, phone sizes and accessibility checks |
+| Cache/load | Sequential isolated workload covers all 21 namespaces | Shared Redis under concurrent realistic reads/writes, capacity/latency measurements and TTL tuning |
+| ML serving maturity | Expense validation failed its quality gate; other sample counts are tiny and some targets are proxies | Sufficient consenting real data, actual outcomes, chronological holdouts and passing quality/freshness gates for each model |
+| Document maturity | Arbitrary or severely degraded layouts cannot be guaranteed | More reviewed real documents per family, accepted corrections, false-match and retry evidence |
+| Career/vehicle/advisory maturity | Source/geography/catalog gaps and heuristic assumptions remain | More real salary, service-cost, condition and outcome records; healthy sources and calibrated predictions |
+| Live integrations | Email/intake adapters tested with fixtures; approved official bureau pulls absent | Configured live account evidence for email, and a separately approved consented bureau integration if required |
+| Usability | Developer readability review completed for core finance pages | Task-based testing with actual users and assistive technology; no claim of comprehensive human validation |
+
+Future enhancements are tracked separately in [Future scope](FUTURE_SCOPE.md):
+generic vehicle naming, more source/catalog coverage, portfolio/job alerts and a
+formal release acceptance registry. Public/cloud hosting and the planned RL
+learner remain outside the active local/LAN requirement. No independent signed
+requirements specification was present; this audit uses the README, architecture,
+status/future-scope documents and live project-tracker definitions.
+
+## Sample-user continuation
+
+The [sample-user audit](USER_DATA_ACCEPTANCE.md) contains the full input and
+expected-output table, the defects reproduced before fixing them, the user-facing
+explanations and artifact paths. Before the fixes, INR 10,000 of flexible spending
+appeared as INR 117,000, rent reduced estimated savings twice, and edited values
+remained stale. Current API and browser results reconcile independently across
+income, expenses, budget, loan, investment and net-worth views.
+
+The synthetic user is temporary and is not left in the normal user database.
+Market/career sources use offline fixtures; arithmetic uses the real services.
+Final continuation verification:
+
+- **379 tests in 495.965 seconds; OK (skipped=6)**, exit 0. This is 373 passing
+  non-browser tests; the six Selenium cases are deliberately separate.
+- **6 Edge tests in 38.885 seconds; OK, zero skips**, exit 0. This includes the
+  three earlier document workflows and three new sample-user/readability cases.
+- Django system check passed; no migration changes were detected.
+- All four changed JavaScript files passed syntax checks; `git diff --check`
+  passed.
+- Eight new backend acceptance tests cover independent totals, aligned budget
+  guidance, month selection/invalid input, edits/deletions, minimal input,
+  ownership isolation, housing allowance boundaries and in-flight cache writes.
+
+Logs: `artifacts/verification/user-data-full-suite.log` and
+`artifacts/verification/user-data-browser-final.log`. Summary:
+`artifacts/verification/completion_audit_summary.json`.
+
+Browser setup initially read animated elements before visible text was ready.
+Its waits now require populated text, and teardown drains active Django requests
+before removing the temporary user/session data. The final run has no test
+errors or session-cleanup exceptions. Navigation can still log harmless client
+disconnects (broken pipes).
 
 ## Verification log
+
+The sections below preserve the initial audit evidence. The sample-user
+continuation uses `artifacts/verification/user-data-full-suite.log` and
+`artifacts/verification/user-data-browser-final.log` for its later results.
 
 ### Browser and document interaction
 
@@ -158,7 +226,7 @@ accuracy, and are stored separately from runtime production proof.
    persistence after an agreed host restart.
 3. Verify access from a second trusted LAN device if LAN access is needed and
    observe worker/beat outcomes across their actual schedules.
-4. Obtain fresh CI Chrome proof and expand browser coverage beyond the three
+4. Obtain fresh CI Chrome proof and expand browser coverage beyond the six
    current workflows; measure Redis and concurrent traffic on the running stack.
 5. Collect real validation outcomes and enough samples for ML readiness. Tiny
    fits and proxy labels remain blocked even when fitting completes.

@@ -37,6 +37,10 @@ see the [completion audit](docs/COMPLETION_AUDIT.md).
 Local verification resumed on 16 September 2026. Commands, results, and limits
 are recorded in the [completion audit](docs/COMPLETION_AUDIT.md).
 
+The [sample-user audit](docs/USER_DATA_ACCEPTANCE.md) documents an isolated
+account with independently reconciled income, spending, budgets, debt and
+investment values, plus real-browser checks of their labels and explanations.
+
 | Scope | Verified state |
 | --- | --- |
 | Project tracker | Broad product areas now stay in In Progress until implementation, data maturity, and browser verification are strong enough; production blockers are tracked separately |

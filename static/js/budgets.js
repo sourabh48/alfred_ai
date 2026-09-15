@@ -39,10 +39,10 @@ function renderBudgetHero(summary, plan) {
 
 function renderBudgetSummary(summary, affordability) {
     const cards = [
-        { title: "Total Budget", value: Alfred.formatCurrency(summary.total_budget), copy: summary.month },
-        { title: "Spent", value: Alfred.formatCurrency(summary.total_spent), copy: `${Alfred.formatPercent(summary.percent_used)} consumed` },
-        { title: "Fixed Obligations", value: Alfred.formatCurrency(summary.fixed_obligations), copy: "Recurring structural commitments" },
-        { title: "Safe Daily Spend", value: Alfred.formatCurrency(affordability.safe_daily_spend), copy: `${summary.tracked_categories} categories tracked` },
+        { title: "Flexible Budget", value: Alfred.formatCurrency(summary.total_budget), copy: summary.month },
+        { title: "Living Spend", value: Alfred.formatCurrency(summary.total_spent), copy: `${Alfred.formatPercent(summary.percent_used)} of flexible budget used` },
+        { title: "Housing + Loan EMIs", value: Alfred.formatCurrency(summary.fixed_obligations), copy: "Reserved separately from flexible spending" },
+        { title: "Daily Budget Guide", value: Alfred.formatCurrency(affordability.safe_daily_spend), copy: `${affordability.days_remaining || 0} days left, including today` },
     ];
 
     document.getElementById("budgetSummaryCards").innerHTML = cards.map(card => `
@@ -66,14 +66,14 @@ function renderBudgetForecast(items) {
             datasets: [
                 {
                     type: "bar",
-                    label: "Projected Expense",
+                    label: "Estimated living costs",
                     data: items.map(item => item.predicted_expense || 0),
                     backgroundColor: "rgba(24, 88, 214, 0.72)",
                     borderRadius: 10,
                 },
                 {
                     type: "line",
-                    label: "Projected Savings",
+                    label: "Income left before investments",
                     data: items.map(item => item.predicted_savings || 0),
                     borderColor: "#148f63",
                     backgroundColor: "rgba(20, 143, 99, 0.12)",
@@ -127,7 +127,7 @@ function renderBudgetCategories(items) {
         <tr>
             <td>
                 <div class="fw-semibold">${Alfred.escapeHtml(item.label)}</div>
-                <div class="muted small">Historical avg ${Alfred.formatCurrency(item.historical_avg)}</div>
+                <div class="muted small">Monthly average ${Alfred.formatCurrency(item.historical_avg)}</div>
             </td>
             <td class="text-end">${Alfred.formatCurrency(item.limit)}</td>
             <td class="text-end">${Alfred.formatCurrency(item.spent)}</td>

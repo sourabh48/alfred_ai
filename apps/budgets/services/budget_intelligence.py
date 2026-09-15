@@ -5,19 +5,33 @@ Location-based budget suggestions, daily expenditure calculator, and smart forec
 from __future__ import annotations
 
 import calendar
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
-from django.db.models import Sum, Avg, Q
+from collections import defaultdict
+from datetime import datetime
+from typing import Dict, List
 from django.utils import timezone
-import requests
 
 from apps.budgets.models import Budget
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+from apps.expenses.services.cashflow_treatment import variable_spend_rows
+
+
+def current_budget_plan(user, *, today=None, budgets=None):
+    today = today or timezone.localdate()
+    plans = budgets if budgets is not None else Budget.objects.filter(user=user).order_by("-id")
+    for plan in plans:
+        for pattern in ("%b %Y", "%B %Y", "%Y-%m"):
+            try:
+                month = datetime.strptime(plan.month.strip(), pattern)
+            except ValueError:
+                continue
+            if (month.year, month.month) == (today.year, today.month):
+                return plan
+    return None
 
 
 class BudgetIntelligenceService:
-    """ML-powered budget recommendations based on location, income, and spending patterns."""
+    """Rule-based budget estimates from location, income, and spending history."""
 
     # Cost of living indices by major Indian cities (base = 100)
     CITY_COST_INDEX = {
@@ -54,7 +68,7 @@ class BudgetIntelligenceService:
 
     def suggest_budget(self, user) -> Dict[str, any]:
         """
-        Generate ML-powered budget suggestions based on:
+        Generate rule-based budget suggestions based on:
         - User's location
         - Income level
         - Historical spending patterns
@@ -119,22 +133,27 @@ class BudgetIntelligenceService:
         Calculate how much user can afford to spend daily in their current situation.
         Considers remaining budget, days left in month, and upcoming obligations.
         """
-        today = timezone.now().date()
+        today = timezone.localdate()
         month_start = today.replace(day=1)
         days_in_month = calendar.monthrange(today.year, today.month)[1]
         days_remaining = days_in_month - today.day + 1
 
         # Get current month spending
         baseline = resolve_canonical_financial_baseline(user)
-        month_spending = Expense.objects.filter(
+        expenses = Expense.objects.filter(
             user=user,
             transaction_date__gte=month_start,
             transaction_date__lte=today,
             direction="debit",
-        ).exclude(classification="loan").aggregate(total=Sum("amount"))["total"] or 0
+        )
+        rows = list(variable_spend_rows(expenses, monthly_housing=user.rent_or_emi))
+        month_spending = float(sum(amount for _, amount in rows))
 
         # Get monthly budget from the canonical baseline so EMI burden is not double counted.
         monthly_budget = float(baseline.get("disposable_cash_flow", 0) or 0)
+        plan = current_budget_plan(user, today=today)
+        if plan is not None:
+            monthly_budget = float(plan.inflation_adjusted)
 
         remaining_budget = monthly_budget - month_spending
 
@@ -142,11 +161,7 @@ class BudgetIntelligenceService:
         safe_daily_spend = remaining_budget / days_remaining if days_remaining > 0 else 0
 
         # Get today's spending
-        today_spending = Expense.objects.filter(
-            user=user,
-            transaction_date=today,
-            direction="debit",
-        ).aggregate(total=Sum("amount"))["total"] or 0
+        today_spending = float(sum(amount for expense, amount in rows if expense.transaction_date == today))
 
         # Calculate average daily spending this month
         days_elapsed = (today - month_start).days + 1
@@ -171,50 +186,26 @@ class BudgetIntelligenceService:
 
     def forecast_finances(self, user, months_ahead: int = 6) -> Dict[str, any]:
         """
-        Forecast user's financial situation for next N months using ML.
-        Predicts spending, income, and savings trajectory.
+        Estimate the next N calendar months from recent recorded living costs.
         """
-        # Get historical data (last 6 months)
-        six_months_ago = timezone.now().date() - timedelta(days=180)
-
-        monthly_expenses = []
-        for i in range(6):
-            month_start = six_months_ago + timedelta(days=30 * i)
-            month_end = month_start + timedelta(days=30)
-
-            expense_total = Expense.objects.filter(
-                user=user,
-                transaction_date__gte=month_start,
-                transaction_date__lt=month_end,
-                direction="debit",
-            ).exclude(classification="loan").aggregate(total=Sum("amount"))["total"] or 0
-
-            monthly_expenses.append(expense_total)
-
-        # Calculate trend
-        if len(monthly_expenses) >= 3:
-            avg_expense = sum(monthly_expenses) / len(monthly_expenses)
-            recent_avg = sum(monthly_expenses[-3:]) / 3
-            trend = "increasing" if recent_avg > avg_expense * 1.1 else "stable"
-        else:
-            avg_expense = sum(monthly_expenses) / len(monthly_expenses) if monthly_expenses else 0
-            trend = "unknown"
-
-        # Forecast future months
+        # A transparent planning estimate based on observed living costs.
+        # Missing months are not observations of zero spending.
         baseline = resolve_canonical_financial_baseline(user)
+        avg_expense = float(baseline.get("observed_average_monthly_variable_spend", 0) or 0)
+        has_history = baseline.get("metric_states", {}).get("observed_average_monthly_variable_spend", {}).get("status") != "unavailable"
+        trend = "held_constant" if has_history else "unknown"
         monthly_income = float(baseline.get("monthly_income", 0) or 0)
         fixed_obligations = float(baseline.get("fixed_obligations", 0) or 0)
 
         forecasts = []
+        today = timezone.localdate()
         for i in range(months_ahead):
-            # Simple linear forecast with trend adjustment
-            trend_multiplier = 1.0 + (0.03 * i if trend == "increasing" else 0)
-            predicted_expense = avg_expense * trend_multiplier
-
+            predicted_expense = avg_expense
             predicted_savings = monthly_income - predicted_expense - fixed_obligations
-
+            month_index = today.year * 12 + today.month + i
+            forecast_month = today.replace(year=month_index // 12, month=month_index % 12 + 1, day=1)
             forecasts.append({
-                "month": (timezone.now().date() + timedelta(days=30 * (i + 1))).strftime("%B %Y"),
+                "month": forecast_month.strftime("%B %Y"),
                 "predicted_expense": round(predicted_expense, 2),
                 "predicted_savings": round(predicted_savings, 2),
                 "cumulative_savings": round(predicted_savings * (i + 1), 2),
@@ -223,8 +214,9 @@ class BudgetIntelligenceService:
         return {
             "current_monthly_expense_avg": round(avg_expense, 2),
             "trend": trend,
-            "forecasts": forecasts,
-            "insights": self._generate_forecast_insights(forecasts, trend),
+            "forecasts": forecasts if has_history and monthly_income > 0 else [],
+            "method": "Recent living-spend average; income and fixed costs held constant. Before investments and card settlements.",
+            "insights": self._generate_forecast_insights(forecasts, trend) if has_history and monthly_income > 0 else ["Add income and spending history before using a forecast."],
             "financial_baseline": baseline,
         }
 
@@ -248,20 +240,20 @@ class BudgetIntelligenceService:
         """Generate category-wise budget allocations."""
         category_budgets = {}
 
-        # Get user's historical spending patterns
-        last_3_months = timezone.now().date() - timedelta(days=90)
-        user_spending = {}
+        expenses = list(Expense.objects.filter(user=user, transaction_date__lte=timezone.localdate()))
+        recent_months = sorted({(item.transaction_date.year, item.transaction_date.month) for item in expenses})[-3:]
+        category_totals = defaultdict(float)
+        for expense, amount in variable_spend_rows(expenses, monthly_housing=user.rent_or_emi):
+            if (expense.transaction_date.year, expense.transaction_date.month) in recent_months:
+                category_totals[expense.category] += float(amount)
 
         for category, _ in Expense.CATEGORY_CHOICES:
             if category in ["income", "transfer", "loan", "credit_card", "investment"]:
                 continue
 
-            historical_avg = Expense.objects.filter(
-                user=user,
-                category=category,
-                direction="debit",
-                transaction_date__gte=last_3_months,
-            ).aggregate(avg=Avg("amount"))["avg"] or 0
+            historical_avg = category_totals[category] / len(recent_months) if recent_months else 0
+            if category == "rent" and user.rent_or_emi > 0 and historical_avg == 0:
+                continue
 
             # Blend historical data with ideal allocation
             ideal_allocation = (disposable_income * self.CATEGORY_ALLOCATION.get(category, 5) / 100) * city_multiplier
@@ -274,6 +266,9 @@ class BudgetIntelligenceService:
                 "historical_avg": round(historical_avg, 2),
             }
 
+        total = sum(item["suggested"] for item in category_budgets.values())
+        for item in category_budgets.values():
+            item["suggested"] = round(item["suggested"] / total * disposable_income, 2) if total else 0
         return category_budgets
 
     def _calculate_daily_expenditure(self, disposable_income: float) -> float:
@@ -293,11 +288,11 @@ class BudgetIntelligenceService:
         dti = (fixed_obligations / monthly_income * 100) if monthly_income > 0 else 0
         if dti > 40:
             recommendations.append(
-                f"⚠️ Your debt-to-income ratio is {dti:.1f}%. Aim to keep it below 40% for financial health."
+                f"Housing and loan EMIs use {dti:.1f}% of monthly income, leaving less for everyday spending."
             )
         elif dti < 25:
             recommendations.append(
-                f"✓ Excellent debt management! Your DTI is {dti:.1f}%."
+                f"Housing and loan EMIs use {dti:.1f}% of monthly income."
             )
 
         # Savings recommendation
@@ -308,7 +303,8 @@ class BudgetIntelligenceService:
 
         # Emergency fund
         months_of_expenses = 6
-        emergency_fund_target = disposable_income * months_of_expenses
+        baseline = resolve_canonical_financial_baseline(user)
+        emergency_fund_target = float(baseline.get("essential_monthly_outflow", 0) or 0) * months_of_expenses
         recommendations.append(
             f"Build an emergency fund of ₹{emergency_fund_target:,.0f} (6 months of expenses)."
         )
@@ -322,7 +318,7 @@ class BudgetIntelligenceService:
         elif status == "WARNING":
             return f"⚠️ Today's spending (₹{today_spend:.0f}) is high. Safe limit: ₹{safe_spend:.0f}"
         else:
-            return f"✓ You're on track! You can safely spend up to ₹{safe_spend:.0f} today."
+            return f"About ₹{safe_spend:,.0f} per day remains in your flexible budget. Allow separately for savings and unrecorded bills."
 
     def _generate_forecast_insights(self, forecasts: List[Dict], trend: str) -> List[str]:
         """Generate insights from financial forecasts."""
@@ -332,7 +328,7 @@ class BudgetIntelligenceService:
 
         if total_predicted_savings > 0:
             insights.append(
-                f"You're projected to save ₹{total_predicted_savings:,.0f} over the next {len(forecasts)} months."
+                f"Estimated income left before investments and card payments: ₹{total_predicted_savings:,.0f} over {len(forecasts)} months."
             )
         else:
             insights.append(

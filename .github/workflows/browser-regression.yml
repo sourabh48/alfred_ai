@@ -10,6 +10,8 @@ on:
       - "static/**"
       - "templates/**"
       - "tests/test_document_review_browser.py"
+      - "tests/test_user_data_browser.py"
+      - "tests/user_acceptance_scenario.py"
       - "tests/test_browser_regression_runner.py"
       - "tests/test_live_ui_contracts.py"
       - "scripts/run_browser_regressions.py"

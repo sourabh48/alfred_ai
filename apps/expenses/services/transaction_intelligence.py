@@ -121,7 +121,8 @@ def hydrate_expense_data(*, user, payload: dict, initial_data: dict | None = Non
 
     for field in ("classification", "category", "payment_mode", "merchant", "external_reference"):
         if _should_fill(field, data, provided_fields):
-            data[field] = inferred.get(field, data.get(field))
+            fallback = getattr(instance, field, Expense._meta.get_field(field).get_default())
+            data[field] = inferred.get(field) or data.get(field) or fallback
 
     if _should_fill("raw_description", data, provided_fields):
         data["raw_description"] = inferred.get("raw_description", source_text)

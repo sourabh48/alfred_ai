@@ -696,7 +696,10 @@ def _build_networth_payload(user) -> dict:
 
     debt_to_asset_ratio = (total_debt / total_assets * 100) if total_assets > 0 else 0
 
-    if net_worth > 1000000:
+    if not total_assets and not total_debt:
+        health_status = "No data"
+        message = "Add current account balances, investments and loans to assess your net worth."
+    elif net_worth > 1000000:
         health_status = "Excellent"
         message = "Strong financial position with healthy net worth"
     elif net_worth > 500000:
@@ -708,6 +711,9 @@ def _build_networth_payload(user) -> dict:
     elif net_worth > 0:
         health_status = "Needs Improvement"
         message = "Low net worth, reduce debt and increase savings"
+    elif net_worth == 0:
+        health_status = "Balanced"
+        message = "Recorded assets equal recorded liabilities."
     else:
         health_status = "Critical"
         message = "Negative net worth - debt exceeds assets. Urgent action needed"

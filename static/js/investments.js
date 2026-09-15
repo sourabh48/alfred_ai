@@ -59,7 +59,7 @@ function renderInvestmentSummary(data) {
     const analysis = data.analysis || {};
     const cards = [
         { title: "Invested", value: Alfred.formatCurrency(summary.total_invested || 0), copy: "Capital deployed so far" },
-        { title: "Gain / Loss", value: Alfred.formatCurrency(summary.gain_loss || 0), copy: `${Alfred.formatNumber(summary.annual_return || 0, 2)}% weighted annual return` },
+        { title: "Unrealized Gain / Loss", value: Alfred.formatCurrency(summary.gain_loss || 0), copy: "Latest recorded value minus amount invested; excludes withdrawals and realized gains" },
         { title: "Monthly SIP", value: Alfred.formatCurrency(summary.monthly_sip || 0), copy: "Recurring monthly contribution" },
         { title: "Risk / Diversification", value: `${analysis.risk_level || summary.risk || "No data"}`, copy: `${Alfred.formatNumber(analysis.diversification_score || 0)} diversification score` },
     ];

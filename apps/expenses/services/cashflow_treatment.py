@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections import defaultdict
+from decimal import Decimal
 
 
 CASHFLOW_REVIEW_AMOUNT_THRESHOLD = 50000.0
@@ -166,6 +168,28 @@ def summarize_cashflow(expenses) -> dict:
     for expense in expenses:
         add_expense_to_cashflow_bucket(bucket, expense)
     return bucket
+
+
+def variable_spend_rows(expenses, *, monthly_housing=0):
+    """Yield living costs after the housing amount already reserved in fixed costs.
+
+    Apply that allowance once per calendar month, across all rent payments.
+    Excess rent still counts; without a declared allowance, all rent counts.
+    Transfers, investments, debt payments and unresolved debits are separate.
+    """
+    allowance = max(Decimal(str(monthly_housing or 0)), Decimal("0"))
+    housing_used = defaultdict(lambda: Decimal("0"))
+    for expense in sorted(expenses, key=lambda item: (item.transaction_date, item.pk or 0)):
+        if classify_cashflow(expense).bucket not in {"expense", "other"}:
+            continue
+        amount = Decimal(str(expense.amount or 0))
+        if expense.category == "rent":
+            key = (expense.transaction_date.year, expense.transaction_date.month)
+            covered = min(amount, max(allowance - housing_used[key], Decimal("0")))
+            housing_used[key] += covered
+            amount -= covered
+        if amount > 0:
+            yield expense, amount
 
 
 def rounded_cashflow_bucket(bucket: dict) -> dict:

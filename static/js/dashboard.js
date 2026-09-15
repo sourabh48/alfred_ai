@@ -42,27 +42,27 @@ function renderFocusStrip(summary, loanPortfolio, behavior) {
 
     const items = [
         {
-            label: "Cash Flow",
+            label: "Recorded Cash Left",
             value: Alfred.formatCurrency(summary.current_month_net),
-            meta: summary.current_month_net >= 0 ? "Net positive this month" : "Outflow is ahead of inflow",
+            meta: `${summary.reference_month}: income minus confirmed outflow`,
             tone: summary.current_month_net >= 0 ? "success" : "danger",
         },
         {
-            label: "Debt Service",
-            value: Alfred.formatPercent(summary.debt_service_ratio),
-            meta: `${loanPortfolio.active_loans} active loan${loanPortfolio.active_loans === 1 ? "" : "s"}`,
+            label: "Debt Payments / Income",
+            value: summary.history_income > 0 ? Alfred.formatPercent(summary.debt_service_ratio) : "—",
+            meta: "All recorded months; includes loan and card payments",
             tone: "primary",
         },
         {
-            label: "Savings Rate",
-            value: Alfred.formatPercent(summary.savings_rate),
-            meta: "Measured from current-month inflow vs outflow",
+            label: "Cash Retained / Income",
+            value: summary.history_income > 0 ? Alfred.formatPercent(summary.savings_rate) : "—",
+            meta: "All recorded months; after investments and card payments",
             tone: "good",
         },
         {
-            label: "Behavior Tone",
+            label: "Spending Pattern",
             value: behavior.personality || "Calibrating",
-            meta: behavior.coach_tone ? `Coach tone: ${behavior.coach_tone}` : "Awaiting stronger pattern depth",
+            meta: "Estimated from your recorded history",
             tone: "accent",
         },
     ];
@@ -86,35 +86,44 @@ function renderFocusStrip(summary, loanPortfolio, behavior) {
 
 function renderHero(summary, behavior) {
     const scoreRing = document.getElementById("healthScoreRing");
-    scoreRing.style.setProperty("--score", Math.round(summary.financial_health_score || 0));
-    document.getElementById("healthScoreValue").textContent = Math.round(summary.financial_health_score || 0);
-    document.getElementById("healthRiskPill").className = `status-pill ${statusClass(summary.risk_level)}`;
-    document.getElementById("healthRiskPill").textContent = summary.risk_level;
+    const needsReview = Number(summary.history_review_required || 0) > 0;
+    const hasScore = summary.transactions && !needsReview;
+    scoreRing.style.setProperty("--score", hasScore ? Math.round(summary.financial_health_score || 0) : 0);
+    document.getElementById("healthScoreValue").textContent = hasScore ? Math.round(summary.financial_health_score || 0) : "—";
+    document.getElementById("healthRiskPill").className = `status-pill ${needsReview ? "status-guarded" : statusClass(summary.risk_level)}`;
+    document.getElementById("healthRiskPill").textContent = needsReview ? "Review transactions first" : (summary.transactions ? `${summary.risk_level} estimated risk` : "No data");
     document.getElementById("dashboardPersonality").textContent = behavior.personality;
     document.getElementById("dashboardReferenceMonth").textContent = summary.reference_month;
+    document.getElementById("dashboardPeriodNote").textContent = summary.transactions
+        ? `Showing ${summary.reference_month}, the latest month with recorded transactions. Rates below cover all recorded months.`
+        : "No transactions yet. Add expenses or import a bank statement to see your totals.";
+    const review = document.getElementById("dashboardReviewNotice");
+    const amount = Number(summary.current_month_review_required || 0);
+    review.hidden = amount <= 0;
+    review.textContent = `${Alfred.formatCurrency(amount)} in debits needs review and is excluded from these totals. Cash left may be lower until you confirm these transactions on Expenses.`;
 }
 
 function renderSummaryCards(summary, loanPortfolio) {
     const cards = [
         {
-            kicker: "Current Month Spend",
+            kicker: "Living Expenses",
             value: Alfred.formatCurrency(summary.current_month_expense),
-            caption: `Delta vs prior month: ${Alfred.formatCurrency(summary.monthly_expense_delta)}`,
+            caption: `${summary.reference_month}; includes recorded rent`,
         },
         {
-            kicker: "Current Month Income",
+            kicker: "Recorded Income",
             value: Alfred.formatCurrency(summary.current_month_income),
-            caption: `Net cash flow: ${Alfred.formatCurrency(summary.current_month_net)}`,
+            caption: `${summary.reference_month}; excludes transfers between accounts`,
         },
         {
-            kicker: "Loan Pressure",
-            value: Alfred.formatCurrency(summary.current_month_loans),
-            caption: `${Alfred.formatPercent(summary.debt_service_ratio)} debt-service ratio`,
+            kicker: "Confirmed Outflow",
+            value: Alfred.formatCurrency(summary.current_month_outflow || 0),
+            caption: "Living costs, loan payments, investments, card payments and other confirmed debits",
         },
         {
-            kicker: "Manual Outstanding",
+            kicker: "Recorded Loan Balance",
             value: Alfred.formatCurrency(loanPortfolio.manual_total_outstanding),
-            caption: `${loanPortfolio.active_loans} active manual loans`,
+            caption: `${loanPortfolio.active_loans} active loan${loanPortfolio.active_loans === 1 ? "" : "s"}`,
         },
     ];
     const homeSummary = loanPortfolio.home_ownership_summary || {};
@@ -157,6 +166,20 @@ function renderMonthlyChart(charts) {
                     label: "Loans",
                     data: charts.monthly_loan_values,
                     backgroundColor: "rgba(196, 74, 61, 0.72)",
+                    borderRadius: 10,
+                },
+                {
+                    type: "bar",
+                    label: "Card payments",
+                    data: charts.monthly_credit_card_payment_values || [],
+                    backgroundColor: "rgba(122, 87, 209, 0.72)",
+                    borderRadius: 10,
+                },
+                {
+                    type: "bar",
+                    label: "Investments",
+                    data: charts.monthly_investment_values || [],
+                    backgroundColor: "rgba(217, 121, 4, 0.72)",
                     borderRadius: 10,
                 },
                 {
@@ -223,9 +246,9 @@ function renderCategoryChart(charts) {
 
 function renderBehavior(summary, behavior) {
     const cards = [
-        { kicker: "Savings Rate", value: Alfred.formatPercent(summary.savings_rate), caption: "Share of inflows retained after outflows." },
+        { kicker: "Cash Retained / Income", value: summary.history_income > 0 ? Alfred.formatPercent(summary.savings_rate) : "—", caption: "All recorded months; after investments and card payments." },
         { kicker: "Discretionary Mix", value: Alfred.formatPercent(summary.discretionary_ratio), caption: "Lifestyle categories as a share of debit outflow." },
-        { kicker: "Stability Score", value: `${Math.round(summary.stability_score)}/100`, caption: "Lower volatility means cleaner planning." },
+        { kicker: "Spending Stability", value: summary.transactions ? `${Math.round(summary.stability_score)}/100` : "—", caption: "Estimated from how much monthly spending changes." },
     ];
 
     document.getElementById("dashboardBehaviorCards").innerHTML = cards.map(card => `

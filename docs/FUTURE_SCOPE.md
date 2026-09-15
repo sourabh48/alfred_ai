@@ -2,22 +2,22 @@
 
 ## Highest-Value Next Steps
 
-1. Expand the current document-review flow into visual OCR overlays and richer field-level correction tooling.
-2. Expand verified evidence beyond travel/career/risk/recommendation/tax into relationship, investment, and other advisory signals where appropriate.
+1. Validate the implemented OCR overlays and field corrections against more real document layouts and additional browser workflows.
+2. Maintain the implemented relationship/investment evidence contracts and add source-backed signals where actual product gaps remain.
 3. Introduce a generalized `VehicleProfile` naming refactor once backward compatibility is planned.
-4. Add stronger automated tests for upload, parsing, statement dedupe, dashboard aggregation, and external-evidence caching.
+4. Extend the existing upload, parsing, deduplication, calculation, cache and browser regressions with real failure cases; see the completion audit for current evidence.
 5. Expand career intelligence to more live job sources, richer recruiter attachment persistence, and more geography-aware compensation benchmarks.
 6. Replace the current lightweight career-timing heuristic with a calibrated evidence model once enough reviewed history exists.
-7. Add breaker telemetry, refresh observability, and admin review surfaces for the verified-intelligence pipeline.
-8. Replace progress-proxy learning metrics with a formal release or model-maturity registry.
+7. Verify the implemented circuit-breaker telemetry, refresh observability and operations console under sustained local-stack use.
+8. Replace project progress estimates with formal release acceptance; the implemented model registry still needs enough genuine validation outcomes for serving readiness.
 9. Add bureau-approved official credit integrations with explicit consent and authentication flow instead of internal-only credit estimates.
 
 ## Improvements Worth Considering
 
 - broaden model-specific maintenance schedules and service intervals across more official manufacturers
-- add OCR confidence overlays and visual document review
-- support route-aware trip costing with fuel-price estimates and service-prep buffers
-- add user feedback loops so corrections can improve parser heuristics over time
+- broaden real-layout coverage of the existing OCR overlays and visual document review
+- validate existing route-aware trip estimates with real fuel and service costs
+- collect reviewed corrections through the existing parser feedback loops
 - add more model-specific part-life assumptions so vehicle performance guidance is less generic
 - add portfolio and job-market alerting with freshness thresholds and proof links
 - add richer recruiter-mail attachment review and persistence beyond the current intake path

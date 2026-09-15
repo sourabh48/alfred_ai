@@ -44,6 +44,13 @@ Canonical formulas:
 
 Every canonical metric is tagged as `observed`, `user-reported`, `derived`, or `unavailable` so missing data is not silently treated as verified financial health. The current database schema still stores several monetary fields as floats; the resolver normalizes them with `Decimal` internally before returning rounded API values.
 
+Flexible living spend is shared by the baseline and budget paths through
+`cashflow_treatment.variable_spend_rows`. Housing already reserved in fixed
+obligations is removed once per calendar month; excess rent still counts.
+Transfers, investments, debt settlements and debits awaiting review remain
+separate. Recorded cash outflow continues to include investments and debt
+payments, so it intentionally differs from flexible living spend.
+
 ### Life Intelligence
 
 - career
@@ -164,6 +171,12 @@ Current materialized paths include:
 - relationship alignment reads in `apps/relationship/views.py`
 
 These payloads expose `_materialized` metadata for debugging and regression tests.
+
+Successful authenticated API writes invalidate the user's derived views and
+views shared through accepted family consent. A per-user cache generation
+prevents stale in-flight responses from becoming current after an edit.
+Background and admin changes still need suitable revision or explicit
+invalidation handling; cached payloads retain their bounded TTLs.
 
 ## Parser Learning
 

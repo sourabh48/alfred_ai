@@ -851,9 +851,9 @@ def project_details_payload(guardrails: dict) -> dict:
         "Add specialty sources only where real users expose role/geography gaps, then validate more salary-bearing outcomes from accepted or rejected opportunities.",
         "Keep verified evidence refresh jobs healthy across advisory surfaces and require proof contracts on any new recommendation or relationship-adjacent path.",
         "Tune production cache TTLs, capacity, and invalidation thresholds against real traffic and payload volume.",
-        "Close production deployment gates for database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache telemetry.",
+        "Verify the local/LAN stack: database, shared cache, Celery worker/beat, backup/restore, restart persistence, browser CI, and concurrent cache traffic.",
         "Keep supervised artifacts fresh, collect more accepted outcomes, and do not count the planned future RL learner as production-ready ML.",
-        "Extend browser-driven regression checks from the proven vehicle invoice/OCR correction path into login, statement upload, vehicle setup, dashboard refresh, and core form submissions.",
+        "Maintain browser proof for login, statement upload, vehicle setup, document correction, dashboard refresh, and sample financial totals; expand to more document families and core form submissions.",
         "Clear calculation review queues and validate salary, vehicle-cost, and stale-evidence outcomes before raising calculation maturity.",
     ]
     improvements = [
@@ -878,7 +878,7 @@ def project_details_payload(guardrails: dict) -> dict:
     ]
 
     risks = [
-        "browser-only issues can still exist outside the covered document-review invoice/OCR correction path",
+        "browser-only issues can still exist beyond the recorded document workflows and sample-user finance pages; fresh CI and wider interaction coverage remain necessary",
         "some external sources are authoritative APIs, but market data still relies on Yahoo Finance",
         "multiple-vehicle support is structurally improved, but some naming remains vehicle-service or bike-centric in code paths for backward compatibility",
         "job-link parsing is robust for many public pages, but some portals can still block direct fetches or hide content behind script/runtime layers",

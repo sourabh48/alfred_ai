@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 from datetime import timedelta
 import hashlib
+from uuid import uuid4
 from time import perf_counter
 
 from django.conf import settings
@@ -260,6 +261,9 @@ def _delete_legacy_locmem_keys(keys: list[str]) -> None:
 
 
 def invalidate_user_materialized_payloads(user_id: int, *, reason: str = "user_data_reset") -> None:
+    # A response already being built may finish after deletion. Its old
+    # generation must never be reused by a later request.
+    cache.set(f"alfred:materialized-generation:{user_id}", uuid4().hex, timeout=None)
     index_key = _user_index_key(user_id)
     tracked_keys = _tracked_user_cache_keys(user_id)
     legacy_locmem_keys = _legacy_locmem_user_keys(user_id)
@@ -284,7 +288,8 @@ def invalidate_user_materialized_payloads(user_id: int, *, reason: str = "user_d
 
 
 def materialize_payload(*, namespace: str, user_id: int, revision: str, ttl_seconds: int, builder):
-    revision_hash = hashlib.sha256((revision or "empty").encode("utf-8")).hexdigest()[:16]
+    generation = cache.get(f"alfred:materialized-generation:{user_id}", "")
+    revision_hash = hashlib.sha256(f"{revision or 'empty'}|{generation}".encode("utf-8")).hexdigest()[:16]
     cache_key = f"alfred:materialized:{namespace}:{user_id}:{revision_hash}"
     tracked_keys = _tracked_user_cache_keys(user_id)
     cached = cache.get(cache_key)

@@ -105,8 +105,9 @@
                     {{ form.variable_income }}
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label" for="{{ form.rent_or_emi.id_for_label }}">Rent / EMI</label>
+                    <label class="form-label" for="{{ form.rent_or_emi.id_for_label }}">Monthly Housing Cost</label>
                     {{ form.rent_or_emi }}
+                    <div class="form-text">Exclude EMIs you record under Loans to avoid counting them twice.</div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label" for="{{ form.password1.id_for_label }}">Password</label>

@@ -52,11 +52,11 @@ function renderLoanSummary(payload) {
             caption: "Registered loans still marked active.",
         },
         {
-            kicker: "Manual Outstanding",
+            kicker: "Recorded Loan Balance",
             value: Alfred.formatCurrency(summary.manual_total_outstanding),
             caption: pendingForeclosureBalance
                 ? `${Alfred.formatCurrency(pendingForeclosureBalance)} is pending foreclosure verification and still counted in liabilities.`
-                : "Estimated outstanding balance across manual loans.",
+                : "Saved balances, or repayment estimates where no balance is entered.",
         },
         {
             kicker: "Planned EMI",
@@ -66,7 +66,7 @@ function renderLoanSummary(payload) {
         {
             kicker: "Detected Repayments",
             value: Alfred.formatCurrency(summary.detected_repayment_total),
-            caption: `${summary.projected_payoff_months} projected months to close current manual book.`,
+            caption: `${summary.projected_payoff_months} estimated months to repay registered loans.`,
         },
         {
             kicker: "Foreclosure Watch",

@@ -92,6 +92,14 @@ class LoanSerializer(serializers.ModelSerializer):
     def get_closure_documents_count(self, obj):
         return obj.closure_documents.count()
 
+    def validate_consolidated_into(self, value):
+        user = getattr(self.context.get("request"), "user", None)
+        if value is not None and (not user or value.user_id != user.pk):
+            raise serializers.ValidationError("Choose one of your own loans.")
+        if value is not None and self.instance is not None and value.pk == self.instance.pk:
+            raise serializers.ValidationError("A loan cannot be consolidated into itself.")
+        return value
+
     def get_latest_foreclosure_snapshot(self, obj):
         snapshot = obj.foreclosure_snapshots.order_by("-updated_at", "-id").first()
         if snapshot is None:

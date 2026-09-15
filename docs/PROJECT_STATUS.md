@@ -4,6 +4,11 @@ The [completion audit](COMPLETION_AUDIT.md) records the current verification
 results and remaining local/LAN runtime work. The sections below describe
 implemented capabilities, not a guarantee of complete real-data coverage.
 
+The [sample-user acceptance audit](USER_DATA_ACCEPTANCE.md) records an isolated
+signup/API scenario, independently reconciled money totals, correction tests,
+and browser checks of the finance pages. It also documents the calculation,
+cache, validation and wording defects found and fixed in that pass.
+
 ## Completed So Far
 
 ### Dashboards and UI

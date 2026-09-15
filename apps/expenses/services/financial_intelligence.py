@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.models import BankAccount, Expense
-from apps.expenses.services.cashflow_treatment import classify_cashflow
+from apps.expenses.services.cashflow_treatment import classify_cashflow, variable_spend_rows
 from apps.integrations.models import CreditReportUpload
 from apps.investments.models import Investment
 from apps.loans.models import Loan, LoanForeclosureSnapshot, LoanPaymentHistory
@@ -43,7 +43,7 @@ BASELINE_FORMULAS = {
     "rent_burden": "User-reported monthly rent or housing obligation.",
     "fixed_obligations": "rent_burden + recurring_emi_burden",
     "disposable_cash_flow": "monthly_income - fixed_obligations",
-    "observed_average_monthly_variable_spend": "Three-month average of observed non-loan debit outflows.",
+    "observed_average_monthly_variable_spend": "Average living spend across the latest three recorded months, excluding housing already reserved in fixed obligations.",
     "savings_capacity": "monthly_income - fixed_obligations - observed_average_monthly_variable_spend",
     "liquid_cash": "Positive active non-credit bank balances.",
     "essential_monthly_outflow": "fixed_obligations + observed_average_monthly_variable_spend",
@@ -195,6 +195,9 @@ def _build_financial_intelligence_uncached(user) -> dict:
         {
             "summary": {
                 "reference_month": reference_date.strftime("%B %Y"),
+                "history_income": round(income_total, 2),
+                "history_outflow": round(debit_total, 2),
+                "history_review_required": round(sum(bucket["review_required"] for bucket in monthly_buckets.values()), 2),
                 "current_month_income": round(current_bucket["income"], 2),
                 "current_month_expense": round(current_bucket["expense"], 2),
                 "current_month_loans": round(current_bucket["loan"], 2),
@@ -324,6 +327,9 @@ def _empty_intelligence() -> dict:
     return {
         "summary": {
             "reference_month": timezone.localdate().strftime("%B %Y"),
+            "history_income": 0.0,
+            "history_outflow": 0.0,
+            "history_review_required": 0.0,
             "current_month_income": 0.0,
             "current_month_expense": 0.0,
             "current_month_loans": 0.0,
@@ -581,13 +587,16 @@ def _build_canonical_financial_baseline_uncached(
     current_bucket = monthly_buckets.get(current_key, _empty_month_bucket())
 
     observed_average_monthly_inflow_amount = _decimal_average(bucket["income"] for bucket in recent_buckets)
+    variable_by_month = defaultdict(lambda: Decimal("0"))
+    for expense, amount in variable_spend_rows(expenses, monthly_housing=getattr(user, "rent_or_emi", 0)):
+        variable_by_month[(expense.transaction_date.year, expense.transaction_date.month)] += amount
     observed_average_monthly_variable_spend_amount = _decimal_average(
-        (_decimal_amount(bucket["expense"]) + _decimal_amount(bucket["other"])) for bucket in recent_buckets
+        variable_by_month[key] for key in recent_month_keys
     )
     observed_average_monthly_total_outflow_amount = _decimal_average(
         _decimal_amount(bucket["outflow"]) for bucket in recent_buckets
     )
-    current_month_variable_spend_amount = _decimal_amount(current_bucket["expense"]) + _decimal_amount(current_bucket["other"])
+    current_month_variable_spend_amount = variable_by_month[current_key]
     current_month_total_outflow_amount = _decimal_amount(current_bucket["outflow"])
 
     profile = CareerProfile.objects.filter(user=user).first()
@@ -717,7 +726,7 @@ def _build_canonical_financial_baseline_uncached(
             "recent_transaction_history",
             "observed_average_monthly_variable_spend",
             inputs=["expense.direct_debit", "expense.uncategorized_cashflow_debit"],
-            note="Transfers, investments, card settlements, and review-gated large other debits are separated from variable living spend.",
+            note="Transfers, investments, debt payments, and debits awaiting review are separate. Rent up to the declared monthly housing amount is already reserved in fixed obligations; excess rent remains in living spend.",
         ),
         "savings_capacity": _baseline_metric_state(
             "derived" if monthly_income_amount > 0 and recent_buckets else "unavailable",
