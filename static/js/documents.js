@@ -29,9 +29,14 @@ const documentCenterResources = [
     { key: "diagnostics", url: "/api/documents/diagnostics/", fallback: { results: [] } },
 ];
 
-function loadDocumentCenter() {
+function loadDocumentCenter(options = {}) {
     return Promise.all(documentCenterResources.map(loadDocumentResource))
         .then(results => {
+            // A request can finish after the user opens a form or starts typing.
+            // Keep its DOM intact; the next idle refresh will load fresh data.
+            if (options.live && Alfred.shouldPauseLiveRefresh(document.getElementById("documentCenterRoot"))) {
+                return;
+            }
             const payload = Object.fromEntries(results.map(result => [result.key, result.data]));
             const failures = results.filter(result => result.error);
 
@@ -496,6 +501,7 @@ function renderReviewQueue(items) {
                                                 id="${formId}-${field.name}"
                                                 name="${field.name}"
                                                 type="${field.type === "number" ? "number" : (field.type === "date" ? "date" : "text")}"
+                                                ${field.type === "number" ? 'step="any"' : ""}
                                                 class="form-control"
                                                 value="${Alfred.escapeHtml(formatReviewFieldValue(field, getReviewFieldValue(state, field.name, item.fields?.[field.name] ?? "")))}"
                                             >

@@ -1,5 +1,9 @@
 # Project Status
 
+The [completion audit](COMPLETION_AUDIT.md) records the current verification
+results and remaining local/LAN runtime work. The sections below describe
+implemented capabilities, not a guarantee of complete real-data coverage.
+
 ## Completed So Far
 
 ### Dashboards and UI
@@ -118,7 +122,7 @@
 ## Pending / Incomplete
 
 - broad official catalog coverage for more bikes, scooters, and cars
-- visual OCR overlays and richer field-level review inputs for unknown or messy document formats
+- broader real-document validation of the implemented OCR overlays and field-level correction inputs
 - deeper verification for more user-entered data outside mobility
 - stronger test coverage
 - broader live-browser verification across more pages after the Selenium runner keeps recording required-browser local Chrome or Edge runs and CI Chrome runs with zero skipped browser tests
@@ -129,7 +133,7 @@
 - broader document-center browser interaction coverage beyond the new retry and diagnostics regression tests
 - broader upload-history coverage in the central document hub beyond the newly added saved loan-import trail
 - broader trainable-model coverage beyond the currently supported structured salary, expense, burnout, behavioral-risk, and parser-confidence paths
-- visual OCR review is still pending, but the parser learning loop now adapts from both repeated upload outcomes and accepted document-center corrections
+- OCR candidates and overlay review are implemented; browser coverage currently exercises statement and vehicle corrections, while broader document-family interaction proof remains open
 - local host/LAN setup validation, backup routine, and sustained local cache telemetry under real usage
 - any future public internet deployment would require an explicit new decision plus fresh readiness proof for database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache traffic
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from django.conf import settings
@@ -8,6 +9,7 @@ from django.utils import timezone
 from .income_intelligence import build_employment_income_signals
 from apps.ml_engine.inference_adapters.salary_predictor import MODEL_PATH, salary_predictor
 from apps.ml_engine.models import AdaptiveModelState
+from apps.ml_engine.training.quality import validation_blockers
 
 
 CITY_TIER_SCORES = {
@@ -209,15 +211,22 @@ def resolve_salary_model_runtime(user, inputs: dict) -> dict:
     }
     if state.status != "ready":
         return {"available": False, "predicted_monthly_income": None, "state": state_payload}
-    if not artifact_path.exists():
+    if not artifact_path.is_file():
         state_payload["inference_reason"] = "artifact_missing"
+        return {"available": False, "predicted_monthly_income": None, "state": state_payload}
+    if not state.is_fresh:
+        state_payload["inference_reason"] = "model_stale"
+        return {"available": False, "predicted_monthly_income": None, "state": state_payload}
+    blockers = validation_blockers(state.model_key, state.sample_count, state.quality_score, state.confidence_estimate)
+    if blockers:
+        state_payload["inference_reason"] = "validation_blocked"
+        state_payload["validation_blockers"] = blockers
         return {"available": False, "predicted_monthly_income": None, "state": state_payload}
 
     feature_vector = {
         "variable_income": inputs["variable_income"],
         "rent_or_emi": inputs["rent_or_emi"],
         "city_tier_score": CITY_TIER_SCORES.get(inputs["city"].lower(), 0.75),
-        "income_variability_ratio": inputs["variable_income"] / max(inputs["current_income"], 1),
         "account_age_days": inputs["account_age_days"],
     }
     try:
@@ -230,7 +239,7 @@ def resolve_salary_model_runtime(user, inputs: dict) -> dict:
         state_payload["inference_reason"] = "load_or_predict_failed"
         return {"available": False, "predicted_monthly_income": None, "state": state_payload}
 
-    if prediction <= 0:
+    if not math.isfinite(prediction) or prediction <= 0:
         state_payload["inference_reason"] = "invalid_prediction"
         return {"available": False, "predicted_monthly_income": None, "state": state_payload}
 

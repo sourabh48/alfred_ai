@@ -18,6 +18,7 @@ from apps.ml_engine.core.alfred_registry import model_registry
 from apps.ml_engine.models import AdaptiveModelState, AdaptiveTrainingRun, DocumentParserLearningMemory
 from apps.relationship.models import RelationshipProfile
 from apps.users.models import User
+from .quality import MINIMUM_VALIDATION_SAMPLES, PROXY_TARGET_NOTES, resolve_artifact_path, validation_blockers
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,7 @@ TRAINING_SPECS = [
         fallback_mode="expense forecasts fall back to recent average and trend heuristics",
         sample_counter=lambda: Expense.objects.count(),
         trainer_path="apps.ml_engine.training.train_expense_lstm.train_expense_lstm",
-        description="Learns rolling cash-flow sequences from imported and manual expense history.",
+        description="Predicts each user's next debit spending transaction, with chronological holdout and a recent-median baseline; this is not a daily cash-flow model.",
     ),
     TrainingSpec(
         key="burnout_rf",
@@ -165,14 +166,16 @@ def run_training_cycle(*, trigger: str = "manual", force: bool = False, model_ke
                 continue
             results.append(_run_training_spec(spec, trigger=trigger, force=force, now=now))
 
-        ready_count = sum(1 for item in results if item["status"] == "ready")
+        fitted_count = sum(1 for item in results if item["status"] == "ready")
+        ready_count = sum(1 for item in results if item["inference_ready"])
         skipped_count = sum(1 for item in results if item["status"] == "skipped")
         failed_count = sum(1 for item in results if item["status"] == "failed")
-        avg_confidence = round(mean([item["confidence_estimate"] for item in results]) if results else 0.0, 2)
+        avg_confidence = round(mean([item["confidence_estimate"] if item["inference_ready"] else 0.0 for item in results]) if results else 0.0, 2)
         return {
             "status": "completed",
-            "detail": f"ALFRED training cycle finished: {ready_count} ready, {skipped_count} skipped, {failed_count} failed.",
+            "detail": f"ALFRED training cycle finished: {fitted_count} fitted, {ready_count} inference-ready, {skipped_count} skipped, {failed_count} failed.",
             "ready_count": ready_count,
+            "fitted_count": fitted_count,
             "skipped_count": skipped_count,
             "failed_count": failed_count,
             "average_confidence": avg_confidence,
@@ -188,17 +191,17 @@ def training_health_snapshot() -> dict:
     spec_by_key = {spec.key: spec for spec in TRAINING_SPECS}
     total = len(states)
     production_states = [item for item in states if item.model_key not in PLANNED_MODEL_KEYS]
-    ready = [item for item in production_states if item.status == "ready"]
+    ready = [item for item in production_states if item.inference_ready]
     fresh = [item for item in ready if item.is_fresh]
     skipped = [item for item in production_states if item.status == "skipped"]
     failed = [item for item in production_states if item.status == "failed"]
     training = [item for item in production_states if item.status == "training"]
     trainable = production_states
-    ready_trainable = [item for item in trainable if item.status == "ready"]
+    ready_trainable = ready
     fresh_trainable = [item for item in ready_trainable if item.is_fresh]
     skipped_trainable = [item for item in trainable if item.status == "skipped"]
     planned = [item for item in states if item.model_key in PLANNED_MODEL_KEYS]
-    average_confidence = round(mean([item.confidence_estimate for item in production_states]) if production_states else 0.0, 2)
+    average_confidence = round(mean([item.confidence_estimate if item.inference_ready else 0.0 for item in production_states]) if production_states else 0.0, 2)
     maturity_items = [_model_maturity_payload(item, spec_by_key.get(item.model_key)) for item in states]
     maturity_counts = Counter(item["maturity_level"] for item in maturity_items)
 
@@ -225,6 +228,8 @@ def training_health_snapshot() -> dict:
         "summary": summary,
         "total_models": total,
         "ready_models": len(ready),
+        "fitted_models": sum(item.status == "ready" for item in production_states),
+        "validation_blocked_models": sum(item.status == "ready" and not item.inference_ready for item in production_states),
         "fresh_models": len(fresh),
         "skipped_models": len(skipped),
         "failed_models": len(failed),
@@ -260,7 +265,7 @@ def _model_maturity_payload(state: AdaptiveModelState, spec: TrainingSpec | None
         maturity_level = "blocked"
     elif state.status == "ready" and not state.is_fresh:
         maturity_level = "trained_stale"
-    elif state.status == "ready" and state.confidence_estimate < 55:
+    elif state.status == "ready" and not state.inference_ready:
         maturity_level = "trained_low_confidence"
     elif state.status == "ready":
         maturity_level = "trained"
@@ -278,6 +283,10 @@ def _model_maturity_payload(state: AdaptiveModelState, spec: TrainingSpec | None
         blockers.append("Training was skipped because the data spread, environment, or implementation is not ready.")
     if state.status == "ready" and not state.is_fresh:
         blockers.append("Model artifact exists but its freshness window has elapsed.")
+    if state.status == "ready":
+        blockers.extend(validation_blockers(state.model_key, state.sample_count, state.quality_score, state.confidence_estimate))
+        if not state.artifact_path or not resolve_artifact_path(state.artifact_path).is_file():
+            blockers.append("The recorded model artifact is missing.")
 
     return {
         "model_key": state.model_key,
@@ -287,7 +296,11 @@ def _model_maturity_payload(state: AdaptiveModelState, spec: TrainingSpec | None
         "minimum_samples": minimum_samples,
         "data_gap": data_gap,
         "maturity_level": maturity_level,
-        "uses_fallback": maturity_level in {"data_limited", "heuristic_fallback", "planned", "blocked", "trained_stale"},
+        "uses_fallback": not state.inference_ready or state.model_key in PLANNED_MODEL_KEYS,
+        "inference_ready": state.inference_ready and state.model_key not in PLANNED_MODEL_KEYS,
+        "minimum_validation_samples": MINIMUM_VALIDATION_SAMPLES.get(state.model_key, 0),
+        "validation_sample_gap": max(MINIMUM_VALIDATION_SAMPLES.get(state.model_key, 0) - state.sample_count, 0),
+        "target_limitation": PROXY_TARGET_NOTES.get(state.model_key, ""),
         "fallback_mode": getattr(spec, "fallback_mode", ""),
         "quality_score": round(state.quality_score, 2),
         "confidence_estimate": round(state.confidence_estimate, 2),
@@ -310,7 +323,7 @@ def _load_trainer(spec: TrainingSpec):
 def _run_training_spec(spec: TrainingSpec, *, trigger: str, force: bool, now) -> dict:
     state = AdaptiveModelState.objects.get(model_key=spec.key)
     sample_count = int(spec.sample_counter())
-    if not force and state.status == "ready" and state.next_refresh_due_at and state.next_refresh_due_at > now:
+    if not force and state.inference_ready and state.next_refresh_due_at and state.next_refresh_due_at > now:
         return _record_skip(
             spec=spec,
             state=state,
@@ -396,6 +409,7 @@ def _run_training_spec(spec: TrainingSpec, *, trigger: str, force: bool, now) ->
             "sample_count": state.sample_count,
             "artifact_path": state.artifact_path,
             "notes": state.notes,
+            "evaluation": result.get("evaluation", {}),
         },
     )
 
@@ -419,13 +433,15 @@ def _run_training_spec(spec: TrainingSpec, *, trigger: str, force: bool, now) ->
         "confidence_estimate": round(state.confidence_estimate, 2),
         "notes": state.notes,
         "artifact_path": state.artifact_path,
+        "inference_ready": state.inference_ready and spec.key not in PLANNED_MODEL_KEYS,
     }
 
 
 def _record_skip(*, spec: TrainingSpec, state: AdaptiveModelState, trigger: str, sample_count: int, note: str, now) -> dict:
-    state.sample_count = sample_count
+    # The artifact's evidence must keep describing its training dataset, even
+    # when more rows have arrived since the fit.
     state.last_trigger = trigger
-    state.save(update_fields=["sample_count", "last_trigger", "updated_at"])
+    state.save(update_fields=["last_trigger", "updated_at"])
     AdaptiveTrainingRun.objects.create(
         model_key=spec.key,
         display_name=spec.label,
@@ -448,6 +464,7 @@ def _record_skip(*, spec: TrainingSpec, state: AdaptiveModelState, trigger: str,
         "confidence_estimate": round(state.confidence_estimate, 2),
         "notes": note,
         "artifact_path": state.artifact_path,
+        "inference_ready": state.inference_ready and spec.key not in PLANNED_MODEL_KEYS,
     }
 
 
@@ -493,4 +510,5 @@ def _record_unavailable(*, spec: TrainingSpec, state: AdaptiveModelState, trigge
         "confidence_estimate": round(state.confidence_estimate, 2),
         "notes": note,
         "artifact_path": state.artifact_path,
+        "inference_ready": False,
     }

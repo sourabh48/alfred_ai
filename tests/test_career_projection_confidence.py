@@ -3,11 +3,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.utils import timezone
 
 from apps.career.models import CareerResume
+from apps.career.services.projection_engine import resolve_salary_model_runtime
 from apps.ml_engine.models import AdaptiveModelState
 
 
@@ -63,7 +65,7 @@ class CareerProjectionConfidenceTests(TestCase):
             model_key="salary_predictor",
             display_name="Salary predictor",
             status="ready",
-            sample_count=22,
+            sample_count=40,
             quality_score=71.4,
             confidence_estimate=68.3,
             artifact_path="ml_models/alfred/salary_model/model.pkl",
@@ -76,7 +78,7 @@ class CareerProjectionConfidenceTests(TestCase):
             return_value=self._market_payload(),
         ), patch(
             "apps.career.services.projection_engine.resolve_artifact_path",
-            return_value=Path("F:/ALFRED/README.md"),
+            return_value=Path(settings.BASE_DIR) / "README.md",
         ), patch(
             "apps.career.services.projection_engine.salary_predictor.predict",
             return_value=120000.0,
@@ -98,7 +100,7 @@ class CareerProjectionConfidenceTests(TestCase):
         self.assertTrue(confidence["model"]["is_fresh"])
         self.assertTrue(confidence["model"]["inference_ready"])
         self.assertEqual(confidence["model"]["inference_reason"], "ok")
-        self.assertEqual(confidence["model"]["sample_count"], 22)
+        self.assertEqual(confidence["model"]["sample_count"], 40)
         self.assertTrue(confidence["support"]["resume_used"])
         self.assertEqual(confidence["support"]["skills_count"], 2)
         self.assertTrue(all("confidence" not in item for item in payload["projections"]))
@@ -136,3 +138,46 @@ class CareerProjectionConfidenceTests(TestCase):
         self.assertTrue(confidence["model"]["available"])
         self.assertFalse(confidence["model"]["inference_ready"])
         self.assertEqual(confidence["model"]["inference_reason"], "artifact_missing")
+
+    def test_invalid_training_evidence_never_reaches_salary_inference(self):
+        state = AdaptiveModelState.objects.create(
+            model_key="salary_predictor", display_name="Salary predictor", status="ready",
+            sample_count=40, quality_score=75, confidence_estimate=70,
+            artifact_path=str(Path(settings.BASE_DIR) / "README.md"),
+            next_refresh_due_at=timezone.now() + timedelta(hours=12),
+        )
+        cases = [
+            ({"sample_count": 9}, "validation_blocked"),
+            ({"quality_score": 49}, "validation_blocked"),
+            ({"confidence_estimate": 54}, "validation_blocked"),
+            ({"next_refresh_due_at": None}, "model_stale"),
+            ({"next_refresh_due_at": timezone.now() - timedelta(seconds=1)}, "model_stale"),
+        ]
+        for changes, reason in cases:
+            with self.subTest(changes=changes):
+                state.sample_count, state.quality_score, state.confidence_estimate = 40, 75, 70
+                state.next_refresh_due_at = timezone.now() + timedelta(hours=12)
+                for key, value in changes.items():
+                    setattr(state, key, value)
+                state.save()
+                with patch("apps.career.services.projection_engine.salary_predictor.predict") as predict:
+                    result = resolve_salary_model_runtime(self.user, {})
+                self.assertFalse(result["available"])
+                self.assertEqual(result["state"]["inference_reason"], reason)
+                predict.assert_not_called()
+
+    def test_nonfinite_salary_predictions_use_heuristic_fallback(self):
+        AdaptiveModelState.objects.create(
+            model_key="salary_predictor", display_name="Salary predictor", status="ready",
+            sample_count=40, quality_score=75, confidence_estimate=70,
+            artifact_path=str(Path(settings.BASE_DIR) / "README.md"),
+            next_refresh_due_at=timezone.now() + timedelta(hours=12),
+        )
+        inputs = {"variable_income": 0, "rent_or_emi": 1000, "city": "Pune", "account_age_days": 30}
+        for prediction in [float("nan"), float("inf"), -1.0]:
+            with self.subTest(prediction=prediction), patch(
+                "apps.career.services.projection_engine.salary_predictor.predict", return_value=prediction,
+            ):
+                result = resolve_salary_model_runtime(self.user, inputs)
+            self.assertFalse(result["available"])
+            self.assertEqual(result["state"]["inference_reason"], "invalid_prediction")

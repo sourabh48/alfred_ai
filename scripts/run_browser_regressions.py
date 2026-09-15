@@ -67,7 +67,10 @@ def main() -> int:
     if args.browser:
         env["ALFRED_BROWSER"] = args.browser
 
-    command = [sys.executable, "manage.py", "test", *args.test_labels]
+    command = [
+        sys.executable, "manage.py", "test", *args.test_labels,
+        "--settings=alfred_ai.browser_test_settings", "--noinput",
+    ]
     print("Running browser regression command:")
     print(" ".join(command))
     print(f"ALFRED_RUN_BROWSER_TESTS={env['ALFRED_RUN_BROWSER_TESTS']}")
@@ -118,8 +121,9 @@ def main() -> int:
 
     if summary["runner_return_code"] == 2:
         print(
-            f"Browser regression job skipped {summary['skipped_count']} Selenium test(s). "
-            "Install Chrome or Edge plus matching driver support, or remove --require-browser for a soft local run."
+            f"Browser regression job ran {summary['tests_run_count']} test(s) "
+            f"and skipped {summary['skipped_count']}. "
+            "Check the test labels and install Chrome or Edge with matching driver support."
         )
     return int(summary["runner_return_code"])
 
@@ -144,7 +148,7 @@ def build_run_summary(
     skipped = skipped_count(output)
     tests_found = tests_found_count(output)
     tests_run = tests_run_count(output)
-    runner_return_code = 2 if return_code == 0 and require_browser and skipped else return_code
+    runner_return_code = 2 if return_code == 0 and require_browser and (skipped or tests_run <= 0) else return_code
     driver_backed_success = (
         runner_return_code == 0
         and skipped == 0

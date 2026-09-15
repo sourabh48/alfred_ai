@@ -241,19 +241,12 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         )
 
     def tearDown(self):
+        result = getattr(getattr(self, "_outcome", None), "result", None)
+        if result and any(test is self for test, _ in result.failures + result.errors):
+            self._capture_browser_artifacts()
         self._disable_live_refresh_timers()
         self._park_browser_between_tests()
         super().tearDown()
-
-    def run(self, result=None):
-        if result is None:
-            return super().run(result)
-        failures_before = len(result.failures)
-        errors_before = len(result.errors)
-        super().run(result)
-        if len(result.failures) > failures_before or len(result.errors) > errors_before:
-            self._capture_browser_artifacts()
-        return result
 
     def test_login_statement_upload_vehicle_setup_and_dashboard_refresh_browser_workflow(self):
         self._login_browser()
@@ -264,7 +257,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
 
     def test_vehicle_invoice_overlay_candidate_buttons_fill_and_save_correction(self):
         self._login_browser()
-        self._install_review_queue_harness()
+        self._open_document_center()
 
         self.wait.until(self.EC.presence_of_element_located((self.By.ID, "documentCenterRoot")))
         self.wait.until(
@@ -286,6 +279,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
             self._click_candidate(field_name, value)
             self.assertEqual(self._review_field(field_name).get_attribute("value"), value)
 
+        self._assert_review_survives_live_refresh("vehicle_document")
         submit = self.wait.until(
             self.EC.presence_of_element_located(
                 (
@@ -294,19 +288,8 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
                 )
             )
         )
-        self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center'});", submit)
-        self.selenium.execute_script(
-            """
-            arguments[0].closest("details").open = true;
-            window.submitDocumentCorrection(
-                { preventDefault: () => {}, currentTarget: arguments[0].form },
-                "vehicle_document",
-                arguments[1]
-            );
-            """,
-            submit,
-            self.document.pk,
-        )
+        self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});", submit)
+        submit.click()
 
         self.wait.until(
             lambda driver: BikeDocument.objects.get(pk=self.document.pk).parser_status == "parsed"
@@ -343,7 +326,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
     def test_statement_review_candidate_buttons_fill_and_save_correction(self):
         self.statement_upload = self._create_unknown_statement_upload()
         self._login_browser()
-        self._install_review_queue_harness()
+        self._open_document_center()
 
         self.wait.until(self.EC.presence_of_element_located((self.By.ID, "documentCenterRoot")))
         self.wait.until(
@@ -366,6 +349,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
                 value,
             )
 
+        self._assert_review_survives_live_refresh("statement_document")
         submit = self.wait.until(
             self.EC.presence_of_element_located(
                 (
@@ -374,19 +358,8 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
                 )
             )
         )
-        self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center'});", submit)
-        self.selenium.execute_script(
-            """
-            arguments[0].closest("details").open = true;
-            window.submitDocumentCorrection(
-                { preventDefault: () => {}, currentTarget: arguments[0].form },
-                "statement_document",
-                arguments[1]
-            );
-            """,
-            submit,
-            self.statement_upload.pk,
-        )
+        self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});", submit)
+        submit.click()
 
         self.wait.until(
             lambda driver: StatementUpload.objects.get(pk=self.statement_upload.pk).parser_status == "parsed"
@@ -571,7 +544,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda driver: driver.find_element(self.By.ID, "dashboardRoot").is_displayed())
 
     def _upload_statement_from_document_center(self):
-        self._install_statement_upload_harness()
+        self._open_document_center()
 
         upload_path = ""
         try:
@@ -582,7 +555,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
             self.Select(self.selenium.find_element(self.By.ID, "documentStatementKind")).select_by_value("bank_statement")
             self.selenium.find_element(self.By.ID, "documentStatementFile").send_keys(upload_path)
             submit = self.selenium.find_element(self.By.CSS_SELECTOR, "#documentStatementForm button[type='submit']")
-            self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center'});", submit)
+            self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});", submit)
             try:
                 submit.click()
             except self.WebDriverException:
@@ -598,63 +571,6 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
                     Path(upload_path).unlink(missing_ok=True)
                 except PermissionError:
                     pass
-
-    def _install_statement_upload_harness(self):
-        self.wait.until(lambda driver: driver.execute_script("return Boolean(window.Alfred)"))
-        self.selenium.execute_script(
-            """
-            document.body.innerHTML = `
-                <main class="container-fluid alfred-layout">
-                    <section id="documentCenterRoot"></section>
-                    <form id="documentStatementForm" class="soft-grid" enctype="multipart/form-data">
-                        <select id="documentStatementKind" name="statement_kind" class="form-select">
-                            <option value="">Auto detect</option>
-                            <option value="bank_statement">Bank Statement</option>
-                            <option value="credit_card_statement">Credit Card Statement</option>
-                            <option value="loan_statement">Loan Statement</option>
-                            <option value="investment_statement">Investment Statement</option>
-                            <option value="other_statement">Other Statement</option>
-                        </select>
-                        <input id="documentStatementFile" name="statement" type="file" class="form-control" accept=".pdf,application/pdf" multiple required>
-                        <div id="documentStatementFeedback" class="d-none alert mb-0"></div>
-                        <button class="btn btn-primary" type="submit">Upload Statements</button>
-                    </form>
-                </main>
-            `;
-            window.__statementUploadHarnessReady = false;
-            window.__statementUploadHarnessError = "";
-            const installHarness = () => {
-                try {
-                    window.loadDocumentCenter = function() {
-                        window.__statementUploadRefreshCalled = true;
-                        return Promise.resolve();
-                    };
-                    const handler = window.submitStatementUpload || submitStatementUpload;
-                    document.getElementById("documentStatementForm").addEventListener("submit", handler);
-                    window.__statementUploadHarnessReady = true;
-                } catch (error) {
-                    window.__statementUploadHarnessError = error.message || String(error);
-                }
-            };
-            if (typeof submitStatementUpload === "function") {
-                installHarness();
-            } else {
-                const script = document.createElement("script");
-                script.src = "/static/js/documents.js?v=2.3";
-                script.onload = installHarness;
-                script.onerror = () => { window.__statementUploadHarnessError = "documents.js failed to load"; };
-                document.head.appendChild(script);
-            }
-            """
-        )
-        self.wait.until(
-            lambda driver: driver.execute_script(
-                "return window.__statementUploadHarnessReady === true || Boolean(window.__statementUploadHarnessError);"
-            )
-        )
-        error = self.selenium.execute_script("return window.__statementUploadHarnessError || '';")
-        if error:
-            self.fail(error)
 
     def _submit_vehicle_setup_form(self):
         self.selenium.get(f"{self.live_server_url}/bike-service/")
@@ -672,7 +588,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self._replace_field("bikeProfileMileage", "48")
 
         submit = self.selenium.find_element(self.By.ID, "bikeProfileSubmit")
-        self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center'});", submit)
+        self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});", submit)
         try:
             submit.click()
         except self.WebDriverException:
@@ -771,74 +687,41 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         except Exception:
             return
 
-    def _install_review_queue_harness(self):
-        self.wait.until(lambda driver: driver.execute_script("return Boolean(window.Alfred)"))
-        self.selenium.execute_script(
-            """
-            document.body.innerHTML = `
-                <main class="container-fluid alfred-layout">
-                    <section id="documentCenterRoot"></section>
-                    <section id="documentReviewQueue"></section>
-                </main>
-            `;
-            window.__alfredReviewQueueLoaded = false;
-            window.__alfredReviewQueueError = "";
-            window.__lastCorrectionRequest = "";
-            window.__lastCorrectionResult = null;
+    def _open_document_center(self):
+        # Exercise the actual template, DOMContentLoaded handlers and form wiring.
+        self.selenium.get(f"{self.live_server_url}/documents/")
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, "documentCenterRoot")))
+        self.wait.until(lambda driver: driver.execute_script("return Boolean(window.Alfred && window.submitDocumentCorrection);"))
+        self.selenium.execute_script("""
             window.__lastCorrectionError = "";
             const originalFetchJSON = window.Alfred.fetchJSON;
             window.Alfred.fetchJSON = function(url, options = {}) {
                 const isCorrection = url === "/api/documents/review-queue/resolve/";
-                if (isCorrection) {
-                    window.__lastCorrectionRequest = options.body || "";
-                    window.__lastCorrectionError = "";
-                    window.__lastCorrectionResult = null;
-                }
-                return originalFetchJSON(url, options)
-                    .then(data => {
-                        if (isCorrection) {
-                            window.__lastCorrectionResult = data;
-                        }
-                        return data;
-                    })
-                    .catch(error => {
-                        if (isCorrection) {
-                            window.__lastCorrectionError = error.message || String(error);
-                        }
-                        throw error;
-                    });
+                if (isCorrection) window.__lastCorrectionRequest = options.body || "";
+                return originalFetchJSON(url, options).then(data => {
+                    if (isCorrection) window.__lastCorrectionResult = data;
+                    return data;
+                }).catch(error => {
+                    if (isCorrection) window.__lastCorrectionError = error.message || String(error);
+                    throw error;
+                });
             };
-            const loadReviewQueueOnly = () => {
-                window.loadDocumentCenter = function() {
-                    return window.Alfred.fetchJSON("/api/documents/review-queue/")
-                        .then(data => {
-                            window.renderReviewQueue(data.results || []);
-                            return data;
-                        });
-                };
-                window.loadDocumentCenter()
-                    .then(() => { window.__alfredReviewQueueLoaded = true; })
-                    .catch(error => { window.__alfredReviewQueueError = error.message || String(error); });
-            };
-            if (window.renderReviewQueue) {
-                loadReviewQueueOnly();
-            } else {
-                const script = document.createElement("script");
-                script.src = "/static/js/documents.js?v=2.3";
-                script.onload = loadReviewQueueOnly;
-                script.onerror = () => { window.__alfredReviewQueueError = "documents.js failed to load"; };
-                document.head.appendChild(script);
-            }
-            """
-        )
-        self.wait.until(
-            lambda driver: driver.execute_script(
-                "return window.__alfredReviewQueueLoaded === true || Boolean(window.__alfredReviewQueueError);"
-            )
-        )
-        error = self.selenium.execute_script("return window.__alfredReviewQueueError || '';")
-        if error:
-            self.fail(error)
+        """)
+
+    def _assert_review_survives_live_refresh(self, scope):
+        result = self.selenium.execute_async_script("""
+            const scope = arguments[0];
+            const done = arguments[arguments.length - 1];
+            const root = document.getElementById("documentCenterRoot");
+            const form = document.querySelector(`#documentReviewQueue form[id^="review-form-${scope}"]`);
+            const values = JSON.stringify(Object.fromEntries(new FormData(form)));
+            window.loadDocumentCenter({ live: true }).then(() => done({
+                contained: root.contains(form),
+                unchanged: form.isConnected && values === JSON.stringify(Object.fromEntries(new FormData(form))),
+                open: form.closest("details").open,
+            })).catch(error => done({ error: error.message }));
+        """, scope)
+        self.assertEqual(result, {"contained": True, "unchanged": True, "open": True})
 
     def _open_review_summary(self, label):
         last_error = None
@@ -850,7 +733,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
                     )
                 )
                 self.selenium.execute_script(
-                    "arguments[0].scrollIntoView({block: 'center'}); arguments[0].closest('details').open = true;",
+                    "arguments[0].scrollIntoView({block: 'center', behavior: 'instant'}); arguments[0].closest('details').open = true;",
                     summary,
                 )
                 return
@@ -873,7 +756,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
                     self.By.CSS_SELECTOR,
                     f'#documentReviewQueue button[data-field-name="{field_name}"][data-field-value="{value}"]',
                 )
-                self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center'});", button)
+                self.selenium.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});", button)
                 try:
                     button.click()
                 except self.WebDriverException:

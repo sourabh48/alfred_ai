@@ -1,150 +1,169 @@
-# Local Hosting
+# Local hosting
 
-ALFRED is treated as a local or LAN-hosted application. The operating path is local hosting.
+ALFRED runs on the local host or a trusted LAN. The Docker Compose stack runs
+Django, PostgreSQL, Redis, a Celery worker, and the beat scheduler, with persistent
+volumes for application data and files.
 
-## Recommended Local Stack
+## First run
 
-Use Docker Compose when you want ALFRED to keep running with background jobs:
-
-- Django web app
-- PostgreSQL database
-- Redis cache and Celery broker
-- Celery worker
-- Celery beat scheduler
-- persistent Docker volumes for database, Redis, uploaded media, static files, and artifacts
-
-This keeps the "main brain" and cron-style jobs on the local host.
-
-## First Run
-
-Prerequisite: install Docker Desktop and make sure `docker compose version` works in PowerShell.
-
-From the repository root:
+Install/start Docker Desktop and confirm `docker compose version` works in
+PowerShell. From the repository root, create the local environment file if it
+does not already exist:
 
 ```powershell
-Copy-Item config\local.env.example config\local.env
+if (-not (Test-Path config\local.env)) {
+    Copy-Item config\local.env.example config\local.env
+}
 ```
 
-Edit `config\local.env` before using real data:
+Edit `config/local.env` before using real data:
 
-- set `DJANGO_SECRET_KEY` to a long random value
-- if another device will connect over LAN, add the host machine IP to `ALLOWED_HOSTS`
-- if another device will connect over LAN, add `http://<host-ip>:8000` to `CSRF_TRUSTED_ORIGINS` and `CORS_ALLOWED_ORIGINS`
-- keep `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true` if raw uploaded PDFs/images should be deleted after parsing
+- Replace `DJANGO_SECRET_KEY` and `DB_PASSWORD` with long random values.
+- Keep `DB_NAME` and `DB_USER` consistent with the database you create.
+- Set `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION` to match your retention
+  choice; `true` deletes raw uploaded PDFs/images after extraction.
+- For LAN access, add `ALFRED_BIND_ADDRESS=<host-LAN-IP>`, add that IP to
+  `ALLOWED_HOSTS`, and add `http://<host-LAN-IP>:8000` to
+  `CSRF_TRUSTED_ORIGINS` and `CORS_ALLOWED_ORIGINS`. Allow inbound traffic only
+  from trusted devices on the Windows Firewall private-network profile.
 
-Start the local stack:
+The default binding is `127.0.0.1:8000`, so another device cannot reach it until
+the LAN binding is configured. `ALFRED_WEB_PORT` can override the host port; use
+that port in the trusted origins and browser URLs too. The optional
+`ALFRED_WEB_WORKERS`, `ALFRED_WEB_TIMEOUT`, and `ALFRED_WORKER_CONCURRENCY`
+settings control web workers, request timeout, and worker concurrency.
+
+Always pass `--env-file config/local.env`: Compose needs it for database and
+port interpolation as well as the environment loaded inside app containers.
+Avoid printing `docker compose config` without `--quiet`; the expanded output
+can contain secrets.
 
 ```powershell
-docker compose -f docker-compose.local.yml up --build -d
+docker compose --env-file config/local.env -f docker-compose.local.yml config --quiet
+docker compose --env-file config/local.env -f docker-compose.local.yml up --build -d
+docker compose --env-file config/local.env -f docker-compose.local.yml exec web python manage.py createsuperuser
 ```
 
-Create your admin user:
+Open `http://localhost:8000/` with the default binding, or
+`http://<host-LAN-IP>:8000/` with a LAN binding. PostgreSQL's initialization
+variables apply only when its volume is first created; editing `DB_PASSWORD`
+later does not change the password already stored by PostgreSQL.
+
+## Day-to-day commands
+
+Start or stop services while keeping their volumes:
 
 ```powershell
-docker compose -f docker-compose.local.yml exec web python manage.py createsuperuser
+docker compose --env-file config/local.env -f docker-compose.local.yml up -d
+docker compose --env-file config/local.env -f docker-compose.local.yml down
 ```
 
-Open:
-
-```text
-http://localhost:8000/
-```
-
-For LAN access, open:
-
-```text
-http://<host-machine-ip>:8000/
-```
-
-## Day-To-Day Commands
-
-Start:
+Inspect services and logs:
 
 ```powershell
-docker compose -f docker-compose.local.yml up -d
+docker compose --env-file config/local.env -f docker-compose.local.yml ps
+docker compose --env-file config/local.env -f docker-compose.local.yml logs -f web worker beat
 ```
 
-Stop without deleting data:
+After updating code, rebuild/recreate the services with `up --build -d`. The web
+startup applies database migrations and collects static files; worker and beat
+wait for web health. Preserve a backup before changes that require migrations.
+
+Run application and migration checks:
 
 ```powershell
-docker compose -f docker-compose.local.yml down
+docker compose --env-file config/local.env -f docker-compose.local.yml exec web python manage.py check
+docker compose --env-file config/local.env -f docker-compose.local.yml exec web python manage.py migrate --check
+docker compose --env-file config/local.env -f docker-compose.local.yml exec web python manage.py makemigrations --check --dry-run
 ```
 
-View services:
+## Repeatable runtime verification
+
+Using the host's Python 3.12+ environment, run:
 
 ```powershell
-docker compose -f docker-compose.local.yml ps
+.\.venv\Scripts\python.exe scripts/local_stack_ops.py verify
 ```
 
-View logs:
+This checks Docker access, Compose configuration, all five service health
+statuses, applied migrations, Django checks, HTTP liveness, Redis, and worker
+response. It writes `artifacts/ops/local_stack_verification.json` on the host
+and exits with status 1 if validation fails. The command does not start or stop
+services or apply migrations. A missing Docker CLI, daemon, or environment file
+is recorded as a blocker.
+
+An accepted result confirms the checks at that moment. Complete these separate
+operational checks before claiming recovery and sustained operation:
+
+1. Run a backup and its isolated restore check as described in
+   [Backup and restore](BACKUP_AND_RESTORE.md).
+2. In an agreed maintenance window, restart the host, start Docker Desktop if
+   needed, and rerun verification. Confirm accounts and retained files persist.
+   Docker restart policies take effect once the Docker engine is running.
+3. Request the configured URL from a second trusted LAN device if LAN access is
+   required.
+4. Observe the relevant scheduled job outcomes over their actual schedule;
+   worker ping and a running beat process alone do not prove jobs completed.
+
+The optional application dependency probe writes inside the artifacts volume:
 
 ```powershell
-docker compose -f docker-compose.local.yml logs -f web worker beat
+docker compose --env-file config/local.env -f docker-compose.local.yml exec web python scripts/run_production_readiness_probe.py
 ```
 
-Run migrations after pulling new code:
+Do not use `--require-ready` for normal LAN hosting unless you intentionally
+configured its HTTPS controls. The strict probe expects HTTPS redirect, secure
+cookies, and HSTS.
+
+### Isolated synthetic cache benchmark
+
+To exercise larger dashboard histories without using configured application
+data or Redis:
 
 ```powershell
-docker compose -f docker-compose.local.yml exec web python manage.py migrate
+.\.venv\Scripts\python.exe scripts/benchmark_local_cache.py
 ```
 
-Run checks:
+The script creates a temporary SQLite database, a private local-memory cache,
+and 3,000 synthetic expense rows plus dashboard fixtures. It disables startup
+training and network access, runs ten sequential requests per endpoint plus
+internal cache checks, then removes temporary storage. The report at
+`artifacts/cache/isolated_synthetic_benchmark.json` records behavior for all 21
+cache namespaces and endpoint latency. This measures a single synthetic user
+through Django's test client; Redis, simultaneous users, actual external data,
+and trained-model performance still require separate evidence.
 
-```powershell
-docker compose -f docker-compose.local.yml exec web python manage.py check
-docker compose -f docker-compose.local.yml exec web python manage.py makemigrations --check --dry-run
-```
+## Persistence and backups
 
-Run the local dependency proof:
-
-```powershell
-docker compose -f docker-compose.local.yml exec web python scripts/run_production_readiness_probe.py
-```
-
-Do not use `--require-ready` for normal LAN hosting unless you intentionally configured public-production HTTPS settings. The strict probe expects public-production controls such as HTTPS redirect, secure cookies, and HSTS.
-
-## Persistence
-
-Local data is stored in Docker volumes:
+Compose declares these logical volume names:
 
 - `alfred_local_postgres`
 - `alfred_local_redis`
 - `alfred_local_media`
 - `alfred_local_artifacts`
 - `alfred_local_staticfiles`
+- `alfred_local_models`
 
-Do not run `docker compose -f docker-compose.local.yml down -v` unless you intentionally want to delete local ALFRED data.
+Docker prefixes the actual names with the Compose project name (`alfred-local`
+by default). Host folders with similar names are separate from these volumes.
+Do not use `down -v` unless you intend to delete this data.
 
-## Backups
+Use the paired PostgreSQL and file backup helper, followed by the isolated
+restore check in [Backup and restore](BACKUP_AND_RESTORE.md). A database-only
+dump omits retained media, trained models, and runtime artifacts.
 
-Create a PostgreSQL backup:
+## Local access and secrets
 
-```powershell
-docker compose -f docker-compose.local.yml exec -T postgres pg_dump -U alfred -d alfred > alfred-backup.sql
-```
+- Keep `config/local.env` untracked and protect the host's user account.
+- Keep port `8000` off the public internet and restrict LAN access to trusted
+  devices.
+- Give family members separate ALFRED accounts.
+- Keep a protected backup on a separate disk, including separately stored
+  runtime configuration needed for recovery.
 
-Restore into an empty local database:
+## Optional native development mode
 
-```powershell
-Get-Content .\alfred-backup.sql | docker compose -f docker-compose.local.yml exec -T postgres psql -U alfred -d alfred
-```
-
-Also back up the Docker media and artifacts volumes if you keep user media or proof artifacts.
-
-## Security Notes
-
-Local hosting is still sensitive because ALFRED stores financial metadata.
-
-- Use a strong Windows login password.
-- Do not expose port `8000` to the public internet.
-- Use Windows Firewall to allow only trusted private-network devices if LAN access is needed.
-- Keep `config/local.env` out of Git.
-- Keep raw document deletion enabled if you do not need retained PDFs/images after extraction.
-- Linked family users should have their own ALFRED accounts instead of sharing a password.
-
-## Optional Native Development Mode
-
-For quick single-machine development without Docker:
+For development without Docker:
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py migrate
@@ -152,4 +171,7 @@ For quick single-machine development without Docker:
 .\.venv\Scripts\python.exe manage.py runserver
 ```
 
-This mode uses local settings and may use SQLite/local-memory cache depending on your `.env`. It is convenient, but Docker Compose is the better local-hosting path because it runs PostgreSQL, Redis, worker, and beat together.
+This uses native settings and may use SQLite and local-memory cache depending
+on your local configuration. Worker and beat processes need to be run
+separately if required. Native data has its own recovery procedure in
+[Backup and restore](BACKUP_AND_RESTORE.md).

@@ -38,7 +38,7 @@ class DocumentReviewAndRetryTests(TestCase):
                         "width": 900,
                         "height": 1200,
                         "preview": text,
-                        "variant": "real_unknown_mobile_layout",
+                        "variant": "synthetic_unknown_mobile_layout",
                         "regions": [
                             {
                                 "text": text[:160],
@@ -153,6 +153,7 @@ class DocumentReviewAndRetryTests(TestCase):
         upload = StatementUpload.objects.create(
             user=self.user,
             source="bank_statement",
+            original_file=SimpleUploadedFile("statement.pdf", b"source for mocked retry", content_type="application/pdf"),
             file_name="hdfc statement.pdf",
             parser_status="needs_review",
             parse_confidence=0.68,
@@ -1325,6 +1326,7 @@ class DocumentReviewAndRetryTests(TestCase):
         upload = StatementUpload.objects.create(
             user=self.user,
             source="bank_statement",
+            original_file=SimpleUploadedFile("statement.pdf", b"source for mocked retry", content_type="application/pdf"),
             file_name="hdfc statement.pdf",
             parser_status="needs_review",
             parse_confidence=0.18,

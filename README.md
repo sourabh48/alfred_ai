@@ -14,6 +14,10 @@ ALFRED is a Django application that turns personal financial records into one wo
 
 ## Current Progress
 
+The percentages below are the earlier project-tracker estimates, not release
+acceptance scores. For current checks and outstanding local-runtime dependencies,
+see the [completion audit](docs/COMPLETION_AUDIT.md).
+
 | Area | Status |
 | --- | --- |
 | Expenses and statements | Working |
@@ -25,25 +29,26 @@ ALFRED is a Django application that turns personal financial records into one wo
 | External proof and freshness | 93% - required-source proof contracts now cover current recommendation and relationship-adjacent surfaces, freshness metadata, circuit breakers, stale fallback, scheduled-refresh contracts, refresh-health observability, 40/40 fresh active evidence records, and an accepted verified-evidence refresh proof; source upkeep still needs healthy scheduled runs over time |
 | UI polish and responsive shell | 74% - live-server smoke coverage, static/form contracts, login, statement upload, vehicle setup, dashboard live refresh, core form wiring, the guarded vehicle catalog picker, a dedicated Selenium runner, CI browser workflow, run-summary proof, and browser failure artifacts are active; full UI maturity still depends on repeated healthy driver-backed execution plus broader real interaction depth |
 | Mobility vehicle catalog and service intelligence | 88% - supported India consumer-vehicle seed scope has 80 source-linked models across 32 manufacturers, route-aware wear guidance, source-refresh policy tracking, and service-cost learning; long-tail models, condition snapshots, and resolved/costed issue outcomes still need real usage growth |
-| ML-assisted features | 87% - production-ready supervised model counts exclude the planned future RL learner; broader ML maturity is capped by confidence, data volume, artifact freshness, and heuristic fallbacks |
+| ML-assisted features | Seven supervised training paths are implemented; serving readiness requires adequate validation data, quality, freshness, and an artifact. Small pilot fits and rule-derived labels do not establish real-world accuracy. The planned RL learner is excluded. |
 | Production hardening | 90% - heavy dashboard materialization and cache health observability cover all 21 registered materialized namespaces under deterministic staging traffic; production cache sizing, TTL tuning, and sustained real-traffic telemetry still need deployment proof |
 
 ## Verification Snapshot
 
-Last verified locally on 14 September 2026.
+Local verification resumed on 16 September 2026. Commands, results, and limits
+are recorded in the [completion audit](docs/COMPLETION_AUDIT.md).
 
 | Scope | Verified state |
 | --- | --- |
 | Project tracker | Broad product areas now stay in In Progress until implementation, data maturity, and browser verification are strong enough; production blockers are tracked separately |
-| Scope completion | 87% in the current local snapshot; this is the average maturity across active product scopes and excludes deployment readiness |
-| Deployment readiness | 11% ready with 89% production blockers remaining in the current local snapshot; shown separately from product scope completion and proven with `python scripts/run_production_readiness_probe.py --require-ready` |
-| Verified complete checks | Backend/API regression baseline, vehicle make/model picker fix, and supervised model refresh are the only 100% entries |
+| Scope completion | Implementation, regression results, local-stack operation, and real-data maturity are tracked separately in the completion audit |
+| Deployment readiness | Local/LAN runtime verification uses `scripts/local_stack_ops.py verify`; public deployment is outside the active scope |
+| Verified complete checks | Use the dated verification log in the completion audit; successful model training alone does not establish inference quality |
 | Vehicle maintenance learning | 88% - current catalog, route-aware maintenance, service-cost learning, source freshness metadata, and brand-filtered selection are implemented, but long-tail models, source upkeep automation, condition snapshots, and real issue outcomes still matter |
 | Vehicle catalog UI | One Make / Brand combobox submits the actual `make` value; Official Catalog Model is populated only after a make is selected and is guarded from live-refresh re-render while the user is choosing |
 | Catalog API | `/api/mobility/bike-models/catalog/` supports `vehicle_type` plus `make`, `brand`, or `manufacturer` filters |
 | ChatGPT context import | `/api/reports/chatgpt-imports/` and the document center accept pasted transcripts or ChatGPT JSON exports, then store detected module evidence for review |
 | Document OCR correction | Generic OCR candidates are mapped into scope-specific correction fields across statement, loan, loan-closure, investment, vehicle, resume, recruiter, and credit-report families; vehicle service invoices also recover label-collapsed compact rows such as embedded `Qty`, `Hrs`, `Amount`, and currency tokens |
-| Model training | 7/7 production-ready supervised model states are fresh and ready; 1 planned future RL learner is excluded from production-ready ML and supervised coverage |
+| Model training | Historical registry status is insufficient for serving. The recorded expense holdout failed its quality gate; other pilot datasets contain only 9–15 rows. Runtime gates now reject insufficient or stale evidence and retain heuristic fallbacks. No real-data retraining was performed in this audit. |
 | Advisory proof contracts | Current recommendation and relationship-adjacent surfaces declare source URL, stale-after, scheduled refresh, stale fallback, and circuit-breaker requirements before any new signal can be treated as mature |
 | Evidence watchlist | Project Details reports live stale, failed, rejected, and due verified evidence with per-scope refresh health, last attempt, and last success timestamps |
 | Materialized cache health | Project Details reports registered cache namespaces, hit/miss counts, TTL metadata, stale regeneration, invalidation reason, revision key, generation latency, and deterministic staging traffic proof for all 21 registered namespaces |
@@ -120,14 +125,19 @@ This native mode is useful for development. For regular local hosting with the d
 ALFRED is local or LAN-hosted in this repo. The recommended always-on setup is local Docker Compose:
 
 ```powershell
-Copy-Item config\local.env.example config\local.env
-docker compose -f docker-compose.local.yml up --build -d
-docker compose -f docker-compose.local.yml exec web python manage.py createsuperuser
+if (-not (Test-Path config\local.env)) {
+    Copy-Item config\local.env.example config\local.env
+}
+docker compose --env-file config/local.env -f docker-compose.local.yml up --build -d
+docker compose --env-file config/local.env -f docker-compose.local.yml exec web python manage.py createsuperuser
 ```
 
 Open `http://localhost:8000/`.
 
-For LAN access, add your host machine IP to `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, and `CORS_ALLOWED_ORIGINS` in `config\local.env`, then open `http://<host-ip>:8000/` from trusted devices.
+For LAN access, set `ALFRED_BIND_ADDRESS=<host-ip>`, add that IP to
+`ALLOWED_HOSTS`, and add `http://<host-ip>:8000` to `CSRF_TRUSTED_ORIGINS` and
+`CORS_ALLOWED_ORIGINS` in `config\local.env`. Then open that URL from trusted
+devices. The default port binding accepts connections only from this host.
 
 The local stack runs:
 
@@ -199,7 +209,7 @@ Runtime health is split between `/health/live/` for Django process liveness and 
 Run the local hosting stack:
 
 ```bash
-docker compose -f docker-compose.local.yml up --build -d
+docker compose --env-file config/local.env -f docker-compose.local.yml up --build -d
 ```
 
 This local stack validates the dependency shape and runs the background jobs locally. It does not claim public internet production readiness because HTTPS, public-domain security, CI browser proof, and sustained production-like cache traffic are separate gates.

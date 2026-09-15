@@ -100,6 +100,21 @@ class BrowserRegressionRunnerTests(TestCase):
         self.assertEqual(summary["github_actions"]["event_name"], "pull_request")
         self.assertEqual(summary["github_actions"]["run_url"], "https://github.com/sourabh48/alfred_ai/actions/runs/987654321")
 
+    def test_required_browser_rejects_empty_or_missing_test_run(self):
+        for output in ("Found 0 test(s).\nRan 0 tests in 0.01s\nOK\n", "Found 3 test(s).\n"):
+            with self.subTest(output=output):
+                summary = run_browser_regressions.build_run_summary(
+                    command=["python", "manage.py", "test"], output=output,
+                    return_code=0, require_browser=True, browser="Edge",
+                    artifact_dir=Path("artifacts/browser"), test_labels=(),
+                    started_at=datetime(2026, 9, 16, tzinfo=timezone.utc),
+                    finished_at=datetime(2026, 9, 16, tzinfo=timezone.utc),
+                    duration_seconds=0, run_browser_tests_env="true",
+                )
+                self.assertEqual(summary["runner_return_code"], 2)
+                self.assertEqual(summary["status"], "failed")
+                self.assertFalse(summary["driver_backed_success"])
+
     def test_github_actions_metadata_builds_run_url_from_environment(self):
         with patch.dict(
             os.environ,

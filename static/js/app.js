@@ -553,7 +553,7 @@ function shouldPauseLiveRefresh(root) {
     if (root && Number(root.dataset.liveRefreshLockedUntil || 0) > Date.now()) {
         return true;
     }
-    if (root && root.querySelector("details[open], .dropdown-menu.show, [data-live-refresh-busy='true']")) {
+    if (root && (root.dataset.liveRefreshBusy === "true" || root.querySelector("details[open], .dropdown-menu.show, [data-live-refresh-busy='true']"))) {
         return true;
     }
     const active = document.activeElement;
@@ -1179,6 +1179,7 @@ window.Alfred = {
     installSessionSecurityTimer,
     setDisabledIfChanged,
     setHTMLIfChanged,
+    shouldPauseLiveRefresh,
     setTextIfChanged,
     syncSelectOptions,
     uploadFilesSequentially,

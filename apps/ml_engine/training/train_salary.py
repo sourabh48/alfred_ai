@@ -44,9 +44,6 @@ def train_salary_model() -> dict:
         account_age_days = (now - created_at).dt.days.clip(lower=0)
 
     df["city_tier_score"] = df["city"].astype(str).str.lower().map(CITY_TIER_SCORES).fillna(0.75)
-    df["income_variability_ratio"] = (
-        df["variable_income"].astype(float) / df["monthly_income"].astype(float).replace(0, 1)
-    ).clip(lower=0, upper=2)
     df["account_age_days"] = account_age_days
 
     feature_names = SalaryPredictor.FEATURE_NAMES

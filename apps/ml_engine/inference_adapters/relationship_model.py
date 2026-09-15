@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import os
 
-import joblib
+import math
+
+from .artifacts import load_inference_artifact
 
 
 MODEL_PATH = os.path.join("ml_models", "alfred", "relationship_model", "model.pkl")
@@ -21,10 +23,9 @@ class RelationshipModelPredictor:
         self._artifact = None
 
     def predict_score(self, features: dict) -> float | None:
+        self._artifact = load_inference_artifact("relationship_model")
         if self._artifact is None:
-            if not os.path.exists(MODEL_PATH):
-                return None
-            self._artifact = joblib.load(MODEL_PATH)
+            return None
         model = self._artifact.get("model")
         feature_names = self._artifact.get("feature_names") or self.FEATURE_NAMES
         row = [[float(features.get(name, 0) or 0) for name in feature_names]]
@@ -34,7 +35,8 @@ class RelationshipModelPredictor:
             return None
         if prediction is None or not len(prediction):
             return None
-        return float(max(0.0, min(100.0, prediction[0])))
+        value = float(prediction[0])
+        return max(0.0, min(100.0, value)) if math.isfinite(value) else None
 
 
 relationship_model_predictor = RelationshipModelPredictor()

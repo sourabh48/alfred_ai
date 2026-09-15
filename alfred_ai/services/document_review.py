@@ -451,6 +451,63 @@ def _merge_non_empty_payload(existing: dict | None, incoming: dict | None) -> di
     return merged
 
 
+def _saved_corrections(payload: dict | None, fields: tuple[str, ...]) -> dict:
+    accepted = (payload or {}).get("accepted_corrections") or {}
+    return {key: accepted[key] for key in fields if accepted.get(key) not in (None, "", [])}
+
+
+def _normalized_skills(value) -> list[str]:
+    values = value if isinstance(value, list) else str(value).split(",")
+    return [str(item).strip() for item in values if str(item).strip()]
+
+
+def _correct_retry_primary(rows: list[dict], payload: dict, collection: str, corrections: dict) -> list[dict]:
+    if not rows or not corrections:
+        return rows
+    previous_rows = payload.get(collection) or []
+    previous_primary = previous_rows[0] if previous_rows else {}
+    source_primary = payload.get("review_primary_source") or previous_primary
+    identity_fields = ("loan_account_number",) if collection == "loans" else ("asset_name", "institution", "account_number")
+
+    def matches(row, previous):
+        if not previous or not any(previous.get(key) for key in identity_fields):
+            return False
+        return all((row.get(key) or "") == (previous.get(key) or "") for key in identity_fields)
+
+    primary_index = next((
+        index for index, row in enumerate(rows)
+        if matches(row, previous_primary) or matches(row, source_primary)
+    ), None)
+    if primary_index is None and len(rows) == 1 and len(previous_rows) <= 1:
+        primary_index = 0
+    if primary_index is not None:
+        primary = {**rows[primary_index], **corrections}
+        return [primary, *rows[:primary_index], *rows[primary_index + 1:]]
+    # A partial retry can omit the reviewed row entirely. Keep that row instead
+    # of applying its accepted identity or amounts to an unrelated parsed row.
+    if previous_primary:
+        return [{**previous_primary, **corrections}, *rows]
+    return rows
+
+
+def _retry_source_unavailable(instance, field_name: str, serializer):
+    field_file = getattr(instance, field_name)
+    if field_file and field_file.storage.exists(field_file.name):
+        return None
+    payload = dict(instance.extracted_payload or {})
+    retention = payload.get("raw_file_retention") or {}
+    retry = dict(payload.get("background_retry") or {})
+    retry.update({
+        "state": "unavailable",
+        "resolution": "raw_file_deleted" if retention.get("deleted") else "source_file_missing",
+        "reason": "Upload the source again to retry extraction. Saved fields and OCR evidence remain available for review.",
+    })
+    payload["background_retry"] = retry
+    instance.extracted_payload = payload
+    instance.save(update_fields=["extracted_payload"])
+    return serializer(instance)
+
+
 def _apply_resume_profile(user, parsed) -> None:
     profile, _ = CareerProfile.objects.get_or_create(
         user=user,
@@ -781,6 +838,9 @@ def retry_review_item(user, *, scope: str, document_id: int) -> dict:
 
 def _retry_statement_document(user, document_id: int) -> dict:
     upload = StatementUpload.objects.get(user=user, pk=document_id)
+    unavailable = _retry_source_unavailable(upload, "original_file", _serialize_statement)
+    if unavailable is not None:
+        return unavailable
     queue_statement_retry(upload, reason="manual_review_retry")
     result = retry_statement_upload(upload, ocr_page_limit=12)
     serialized = _serialize_statement(result.upload if result is not None else upload)
@@ -830,6 +890,9 @@ def _retry_statement_document(user, document_id: int) -> dict:
 
 def _retry_loan_document(user, document_id: int) -> dict:
     document = LoanImportDocument.objects.prefetch_related("linked_loans").get(user=user, pk=document_id)
+    unavailable = _retry_source_unavailable(document, "uploaded_file", _serialize_loan)
+    if unavailable is not None:
+        return unavailable
     payload, retry_state = _begin_retry_payload(document.extracted_payload)
     document.extracted_payload = payload
     document.save(update_fields=["extracted_payload"])
@@ -840,6 +903,13 @@ def _retry_loan_document(user, document_id: int) -> dict:
     finally:
         document.uploaded_file.close()
 
+    accepted = _saved_corrections(payload, ("document_type", "lender", "loan_type", "loan_account_number"))
+    if accepted.get("document_type"):
+        parsed["document_type"] = accepted["document_type"]
+    parsed["loans"] = _correct_retry_primary(
+        parsed.get("loans") or [], payload, "loans",
+        {key: value for key, value in accepted.items() if key != "document_type"},
+    )
     created_loans = _upsert_retry_loans(user, parsed.get("loans") or [])
     existing_payload = dict(document.extracted_payload or {})
     updated_payload = _merge_non_empty_payload(
@@ -868,10 +938,10 @@ def _retry_loan_document(user, document_id: int) -> dict:
     document.extracted_payload = updated_payload
     if created_loans:
         previous_loans = list(document.linked_loans.all())
-        document.summary = f"{len(created_loans)} loan record(s) are now linked to this document after retry."
+        linked_count = len({loan.pk for loan in [*previous_loans, *created_loans]})
+        document.summary = f"{linked_count} loan record(s) are now linked to this document after retry."
         document.save(update_fields=["document_type", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary"])
-        document.linked_loans.set(created_loans)
-        _delete_orphan_loans(previous_loans, created_loans)
+        document.linked_loans.add(*created_loans)
     else:
         document.summary = document.summary or "Retry completed, but Alfred still needs review to map structured loan rows."
         document.save(update_fields=["document_type", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary"])
@@ -932,6 +1002,9 @@ def _retry_loan_document(user, document_id: int) -> dict:
 
 def _retry_loan_closure_document(user, document_id: int) -> dict:
     document = LoanClosureDocument.objects.select_related("loan").get(loan__user=user, pk=document_id)
+    unavailable = _retry_source_unavailable(document, "uploaded_file", _serialize_loan_closure)
+    if unavailable is not None:
+        return unavailable
     payload, retry_state = _begin_retry_payload(document.extracted_payload)
     document.extracted_payload = payload
     document.save(update_fields=["extracted_payload"])
@@ -943,6 +1016,7 @@ def _retry_loan_closure_document(user, document_id: int) -> dict:
         document.uploaded_file.close()
 
     merged_payload = _merge_non_empty_payload(document.extracted_payload, {**(parsed.get("payload") or {}), "parser_notes": parsed.get("parser_notes", "")})
+    merged_payload.update(_saved_corrections(payload, ("loan_account_number", "matched_keyword", "closure_amount", "closure_date")))
     verified, notes = loan_closure_parser.verify_document(document.loan, {"payload": merged_payload, "extracted_text": parsed.get("extracted_text") or document.extracted_text})
     retry_resolution = "closure_document_verified" if verified else "still_needs_review"
     merged_payload = _retry_payload(
@@ -1029,6 +1103,9 @@ def _retry_loan_closure_document(user, document_id: int) -> dict:
 
 def _retry_investment_document(user, document_id: int) -> dict:
     document = InvestmentImportDocument.objects.prefetch_related("linked_investments").get(user=user, pk=document_id)
+    unavailable = _retry_source_unavailable(document, "uploaded_file", _serialize_investment)
+    if unavailable is not None:
+        return unavailable
     payload, retry_state = _begin_retry_payload(document.extracted_payload)
     document.extracted_payload = payload
     document.save(update_fields=["extracted_payload"])
@@ -1039,7 +1116,18 @@ def _retry_investment_document(user, document_id: int) -> dict:
     finally:
         document.uploaded_file.close()
 
-    created_investments = _upsert_retry_investments(user, parsed.get("investments") or [])
+    accepted = _saved_corrections(payload, ("broker_name", "asset_name", "asset_type", "account_number", "invested_amount", "current_value"))
+    if accepted.get("broker_name"):
+        parsed["broker"] = accepted["broker_name"]
+    if parsed.get("investments"):
+        row_corrections = {key: value for key, value in accepted.items() if key != "broker_name"}
+        if "broker_name" in accepted:
+            row_corrections["institution"] = accepted["broker_name"]
+        parsed["investments"] = _correct_retry_primary(parsed["investments"], payload, "investments", row_corrections)
+        parsed.setdefault("payload", {})["investments"] = parsed["investments"]
+    created_investments = _upsert_retry_investments(
+        user, parsed.get("investments") or [], preserve_existing=True, primary_corrections=accepted,
+    )
     updated_payload = _merge_non_empty_payload(document.extracted_payload, parsed.get("payload") or {})
     retry_resolution = "investment_rows_updated" if created_investments else "still_needs_review"
     updated_payload = _retry_payload(
@@ -1050,20 +1138,20 @@ def _retry_investment_document(user, document_id: int) -> dict:
         retry_count=retry_state["retry_count"],
     )
     previous_investments = list(document.linked_investments.all())
+    linked_count = len({item.pk for item in [*previous_investments, *created_investments]})
     document.broker_name = _prefer_value(parsed.get("broker"), document.broker_name)
     document.parse_confidence = max(float(document.parse_confidence or 0), float(parsed.get("confidence") or 0))
     document.parser_status = _best_status(document.parser_status, parsed.get("parser_status") or "needs_review")
     document.extracted_text = _prefer_value(parsed.get("extracted_text"), document.extracted_text)
     document.extracted_payload = updated_payload
     document.summary = (
-        f"{len(created_investments)} investment record(s) are now linked to this document after retry."
+        f"{linked_count} investment record(s) are now linked to this document after retry."
         if created_investments
         else (document.summary or "Retry completed, but Alfred still needs review to map structured investment rows.")
     )
     document.save(update_fields=["broker_name", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary", "updated_at"])
     if created_investments:
-        document.linked_investments.set(created_investments)
-        _delete_orphan_investments(previous_investments, created_investments)
+        document.linked_investments.add(*created_investments)
     record_parser_learning(
         user=user,
         scope="investment_document",
@@ -1117,6 +1205,9 @@ def _retry_investment_document(user, document_id: int) -> dict:
 
 def _retry_vehicle_document(user, document_id: int) -> dict:
     document = BikeDocument.objects.select_related("bike_profile").get(user=user, pk=document_id)
+    unavailable = _retry_source_unavailable(document, "document_file", _serialize_vehicle)
+    if unavailable is not None:
+        return unavailable
     payload, retry_state = _begin_retry_payload(document.extracted_payload)
     document.extracted_payload = payload
     document.save(update_fields=["extracted_payload"])
@@ -1127,6 +1218,20 @@ def _retry_vehicle_document(user, document_id: int) -> dict:
     finally:
         document.document_file.close()
 
+    accepted = dict(payload.get("accepted_corrections") or {})
+    parsed.fields.update(_saved_corrections(payload, ("issuer", "document_number", "vehicle_number", "issue_date", "expiry_date")))
+    service_corrections = _saved_corrections(payload, ("service_date", "service_center", "service_type", "odometer_km", "cost", "next_service_date", "next_service_km", "extracted_work_summary"))
+    for key in ("odometer_km", "next_service_km", "cost"):
+        if key in service_corrections:
+            service_corrections[key] = float(service_corrections[key])
+    parsed.service_payload = {**(parsed.service_payload or {}), **service_corrections}
+    parsed.service_payload = _apply_vehicle_service_payload_corrections(parsed.service_payload or {}, accepted)
+    if "cost" in service_corrections:
+        parsed.service_payload["cost"] = service_corrections["cost"]
+        parsed.fields["amount"] = service_corrections["cost"]
+    if accepted.get("document_type"):
+        document.document_type = accepted["document_type"]
+        parsed.document_type = accepted["document_type"]
     relevance = bike_document_ai.verify_relevance(document.bike_profile, parsed, document.document_type)
     updated_payload = _merge_non_empty_payload(document.extracted_payload, build_document_payload(parsed, relevance))
     updated_payload = _retry_payload(
@@ -1143,7 +1248,7 @@ def _retry_vehicle_document(user, document_id: int) -> dict:
     document.issue_date = _parse_date(parsed.fields.get("issue_date")) or document.issue_date
     document.expiry_date = _parse_date(parsed.fields.get("expiry_date")) or document.expiry_date
     amount = parsed.fields.get("amount")
-    document.premium_amount = amount if isinstance(amount, (int, float)) and amount else document.premium_amount
+    document.premium_amount = amount if isinstance(amount, (int, float)) and (amount or "cost" in service_corrections) else document.premium_amount
     document.parse_confidence = max(float(document.parse_confidence or 0), float(parsed.confidence or 0))
     document.parser_status = _best_status(document.parser_status, parsed.parser_status)
     document.parser_notes = " ".join(filter(None, [parsed.parser_notes, *relevance["reasons"]])).strip() or document.parser_notes
@@ -1151,6 +1256,7 @@ def _retry_vehicle_document(user, document_id: int) -> dict:
     document.extracted_payload = updated_payload
     document.save(
         update_fields=[
+            "document_type",
             "document_title",
             "issuer",
             "document_number",
@@ -1226,6 +1332,9 @@ def _retry_vehicle_document(user, document_id: int) -> dict:
 
 def _retry_resume_document(user, document_id: int) -> dict:
     resume = CareerResume.objects.get(user=user, pk=document_id)
+    unavailable = _retry_source_unavailable(resume, "uploaded_file", _serialize_resume)
+    if unavailable is not None:
+        return unavailable
     payload, retry_state = _begin_retry_payload(resume.extracted_payload)
     resume.extracted_payload = payload
     resume.save(update_fields=["extracted_payload"])
@@ -1236,6 +1345,12 @@ def _retry_resume_document(user, document_id: int) -> dict:
     finally:
         resume.uploaded_file.close()
 
+    accepted = _saved_corrections(payload, ("role", "experience_years", "skills"))
+    if "skills" in accepted:
+        accepted["skills"] = _normalized_skills(accepted["skills"])
+    if "experience_years" in accepted:
+        accepted["experience_years"] = float(accepted["experience_years"])
+    parsed.payload.update(accepted)
     merged_payload = _merge_non_empty_payload(resume.extracted_payload, parsed.payload)
     merged_payload = _retry_payload(
         merged_payload,
@@ -1330,6 +1445,10 @@ def _retry_recruiter_document(user, document_id: int) -> dict:
     combined_text = payload.get("intake_combined_text") or analysis.extracted_text or payload.get("intake_message_text") or ""
     message_text = payload.get("intake_message_text") or combined_text
     snapshot = job_intelligence.parse_recruiter_message(message_text or combined_text)
+    for key, value in _saved_corrections(payload, ("job_title", "company", "location", "experience_years", "salary_min", "salary_max")).items():
+        if key in {"experience_years", "salary_min", "salary_max"}:
+            value = float(value)
+        setattr(snapshot, "title" if key == "job_title" else key, value)
     parser_status, parse_confidence = _recruiter_parser_state(
         snapshot,
         attachment_present=bool(payload.get("attachment_file_name")),
@@ -1431,6 +1550,9 @@ def _retry_recruiter_document(user, document_id: int) -> dict:
 
 def _retry_credit_report(user, document_id: int) -> dict:
     upload = CreditReportUpload.objects.select_related("parsed_credit_score").get(user=user, pk=document_id)
+    unavailable = _retry_source_unavailable(upload, "uploaded_file", _serialize_credit)
+    if unavailable is not None:
+        return unavailable
     payload, retry_state = _begin_retry_payload(upload.extracted_payload)
     upload.extracted_payload = payload
     upload.save(update_fields=["extracted_payload"])
@@ -1441,6 +1563,9 @@ def _retry_credit_report(user, document_id: int) -> dict:
     finally:
         upload.uploaded_file.close()
 
+    accepted = _saved_corrections(payload, ("bureau", "applicant_name", "report_number", "report_date"))
+    parsed.payload.update(accepted)
+    parsed.bureau = accepted.get("bureau", parsed.bureau)
     merged_payload = _merge_non_empty_payload(
         upload.extracted_payload,
         {**parsed.payload, "bureau": parsed.bureau or parsed.payload.get("bureau", "")},
@@ -1573,30 +1698,39 @@ def _delete_orphan_loans(previous_loans: list[Loan], current_loans: list[Loan]) 
         loan.delete()
 
 
-def _upsert_retry_investments(user, investments_data: list[dict]) -> list[Investment]:
+def _upsert_retry_investments(
+    user, investments_data: list[dict], *, preserve_existing: bool = False, primary_corrections: dict | None = None,
+) -> list[Investment]:
     linked: list[Investment] = []
     if not investments_data:
         return linked
     with transaction.atomic():
-        for item in investments_data:
+        for index, item in enumerate(investments_data):
             asset_name = (item.get("asset_name") or "").strip()
             institution = (item.get("institution") or "").strip()
             if not asset_name:
                 continue
+            defaults = {
+                key: item[key]
+                for key in ("asset_type", "risk_level", "notes")
+                if item.get(key) not in (None, "")
+            }
+            for key in ("invested_amount", "monthly_sip", "current_value", "annual_return_rate"):
+                if item.get(key) in (None, ""):
+                    continue
+                value = float(item[key])
+                # Portfolio extraction uses zero when an amount was not found.
+                # Only an explicit correction should erase a saved amount.
+                if preserve_existing and value == 0 and not (index == 0 and key in (primary_corrections or {})):
+                    continue
+                defaults[key] = value
             investment, _ = Investment.objects.update_or_create(
                 user=user,
                 asset_name=asset_name,
                 institution=institution,
-                defaults={
-                    "asset_type": item.get("asset_type", "equity"),
-                    "account_number": item.get("account_number", ""),
-                    "invested_amount": float(item.get("invested_amount") or 0),
-                    "monthly_sip": float(item.get("monthly_sip") or 0),
-                    "current_value": float(item.get("current_value") or 0),
-                    "annual_return_rate": float(item.get("annual_return_rate") or 0),
-                    "risk_level": item.get("risk_level", ""),
-                    "notes": item.get("notes", ""),
-                },
+                account_number=(item.get("account_number") or "").strip(),
+                defaults=defaults,
+                create_defaults={"asset_type": "equity", **defaults},
             )
             linked.append(investment)
     return linked
@@ -1619,14 +1753,18 @@ def _refresh_imported_service_records(document: BikeDocument, parsed) -> None:
     if not service_payload and not records:
         return
 
-    issue_date = _parse_date(service_payload.get("service_date")) or timezone.localdate()
+    issue_date = _parse_date(service_payload.get("service_date"))
     for record in records:
         update_fields = ["parsed_payload"]
         if service_payload:
-            record.service_date = issue_date
-            record.odometer_km = int(service_payload.get("odometer_km") or record.odometer_km or 0)
+            record.service_date = issue_date or record.service_date
+            odometer_km = _parse_float(service_payload.get("odometer_km"))
+            if odometer_km is not None:
+                record.odometer_km = int(odometer_km)
             record.service_type = service_payload.get("service_type") or record.service_type
-            record.cost = float(service_payload.get("cost") or record.cost or 0)
+            cost = _parse_float(service_payload.get("cost"))
+            if cost is not None:
+                record.cost = cost
             record.service_center = service_payload.get("service_center") or record.service_center
             record.next_service_date = _parse_date(service_payload.get("next_service_date")) or record.next_service_date
             record.next_service_km = service_payload.get("next_service_km") or record.next_service_km
@@ -1898,8 +2036,12 @@ def _serialize_investment(document: InvestmentImportDocument) -> dict:
     payload = document.extracted_payload or {}
     payload_items = payload.get("investments") or []
     linked_items = list(document.linked_investments.all())
-    first_linked = linked_items[0] if linked_items else None
     first_payload = payload_items[0] if payload_items else {}
+    first_linked = next((item for item in linked_items if (
+        item.asset_name == first_payload.get("asset_name")
+        and item.account_number == (first_payload.get("account_number") or "")
+        and item.institution == (first_payload.get("institution") or document.broker_name)
+    )), None) if first_payload else (linked_items[0] if linked_items else None)
     return {
         "scope": "investment_document",
         "id": document.id,
@@ -2447,6 +2589,9 @@ def _apply_statement_correction(user, document_id: int, corrections: dict) -> di
         field_names=[key for key, value in accepted.items() if value],
         confidence=upload.parse_confidence,
     )
+    unavailable = _retry_source_unavailable(upload, "original_file", _serialize_statement)
+    if unavailable is not None:
+        return unavailable
     queue_statement_retry(upload, reason="accepted_user_correction")
     ocr_progress = dict((upload.extracted_payload or {}).get("ocr_progress") or {})
     processed_pages = int(ocr_progress.get("processed_pages") or 0)
@@ -2457,6 +2602,7 @@ def _apply_statement_correction(user, document_id: int, corrections: dict) -> di
     return _serialize_statement(upload)
 
 
+@transaction.atomic
 def _apply_loan_correction(user, document_id: int, corrections: dict) -> dict:
     document = LoanImportDocument.objects.get(user=user, pk=document_id)
     payload = dict(document.extracted_payload or {})
@@ -2465,6 +2611,23 @@ def _apply_loan_correction(user, document_id: int, corrections: dict) -> dict:
     payload["accepted_corrections"] = accepted
     payload = _mark_review_queue_resolved(payload)
     document.document_type = corrections.get("document_type", document.document_type)
+    linked_loans = list(document.linked_loans.all())
+    primary_item = dict((payload.get("loans") or [{}])[0])
+    payload.setdefault("review_primary_source", dict(primary_item))
+    primary_loan = next((loan for loan in linked_loans if (
+        primary_item.get("loan_account_number") and loan.loan_account_number == primary_item["loan_account_number"]
+    )), None)
+    if primary_loan is None and len(linked_loans) == 1:
+        primary_loan = linked_loans[0]
+    corrected_fields = _saved_corrections(payload, ("lender", "loan_type", "loan_account_number"))
+    if primary_loan is not None:
+        loan = primary_loan
+        for key, value in corrected_fields.items():
+            setattr(loan, key, value)
+        if corrected_fields:
+            loan.save(update_fields=list(corrected_fields))
+    if primary_item or corrected_fields:
+        payload["loans"] = [{**primary_item, **corrected_fields}, *(payload.get("loans") or [])[1:]]
     document.parse_confidence = max(document.parse_confidence, 0.7 if len(accepted) >= 3 else 0.58)
     document.parser_status = "parsed" if document.linked_loans.exists() else "needs_review"
     document.extracted_payload = payload
@@ -2544,6 +2707,7 @@ def _apply_loan_closure_correction(user, document_id: int, corrections: dict) ->
     return _serialize_loan_closure(document)
 
 
+@transaction.atomic
 def _apply_investment_correction(user, document_id: int, corrections: dict) -> dict:
     document = InvestmentImportDocument.objects.prefetch_related("linked_investments").get(user=user, pk=document_id)
     payload = dict(document.extracted_payload or {})
@@ -2552,7 +2716,22 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
     payload["accepted_corrections"] = accepted
     payload = _mark_review_queue_resolved(payload)
 
+    previous_investments = list(document.linked_investments.all())
     primary_item = dict(((payload.get("investments") or [{}])[0]) if payload.get("investments") else {})
+    payload.setdefault("review_primary_source", dict(primary_item))
+    previous_primary = next((item for item in previous_investments if (
+        item.asset_name == primary_item.get("asset_name")
+        and item.account_number == (primary_item.get("account_number") or "")
+        and item.institution == (primary_item.get("institution") or document.broker_name)
+    )), None) if primary_item else (previous_investments[0] if previous_investments else None)
+    if previous_primary:
+        primary_item = {
+            **{field: getattr(previous_primary, field) for field in (
+                "asset_name", "asset_type", "institution", "account_number", "invested_amount",
+                "current_value", "monthly_sip", "annual_return_rate", "risk_level", "notes",
+            )},
+            **primary_item,
+        }
     if corrections.get("asset_name"):
         primary_item["asset_name"] = str(corrections["asset_name"]).strip()
     if corrections.get("asset_type"):
@@ -2568,14 +2747,15 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
     if corrections.get("broker_name"):
         document.broker_name = str(corrections["broker_name"]).strip()
         payload["broker_name"] = document.broker_name
+        primary_item["institution"] = document.broker_name
     if document.broker_name and not primary_item.get("institution"):
         primary_item["institution"] = document.broker_name
     if primary_item:
         remaining_items = list(payload.get("investments") or [])[1:]
         payload["investments"] = [primary_item, *remaining_items]
 
-    previous_investments = list(document.linked_investments.all())
-    linked = _upsert_retry_investments(user, [primary_item] if primary_item.get("asset_name") else [])
+    updated_primary = _upsert_retry_investments(user, [primary_item] if primary_item.get("asset_name") else [])
+    linked = [*updated_primary, *[item for item in previous_investments if item != previous_primary and item not in updated_primary]]
     document.extracted_payload = payload
     document.parse_confidence = max(document.parse_confidence, 0.8 if linked else 0.63)
     document.parser_status = "parsed" if linked else "needs_review"
@@ -2713,7 +2893,7 @@ def _apply_resume_correction(user, document_id: int, corrections: dict) -> dict:
     if corrections.get("experience_years") not in (None, ""):
         payload["experience_years"] = float(corrections["experience_years"])
     if corrections.get("skills"):
-        payload["skills"] = [item.strip() for item in str(corrections["skills"]).split(",") if item.strip()]
+        payload["skills"] = _normalized_skills(corrections["skills"])
     resume.extracted_payload = payload
     resume.summary = resume.summary or "User review accepted for this resume."
     resume.parse_confidence = max(resume.parse_confidence, 0.75 if payload.get("skills") else 0.6)
@@ -2865,6 +3045,7 @@ def _apply_recruiter_correction(user, document_id: int, corrections: dict) -> di
     if salary_max is not None:
         snapshot_payload["salary_max"] = salary_max
     payload["job_snapshot"] = snapshot_payload
+    analysis.extracted_payload = payload
 
     snapshot = _job_snapshot_like(
         {

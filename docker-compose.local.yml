@@ -4,11 +4,11 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: alfred
-      POSTGRES_USER: alfred
-      POSTGRES_PASSWORD: alfred-local-postgres-password
+      POSTGRES_DB: ${DB_NAME:-alfred}
+      POSTGRES_USER: ${DB_USER:-alfred}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Pass --env-file config/local.env with DB_PASSWORD set}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U alfred -d alfred"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 8
@@ -48,11 +48,12 @@ services:
       retries: 5
     restart: unless-stopped
     ports:
-      - "${ALFRED_WEB_PORT:-8000}:8000"
+      - "${ALFRED_BIND_ADDRESS:-127.0.0.1}:${ALFRED_WEB_PORT:-8000}:8000"
     volumes:
       - alfred_local_media:/app/media
       - alfred_local_artifacts:/app/artifacts
       - alfred_local_staticfiles:/app/staticfiles
+      - alfred_local_models:/app/ml_models
 
   worker:
     build: .
@@ -60,6 +61,8 @@ services:
       - ${ALFRED_LOCAL_ENV_FILE:-config/local.env}
     command: celery -A alfred_ai worker -l info --concurrency ${ALFRED_WORKER_CONCURRENCY:-1}
     depends_on:
+      web:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
@@ -73,19 +76,22 @@ services:
     volumes:
       - alfred_local_media:/app/media
       - alfred_local_artifacts:/app/artifacts
+      - alfred_local_models:/app/ml_models
 
   beat:
     build: .
     env_file:
       - ${ALFRED_LOCAL_ENV_FILE:-config/local.env}
-    command: celery -A alfred_ai beat -l info --schedule /app/artifacts/celerybeat-schedule
+    command: celery -A alfred_ai beat -l info --pidfile /tmp/alfred-beat.pid --schedule /app/artifacts/celerybeat-schedule
     depends_on:
+      web:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "celery -A alfred_ai inspect ping --timeout=5 >/dev/null"]
+      test: ["CMD-SHELL", "test -s /tmp/alfred-beat.pid && kill -0 $$(cat /tmp/alfred-beat.pid)"]
       interval: 60s
       timeout: 10s
       retries: 5
@@ -99,3 +105,4 @@ volumes:
   alfred_local_media:
   alfred_local_artifacts:
   alfred_local_staticfiles:
+  alfred_local_models:

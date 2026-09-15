@@ -4,13 +4,14 @@ import shutil
 import tempfile
 from datetime import timedelta
 from io import StringIO
+from importlib import import_module
 from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from apps.behavioral.models import BehavioralSignal
@@ -101,7 +102,8 @@ class MLTrainingOrchestratorTests(TestCase):
             ("apps.ml_engine.training.train_relationship.MODEL_PATH", "relationship_model/model.pkl"),
             ("apps.ml_engine.training.train_service_cost.MODEL_PATH", "service_cost_predictor/model.pkl"),
         ]:
-            path_patch = patch(target, str(self.artifact_root / relative_path))
+            module_name, attribute_name = target.rsplit(".", 1)
+            path_patch = patch.object(import_module(module_name), attribute_name, str(self.artifact_root / relative_path))
             path_patch.start()
             self.addCleanup(path_patch.stop)
 
@@ -242,12 +244,11 @@ class MLTrainingOrchestratorTests(TestCase):
             minimum_confidence=22,
             artifact_expected=True,
         )
-        self._assert_training_outcome(
-            state=states["expense_forecaster"],
-            result_item=results["expense_forecaster"],
-            minimum_confidence=25,
-            artifact_expected=True,
-        )
+        # This small fixture supports fitting other pilots, but does not meet
+        # the forecaster's validation gate.
+        self.assertEqual(states["expense_forecaster"].status, "skipped")
+        self.assertEqual(results["expense_forecaster"]["status"], "skipped")
+        self.assertFalse(states["expense_forecaster"].inference_ready)
         self._assert_training_outcome(
             state=states["burnout_rf"],
             result_item=results["burnout_rf"],
@@ -268,9 +269,11 @@ class MLTrainingOrchestratorTests(TestCase):
         )
 
         snapshot = training_health_snapshot()
-        self.assertGreaterEqual(snapshot["ready_models"] + snapshot["skipped_models"], 4)
+        self.assertGreaterEqual(snapshot["fitted_models"] + snapshot["skipped_models"], 4)
+        self.assertEqual(snapshot["ready_models"], 0)
         self.assertGreaterEqual(snapshot["overall_progress"], 0)
 
+    @override_settings(ALFRED_AUTO_TRAIN_ON_STARTUP=True)
     def test_should_bootstrap_training_respects_command_and_flag(self):
         self.assertFalse(should_bootstrap_training(["manage.py", "test"]))
         self.assertFalse(should_bootstrap_training(["manage.py", "migrate"]))
@@ -386,6 +389,7 @@ class MLTrainingOrchestratorTests(TestCase):
             AdaptiveTrainingRun.objects.filter(model_key="burnout_rf", status="skipped").exists()
         )
 
+    @override_settings(ALFRED_AUTO_TRAIN_ON_STARTUP=True)
     def test_runtime_status_requires_superuser_approval_before_starting_up(self):
         self.client.force_login(self.superuser)
 

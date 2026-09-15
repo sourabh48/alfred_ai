@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import joblib
-from pathlib import Path
+import math
+
+from .artifacts import load_inference_artifact
 
 
 MODEL_PATH = "ml_models/alfred/service_cost_predictor/model.pkl"
@@ -48,17 +49,12 @@ class ServiceCostPredictor:
         self._artifact = None
 
     def load(self, *, model_path: str | None = None, force_reload: bool = False):
-        resolved_path = str(Path(model_path or MODEL_PATH))
-        if self._artifact is not None and not force_reload and getattr(self, "_loaded_from", None) == resolved_path:
-            return
-        self._artifact = joblib.load(resolved_path)
-        self._loaded_from = resolved_path
+        self._artifact = load_inference_artifact("service_cost_predictor", model_path)
 
     def predict_cost(self, features: dict, *, model_path: str | None = None, force_reload: bool = False) -> float | None:
-        resolved_path = Path(model_path or MODEL_PATH)
-        if not resolved_path.exists():
+        self.load(model_path=model_path, force_reload=force_reload)
+        if self._artifact is None:
             return None
-        self.load(model_path=str(resolved_path), force_reload=force_reload)
         model = (self._artifact or {}).get("model")
         feature_names = (self._artifact or {}).get("feature_names") or self.FEATURE_NAMES
         row = [[float(features.get(name, 0) or 0) for name in feature_names]]
@@ -68,7 +64,8 @@ class ServiceCostPredictor:
             return None
         if prediction is None or not len(prediction):
             return None
-        return float(max(0.0, prediction[0]))
+        value = float(prediction[0])
+        return max(0.0, value) if math.isfinite(value) else None
 
 
 service_cost_predictor = ServiceCostPredictor()

@@ -13,6 +13,8 @@ __pycache__
 db.sqlite3
 .env
 .env.*
+config/*.env
+backups
 artifacts
 logs
 media

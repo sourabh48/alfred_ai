@@ -134,9 +134,9 @@ class ProductionReadinessContractTests(SimpleTestCase):
         self.assertIn("Production database config", production)
         self.assertIn("Shared cache config", production)
         self.assertIn("Celery worker and beat proof", production)
-        self.assertIn("ALFRED is treated as a local or LAN-hosted application", local)
-        self.assertIn("docker compose -f docker-compose.local.yml up --build -d", local)
-        self.assertIn("Do not run `docker compose -f docker-compose.local.yml down -v`", local)
+        self.assertIn("ALFRED runs on the local host or a trusted LAN", local.replace("\n", " "))
+        self.assertIn("docker compose --env-file config/local.env -f docker-compose.local.yml up --build -d", local)
+        self.assertIn("Do not use `down -v` unless you intend to delete", local)
 
     def test_local_env_and_docker_contracts_cover_web_postgres_redis_and_celery(self):
         dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")

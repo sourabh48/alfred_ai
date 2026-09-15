@@ -40,8 +40,19 @@ class AdaptiveModelState(models.Model):
         if self.status != "ready":
             return False
         if self.next_refresh_due_at is None:
-            return True
+            return False
         return timezone.now() < self.next_refresh_due_at
+
+    @property
+    def inference_ready(self) -> bool:
+        from apps.ml_engine.training.quality import resolve_artifact_path, validation_blockers
+
+        return bool(
+            self.is_fresh
+            and self.artifact_path
+            and resolve_artifact_path(self.artifact_path).is_file()
+            and not validation_blockers(self.model_key, self.sample_count, self.quality_score, self.confidence_estimate)
+        )
 
 
 class AdaptiveTrainingRun(models.Model):
