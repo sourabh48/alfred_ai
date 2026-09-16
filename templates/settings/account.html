@@ -7,13 +7,12 @@
         <div>
             <div class="alfred-chip mb-3">Account and family context</div>
             <h1 class="alfred-hero-title">Settings</h1>
-            <p class="alfred-hero-copy">Update your profile, household details, and secure family links from one place.</p>
+            <p class="alfred-hero-copy">Update your profile and connect family members using a link code.</p>
         </div>
         <div class="surface-card" style="min-width: 260px;">
-            <p class="metric-kicker">Family Context</p>
-            <div class="metric-value" id="settingsFamilyContextCount">1</div>
-            <p class="metric-caption mb-1">Linked accounts: <span id="settingsLinkedAccountCount">0</span></p>
-            <p class="metric-caption mb-0">Shared dependents: <span id="settingsSharedDependentCount">0</span></p>
+            <p class="metric-kicker">Connected Members</p>
+            <div class="metric-value" id="settingsLinkedAccountCount">0</div>
+            <p class="metric-caption mb-0">Accounts connected by link code.</p>
         </div>
     </div>
 </section>
@@ -76,8 +75,8 @@
         <div class="surface-card h-100">
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
                 <div>
-                    <h2 class="page-section-title mb-1">Family Account Link</h2>
-                    <p class="page-section-copy mb-0">Invite codes expire in <span id="settingsInviteTtlLabel">24 hours</span>.</p>
+                    <h2 class="page-section-title mb-1">Connect an Account</h2>
+                    <p class="page-section-copy mb-0">Share a link code with a family member, or enter their code below. Codes expire in 24 hours.</p>
                 </div>
                 <span class="status-pill status-guarded" id="settingsLinkStatus">Private</span>
             </div>
@@ -94,8 +93,8 @@
                 </div>
                 <form id="settingsAcceptInviteForm" class="soft-grid" data-live-refresh-hold="true">
                     <div>
-                        <label class="form-label" for="settingsInviteCodeInput">Accept Link Code</label>
-                        <input id="settingsInviteCodeInput" name="invite_code" class="form-control" placeholder="ALF-XXXX-XXXX" autocomplete="off">
+                        <label class="form-label" for="settingsInviteCodeInput">Link Code</label>
+                        <input id="settingsInviteCodeInput" name="invite_code" class="form-control" placeholder="ALF-XXXX-XXXX" autocomplete="off" required>
                     </div>
                     <div id="settingsLinkFeedback" class="d-none alert mb-0"></div>
                     <div>
@@ -104,65 +103,17 @@
                 </form>
             </div>
 
-            <div class="mt-4">
-            <h3 class="h6 fw-bold mb-3">Linked Accounts</h3>
-            <p class="metric-caption">Use this for a spouse or family member with their own ALFRED account. They keep editing their own profile and ALFRED uses the accepted link for family totals.</p>
-            <div class="data-stack" id="settingsLinkedAccountsList"></div>
-        </div>
         </div>
     </div>
 </section>
 
 <section class="surface-card">
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
-        <div>
-            <h2 class="page-section-title mb-1">Manual Dependents</h2>
-            <p class="page-section-copy mb-0">Optional dependents without their own ALFRED login. Linked spouse/family data is populated from linked accounts above.</p>
-        </div>
-        <span class="status-pill status-stable" id="settingsDependentStatus">Ready</span>
-    </div>
-
-    <form id="settingsDependentForm" class="soft-grid mb-4" data-live-refresh-hold="true">
-        <input id="settingsDependentId" name="id" type="hidden">
-        <div class="row g-3">
-            <div class="col-md-5">
-                <label class="form-label" for="settingsDependentName">Name</label>
-                <input id="settingsDependentName" name="name" class="form-control" required>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label" for="settingsDependentAge">Age</label>
-                <input id="settingsDependentAge" name="age" type="number" min="0" class="form-control" required>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label" for="settingsDependentRelation">Relation</label>
-                <input id="settingsDependentRelation" name="relation" class="form-control" required>
-            </div>
-            <div class="col-md-2 d-flex align-items-end gap-2">
-                <button id="settingsDependentSubmitBtn" class="btn btn-primary w-100" type="submit">Add</button>
-            </div>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-            <button id="settingsDependentCancelBtn" class="btn btn-outline-secondary btn-sm d-none" type="button">Cancel Edit</button>
-        </div>
-        <div id="settingsDependentFeedback" class="d-none alert mb-0"></div>
-    </form>
-
-    <div class="table-responsive">
-        <table class="table table-alfred align-middle mb-0 metric-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Relation</th>
-                    <th class="text-end">Age</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="settingsDependentTableBody"></tbody>
-        </table>
-    </div>
+    <h2 class="page-section-title mb-1">Connected Members</h2>
+    <p class="page-section-copy mb-3">Members appear here once a link code has been accepted.</p>
+    <div class="data-stack" id="settingsLinkedAccountsList" aria-live="polite"></div>
 </section>
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/settings.js?v=1.1"></script>
+<script src="/static/js/settings.js?v=1.2"></script>
 {% endblock %}

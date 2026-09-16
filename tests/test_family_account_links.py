@@ -60,10 +60,11 @@ class FamilyAccountLinkTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="accountSettingsRoot"')
         self.assertContains(response, 'id="accountProfileForm"')
-        self.assertContains(response, 'id="settingsDependentForm"')
+        self.assertNotContains(response, 'id="settingsDependentForm"')
         self.assertContains(response, 'id="settingsAcceptInviteForm"')
-        self.assertContains(response, "Manual Dependents")
-        self.assertContains(response, "Linked spouse/family data is populated from linked accounts above.")
+        self.assertNotContains(response, "Manual Dependents")
+        self.assertContains(response, "Connected Members")
+        self.assertContains(response, 'id="settingsLinkedAccountsList"')
         self.assertContains(response, "/static/js/settings.js")
 
     def test_family_link_code_is_one_time_output_and_hash_stored(self):

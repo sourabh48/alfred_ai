@@ -304,7 +304,7 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         ):
             self.assertIn(expected, bike_script)
 
-    def test_settings_page_contracts_cover_profile_dependents_and_family_links(self):
+    def test_settings_page_contracts_cover_profile_and_family_link_codes(self):
         html = self._fetch_text("/settings/")
         parser = _AssetParser()
         parser.feed(html)
@@ -326,8 +326,8 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
             }.issubset({control["name"] for control in profile_form["controls"]})
         )
 
-        dependent_form = self._form_by_id(parser, "settingsDependentForm")
-        self.assertTrue({"id", "name", "age", "relation"}.issubset({control["name"] for control in dependent_form["controls"]}))
+        self.assertNotIn("settingsDependentForm", parser.ids)
+        self.assertIn("settingsLinkedAccountsList", parser.ids)
 
         invite_form = self._form_by_id(parser, "settingsAcceptInviteForm")
         self.assertTrue({"invite_code"}.issubset({control["name"] for control in invite_form["controls"]}))
@@ -335,14 +335,13 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         script = self._fetch_text("/static/js/settings.js")
         for expected in (
             'Alfred.fetchJSON("/api/users/profile/")',
-            'Alfred.fetchJSON("/api/family/")',
             'Alfred.fetchJSON("/api/family/account-links/")',
             'Alfred.fetchJSON("/api/users/profile/",',
             'Alfred.fetchJSON("/api/family/account-links/accept/",',
             '`/api/family/account-links/${id}/revoke/`',
-            'const url = id ? `/api/family/${id}/` : "/api/family/";',
         ):
             self.assertIn(expected, script)
+        self.assertNotIn('Alfred.fetchJSON("/api/family/")', script)
 
     def test_browser_regression_runner_and_ci_job_are_wired_to_selenium_suite(self):
         runner = (REPO_ROOT / "scripts" / "run_browser_regressions.py").read_text(encoding="utf-8")
