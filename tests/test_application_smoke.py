@@ -51,13 +51,17 @@ class ApplicationSmokeTests(TestCase):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
 
-    def test_global_remove_data_button_renders_once_per_authenticated_page(self):
+    def test_remove_data_button_renders_only_in_settings(self):
         self.client.force_login(self.user)
-        for path in ("/dashboard/", "/career/"):
+        for path in ("/dashboard/", "/career/", "/settings/"):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
-                self.assertContains(response, 'id="navbarClearDataBtn"', count=1)
+                self.assertNotContains(response, 'id="navbarClearDataBtn"')
+                if path == "/settings/":
+                    self.assertContains(response, 'id="settingsClearDataBtn"', count=1)
+                else:
+                    self.assertNotContains(response, 'id="settingsClearDataBtn"')
 
     def test_core_create_and_dashboard_endpoints_work_end_to_end(self):
         self.client.force_login(self.user)

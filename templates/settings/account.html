@@ -107,10 +107,16 @@
     </div>
 </section>
 
-<section class="surface-card">
+<section class="surface-card mb-4">
     <h2 class="page-section-title mb-1">Connected Members</h2>
     <p class="page-section-copy mb-3">Members appear here once a link code has been accepted.</p>
     <div class="data-stack" id="settingsLinkedAccountsList" aria-live="polite"></div>
+</section>
+
+<section class="surface-card">
+    <h2 class="page-section-title mb-1">Account Data</h2>
+    <p class="page-section-copy mb-3">Remove your saved Alfred data and uploaded documents to start fresh. Your account stays active. This cannot be undone.</p>
+    <button id="settingsClearDataBtn" type="button" class="btn btn-outline-danger">{{ ui_config.navigation.remove_data_label }}</button>
 </section>
 {% endblock %}
 

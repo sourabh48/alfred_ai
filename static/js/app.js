@@ -915,7 +915,7 @@ function summarizeUploadBatch(results, options = {}) {
 }
 
 function installUserDataResetAction() {
-    const button = document.getElementById("navbarClearDataBtn");
+    const button = document.getElementById("settingsClearDataBtn");
     if (!button || button.dataset.bound === "true") {
         return;
     }

@@ -34,7 +34,6 @@
                 <span class="alfred-session-countdown" data-session-countdown>--:--</span>
             </div>
             <div class="alfred-nav-chip d-none d-sm-inline-flex">{{ ui_config.navigation.signed_in_prefix }} {{ request.user.username }}</div>
-            <button id="navbarClearDataBtn" type="button" class="btn btn-outline-warning btn-sm rounded-pill px-3">{{ ui_config.navigation.remove_data_label }}</button>
             <form action="{% url 'logout' %}" method="post" class="m-0">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-outline-light btn-sm rounded-pill px-3">{{ ui_config.navigation.sign_out_label }}</button>

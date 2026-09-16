@@ -1,6 +1,6 @@
 {
     "parser_confidence_calibrator": {
-        "version": "2026-09-15T22:46:57.832332+00:00",
+        "version": "2026-09-16T17:28:39.490376+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 100.0,
@@ -12,7 +12,7 @@
         }
     },
     "relationship_model": {
-        "version": "2026-09-15T22:46:57.982333+00:00",
+        "version": "2026-09-16T17:28:39.794840+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 91.95,
@@ -24,7 +24,7 @@
         }
     },
     "salary_predictor": {
-        "version": "2026-09-15T22:46:57.127941+00:00",
+        "version": "2026-09-16T17:28:38.169743+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 96.41,
@@ -36,7 +36,7 @@
         }
     },
     "expense_forecaster": {
-        "version": "2026-09-15T22:46:57.365428+00:00",
+        "version": "2026-09-16T17:28:38.626713+00:00",
         "metadata": {
             "status": "skipped",
             "quality_score": 2.81,
@@ -66,7 +66,7 @@
         }
     },
     "burnout_rf": {
-        "version": "2026-09-15T22:46:57.518182+00:00",
+        "version": "2026-09-16T17:28:38.872714+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 100.0,
@@ -78,7 +78,7 @@
         }
     },
     "risk_classifier": {
-        "version": "2026-09-15T22:46:57.683415+00:00",
+        "version": "2026-09-16T17:28:39.196514+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 100.0,
@@ -90,7 +90,7 @@
         }
     },
     "service_cost_predictor": {
-        "version": "2026-09-15T22:46:58.123444+00:00",
+        "version": "2026-09-16T17:28:40.074420+00:00",
         "metadata": {
             "status": "ready",
             "quality_score": 71.3,
@@ -102,7 +102,7 @@
         }
     },
     "rl_agent": {
-        "version": "2026-09-15T22:46:58.270800+00:00",
+        "version": "2026-09-16T17:28:40.300840+00:00",
         "metadata": {
             "status": "skipped",
             "quality_score": 0.0,
