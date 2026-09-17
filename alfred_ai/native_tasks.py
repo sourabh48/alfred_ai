@@ -1,6 +1,7 @@
 """Schedules used by the single native Huey consumer (times are UTC)."""
 from huey import crontab
 import os
+import time
 from huey.contrib.djhuey import db_periodic_task, db_task
 from django.core.cache import cache
 from django.utils import timezone
@@ -21,11 +22,14 @@ def native_scheduler_heartbeat():
 
 
 @db_task(retries=2, retry_delay=1)
-def native_runtime_probe(probe_id, fail_once=False):
+def native_runtime_probe(probe_id, fail_once=False, hold_seconds=0):
     """A harmless queue/retry diagnostic, also used by the verification script."""
     key = f"native:probe:{probe_id}"
     cache.add(key, 0, timeout=300)
     attempts = cache.incr(key)
+    if hold_seconds:
+        # Bounded pause lets the isolated recovery drill kill an executing job.
+        time.sleep(min(max(float(hold_seconds), 0), 30))
     if fail_once and attempts == 1:
         raise RuntimeError("Intentional transient failure for the native retry diagnostic")
     return {"probe_id": probe_id, "attempts": attempts, "worker_pid": os.getpid()}

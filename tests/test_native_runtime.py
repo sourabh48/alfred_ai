@@ -1,5 +1,6 @@
 """Boundary checks that do not require the long-running native integration drill."""
 import os
+import socket
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -8,9 +9,17 @@ from django.test import SimpleTestCase, override_settings
 from alfred_ai.services.ocr_process import ocr_command
 from apps.integrations.models import _encrypt_token, _decrypt_token
 from alfred_native import InstanceLock, data_directory, parent_is_running
+from alfred_ai.services.native_web import create_native_server
 
 
 class NativeRuntimeBoundaryTests(SimpleTestCase):
+    def test_listener_refuses_an_occupied_port(self):
+        with socket.socket() as occupied:
+            occupied.bind(("127.0.0.1", 0))
+            occupied.listen(1)
+            with self.assertRaises(OSError):
+                create_native_server(lambda *_: [], occupied.getsockname()[1])
+
     def test_process_monitor_recognizes_its_own_process(self):
         self.assertTrue(parent_is_running(os.getpid()))
         self.assertFalse(parent_is_running(2147483647))

@@ -27,6 +27,7 @@ venv/
 # =========================
 # ML Models & Artifacts
 # =========================
+ml_models/alfred/model_registry/registry.json
 ml_models/**/model.pt
 ml_models/**/model.bin
 ml_models/**/model.pkl

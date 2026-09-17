@@ -15,6 +15,26 @@
     --alfred-radius: 24px;
 }
 
+.alfred-skip-link {
+    position: fixed;
+    top: -5rem;
+    left: 1rem;
+    z-index: 2000;
+    padding: .75rem 1rem;
+    background: #10253f;
+    color: #fff;
+}
+
+.alfred-skip-link:focus {
+    top: 1rem;
+    color: #fff;
+}
+
+:focus-visible {
+    outline: 3px solid #1858d6;
+    outline-offset: 3px;
+}
+
 body.alfred-body {
     min-height: 100vh;
     margin: 0;

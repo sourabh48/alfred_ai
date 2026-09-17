@@ -34,13 +34,26 @@ def native_readiness_snapshot():
     except Exception:
         cache_ok, worker, scheduler = False, {}, {}
     check("cache", "Shared local cache", cache_ok, "Pages and background jobs share current data.", "Restart ALFRED.")
+    review_count = 0
+    try:
+        from huey.contrib.djhuey import HUEY
+        review_count = HUEY.storage.sql(
+            "SELECT count(*) FROM native_claim WHERE queue=? AND state='review'",
+            (HUEY.storage.name,), results=True)[0][0]
+    except Exception:
+        pass  # Worker/queue health below still determines readiness.
     for key, label, heartbeat, age, detail in (
         ("worker", "Background processing", worker, 15, "Document processing runs separately from the web pages."),
         ("scheduler", "Scheduled jobs", scheduler, 150, "Automatic retries and scheduled updates are enabled."),
     ):
         valid = isinstance(heartbeat, dict) and heartbeat.get("instance") == os.environ.get("ALFRED_NATIVE_INSTANCE")
         ready = valid and time.time() - heartbeat.get("time", 0) < age
-        check(key, label, ready, detail, "Allow a minute after startup; restart ALFRED if this persists.")
+        action = "Allow a minute after startup; restart ALFRED if this persists."
+        if key == "worker" and review_count:
+            ready = False
+            detail = f"{review_count} interrupted job(s) need review before retrying; other background work can continue."
+            action = "Run ALFRED.exe jobs to inspect interrupted work; check partial changes before using retry-job."
+        check(key, label, ready, detail, action)
     check("local_security", "Local access", not settings.DEBUG and len(settings.SECRET_KEY) >= 50,
           "The server accepts connections from this computer only. Sign in to access your data.",
           "Start ALFRED using its native launcher.")

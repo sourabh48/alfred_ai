@@ -123,8 +123,8 @@ def configure(data):
 
 class InstanceLock:
     """An OS lock is released on process exit, including a crashed process."""
-    def __init__(self, data):
-        self.file = (runtime_directory(data) / "instance.lock").open("a+b")
+    def __init__(self, data, name="instance.lock"):
+        self.file = (runtime_directory(data) / name).open("a+b")
 
     def __enter__(self):
         try:
@@ -175,12 +175,22 @@ def parent_is_running(pid):
 
 
 def worker(data, instance, parent_pid):
+    # A surviving worker may still be finishing after its supervisor died.
+    # Never recover claims while another consumer can still execute them.
+    with InstanceLock(data, "worker.lock"):
+        return consume(data, instance, parent_pid)
+
+
+def consume(data, instance, parent_pid):
     os.environ["ALFRED_NATIVE_INSTANCE"] = instance
     configure(data)
     from alfred_ai import native_tasks  # noqa: F401 -- explicit task discovery for frozen builds
     from django.core.cache import cache
     from huey.contrib.djhuey import HUEY
     from huey.consumer import ConsumerStopped
+
+    recovery = HUEY.storage.recover(HUEY.deserialize_task)
+    write_json(runtime_directory(data) / "job-recovery.json", {"time": time.time(), **recovery})
 
     # A separate queue consumer with thread workers works on Windows.
     consumer = HUEY.create_consumer(workers=2, worker_type="thread", periodic=True)
@@ -218,7 +228,7 @@ def serve(data, port):
         configure(data)
         from django.core.management import call_command
         from django.core.wsgi import get_wsgi_application
-        from waitress import create_server
+        from alfred_ai.services.native_web import create_native_server
         from alfred_ai.tasks import production_probe_task
 
         with sqlite3.connect(data / "db.sqlite3", timeout=30) as connection:
@@ -234,11 +244,11 @@ def serve(data, port):
         application = get_wsgi_application()
         for candidate in range(port, min(port + 20, 65536)):
             try:
-                server = create_server(application, host="127.0.0.1", port=candidate, threads=4)
+                server = create_native_server(application, candidate)
                 state["port"] = candidate
                 break
             except OSError as error:
-                if getattr(error, "winerror", None) != 10048 and error.errno != 98:
+                if getattr(error, "winerror", None) not in (10048, 10013) and error.errno != 98:
                     raise
         if server is None:
             raise RuntimeError("No free local port. Use --port to choose another port.")
@@ -299,12 +309,24 @@ def start(data, port, open_browser):
 
 def stop(data):
     state = read_state(data)
-    if state.get("pid") and not parent_is_running(state["pid"]):
-        if state.get("worker_pid") and parent_is_running(state["worker_pid"]):
-            print("The server has stopped; its background worker is finishing current work.")
-            return 1
-        state["status"] = "stopped"
-        write_json(runtime_directory(data) / "runtime.json", state)
+    # PIDs can be reused after a reboot. OS locks identify our processes;
+    # an unrelated process with the old PID must never affect stop behaviour.
+    try:
+        inactive = InstanceLock(data)
+        inactive.__enter__()
+    except OSError:
+        pass  # A supervisor owns the folder; ask it to stop below.
+    else:
+        try:
+            try:
+                with InstanceLock(data, "worker.lock"):
+                    state["status"] = "stopped"
+                    write_json(runtime_directory(data) / "runtime.json", state)
+            except OSError:
+                print("The server has stopped; its background worker is finishing current work.")
+                return 1
+        finally:
+            inactive.__exit__()
     if state.get("status") in ("starting", "running", "stopping") and state.get("instance"):
         (runtime_directory(data) / f"stop-{state['instance']}").touch()
         deadline = time.monotonic() + 120
@@ -325,7 +347,8 @@ def main():
         from alfred_ai.services.ocr_process import run_frozen_worker
         return run_frozen_worker(sys.argv[2:])
     parser = argparse.ArgumentParser(description="ALFRED local Windows application")
-    parser.add_argument("command", nargs="?", default="start", choices=("start", "stop", "status", "serve", "worker"))
+    parser.add_argument("command", nargs="?", default="start", choices=("start", "stop", "status", "serve", "worker", "jobs", "retry-job"))
+    parser.add_argument("--job-id", help="Interrupted job ID shown by the jobs command")
     parser.add_argument("--data-dir")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--no-browser", action="store_true")
@@ -335,6 +358,18 @@ def main():
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
     data = data_directory(args.data_dir)
+    if args.command in ("jobs", "retry-job"):
+        configure(data)
+        from alfred_ai import native_tasks  # noqa: F401
+        from huey.contrib.djhuey import HUEY
+        if args.command == "retry-job":
+            if not args.job_id:
+                parser.error("retry-job requires --job-id from the jobs command")
+            HUEY.storage.retry_review(args.job_id, HUEY.deserialize_task)
+            print("Reviewed job queued for another attempt.")
+        else:
+            print(json.dumps(HUEY.storage.review_jobs(HUEY.deserialize_task), indent=2))
+        return 0
     if args.command == "serve":
         return serve(data, args.port)
     if args.command == "worker":

@@ -76,8 +76,26 @@ queued probe to complete before opening the browser.
 | Evidence cleanup | Daily at 02:15 |
 | Eligible model training | Daily at 03:00, subject to existing consent/data gates |
 
-Shutdown waits for in-flight work; queued jobs survive restart. Huey does not
-guarantee recovery of an in-flight task after power loss or forced termination.
+Shutdown waits for in-flight work; queued jobs survive restart. The native
+SQLite adapter now records a claim before removing a queued job and acknowledges
+it only after completion. Queue/schedule transfers are atomic and SQLite uses
+full synchronous writes. An exclusive worker lock prevents concurrent recovery.
+After an abrupt stop, repeatable maintenance jobs are replayed up to three times.
+Interrupted imports, training and unknown jobs retain their payload for review;
+their application changes cannot share the queue transaction, so automatic
+replay could repeat partially completed changes. This is not exactly-once
+execution or a hardware power-loss certification.
+
+```powershell
+.\ALFRED.exe jobs
+.\ALFRED.exe retry-job --job-id <ID-from-jobs>
+```
+
+Check partial changes before explicitly retrying a retained job. Project Details
+flags jobs awaiting review. Job outcomes and timing are retained for 30 days in
+`artifacts/native/jobs.sqlite3`; document contents and task arguments are not
+copied into the operational history. Unfinished claims are never aged out.
+
 Schedules do not run while the application/computer is off. External source
 refreshes still need internet access. Charts and controls use bundled assets;
 optional Google fonts fall back to system fonts offline.
@@ -101,6 +119,7 @@ It uses synthetic records in disposable folders, never the live account.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/verify_native_runtime.py --browser
+.\.venv\Scripts\python.exe scripts/verify_native_runtime.py --browser --extended
 .\.venv\Scripts\python.exe manage.py test --noinput
 .\.venv\Scripts\python.exe -m PyInstaller packaging/ALFRED.spec --noconfirm
 .\.venv\Scripts\python.exe scripts/verify_native_runtime.py --executable dist/ALFRED/ALFRED.exe --browser
@@ -113,3 +132,20 @@ installer. `artifacts/ops/native_huey_verification.json` and
 built for Windows x64; validation on a clean second PC remains a separate check.
 
 The existing Docker/Celery configuration is retained as an optional alternative.
+
+The extended check needs the official axe-core 4.13.0 npm package extracted to
+`artifacts/tools/package`; see the pinned download/hash in the CI workflow.
+It checks 12 concurrent users, five pages at four widths, automated WCAG checks,
+keyboard navigation and an executing worker killed during a test job.
+See [Windows acceptance](WINDOWS_ACCEPTANCE.md) for the separate-PC/reboot kit.
+
+For actual elapsed-time observation, keep Windows awake and ALFRED running:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/observe_native_runtime.py --data-dir F:\ALFRED --hours 8 --report artifacts/ops/native_overnight_verification.json
+```
+
+An interrupted observation or missed schedule remains a failed/incomplete proof.
+In India, refresh runs at 05:30, 11:30, 17:30 and 23:30; cleanup at 07:45 and
+eligible training at 08:30. A scheduled training cycle can legitimately skip
+models because consent, data, freshness or runtime approval gates are unmet.

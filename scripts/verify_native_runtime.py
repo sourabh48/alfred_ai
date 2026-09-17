@@ -26,11 +26,12 @@ def main():
     parser.add_argument("--executable", type=Path)
     parser.add_argument("--port", type=int, default=8030)
     parser.add_argument("--browser", action="store_true", help="Check the real UI using headless Chrome")
+    parser.add_argument("--extended", action="store_true", help="Concurrent users, mobile and accessibility checks")
     args = parser.parse_args()
     run = uuid.uuid4().hex[:10]
     data = ROOT / "artifacts" / "native-tests" / run
     data.mkdir(parents=True)
-    report = {"run": run, "data_dir": str(data), "executable": str(args.executable or sys.executable), "checks": {}}
+    report = {"run": run, "data_dir": str(data), "executable": str(args.executable or sys.executable), "passed": False, "checks": {}}
     prefix = [str(args.executable.resolve())] if args.executable else [sys.executable, str(ROOT / "alfred_native.py")]
 
     def command(action):
@@ -194,9 +195,24 @@ def main():
         recovered = native_runtime_probe(run + "-recovered").get(blocking=True, timeout=30)
         assert recovered["worker_pid"] != state["worker_pid"]
         passed("supervisor_restarts_stopped_worker", recovered["worker_pid"])
+        crash_probe = native_runtime_probe(run + "-crash", hold_seconds=8)
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and cache.get(f"native:probe:{run}-crash") != 1:
+            time.sleep(0.1)
+        assert cache.get(f"native:probe:{run}-crash") == 1, "Crash probe never started"
+        # Kill only the child identified by this isolated data folder's supervisor.
+        import signal
+        os.kill(read_state(data)["worker_pid"], signal.SIGTERM)
+        crash_result = crash_probe.get(blocking=True, timeout=60)
+        assert crash_result["attempts"] == 2, crash_result
+        assert HUEY.storage.sql("SELECT COUNT(*) FROM native_history WHERE outcome='recovered'", results=True)[0][0] >= 1
+        passed("inflight_job_recovers_after_worker_kill", crash_result)
         heartbeat = cache.get("native:scheduler-heartbeat")
         assert heartbeat and heartbeat["instance"] == state["instance"]
         passed("scheduler_executed_heartbeat")
+        if args.extended:
+            from scripts.verify_native_extended import verify_extended
+            verify_extended(base, session, scenario, data, passed)
         if args.executable:
             import fitz
             pdf_path = data / "ocr-proof.pdf"
@@ -227,10 +243,15 @@ def main():
         passed("queued_job_and_account_persist_after_restart")
         command("stop")
 
+        backup_probe = native_runtime_probe(run + "-backup-queue")
         backup = data.parent / f"{run}-backup"
         restored = data.parent / f"{run}-restored"
         backup.mkdir()
         with sqlite3.connect(data / "db.sqlite3") as source, sqlite3.connect(backup / "db.sqlite3") as target:
+            source.backup(target)
+        queue_copy = backup / "artifacts" / "native" / "jobs.sqlite3"
+        queue_copy.parent.mkdir(parents=True)
+        with sqlite3.connect(data / "artifacts" / "native" / "jobs.sqlite3") as source, sqlite3.connect(queue_copy) as target:
             source.backup(target)
         shutil.copytree(data / "media", backup / "media")
         shutil.copytree(data / "config", backup / "config")
@@ -246,12 +267,27 @@ def main():
             assert all(restored_response.json()["summary"][key] == summary[key] for key in expected)
             assert session.get(restore_base + upload.original_file.url, timeout=10).content == owner.content
             passed("backup_restore_http_data_and_upload")
+            deadline = time.monotonic() + 30
+            restored_job = None
+            while time.monotonic() < deadline:
+                with sqlite3.connect(restored / "artifacts" / "native" / "jobs.sqlite3") as queue:
+                    row = queue.execute("SELECT value FROM kv WHERE queue=? AND key=?",
+                                        (HUEY.storage.name, backup_probe.id)).fetchone()
+                if row:
+                    restored_job = HUEY.serializer.deserialize(row[0])
+                    break
+                time.sleep(.2)
+            assert restored_job and restored_job["probe_id"] == run + "-backup-queue", restored_job
+            passed("backup_restore_pending_job")
         finally:
             subprocess.run([*prefix, "stop", "--data-dir", str(restored)], timeout=180, check=True)
         report["passed"] = True
     finally:
         subprocess.run([*prefix, "stop", "--data-dir", str(data)], timeout=180)
-        report_path = ROOT / "artifacts" / "ops" / ("native_exe_verification.json" if args.executable else "native_huey_verification.json")
+        filename = "native_exe_verification.json" if args.executable else "native_huey_verification.json"
+        if args.extended:
+            filename = filename.replace("_verification", "_extended_verification")
+        report_path = ROOT / "artifacts" / "ops" / filename
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"Report: {report_path}", flush=True)

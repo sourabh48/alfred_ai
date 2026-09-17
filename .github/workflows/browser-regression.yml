@@ -15,9 +15,52 @@ on:
       - "tests/test_browser_regression_runner.py"
       - "tests/test_live_ui_contracts.py"
       - "scripts/run_browser_regressions.py"
+      - "scripts/verify_native*.py"
+      - "alfred_native.py"
+      - "tests/test_durable_queue.py"
+      - "tests/test_native_runtime.py"
       - "requirements.txt"
 
 jobs:
+  native-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      ALFRED_LOCAL_RUNTIME: "true"
+      ALFRED_AUTO_TRAIN_ON_STARTUP: "false"
+      ALFRED_REGISTRY_PATH: artifacts/ci-model-registry
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: browser-actions/setup-chrome@v1
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Download pinned accessibility engine
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts/tools -Force | Out-Null
+          Invoke-WebRequest https://registry.npmjs.org/axe-core/-/axe-core-4.13.0.tgz -OutFile artifacts/tools/axe-core.tgz
+          tar -xzf artifacts/tools/axe-core.tgz -C artifacts/tools package/axe.min.js package/LICENSE
+          if ((Get-FileHash artifacts/tools/package/axe.min.js -Algorithm SHA256).Hash -ne 'C24F097BD2F451D4F933E8BC7D8D539F8672A2EBCB5CC9F9F3EEC8CA9470A0C1') { throw 'Unexpected axe-core hash' }
+      - name: Backend and recovery regression suite
+        run: python manage.py test --noinput
+      - name: Native HTTP, recovery, backup, concurrency and accessibility
+        run: python scripts/verify_native_runtime.py --browser --extended
+      - name: Upload native proof (synthetic data only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-windows-proof
+          path: |
+            artifacts/ops/native_huey_extended_verification.json
+            artifacts/native-tests/*/mobile-accessibility.json
+            artifacts/native-tests/*/*.png
+            artifacts/native-tests/*/artifacts/native/*.log
+          if-no-files-found: warn
+
   selenium:
     runs-on: ubuntu-latest
     timeout-minutes: 30

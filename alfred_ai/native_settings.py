@@ -40,11 +40,12 @@ CACHES = {"default": {
 INSTALLED_APPS = [*INSTALLED_APPS, "huey.contrib.djhuey"]
 HUEY = {
     "name": "alfred-native",
-    "huey_class": "huey.SqliteHuey",
+    "huey_class": "alfred_ai.durable_queue.DurableSqliteHuey",
     "filename": str(BASE_DIR / "artifacts" / "native" / "jobs.sqlite3"),
     "immediate": False,
     "utc": True,
     "results": True,
     "store_none": True,
+    "fsync": True,
     "consumer": {"workers": 2, "worker_type": "thread", "periodic": True},
 }

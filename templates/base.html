@@ -30,6 +30,7 @@
     data-shell-mode="{% if request.user.is_authenticated and not hide_sidebar %}workspace{% else %}focus{% endif %}"
 >
 
+<a class="alfred-skip-link" href="#alfredMainScroll">Skip to main content</a>
 {% include "partials/navbar.html" %}
 
 <div id="alfredTopProgress" class="alfred-top-progress" aria-hidden="true">
@@ -41,9 +42,9 @@
     <div class="row g-0 alfred-workspace-row">
         {% if request.user.is_authenticated and not hide_sidebar %}
         {% include "partials/sidebar.html" %}
-        <main class="col-12 col-md-9 ms-sm-auto col-lg-10 px-3 px-md-4 py-4 alfred-main" id="alfredMainScroll">
+        <main class="col-12 col-md-9 ms-sm-auto col-lg-10 px-3 px-md-4 py-4 alfred-main" id="alfredMainScroll" tabindex="-1">
         {% else %}
-        <main class="col-12 px-3 px-lg-4 py-4 alfred-main alfred-main-wide" id="alfredMainScroll">
+        <main class="col-12 px-3 px-lg-4 py-4 alfred-main alfred-main-wide" id="alfredMainScroll" tabindex="-1">
         {% endif %}
             {% block content %}{% endblock %}
         </main>

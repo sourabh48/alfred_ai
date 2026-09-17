@@ -196,7 +196,7 @@ function renderLoanTable(loans) {
         return `
             <tr>
                 <td>
-                    ${item.is_active ? `<input type="checkbox" class="form-check-input" ${selectedLoanIds.has(item.id) ? "checked" : ""} onchange="toggleLoanSelection(${item.id}, this.checked)">` : `<span class="muted small">-</span>`}
+                    ${item.is_active ? `<input type="checkbox" class="form-check-input" aria-label="Select loan ${item.id} for consolidation" ${selectedLoanIds.has(item.id) ? "checked" : ""} onchange="toggleLoanSelection(${item.id}, this.checked)">` : `<span class="muted small">-</span>`}
                 </td>
                 <td>
                     <div class="fw-semibold">${loanLabel}</div>

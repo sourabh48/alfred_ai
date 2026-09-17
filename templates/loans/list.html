@@ -30,8 +30,8 @@
                 <input type="hidden" name="id" id="loanId">
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">Loan Type</label>
-                        <select name="loan_type" class="form-select" required>
+                        <label class="form-label" for="manualLoanType">Loan Type</label>
+                        <select id="manualLoanType" name="loan_type" class="form-select" required>
                             <option value="home">Home Loan</option>
                             <option value="personal">Personal Loan</option>
                             <option value="car">Car Loan</option>
@@ -42,52 +42,52 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Lender</label>
-                        <input name="lender" class="form-control" placeholder="Bank or NBFC">
+                        <label class="form-label" for="manualLoanLender">Lender</label>
+                        <input id="manualLoanLender" name="lender" class="form-control" placeholder="Bank or NBFC">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Loan Account Number</label>
-                        <input name="loan_account_number" class="form-control" placeholder="Optional account reference">
+                        <label class="form-label" for="manualLoanAccount">Loan Account Number</label>
+                        <input id="manualLoanAccount" name="loan_account_number" class="form-control" placeholder="Optional account reference">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Principal</label>
-                        <input type="number" step="0.01" name="principal" class="form-control" required>
+                        <label class="form-label" for="manualLoanPrincipal">Principal</label>
+                        <input id="manualLoanPrincipal" type="number" step="0.01" name="principal" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Interest Rate (%)</label>
-                        <input type="number" step="0.01" name="interest_rate" class="form-control" required>
+                        <label class="form-label" for="manualLoanInterest">Interest Rate (%)</label>
+                        <input id="manualLoanInterest" type="number" step="0.01" name="interest_rate" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">EMI</label>
-                        <input type="number" step="0.01" name="emi" class="form-control" required>
+                        <label class="form-label" for="manualLoanEmi">EMI</label>
+                        <input id="manualLoanEmi" type="number" step="0.01" name="emi" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Tenure (months)</label>
-                        <input type="number" name="tenure_months" class="form-control" required>
+                        <label class="form-label" for="manualLoanTenure">Tenure (months)</label>
+                        <input id="manualLoanTenure" type="number" name="tenure_months" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Remaining Balance</label>
-                        <input type="number" step="0.01" name="remaining_balance" class="form-control" placeholder="Optional">
+                        <label class="form-label" for="manualLoanBalance">Remaining Balance</label>
+                        <input id="manualLoanBalance" type="number" step="0.01" name="remaining_balance" class="form-control" placeholder="Optional">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Start Date</label>
-                        <input type="date" name="start_date" class="form-control" required>
+                        <label class="form-label" for="manualLoanStart">Start Date</label>
+                        <input id="manualLoanStart" type="date" name="start_date" class="form-control" required>
                     </div>
                     <div class="col-12 d-none" id="loanHomeFields">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label">Property Purchase Price</label>
-                                <input type="number" step="0.01" name="home_purchase_price" class="form-control" value="0" placeholder="Optional property buy price">
+                                <label class="form-label" for="manualLoanPurchasePrice">Property Purchase Price</label>
+                                <input id="manualLoanPurchasePrice" type="number" step="0.01" name="home_purchase_price" class="form-control" value="0" placeholder="Optional property buy price">
                                 <div class="form-text">If you know the property buy price, Alfred derives the home down payment from purchase price minus financed loan amount.</div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Home Down Payment</label>
-                                <input type="number" step="0.01" name="home_down_payment" class="form-control" value="0">
+                                <label class="form-label" for="manualLoanDownPayment">Home Down Payment</label>
+                                <input id="manualLoanDownPayment" type="number" step="0.01" name="home_down_payment" class="form-control" value="0">
                                 <div class="form-text" id="loanDownPaymentHint">Enter the upfront cash used at purchase, or let Alfred derive it automatically when purchase price is set.</div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Other Upfront Home Payments</label>
-                                <input type="number" step="0.01" name="home_other_upfront_payments" class="form-control" value="0">
+                                <label class="form-label" for="manualLoanUpfront">Other Upfront Home Payments</label>
+                                <input id="manualLoanUpfront" type="number" step="0.01" name="home_other_upfront_payments" class="form-control" value="0">
                             </div>
                             <div class="col-12">
                                 <div class="detail-item" id="loanHomeAcquisitionSummary">
@@ -97,8 +97,8 @@
                         </div>
                     </div>
                     <div class="col-12">
-                        <label class="form-label">Notes</label>
-                        <textarea name="notes" rows="3" class="form-control" placeholder="Prepayment options, floating rate notes, etc."></textarea>
+                        <label class="form-label" for="manualLoanNotes">Notes</label>
+                        <textarea id="manualLoanNotes" name="notes" rows="3" class="form-control" placeholder="Prepayment options, floating rate notes, etc."></textarea>
                     </div>
                 </div>
                 <div id="loanFormError" class="alert alert-danger d-none mb-0"></div>
@@ -207,7 +207,7 @@
                     <p class="page-section-copy">Registered loans with estimated outstanding balance, consolidation status, and foreclosure workflow.</p>
                 </div>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Registered loans">
                 <table class="table table-alfred align-middle mb-0">
                     <thead>
                         <tr>
