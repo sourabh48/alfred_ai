@@ -80,6 +80,7 @@ python-installer.exe
 # =========================
 node_modules/
 dist/
+build/
 .parcel-cache/
 .turbo/
 android/

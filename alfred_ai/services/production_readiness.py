@@ -866,6 +866,9 @@ def _security_config_check() -> dict:
 
 
 def production_readiness_snapshot(*, cache_health: dict | None = None, browser_coverage: dict | None = None) -> dict:
+    if getattr(settings, "ALFRED_NATIVE_RUNTIME", False):
+        from .native_readiness import native_readiness_snapshot
+        return native_readiness_snapshot()
     cache_health = dict(cache_health or {})
     browser_coverage = dict(browser_coverage or {})
     proof = load_production_deployment_proof()

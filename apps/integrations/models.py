@@ -4,7 +4,7 @@ Models for Integration module - Credit Scores, Email Connections, etc.
 import base64
 import hashlib
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -13,9 +13,12 @@ from django.utils import timezone
 TOKEN_PREFIX = "enc::"
 
 
-def _email_token_cipher() -> Fernet:
-    digest = hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest()
-    return Fernet(base64.urlsafe_b64encode(digest))
+def _email_token_cipher() -> MultiFernet:
+    keys = [settings.SECRET_KEY, *getattr(settings, "SECRET_KEY_FALLBACKS", [])]
+    return MultiFernet([
+        Fernet(base64.urlsafe_b64encode(hashlib.sha256(key.encode("utf-8")).digest()))
+        for key in keys
+    ])
 
 
 def _encrypt_token(value: str | None) -> str | None:

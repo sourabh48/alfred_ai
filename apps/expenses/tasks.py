@@ -1,4 +1,4 @@
-from celery import shared_task
+from alfred_ai.background import shared_task
 
 from .models import StatementUpload
 from .services.statement_lifecycle import retry_statement_upload

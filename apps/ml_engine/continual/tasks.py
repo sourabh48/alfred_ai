@@ -1,4 +1,4 @@
-from celery import shared_task
+from alfred_ai.background import shared_task
 
 from apps.ml_engine.training.orchestrator import run_training_cycle
 

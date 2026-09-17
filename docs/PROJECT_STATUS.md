@@ -4,6 +4,17 @@ The [completion audit](COMPLETION_AUDIT.md) records the current verification
 results and remaining local/LAN runtime work. The sections below describe
 implemented capabilities, not a guarantee of complete real-data coverage.
 
+The active Windows runtime is [Waitress + Huey + SQLite](NATIVE_WINDOWS.md),
+with a double-click launcher, persistent task queue, shared local cache and
+standalone installer build. The [earlier recovery proof](NATIVE_RECOVERY_PROOF.md)
+records the original SQLite snapshot/restore. Current native verification also
+exercises real HTTP, worker execution, retries, restart and an isolated restore.
+Docker/PostgreSQL/Redis/Celery remain an optional, separately unverified runtime.
+The BIOS virtualization issue does not block native Windows operation.
+The [native verification report](NATIVE_WINDOWS_VERIFICATION.md) records the
+passing full suite, Chrome workflows, packaged OCR, worker/recovery tests and
+preservation of the existing account data.
+
 The [sample-user acceptance audit](USER_DATA_ACCEPTANCE.md) records an isolated
 signup/API scenario, independently reconciled money totals, correction tests,
 and browser checks of the finance pages. It also documents the calculation,
@@ -139,7 +150,7 @@ cache, validation and wording defects found and fixed in that pass.
 - broader upload-history coverage in the central document hub beyond the newly added saved loan-import trail
 - broader trainable-model coverage beyond the currently supported structured salary, expense, burnout, behavioral-risk, and parser-confidence paths
 - OCR candidates and overlay review are implemented; browser coverage currently exercises statement and vehicle corrections, while broader document-family interaction proof remains open
-- local host/LAN setup validation, backup routine, and sustained local cache telemetry under real usage
+- clean second-PC installation, host-reboot and optional LAN validation; sustained scheduled-job outcomes and local cache telemetry under real usage (native startup, installer, process restart and backup/restore proof have passed)
 - any future public internet deployment would require an explicit new decision plus fresh readiness proof for database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache traffic
 
 ## Risks Remaining
@@ -151,7 +162,7 @@ cache, validation and wording defects found and fixed in that pass.
 - job-link parsing is robust for many public pages, but some portals can still block direct fetches or hide content behind script/runtime layers
 - project-details is now dynamic from live operational data, but it is still not generated from a formal release registry
 - large-data hardening has deterministic staging proof for all registered cache namespaces, but production maturity still requires shared-cache telemetry under realistic concurrency and payload volume
-- public-production readiness remains inactive and decision-gated even when local checks pass; local Docker hosting is the active path and should use PostgreSQL, Redis, worker, and beat rather than SQLite/local-memory cache
+- public-production readiness remains inactive and decision-gated; native Waitress/Huey/SQLite with a shared disk cache is the active Windows path, and Docker/PostgreSQL/Redis/Celery is an optional alternative
 - balance-sheet vehicle classification is heuristic and should still be reviewed against real ownership/use patterns where the financial treatment matters
 - auto-training is now safe and stateful, but several modules still remain heuristic, placeholder, or data-poor and should not be treated as fully learned systems yet
 - parser adaptation is materially stronger now, but "all document types without fail" is still not a truthful guarantee for arbitrary or severely degraded files

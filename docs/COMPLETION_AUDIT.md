@@ -1,15 +1,32 @@
 # Local/LAN completion audit
 
-Audit started: 15 September 2026. Continued: 16 September 2026 (Asia/Kolkata).
+Audit started: 15 September 2026. Continued: 17 September 2026 (Asia/Kolkata).
 Initial baseline commit: `c31de65`. Sample-user continuation baseline: `a20435e`;
 results cover the local working tree.
 
-**Result:** requirements are **not all accepted**. The current working tree
+**Result:** requirements are **not all accepted**. The 16 September tree
 passed **373 non-browser tests and all six Edge workflows**. The sample-user
 continuation fixed additional arithmetic, cache, ownership and presentation
-defects. Runtime acceptance remains open because
-Docker is unavailable; real-data model validation and fresh CI Chrome proof also
-remain.
+defects. The active runtime is now native Windows with Waitress, Huey and SQLite;
+Docker engine readiness is no longer a prerequisite. Real-data model validation,
+fresh CI Chrome proof and broader usage coverage remain.
+
+The 16 September operational continuation passed native SQLite runtime checks,
+an isolated database/file restore, and persistence after restarting Django.
+See [Native runtime and recovery proof](NATIVE_RECOVERY_PROOF.md).
+On 17 September, Docker Desktop/Compose and WSL installation were confirmed,
+but the Linux engine remains unverified because BIOS hardware virtualization
+is disabled. Docker is optional for native operation; see
+[Docker setup status](DOCKER_SETUP_STATUS.md).
+
+The native implementation and controls are documented in
+[Native Windows](NATIVE_WINDOWS.md). Its verification script uses fresh data
+folders to test real sign-up/API totals, private downloads, background jobs,
+retries, a scheduled heartbeat, queued-job persistence, and a restored account.
+The [17 September native verification](NATIVE_WINDOWS_VERIFICATION.md) records
+378 passing backend tests, all six Chrome workflows, packaged OCR, native
+background operation and backup/restore proof. Existing-account adoption left
+all 55 table contents and 8,284 existing file hashes unchanged.
 
 This checklist compares the README, project tracker, architecture and status notes
 with implementation and recorded verification. Implementation, test results,
@@ -33,22 +50,22 @@ outside this audit.
 | Raw-upload retention and retry behavior | Implemented | Missing/purged original-file cases tested across all seven file scopes; retained corrections remain usable |
 | Career, vehicle and advisory evidence | Implemented with heuristic/data limits | Outcome, freshness and failure-recovery contracts covered by regressions; fresh real outcomes still required |
 | Supervised ML quality and freshness | Training implemented | Readiness gates enforced and regressions pass; poor expense quality, tiny datasets and proxy targets remain blockers |
-| Browser interactions and CI | Runner/workflow implemented | Local Edge suite expanded from three to six workflows; fresh CI Chrome and wider interaction coverage remain |
-| Local stack and background jobs | Compose configuration implemented | Configuration fixes and verification helper complete; Docker unavailable, so runtime remains unverified |
-| Backup, restore and restart recovery | Instructions exist | Safe backup/isolated-restore helper and 19 unit tests complete; live restore and host restart drill still required |
-| Cache performance | All 21 groups have staging proof | Isolated synthetic workload covers 21/21 namespaces; Redis, concurrent load and runtime tuning remain |
+| Browser interactions and CI | Runner/workflow implemented | All six current local Chrome workflows passed on 17 September; fresh CI Chrome and wider interaction coverage remain |
+| Local stack and background jobs | Native Waitress/Huey/SQLite runtime implemented | Real HTTP, asynchronous execution, retry, scheduled heartbeat and queued-job restart verified in isolated data; optional PostgreSQL/Redis/Celery remains separate |
+| Backup, restore and restart recovery | Native instructions and verification script exist | Native database/file backup, isolated restore, authenticated HTTP values and process restart passed; host reboot remains unverified |
+| Cache performance | All 21 groups have staging proof | Isolated synthetic workload covers 21/21 namespaces; native concurrent cache increments passed; realistic concurrent load and runtime tuning remain |
 | Documentation and completion tracking | Reconciled | README/model claims, local commands, OCR/future scope and tracker next steps updated; percentages remain maturity estimates |
 
 ## Remaining requirements and their acceptance conditions
 
 | Priority / area | What is left | Evidence needed to close it |
 | --- | --- | --- |
-| Local runtime | Docker/Compose unavailable on this host | Start local PostgreSQL, Redis, web, worker and beat; pass `scripts/local_stack_ops.py verify` |
-| Recovery | Live backup/restore and host restart persistence untested | Paired backup, successful isolated database/file restore, restart and verify records/files remain |
+| Local runtime | Native Windows selected; separate-PC acceptance remains | Install and run the packaged app on a clean Windows x64 computer |
+| Recovery | Native SQLite restore and process restart passed; host reboot remains | Verify persistence after an agreed host restart; PostgreSQL restore applies only if that optional runtime is adopted |
 | LAN operation | A second device has not been tested | Trusted second-device login and API access, with the intended local firewall/bind configuration |
-| Scheduled work | Contract tests exist; sustained actual scheduled outcomes are unverified | Observe worker/beat evidence refresh, cleanup and permitted training across scheduled cycles |
-| CI and browser breadth | Local Edge proof exists; fresh CI Chrome and wider form/device coverage are missing | Current-change CI Chrome with no skips; extend document-family/forms, phone sizes and accessibility checks |
-| Cache/load | Sequential isolated workload covers all 21 namespaces | Shared Redis under concurrent realistic reads/writes, capacity/latency measurements and TTL tuning |
+| Scheduled work | Actual Huey worker and heartbeat verified; sustained business outcomes remain | Observe evidence refresh, cleanup and permitted training across their full scheduled cycles |
+| CI and browser breadth | Six current local Chrome workflows passed; fresh CI Chrome and wider form/device coverage are missing | Current-change CI Chrome with no skips; extend document-family/forms, phone sizes and accessibility checks |
+| Cache/load | Sequential isolated workload covers all 21 namespaces; native cache is shared on disk | Concurrent realistic reads/writes, capacity/latency measurements and TTL tuning on the selected native runtime |
 | ML serving maturity | Expense validation failed its quality gate; other sample counts are tiny and some targets are proxies | Sufficient consenting real data, actual outcomes, chronological holdouts and passing quality/freshness gates for each model |
 | Document maturity | Arbitrary or severely degraded layouts cannot be guaranteed | More reviewed real documents per family, accepted corrections, false-match and retry evidence |
 | Career/vehicle/advisory maturity | Source/geography/catalog gaps and heuristic assumptions remain | More real salary, service-cost, condition and outcome records; healthy sources and calibrated predictions |
@@ -141,11 +158,13 @@ and cleanup failures. Actual Docker backup/restore has **not** run.
 .\.venv\Scripts\python.exe scripts/local_stack_ops.py verify
 ```
 
-Result: exit 1, **Docker CLI unavailable**. The blocker is recorded in
+Initial result before Docker installation: exit 1, **Docker CLI unavailable**. The blocker is recorded in
 `artifacts/ops/local_stack_verification.json`. Service health, migrations on
 PostgreSQL, real Redis/worker operation, host restart persistence, second-device
-LAN access, scheduled job outcomes, and a live isolated restore check remain
-unverified. See [Local hosting](LOCAL_HOSTING.md) and
+LAN access, scheduled job outcomes, and a PostgreSQL isolated restore check remain
+unverified. Native SQLite runtime, isolated restore, and Django process restart
+checks subsequently passed; see [Native recovery proof](NATIVE_RECOVERY_PROOF.md).
+See [Local hosting](LOCAL_HOSTING.md) and
 [Backup and restore](BACKUP_AND_RESTORE.md) for repeatable commands.
 
 ### Model evidence and limits
@@ -220,14 +239,15 @@ accuracy, and are stored separately from runtime production proof.
 
 ## Remaining acceptance work
 
-1. Make Docker/Compose available and start the configured local stack, then run
-   `scripts/local_stack_ops.py verify`.
-2. Capture a paired backup, pass its isolated restore check, and verify data
-   persistence after an agreed host restart.
+1. Validate the Windows installer on a clean second PC. Docker/BIOS changes are
+   optional and do not block the selected native runtime.
+2. Verify persistence after an agreed host restart. Native SQLite backup/restore
+   and process restart have passed; see [Native Windows](NATIVE_WINDOWS.md) and
+   the [earlier recovery proof](NATIVE_RECOVERY_PROOF.md).
 3. Verify access from a second trusted LAN device if LAN access is needed and
-   observe worker/beat outcomes across their actual schedules.
+   observe Huey job outcomes across their actual schedules.
 4. Obtain fresh CI Chrome proof and expand browser coverage beyond the six
-   current workflows; measure Redis and concurrent traffic on the running stack.
+   current workflows; measure concurrent traffic on the running native stack.
 5. Collect real validation outcomes and enough samples for ML readiness. Tiny
    fits and proxy labels remain blocked even when fitting completes.
 

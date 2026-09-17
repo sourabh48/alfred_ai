@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from celery import shared_task
+from alfred_ai.background import shared_task
 from django.core.cache import cache
 from django.utils import timezone
 

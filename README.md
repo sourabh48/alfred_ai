@@ -45,7 +45,7 @@ investment values, plus real-browser checks of their labels and explanations.
 | --- | --- |
 | Project tracker | Broad product areas now stay in In Progress until implementation, data maturity, and browser verification are strong enough; production blockers are tracked separately |
 | Scope completion | Implementation, regression results, local-stack operation, and real-data maturity are tracked separately in the completion audit |
-| Deployment readiness | Local/LAN runtime verification uses `scripts/local_stack_ops.py verify`; public deployment is outside the active scope |
+| Deployment readiness | Native Windows verification uses `scripts/verify_native_runtime.py`; the optional Compose path uses `scripts/local_stack_ops.py verify`; public deployment is outside the active scope |
 | Verified complete checks | Use the dated verification log in the completion audit; successful model training alone does not establish inference quality |
 | Vehicle maintenance learning | 88% - current catalog, route-aware maintenance, service-cost learning, source freshness metadata, and brand-filtered selection are implemented, but long-tail models, source upkeep automation, condition snapshots, and real issue outcomes still matter |
 | Vehicle catalog UI | One Make / Brand combobox submits the actual `make` value; Official Catalog Model is populated only after a make is selected and is guarded from live-refresh re-render while the user is choosing |
@@ -113,6 +113,14 @@ Alfred now treats a home loan as an asset-backed position in the financial summa
 
 ## Quick Start
 
+**Windows:** double-click **Start ALFRED.cmd**. It starts the web server and
+background jobs together using Waitress, Huey and SQLite. Stop it using
+**Stop ALFRED.cmd**. Docker is unnecessary. A standalone installer is built at
+`dist/ALFRED-Setup.exe`; see [Native Windows](docs/NATIVE_WINDOWS.md) for data
+locations, controls, backup/restore and verification.
+
+For development only:
+
 ```bash
 pip install -r requirements.txt
 python manage.py migrate
@@ -122,11 +130,13 @@ python manage.py runserver
 
 Open `http://127.0.0.1:8000/`.
 
-This native mode is useful for development. For regular local hosting with the database, cache, and background jobs running together, use Docker Compose.
+`runserver` is one word. For regular Windows use, the native launcher also starts
+the background worker and scheduler.
 
 ## Local Hosting
 
-ALFRED is local or LAN-hosted in this repo. The recommended always-on setup is local Docker Compose:
+ALFRED is local or LAN-hosted in this repo. Docker Compose is an optional
+alternative using PostgreSQL, Redis and Celery:
 
 ```powershell
 if (-not (Test-Path config\local.env)) {
@@ -165,7 +175,8 @@ If the local config file is missing, Alfred falls back to built-in defaults. The
 
 ## Background Workers
 
-Some retry, refresh, and training flows use Celery:
+The native launcher manages Huey workers automatically. The optional Docker/Linux
+runtime uses Celery:
 
 ```bash
 celery -A alfred_ai worker -l info

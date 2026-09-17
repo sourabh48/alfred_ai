@@ -101,7 +101,13 @@ urlpatterns = [
     path("api/integrations/", include("apps.integrations.urls")),
 ]
 
-if settings.DEBUG:
+if getattr(settings, "ALFRED_NATIVE_RUNTIME", False):
+    from .native_views import native_health, private_media
+    urlpatterns += [
+        path("health/native/", native_health, name="native_health"),
+        path("media/<path:path>", private_media, name="private_media"),
+    ]
+elif settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 handler404 = "alfred_ai.views.not_found_view"

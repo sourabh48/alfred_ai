@@ -1,4 +1,4 @@
-from celery import shared_task
+from alfred_ai.background import shared_task
 
 from apps.integrations.services import verified_intelligence
 

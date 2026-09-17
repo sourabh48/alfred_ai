@@ -1,5 +1,10 @@
 # Local hosting
 
+For the selected native Windows setup, use [Native Windows](NATIVE_WINDOWS.md):
+Waitress, Huey and SQLite start together from a double-click launcher or the
+standalone installer. The rest of this document describes the optional Docker
+Compose alternative.
+
 ALFRED runs on the local host or a trusted LAN. The Docker Compose stack runs
 Django, PostgreSQL, Redis, a Celery worker, and the beat scheduler, with persistent
 volumes for application data and files.

@@ -21,6 +21,7 @@ from pypdf import PdfReader
 
 from alfred_ai.services import apply_parser_learning
 from alfred_ai.services.pdf_recovery import rebuild_orphaned_pdf
+from alfred_ai.services.ocr_process import ocr_command, hidden_process_options
 
 
 TXN_START_RE = re.compile(r"^\d{2}/\d{2}/\d{2}\s+")
@@ -655,13 +656,14 @@ def _extract_with_isolated_ocr(raw_bytes: bytes, page_limit: int) -> str:
             temp_path = handle.name
 
         completed = subprocess.run(
-            [sys.executable, "-c", ISOLATED_OCR_WORKER, temp_path, str(max(page_limit, 1))],
+            ocr_command("statement", ISOLATED_OCR_WORKER, temp_path, page_limit),
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="ignore",
             timeout=ISOLATED_OCR_TIMEOUT_SECONDS,
             env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            **hidden_process_options(),
         )
         if completed.returncode != 0:
             return ""
