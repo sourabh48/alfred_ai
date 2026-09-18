@@ -146,6 +146,9 @@ For actual elapsed-time observation, keep Windows awake and ALFRED running:
 ```
 
 An interrupted observation or missed schedule remains a failed/incomplete proof.
+Use `--keep-awake` to prevent automatic Windows sleep during observation. Choose
+a window that includes the daily cleanup and training times; the option does not
+prevent manual shutdown or reboot.
 In India, refresh runs at 05:30, 11:30, 17:30 and 23:30; cleanup at 07:45 and
 eligible training at 08:30. A scheduled training cycle can legitimately skip
 models because consent, data, freshness or runtime approval gates are unmet.

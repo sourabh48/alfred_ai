@@ -1,15 +1,22 @@
 # Local/LAN completion audit
 
-Audit started: 15 September 2026. Continued: 17 September 2026 (Asia/Kolkata).
+Audit started: 15 September 2026. Continued: 18 September 2026 (Asia/Kolkata).
 Initial baseline commit: `c31de65`. Sample-user continuation baseline: `a20435e`;
 results cover the local working tree.
+
+The [18 September hardening report](NATIVE_HARDENING_VERIFICATION.md) records
+acknowledged queue recovery, the observed host reboot, 12-user concurrency,
+mobile/accessibility fixes, document-layout regressions and project cleanup.
+Clean-PC acceptance, elapsed scheduled outcomes and checked real-data accuracy
+remain open; consult that report for current CI/package verification status.
 
 **Result:** requirements are **not all accepted**. The 16 September tree
 passed **373 non-browser tests and all six Edge workflows**. The sample-user
 continuation fixed additional arithmetic, cache, ownership and presentation
 defects. The active runtime is now native Windows with Waitress, Huey and SQLite;
-Docker engine readiness is no longer a prerequisite. Real-data model validation,
-fresh CI Chrome proof and broader usage coverage remain.
+Docker engine readiness is no longer a prerequisite. Real-data model validation
+and broader real-user/document coverage remain. Fresh Windows/Chrome CI and the
+bounded concurrency/mobile/accessibility checks passed on 18 September.
 
 The 16 September operational continuation passed native SQLite runtime checks,
 an isolated database/file restore, and persistence after restarting Django.
@@ -50,10 +57,10 @@ outside this audit.
 | Raw-upload retention and retry behavior | Implemented | Missing/purged original-file cases tested across all seven file scopes; retained corrections remain usable |
 | Career, vehicle and advisory evidence | Implemented with heuristic/data limits | Outcome, freshness and failure-recovery contracts covered by regressions; fresh real outcomes still required |
 | Supervised ML quality and freshness | Training implemented | Readiness gates enforced and regressions pass; poor expense quality, tiny datasets and proxy targets remain blockers |
-| Browser interactions and CI | Runner/workflow implemented | All six current local Chrome workflows passed on 17 September; fresh CI Chrome and wider interaction coverage remain |
+| Browser interactions and CI | Runner/workflow implemented | Six local and six fresh CI Chrome workflows passed; Windows CI passed 394 backend tests and 21 native checks; broader manual accessibility/interaction coverage remains |
 | Local stack and background jobs | Native Waitress/Huey/SQLite runtime implemented | Real HTTP, asynchronous execution, retry, scheduled heartbeat and queued-job restart verified in isolated data; optional PostgreSQL/Redis/Celery remains separate |
-| Backup, restore and restart recovery | Native instructions and verification script exist | Native database/file backup, isolated restore, authenticated HTTP values and process restart passed; host reboot remains unverified |
-| Cache performance | All 21 groups have staging proof | Isolated synthetic workload covers 21/21 namespaces; native concurrent cache increments passed; realistic concurrent load and runtime tuning remain |
+| Backup, restore and restart recovery | Native instructions and verification script exist | Native restore/process restart passed; observed host reboot retained 13 checked financial tables and 8,273 uploads; clean-PC acceptance remains |
+| Cache performance | All 21 groups have staging proof | Native cache increments and 12 concurrent users with isolated correct totals passed; higher-volume real usage and tuning remain |
 | Documentation and completion tracking | Reconciled | README/model claims, local commands, OCR/future scope and tracker next steps updated; percentages remain maturity estimates |
 
 ## Remaining requirements and their acceptance conditions
@@ -61,11 +68,11 @@ outside this audit.
 | Priority / area | What is left | Evidence needed to close it |
 | --- | --- | --- |
 | Local runtime | Native Windows selected; separate-PC acceptance remains | Install and run the packaged app on a clean Windows x64 computer |
-| Recovery | Native SQLite restore and process restart passed; host reboot remains | Verify persistence after an agreed host restart; PostgreSQL restore applies only if that optional runtime is adopted |
+| Recovery | Native restore, process restart and observed host reboot retention passed; interrupted jobs retained | Clean-PC reboot acceptance remains; reviewed retries apply to interrupted imports/training; physical power-cut testing is separate |
 | LAN operation | A second device has not been tested | Trusted second-device login and API access, with the intended local firewall/bind configuration |
 | Scheduled work | Actual Huey worker and heartbeat verified; sustained business outcomes remain | Observe evidence refresh, cleanup and permitted training across their full scheduled cycles |
-| CI and browser breadth | Six current local Chrome workflows passed; fresh CI Chrome and wider form/device coverage are missing | Current-change CI Chrome with no skips; extend document-family/forms, phone sizes and accessibility checks |
-| Cache/load | Sequential isolated workload covers all 21 namespaces; native cache is shared on disk | Concurrent realistic reads/writes, capacity/latency measurements and TTL tuning on the selected native runtime |
+| Browser breadth | Fresh Windows/Chrome CI, 12 concurrent users, five pages at four widths and automated accessibility passed | Extend document-family/forms and manual assistive-technology coverage beyond the recorded test scope |
+| Cache/load | All 21 namespaces and native shared-cache increments covered; 12 users/60 writes with correct isolated totals passed | Higher-volume real workloads, longer capacity/latency measurements and TTL tuning |
 | ML serving maturity | Expense validation failed its quality gate; other sample counts are tiny and some targets are proxies | Sufficient consenting real data, actual outcomes, chronological holdouts and passing quality/freshness gates for each model |
 | Document maturity | Arbitrary or severely degraded layouts cannot be guaranteed | More reviewed real documents per family, accepted corrections, false-match and retry evidence |
 | Career/vehicle/advisory maturity | Source/geography/catalog gaps and heuristic assumptions remain | More real salary, service-cost, condition and outcome records; healthy sources and calibrated predictions |

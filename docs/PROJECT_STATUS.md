@@ -15,6 +15,12 @@ The [native verification report](NATIVE_WINDOWS_VERIFICATION.md) records the
 passing full suite, Chrome workflows, packaged OCR, worker/recovery tests and
 preservation of the existing account data.
 
+The [18 September hardening report](NATIVE_HARDENING_VERIFICATION.md) adds
+durable job claims/recovery, post-reboot retention proof, 12 concurrent-user
+checks, mobile and automated accessibility coverage, and project cleanup.
+The separate-PC test, real overnight outcomes and independently checked model
+accuracy remain open; the report links the fresh verification branch/CI run.
+
 The [sample-user acceptance audit](USER_DATA_ACCEPTANCE.md) records an isolated
 signup/API scenario, independently reconciled money totals, correction tests,
 and browser checks of the finance pages. It also documents the calculation,
@@ -150,7 +156,7 @@ cache, validation and wording defects found and fixed in that pass.
 - broader upload-history coverage in the central document hub beyond the newly added saved loan-import trail
 - broader trainable-model coverage beyond the currently supported structured salary, expense, burnout, behavioral-risk, and parser-confidence paths
 - OCR candidates and overlay review are implemented; browser coverage currently exercises statement and vehicle corrections, while broader document-family interaction proof remains open
-- clean second-PC installation, host-reboot and optional LAN validation; sustained scheduled-job outcomes and local cache telemetry under real usage (native startup, installer, process restart and backup/restore proof have passed)
+- clean second-PC installation and optional LAN validation; sustained scheduled-job outcomes and higher-volume local cache telemetry (native installer, observed host-reboot retention, 12-user concurrency and backup/restore proof have passed)
 - any future public internet deployment would require an explicit new decision plus fresh readiness proof for database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache traffic
 
 ## Risks Remaining

@@ -1,7 +1,9 @@
 """Record a real elapsed-time soak; never treat a manual task call as overnight proof."""
 import argparse
+import atexit
 import datetime
 import json
+import os
 from pathlib import Path
 import sqlite3
 import sys
@@ -36,9 +38,16 @@ def main():
     parser.add_argument("--hours", type=float, default=8)
     parser.add_argument("--interval", type=float, default=60)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--keep-awake", action="store_true", help="Prevent automatic Windows sleep during this observation")
     args = parser.parse_args()
     if args.hours <= 0 or args.interval < 1:
         parser.error("hours must be positive; interval must be at least one second")
+    if args.keep_awake and os.name == "nt":
+        import ctypes
+        set_execution_state = ctypes.windll.kernel32.SetThreadExecutionState
+        if not set_execution_state(0x80000001):  # CONTINUOUS | SYSTEM_REQUIRED
+            raise RuntimeError("Windows could not keep this observation awake")
+        atexit.register(set_execution_state, 0x80000000)
     data = args.data_dir.resolve()
     started = time.time()
     report = {"started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),

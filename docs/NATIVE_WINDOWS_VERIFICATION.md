@@ -64,7 +64,11 @@ SHA-256 of the installer:
 A5F0065CCBFCE09DD618314149F5A2E25AAB9A80F496E13253769DAB7E46917A
 ```
 
-## Limits
+## Limits at the 17 September baseline
+
+The [18 September continuation](NATIVE_HARDENING_VERIFICATION.md) supersedes
+the reboot, interrupted-job and broader local-test limitations below. This
+section preserves the scope of the original executable/installer evidence.
 
 This proves operation on the current Windows x64 computer. A clean second-PC
 installation, host reboot, LAN access and sustained overnight job outcomes
