@@ -476,7 +476,9 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.fail(f"Missing control {name} in form {form.get('id')}")
 
     def _fetch_text(self, path: str, *, session_cookie: str | None = None) -> str:
-        return self._fetch_bytes(path, session_cookie=session_cookie).decode("utf-8", errors="replace")
+        # Static HTTP bytes retain Git's Windows CRLF checkout endings.
+        # Text contracts compare content using the same newline convention.
+        return self._fetch_bytes(path, session_cookie=session_cookie).decode("utf-8", errors="replace").replace("\r\n", "\n")
 
     def _fetch_bytes(self, path: str, *, session_cookie: str | None = None) -> bytes:
         request = Request(
