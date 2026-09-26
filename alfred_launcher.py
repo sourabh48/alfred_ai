@@ -62,6 +62,10 @@ def main(argv=None):
 
     window = tk.Tk()
     window.title("ALFRED")
+    assets = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    icon = assets / "static" / "alfred.ico"
+    if os.name == "nt" and icon.is_file():
+        window.iconbitmap(default=str(icon))
     window.resizable(False, False)
     width, height = 440, 190
     window.geometry(f"{width}x{height}+{(window.winfo_screenwidth()-width)//2}+{(window.winfo_screenheight()-height)//2}")

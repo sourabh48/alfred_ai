@@ -45,9 +45,11 @@ analysis = Analysis(
 )
 pyz = PYZ(analysis.pure)
 exe = EXE(pyz, analysis.scripts, [], exclude_binaries=True, name="ALFRED",
-          console=True, disable_windowed_traceback=False, upx=False)
+          console=True, disable_windowed_traceback=False, upx=False,
+          icon=str(root / "static" / "alfred.ico"))
 launcher = EXE(pyz, analysis.scripts, [], exclude_binaries=True, name="ALFRED Launcher",
-               console=False, disable_windowed_traceback=False, upx=False)
+               console=False, disable_windowed_traceback=False, upx=False,
+               icon=str(root / "static" / "alfred.ico"))
 coll = COLLECT(exe, launcher, analysis.binaries, analysis.datas,
                strip=False, upx=False, name="ALFRED")
 for name in ("Start ALFRED.cmd", "Stop ALFRED.cmd", "READ ME.txt"):

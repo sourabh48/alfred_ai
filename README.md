@@ -17,17 +17,22 @@ ALFRED is local or LAN-hosted; the current Windows build runs on this PC using
 
 ## Run on Windows
 
-**Existing checkout:** double-click **Start ALFRED.cmd**. It uses the packaged
+**Existing checkout:** double-click the **ALFRED** shortcut (`ALFRED.lnk`) or
+**Start ALFRED.cmd**. It uses the packaged
 launcher when available and keeps this checkout's existing data. Stop it with
 **Stop ALFRED.cmd**.
 For a fresh development checkout, follow the [development guide](docs/DEVELOPMENT.md).
 
-**Packaged application:** run the [26 September installer](artifacts/releases/20260926/distributables-retry/ALFRED-Setup.exe), then
+**Packaged application:** run [ALFRED-Setup.exe](release/ALFRED-Setup.exe), then
 open the ALFRED desktop shortcut. The installer includes Python and dependencies.
-For portable use, extract the [Windows ZIP](artifacts/releases/20260926/distributables-retry/ALFRED-Windows-x64.zip) and double-click
+For portable use, extract the [Windows ZIP](release/ALFRED-Windows-x64.zip) and double-click
 **ALFRED Launcher.exe**. Keep its complete folder together. Neither package
 requires a separate Python, pip or Docker installation. See the
 [standalone package guide](docs/WINDOWS_PACKAGE.md).
+
+**Uninstall:** use **Uninstall ALFRED** in the Start menu or Windows Settings >
+Apps. The installed folder also contains **Uninstall ALFRED.cmd**. Your saved
+accounts, documents and settings are retained.
 
 The launcher opens your browser, normally at <http://127.0.0.1:8000/>. It chooses
 another port if needed. Create an account or sign in. Closing the browser leaves
@@ -53,6 +58,12 @@ an interrupted overnight verification automatically.
 
 ## Verification and remaining work
 
+The **27 September 2026** release includes the installer, named uninstaller and
+ALFRED icon. The fresh backend run passed 407 tests, and all nine Chrome browser
+cases passed separately. The unchanged native executables passed 23 packaged
+runtime checks and a 24-user load check on 26 September. See the
+[current release verification](docs/WINDOWS_PACKAGE_VERIFICATION_20260927.md).
+
 As of **18 September 2026**, the packaged runtime, installer, backup/restore,
 interrupted-worker recovery, host reboot retention and Windows/Chrome CI checks
 passed. Concurrent-user, mobile-layout and automated accessibility checks also
@@ -61,7 +72,8 @@ passed within their recorded scope. See the [verification report](docs/NATIVE_HA
 Remaining acceptance work:
 
 - Install and test on a clean second Windows PC, including a reboot.
-- Complete the overnight observation of refresh, cleanup and eligible training.
+- Finish the overnight observation of refresh, cleanup and eligible training
+  (started 27 September at 00:13 IST; expected completion around 10:13 IST).
 - Validate accuracy with independently checked real data and more document layouts.
 - Extend manual screen-reader testing and testing under heavier real usage.
 

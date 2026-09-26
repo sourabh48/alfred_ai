@@ -80,8 +80,10 @@ Portable executable SHA-256:
 ```
 
 The privacy scan checked 11,676 bundled files and found no private database,
-upload, model-registry or environment-file paths. The prior installer is retained
-under `artifacts/releases/20260917`. The clean-PC PowerShell kit passed its Fresh
+upload, model-registry or environment-file paths. The prior installer was retained
+under `artifacts/releases/20260917`; its binary was removed during the
+[26 September cleanup](WINDOWS_PACKAGE_VERIFICATION_20260926.md), retaining its
+checksum. The clean-PC PowerShell kit passed its Fresh
 phase locally; its Reboot phase correctly refused an unchanged Windows boot time.
 This validates the kit, not a separate-PC installation.
 
@@ -103,7 +105,8 @@ checked. These are synthetic layout regressions, not real-document accuracy.
 
 - Retired `fix_structure.py`, whose outdated expected-file list could move valid
   project files, and the checked-in 29 MB Python installer. Recoverable local
-  copies are under `artifacts/retired-20260918`.
+  copies were placed under `artifacts/retired-20260918`. The script remains there;
+  the obsolete Python installer was removed during the 26 September cleanup.
 - Removed generated model-registry JSON from Git tracking and added an ignore
   rule. The actual registry and trained models remain on disk.
 - Kept current releases, historical test evidence, virtual environment, accounts,

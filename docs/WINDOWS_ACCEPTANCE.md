@@ -1,13 +1,13 @@
 # Clean-PC and reboot acceptance
 
 Use a separate Windows x64 computer with no project checkout, Python or Docker.
-Copy the complete portable `dist/ALFRED` folder and
-`scripts/verify_windows_acceptance.ps1`, or install `dist/ALFRED-Setup.exe` first.
+Extract `ALFRED-Windows-x64.zip` or install `ALFRED-Setup.exe` from the
+release folder first.
 An isolated folder on the development PC does not establish clean-PC acceptance.
 
-The prepared `artifacts/releases/20260925/Second-PC-acceptance` folder contains
-the installer, both phase launchers, instructions and a release manifest. Copy
-the complete folder. Its manifest rejects the development PC and an executable
+The release folder contains the installer, both phase launchers, instructions
+and an acceptance manifest. Copy the complete folder. Its manifest rejects
+the development PC and an executable
 whose hash differs from the supplied release. Reboot proof also records the
 machine fingerprint and rejects a different PC from the Fresh phase.
 

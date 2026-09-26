@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import zipfile
 
@@ -18,9 +19,27 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def write_acceptance_kit(bundle, output):
+    import winreg
+
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography",
+                        access=winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
+        machine_guid = winreg.QueryValueEx(key, "MachineGuid")[0]
+    for name in ("Verify fresh install.cmd", "Verify after reboot.cmd", "ACCEPTANCE.txt"):
+        shutil.copy2(ROOT / "packaging/windows" / name, output / name)
+    shutil.copy2(ROOT / "scripts/verify_windows_acceptance.ps1", output / "verify_windows_acceptance.ps1")
+    for name in ("MANUAL_ACCEPTANCE.md", "WINDOWS_ACCEPTANCE.md"):
+        shutil.copy2(ROOT / "docs" / name, output / name)
+    (output / "acceptance-manifest.json").write_text(json.dumps({
+        "development_machine_fingerprint": hashlib.sha256(machine_guid.encode("utf-8")).hexdigest(),
+        "executable_sha256": digest(bundle / "ALFRED.exe"),
+    }, indent=2), encoding="utf-8")
+
+
 def inspect_bundle(bundle):
     required = ("ALFRED.exe", "ALFRED Launcher.exe", "Start ALFRED.cmd", "Stop ALFRED.cmd",
                 "READ ME.txt", "_internal/python312.dll", "_internal/base_library.zip",
+                "_internal/static/alfred.ico",
                 "_internal/static/vendor/bootstrap.min.css", "_internal/static/vendor/chart.umd.min.js",
                 "_internal/templates/career/list.html", "_internal/templates/integrations/credit_score.html")
     missing = [name for name in required if not (bundle / name).is_file()]
@@ -51,6 +70,8 @@ def inspect_bundle(bundle):
     for name in ("career/list.html", "integrations/credit_score.html"):
         if digest(bundle / "_internal/templates" / name) != digest(ROOT / "templates" / name):
             raise RuntimeError(f"Bundled template is stale: {name}")
+    if digest(bundle / "_internal/static/alfred.ico") != digest(ROOT / "static/alfred.ico"):
+        raise RuntimeError("Bundled Windows icon is stale")
     return files
 
 
@@ -80,6 +101,7 @@ def main():
         if bad:
             raise RuntimeError(f"ZIP verification failed: {bad}")
     temporary.replace(archive)
+    write_acceptance_kit(bundle, output)
     manifest = {
         "created_at": datetime.now(timezone.utc).isoformat(), "platform": "Windows x64",
         "requires_system_python": False, "files_checked": len(files),

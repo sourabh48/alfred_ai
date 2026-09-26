@@ -4,6 +4,13 @@ The [completion audit](COMPLETION_AUDIT.md) records the current verification
 results and remaining local/LAN runtime work. The sections below describe
 implemented capabilities, not a guarantee of complete real-data coverage.
 
+The [27 September release verification](WINDOWS_PACKAGE_VERIFICATION_20260927.md)
+records the current installer/uninstaller, 407 passing backend tests and nine
+passing Chrome workflows. The same native executables passed the
+[26 September runtime checks](WINDOWS_PACKAGE_VERIFICATION_20260926.md), including
+23 packaged checks and a 24-user load test. The ten-hour overnight observation
+started on 27 September; its final outcome remains pending.
+
 The active Windows runtime is [Waitress + Huey + SQLite](NATIVE_WINDOWS.md),
 with a double-click launcher, persistent task queue, shared local cache and
 standalone installer build. The [earlier recovery proof](NATIVE_RECOVERY_PROOF.md)

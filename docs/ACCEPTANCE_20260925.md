@@ -72,8 +72,10 @@ intentionally separate**, 754.498 seconds, exit zero. The nine browser cases als
 passed in their dedicated Chrome run. Django reported no system-check issues.
 Log: `artifacts/acceptance-20260925-full-suite.log`.
 
-Packaged release verification and new overnight launch: pending completion of
-the current build/verification processes.
+The [26 September package continuation](WINDOWS_PACKAGE_VERIFICATION_20260926.md)
+completed packaged runtime, installer, launcher and uninstall verification.
+The updated local runtime is running. A new completed overnight observation
+remains pending.
 
 ## Acceptance still requiring external evidence
 

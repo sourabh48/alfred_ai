@@ -1,0 +1,17 @@
+ALFRED - separate Windows PC acceptance
+
+1. Copy this complete release folder to a different Windows x64 PC.
+2. Run ALFRED-Setup.exe using its default per-user installation location.
+3. Run "Verify fresh install.cmd" and retain the evidence folder.
+4. Save your other work and restart Windows normally.
+5. Run "Verify after reboot.cmd" on the same PC and Windows account.
+6. Follow MANUAL_ACCEPTANCE.md and WINDOWS_ACCEPTANCE.md for the human checks.
+
+The checks create a synthetic account in a separate data directory. They do not
+use your normal account or restart Windows. Run both checks in the same calendar
+month. The manifest rejects the development PC and an executable that does not
+match this release. These files are instructions, not proof of completed tests.
+
+For a custom installation path or portable use, run verify_windows_acceptance.ps1
+with -Executable pointing to ALFRED.exe, as described in WINDOWS_ACCEPTANCE.md.
+Retain %LOCALAPPDATA%\ALFRED-acceptance\fresh-proof.json and reboot-proof.json.

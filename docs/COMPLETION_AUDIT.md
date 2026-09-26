@@ -4,6 +4,13 @@ Audit started: 15 September 2026. Continued: 18 September 2026 (Asia/Kolkata).
 Initial baseline commit: `c31de65`. Sample-user continuation baseline: `a20435e`;
 results cover the local working tree.
 
+The [27 September release continuation](WINDOWS_PACKAGE_VERIFICATION_20260927.md)
+adds the current installer/uninstaller, 407 passing backend tests and nine
+passing Chrome workflows. The unchanged native executables retain the
+[26 September runtime proof](WINDOWS_PACKAGE_VERIFICATION_20260926.md), including
+23 packaged checks and 24 concurrent users. A ten-hour overnight observation
+is running; separate-PC and completed overnight acceptance remain open.
+
 The [18 September hardening report](NATIVE_HARDENING_VERIFICATION.md) records
 acknowledged queue recovery, the observed host reboot, 12-user concurrency,
 mobile/accessibility fixes, document-layout regressions and project cleanup.

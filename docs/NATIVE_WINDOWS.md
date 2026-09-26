@@ -11,12 +11,14 @@ your browser; two hidden processes handle web requests and background jobs.
 
 ## Start and stop
 
-For the existing checkout, double-click **Start ALFRED.cmd** in `F:\ALFRED`.
+For the existing checkout, double-click the **ALFRED** shortcut (`ALFRED.lnk`)
+or **Start ALFRED.cmd** in `F:\ALFRED`.
 It uses the existing account database, uploads and models. First startup may
 take a minute while it applies migrations and prepares static assets.
 Double-click **Stop ALFRED.cmd** to stop after current work finishes.
 
-For a separate installation, run `dist\ALFRED-Setup.exe` and use the ALFRED
+For a separate installation, run `ALFRED-Setup.exe` from the
+[current release](WINDOWS_PACKAGE.md) and use the ALFRED
 desktop shortcut. The installer includes Python and the application libraries.
 It creates a separate data folder at `%LOCALAPPDATA%\ALFRED`; existing checkout
 data is not silently copied into a new installation.

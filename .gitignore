@@ -70,6 +70,7 @@ celerybeat.pid
 .DS_Store
 Thumbs.db
 Desktop.ini
+/ALFRED.lnk
 python-installer.exe
 *.tmp
 *.temp
@@ -81,6 +82,7 @@ python-installer.exe
 # =========================
 node_modules/
 dist/
+release/
 build/
 .parcel-cache/
 .turbo/

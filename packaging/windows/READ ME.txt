@@ -27,6 +27,10 @@ INSTALLER
 ALFRED-Setup.exe installs this same bundle for the current Windows user and
 creates desktop and Start menu shortcuts. Administrator access is not required.
 Uninstalling retains the separate data folder.
+To uninstall, use Start menu > ALFRED > Uninstall ALFRED, Windows Settings >
+Apps, or Uninstall ALFRED.cmd in the installed folder. If background work cannot
+stop, uninstall cancels before removing application files. Retry after it finishes.
+For the portable ZIP, stop ALFRED and delete its extracted program folder.
 
 TROUBLESHOOTING
 Run ALFRED.exe status from this folder, or inspect:
