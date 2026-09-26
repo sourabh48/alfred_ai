@@ -6,7 +6,7 @@ from pathlib import Path
 import time
 
 
-def verify_extended(base, session, scenario, data, passed):
+def verify_extended(base, session, scenario, data, passed, *, user_count=12, writes_per_user=5, sustained_seconds=0):
     import requests
     from django.contrib.auth import get_user_model
     from django.utils import timezone
@@ -17,7 +17,7 @@ def verify_extended(base, session, scenario, data, passed):
     from tests.user_acceptance_scenario import PASSWORD
 
     users = [get_user_model().objects.create_user(username=f"concurrent_{index}", password=PASSWORD)
-             for index in range(12)]
+             for index in range(user_count)]
 
     def exercise(index):
         user = users[index]
@@ -31,7 +31,7 @@ def verify_extended(base, session, scenario, data, passed):
                                    allow_redirects=False, timeout=30)
             assert response.status_code == 302, (index, response.status_code)
             headers = {"X-CSRFToken": client.cookies["csrftoken"]}
-            for number in range(5):
+            for number in range(writes_per_user):
                 started = time.monotonic()
                 response = client.post(base + "/api/expenses/", headers=headers, json={
                     "amount": 1000 + index, "category": "income", "classification": "other",
@@ -40,22 +40,32 @@ def verify_extended(base, session, scenario, data, passed):
                 }, timeout=90)
                 durations.append(time.monotonic() - started)
                 assert response.status_code == 201, (index, response.status_code, response.text[:200])
-            started = time.monotonic()
-            payload = client.get(base + "/api/expenses/dashboard/", timeout=90).json()
-            durations.append(time.monotonic() - started)
-            assert Decimal(str(payload["summary"]["current_month_income"])) == 5 * (1000 + index), payload["summary"]
+            deadline = time.monotonic() + sustained_seconds
+            while True:
+                started = time.monotonic()
+                response = client.get(base + "/api/expenses/dashboard/", timeout=90)
+                response.raise_for_status()
+                payload = response.json()
+                durations.append(time.monotonic() - started)
+                assert Decimal(str(payload["summary"]["current_month_income"])) == writes_per_user * (1000 + index), payload["summary"]
+                if time.monotonic() >= deadline:
+                    break
+                time.sleep(0.1)
             response = client.get(base + "/api/expenses/", timeout=30)
             response.raise_for_status()
             rows = response.json()
             rows = rows if isinstance(rows, list) else rows["results"]
-            assert len(rows) == 5 and all(row["user"] == user.pk for row in rows), (index, rows)
+            assert len(rows) == writes_per_user and all(row["user"] == user.pk for row in rows), (index, rows)
         return durations
 
     started = time.monotonic()
-    with ThreadPoolExecutor(max_workers=12) as pool:
-        durations = sorted(value for group in pool.map(exercise, range(12)) for value in group)
-    passed("twelve_concurrent_users_isolated_writes_and_correct_totals", {
-        "users": 12, "writes": 60, "timed_requests": len(durations), "errors": 0,
+    with ThreadPoolExecutor(max_workers=user_count) as pool:
+        durations = sorted(value for group in pool.map(exercise, range(user_count)) for value in group)
+    check_name = ("twelve_concurrent_users_isolated_writes_and_correct_totals" if user_count == 12 and not sustained_seconds
+                  else "sustained_concurrent_users_isolated_writes_and_correct_totals")
+    passed(check_name, {
+        "users": user_count, "writes": user_count * writes_per_user, "timed_requests": len(durations), "errors": 0,
+        "sustained_seconds_per_user": sustained_seconds, "scope": "Synthetic local HTTP traffic",
         "p95_seconds": round(durations[int((len(durations) - 1) * .95)], 3),
         "total_seconds": round(time.monotonic() - started, 2),
     })
@@ -69,6 +79,7 @@ def verify_extended(base, session, scenario, data, passed):
     options.add_argument("--no-sandbox")
     browser = webdriver.Chrome(options=options)
     findings = {"axe_version": "4.13.0", "layouts": [], "accessibility": []}
+    pages = ("dashboard", "expenses", "settings", "documents", "loans", "career", "credit-score")
     try:
         browser.set_script_timeout(90)
         browser.get(base + "/login/")
@@ -78,7 +89,7 @@ def verify_extended(base, session, scenario, data, passed):
         for width in (360, 390, 768, 1440):
             browser.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", {
                 "width": width, "height": 900, "deviceScaleFactor": 1, "mobile": width < 768})
-            for page in ("dashboard", "expenses", "settings", "documents", "loans"):
+            for page in pages:
                 browser.get(f"{base}/{page}/")
                 wait.until(lambda driver: driver.execute_script("return document.readyState") == "complete")
                 if page == "dashboard":
@@ -120,9 +131,9 @@ def verify_extended(base, session, scenario, data, passed):
         browser.quit()
         (data / "mobile-accessibility.json").write_text(json.dumps(findings, indent=2), encoding="utf-8")
     assert all(item["passed"] for item in findings["layouts"]), "Responsive overflow: see mobile-accessibility.json"
-    passed("responsive_layouts", {"pages": 5, "widths": [360, 390, 768, 1440]})
+    passed("responsive_layouts", {"pages": len(pages), "page_names": pages, "widths": [360, 390, 768, 1440]})
     serious = [item for item in findings["accessibility"]
                if any(v["impact"] in ("serious", "critical") for v in item["violations"])]
     assert not serious, "Accessibility findings: see mobile-accessibility.json"
-    passed("automated_wcag_audit", {"pages": 5, "widths": [390, 1440], "serious_or_critical": 0,
+    passed("automated_wcag_audit", {"pages": len(pages), "page_names": pages, "widths": [390, 1440], "serious_or_critical": 0,
                                    "scope": "Automated checks; manual screen-reader audit remains separate"})

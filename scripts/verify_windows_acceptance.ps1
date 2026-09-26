@@ -12,6 +12,20 @@ $evidence = [IO.Path]::GetFullPath($EvidenceDirectory)
 $data = Join-Path $evidence 'data'
 $baselinePath = Join-Path $evidence 'baseline.json'
 $boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('o')
+$machineGuid = (Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid).MachineGuid
+$sha = [Security.Cryptography.SHA256]::Create()
+try { $machineFingerprint = [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($machineGuid))).Replace('-', '').ToLowerInvariant() }
+finally { $sha.Dispose() }
+$manifestPath = Join-Path $PSScriptRoot 'acceptance-manifest.json'
+if (Test-Path -LiteralPath $manifestPath) {
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if ($manifest.development_machine_fingerprint -eq $machineFingerprint) {
+        throw 'This kit requires a separate PC. This machine matches the development computer.'
+    }
+    if ($manifest.executable_sha256 -ne (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash) {
+        throw 'The executable does not match the release packaged with this acceptance kit.'
+    }
+}
 
 function Invoke-Alfred([string]$Action) {
     $process = Start-Process -FilePath $exePath -ArgumentList ($Action + ' --data-dir "' + $data + '" --port 8080 --no-browser') -WindowStyle Hidden -PassThru
@@ -27,10 +41,12 @@ if ($Phase -eq 'Fresh') {
         password = 'AcceptanceOnly936!'
         boot = $boot
         executable_sha256 = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash
+        machine_fingerprint = $machineFingerprint
         host_context = 'Operator must separately confirm this is a clean second PC'
     }
 } else {
     $baseline = Get-Content -LiteralPath $baselinePath -Raw | ConvertFrom-Json
+    if ($baseline.machine_fingerprint -and $baseline.machine_fingerprint -ne $machineFingerprint) { throw 'Run Reboot on the same PC as Fresh.' }
     if ($baseline.boot -eq $boot) { throw 'No Windows reboot occurred since Fresh. Process restart is not reboot proof.' }
     if ($baseline.executable_sha256 -ne (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash) { throw 'Use the same executable for both phases.' }
 }
@@ -70,7 +86,7 @@ try {
     if ([decimal]$summary.current_month_income -ne 42000 -or [decimal]$summary.current_month_expense -ne 1200 -or [decimal]$summary.current_month_net -ne 40800) { throw 'Saved financial totals do not match the entered data (run both phases in the same calendar month).' }
     $page = Invoke-WebRequest -Uri ($base + '/settings/') -WebSession $session -UseBasicParsing
     if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'Remove My Data') { throw 'Settings did not render as expected.' }
-    [ordered]@{passed=$true; phase=$Phase; tested_at=(Get-Date).ToUniversalTime().ToString('o'); boot=$boot; previous_boot=$baseline.boot; executable_sha256=$baseline.executable_sha256; income=42000; expense=1200; remaining=40800; data_directory=$data; host_context=$baseline.host_context} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $evidence ($Phase.ToLower() + '-proof.json')) -Encoding UTF8
+    [ordered]@{passed=$true; phase=$Phase; tested_at=(Get-Date).ToUniversalTime().ToString('o'); boot=$boot; previous_boot=$baseline.boot; machine_fingerprint=$machineFingerprint; executable_sha256=$baseline.executable_sha256; income=42000; expense=1200; remaining=40800; data_directory=$data; host_context=$baseline.host_context} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $evidence ($Phase.ToLower() + '-proof.json')) -Encoding UTF8
     Write-Output "PASS $Phase. Evidence: $evidence. Synthetic data retained for the reboot phase."
 } finally {
     if (Test-Path -LiteralPath (Join-Path $data 'artifacts/native/runtime.json')) { Invoke-Alfred 'stop' }

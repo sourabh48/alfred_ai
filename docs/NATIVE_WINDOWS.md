@@ -1,7 +1,9 @@
 # ALFRED on Windows
 
-See the [dated verification report](NATIVE_WINDOWS_VERIFICATION.md) for test
-results, executable proof, backup location and remaining validation limits.
+See the [standalone package guide](WINDOWS_PACKAGE.md),
+[acceptance continuation](ACCEPTANCE_20260925.md) and
+[18 September verification report](NATIVE_HARDENING_VERIFICATION.md)
+for dated test results, executable proof, backups and remaining acceptance work.
 
 The native application uses **Waitress + Huey + SQLite**. Docker, WSL, Redis
 and a Celery service are unnecessary for this runtime. The interface opens in
@@ -36,6 +38,30 @@ Command-line controls:
 
 The native launcher binds to this computer only. LAN service and Windows
 auto-start are separate configurations, not enabled by this installer.
+
+### Automatic startup after Windows sign-in
+
+For the existing checkout, double-click **Enable ALFRED startup.cmd** in
+`F:\ALFRED`. Wait for its confirmation before closing the window. Alternatively,
+run the following in PowerShell from `F:\ALFRED`:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\set_windows_autostart.ps1 -Action Enable
+```
+
+This registers a current-user Windows Run entry named `ALFRED`. It starts the
+packaged executable quietly with the existing checkout data and no browser.
+Windows sign-in is required; this is not a service that runs before login.
+The execution-policy option applies only to this script process.
+Keep the complete `dist\ALFRED` folder in place. For another installation, pass
+`-Executable` and `-DataDirectory` explicitly to select its executable and data.
+
+Use `-Action Status` to inspect the entry or `-Action Disable` to remove it,
+with the same paths if you supplied them. These commands do not stop ALFRED or
+interrupt an ongoing verification. Windows Settings > Apps > Startup can also
+disable the entry. Registering it does not prove an actual Windows sign-in;
+check ALFRED after the next normal sign-in. An interrupted overnight observer
+still needs to be started separately.
 
 ## Data and secrets
 
@@ -135,14 +161,18 @@ The existing Docker/Celery configuration is retained as an optional alternative.
 
 The extended check needs the official axe-core 4.13.0 npm package extracted to
 `artifacts/tools/package`; see the pinned download/hash in the CI workflow.
-It checks 12 concurrent users, five pages at four widths, automated WCAG checks,
+It checks 12 concurrent users by default, seven pages at four widths, automated WCAG checks,
 keyboard navigation and an executing worker killed during a test job.
+Use `--load-users 24 --load-writes 20 --load-seconds 120` for 480 synthetic
+writes followed by two minutes of repeated dashboard checks per user. Reports
+record request counts, latency, arithmetic and ownership checks. This is a
+bounded synthetic workload, not proof of capacity under arbitrary real usage.
 See [Windows acceptance](WINDOWS_ACCEPTANCE.md) for the separate-PC/reboot kit.
 
 For actual elapsed-time observation, keep Windows awake and ALFRED running:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/observe_native_runtime.py --data-dir F:\ALFRED --hours 8 --report artifacts/ops/native_overnight_verification.json
+.\.venv\Scripts\python.exe scripts/observe_native_runtime.py --data-dir F:\ALFRED --hours 18 --keep-awake --report artifacts/ops/native_overnight_verification-NEW-RUN.json
 ```
 
 An interrupted observation or missed schedule remains a failed/incomplete proof.
@@ -152,3 +182,14 @@ prevent manual shutdown or reboot.
 In India, refresh runs at 05:30, 11:30, 17:30 and 23:30; cleanup at 07:45 and
 eligible training at 08:30. A scheduled training cycle can legitimately skip
 models because consent, data, freshness or runtime approval gates are unmet.
+
+Use a new report filename for each run; existing evidence is never overwritten.
+To check a saved run without starting work:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/observe_native_runtime.py --data-dir F:\ALFRED --report artifacts/ops/native_overnight_verification-NEW-RUN.json --status
+```
+
+Status checks classify stale samples from an unfinished run as `interrupted`,
+even if its saved status says `observing`. Exit code zero means a completed pass;
+an active, interrupted or failed run returns one. The original report is retained.

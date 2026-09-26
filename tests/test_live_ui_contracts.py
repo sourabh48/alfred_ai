@@ -347,6 +347,7 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         runner = (REPO_ROOT / "scripts" / "run_browser_regressions.py").read_text(encoding="utf-8")
         workflow = (REPO_ROOT / ".github" / "workflows" / "browser-regression.yml").read_text(encoding="utf-8")
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        development = (REPO_ROOT / "docs" / "DEVELOPMENT.md").read_text(encoding="utf-8")
         browser_tests = (REPO_ROOT / "tests" / "test_document_review_browser.py").read_text(encoding="utf-8")
 
         self.assertIn('"ALFRED_RUN_BROWSER_TESTS"] = "true"', runner)
@@ -383,9 +384,10 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn("artifacts/browser", workflow)
         self.assertIn("if-no-files-found: error", workflow)
 
-        self.assertIn("python scripts/run_browser_regressions.py --browser Chrome --require-browser", readme)
-        self.assertIn("browser_regression_summary.json", readme)
-        self.assertIn("ALFRED_RUN_BROWSER_TESTS=true", readme)
+        self.assertIn("docs/DEVELOPMENT.md", readme)
+        self.assertIn("scripts/run_browser_regressions.py --browser Chrome --require-browser", development)
+        self.assertIn("browser_regression_summary.json", development)
+        self.assertIn("ALFRED_RUN_BROWSER_TESTS=true", development)
         self.assertIn("ALFRED_BROWSER_ARTIFACT_DIR", browser_tests)
         self.assertIn("save_screenshot", browser_tests)
         self.assertIn(".html", browser_tests)

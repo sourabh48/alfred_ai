@@ -1,3 +1,10 @@
+#ifndef BundleDir
+  #define BundleDir "..\dist\ALFRED"
+#endif
+#ifndef ReleaseDir
+  #define ReleaseDir "..\dist"
+#endif
+
 [Setup]
 AppId={{D4BFC620-610B-4AF7-81BF-215ECAC7297B}
 AppName=ALFRED
@@ -8,24 +15,24 @@ DefaultGroupName=ALFRED
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir=..\dist
+OutputDir={#ReleaseDir}
 OutputBaseFilename=ALFRED-Setup
 Compression=lzma2/fast
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\ALFRED.exe
+UninstallDisplayIcon={app}\ALFRED Launcher.exe
 CloseApplications=no
 
 [Files]
-Source: "..\dist\ALFRED\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\ALFRED"; Filename: "{app}\ALFRED.exe"; WorkingDir: "{app}"
-Name: "{group}\Stop ALFRED"; Filename: "{app}\ALFRED.exe"; Parameters: "stop"; WorkingDir: "{app}"
-Name: "{autodesktop}\ALFRED"; Filename: "{app}\ALFRED.exe"; WorkingDir: "{app}"
+Name: "{group}\ALFRED"; Filename: "{app}\ALFRED Launcher.exe"; WorkingDir: "{app}"
+Name: "{group}\Stop ALFRED"; Filename: "{app}\ALFRED Launcher.exe"; Parameters: "stop"; WorkingDir: "{app}"
+Name: "{autodesktop}\ALFRED"; Filename: "{app}\ALFRED Launcher.exe"; WorkingDir: "{app}"
 
 [Run]
-Filename: "{app}\ALFRED.exe"; Description: "Open ALFRED"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\ALFRED Launcher.exe"; Description: "Open ALFRED"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 Filename: "{app}\ALFRED.exe"; Parameters: "stop"; Flags: runhidden waituntilterminated; RunOnceId: "StopAlfred"

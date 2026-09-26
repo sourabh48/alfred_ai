@@ -1,5 +1,6 @@
 # Build from the repository root: python -m PyInstaller packaging/ALFRED.spec --noconfirm
 import os
+import shutil
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
 
@@ -10,7 +11,7 @@ os.environ["ALFRED_TASK_BACKEND"] = "huey"
 os.environ["DJANGO_SETTINGS_MODULE"] = "alfred_ai.settings"
 datas = [(str(root / "templates"), "templates"), (str(root / "static"), "static")]
 binaries = []
-hiddenimports = ["alfred_ai.native_settings", "diskcache.djangocache", "huey.contrib.djhuey",
+hiddenimports = ["alfred_launcher", "alfred_ai.native_settings", "diskcache.djangocache", "huey.contrib.djhuey",
                  "django.db.backends.sqlite3", "django.contrib.sessions.backends.db",
                  "django.template.backends.django", "django.contrib.auth.backends",
                  "corsheaders", "rest_framework", "rest_framework.authtoken"]
@@ -45,4 +46,9 @@ analysis = Analysis(
 pyz = PYZ(analysis.pure)
 exe = EXE(pyz, analysis.scripts, [], exclude_binaries=True, name="ALFRED",
           console=True, disable_windowed_traceback=False, upx=False)
-coll = COLLECT(exe, analysis.binaries, analysis.datas, strip=False, upx=False, name="ALFRED")
+launcher = EXE(pyz, analysis.scripts, [], exclude_binaries=True, name="ALFRED Launcher",
+               console=False, disable_windowed_traceback=False, upx=False)
+coll = COLLECT(exe, launcher, analysis.binaries, analysis.datas,
+               strip=False, upx=False, name="ALFRED")
+for name in ("Start ALFRED.cmd", "Stop ALFRED.cmd", "READ ME.txt"):
+    shutil.copy2(root / "packaging" / "windows" / name, Path(coll.name) / name)

@@ -349,11 +349,12 @@ def parse_bank_statement(file_obj: BinaryIO, user=None, *, ocr_page_limit: int |
     loan_hints = _extract_loan_hints(full_text)
 
     groups = _collect_transaction_groups(full_text.splitlines())
+    column_directions = _statement_column_directions(full_text)
     transactions: list[ParsedTransaction] = []
     previous_closing: float | None = None
 
     for group in groups:
-        transaction = _parse_transaction_group(group, previous_closing)
+        transaction = _parse_transaction_group(group, previous_closing, column_directions)
         if transaction is None:
             continue
         transactions.append(transaction)
@@ -543,8 +544,51 @@ def _extract_statement_text(raw_bytes: bytes, *, ocr_page_limit: int, preview_pa
 def _extract_with_pypdf(raw_bytes: bytes, page_limit: int | None = None) -> str:
     with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
         reader = PdfReader(BytesIO(raw_bytes))
-    pages = [page.extract_text() or "" for page in reader.pages[:page_limit]]
+    pages = []
+    for page in reader.pages[:page_limit]:
+        text = page.extract_text() or ""
+        if re.search(r"Withdrawal\s+Amt", text, re.IGNORECASE) and re.search(r"Deposit\s+Amt", text, re.IGNORECASE):
+            # Flattening blank cells loses whether the first amount is a deposit.
+            # Keep the printed columns when the PDF exposes usable positions.
+            try:
+                layout = page.extract_text(extraction_mode="layout") or ""
+                if _statement_column_directions(layout):
+                    text = layout
+            except Exception:
+                logger.debug("Statement layout extraction unavailable; retaining plain text.", exc_info=True)
+        pages.append(text)
     return "\n".join(pages).strip()
+
+
+def _statement_column_directions(text: str) -> dict[tuple[str, float, float], str | None]:
+    """Read explicit withdrawal/deposit cells; ambiguous collisions stay untrusted."""
+    directions = {}
+    columns = None
+    transaction_date = None
+    money = re.compile(r"[0-9,]+\.\d{2}")
+    for line in text.splitlines():
+        headers = [re.search(pattern, line, re.IGNORECASE) for pattern in (
+            r"Withdrawal\s+Amt\.?", r"Deposit\s+Amt\.?", r"Closing\s+Balance")]
+        if all(headers) and headers[0].start() < headers[1].start() < headers[2].start():
+            columns = tuple(header.start() for header in headers)
+            transaction_date = None
+            continue
+        date_match = TXN_START_RE.match(line.strip())
+        if date_match:
+            transaction_date = date_match.group().strip()
+        if not columns or not transaction_date:
+            continue
+        withdrawal, deposit, closing = columns
+        cells = [line[withdrawal:deposit].strip(), line[deposit:closing].strip(), line[closing:].strip()]
+        if not money.fullmatch(cells[2]) or any(cell and not money.fullmatch(cell) for cell in cells[:2]):
+            continue
+        values = [_to_float(cell) if cell else 0.0 for cell in cells]
+        if bool(values[0]) == bool(values[1]):
+            continue
+        key = (transaction_date, values[0] or values[1], values[2])
+        direction = "debit" if values[0] else "credit"
+        directions[key] = direction if key not in directions or directions[key] == direction else None
+    return directions
 
 
 def _extract_with_fitz(raw_bytes: bytes, page_limit: int | None = None) -> str:
@@ -707,7 +751,7 @@ def _collect_transaction_groups(lines: list[str]) -> list[str]:
     return groups
 
 
-def _parse_transaction_group(group: str, previous_closing: float | None) -> ParsedTransaction | None:
+def _parse_transaction_group(group: str, previous_closing: float | None, column_directions=None) -> ParsedTransaction | None:
     match = TXN_RE.search(_normalize_space(group))
     if match is None:
         return None
@@ -715,13 +759,13 @@ def _parse_transaction_group(group: str, previous_closing: float | None) -> Pars
     description = match.group("body")
     if match.group("tail"):
         description = f"{description} {match.group('tail')}"
-    details = classify_transaction_text(description, _infer_direction(description, _to_float(match.group("closing")), previous_closing))
     amount = _to_float(match.group("amount"))
     closing_balance = _to_float(match.group("closing"))
-    direction = details["direction"]
+    direction = (column_directions or {}).get((match.group("txn_date"), amount, closing_balance))
+    details = classify_transaction_text(description, direction or _infer_direction(description, closing_balance, previous_closing))
 
     return ParsedTransaction(
-        transaction_date=datetime.strptime(match.group("value_date"), "%d/%m/%y").date(),
+        transaction_date=datetime.strptime(match.group("txn_date"), "%d/%m/%y").date(),
         amount=amount,
         closing_balance=closing_balance,
         direction=details["direction"],

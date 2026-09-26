@@ -1,0 +1,37 @@
+ALFRED for Windows x64
+
+PORTABLE PACKAGE
+1. Extract the complete ZIP to a folder you can write to.
+2. Double-click ALFRED Launcher.exe (or Start ALFRED.cmd).
+3. Wait for the browser to open, then create your account or sign in.
+
+Keep ALFRED.exe, ALFRED Launcher.exe and the _internal folder together.
+Do not run directly inside the ZIP. Python, the application libraries, local
+database/queue/cache engines, OCR runtime and web assets are included. You do
+not need to install Python, pip, Docker, PostgreSQL or Redis.
+
+DATA
+Your accounts, documents, settings and models are stored separately in:
+  %LOCALAPPDATA%\ALFRED
+Updating or replacing this program folder does not erase that data. Keep a
+private backup before moving to a different computer. A custom data folder can
+be selected with ALFRED Launcher.exe --data-dir "C:\Your data folder".
+
+STOPPING
+Double-click Stop ALFRED.cmd to finish active work and stop the background app.
+Closing the browser alone does not stop scheduled work. Schedules only run
+while the app and computer are on. Internet access is needed for live external
+sources; the bundled interface and local data work without internet access.
+
+INSTALLER
+ALFRED-Setup.exe installs this same bundle for the current Windows user and
+creates desktop and Start menu shortcuts. Administrator access is not required.
+Uninstalling retains the separate data folder.
+
+TROUBLESHOOTING
+Run ALFRED.exe status from this folder, or inspect:
+  %LOCALAPPDATA%\ALFRED\artifacts\native\server.log
+  %LOCALAPPDATA%\ALFRED\artifacts\native\worker.log
+The local server chooses another port if its usual port is already in use.
+
+This package does not contain the developer's database, uploads or credentials.

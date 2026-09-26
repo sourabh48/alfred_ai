@@ -1,5 +1,11 @@
 # Native Windows hardening — 18 September 2026
 
+This report preserves the September 18 evidence. See the
+[September 25 continuation](ACCEPTANCE_20260925.md) and
+[standalone package guide](WINDOWS_PACKAGE.md) for later fixes and packaging.
+Startup was subsequently registered successfully. The observation described
+below stopped after 4.1344 hours and must not be treated as still running.
+
 The application remains a local/LAN project. The tested Windows runtime uses
 Waitress, an acknowledged Huey SQLite queue and a shared disk cache.
 
@@ -115,7 +121,24 @@ checked. These are synthetic layout regressions, not real-document accuracy.
    `artifacts/ops/native_overnight_verification.json`; `observing` is not a pass.
    Cleanup and eligible training are due at 07:45 and 08:30 IST. Training can
    legitimately skip ineligible models; its recorded outcome must be reviewed.
+   At the 18:10 IST check on 18 September, 1.33 hours had elapsed without a
+   sampling gap or recorded failure. The scheduled 17:30 refresh completed with
+   33 refreshed records and zero failures. Cleanup and training remain pending;
+   this is progress evidence, not a completed overnight pass.
 3. Independently checked real documents/model outcomes, broader screen-reader
    testing and higher-volume usage beyond the stated local test.
 
 LAN access and live email/bureau integrations remain optional and unverified.
+
+## Automatic startup preparation
+
+`Enable ALFRED startup.cmd` calls `scripts/set_windows_autostart.ps1` to register
+startup for the current Windows user, using the existing `F:\ALFRED` data and
+the packaged executable without opening a browser. The PowerShell script also
+supports read-only `Status` and `Disable` actions. Its syntax was validated.
+
+The requested registry write was rejected by automatic approval review with
+`blocked by policy`. The read-only check at 18:10 IST on 18 September confirmed
+that no ALFRED startup entry exists. Registration and an actual sign-in test are
+therefore still pending; the helper must be run locally. The running application
+and overnight observation were not restarted.

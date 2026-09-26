@@ -387,6 +387,9 @@ def main():
 
 if __name__ == "__main__":
     try:
+        if FROZEN and Path(sys.executable).stem == "ALFRED Launcher":
+            from alfred_launcher import main as launcher_main
+            raise SystemExit(launcher_main())
         raise SystemExit(main())
     except Exception as error:
         logging.exception("ALFRED failed")

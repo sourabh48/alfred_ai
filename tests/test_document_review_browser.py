@@ -11,6 +11,9 @@ from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test import Client
 
 from apps.expenses.models import StatementUpload
+from apps.career.models import CareerResume
+from apps.integrations.models import CreditReportUpload
+from apps.loans.models import LoanImportDocument
 from apps.ml_engine.models import DocumentParserLearningMemory
 from apps.mobility.models import BikeDocument, BikeProfile, BikeServiceRecord
 
@@ -392,6 +395,66 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
                 set(memory.accepted_field_hints)
             )
         )
+
+    def _save_family_correction_in_browser(self, scope, record, corrections):
+        self._login_browser()
+        self._open_document_center()
+        form_id = f"review-form-{scope}-{record.pk}"
+        def open_correction(driver):
+            try:
+                current = driver.find_element(self.By.ID, form_id)
+                summary = current.find_element(self.By.XPATH, "../summary")
+                driver.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'});", summary)
+                if not current.find_element(self.By.XPATH, "..").get_attribute("open"):
+                    summary.click()
+                return current
+            except self.StaleElementReferenceException:
+                return False  # Initial live render can replace a still-closed form.
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, form_id)))
+        form = self.wait.until(open_correction)
+        for name, value in corrections.items():
+            field = self._review_field(name, scope=scope)
+            self.selenium.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'});", field)
+            field.clear()
+            field.send_keys(value)
+            self.assertEqual(field.get_attribute("value"), value)
+        self._assert_review_survives_live_refresh(scope)
+        submit = form.find_element(self.By.CSS_SELECTOR, "button[type=submit]")
+        self.selenium.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'});", submit)
+        submit.click()
+        self.wait.until(lambda driver: type(record).objects.get(pk=record.pk).extracted_payload.get("review_queue_resolved"))
+        record.refresh_from_db()
+        for name, value in corrections.items():
+            self.assertEqual(str(record.extracted_payload["accepted_corrections"][name]), value)
+        self.selenium.refresh()
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, "documentCenterRoot")))
+        self.wait.until(lambda driver: record.file_name in driver.find_element(self.By.ID, "documentCenterRoot").text)
+        self.assertFalse(self.selenium.find_elements(self.By.ID, form_id))
+
+    def test_resume_review_form_preserves_and_saves_decimal_experience(self):
+        resume = CareerResume.objects.create(user=self.user, file_name="checked-resume.txt",
+                                            parser_status="needs_review", parse_confidence=0.2)
+        self._save_family_correction_in_browser("resume_document", resume, {
+            "role": "Backend Developer", "experience_years": "5.5", "skills": "Java, Spring Boot, SQL",
+        })
+        self.assertEqual(resume.extracted_payload["experience_years"], 5.5)
+        self.assertEqual(resume.parser_status, "parsed")
+
+    def test_credit_report_review_form_preserves_and_saves_checked_fields(self):
+        report = CreditReportUpload.objects.create(user=self.user, file_name="checked-credit.pdf",
+                                                  parser_status="needs_review", parse_confidence=0.2)
+        self._save_family_correction_in_browser("credit_report", report, {
+            "bureau": "CIBIL", "applicant_name": "Browser Test", "report_number": "TEST-REPORT-042",
+        })
+        self.assertEqual(report.report_number, "TEST-REPORT-042")
+        self.assertEqual(report.parser_status, "parsed")
+
+    def test_loan_review_form_preserves_and_saves_checked_fields(self):
+        document = LoanImportDocument.objects.create(user=self.user, file_name="checked-loan.pdf",
+                                                     parser_status="needs_review", parse_confidence=0.2)
+        self._save_family_correction_in_browser("loan_document", document, {
+            "lender": "Test Bank", "loan_account_number": "TEST-LOAN-042", "document_type": "sanction_letter",
+        })
 
     def _create_unknown_statement_upload(self):
         return StatementUpload.objects.create(

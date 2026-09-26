@@ -5,6 +5,12 @@ Copy the complete portable `dist/ALFRED` folder and
 `scripts/verify_windows_acceptance.ps1`, or install `dist/ALFRED-Setup.exe` first.
 An isolated folder on the development PC does not establish clean-PC acceptance.
 
+The prepared `artifacts/releases/20260925/Second-PC-acceptance` folder contains
+the installer, both phase launchers, instructions and a release manifest. Copy
+the complete folder. Its manifest rejects the development PC and an executable
+whose hash differs from the supplied release. Reboot proof also records the
+machine fingerprint and rejects a different PC from the Fresh phase.
+
 Run in PowerShell, adjusting the executable path:
 
 ```powershell
@@ -33,6 +39,8 @@ whether Python/Docker were absent, installer versus portable use, and any prompt
 Also open the app with its test data folder and review the dashboard, upload an
 anonymized checked document, use Settings, and test uninstall retention. Those
 manual observations and a genuinely separate PC are needed to complete acceptance.
+Use [Human acceptance checks](MANUAL_ACCEPTANCE.md) to record Windows sign-in,
+screen-reader, keyboard and document observations.
 
 The local synthetic baseline contains a test password only. Do not use this
 script against an existing account or production data folder.

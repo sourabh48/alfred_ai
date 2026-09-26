@@ -48,10 +48,10 @@ cache, validation and wording defects found and fixed in that pass.
 - heavy finance, mobility, bike-service, and career dashboard reads now use cache-aware materialized payloads keyed to data revisions
 - investment summary, allocation, and growth reads now also use cache-aware materialized payloads keyed to portfolio revision
 - deterministic staging traffic now exercises all 21 registered materialized cache namespaces and records hit/miss, TTL, generation latency, stale regeneration, revision, and invalidation proof without marking production cache maturity complete
-- Project Details now exposes deployment-readiness status for database, shared cache, Celery worker/beat, security settings, browser CI proof, and production-like cache telemetry; local hosting is the active path while public-production proof remains separate
+- Project Details selects readiness checks for the active runtime; native Windows checks use Huey, while Celery worker/beat requirements apply to the optional Compose runtime
 - the shared `tests/` package is now discoverable by default so the normal `manage.py test` command runs the suite instead of silently skipping it
 - supported ML models now persist training state, run history, quality estimates, and freshness windows in the database
-- supported ML models can now auto-train on startup and on the scheduled nightly cycle when data thresholds and dependencies are healthy
+- supported ML models can train on the scheduled nightly cycle when consent, data and runtime gates pass; the native Windows runtime disables startup training
 - project status now treats local/LAN hosting as the only active operating path; provider-specific deployment leftovers have been removed from tracked source, IDE metadata, artifacts, and local cached evidence
 
 ### Vehicle and Mobility
@@ -141,23 +141,28 @@ cache, validation and wording defects found and fixed in that pass.
 - parser-confidence calibration is now a trainable ML path that learns from parser outcome history instead of relying only on static confidence heuristics
 - relationship-model training is now a safe, bounded path that only activates when enough scored partner profiles exist
 
-## Pending / Incomplete
+## Pending acceptance
 
-- broad official catalog coverage for more bikes, scooters, and cars
-- broader real-document validation of the implemented OCR overlays and field-level correction inputs
-- deeper verification for more user-entered data outside mobility
-- stronger test coverage
-- broader live-browser verification across more pages after the Selenium runner keeps recording required-browser local Chrome or Edge runs and CI Chrome runs with zero skipped browser tests
-- official bureau integrations with consent flow if real CIBIL/Experian/Equifax/CRIF pulls are required
-- broader live job-source coverage beyond the current Remotive feed and current public-page adapters
-- richer market/career/risk modeling than the current lightweight signal blending
-- broader endpoint and browser-interaction coverage beyond the new mobility and project-details regression tests
-- broader document-center browser interaction coverage beyond the new retry and diagnostics regression tests
-- broader upload-history coverage in the central document hub beyond the newly added saved loan-import trail
-- broader trainable-model coverage beyond the currently supported structured salary, expense, burnout, behavioral-risk, and parser-confidence paths
-- OCR candidates and overlay review are implemented; browser coverage currently exercises statement and vehicle corrections, while broader document-family interaction proof remains open
-- clean second-PC installation and optional LAN validation; sustained scheduled-job outcomes and higher-volume local cache telemetry (native installer, observed host-reboot retention, 12-user concurrency and backup/restore proof have passed)
-- any future public internet deployment would require an explicit new decision plus fresh readiness proof for database, shared cache, Celery worker/beat, security settings, browser CI, and production-like cache traffic
+- Clean second-PC installation and reboot acceptance. Installer, host-reboot retention and backup/restore checks have passed on the development PC.
+- Full overnight scheduled refresh, cleanup and eligible-training outcomes. The September 18 report was interrupted after 4.1344 hours; it is not an active or passing observation.
+- More independently checked documents and model outcomes, with enough consenting data to pass quality and freshness gates. The September 25 comparison passed 68 checked fields across three private documents.
+- Manual screen-reader testing and heavier real usage. Nine Chrome workflows and a 24-user/480-write synthetic load check passed; the three newly found dropdown-label issues are fixed and included in packaged verification.
+- A real Windows sign-in check. Current-user startup registration succeeded on September 25 and remains registered.
+
+See the [September 25 continuation](ACCEPTANCE_20260925.md),
+[standalone package guide](WINDOWS_PACKAGE.md) and
+[completion audit](COMPLETION_AUDIT.md) for acceptance conditions and dated
+evidence. The earlier Windows/Chrome CI proof is dated September 18; current
+continuation checks are local.
+
+## Optional extensions
+
+- LAN access and live email/bureau integrations, with the required account access and consent.
+- More vehicle catalog models, job sources and geography coverage, informed by real usage.
+- Additional model families and richer career/market/risk guidance after current models have sufficient validation evidence.
+
+The [future scope](FUTURE_SCOPE.md) records broader product ideas. Public/cloud
+deployment requires a separate explicit decision and is outside current scope.
 
 ## Risks Remaining
 

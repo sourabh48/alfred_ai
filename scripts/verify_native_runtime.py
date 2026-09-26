@@ -24,19 +24,38 @@ sys.path.insert(0, str(ROOT))
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--executable", type=Path)
+    parser.add_argument("--launcher", type=Path, help="Use the bundled desktop launcher for start/stop")
     parser.add_argument("--port", type=int, default=8030)
     parser.add_argument("--browser", action="store_true", help="Check the real UI using headless Chrome")
     parser.add_argument("--extended", action="store_true", help="Concurrent users, mobile and accessibility checks")
+    parser.add_argument("--load-users", type=int, default=12)
+    parser.add_argument("--load-writes", type=int, default=5, help="Transactions per synthetic concurrent user")
+    parser.add_argument("--load-seconds", type=float, default=0, help="Sustained read window after each user's writes")
     args = parser.parse_args()
+    if args.launcher and not args.executable:
+        parser.error("--launcher requires --executable from the same bundle")
+    if args.load_users < 1 or args.load_writes < 1 or args.load_seconds < 0:
+        parser.error("load-users/load-writes must be positive and load-seconds cannot be negative")
     run = uuid.uuid4().hex[:10]
     data = ROOT / "artifacts" / "native-tests" / run
     data.mkdir(parents=True)
     report = {"run": run, "data_dir": str(data), "executable": str(args.executable or sys.executable), "passed": False, "checks": {}}
     prefix = [str(args.executable.resolve())] if args.executable else [sys.executable, str(ROOT / "alfred_native.py")]
+    # configure() changes cwd to the isolated data directory; resolve CLI paths first.
+    launcher_prefix = [str(args.launcher.resolve())] if args.launcher else prefix
 
     def command(action):
-        result = subprocess.run([*prefix, action, "--data-dir", str(data), "--port", str(args.port), "--no-browser"],
-                                capture_output=True, text=True, timeout=240)
+        command_prefix = launcher_prefix if action in ("start", "stop") else prefix
+        extra = ["--quiet"] if command_prefix != prefix else []
+        environment = os.environ.copy()
+        if args.executable:
+            # The packaged app must resolve its own Python and native libraries.
+            environment.pop("PYTHONHOME", None)
+            environment.pop("PYTHONPATH", None)
+            system = Path(os.environ.get("SystemRoot", "C:/Windows"))
+            environment["PATH"] = os.pathsep.join(map(str, (system / "System32", system)))
+        result = subprocess.run([*command_prefix, action, *extra, "--data-dir", str(data), "--port", str(args.port), "--no-browser"],
+                                capture_output=True, text=True, timeout=300, env=environment)
         assert result.returncode == 0, (action, result.stdout, result.stderr)
         return result.stdout
 
@@ -167,6 +186,34 @@ def main():
         assert other.get(file_url, timeout=10).status_code == 404
         passed("private_upload_ownership")
 
+        # Exercise the packaged parser through HTTP, including the first deposit
+        # and a transaction whose posting month differs from its value date.
+        import fitz
+        with fitz.open() as document:
+            page = document.new_page(width=1100, height=800)
+            page.insert_text((30, 40), "HDFC BANK Account No: 9988776655", fontname="cour", fontsize=9)
+            header = (f"{'Date':<12}{'Narration':<35}{'Chq./Ref.No.':<18}{'Value Dt':<12}"
+                      f"{'Withdrawal Amt.':<20}{'Deposit Amt.':<20}Closing Balance")
+            page.insert_text((30, 70), header, fontname="cour", fontsize=9)
+            for index, (posted, description, valued, debit, credit, balance) in enumerate((
+                ("31/03/26", "UPI-INCOMING", "31/03/26", "", "250.00", "1,250.00"),
+                ("01/04/26", "INTEREST PAID", "31/03/26", "", "12.00", "1,262.00"),
+            )):
+                line = (f"{posted:<12}{description:<35}{str(112233445566 + index):<18}{valued:<12}"
+                        f"{debit:>16}    {credit:>16}    {balance:>16}")
+                page.insert_text((30, 100 + index * 30), line, fontname="cour", fontsize=9)
+            statement = document.tobytes()
+        response = other.post(base + "/api/expenses/import-statement/",
+                              headers={"X-CSRFToken": other.cookies["csrftoken"]},
+                              data={"statement_kind": "bank_statement"},
+                              files={"statement": ("checked-columns.pdf", statement, "application/pdf")}, timeout=90)
+        assert response.status_code == 201, (response.status_code, response.text[:500])
+        rows = other.get(base + "/api/expenses/", timeout=30).json()
+        rows = rows if isinstance(rows, list) else rows["results"]
+        actual = sorted((row["transaction_date"], float(row["amount"]), row["direction"]) for row in rows)
+        assert actual == [("2026-03-31", 250.0, "credit"), ("2026-04-01", 12.0, "credit")], actual
+        passed("pdf_deposit_columns_and_transaction_dates_over_http", {"checked_rows": 2})
+
         probe = native_runtime_probe(run)
         result = probe.get(blocking=True, timeout=30)
         assert result["worker_pid"] != os.getpid() and result["attempts"] == 1
@@ -212,7 +259,9 @@ def main():
         passed("scheduler_executed_heartbeat")
         if args.extended:
             from scripts.verify_native_extended import verify_extended
-            verify_extended(base, session, scenario, data, passed)
+            verify_extended(base, session, scenario, data, passed,
+                            user_count=args.load_users, writes_per_user=args.load_writes,
+                            sustained_seconds=args.load_seconds)
         if args.executable:
             import fitz
             pdf_path = data / "ocr-proof.pdf"

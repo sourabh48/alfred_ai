@@ -17,6 +17,30 @@ from alfred_native import read_state, write_json
 REQUIRED = ("native_intelligence_refresh", "native_intelligence_cleanup", "native_nightly_training")
 
 
+def observation_status(report, *, now=None):
+    """A saved 'observing' flag is only current while samples keep arriving."""
+    now = time.time() if now is None else now
+    result = {key: value for key, value in report.items() if key not in ("samples", "jobs")}
+    samples = report.get("samples") or []
+    last = samples[-1]["time"] if samples else report.get("start_timestamp", 0)
+    result["last_sample_at"] = datetime.datetime.fromtimestamp(last, datetime.timezone.utc).isoformat()
+    if report.get("status") == "observing" and now - last > max(180, report.get("interval_seconds", 60) * 3):
+        result.update(status="interrupted", passed=False,
+                      reason="The observer stopped reporting before its required window completed.")
+    return result
+
+
+def job_failed(job):
+    """Task completion can still contain failed refreshes or model fits."""
+    if job["outcome"] in ("error", "interrupted_needs_review"):
+        return True
+    summary = job.get("summary") or {}
+    if summary.get("status") in ("error", "failed"):
+        return True
+    return any(isinstance(summary.get(key), (int, float)) and summary[key] > 0
+               for key in ("failed", "failed_count", "failed_models"))
+
+
 def snapshot(data, since):
     database = data / "artifacts" / "native" / "jobs.sqlite3"
     if not database.exists():
@@ -38,8 +62,16 @@ def main():
     parser.add_argument("--hours", type=float, default=8)
     parser.add_argument("--interval", type=float, default=60)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--status", action="store_true", help="Read the saved report and detect stale observation without starting work")
     parser.add_argument("--keep-awake", action="store_true", help="Prevent automatic Windows sleep during this observation")
     args = parser.parse_args()
+    if args.status:
+        report = json.loads(args.report.read_text(encoding="utf-8"))
+        result = observation_status(report)
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("passed") else 1
+    if args.report.exists():
+        parser.error("report already exists; choose a new path to preserve the earlier evidence")
     if args.hours <= 0 or args.interval < 1:
         parser.error("hours must be positive; interval must be at least one second")
     if args.keep_awake and os.name == "nt":
@@ -50,8 +82,10 @@ def main():
         atexit.register(set_execution_state, 0x80000000)
     data = args.data_dir.resolve()
     started = time.time()
+    monotonic_started = time.monotonic()
     report = {"started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              "start_timestamp": started, "required_hours": args.hours, "samples": [], "passed": False}
+              "start_timestamp": started, "required_hours": args.hours, "interval_seconds": args.interval,
+              "observer_pid": os.getpid(), "samples": [], "passed": False}
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     while True:
         state = read_state(data)
@@ -65,15 +99,14 @@ def main():
         now = time.time()
         report["samples"].append({"time": now, "healthy": healthy, "instance": state.get("instance")})
         report["jobs"], report["history_error"] = snapshot(data, started)
-        report["elapsed_hours"] = round((now - started) / 3600, 4)
+        report["elapsed_hours"] = round((time.monotonic() - monotonic_started) / 3600, 4)
         report["pending_schedules"] = [name for name in REQUIRED if not any(
             job["task"].endswith("." + name) and job["outcome"] == "complete" for job in report["jobs"])]
-        report["failed_job_count"] = sum(job["outcome"] in ("error", "interrupted_needs_review")
-                                          or job["summary"].get("failed_count", 0) > 0 for job in report["jobs"])
+        report["failed_job_count"] = sum(job_failed(job) for job in report["jobs"])
         gap = any(b["time"] - a["time"] > max(180, args.interval * 3)
                   for a, b in zip(report["samples"], report["samples"][1:]))
         report["sampling_gap"] = gap
-        finished = now - started >= args.hours * 3600
+        finished = time.monotonic() - monotonic_started >= args.hours * 3600
         report["status"] = "finished" if finished else "observing"
         report["passed"] = (finished and not gap and not report["pending_schedules"]
                             and not report["history_error"] and not report["failed_job_count"]

@@ -61,7 +61,7 @@ outside this audit.
 | Local stack and background jobs | Native Waitress/Huey/SQLite runtime implemented | Real HTTP, asynchronous execution, retry, scheduled heartbeat and queued-job restart verified in isolated data; optional PostgreSQL/Redis/Celery remains separate |
 | Backup, restore and restart recovery | Native instructions and verification script exist | Native restore/process restart passed; observed host reboot retained 13 checked financial tables and 8,273 uploads; clean-PC acceptance remains |
 | Cache performance | All 21 groups have staging proof | Native cache increments and 12 concurrent users with isolated correct totals passed; higher-volume real usage and tuning remain |
-| Documentation and completion tracking | Reconciled | README/model claims, local commands, OCR/future scope and tracker next steps updated; percentages remain maturity estimates |
+| Documentation and completion tracking | Reconciled | README shortened to current Windows usage, data/recovery and remaining acceptance; development commands moved to a dedicated guide; stale percentage estimates removed from README |
 
 ## Remaining requirements and their acceptance conditions
 
@@ -244,19 +244,27 @@ Django test-client requests and are affected by other work on the host. They do
 not establish real-user latency, concurrent throughput, Redis behavior, or model
 accuracy, and are stored separately from runtime production proof.
 
-## Remaining acceptance work
+## Remaining acceptance work (25–26 September update)
 
-1. Validate the Windows installer on a clean second PC. Docker/BIOS changes are
-   optional and do not block the selected native runtime.
-2. Verify persistence after an agreed host restart. Native SQLite backup/restore
-   and process restart have passed; see [Native Windows](NATIVE_WINDOWS.md) and
-   the [earlier recovery proof](NATIVE_RECOVERY_PROOF.md).
-3. Verify access from a second trusted LAN device if LAN access is needed and
-   observe Huey job outcomes across their actual schedules.
-4. Obtain fresh CI Chrome proof and expand browser coverage beyond the six
-   current workflows; measure concurrent traffic on the running native stack.
-5. Collect real validation outcomes and enough samples for ML readiness. Tiny
-   fits and proxy labels remain blocked even when fitting completes.
+1. Validate the Windows installer and reboot retention on a clean second PC.
+   The development PC's host-reboot retention, packaged runtime and isolated
+   backup/restore checks passed; the second-PC check remains separate.
+2. Complete a new sustained scheduled observation. The September 18 report
+   stopped after 4.1344 hours; the new status command identifies it as interrupted.
+   Cleanup and eligible training still need full-cycle evidence.
+3. Collect more independently checked documents and model outcomes, sufficient
+   consenting samples, and passing per-model quality/freshness evidence. The
+   September 25 check passed 68 fields across three real documents after fixing
+   statement direction/date handling and a case-sensitive resume checker.
+4. Extend manual screen-reader/document-family interaction coverage and
+   higher-volume real usage. Fresh Windows/Chrome CI, six Chrome workflows,
+   24-user/480-write synthetic concurrency and nine Chrome workflows passed
+   locally during the continuation. See [dated evidence](ACCEPTANCE_20260925.md).
+5. Verify an actual Windows sign-in. Startup registration succeeded on September
+   25 and remains present. See [startup controls](NATIVE_WINDOWS.md#automatic-startup-after-windows-sign-in).
 
-No cloud deployment, live restore, host restart, or production-data retraining
-was performed during this continuation.
+LAN access and live email/bureau integrations remain optional. Public/cloud
+deployment is outside the current scope. The earlier verification log above is
+historical; use the [18 September report](NATIVE_HARDENING_VERIFICATION.md) for
+historical results; the [continuation](ACCEPTANCE_20260925.md) and
+[standalone package guide](WINDOWS_PACKAGE.md) describe the latest work.
