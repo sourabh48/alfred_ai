@@ -265,6 +265,7 @@ Starting an observation does not count as passing it.
 | Find source files or ownership details | [Repository map](docs/REPOSITORY.md) · [Copyright and fingerprints](docs/OWNERSHIP.md) |
 | Configure startup, schedules or recovery | [Native Windows guide](docs/NATIVE_WINDOWS.md) |
 | Develop, test or build | [Development guide](docs/DEVELOPMENT.md) |
+| Continue a full product audit in Claude | [Claude audit and completion prompt](docs/CLAUDE_HANDOFF.md) |
 | Test a fresh Windows PC | [Windows acceptance checklist](docs/WINDOWS_ACCEPTANCE.md) |
 | Understand data handling | [Privacy and storage](docs/DATA_PRIVACY_AND_STORAGE.md) |
 | Understand the system and planned work | [Architecture](docs/ARCHITECTURE.md) · [Future scope](docs/FUTURE_SCOPE.md) |
