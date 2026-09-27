@@ -4,15 +4,18 @@ The Windows x64 release contains its own Python 3.12 runtime and application
 dependencies. No Python, pip, virtual environment, Docker, PostgreSQL or Redis
 installation is required on the destination PC.
 
-The current release is available in the repository's `release` folder:
+Download the [Windows preview from GitHub Releases](https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.0-preview.1):
 
-- [Windows installer](../release/ALFRED-Setup.exe)
-- [Portable ZIP](../release/ALFRED-Windows-x64.zip)
-- [SHA-256 checksums](../release/SHA256SUMS.txt)
-- [Release manifest](../release/release-manifest.json)
+- [Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Setup.exe)
+- [Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Windows-x64.zip)
+- [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/SHA256SUMS.txt)
+- [Release manifest](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/release-manifest.json)
 
-These generated files are untracked. The release folder also contains the
-separate-PC acceptance launchers and manifest; see `ACCEPTANCE.txt` there.
+Local builds remain in the ignored `release` folder; binaries are distributed
+as release assets rather than committed to Git. The developer's complete local
+release folder also contains separate-PC acceptance launchers and a machine-bound
+manifest; see `ACCEPTANCE.txt` there. That acceptance kit is separate from the
+public downloads.
 The [27 September verification](WINDOWS_PACKAGE_VERIFICATION_20260927.md)
 records the current release checks, uninstall behavior and cleanup. The
 [26 September runtime verification](WINDOWS_PACKAGE_VERIFICATION_20260926.md)

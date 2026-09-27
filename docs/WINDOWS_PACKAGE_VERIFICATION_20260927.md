@@ -1,10 +1,10 @@
 # Windows release verification - 27 September 2026
 
-The current local/LAN release is in [release](../release), with the
-[installer](../release/ALFRED-Setup.exe),
-[portable ZIP](../release/ALFRED-Windows-x64.zip),
-[checksums](../release/SHA256SUMS.txt) and
-[manifest](../release/release-manifest.json). The installer and both launchers
+The current local/LAN release is available from [GitHub Releases](https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.0-preview.1), with the
+[installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Setup.exe),
+[portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Windows-x64.zip),
+[checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/SHA256SUMS.txt) and
+[manifest](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/release-manifest.json). Local copies remain in `release`. The installer and both launchers
 use the ALFRED icon. The existing checkout remains available through `ALFRED.lnk`
 and `Start ALFRED.cmd`.
 

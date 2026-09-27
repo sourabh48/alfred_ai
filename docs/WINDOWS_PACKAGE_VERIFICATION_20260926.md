@@ -8,8 +8,8 @@ local `ALFRED.lnk` shortcut or `Start ALFRED.cmd`.
 
 The installer and portable ZIP tested on this date were subsequently archived
 to `F:\ALFRED-retired\20260927\release`. Use the current
-[installer](../release/ALFRED-Setup.exe) and
-[portable ZIP](../release/ALFRED-Windows-x64.zip). The historical
+[installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Setup.exe) and
+[portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Windows-x64.zip). The historical
 [manifest](../artifacts/releases/20260926-icon/distributables/release-manifest.json)
 and [checksums](../artifacts/releases/20260926-icon/distributables/SHA256SUMS.txt)
 identify the tested binaries. The bundle scan checked 12,608 files and found

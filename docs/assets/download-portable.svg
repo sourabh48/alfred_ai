@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="240" height="64" viewBox="0 0 240 64" role="img" aria-label="Portable ZIP — extract and launch">
   <rect x="1" y="1" width="238" height="62" rx="12" fill="#152637" stroke="#688497"/>
   <path d="m21 25 11-6 11 6-11 6Zm0 0v14l11 6 11-6V25M32 31v14M26 22l11 6v7" fill="none" stroke="#9dded5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-  <g font-family="Segoe UI, Arial, sans-serif">
+  <g font-family="sans-serif">
     <text x="60" y="29" fill="#edf6fa" font-size="18" font-weight="700">Portable ZIP</text>
     <text x="61" y="47" fill="#b4c8d4" font-size="12">Extract and launch</text>
   </g>
