@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="304" height="64" viewBox="0 0 304 64" role="img" aria-label="Download for Windows — x64 installer">
+  <rect x="1" y="1" width="302" height="62" rx="12" fill="#2dd4bf" stroke="#5eead4"/>
+  <path d="M30 20v19m-7-7 7 7 7-7m-17 8v5h20v-5" fill="none" stroke="#082f36" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <g font-family="Segoe UI, Arial, sans-serif" fill="#082f36">
+    <text x="56" y="29" font-size="18" font-weight="700">Download for Windows</text>
+    <text x="57" y="47" font-size="12">x64 installer · Python included</text>
+  </g>
+</svg>
