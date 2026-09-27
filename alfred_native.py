@@ -223,7 +223,7 @@ def serve(data, port):
     os.environ["ALFRED_NATIVE_INSTANCE"] = instance
     state = {"instance": instance, "pid": os.getpid(), "status": "starting", "port": port}
     write_json(runtime / "runtime.json", state)
-    child = server = None
+    child = server = tray = None
     try:
         configure(data)
         from django.core.management import call_command
@@ -257,6 +257,12 @@ def serve(data, port):
         state.update(status="running", worker_pid=child.pid, started_at=time.time())
         write_json(runtime / "runtime.json", state)
         print(f"ALFRED is ready at http://127.0.0.1:{state['port']}/", flush=True)
+        from alfred_tray import start_tray
+        tray = start_tray(
+            data, state, ASSETS,
+            on_stop=lambda: (runtime / f"stop-{instance}").touch(),
+            record=lambda payload: write_json(runtime / "tray.json", payload),
+        )
         restarts = []
         while not (runtime / f"stop-{instance}").exists():
             if not thread.is_alive():
@@ -273,6 +279,8 @@ def serve(data, port):
     finally:
         state["status"] = "stopping"
         write_json(runtime / "runtime.json", state)
+        if tray is not None:
+            tray.mark_stopping()
         if server is not None:
             server.close()
             server.task_dispatcher.shutdown(timeout=30)
@@ -280,6 +288,8 @@ def serve(data, port):
             (runtime / f"worker-stop-{instance}").touch()
             child.wait()  # Do not cut off a running document import or model save.
         (runtime / f"stop-{instance}").unlink(missing_ok=True)
+        if tray is not None:
+            tray.close()
         state["status"] = "stopped"
         write_json(runtime / "runtime.json", state)
         lock.__exit__()

@@ -11,6 +11,24 @@ import urllib.request
 import uuid
 
 
+def registered_tray_rectangle(tray):
+    """Ask Windows itself whether this supervisor's notification icon exists."""
+    class Identifier(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.DWORD), ("hWnd", wintypes.HWND),
+                    ("uID", wintypes.UINT), ("guidItem", ctypes.c_byte * 16)]
+
+    identifier = Identifier()
+    identifier.cbSize = ctypes.sizeof(identifier)
+    identifier.hWnd = tray["window_handle"]
+    identifier.uID = tray["icon_id"]
+    rectangle = wintypes.RECT()
+    query = ctypes.windll.shell32.Shell_NotifyIconGetRect
+    query.argtypes = (ctypes.POINTER(Identifier), ctypes.POINTER(wintypes.RECT))
+    query.restype = ctypes.c_long
+    result = query(ctypes.byref(identifier), ctypes.byref(rectangle))
+    return result, [rectangle.left, rectangle.top, rectangle.right, rectangle.bottom]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", type=Path, required=True)
@@ -61,6 +79,21 @@ def main():
         with opener.open(f"http://127.0.0.1:{state['port']}/health/native/", timeout=10) as response:
             health = json.load(response)
         assert health["status"] == "ok" and health["instance"] == state["instance"], health
+        tray_path = data / "artifacts/native/tray.json"
+        deadline = time.monotonic() + 15
+        tray = {}
+        while time.monotonic() < deadline:
+            if tray_path.exists():
+                tray = json.loads(tray_path.read_text(encoding="utf-8"))
+                if tray.get("status") == "running":
+                    break
+            time.sleep(0.2)
+        assert tray.get("visible") and tray.get("instance") == state["instance"], tray
+        status, rectangle = registered_tray_rectangle(tray)
+        assert status == 0, f"Windows did not find the tray icon: {status}"
+        assert (bundle / "_internal/guide/index.html").is_file(), "Offline guide missing"
+        report.update(tray_registered_with_windows=True, tray_rectangle=rectangle,
+                      tray=tray, offline_guide_bundled=True)
         report.update(passed=True, port=state["port"], launcher_exit=process.returncode)
     finally:
         if process.poll() is None:
@@ -70,6 +103,10 @@ def main():
                                  creationflags=flags, capture_output=True, text=True, timeout=180)
         report["stop_exit"] = stopped.returncode
         report["passed"] = report["passed"] and stopped.returncode == 0
+        if report.get("tray"):
+            removed, _ = registered_tray_rectangle(report["tray"])
+            report["tray_removed_after_stop"] = removed != 0
+            report["passed"] = report["passed"] and report["tray_removed_after_stop"]
         (data / "proof.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
         (root / "artifacts/ops/packaged_launcher_verification.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report), flush=True)

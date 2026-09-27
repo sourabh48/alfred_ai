@@ -9,9 +9,10 @@ os.environ["ALFRED_LOCAL_RUNTIME"] = "true"
 os.environ["ALFRED_AUTO_TRAIN_ON_STARTUP"] = "false"
 os.environ["ALFRED_TASK_BACKEND"] = "huey"
 os.environ["DJANGO_SETTINGS_MODULE"] = "alfred_ai.settings"
-datas = [(str(root / "templates"), "templates"), (str(root / "static"), "static")]
+datas = [(str(root / "templates"), "templates"), (str(root / "static"), "static"),
+         (str(root / "docs" / "guide"), "guide")]
 binaries = []
-hiddenimports = ["alfred_launcher", "alfred_ai.native_settings", "diskcache.djangocache", "huey.contrib.djhuey",
+hiddenimports = ["alfred_launcher", "alfred_tray", "pystray._win32", "alfred_ai.native_settings", "diskcache.djangocache", "huey.contrib.djhuey",
                  "django.db.backends.sqlite3", "django.contrib.sessions.backends.db",
                  "django.template.backends.django", "django.contrib.auth.backends",
                  "corsheaders", "rest_framework", "rest_framework.authtoken"]
@@ -32,7 +33,7 @@ for package in ("rapidocr_onnxruntime", "onnxruntime"):
     datas += package_data
     binaries += package_binaries
     hiddenimports += package_imports
-for package in ("huey", "diskcache", "waitress", "django", "djangorestframework"):
+for package in ("huey", "diskcache", "waitress", "django", "djangorestframework", "pystray"):
     datas += copy_metadata(package)
 datas += collect_data_files("rest_framework")
 

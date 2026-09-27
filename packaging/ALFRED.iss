@@ -8,7 +8,7 @@
 [Setup]
 AppId={{D4BFC620-610B-4AF7-81BF-215ECAC7297B}
 AppName=ALFRED
-AppVersion=1.0.0
+AppVersion=1.0.1
 AppPublisher=ALFRED
 DefaultDirName={localappdata}\Programs\ALFRED
 DefaultGroupName=ALFRED

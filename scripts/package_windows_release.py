@@ -39,7 +39,8 @@ def write_acceptance_kit(bundle, output):
 def inspect_bundle(bundle):
     required = ("ALFRED.exe", "ALFRED Launcher.exe", "Start ALFRED.cmd", "Stop ALFRED.cmd",
                 "READ ME.txt", "_internal/python312.dll", "_internal/base_library.zip",
-                "_internal/static/alfred.ico",
+                "_internal/static/alfred.ico", "_internal/guide/index.html",
+                "_internal/guide/images/04-tray.svg",
                 "_internal/static/vendor/bootstrap.min.css", "_internal/static/vendor/chart.umd.min.js",
                 "_internal/templates/career/list.html", "_internal/templates/integrations/credit_score.html")
     missing = [name for name in required if not (bundle / name).is_file()]
@@ -108,7 +109,8 @@ def main():
         "bundle_bytes": sum(path.stat().st_size for path in files),
         "data_directory": "%LOCALAPPDATA%/ALFRED", "private_runtime_paths_found": 0,
         "components": ["Python 3.12", "Django", "Waitress", "Huey", "SQLite", "diskcache",
-                       "RapidOCR", "ONNX Runtime", "Tcl/Tk desktop launcher", "bundled web assets"],
+                       "RapidOCR", "ONNX Runtime", "Tcl/Tk desktop launcher", "Windows tray icon",
+                       "offline illustrated installation guide", "bundled web assets"],
         "artifacts": {path.name: {"bytes": path.stat().st_size, "sha256": digest(path)}
                       for path in (archive, installer, bundle / "ALFRED.exe", bundle / "ALFRED Launcher.exe")},
     }

@@ -18,6 +18,11 @@ private backup before moving to a different computer. A custom data folder can
 be selected with ALFRED Launcher.exe --data-dir "C:\Your data folder".
 
 STOPPING
+ALFRED shows its A icon in the Windows notification area while it is running.
+If hidden, open the arrow beside the clock. Click the icon to open ALFRED.
+Right-click it for Open ALFRED, Installation guide, Open data folder and Stop
+ALFRED. The illustrated installation guide is bundled and opens offline.
+
 Double-click Stop ALFRED.cmd to finish active work and stop the background app.
 Closing the browser alone does not stop scheduled work. Schedules only run
 while the app and computer are on. Internet access is needed for live external

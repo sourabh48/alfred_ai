@@ -92,6 +92,13 @@ Uninstalling the application retains the separate data folder.
 
 ## Background processing
 
+On Windows, the running supervisor owns an ALFRED notification-area icon.
+It stays after the launcher and browser close. Click it to open the selected
+local port, or right-click for the offline installation guide, data folder and
+**Stop ALFRED**. The icon remains during graceful shutdown and is removed when
+jobs finish. Windows may place it under the notification area's arrow.
+Headless development checks can set `ALFRED_NO_TRAY=1`; normal launches show it.
+
 One Huey consumer runs two thread workers and a scheduler. The queue uses its
 own SQLite file; the shared cache also uses SQLite. Startup waits for a real
 queued probe to complete before opening the browser.

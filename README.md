@@ -72,6 +72,17 @@ integrations need internet access; the interface assets and OCR engines are bund
 You need a Windows x64 PC and a browser. Python, pip, Docker, PostgreSQL and Redis
 do not need to be installed separately.
 
+**[Open the illustrated installation guide →](docs/INSTALLATION.md)**
+
+<table>
+  <tr>
+    <td width="50%"><a href="docs/INSTALLATION.md#1-download"><img src="docs/guide/images/01-download.svg" alt="Step 1: download the ALFRED Windows installer" width="100%"></a></td>
+    <td width="50%"><a href="docs/INSTALLATION.md#4-use-the-tray-icon"><img src="docs/guide/images/04-tray.svg" alt="Find the ALFRED A icon near the Windows clock and right-click for controls" width="100%"></a></td>
+  </tr>
+</table>
+
+*Illustrated steps; the full guide covers download, setup, first launch and the tray menu.*
+
 ### 1. Download
 
 | Download | Best for | Approximate size |
@@ -96,6 +107,11 @@ is not digitally signed; checksums are provided with the release.
 
 The browser normally opens at `http://127.0.0.1:8000/`. ALFRED selects another
 port if needed; use the launcher to open the correct address.
+
+The **ALFRED A icon stays in the Windows tray while the app runs**. Click it to
+open your workspace. Right-click for **Installation guide**, **Open data folder**
+and **Stop ALFRED**. If it is hidden, use the **↑ arrow** near the clock.
+The guide also opens offline from that menu.
 
 <details>
 <summary><strong>Using the portable ZIP instead</strong></summary>
@@ -126,7 +142,7 @@ For the ZIP, replace the filename with `ALFRED-Windows-x64.zip`.
 
 ### 3. Stop, update or uninstall
 
-- **Stop:** use **Stop ALFRED** in the Start menu, or **Stop ALFRED.cmd** in the
+- **Stop:** use **Stop ALFRED** in the tray or Start menu, or **Stop ALFRED.cmd** in the
   portable folder. Closing the browser leaves background jobs running.
 - **Update:** keep a backup, then run the newer installer or replace the portable
   program folder. The separate data folder is retained.
@@ -241,6 +257,7 @@ Starting an observation does not count as passing it.
 | I want to… | Read this |
 | --- | --- |
 | Install, update or uninstall | [Windows package guide](docs/WINDOWS_PACKAGE.md) |
+| Follow installation pictures | [Illustrated installation guide](docs/INSTALLATION.md) |
 | Configure startup, schedules or recovery | [Native Windows guide](docs/NATIVE_WINDOWS.md) |
 | Develop, test or build | [Development guide](docs/DEVELOPMENT.md) |
 | Test a fresh Windows PC | [Windows acceptance checklist](docs/WINDOWS_ACCEPTANCE.md) |

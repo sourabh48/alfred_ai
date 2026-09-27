@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Install and use ALFRED</title>
+  <style>
+    :root{--ink:#163547;--muted:#536d7b;--teal:#087d73;--line:#d8e5ec;--paper:#f2f7fa}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 "Segoe UI",Arial,sans-serif}
+    a{color:var(--teal);text-underline-offset:3px}a:focus-visible,summary:focus-visible{outline:3px solid #13aa98;outline-offset:4px}
+    header{background:#0d1f2e;color:#fff}nav,.hero,main,footer{max-width:1160px;margin:auto;padding:24px 32px}
+    nav{display:flex;align-items:center;gap:14px;border-bottom:1px solid #284254}.brand{font-size:21px;font-weight:750;letter-spacing:2px}
+    .navlinks{display:flex;gap:22px;margin-left:auto;flex-wrap:wrap}nav a{color:#cae1e9;text-decoration:none;font-size:14px}
+    .hero{padding-top:48px;padding-bottom:48px}.eyebrow{font-size:12px;letter-spacing:2px;font-weight:700;text-transform:uppercase;color:#72decd}
+    h1{font-size:clamp(32px,5vw,48px);line-height:1.15;margin:12px 0 18px;letter-spacing:-1.4px}.hero p{max-width:680px;color:#c1d4df;font-size:18px}
+    .button{display:inline-block;padding:12px 20px;border-radius:9px;background:#2dd4bf;color:#083b3b;text-decoration:none;font-weight:700;margin:8px 12px 0 0}
+    .secondary{background:transparent;color:#d5e7ed;border:1px solid #5d7c8f}.note{font-size:14px!important;color:#a9c2cf!important}
+    main{padding-top:38px;padding-bottom:40px}section{scroll-margin-top:24px;margin-bottom:38px}h2{font-size:27px;line-height:1.3;margin:0 0 10px}h3{font-size:21px;margin:0 0 10px}
+    .lead{color:var(--muted);margin:0 0 24px}.steps{display:grid;grid-template-columns:1fr 1fr;gap:24px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+    .card img{width:100%;height:auto;display:block}.copy{padding:24px}.copy p{margin:8px 0;color:var(--muted)}.step{font-size:12px;font-weight:750;letter-spacing:1.6px;color:var(--teal);text-transform:uppercase}
+    .info{background:#e1f4ee;border-left:4px solid var(--teal);border-radius:0 12px 12px 0;padding:20px 24px;margin-top:24px}
+    .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.controls .card{padding:24px}.controls p{color:var(--muted);margin-bottom:0}
+    code{font-size:.9em;background:#eaf0f4;border-radius:5px;padding:2px 6px;overflow-wrap:anywhere}pre{background:#102a3a;color:#dceaf2;border-radius:10px;padding:18px;overflow:auto}pre code{background:transparent;padding:0;color:inherit;overflow-wrap:normal}
+    details{background:#fff;border:1px solid var(--line);border-radius:12px;margin:12px 0;padding:17px 22px}summary{cursor:pointer;font-weight:650}details p{color:var(--muted)}
+    footer{border-top:1px solid var(--line);font-size:14px;color:var(--muted)}.fine{font-size:13px;color:var(--muted)}
+    @media(max-width:700px){nav,.hero,main,footer{padding-left:20px;padding-right:20px}nav{align-items:flex-start;flex-wrap:wrap}.navlinks{width:100%;margin-left:0;gap:18px}.hero{padding-top:32px;padding-bottom:32px}.steps,.controls{grid-template-columns:1fr}.copy{padding:20px}}
+  </style>
+</head>
+<body>
+<header>
+  <nav aria-label="Main navigation">
+    <svg width="38" height="38" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#203e50"/><path d="M28 12h8l17 38H42l-3-8H25l-3 8H11l17-38Zm1 21h6l-3-9Z" fill="#fff" fill-rule="evenodd"/><path d="M26 36h12l2 6H24Z" fill="#2dd4bf"/></svg>
+    <span class="brand">ALFRED</span>
+    <div class="navlinks"><a href="#install">Installation</a><a href="#everyday">Everyday controls</a><a href="#developers">Developer setup</a></div>
+  </nav>
+  <div class="hero">
+    <div class="eyebrow">Windows x64 · Illustrated setup guide</div>
+    <h1>Your workspace starts here.</h1>
+    <p>Install ALFRED, open your browser, and keep your finances and documents together on your own PC.</p>
+    <a class="button" href="https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Setup.exe">Download the installer ↓</a>
+    <a class="button secondary" href="https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Windows-x64.zip">Portable ZIP</a>
+    <p class="note">Python and application dependencies are included. The preview installer is unsigned; checksums are available on the release page.</p>
+  </div>
+</header>
+<main>
+  <section id="install" aria-labelledby="install-title">
+    <h2 id="install-title">Install in four steps</h2>
+    <p class="lead">These illustrations show the steps to follow. Windows and setup screens can look different on your PC.</p>
+    <div class="steps">
+      <article class="card"><img src="images/01-download.svg" alt="Download ALFRED-Setup.exe from the GitHub release asset list" width="960" height="540"><div class="copy"><span class="step">01 · Download</span><h3>Choose your Windows package</h3><p>Download <strong>ALFRED-Setup.exe</strong> for normal installation. You do not need a separate Python, pip, Docker, PostgreSQL or Redis installation.</p><p>Prefer portable? Download the ZIP and extract the entire folder before running it.</p></div></article>
+      <article class="card"><img src="images/02-install.svg" alt="Run ALFRED Setup and follow the installer to create shortcuts" width="960" height="540"><div class="copy"><span class="step">02 · Install</span><h3>Follow the setup wizard</h3><p>Open the downloaded installer, follow setup, then finish. Installation is for your Windows account and does not require administrator access.</p><p>ALFRED creates desktop and Start menu shortcuts, including a named uninstaller.</p></div></article>
+      <article class="card"><img src="images/03-launch.svg" alt="Open the ALFRED launcher, wait for the browser, then create an account or sign in" width="960" height="540"><div class="copy"><span class="step">03 · Launch</span><h3>Open your workspace</h3><p>Open <strong>ALFRED</strong> from the desktop or Start menu. Wait for the progress window to finish and your browser to open, then create an account or sign in.</p><p>For the portable ZIP, open <strong>ALFRED Launcher.exe</strong> in the extracted <strong>ALFRED</strong> folder.</p></div></article>
+      <article class="card"><img src="images/04-tray.svg" alt="Find the ALFRED A icon in the Windows notification area; right-click to open its menu" width="960" height="540"><div class="copy"><span class="step">04 · Find the tray icon</span><h3>ALFRED stays within reach</h3><p>Look for the <strong>A icon near the Windows clock</strong>. It remains while ALFRED runs, including after you close the browser. Click it to open the app; right-click for the menu.</p><p>If it is hidden, use the <strong>↑ arrow</strong> in the notification area. You can move it into the visible tray using Windows taskbar settings.</p></div></article>
+    </div>
+    <aside class="info"><strong>Your accounts and files stay separate from the program.</strong><br>Installer and portable copies use <code>%LOCALAPPDATA%\ALFRED</code> by default. They do not import a development checkout's accounts automatically. Uninstalling preserves this data folder.</aside>
+  </section>
+  <section id="everyday" aria-labelledby="everyday-title">
+    <h2 id="everyday-title">Everyday controls</h2><p class="lead">Right-click the ALFRED tray icon to manage the running application.</p>
+    <div class="controls">
+      <article class="card"><h3>Open ALFRED</h3><p>Open the correct local browser address, even when ALFRED selected a different port.</p></article>
+      <article class="card"><h3>Help and data</h3><p><strong>Installation guide</strong> opens this page offline. <strong>Open data folder</strong> takes you to the selected runtime's files.</p></article>
+      <article class="card"><h3>Stop safely</h3><p><strong>Stop ALFRED</strong> lets active jobs finish. The icon disappears after shutdown. Closing the browser alone leaves jobs running.</p></article>
+    </div>
+  </section>
+  <section aria-labelledby="questions-title">
+    <h2 id="questions-title">A few useful details</h2>
+    <details><summary>How do I update or uninstall?</summary><p>Back up your data, then run the newer installer. For portable use, stop ALFRED before replacing its extracted program folder. Uninstall using the Start menu, Windows Settings → Apps, or <strong>Uninstall ALFRED.cmd</strong> in the installed program folder. Saved data is retained.</p></details>
+    <details><summary>Where is the browser address?</summary><p>The usual address is <code>http://127.0.0.1:8000/</code>. ALFRED selects another port when necessary. Use the launcher or tray icon to open the right address.</p></details>
+    <details><summary>What should I back up?</summary><p>Keep the database, uploads, models and private configuration together. Follow the <a href="https://github.com/sourabh48/alfred_ai/blob/master/docs/NATIVE_WINDOWS.md#backup-and-restore">backup and restore guide</a>. Do not publish your data folder or local credentials.</p></details>
+    <details><summary>Does everything work offline?</summary><p>The interface, local data and OCR assets are bundled. Live external sources and configured integrations need internet access. Background schedules run while the PC and ALFRED are on.</p></details>
+  </section>
+  <section id="developers" aria-labelledby="developer-title">
+    <h2 id="developer-title">Developers: run from source</h2>
+    <p class="lead">Use this separate route to change code or run tests. The packaged app above needs none of these setup steps.</p>
+    <p>Install Git and Python 3.12, then run in PowerShell:</p>
+    <pre><code>git clone https://github.com/sourabh48/alfred_ai.git
+cd alfred_ai
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe alfred_native.py start</code></pre>
+    <p>Source runs use the checkout as the default data folder. Keep runtime secrets in untracked local environment files. See the <a href="https://github.com/sourabh48/alfred_ai/blob/master/docs/DEVELOPMENT.md">development guide</a> for tests and builds.</p>
+  </section>
+</main>
+<footer><strong>ALFRED</strong> · Local / LAN workspace<br><a href="https://github.com/sourabh48/alfred_ai/releases">Releases and checksums</a> · <a href="https://github.com/sourabh48/alfred_ai/issues">Report an issue</a></footer>
+</body>
+</html>

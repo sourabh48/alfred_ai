@@ -23,6 +23,10 @@ records the runtime, load, mobile and accessibility checks for these executables
 
 ## Start using ALFRED
 
+Follow the [illustrated installation guide](INSTALLATION.md) for pictures of
+the download, setup, first launch and tray controls. The same guide is bundled
+for offline use under **Installation guide** in the tray menu.
+
 Choose either distribution:
 
 - **Installer:** run `ALFRED-Setup.exe`, then open ALFRED from the desktop or
@@ -36,6 +40,11 @@ The launcher shows progress while the local server and worker start, then opens
 the default browser. On a new PC, create an account. Double-click `Stop ALFRED.cmd`
 or use the installed Stop ALFRED shortcut to finish background work and stop.
 Closing the browser leaves scheduled work running.
+
+The **ALFRED A icon** remains in the Windows notification area while the native
+server runs, including quiet startup after sign-in. Click it to open the app;
+right-click for the installation guide, data folder and graceful shutdown.
+If Windows places it in the overflow area, use the arrow next to the clock.
 
 To uninstall an installed copy, choose **Uninstall ALFRED** in the Start menu,
 use Windows Settings > Apps, or run **Uninstall ALFRED.cmd** in its program
