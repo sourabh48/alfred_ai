@@ -4,16 +4,19 @@ Audit started: 15 September 2026. Continued: 18 September 2026 (Asia/Kolkata).
 Initial baseline commit: `c31de65`. Sample-user continuation baseline: `a20435e`;
 results cover the local working tree.
 
+The [28 September continuation](WINDOWS_TRAY_VERIFICATION_20260928.md) records
+tray controls, branded launcher, illustrated website, attribution and cleanup.
+
 The [27 September release continuation](WINDOWS_PACKAGE_VERIFICATION_20260927.md)
-adds the current installer/uninstaller, 407 passing backend tests and nine
+records the previous installer/uninstaller, 407 passing backend tests and nine
 passing Chrome workflows, plus six passing installer lifecycle checks. The
-unchanged native executables retain the
+previous native executables retain the
 [26 September runtime proof](WINDOWS_PACKAGE_VERIFICATION_20260926.md), including
-23 packaged checks and 24 concurrent users. Two observations were interrupted
-by host restarts. A fresh attempt began at 18:44 IST on 27 September under a
-supervisor configured to start again at Windows sign-in. Expected completion
-is 09:00 IST on 28 September if the PC remains awake; interrupted windows never
-combine into a pass. All 16 focused observation/supervisor tests passed.
+23 packaged checks and 24 concurrent users. Observations interrupted by host
+restarts are retained. The verification supervisor begins a fresh full window;
+interrupted windows never combine into a pass. Use the verification startup
+control's Status action for the current attempt and expected finish.
+All 16 focused observation/supervisor tests passed.
 Separate-PC and completed overnight acceptance remain open.
 
 The [18 September hardening report](NATIVE_HARDENING_VERIFICATION.md) records

@@ -38,7 +38,8 @@ def write_acceptance_kit(bundle, output):
 
 def inspect_bundle(bundle):
     required = ("ALFRED.exe", "ALFRED Launcher.exe", "Start ALFRED.cmd", "Stop ALFRED.cmd",
-                "READ ME.txt", "_internal/python312.dll", "_internal/base_library.zip",
+                "READ ME.txt", "NOTICE.txt", "project-identity.json",
+                "_internal/python312.dll", "_internal/base_library.zip",
                 "_internal/static/alfred.ico", "_internal/guide/index.html",
                 "_internal/guide/images/04-tray.svg",
                 "_internal/static/vendor/bootstrap.min.css", "_internal/static/vendor/chart.umd.min.js",
@@ -104,6 +105,10 @@ def main():
     temporary.replace(archive)
     write_acceptance_kit(bundle, output)
     manifest = {
+        "project": json.loads((bundle / "project-identity.json").read_text(encoding="utf-8")),
+        "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "source_dirty": bool(subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT, text=True).strip()),
+        "notice_sha256": digest(bundle / "NOTICE.txt"),
         "created_at": datetime.now(timezone.utc).isoformat(), "platform": "Windows x64",
         "requires_system_python": False, "files_checked": len(files),
         "bundle_bytes": sum(path.stat().st_size for path in files),

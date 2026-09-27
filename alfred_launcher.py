@@ -65,7 +65,7 @@ def main(argv=None):
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ALFRED.Desktop")
     window = tk.Tk()
-    window.title("ALFRED")
+    window.title("Alfred - Finance Assistant")
     assets = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     icon = assets / "static" / "alfred.ico"
     if os.name == "nt" and icon.is_file():
@@ -89,7 +89,7 @@ def main(argv=None):
     titles.pack(side="left")
     tk.Label(titles, text="ALFRED", font=("Segoe UI", 20, "bold"),
              background=background, foreground=foreground).pack(anchor="w")
-    tk.Label(titles, text="Your personal workspace", font=("Segoe UI", 10),
+    tk.Label(titles, text="Finance Assistant · Life on our Trails", font=("Segoe UI", 10),
              background=background, foreground=muted).pack(anchor="w")
     wording = "Opening your workspace" if args.command == "start" else "Finishing work and stopping"
     tk.Label(frame, text=wording, font=("Segoe UI", 12, "bold"),

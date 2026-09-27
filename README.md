@@ -1,4 +1,6 @@
 <p align="center">
+  <strong>Alfred - Finance Assistant</strong><br>
+  A product of <strong>Life on our Trails</strong><br><br>
   <img src="docs/assets/readme-hero.svg" alt="ALFRED — personal finance, documents and planning in one local workspace" width="100%">
 </p>
 
@@ -8,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Setup.exe"><img src="docs/assets/download-windows.svg" alt="Download ALFRED for Windows x64 — installer" width="304" height="64"></a>
+  <a href="https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Setup.exe"><img src="docs/assets/download-windows.svg" alt="Download ALFRED for Windows x64 — installer" width="304" height="64"></a>
   &nbsp;
-  <a href="https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Windows-x64.zip"><img src="docs/assets/download-portable.svg" alt="Download the portable Windows ZIP" width="240" height="64"></a>
+  <a href="https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Windows-x64.zip"><img src="docs/assets/download-portable.svg" alt="Download the portable Windows ZIP" width="240" height="64"></a>
 </p>
 
 <p align="center">
@@ -72,7 +74,8 @@ integrations need internet access; the interface assets and OCR engines are bund
 You need a Windows x64 PC and a browser. Python, pip, Docker, PostgreSQL and Redis
 do not need to be installed separately.
 
-**[Open the illustrated installation guide →](docs/INSTALLATION.md)**
+**[Open the installation website →](https://sourabh48.github.io/alfred_ai/guide/)** ·
+[Read the guide on GitHub](docs/INSTALLATION.md)
 
 <table>
   <tr>
@@ -87,12 +90,12 @@ do not need to be installed separately.
 
 | Download | Best for | Approximate size |
 | --- | --- | --- |
-| **[Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Setup.exe)** | Desktop and Start menu shortcuts, plus an uninstaller | 485 MB |
-| **[Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Windows-x64.zip)** | Running from an extracted program folder | 542 MB |
-| [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/SHA256SUMS.txt) | Checking the downloaded files | < 1 KB |
+| **[Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Setup.exe)** | Desktop and Start menu shortcuts, plus an uninstaller | 485 MB |
+| **[Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Windows-x64.zip)** | Running from an extracted program folder | 542 MB |
+| [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/SHA256SUMS.txt) | Checking the downloaded files | < 1 KB |
 
-The current download is **v1.0.0-preview.1**, containing the Windows build verified
-on 26–27 September 2026. See the [release notes](https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.0-preview.1)
+The current download is **v1.0.1-preview.1**, with persistent Windows tray controls,
+a refreshed launcher and illustrated setup instructions. See the [release notes](https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.1-preview.1)
 and [remaining acceptance checks](#verification-status). This preview installer
 is not digitally signed; checksums are provided with the release.
 
@@ -128,7 +131,7 @@ Portable describes the program folder. By default, its data is still stored in
 <details>
 <summary><strong>Check a download's SHA-256 checksum</strong></summary>
 
-Download [SHA256SUMS.txt](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/SHA256SUMS.txt)
+Download [SHA256SUMS.txt](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/SHA256SUMS.txt)
 from the same release. In PowerShell, open the folder containing the installer:
 
 ```powershell
@@ -258,6 +261,8 @@ Starting an observation does not count as passing it.
 | --- | --- |
 | Install, update or uninstall | [Windows package guide](docs/WINDOWS_PACKAGE.md) |
 | Follow installation pictures | [Illustrated installation guide](docs/INSTALLATION.md) |
+| Open the website or manage search visibility | [Product website](https://sourabh48.github.io/alfred_ai/) · [Website and SEO](docs/WEBSITE.md) |
+| Find source files or ownership details | [Repository map](docs/REPOSITORY.md) · [Copyright and fingerprints](docs/OWNERSHIP.md) |
 | Configure startup, schedules or recovery | [Native Windows guide](docs/NATIVE_WINDOWS.md) |
 | Develop, test or build | [Development guide](docs/DEVELOPMENT.md) |
 | Test a fresh Windows PC | [Windows acceptance checklist](docs/WINDOWS_ACCEPTANCE.md) |
@@ -273,8 +278,11 @@ uses Waitress, Huey and SQLite. Public/cloud deployment is outside the current s
 
 <p align="center">
   <strong>ALFRED</strong><br>
-  Your finances and documents, together.<br><br>
-  <a href="https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.0-preview.1">Download the Windows preview</a> ·
+  Finance Assistant by Life on our Trails.<br>
+  © 2026 Life on our Trails. All rights reserved.<br><br>
+  <a href="https://sourabh48.github.io/alfred_ai/">Product website</a> ·
+  <a href="docs/OWNERSHIP.md">Copyright and release fingerprints</a> ·
+  <a href="https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.1-preview.1">Download the Windows preview</a> ·
   <a href="https://github.com/sourabh48/alfred_ai/issues">Report an issue</a> ·
   <a href="#features">Back to features ↑</a>
 </p>

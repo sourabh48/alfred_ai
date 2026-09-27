@@ -4,22 +4,24 @@ The Windows x64 release contains its own Python 3.12 runtime and application
 dependencies. No Python, pip, virtual environment, Docker, PostgreSQL or Redis
 installation is required on the destination PC.
 
-Download the [Windows preview from GitHub Releases](https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.0-preview.1):
+Download the [Windows preview from GitHub Releases](https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.1-preview.1):
 
-- [Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Setup.exe)
-- [Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/ALFRED-Windows-x64.zip)
-- [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/SHA256SUMS.txt)
-- [Release manifest](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.0-preview.1/release-manifest.json)
+- [Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Setup.exe)
+- [Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Windows-x64.zip)
+- [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/SHA256SUMS.txt)
+- [Release manifest](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/release-manifest.json)
 
 Local builds remain in the ignored `release` folder; binaries are distributed
 as release assets rather than committed to Git. The developer's complete local
 release folder also contains separate-PC acceptance launchers and a machine-bound
 manifest; see `ACCEPTANCE.txt` there. That acceptance kit is separate from the
 public downloads.
-The [27 September verification](WINDOWS_PACKAGE_VERIFICATION_20260927.md)
-records the current release checks, uninstall behavior and cleanup. The
+The [28 September tray verification](WINDOWS_TRAY_VERIFICATION_20260928.md)
+records this release's launcher, tray, installer and guide checks. The
+[27 September verification](WINDOWS_PACKAGE_VERIFICATION_20260927.md)
+records the previous release's checks, uninstall behavior and cleanup. The
 [26 September runtime verification](WINDOWS_PACKAGE_VERIFICATION_20260926.md)
-records the runtime, load, mobile and accessibility checks for these executables.
+records the previous release's runtime, load, mobile and accessibility checks.
 
 ## Start using ALFRED
 
@@ -69,6 +71,7 @@ From the configured development environment:
 
 ```powershell
 .\.venv\Scripts\python.exe -m PyInstaller packaging/ALFRED.spec --noconfirm --distpath artifacts/releases/next-build --workpath build
+.\.venv\Scripts\python.exe scripts/verify_packaged_launcher.py --bundle artifacts/releases/next-build/ALFRED
 .\.venv\Scripts\python.exe scripts/verify_native_runtime.py --executable artifacts/releases/next-build/ALFRED/ALFRED.exe --launcher "artifacts/releases/next-build/ALFRED/ALFRED Launcher.exe" --browser --extended --load-users 24 --load-writes 20 --load-seconds 120
 .\.venv\Scripts\python.exe scripts/package_windows_release.py --bundle artifacts/releases/next-build/ALFRED --output artifacts/releases/next-build/distributables --iscc F:/ALFRED-tools/InnoSetup/ISCC.exe
 .\.venv\Scripts\python.exe scripts/verify_windows_installer.py --installer artifacts/releases/next-build/distributables/ALFRED-Setup.exe --report artifacts/ops/next-installer-lifecycle.json

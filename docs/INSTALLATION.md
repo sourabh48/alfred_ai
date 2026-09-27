@@ -1,4 +1,6 @@
-# Install and use ALFRED
+# Install and use Alfred - Finance Assistant
+
+**[Open this guide as a website](https://sourabh48.github.io/alfred_ai/guide/)** · A product of Life on our Trails
 
 [← Project overview](../README.md) · [Windows downloads](https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.1-preview.1) · [Developer setup](DEVELOPMENT.md)
 

@@ -55,3 +55,5 @@ coll = COLLECT(exe, launcher, analysis.binaries, analysis.datas,
                strip=False, upx=False, name="ALFRED")
 for name in ("Start ALFRED.cmd", "Stop ALFRED.cmd", "READ ME.txt"):
     shutil.copy2(root / "packaging" / "windows" / name, Path(coll.name) / name)
+shutil.copy2(root / "NOTICE.txt", Path(coll.name) / "NOTICE.txt")
+shutil.copy2(root / "packaging" / "project-identity.json", Path(coll.name) / "project-identity.json")

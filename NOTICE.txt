@@ -1,0 +1,16 @@
+Alfred - Finance Assistant
+Copyright (c) 2026 Life on our Trails. All rights reserved.
+
+Project identifier: 4bd97575-d520-4add-b0db-0afe0661156f
+Official source: https://github.com/sourabh48/alfred_ai
+Official website: https://sourabh48.github.io/alfred_ai/
+
+This notice identifies the original Alfred application code and documentation.
+No open-source license is granted for that original work by this notice.
+Rights granted by applicable law, separate written permission, and GitHub's
+terms for public repositories are unaffected. Third-party components retain
+their own copyright notices and licenses; this notice does not replace them.
+
+Release SHA-256 hashes identify the published files and can detect changes when
+compared with the official release. This project identifier is public attribution,
+not a secret, an access key, copy protection, or a digital signature.
