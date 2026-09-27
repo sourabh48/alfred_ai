@@ -56,35 +56,23 @@ def snapshot(data, since):
         return [], type(error).__name__
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", type=Path, required=True)
-    parser.add_argument("--hours", type=float, default=8)
-    parser.add_argument("--interval", type=float, default=60)
-    parser.add_argument("--report", type=Path, required=True)
-    parser.add_argument("--status", action="store_true", help="Read the saved report and detect stale observation without starting work")
-    parser.add_argument("--keep-awake", action="store_true", help="Prevent automatic Windows sleep during this observation")
-    args = parser.parse_args()
-    if args.status:
-        report = json.loads(args.report.read_text(encoding="utf-8"))
-        result = observation_status(report)
-        print(json.dumps(result, indent=2))
-        return 0 if result.get("passed") else 1
-    if args.report.exists():
-        parser.error("report already exists; choose a new path to preserve the earlier evidence")
-    if args.hours <= 0 or args.interval < 1:
-        parser.error("hours must be positive; interval must be at least one second")
-    if args.keep_awake and os.name == "nt":
+def run_observation(data, hours, interval, report_path, *, keep_awake=False,
+                    restart_on_gap=False, stop_file=None):
+    if report_path.exists():
+        raise FileExistsError("Report already exists; earlier evidence must be preserved")
+    if hours <= 0 or interval < 1:
+        raise ValueError("Hours must be positive; interval must be at least one second")
+    if keep_awake and os.name == "nt":
         import ctypes
         set_execution_state = ctypes.windll.kernel32.SetThreadExecutionState
         if not set_execution_state(0x80000001):  # CONTINUOUS | SYSTEM_REQUIRED
             raise RuntimeError("Windows could not keep this observation awake")
         atexit.register(set_execution_state, 0x80000000)
-    data = args.data_dir.resolve()
+    data = data.resolve()
     started = time.time()
     monotonic_started = time.monotonic()
     report = {"started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              "start_timestamp": started, "required_hours": args.hours, "interval_seconds": args.interval,
+              "start_timestamp": started, "required_hours": hours, "interval_seconds": interval,
               "observer_pid": os.getpid(), "samples": [], "passed": False}
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     while True:
@@ -103,20 +91,47 @@ def main():
         report["pending_schedules"] = [name for name in REQUIRED if not any(
             job["task"].endswith("." + name) and job["outcome"] == "complete" for job in report["jobs"])]
         report["failed_job_count"] = sum(job_failed(job) for job in report["jobs"])
-        gap = any(b["time"] - a["time"] > max(180, args.interval * 3)
+        gap = any(b["time"] - a["time"] > max(180, interval * 3)
                   for a, b in zip(report["samples"], report["samples"][1:]))
         report["sampling_gap"] = gap
-        finished = time.monotonic() - monotonic_started >= args.hours * 3600
-        report["status"] = "finished" if finished else "observing"
-        report["passed"] = (finished and not gap and not report["pending_schedules"]
+        finished = time.monotonic() - monotonic_started >= hours * 3600
+        interrupted = restart_on_gap and gap
+        cancelled = stop_file is not None and stop_file.exists()
+        report["status"] = ("cancelled" if cancelled else "interrupted" if interrupted
+                            else "finished" if finished else "observing")
+        if interrupted:
+            report["reason"] = "Sampling stopped across a sleep or interruption; a fresh continuous attempt is required."
+        report["passed"] = (finished and not cancelled and not gap and not report["pending_schedules"]
                             and not report["history_error"] and not report["failed_job_count"]
                             and all(item["healthy"] for item in report["samples"]))
-        args.report.parent.mkdir(parents=True, exist_ok=True)
-        write_json(args.report.resolve(), report)
-        if finished:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(report_path.resolve(), report)
+        if finished or interrupted or cancelled:
             print(json.dumps({key: report[key] for key in ("status", "passed", "pending_schedules", "elapsed_hours")}))
+            if cancelled:
+                return 3
+            if interrupted:
+                return 2
             return 0 if report["passed"] else 1
-        time.sleep(args.interval)
+        time.sleep(interval)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--data-dir", type=Path, required=True)
+    parser.add_argument("--hours", type=float, default=8)
+    parser.add_argument("--interval", type=float, default=60)
+    parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--status", action="store_true", help="Read the saved report and detect stale observation without starting work")
+    parser.add_argument("--keep-awake", action="store_true", help="Prevent automatic Windows sleep during this observation")
+    args = parser.parse_args()
+    if args.status:
+        result = observation_status(json.loads(args.report.read_text(encoding="utf-8")))
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("passed") else 1
+    if args.report.exists() or args.hours <= 0 or args.interval < 1:
+        parser.error("Choose a new report path, positive hours and an interval of at least one second")
+    return run_observation(args.data_dir, args.hours, args.interval, args.report, keep_awake=args.keep_awake)
 
 
 if __name__ == "__main__":

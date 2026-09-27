@@ -89,6 +89,22 @@ def wait_for_runtime_exit(data):
             kernel.CloseHandle(handle)
 
 
+def wait_for_uninstall(installed, log_path):
+    """Inno's original EXE exits before its clone completes final callbacks."""
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        try:
+            log = log_path.read_text(encoding="utf-8-sig", errors="replace")
+        except (FileNotFoundError, PermissionError):
+            log = ""
+        if ("Uninstallation process succeeded." in log and "Log closed." in log
+                and not (installed / "ALFRED.exe").exists()
+                and registry_value(UNINSTALL_KEY, "InstallLocation") is None):
+            return
+        time.sleep(0.2)
+    raise AssertionError("Uninstaller did not finish its final cleanup; inspect its log")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--installer", type=Path, required=True)
@@ -125,11 +141,24 @@ def main():
     environment["ALFRED_DATA_DIR"] = str(data)
     environment["LOCALAPPDATA"] = str(work / "LocalAppData")
     original_startup = registry_value(RUN_KEY, "ALFRED")
+    recovery_path = work / "original-windows-state.json"
+    if original_shortcut is not None:
+        (work / "original-desktop-shortcut.lnk").write_bytes(original_shortcut)
+    recovery = {
+        "install_dir": str(installed), "original_startup": original_startup,
+        "desktop_shortcut": str(desktop_shortcut),
+        "desktop_backup": str(work / "original-desktop-shortcut.lnk") if original_shortcut is not None else None,
+        "test_startup": None,
+    }
+    # finally cannot run after a shutdown or forced termination. Keep recovery
+    # values on disk before the installer or startup-entry test changes Windows.
+    recovery_path.write_text(json.dumps(recovery, indent=2), encoding="utf-8")
     owned_startup = None
     startup_touched = False
     report = {"run": run, "created_at": datetime.now(timezone.utc).isoformat(),
               "installer_sha256": digest(installer), "data_dir": str(data),
-              "install_dir": str(installed), "passed": False, "checks": {}}
+              "install_dir": str(installed), "recovery_file": str(recovery_path),
+              "passed": False, "checks": {}}
 
     def passed(name, detail=True):
         report["checks"][name] = detail
@@ -158,13 +187,10 @@ def main():
         return f"http://127.0.0.1:{state['port']}"
 
     def uninstall(label):
+        log_path = work / (label + '.log')
         execute([uninstaller, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
-                 f"/LOG={work / (label + '.log')}"])
-        # Inno's temporary clone can finish deleting its own EXE after exit.
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline and (native.exists() or registry_value(UNINSTALL_KEY, "InstallLocation")):
-            time.sleep(0.2)
-        assert not native.exists() and registry_value(UNINSTALL_KEY, "InstallLocation") is None
+                 f"/LOG={log_path}"])
+        wait_for_uninstall(installed, log_path)
 
     session = requests.Session()
     session.trust_env = False
@@ -231,7 +257,10 @@ def main():
 
         install("startup-cleanup-install")
         escaped_native = str(native).replace("'", "''")
-        owned_startup = (f'powershell.exe -NoProfile -Command "& \'{escaped_native}\' start --no-browser"', winreg.REG_SZ)
+        escaped_data = str(data).replace("'", "''")
+        owned_startup = (f'powershell.exe -NoProfile -Command "& \'{escaped_native}\' start --data-dir \'{escaped_data}\' --no-browser"', winreg.REG_SZ)
+        recovery["test_startup"] = owned_startup
+        recovery_path.write_text(json.dumps(recovery, indent=2), encoding="utf-8")
         startup_touched = True
         set_startup(owned_startup)
         uninstall("startup-cleanup-uninstall")

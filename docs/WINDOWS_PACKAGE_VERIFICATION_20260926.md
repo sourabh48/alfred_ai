@@ -6,9 +6,11 @@ local `ALFRED.lnk` shortcut or `Start ALFRED.cmd`.
 
 ## Release and icon
 
-The [installer](../artifacts/releases/20260926-icon/distributables/ALFRED-Setup.exe)
-and [portable ZIP](../artifacts/releases/20260926-icon/distributables/ALFRED-Windows-x64.zip)
-are complete. Their [manifest](../artifacts/releases/20260926-icon/distributables/release-manifest.json)
+The installer and portable ZIP tested on this date were subsequently archived
+to `F:\ALFRED-retired\20260927\release`. Use the current
+[installer](../release/ALFRED-Setup.exe) and
+[portable ZIP](../release/ALFRED-Windows-x64.zip). The historical
+[manifest](../artifacts/releases/20260926-icon/distributables/release-manifest.json)
 and [checksums](../artifacts/releases/20260926-icon/distributables/SHA256SUMS.txt)
 identify the tested binaries. The bundle scan checked 12,608 files and found
 no prohibited private runtime paths. ZIP CRC verification passed.

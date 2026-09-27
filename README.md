@@ -53,14 +53,17 @@ for status, disabling it, or selecting another installation.
 - Queued jobs survive restart. Interrupted maintenance jobs can retry;
   interrupted imports and training are retained for review.
 
-Schedules run while ALFRED and the PC are on. Windows startup does not resume
-an interrupted overnight verification automatically.
+Schedules run while ALFRED and the PC are on. The checkout also has a separate
+[verification startup control](docs/NATIVE_WINDOWS.md#verification-across-windows-sign-ins)
+that preserves interrupted attempts and starts a fresh observation after sign-in.
 
 ## Verification and remaining work
 
 The **27 September 2026** release includes the installer, named uninstaller and
 ALFRED icon. The fresh backend run passed 407 tests, and all nine Chrome browser
-cases passed separately. The unchanged native executables passed 23 packaged
+cases passed separately. All six installer lifecycle checks passed, including
+upgrade retention, shutdown protection and startup-entry cleanup. The unchanged
+native executables passed 23 packaged
 runtime checks and a 24-user load check on 26 September. See the
 [current release verification](docs/WINDOWS_PACKAGE_VERIFICATION_20260927.md).
 
@@ -73,13 +76,19 @@ Remaining acceptance work:
 
 - Install and test on a clean second Windows PC, including a reboot.
 - Finish the overnight observation of refresh, cleanup and eligible training
-  (started 27 September at 00:13 IST; expected completion around 10:13 IST).
+  (started 27 September at 18:44 IST; expected completion around 09:00 IST
+  on 28 September if the PC remains awake). Reboots reset the required window.
 - Validate accuracy with independently checked real data and more document layouts.
 - Extend manual screen-reader testing and testing under heavier real usage.
 
 Model fitting alone does not establish accuracy. Current validation limits and
 per-requirement evidence are in the [completion audit](docs/COMPLETION_AUDIT.md).
 LAN access and live email/bureau integrations remain optional and unverified.
+
+Cleanup removed 5.48 GB of earlier generated files. Another 1.03 GB of obsolete
+release files and source caches was moved to `F:\ALFRED-retired\20260927` for
+recovery; archiving those files did not free disk space. Current packages are in
+`release`, and accounts, uploads, models and backups are preserved.
 
 ## Further documentation
 

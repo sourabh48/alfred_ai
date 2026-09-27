@@ -25,7 +25,7 @@ def write_acceptance_kit(bundle, output):
     with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography",
                         access=winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
         machine_guid = winreg.QueryValueEx(key, "MachineGuid")[0]
-    for name in ("Verify fresh install.cmd", "Verify after reboot.cmd", "ACCEPTANCE.txt"):
+    for name in ("Verify fresh install.cmd", "Verify after reboot.cmd", "ACCEPTANCE.txt", "READ ME.txt"):
         shutil.copy2(ROOT / "packaging/windows" / name, output / name)
     shutil.copy2(ROOT / "scripts/verify_windows_acceptance.ps1", output / "verify_windows_acceptance.ps1")
     for name in ("MANUAL_ACCEPTANCE.md", "WINDOWS_ACCEPTANCE.md"):

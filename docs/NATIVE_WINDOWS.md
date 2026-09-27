@@ -62,8 +62,8 @@ Use `-Action Status` to inspect the entry or `-Action Disable` to remove it,
 with the same paths if you supplied them. These commands do not stop ALFRED or
 interrupt an ongoing verification. Windows Settings > Apps > Startup can also
 disable the entry. Registering it does not prove an actual Windows sign-in;
-check ALFRED after the next normal sign-in. An interrupted overnight observer
-still needs to be started separately.
+check ALFRED after the next normal sign-in. Verification has a separate startup
+control described below.
 
 ## Data and secrets
 
@@ -195,3 +195,39 @@ To check a saved run without starting work:
 Status checks classify stale samples from an unfinished run as `interrupted`,
 even if its saved status says `observing`. Exit code zero means a completed pass;
 an active, interrupted or failed run returns one. The original report is retained.
+
+### Verification across Windows sign-ins
+
+The checkout can keep attempting a continuous observation after a host restart:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\set_observation_autostart.ps1 -Action Enable -PythonExecutable F:\ALFRED\.venv\Scripts\python.exe
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\set_observation_autostart.ps1 -Action Status
+```
+
+Use the project's configured Python executable. This developer verification
+helper requires the checkout and its environment; the installed app itself
+still runs without a separate Python installation.
+
+Enable creates the current-user `ALFRED Verification` startup entry and starts
+the supervisor quietly. The ordinary `ALFRED` startup entry is unchanged. Each
+attempt lasts at least ten hours and covers the next refresh, cleanup and
+training schedules with a thirty-minute margin. A reboot or sampling gap
+requires a new full attempt; older reports remain in
+`artifacts/ops/continuous-observation`. Status reads the latest report and
+detects stale samples. The startup entry is removed after a completed pass.
+
+The helper leaves power settings unchanged: keep Windows awake for a continuous
+run. A completed failed attempt stops for investigation instead of being retried
+silently. After fixing its cause, run `scripts/complete_native_observation.py`
+with `--data-dir`, `--executable`, `--evidence-dir` and `--retry-failed` to make an
+explicit retry. Preserve the prior evidence.
+
+To cancel verification and remove only its own startup entry:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\set_observation_autostart.ps1 -Action Disable
+```
+
+The observer stops within approximately one sampling interval. ALFRED remains
+running. Enabling again clears that cancellation marker.

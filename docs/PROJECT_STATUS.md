@@ -6,10 +6,15 @@ implemented capabilities, not a guarantee of complete real-data coverage.
 
 The [27 September release verification](WINDOWS_PACKAGE_VERIFICATION_20260927.md)
 records the current installer/uninstaller, 407 passing backend tests and nine
-passing Chrome workflows. The same native executables passed the
+passing Chrome workflows. All six installer lifecycle checks passed. The same
+native executables passed the
 [26 September runtime checks](WINDOWS_PACKAGE_VERIFICATION_20260926.md), including
-23 packaged checks and a 24-user load test. The ten-hour overnight observation
-started on 27 September; its final outcome remains pending.
+23 packaged checks and a 24-user load test. Two overnight attempts were
+interrupted by host restarts. A supervisor started a fresh attempt at 18:44 IST
+on 27 September, with expected completion at 09:00 IST on 28 September if the
+PC remains awake. It restarts verification after Windows sign-in while retaining
+each interrupted attempt. Its final outcome remains pending; 16 focused tests
+passed for the observation and supervisor logic.
 
 The active Windows runtime is [Waitress + Huey + SQLite](NATIVE_WINDOWS.md),
 with a double-click launcher, persistent task queue, shared local cache and

@@ -6,10 +6,15 @@ results cover the local working tree.
 
 The [27 September release continuation](WINDOWS_PACKAGE_VERIFICATION_20260927.md)
 adds the current installer/uninstaller, 407 passing backend tests and nine
-passing Chrome workflows. The unchanged native executables retain the
+passing Chrome workflows, plus six passing installer lifecycle checks. The
+unchanged native executables retain the
 [26 September runtime proof](WINDOWS_PACKAGE_VERIFICATION_20260926.md), including
-23 packaged checks and 24 concurrent users. A ten-hour overnight observation
-is running; separate-PC and completed overnight acceptance remain open.
+23 packaged checks and 24 concurrent users. Two observations were interrupted
+by host restarts. A fresh attempt began at 18:44 IST on 27 September under a
+supervisor configured to start again at Windows sign-in. Expected completion
+is 09:00 IST on 28 September if the PC remains awake; interrupted windows never
+combine into a pass. All 16 focused observation/supervisor tests passed.
+Separate-PC and completed overnight acceptance remain open.
 
 The [18 September hardening report](NATIVE_HARDENING_VERIFICATION.md) records
 acknowledged queue recovery, the observed host reboot, 12-user concurrency,

@@ -71,7 +71,10 @@ the development tools from the packaged process's PATH.
 The installer verifier requires no existing registered ALFRED installation. It
 uses disposable data and a program path with spaces and an apostrophe, verifies
 upgrade retention and failed-shutdown protection, and restores the original
-Windows startup entry after checking ownership-aware uninstall cleanup.
+Windows startup entry and desktop shortcut after checking ownership-aware
+uninstall cleanup. Before making changes it saves the original Windows state
+and any desktop shortcut in its generated test folder, allowing recovery if
+Windows or the test process is interrupted.
 
 The separate-PC and real reboot checks remain distinct from local packaged
 verification. Follow [Windows acceptance](WINDOWS_ACCEPTANCE.md) and retain its
