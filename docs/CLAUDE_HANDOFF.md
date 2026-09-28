@@ -4,6 +4,10 @@ Copy the prompt below into Claude Code with this repository open. It asks Claude
 to inspect the current state first, because release and runtime evidence can
 change after this document was written.
 
+The [29 September continuation](TRAVEL_RELEASE_VERIFICATION_20260929.md) supersedes
+the 1.0.1 release snapshot below for current packaging and local upgrade evidence.
+Inspect that report first; public publication and remaining acceptance are separate.
+
 ---
 
 You are working on **Alfred - Finance Assistant**, a product of **Life on our

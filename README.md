@@ -100,12 +100,16 @@ do not need to be installed separately.
 | **[Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Setup.exe)** | Desktop and Start menu shortcuts, plus an uninstaller | 485 MB |
 | **[Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Windows-x64.zip)** | Running from an extracted program folder | 542 MB |
 | [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/SHA256SUMS.txt) | Checking the downloaded files | < 1 KB |
+| [Release manifest](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/release-manifest.json) | File sizes, hashes and build provenance | < 5 KB |
 
 The current download is **v1.1.0-preview.1**, adding conversational travel discovery,
 persistent research, editable itineraries and travel preferences. It retains the
 Windows tray controls and illustrated setup instructions. See the [release notes](https://github.com/sourabh48/alfred_ai/releases/tag/v1.1.0-preview.1)
 and [remaining acceptance checks](#verification-status). This preview installer
 is not digitally signed; checksums are provided with the release.
+
+See the [release verification](docs/TRAVEL_RELEASE_VERIFICATION_20260929.md)
+for package fingerprints, upgrade checks and remaining acceptance work.
 
 ### 2. Install and open
 
@@ -236,7 +240,7 @@ Local-only access is the default; LAN access is a separate configuration decisio
 
 ## Verification status
 
-**Recorded Windows verification, 26–28 September 2026.** These are completed
+**Recorded Windows verification, 26–29 September 2026.** These are completed
 checks within the scope of the linked reports, not a claim of universal accuracy.
 
 | Check | Recorded result |
@@ -244,15 +248,16 @@ checks within the scope of the linked reports, not a claim of universal accuracy
 | Current launcher and tray | Real Windows icon registered and removed correctly; offline guide present |
 | Current packaged native runtime | **23 checks passed** on 28 September |
 | Current concurrent local usage | **24 users, 480 writes, zero errors** |
-| Current installed upgrade | **1.0.0 → 1.0.1 passed**, database retained and uninstaller present |
-| Backend regression suite | **407 passed** on the previous release; browser cases separate |
-| Chrome browser workflows | **9 passed**, zero skips on the previous release |
+| Current installed upgrade | **1.0.1 → 1.1.0 passed**, existing records retained and uninstaller present |
+| Backend regression suite | **466 passed**; 11 browser cases skipped and checked separately |
+| Chrome browser workflows | **11 passed**, zero skips, including travel planning |
 | Full installer lifecycle | **6 passed** on the previous release; current full uninstall acceptance remains open |
 | Observation and supervisor logic | **16 focused tests passed** |
 | Tray/native/launcher logic | **16 focused tests passed** after branding changes |
 | OCR, backup/restore, mobile layouts and automated accessibility | Passed within the documented test scope |
 
-[Current tray and release verification](docs/WINDOWS_TRAY_VERIFICATION_20260928.md) ·
+[Travel preview release verification](docs/TRAVEL_RELEASE_VERIFICATION_20260929.md) ·
+[Previous tray and release verification](docs/WINDOWS_TRAY_VERIFICATION_20260928.md) ·
 [Previous release verification](docs/WINDOWS_PACKAGE_VERIFICATION_20260927.md) ·
 [Native runtime evidence](docs/WINDOWS_PACKAGE_VERIFICATION_20260926.md) ·
 [Completion audit](docs/COMPLETION_AUDIT.md)

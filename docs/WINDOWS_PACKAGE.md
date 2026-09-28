@@ -4,12 +4,15 @@ The Windows x64 release contains its own Python 3.12 runtime and application
 dependencies. No Python, pip, virtual environment, Docker, PostgreSQL or Redis
 installation is required on the destination PC.
 
-Download the [Windows preview from GitHub Releases](https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.1-preview.1):
+The [1.1.0 travel preview verification](TRAVEL_RELEASE_VERIFICATION_20260929.md)
+records the current package fingerprints, travel checks and local upgrade.
 
-- [Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Setup.exe)
-- [Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Windows-x64.zip)
-- [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/SHA256SUMS.txt)
-- [Release manifest](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/release-manifest.json)
+Download the [Windows preview from GitHub Releases](https://github.com/sourabh48/alfred_ai/releases/tag/v1.1.0-preview.1):
+
+- [Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Setup.exe)
+- [Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Windows-x64.zip)
+- [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/SHA256SUMS.txt)
+- [Release manifest](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/release-manifest.json)
 
 Local builds remain in the ignored `release` folder; binaries are distributed
 as release assets rather than committed to Git. The developer's complete local
@@ -17,7 +20,7 @@ release folder also contains separate-PC acceptance launchers and a machine-boun
 manifest; see `ACCEPTANCE.txt` there. That acceptance kit is separate from the
 public downloads.
 The [28 September tray verification](WINDOWS_TRAY_VERIFICATION_20260928.md)
-records this release's launcher, tray, installer and guide checks. The
+records the preceding release's launcher, tray, installer and guide checks. The
 [27 September verification](WINDOWS_PACKAGE_VERIFICATION_20260927.md)
 records the previous release's checks, uninstall behavior and cleanup. The
 [26 September runtime verification](WINDOWS_PACKAGE_VERIFICATION_20260926.md)

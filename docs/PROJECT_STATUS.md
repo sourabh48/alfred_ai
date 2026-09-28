@@ -4,6 +4,9 @@ The [completion audit](COMPLETION_AUDIT.md) records the current verification
 results and remaining local/LAN runtime work. The sections below describe
 implemented capabilities, not a guarantee of complete real-data coverage.
 
+The [29 September travel release continuation](TRAVEL_RELEASE_VERIFICATION_20260929.md)
+records the 1.1.0 preview packaging, current travel tests and local upgrade evidence.
+
 The [28 September continuation](WINDOWS_TRAY_VERIFICATION_20260928.md) records
 the current tray, branding, website, attribution and cleanup work.
 
