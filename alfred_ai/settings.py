@@ -357,6 +357,10 @@ _require_production(
 )
 
 CELERY_BEAT_SCHEDULE = {
+    "travel-research-recovery": {
+        "task": "apps.mobility.tasks.resume_travel_research",
+        "schedule": timedelta(minutes=2),
+    },
     "alfred-nightly-training": {
         "task": "apps.ml_engine.continual.tasks.run_global_training_cycle",
         "schedule": timedelta(hours=24),

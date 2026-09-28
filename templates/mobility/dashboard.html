@@ -1,31 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Mobility{% endblock %}
+{% block title %}AI Travel Planner · Alfred{% endblock %}
 
 {% block content %}
 <section class="alfred-hero fade-in" id="mobilityRoot">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
-            <div class="alfred-chip mb-3">Travel planning and trip memory system</div>
-            <h1 class="alfred-hero-title">Keep your route plans, trip logs, ride spending, heat map, and travel photo trail in one focused mobility workspace.</h1>
-            <p class="alfred-hero-copy">Bike maintenance and documents now live in the dedicated Bike Service dashboard. Mobility stays focused on trip planning, movement logs, and media history.</p>
+            <div class="alfred-chip mb-3">ALFRED / AI Travel Planner</div>
+            <h1 class="alfred-hero-title">Plan your next escape.</h1>
+            <p class="alfred-hero-copy">Tell Alfred when you're free, your budget, or what kind of trip you're craving. You don't need a destination to begin.</p>
         </div>
-        <div class="surface-card" style="min-width: 280px;">
-            <p class="metric-kicker">Travel Snapshot</p>
-            <div class="metric-value" id="mobilityTripHero">Upcoming trips: 0</div>
-            <p class="metric-caption mb-1" id="mobilityConditionMeta">Bike service status lives in the dedicated maintenance dashboard.</p>
-            <p class="metric-caption mb-0" id="mobilityDocumentMeta">Expiring documents: 0</p>
+        <div class="small">
+            <div id="mobilityTripHero">Upcoming trips: 0</div>
+            <span id="mobilityConditionMeta" hidden></span>
+            <span id="mobilityDocumentMeta" hidden></span>
         </div>
     </div>
 </section>
 
+{% include "mobility/planner.html" %}
 <section class="soft-grid four-up mb-4" id="mobilitySummaryCards"></section>
 <div id="mobilityPageAlert" class="d-none mb-4"></div>
 
-<section class="row g-4 mb-4">
+<details class="mb-4" id="planDetails" hidden>
+    <summary class="page-section-title">Plan Details · Edit saved plan</summary>
+<section class="row g-4 mt-1">
     <div class="col-xl-12">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Travel Plan</h2>
-            <p class="page-section-copy mb-3">Register each upcoming or completed trip with timing, budget, and movement mode.</p>
+            <h2 class="page-section-title">Structured plan details</h2>
+            <p class="page-section-copy mb-3">These details are filled from your conversation. Drafts may leave destination and dates open.</p>
             <form id="travelPlanForm" class="soft-grid">
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -34,15 +36,15 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="destination">Destination</label>
-                        <input id="destination" name="destination" class="form-control" required>
+                        <input id="destination" name="destination" class="form-control">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="tripStartDate">Start Date</label>
-                        <input id="tripStartDate" name="start_date" type="date" class="form-control" required>
+                        <input id="tripStartDate" name="start_date" type="date" class="form-control">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="tripEndDate">End Date</label>
-                        <input id="tripEndDate" name="end_date" type="date" class="form-control" required>
+                        <input id="tripEndDate" name="end_date" type="date" class="form-control">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="tripBudget">Budget</label>
@@ -67,7 +69,11 @@
                     <div class="col-md-6">
                         <label class="form-label" for="tripStatus">Status</label>
                         <select id="tripStatus" name="status" class="form-select">
+                            <option value="draft">Draft</option>
+                            <option value="researching">Researching</option>
+                            <option value="suggestions_ready">Suggestions Ready</option>
                             <option value="planned">Planned</option>
+                            <option value="confirmed">Confirmed</option>
                             <option value="booked">Booked</option>
                             <option value="on_trip">On Trip</option>
                             <option value="completed">Completed</option>
@@ -85,20 +91,22 @@
                 </div>
                 <div id="travelPlanFeedback" class="d-none alert mb-0"></div>
                 <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-primary" type="submit">Save Travel Plan</button>
-                    <button class="btn btn-outline-primary" type="button" id="travelAdviceButton">Generate Travel Advice</button>
+                    <button class="btn btn-primary" type="submit">Update Details</button>
+                    <button class="btn btn-outline-primary" type="button" id="travelAdviceButton">Continue planning in chat</button>
                 </div>
             </form>
             <div class="mt-4">
                 <h3 class="h6 fw-bold mb-3">Travel Advisor</h3>
                 <div id="travelAdvisorPanel" class="data-stack">
-                    <div class="empty-state">Enter a destination, dates, and budget to preview weather, offbeat stops, stay budget, and bike-readiness guidance.</div>
+                    <div class="empty-state">Use the conversation above for discovery, research and itinerary changes.</div>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
+ </details>
+<details class="mb-4"><summary class="page-section-title mb-3">Trip journal and photo upload</summary>
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
@@ -155,12 +163,12 @@
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Trip Photo Upload</h2>
-            <p class="page-section-copy mb-3">Attach photos to the plan or a specific log entry so the gallery and heat map can reflect your route.</p>
+            <p class="page-section-copy mb-3">Upload with or without a plan. Date and location metadata can suggest a trip association for you to review.</p>
             <form id="tripPhotoForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label" for="photoPlan">Travel Plan</label>
-                        <select id="photoPlan" name="travel_plan" class="form-select" required></select>
+                        <select id="photoPlan" name="travel_plan" class="form-select"></select>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="photoLog">Trip Log</label>
@@ -198,6 +206,7 @@
     </div>
 </section>
 
+ </details>
 <section class="row g-4 mb-4">
     <div class="col-xl-12">
         <div class="surface-card h-100">
@@ -244,5 +253,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/mobility.js?v=2.5"></script>
+<link rel="stylesheet" href="/static/css/travel_planner.css?v=1">
+<script src="/static/js/mobility.js?v=3"></script>
+<script src="/static/js/travel_planner.js?v=1"></script>
+<script src="/static/js/travel_preferences.js?v=1"></script>
 {% endblock %}

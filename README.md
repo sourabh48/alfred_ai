@@ -67,6 +67,11 @@
 </table>
 
 ALFRED uses **Django + Waitress + Huey + SQLite** for its native Windows runtime.
+The source now includes a [chat-first Travel Planner](docs/TRAVEL_PLANNER.md):
+start without a destination, compare suggestions, build and edit an itinerary,
+and save the conversation as a travel plan. The 1.0.1 Windows download predates
+this feature; see the planner guide for current coverage and verification.
+
 Your data stays in your chosen local folder. Live external sources and configured
 integrations need internet access; the interface assets and OCR engines are bundled.
 

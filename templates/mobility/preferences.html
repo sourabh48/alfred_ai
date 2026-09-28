@@ -1,0 +1,17 @@
+<section id="travelPreferences" class="surface-card mb-4">
+    <p class="metric-kicker">TRAVEL MEMORY</p><h2 class="page-section-title">Your Travel Style</h2>
+    <p>See why Alfred believes each preference. You can edit or remove any item. Learned signals are tentative; explicit choices take priority.</p>
+    <div id="travelPreferencesAlert" role="status" class="small mb-2"></div>
+    <label for="travelNovelty" class="form-label">New places or familiar favourites?</label>
+    <select id="travelNovelty" class="form-select mb-3"><option value="mostly_new">Mostly New</option><option value="balanced">Balanced</option><option value="mostly_familiar">Mostly Familiar</option></select>
+    <label class="d-block mb-2"><input type="checkbox" id="travelLearning"> Learn from choices and trip feedback</label>
+    <label class="d-block mb-3"><input type="checkbox" id="travelMediaLearning"> Use tags on photos I favourite as tentative preference signals</label>
+    <div id="travelPreferenceList"></div>
+    <form id="travelPreferenceForm" class="d-flex flex-wrap gap-2 my-3">
+        <label for="travelPreferenceKey" class="visually-hidden">Preference</label><select id="travelPreferenceKey" class="form-select" style="max-width:260px">
+            <option>mountains</option><option>beaches</option><option>forests</option><option>waterfalls</option><option>wildlife</option><option>historical places</option><option>architecture</option><option>trekking</option><option>camping</option><option>photography</option><option>food</option><option>culture</option><option>nightlife</option><option>quiet locations</option><option>offbeat places</option><option>adventure</option><option>slow travel</option><option>cool weather</option><option>scenic roads</option><option>budget travel</option>
+        </select><button class="btn btn-outline-primary" type="submit">I enjoy this</button>
+    </form>
+    <button id="travelResetPreferences" type="button" class="btn btn-outline-secondary">Reset Learned Preferences</button>
+    <p class="small mt-2">Reset removes inferred preferences and retains choices you explicitly set. Travel records are preserved.</p>
+</section>

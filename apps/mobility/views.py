@@ -608,6 +608,33 @@ class TravelPlanDetailView(RetrieveUpdateDestroyAPIView):
         ).select_related("vehicle_profile")
 
 
+    def perform_update(self, serializer):
+        from .services.travel_discovery import fact
+        from .models import TravelPlanningSession
+        original = serializer.instance
+        core = ("destination", "start_date", "end_date", "budget", "transport_mode", "vehicle_profile")
+        changed = any(key in serializer.validated_data and getattr(original,key) != serializer.validated_data[key] for key in core)
+        plan = serializer.save()
+        session = TravelPlanningSession.objects.filter(plan=plan, user=self.request.user).first()
+        if session:
+            if changed:
+                for key, val in {"selected_destination":plan.destination, "available_start_date":str(plan.start_date) if plan.start_date else None,
+                                 "available_end_date":str(plan.end_date) if plan.end_date else None, "trip_duration":plan.duration_days or None,
+                                 "budget":plan.budget, "transport_mode":plan.transport_mode, "vehicle_profile":plan.vehicle_profile_id}.items():
+                    if val is None:
+                        session.state.pop(key,None)
+                    else:
+                        session.state[key] = fact(val,"plan_details",True)
+                session.revision += 1
+                session.itinerary = {}
+                session.status = "destination_selected" if plan.destination else "discovery"
+                plan.itinerary = {}
+                plan.planning_state = session.state
+                plan.save(update_fields=["itinerary","planning_state"])
+            session.title = plan.title
+            session.save()
+
+
 class TripLogListCreateView(ListCreateAPIView):
     serializer_class = TripLogSerializer
     permission_classes = [IsAuthenticated]
@@ -638,7 +665,9 @@ class TripPhotoListCreateView(ListCreateAPIView):
         return TripPhoto.objects.filter(user=self.request.user).select_related("travel_plan", "travel_plan__vehicle_profile", "trip_log").order_by("-taken_at", "-id")
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        photo = serializer.save(user=self.request.user)
+        from .services.travel_media import enrich_photo
+        enrich_photo(photo)
 
 
 class TripPhotoDetailView(RetrieveUpdateDestroyAPIView):
@@ -648,6 +677,11 @@ class TripPhotoDetailView(RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return TripPhoto.objects.filter(user=self.request.user).select_related("travel_plan", "travel_plan__vehicle_profile", "trip_log")
+
+    def perform_update(self, serializer):
+        photo = serializer.save()
+        from .services.travel_media import learn_from_favorite
+        learn_from_favorite(photo)
 
 
 class TravelAdvisorPreviewView(APIView):
@@ -662,7 +696,12 @@ class TravelAdvisorPreviewView(APIView):
         vehicle_profile = _resolve_bike_profile(request.user, request.data.get("vehicle_profile_id"))
 
         if not destination or not start_date or not end_date:
-            return Response({"detail": "Destination, start date, and end date are required."}, status=status.HTTP_400_BAD_REQUEST)
+            from .services.travel_conversation import new_session, send_message
+            from .planner_views import session_payload
+            session = new_session(request.user)
+            parts = [f"{start_date} to {end_date}" if start_date and end_date else "", f"Budget ₹{budget}" if budget else ""]
+            text = ". ".join(p for p in parts if p) or "Help me plan a trip"
+            return Response(session_payload(send_message(session.id, request.user, text)), status=status.HTTP_201_CREATED)
 
         try:
             parsed_start = date_cls.fromisoformat(start_date)
@@ -731,7 +770,7 @@ class MobilityDashboardView(APIView):
 
         active_trip_status = {"planned", "booked", "on_trip"}
         today = timezone.localdate()
-        upcoming_plans = [plan for plan in travel_plans if plan.status in active_trip_status and plan.end_date >= today]
+        upcoming_plans = [plan for plan in travel_plans if plan.status in active_trip_status | {"confirmed"} and plan.end_date and plan.end_date >= today]
         completed_plans = [plan for plan in travel_plans if plan.status == "completed"]
         total_trip_budget = sum(plan.budget or 0 for plan in travel_plans)
         total_trip_spend = sum(log.spend_amount or 0 for log in trip_logs)
@@ -758,7 +797,7 @@ class MobilityDashboardView(APIView):
             heatmap_points.append(
                 {
                     "type": "photo",
-                    "title": photo.caption or photo.travel_plan.title,
+                    "title": photo.caption or (photo.travel_plan.title if photo.travel_plan else "Unassigned trip photo"),
                     "location_name": photo.location_name,
                     "latitude": photo.latitude,
                     "longitude": photo.longitude,

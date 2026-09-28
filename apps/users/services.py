@@ -26,6 +26,8 @@ from apps.mobility.models import (
     BikeServiceRecord,
     FuelRefillLog,
     TravelPlan,
+    TravelPlanningSession,
+    TravelPreferenceProfile,
     TripLog,
     TripPhoto,
 )
@@ -148,6 +150,8 @@ def clear_user_fed_data(user) -> dict:
         bike_document_qs.delete()
         trip_photo_qs.delete()
         TripLog.objects.filter(user=user).delete()
+        TravelPlanningSession.objects.filter(user=user).delete()
+        TravelPreferenceProfile.objects.filter(user=user).delete()
         TravelPlan.objects.filter(user=user).delete()
         BikeProfile.objects.filter(user=user).delete()
 

@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -160,7 +161,11 @@ class TravelPlan(models.Model):
     ]
 
     STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("researching", "Researching"),
+        ("suggestions_ready", "Suggestions Ready"),
         ("planned", "Planned"),
+        ("confirmed", "Confirmed"),
         ("booked", "Booked"),
         ("on_trip", "On Trip"),
         ("completed", "Completed"),
@@ -170,14 +175,16 @@ class TravelPlan(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="travel_plans")
     vehicle_profile = models.ForeignKey("BikeProfile", on_delete=models.SET_NULL, null=True, blank=True, related_name="travel_plans")
     title = models.CharField(max_length=160)
-    destination = models.CharField(max_length=200)
-    start_date = models.DateField()
-    end_date = models.DateField()
+    destination = models.CharField(max_length=200, null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
     budget = models.FloatField(default=0)
     transport_mode = models.CharField(max_length=20, choices=TRANSPORT_MODE_CHOICES, default="ride")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="planned")
     stay_details = models.CharField(max_length=200, blank=True)
     notes = models.TextField(blank=True)
+    planning_state = models.JSONField(default=dict, blank=True)
+    itinerary = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -193,7 +200,103 @@ class TravelPlan(models.Model):
 
     @property
     def duration_days(self) -> int:
+        if not self.start_date or not self.end_date:
+            return self.planning_state.get("trip_duration", {}).get("value", 0)
         return max((self.end_date - self.start_date).days + 1, 1)
+
+    def clean(self):
+        super().clean()
+        if self.status not in {"draft", "researching", "suggestions_ready", "cancelled"}:
+            missing = {key: "Required for a planned trip." for key in
+                       ("destination", "start_date", "end_date") if not getattr(self, key)}
+            if missing:
+                raise ValidationError(missing)
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError({"end_date": "End date must follow the start date."})
+
+
+class TravelPlanningSession(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="travel_sessions")
+    plan = models.OneToOneField(TravelPlan, null=True, blank=True, on_delete=models.SET_NULL, related_name="planning_session")
+    title = models.CharField(max_length=160, default="Your next escape")
+    state = models.JSONField(default=dict)
+    candidates = models.JSONField(default=list)
+    itinerary = models.JSONField(default=dict)
+    status = models.CharField(max_length=30, default="discovery")
+    revision = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+
+class TravelMessage(models.Model):
+    session = models.ForeignKey(TravelPlanningSession, on_delete=models.CASCADE, related_name="messages")
+    role = models.CharField(max_length=12, choices=[("user", "User"), ("assistant", "Alfred")])
+    text = models.TextField()
+    chips = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+
+class TravelResearchSession(models.Model):
+    session = models.ForeignKey(TravelPlanningSession, on_delete=models.CASCADE, related_name="research_runs")
+    request = models.JSONField(default=dict)
+    status = models.CharField(max_length=40, default="queued", db_index=True)
+    deep = models.BooleanField(default=False)
+    recheck = models.BooleanField(default=False)
+    revision = models.PositiveIntegerField(default=0)
+    research_version = models.PositiveIntegerField(default=1)
+    candidate_count = models.PositiveIntegerField(default=0)
+    sources_checked = models.PositiveIntegerField(default=0)
+    error = models.TextField(blank=True)
+    summary = models.TextField(blank=True)
+    changes = models.JSONField(default=list)
+    result = models.JSONField(default=list)
+    lease_token = models.CharField(max_length=36, blank=True)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-id"]
+
+
+class TravelResearchEvidence(models.Model):
+    research = models.ForeignKey(TravelResearchSession, on_delete=models.CASCADE, related_name="evidence")
+    destination = models.CharField(max_length=200)
+    data_type = models.CharField(max_length=40)
+    source_url = models.URLField(max_length=1000, blank=True)
+    source_name = models.CharField(max_length=160)
+    retrieved_at = models.DateTimeField(null=True, blank=True)
+    valid_until = models.DateTimeField(null=True, blank=True)
+    confidence = models.CharField(max_length=16, default="UNKNOWN")
+    freshness = models.CharField(max_length=20, default="unknown")
+    finding = models.JSONField(default=dict)
+
+
+class TravelPreferenceProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="travel_preferences")
+    novelty = models.CharField(max_length=20, default="balanced", choices=[
+        ("mostly_new", "Mostly New"), ("balanced", "Balanced"), ("mostly_familiar", "Mostly Familiar")])
+    preferences = models.JSONField(default=dict)
+    learning_enabled = models.BooleanField(default=True)
+    media_learning_enabled = models.BooleanField(default=False)
+    reset_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class TravelFeedback(models.Model):
+    plan = models.OneToOneField(TravelPlan, on_delete=models.CASCADE, related_name="feedback")
+    rating = models.CharField(max_length=20, choices=[("loved", "Loved it"), ("good", "Good"), ("okay", "Okay"), ("disliked", "Didn't enjoy it")])
+    liked = models.JSONField(default=list)
+    disliked = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class TripLog(models.Model):
@@ -222,10 +325,13 @@ class TripLog(models.Model):
 
 class TripPhoto(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="trip_photos")
-    travel_plan = models.ForeignKey(TravelPlan, on_delete=models.CASCADE, related_name="photos")
+    travel_plan = models.ForeignKey(TravelPlan, null=True, blank=True, on_delete=models.CASCADE, related_name="photos")
     trip_log = models.ForeignKey(TripLog, on_delete=models.SET_NULL, null=True, blank=True, related_name="photos")
     image = models.FileField(upload_to="trip_photos/%Y/%m/")
     caption = models.CharField(max_length=200, blank=True)
+    is_favorite = models.BooleanField(default=False)
+    preference_tags = models.JSONField(default=list, blank=True)
+    ignored_plan_ids = models.JSONField(default=list, blank=True)
     location_name = models.CharField(max_length=200, blank=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
@@ -239,7 +345,7 @@ class TripPhoto(models.Model):
         ]
 
     def __str__(self):
-        return self.caption or f"Photo for {self.travel_plan.title}"
+        return self.caption or (f"Photo for {self.travel_plan.title}" if self.travel_plan else "Unassigned trip photo")
 
 
 class BikeIssueReport(models.Model):

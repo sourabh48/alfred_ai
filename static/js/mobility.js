@@ -124,7 +124,7 @@ function renderTravelPlans(items) {
                     </div>
                     <div class="text-end">
                         <strong>${Alfred.formatCurrency(item.budget)}</strong>
-                        <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTravelPlan(${item.id})">Delete</button></div>
+                        <div class="mt-2"><button class="btn btn-sm btn-outline-primary" type="button" onclick="TravelPlanner.openPlan(${item.id})">Open plan</button> <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTravelPlan(${item.id})">Delete</button></div>
                     </div>
                 </div>
             </div>
@@ -159,6 +159,7 @@ function renderPhotoGallery(items) {
                 <div class="muted small">${Alfred.escapeHtml(item.location_name || item.travel_plan_title)}</div>
                 <div class="muted small">${item.trip_log_title ? `Linked log: ${Alfred.escapeHtml(item.trip_log_title)}` : `Plan: ${Alfred.escapeHtml(item.travel_plan_title)}`}</div>
                 <div class="muted small">${item.taken_at ? Alfred.formatDateTime(item.taken_at) : "Time not set"}</div>
+                <details class="mt-2"><summary>Favourite and travel tags</summary><label class="small" for="photoTags${item.id}">Tags you recognise in this photo (hold Ctrl to select several)</label><select id="photoTags${item.id}" class="form-select" multiple>${["mountains","beaches","waterfalls","photography","scenic roads","forests","camping","architecture"].map(tag=>`<option ${item.preference_tags?.includes(tag) ? "selected" : ""}>${tag}</option>`).join("")}</select><button class="btn btn-sm btn-outline-primary mt-2" onclick="savePhotoPreference(${item.id})">${item.is_favorite ? "Remove favourite" : "Mark favourite"}</button><p class="small mt-2">Tags inform travel preferences only if you opt in under Settings.</p></details>
                 <button class="btn btn-sm btn-outline-danger mt-3" type="button" onclick="deleteTripPhoto(${item.id})">Delete</button>
             </div>
         </article>
@@ -196,7 +197,7 @@ function hydratePlanSelects(selectedPhotoPlan, selectedPhotoLog) {
     const photoPlan = document.getElementById("photoPlan");
     const hasPlans = mobilityState.plans.length > 0;
     const defaultPlanId = hasPlans ? String(mobilityState.plans[0].id) : "";
-    const activePhotoPlan = keepValue(selectedPhotoPlan, mobilityState.plans) || defaultPlanId;
+    const activePhotoPlan = keepValue(selectedPhotoPlan, mobilityState.plans);
 
     const planLabel = item => `${item.title} | ${item.destination}`;
     Alfred.syncSelectOptions(tripLogPlan, mobilityState.plans, {
@@ -209,21 +210,21 @@ function hydratePlanSelects(selectedPhotoPlan, selectedPhotoLog) {
         fallbackValue: defaultPlanId,
     });
     Alfred.syncSelectOptions(photoPlan, mobilityState.plans, {
-        includeBlank: !hasPlans,
-        blankLabel: "Create a travel plan first",
+        includeBlank: true,
+        blankLabel: "Unassigned · match with a trip later",
         getValue: item => item.id,
         getLabel: planLabel,
-        disableWhenEmpty: true,
+        disableWhenEmpty: false,
         preferredValue: activePhotoPlan,
-        fallbackValue: activePhotoPlan || defaultPlanId,
+        fallbackValue: "",
     });
 
     syncPhotoLogOptions(selectedPhotoLog);
     Alfred.setDisabledIfChanged(document.querySelector("#tripLogForm button[type='submit']"), !hasPlans);
-    Alfred.setDisabledIfChanged(document.querySelector("#tripPhotoForm button[type='submit']"), !hasPlans);
+    Alfred.setDisabledIfChanged(document.querySelector("#tripPhotoForm button[type='submit']"), false);
     if (!hasPlans) {
         showFeedback("tripLogFeedback", "Create a travel plan before logging trip activity.", "warning");
-        showFeedback("tripPhotoFeedback", "Create a travel plan before uploading trip photos.", "warning");
+        hideFeedback("tripPhotoFeedback");
     } else {
         hideFeedback("tripLogFeedback");
         hideFeedback("tripPhotoFeedback");
@@ -268,7 +269,9 @@ function submitTravelPlan(event) {
     const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
     payload.budget = Number(payload.budget || 0);
     payload.vehicle_profile = payload.vehicle_profile ? Number(payload.vehicle_profile) : null;
-    Alfred.fetchJSON("/api/mobility/travel-plans/", { method: "POST", body: JSON.stringify(payload) })
+    for (const key of ["destination", "start_date", "end_date"]) if (!payload[key]) payload[key] = null;
+    const planId = event.currentTarget.dataset.planId;
+    Alfred.fetchJSON(`/api/mobility/travel-plans/${planId ? `${planId}/` : ""}`, { method: planId ? "PATCH" : "POST", body: JSON.stringify(payload) })
         .then(() => {
             showFeedback("travelPlanFeedback", "Travel plan saved.", "success");
     renderTravelAdvicePlaceholder("Travel plan saved. Generate Travel Advice to pull live weather and itinerary guidance for the destination.");
@@ -278,18 +281,8 @@ function submitTravelPlan(event) {
 }
 
 function previewTravelAdvice() {
-    const form = document.getElementById("travelPlanForm");
-    const payload = Object.fromEntries(new FormData(form).entries());
-    payload.budget = Number(payload.budget || 0);
-    payload.vehicle_profile_id = payload.vehicle_profile ? Number(payload.vehicle_profile) : null;
-    if (!payload.destination || !payload.start_date || !payload.end_date) {
-        showFeedback("travelPlanFeedback", "Destination, start date, and end date are required for travel advice.", "warning");
-        return;
-    }
-    renderTravelAdvicePlaceholder("Pulling live location and weather context...");
-    Alfred.fetchJSON("/api/mobility/travel-advisor/preview/", { method: "POST", body: JSON.stringify(payload) })
-        .then(renderTravelAdvice)
-        .catch(error => renderTravelAdvicePlaceholder(error.message));
+    document.getElementById("travelPlanner").scrollIntoView({behavior: "smooth"});
+    document.getElementById("plannerInput").focus();
 }
 
 function submitTripLog(event) {
@@ -314,10 +307,6 @@ function submitTripPhoto(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    if (!formData.get("travel_plan")) {
-        showFeedback("tripPhotoFeedback", "Select a travel plan before uploading a photo.", "warning");
-        return;
-    }
     const payload = new FormData();
     formData.forEach((value, key) => {
         if (value !== "" && value !== null) {
@@ -325,11 +314,17 @@ function submitTripPhoto(event) {
         }
     });
     Alfred.fetchJSON("/api/mobility/trip-photos/", { method: "POST", body: payload })
-        .then(() => { form.reset(); setMobilityDefaults(); showFeedback("tripPhotoFeedback", "Trip photo uploaded.", "success"); loadMobilityDashboard(); })
+        .then(() => { form.reset(); setMobilityDefaults(); showFeedback("tripPhotoFeedback", "Trip photo uploaded.", "success"); loadMobilityDashboard(); TravelPlanner.refreshPostTrip(); })
         .catch(error => showFeedback("tripPhotoFeedback", error.message, "danger"));
 }
 
 function deleteTravelPlan(id) { deleteRecord(`/api/mobility/travel-plans/${id}/`, "Delete this travel plan and its logs/photos?"); }
+function savePhotoPreference(id) {
+    const photo = mobilityState.photos.find(p=>p.id === id);
+    const tags = Array.from(document.getElementById(`photoTags${id}`).selectedOptions).map(o=>o.value);
+    Alfred.fetchJSON(`/api/mobility/trip-photos/${id}/`, {method:"PATCH",body:JSON.stringify({is_favorite:!photo.is_favorite,preference_tags:tags})})
+        .then(loadMobilityDashboard).catch(error=>showRootAlert(error.message,"danger"));
+}
 function deleteTripLog(id) { deleteRecord(`/api/mobility/trip-logs/${id}/`, "Delete this trip log?"); }
 function deleteTripPhoto(id) { deleteRecord(`/api/mobility/trip-photos/${id}/`, "Delete this trip photo?"); }
 

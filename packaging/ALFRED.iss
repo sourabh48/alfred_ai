@@ -8,7 +8,7 @@
 [Setup]
 AppId={{D4BFC620-610B-4AF7-81BF-215ECAC7297B}
 AppName=ALFRED
-AppVersion=1.0.1
+AppVersion=1.1.0
 AppPublisher=Life on our Trails
 AppPublisherURL=https://sourabh48.github.io/alfred_ai/
 AppSupportURL=https://github.com/sourabh48/alfred_ai/issues

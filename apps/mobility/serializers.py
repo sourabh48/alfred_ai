@@ -212,17 +212,27 @@ class TravelPlanSerializer(serializers.ModelSerializer):
             "stay_details",
             "notes",
             "duration_days",
+            "planning_state",
+            "itinerary",
             "log_count",
             "photo_count",
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("user", "duration_days", "log_count", "photo_count", "created_at", "updated_at")
+        read_only_fields = ("user", "duration_days", "planning_state", "itinerary", "log_count", "photo_count", "created_at", "updated_at")
 
     def validate(self, attrs):
         request = self.context.get("request")
         start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
         end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
+        plan_status = attrs.get("status", getattr(self.instance, "status", "planned"))
+        if plan_status not in {"draft", "researching", "suggestions_ready", "cancelled"}:
+            missing = {field: "Required for a planned trip." for field in ("destination", "start_date", "end_date")
+                       if not attrs.get(field, getattr(self.instance, field, None))}
+            if missing:
+                raise serializers.ValidationError(missing)
+        if attrs.get("budget", 0) < 0:
+            raise serializers.ValidationError({"budget": "Budget cannot be negative."})
         vehicle_profile = attrs.get("vehicle_profile", getattr(self.instance, "vehicle_profile", None))
         if start_date and end_date and end_date < start_date:
             raise serializers.ValidationError("Trip end date cannot be earlier than the start date.")
@@ -275,7 +285,7 @@ class TripLogSerializer(serializers.ModelSerializer):
 
 
 class TripPhotoSerializer(serializers.ModelSerializer):
-    travel_plan_title = serializers.CharField(source="travel_plan.title", read_only=True)
+    travel_plan_title = serializers.CharField(source="travel_plan.title", read_only=True, default="Unassigned")
     trip_log_title = serializers.CharField(source="trip_log.title", read_only=True)
     photo_url = serializers.SerializerMethodField()
 
@@ -291,6 +301,8 @@ class TripPhotoSerializer(serializers.ModelSerializer):
             "image",
             "photo_url",
             "caption",
+            "is_favorite",
+            "preference_tags",
             "location_name",
             "latitude",
             "longitude",
@@ -307,6 +319,12 @@ class TripPhotoSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(obj.image.url)
         return obj.image.url
 
+    def validate_preference_tags(self, value):
+        from .services.travel_conversation import STYLE_WORDS
+        if not isinstance(value, list) or len(value) > 10 or any(v not in STYLE_WORDS for v in value):
+            raise serializers.ValidationError("Use up to ten known travel preference tags.")
+        return list(dict.fromkeys(value))
+
     def validate(self, attrs):
         request = self.context.get("request")
         travel_plan = attrs.get("travel_plan", getattr(self.instance, "travel_plan", None))
@@ -320,6 +338,8 @@ class TripPhotoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"trip_log": "You can only attach photos to your own trip logs."})
         if trip_log and travel_plan and trip_log.travel_plan_id != travel_plan.id:
             raise serializers.ValidationError({"trip_log": "Selected trip log does not belong to the chosen travel plan."})
+        if trip_log and not travel_plan:
+            attrs["travel_plan"] = trip_log.travel_plan
         if (latitude is None) != (longitude is None):
             raise serializers.ValidationError("Provide both latitude and longitude together.")
 

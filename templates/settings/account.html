@@ -113,6 +113,7 @@
     <div class="data-stack" id="settingsLinkedAccountsList" aria-live="polite"></div>
 </section>
 
+{% include "mobility/preferences.html" %}
 <section class="surface-card">
     <h2 class="page-section-title mb-1">Account Data</h2>
     <p class="page-section-copy mb-3">Remove your saved Alfred data and uploaded documents to start fresh. Your account stays active. This cannot be undone.</p>
@@ -122,4 +123,6 @@
 
 {% block extra_js %}
 <script src="/static/js/settings.js?v=1.2"></script>
+<link rel="stylesheet" href="/static/css/travel_planner.css?v=1">
+<script src="/static/js/travel_preferences.js?v=1"></script>
 {% endblock %}

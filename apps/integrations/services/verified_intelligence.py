@@ -1343,7 +1343,9 @@ class VerifiedIntelligenceService:
         return payload, summary, "Weather is cached from Open-Meteo with short freshness windows so stale forecasts can be replaced quickly."
 
     def _fetch_google_news(self, feed_url: str, query: str) -> tuple[dict, str, str]:
-        parsed = feedparser.parse(feed_url)
+        response = requests.get(feed_url, headers={"User-Agent": self.USER_AGENT}, timeout=10)
+        response.raise_for_status()
+        parsed = feedparser.parse(response.content)
         items = []
         for entry in parsed.entries[:8]:
             source = ""
