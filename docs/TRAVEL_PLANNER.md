@@ -113,5 +113,10 @@ comparison, selection, itinerary, targeted edits, saving, reopening, draft quick
 chips, preference editing and actual 390/768-pixel emulated viewports. These use
 deterministic weather fixtures; the separate native drill checks live weather.
 
-The downloaded 1.0.1 preview predates this planner feature. A source change does
-not update an already-installed frozen executable; a new Windows build is needed.
+The planner is included in **1.1.0-preview.1**. Earlier Windows installations
+need the new installer; pulling source alone does not update a frozen executable.
+To verify that executable in a disposable data folder:
+
+```powershell
+python scripts/verify_travel_runtime.py --executable dist/ALFRED/ALFRED.exe --report artifacts/ops/travel-packaged-verification.json
+```

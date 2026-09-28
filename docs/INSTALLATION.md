@@ -2,7 +2,7 @@
 
 **[Open this guide as a website](https://sourabh48.github.io/alfred_ai/guide/)** · A product of Life on our Trails
 
-[← Project overview](../README.md) · [Windows downloads](https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.1-preview.1) · [Developer setup](DEVELOPMENT.md)
+[← Project overview](../README.md) · [Windows downloads](https://github.com/sourabh48/alfred_ai/releases/tag/v1.1.0-preview.1) · [Developer setup](DEVELOPMENT.md)
 
 Use this guide to install the Windows x64 application. Python and dependencies
 are included. The images below are illustrated instructions, not screenshots;
@@ -12,7 +12,7 @@ Windows and setup screens can vary.
 
 ![Download ALFRED-Setup.exe from the GitHub release](guide/images/01-download.svg)
 
-Download **[ALFRED-Setup.exe](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Setup.exe)**.
+Download **[ALFRED-Setup.exe](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Setup.exe)**.
 For portable use, choose the ZIP and extract it completely. Checksums are on the
 release page. This preview installer is not digitally signed.
 

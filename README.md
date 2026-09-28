@@ -12,9 +12,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Setup.exe"><img src="docs/assets/download-windows.svg" alt="Download ALFRED for Windows x64 — installer" width="304" height="64"></a>
+  <a href="https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Setup.exe"><img src="docs/assets/download-windows.svg" alt="Download ALFRED for Windows x64 — installer" width="304" height="64"></a>
   &nbsp;
-  <a href="https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Windows-x64.zip"><img src="docs/assets/download-portable.svg" alt="Download the portable Windows ZIP" width="240" height="64"></a>
+  <a href="https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Windows-x64.zip"><img src="docs/assets/download-portable.svg" alt="Download the portable Windows ZIP" width="240" height="64"></a>
 </p>
 
 <p align="center">
@@ -67,10 +67,10 @@
 </table>
 
 ALFRED uses **Django + Waitress + Huey + SQLite** for its native Windows runtime.
-The source now includes a [chat-first Travel Planner](docs/TRAVEL_PLANNER.md):
+The Windows app includes a [chat-first Travel Planner](docs/TRAVEL_PLANNER.md):
 start without a destination, compare suggestions, build and edit an itinerary,
-and save the conversation as a travel plan. The 1.0.1 Windows download predates
-this feature; see the planner guide for current coverage and verification.
+and save the conversation as a travel plan. Start with dates, a budget or a craving;
+destination selection comes later. See the planner guide for current coverage.
 
 Your data stays in your chosen local folder. Live external sources and configured
 integrations need internet access; the interface assets and OCR engines are bundled.
@@ -97,12 +97,13 @@ do not need to be installed separately.
 
 | Download | Best for | Approximate size |
 | --- | --- | --- |
-| **[Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Setup.exe)** | Desktop and Start menu shortcuts, plus an uninstaller | 485 MB |
-| **[Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/ALFRED-Windows-x64.zip)** | Running from an extracted program folder | 542 MB |
-| [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/SHA256SUMS.txt) | Checking the downloaded files | < 1 KB |
+| **[Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Setup.exe)** | Desktop and Start menu shortcuts, plus an uninstaller | 485 MB |
+| **[Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Windows-x64.zip)** | Running from an extracted program folder | 542 MB |
+| [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/SHA256SUMS.txt) | Checking the downloaded files | < 1 KB |
 
-The current download is **v1.0.1-preview.1**, with persistent Windows tray controls,
-a refreshed launcher and illustrated setup instructions. See the [release notes](https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.1-preview.1)
+The current download is **v1.1.0-preview.1**, adding conversational travel discovery,
+persistent research, editable itineraries and travel preferences. It retains the
+Windows tray controls and illustrated setup instructions. See the [release notes](https://github.com/sourabh48/alfred_ai/releases/tag/v1.1.0-preview.1)
 and [remaining acceptance checks](#verification-status). This preview installer
 is not digitally signed; checksums are provided with the release.
 
@@ -138,7 +139,7 @@ Portable describes the program folder. By default, its data is still stored in
 <details>
 <summary><strong>Check a download's SHA-256 checksum</strong></summary>
 
-Download [SHA256SUMS.txt](https://github.com/sourabh48/alfred_ai/releases/download/v1.0.1-preview.1/SHA256SUMS.txt)
+Download [SHA256SUMS.txt](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/SHA256SUMS.txt)
 from the same release. In PowerShell, open the folder containing the installer:
 
 ```powershell
@@ -294,7 +295,7 @@ uses Waitress, Huey and SQLite. Public/cloud deployment is outside the current s
   © 2026 Life on our Trails. All rights reserved.<br><br>
   <a href="https://sourabh48.github.io/alfred_ai/">Product website</a> ·
   <a href="docs/OWNERSHIP.md">Copyright and release fingerprints</a> ·
-  <a href="https://github.com/sourabh48/alfred_ai/releases/tag/v1.0.1-preview.1">Download the Windows preview</a> ·
+  <a href="https://github.com/sourabh48/alfred_ai/releases/tag/v1.1.0-preview.1">Download the Windows preview</a> ·
   <a href="https://github.com/sourabh48/alfred_ai/issues">Report an issue</a> ·
   <a href="#features">Back to features ↑</a>
 </p>
