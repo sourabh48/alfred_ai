@@ -144,6 +144,13 @@ Current build locations to inspect:
 - `release/ALFRED-Setup.exe` — the convenient local installer location
 - Inno Setup compiler: `F:\ALFRED-tools\InnoSetup\ISCC.exe`
 
+The verified 28 September candidate was promoted to `dist/ALFRED`, and its
+distributables to `release/`; the earlier candidate paths may therefore be
+absent. Previous binaries and stopped-data backups are retained under
+`F:\ALFRED-retired\20260928-before-tray`. Both installed and checkout copies
+were health/tray checked. They use separate data folders; do not merge them or
+change the owner's shortcuts without establishing which workspace is intended.
+
 If a fresh build is needed, substitute a fresh folder for `next-build` below:
 
 ```powershell
@@ -197,6 +204,14 @@ previous release; 23 packaged checks and 24-user load on an earlier binary;
 and 16 focused tray/native/launcher tests plus 18 source native checks during
 the tray update. Reconcile current reports and timestamps before quoting counts.
 The 28 September report is the starting point for current release evidence.
+
+The completed fresh tray-package run `b19f96b008` passed 23 checks, including
+24 users/480 writes, 28 responsive checks and 14 automated accessibility audits.
+The installed 1.0.0 → 1.0.1 upgrade retained its database hash. A first packaged
+attempt failed on a lost local connection and is retained separately. Full
+uninstall testing for the new release was blocked by a real registered install;
+use an isolated Windows user or second PC. Recheck current logs before assuming
+these results apply to any later edits.
 
 Finish with:
 

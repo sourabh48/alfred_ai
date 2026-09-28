@@ -1,6 +1,8 @@
 <p align="center">
   <strong>Alfred - Finance Assistant</strong><br>
   A product of <strong>Life on our Trails</strong><br><br>
+  <a href="https://sourabh48.github.io/alfred_ai/">Open the product website</a> ·
+  <a href="https://sourabh48.github.io/alfred_ai/guide/">Illustrated installation guide</a><br><br>
   <img src="docs/assets/readme-hero.svg" alt="ALFRED — personal finance, documents and planning in one local workspace" width="100%">
 </p>
 
@@ -228,20 +230,24 @@ Local-only access is the default; LAN access is a separate configuration decisio
 
 ## Verification status
 
-**Recorded Windows verification, 26–27 September 2026.** These are completed
+**Recorded Windows verification, 26–28 September 2026.** These are completed
 checks within the scope of the linked reports, not a claim of universal accuracy.
 
 | Check | Recorded result |
 | --- | --- |
-| Backend regression suite | **407 passed**; browser cases run separately |
-| Chrome browser workflows | **9 passed**, zero skips |
-| Installer lifecycle | **6 passed**, including upgrade retention and uninstall |
-| Packaged native runtime | **23 checks passed** |
-| Concurrent local usage | **24-user test passed** |
+| Current launcher and tray | Real Windows icon registered and removed correctly; offline guide present |
+| Current packaged native runtime | **23 checks passed** on 28 September |
+| Current concurrent local usage | **24 users, 480 writes, zero errors** |
+| Current installed upgrade | **1.0.0 → 1.0.1 passed**, database retained and uninstaller present |
+| Backend regression suite | **407 passed** on the previous release; browser cases separate |
+| Chrome browser workflows | **9 passed**, zero skips on the previous release |
+| Full installer lifecycle | **6 passed** on the previous release; current full uninstall acceptance remains open |
 | Observation and supervisor logic | **16 focused tests passed** |
+| Tray/native/launcher logic | **16 focused tests passed** after branding changes |
 | OCR, backup/restore, mobile layouts and automated accessibility | Passed within the documented test scope |
 
-[Release verification](docs/WINDOWS_PACKAGE_VERIFICATION_20260927.md) ·
+[Current tray and release verification](docs/WINDOWS_TRAY_VERIFICATION_20260928.md) ·
+[Previous release verification](docs/WINDOWS_PACKAGE_VERIFICATION_20260927.md) ·
 [Native runtime evidence](docs/WINDOWS_PACKAGE_VERIFICATION_20260926.md) ·
 [Completion audit](docs/COMPLETION_AUDIT.md)
 

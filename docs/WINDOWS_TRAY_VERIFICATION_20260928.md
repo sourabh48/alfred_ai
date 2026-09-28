@@ -16,10 +16,57 @@ Product: **Alfred - Finance Assistant**. Copyright owner: **Life on our Trails**
 
 ## Windows package
 
-The branded package rebuild and packaged tray/installer verification are in
-progress. The previous release remains recorded separately; its results do not
-establish that this new package has passed. This section is updated from actual
-packaged test reports before publishing the new release.
+The branded build completed successfully from source commit `65dd94b` (the
+runtime/branding changes are in `1cf4b83`; the later commit adds the audit prompt).
+
+| Check | Result |
+| --- | --- |
+| Packaged desktop launcher | Progress window observed; correct brand; exit 0 without system Python on PATH |
+| Windows tray | Windows API confirmed the real icon; offline guide bundled; icon removed after graceful stop |
+| Packaged native runtime | **23 checks passed** in fresh run `b19f96b008` |
+| Concurrent local use | **24 users, 480 writes, 3,962 timed requests, zero errors**; correct isolated totals |
+| Load timing | 120-second read window per user; p95 2.687 seconds; total 178.69 seconds; synthetic local traffic |
+| Responsive layouts | **28 checks passed** across seven pages and four widths |
+| Automated accessibility | **14 audits**, zero serious/critical findings; keyboard skip link passed |
+| OCR and recovery | Bundled document/statement OCR, worker recovery, retries, queued work after restart, database/upload/queue restore passed |
+| Distribution | 12,624 bundle files inspected; no private runtime paths; ZIP CRC and SHA-256 checks completed |
+| Installed upgrade | Existing 1.0.0 upgraded to 1.0.1; database hash retained; executable matches release; uninstaller present |
+
+The first packaged native attempt lost its local test-server connection and
+failed after the two startup checks. Its report is preserved; no pass is claimed
+for that attempt. The fresh complete run above passed. The original interruption
+has not been independently attributed to a specific cause.
+
+A real registered installation now exists on this PC. The isolated installer
+lifecycle runner refused to overwrite it. The current upgrade was verified with
+a stopped-data backup and retained database hash. The six full install/upgrade/
+uninstall checks in the 27 September report belong to the previous release;
+fresh uninstall acceptance for this release remains for an isolated Windows
+user or second PC. Personal data was not uninstalled for testing.
+
+The public homepage, guide, sitemap and tray illustration returned HTTP 200 and
+matched their source files. GitHub Pages publishes only documentation.
+
+Both the checkout and the registered installed copy were restarted and passed
+health plus actual Windows tray-registration checks. They retain their separate
+data folders. The verified candidate was promoted to `dist/ALFRED` and the
+installer/ZIP to `release/`. Previous program/release folders and stopped-data
+backups were retained outside the repository under
+`F:\ALFRED-retired\20260928-before-tray`.
+
+The prior observation was cancelled for the controlled upgrade and retained.
+A fresh observation is running against the updated checkout with sign-in
+verification enabled. It is **not a completed pass**; inspect the current report
+for its status and expected finish.
+
+### Release fingerprints
+
+- Installer SHA-256: `95820f6864fa9adee7cb711fc7a0c037df831d1722169a6ddfee2fd3bfff07e8`
+- ZIP SHA-256: `f270201c6dac6f773232dede7aa532b06641138fc97e19883f3b477d138b80f1`
+- Native executable SHA-256: `3fa0011ed2f0251131a61e6c661b03a142310331a0102ce4d8c6c14a5d1bd115`
+
+The release manifest records source commit, clean tracked-source status, product
+identity, notice hash and executable hashes. These are not digital signatures.
 
 ## Evidence locations
 
@@ -29,6 +76,14 @@ data included in public downloads:
 - `artifacts/tray-brand-tests-20260928.log`
 - `artifacts/ops/native-tray-source-20260928.json`
 - `artifacts/ops/website-verification-20260928.json`
+- `artifacts/ops/published-website-20260928.json`
+- `artifacts/ops/packaged-tray-20260928.json`
+- `artifacts/ops/native-tray-first-attempt-20260928.json` (failed attempt)
+- `artifacts/ops/native-tray-package-passed-20260928.json`
+- `artifacts/ops/installed-tray-upgrade-20260928.json`
+- `artifacts/ops/checkout-tray-backup-20260928.json`
+- `artifacts/ops/live-tray-upgrade-20260928.json`
+- `artifacts/ops/tray-program-upgrade-20260928.json`
 
 ## Remaining acceptance
 
