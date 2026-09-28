@@ -18,6 +18,9 @@ Product: **Alfred - Finance Assistant**. Copyright owner: **Life on our Trails**
 
 The branded build completed successfully from source commit `65dd94b` (the
 runtime/branding changes are in `1cf4b83`; the later commit adds the audit prompt).
+The final distribution was packaged from `5d6c64e`, incorporating the owner's
+2026 copyright correction. ZIP comparison confirmed that only
+`project-identity.json` changed; both tested executables are byte-identical.
 
 | Check | Result |
 | --- | --- |
@@ -61,8 +64,8 @@ for its status and expected finish.
 
 ### Release fingerprints
 
-- Installer SHA-256: `95820f6864fa9adee7cb711fc7a0c037df831d1722169a6ddfee2fd3bfff07e8`
-- ZIP SHA-256: `f270201c6dac6f773232dede7aa532b06641138fc97e19883f3b477d138b80f1`
+- Installer SHA-256: `da0d19be607ce2ca58de251bdc008c7a9a083977bb48be5e6fc61ebb4d7e6b83`
+- ZIP SHA-256: `af2f69032df2a2bc05430c31d85a9525d533d9301eb33d3726f53869dee437cc`
 - Native executable SHA-256: `3fa0011ed2f0251131a61e6c661b03a142310331a0102ce4d8c6c14a5d1bd115`
 
 The release manifest records source commit, clean tracked-source status, product
