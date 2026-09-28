@@ -43,6 +43,8 @@ def inspect_bundle(bundle):
                 "_internal/static/alfred.ico", "_internal/guide/index.html",
                 "_internal/guide/images/04-tray.svg",
                 "_internal/static/vendor/bootstrap.min.css", "_internal/static/vendor/chart.umd.min.js",
+                "_internal/templates/mobility/planner.html", "_internal/templates/mobility/preferences.html",
+                "_internal/static/js/travel_planner.js", "_internal/static/css/travel_planner.css",
                 "_internal/templates/career/list.html", "_internal/templates/integrations/credit_score.html")
     missing = [name for name in required if not (bundle / name).is_file()]
     for pattern in ("_internal/rapidocr_onnxruntime/models/*.onnx", "_internal/onnxruntime/capi/*.dll",
@@ -69,11 +71,15 @@ def inspect_bundle(bundle):
                 or lowered.endswith("ml_models/alfred/model_registry/registry.json")):
             raise RuntimeError(f"Private runtime path found in release: {relative}")
         files.append(path)
-    for name in ("career/list.html", "integrations/credit_score.html"):
+    for name in ("career/list.html", "integrations/credit_score.html", "mobility/dashboard.html",
+                 "mobility/planner.html", "mobility/preferences.html"):
         if digest(bundle / "_internal/templates" / name) != digest(ROOT / "templates" / name):
             raise RuntimeError(f"Bundled template is stale: {name}")
     if digest(bundle / "_internal/static/alfred.ico") != digest(ROOT / "static/alfred.ico"):
         raise RuntimeError("Bundled Windows icon is stale")
+    for name in ("js/travel_planner.js", "js/travel_preferences.js", "js/mobility.js", "css/travel_planner.css"):
+        if digest(bundle / "_internal/static" / name) != digest(ROOT / "static" / name):
+            raise RuntimeError(f"Bundled travel asset is stale: {name}")
     return files
 
 
@@ -115,7 +121,8 @@ def main():
         "data_directory": "%LOCALAPPDATA%/ALFRED", "private_runtime_paths_found": 0,
         "components": ["Python 3.12", "Django", "Waitress", "Huey", "SQLite", "diskcache",
                        "RapidOCR", "ONNX Runtime", "Tcl/Tk desktop launcher", "Windows tray icon",
-                       "offline illustrated installation guide", "bundled web assets"],
+                       "offline illustrated installation guide", "bundled web assets",
+                       "chat-first travel planner", "persistent travel research and preferences"],
         "artifacts": {path.name: {"bytes": path.stat().st_size, "sha256": digest(path)}
                       for path in (archive, installer, bundle / "ALFRED.exe", bundle / "ALFRED Launcher.exe")},
     }
