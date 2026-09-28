@@ -283,7 +283,7 @@ Starting an observation does not count as passing it.
 | Review completion and cleanup records | [Completion audit](docs/COMPLETION_AUDIT.md) · [Release verification](docs/WINDOWS_PACKAGE_VERIFICATION_20260927.md) |
 | Use the optional container runtime | [Local Docker Compose guide](docs/LOCAL_HOSTING.md) |
 
-Docker/PostgreSQL/Redis/Celery is an optional runtime. The native Windows app
+ALFRED is local or LAN-hosted. Docker/PostgreSQL/Redis/Celery is an optional runtime. The native Windows app
 uses Waitress, Huey and SQLite. Public/cloud deployment is outside the current scope.
 
 ---

@@ -4,6 +4,7 @@ Uses synthetic local user data and real public weather research. Never opens
 the checkout's or installed application's private database.
 """
 import json
+import argparse
 import os
 from pathlib import Path
 import subprocess
@@ -17,13 +18,24 @@ sys.path.insert(0, str(ROOT))
 
 def main():
     import requests
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--executable",type=Path)
+    parser.add_argument("--report",type=Path,default=ROOT/"artifacts"/"ops"/"travel-runtime-verification.json")
+    args=parser.parse_args()
+    report_path=args.report.resolve()
     data = ROOT / "artifacts" / "travel-runtime" / uuid.uuid4().hex[:10]
     data.mkdir(parents=True)
-    report = {"data_dir":str(data), "passed":False, "checks":{}}
-    prefix = [sys.executable, str(ROOT/"alfred_native.py")]
+    report = {"data_dir":str(data), "executable":str(args.executable or sys.executable), "passed":False, "checks":{}}
+    prefix = [str(args.executable.resolve())] if args.executable else [sys.executable, str(ROOT/"alfred_native.py")]
     def command(action):
+        environment=os.environ.copy()
+        if args.executable:
+            environment.pop("PYTHONHOME",None)
+            environment.pop("PYTHONPATH",None)
+            system=Path(os.environ.get("SystemRoot","C:/Windows"))
+            environment["PATH"]=os.pathsep.join(map(str,(system/"System32",system)))
         result = subprocess.run([*prefix, action, "--data-dir",str(data),"--port","8045","--no-browser"],
-                                capture_output=True,text=True,timeout=240)
+                                capture_output=True,text=True,timeout=240,env=environment)
         assert result.returncode == 0, (action,result.stdout,result.stderr)
     try:
         command("start")
@@ -89,7 +101,7 @@ def main():
     finally:
         try: command("stop")
         finally:
-            output=ROOT/"artifacts"/"ops"/"travel-runtime-verification.json"
+            output=report_path
             output.parent.mkdir(parents=True,exist_ok=True)
             output.write_text(json.dumps(report,indent=2),encoding="utf-8")
             print(json.dumps(report,indent=2),flush=True)
