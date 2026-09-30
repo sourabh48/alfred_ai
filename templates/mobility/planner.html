@@ -19,7 +19,7 @@
             <button type="button" class="btn btn-sm btn-primary" id="plannerSave" hidden>Save Travel Plan</button>
             <button type="button" class="btn btn-sm btn-outline-primary" data-planner-message="Recheck trip" id="plannerRecheck" hidden>Recheck Trip</button>
         </div>
-        <p class="small text-muted mt-3 mb-0">Your conversation and travel history stay local. Public research uses only destination and forecast dates. Estimates are not bookings.</p>
+        <p class="small text-muted mt-3 mb-0">Your conversation and travel history stay local. Research sends only needed public place, city-coordinate, date, transport and search-category details. ALFRED researches and plans; you book externally. No bookings or payments are made here.</p>
     </div>
     <aside class="travel-sidebar">
         <section class="surface-card"><h2 class="h5">Trip in focus</h2><div id="plannerContext" class="small">Start with an idea. We'll fill in the details together.</div>
@@ -36,4 +36,16 @@
     <div id="plannerComparison" class="surface-card mt-3" hidden></div>
 </section>
 <section id="plannerItinerary" class="mb-4" hidden aria-label="Your itinerary"></section>
+<section id="plannerEvidence" class="mb-4" hidden aria-label="Travel research, map and sources">
+    <h2 id="plannerEvidenceTitle" class="page-section-title">Travel research</h2>
+    <div id="plannerResearchChoices" class="travel-actions mb-3" aria-label="Choose destination research"></div>
+    <section class="surface-card mb-3"><h3 class="h5">Map and routes</h3>
+        <p class="small">Loading tiles shares the displayed map area with the configured map provider. Route lines do not establish motorcycle legality or current road conditions.</p>
+        <button type="button" id="plannerLoadMap" class="btn btn-sm btn-outline-primary">Load map</button>
+        <p id="plannerMapStatus" class="small" role="status">Available route geometry and places will appear here. Missing routes remain unverified.</p>
+        <div id="plannerMap" hidden aria-label="Interactive route and place map"></div>
+    </section>
+    <div id="plannerEvidenceBody" class="travel-evidence-grid"></div>
+    <details id="plannerQuota" class="surface-card mt-3" hidden><summary>Internal provider usage</summary><button id="plannerLoadQuota" class="btn btn-sm btn-outline-primary mt-2">Load provider usage</button><div id="plannerQuotaBody"></div></details>
+</section>
 <section id="plannerPostTrip" class="surface-card mb-4" hidden><h2 class="page-section-title">After your trip</h2><div id="plannerFeedback"></div><div id="plannerMedia"></div></section>

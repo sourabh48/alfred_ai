@@ -36,7 +36,7 @@ def say(session, text, chips=()):
 
 
 def new_session(user, plan=None):
-    session = TravelPlanningSession.objects.create(user=user, plan=plan, title=plan.title if plan else "Your next escape")
+    session = TravelPlanningSession.objects.create(user=user, plan=plan, title=plan.title if plan else "Your next escape",status="draft")
     if plan:
         session.state = deepcopy(plan.planning_state)
         for key, val in {"selected_destination": plan.destination, "available_start_date": plan.start_date.isoformat() if plan.start_date else None,
@@ -45,7 +45,22 @@ def new_session(user, plan=None):
             if val is not None:
                 session.state[key] = fact(val, "saved_plan", True)
         session.itinerary = plan.itinerary
-        session.status = "itinerary_ready" if plan.itinerary else "discovery"
+        session.status = "ready" if plan.itinerary else "draft"
+    from .travel.intent import PROFILE_KEYS, validate_preference
+    profile = profile_for(user)
+    aliases = {"typical_duration":"trip_duration", "preferred_transport":"transport_mode"}
+    for key, pref in profile.preferences.items():
+        target = aliases.get(key, key)
+        if pref.get("source") == "user_removed" or target == "pillion":
+            # Past companions do not establish occupancy for a new trip.
+            continue
+        if (target in PROFILE_KEYS or target == "trip_duration") and target not in session.state:
+            try:
+                validate_preference(target,pref.get("value"))
+            except ValidationError:
+                session.state["preference_review_needed"] = fact(True,"invalid_saved_preference",False)
+                continue
+            session.state[target] = fact(pref.get("value"), "saved_travel_preference", pref.get("confirmed_by_user",False), pref.get("confidence",.5))
     if not value(session.state, "origin") and user.city:
         session.state["origin"] = fact(user.city, "configured_home_city", False, .85)
     session.save()
@@ -55,6 +70,7 @@ def new_session(user, plan=None):
 
 
 def extract(state, text):
+    prior_mode = deepcopy(state.get("transport_mode"))
     state = deepcopy(state)
     lower = text.lower().strip().replace("’", "'")
     notes = []
@@ -147,7 +163,7 @@ def extract(state, text):
         put("novelty", "mostly_new")
     elif "familiar" in lower or "revisit" in lower:
         put("novelty", "mostly_familiar")
-    for pattern, mode in [(r"\b(?:bike|motorcycle|riding)\b", "ride"), (r"\b(?:car|road trip)\b", "roadtrip"), (r"\btrain\b", "train"), (r"\bflight|fly\b", "flight")]:
+    for pattern, mode in [(r"\b(?:bike|motorcycle|riding)\b", "ride"), (r"\b(?:car|road trip)\b", "roadtrip"), (r"\btrain\b", "train"), (r"\bbus\b", "bus"), (r"\bflight|fly\b", "flight")]:
         if re.search(pattern, lower):
             put("transport_mode", mode)
     if "pillion" in lower:
@@ -181,6 +197,13 @@ def extract(state, text):
     for interest in ("camping", "trekking", "photography", "nightlife"):
         if interest in styles or interest in avoided:
             put(interest+"_interest", interest in styles)
+    from .travel.intent import augment
+    state = augment(state, text)
+    if value(state,"compare_modes") and re.search(r"\b(?:compare|vs|versus)\b",lower):
+        if prior_mode:
+            state["transport_mode"] = prior_mode
+        else:
+            state.pop("transport_mode",None)
     return state, notes
 
 
@@ -193,6 +216,13 @@ def vehicle_state(session):
         if bike:
             session.state["vehicle_profile"] = fact(bike.id,"configured_primary_vehicle",False,.85)
     if bike:
+        from .travel.bike import bike_context
+        context = bike_context(bike, end_date=value(session.state, "available_end_date"),
+                               distance_km=(session.itinerary.get("route", {}).get("distance_km_one_way") or 0)*2)
+        session.state["vehicle_condition"] = fact(context, "vehicle_records", True)
+        for field in ("fuel_price_per_litre", "fuel_price_date"):
+            if context.get(field) is not None:
+                session.state[field] = fact(context[field], "fuel_refill_record", True)
         for field, val in {"vehicle_name": bike.display_name, "vehicle_mileage": bike.expected_mileage_kmpl,
                            "vehicle_tank_litres": bike.fuel_tank_capacity_l}.items():
             if val:
@@ -201,16 +231,13 @@ def vehicle_state(session):
 
 def ready_prompt(session, prefix=""):
     state = session.state
+    session.status = "needs_input"
     if not value(state, "trip_duration"):
         state["pending_question"] = fact("duration", "assistant", False)
         say(session, prefix+"How many days do you have? Approximate duration is fine.", ["2 days", "3 days", "4 days", "A long weekend"])
     elif not value(state, "origin"):
         state["pending_question"] = fact("origin", "assistant", False)
         say(session, prefix+"Where will you be starting from? A city is enough.")
-    elif not state["origin"].get("confirmed_by_user"):
-        state["pending_question"] = fact("origin_confirmation", "assistant", False)
-        say(session, prefix+f"I'll assume you're starting from {value(state, 'origin')}, from your configured city. Use that?",
-            ["Yes use that", "Change starting city"])
     elif not value(state, "budget") and not value(state, "budget_type"):
         state["pending_question"] = fact("budget", "assistant", False)
         say(session, prefix+"I can suggest places without an exact budget. Do you want budget, moderate or premium options?",
@@ -234,6 +261,11 @@ def send_message(session_id, user, text):
         raise ValidationError("Send a message of 1–2,000 characters.")
     old_state = deepcopy(session.state)
     session.state, notes = extract(session.state, text)
+    if value(session.state,"requested_destination") != value(old_state,"requested_destination") and value(session.state,"requested_destination"):
+        if value(session.state,"selected_destination") != value(session.state,"requested_destination"):
+            session.itinerary = {}
+            session.state.pop("selected_destination",None)
+            session.state.pop("selected_location",None)
     TravelMessage.objects.create(session=session, role="user", text=text)
     lower = text.lower()
     if session.state != old_state:
@@ -244,11 +276,58 @@ def send_message(session_id, user, text):
     for key in value(session.state, "must_avoid", []):
         if key not in value(old_state, "must_avoid", []):
             learn(user, key, False, "Explicit avoidance: "+text[:160], 1, True)
+    from .travel.intent import PROFILE_KEYS
+    for key in PROFILE_KEYS:
+        if key in session.state and session.state[key] != old_state.get(key) and session.state[key].get("confirmed_by_user"):
+            learn(user,key,value(session.state,key),"Explicit travel preference",1,True)
     vehicle_state(session)
     if session.title == "Your next escape" and value(session.state,"available_start_date"):
         session.title = date.fromisoformat(value(session.state,"available_start_date")).strftime("%B escape")
     session.save()
     prefix = " ".join(notes) + (" " if notes else "")
+    if "continue" in lower and "previous" in lower and not session.plan_id:
+        previous = TravelPlan.objects.filter(user=user).exclude(status="cancelled").exclude(itinerary={}).order_by("-updated_at").first()
+        if previous:
+            session.state = deepcopy(previous.planning_state)
+            session.itinerary = deepcopy(previous.itinerary)
+            session.state["selected_destination"] = fact(previous.destination,"previous_trip",True)
+            session.state["requested_destination"] = fact(previous.destination,"previous_trip",True)
+            session.title = f"Continue {previous.title}"[:180]
+            session.status = "draft"
+            session.revision += 1
+            session.save()
+            say(session,"Loaded your previous trip into this draft. Its dates and external facts may be old; tell me the new dates to re-plan.",["Change dates","Recheck trip"])
+        else:
+            say(session,"No previous itinerary is saved yet. This conversation is retained; tell me the trip you want to continue.")
+        return session
+    if lower in {"show everything on a map", "show map", "map"}:
+        say(session,"The map panel shows the available route and places. Missing coordinates or unverified routes are labelled.")
+        return session
+    if lower in {"accept weather alternatives", "apply weather alternatives"}:
+        from .travel.presentation import age_saved_facts
+        session.itinerary = age_saved_facts({"itinerary":session.itinerary})["itinerary"]
+        proposals = session.itinerary.get("weather_proposals",[])
+        for day in session.itinerary.get("days",[]):
+            proposal = next((p for p in proposals if p.get("date") == day.get("date")),None)
+            if proposal:
+                for item in day["items"]:
+                    if item["type"] in {"activity","trekking","photography"}:
+                        item.update(title="Indoor local visit or rest; choose an open venue",type="backup",duration="Flexible",cost_note="Existing activity allowance retained")
+                day["weather_adjustment"] = proposal["reason"]
+        if proposals:
+            session.itinerary["edits"].append({"request":text,"day":None})
+            session.save()
+        say(session,"Applied the proposed indoor/rest alternatives; existing budget allowances are retained." if proposals else "No current weather alternatives are available. Recheck the trip first.")
+        return session
+    research_followup = bool(re.search(r"\b(?:check|find|show|compare|re-plan|replan|refresh|is|need)\b",lower) and re.search(r"\b(?:weather|rain|forecast|hotels?|availability|trains?|flights?|buses?|permit|permission|open|unexplored|hidden|camping)\b",lower))
+    route_change = any(value(session.state,k) != value(old_state,k) for k in ("avoid_expressways","avoid_tolls","scenic_preference"))
+    if (research_followup or route_change) and session.candidates:
+        queue_research(session,recheck=True,force=bool(re.search(r"\b(?:refresh|live refresh)\b",lower)))
+        reply = "I'll update research using your saved trip details and fresh cached results where available."
+        if "flight" in lower and not (value(session.state,"origin_airport") and value(session.state,"destination_airport")):
+            reply += " For flight search, give the airport codes, for example BLR to CCJ; I won't guess the nearest airports."
+        say(session,reply)
+        return session
     if lower in {"compare", "compare destinations", "compare again"}:
         say(session, "Compare the options below. Estimates share the same budget assumptions; unknown facts are labelled.")
         return session
@@ -256,7 +335,7 @@ def send_message(session_id, user, text):
         if not session.candidates:
             ready_prompt(session, prefix)
         else:
-            queue_research(session, deep=True, recheck=lower == "recheck trip")
+            queue_research(session, deep=True, recheck=lower == "recheck trip", force=lower == "recheck trip")
             say(session, "Research is saved and queued. You can close this page; the results and sources will be here when you return.")
         return session
     choice = None
@@ -275,8 +354,12 @@ def send_message(session_id, user, text):
         session.save()
         return session
     if choice:
+        from .travel.discovery import remember
+        remember(user,choice,"accepted")
         session.state["selected_destination"] = fact(choice["name"])
-        session.status = "destination_selected"
+        session.state["requested_destination"] = fact(choice["name"])
+        session.state["selected_location"] = fact({k:choice[k] for k in ("id","name","lat","lon","region","country") if k in choice})
+        session.status = "researched"
         session.itinerary = {}
         session.title = f"{choice['name']} escape"
         for style in choice["styles"]:
@@ -290,7 +373,7 @@ def send_message(session_id, user, text):
             say(session, "Choose a destination first, then I'll build one detailed itinerary.")
         else:
             session.itinerary = build_itinerary(session.state, selected)
-            session.status = "itinerary_ready"
+            session.status = "ready"
             say(session, "Your flexible itinerary is ready. Review the day-by-day plan, budget and verification notes. Tell me what to change.",
                 ["Make day 2 relaxed", "Reduce the budget", "Add one waterfall"])
     elif lower == "adjust budget":
@@ -320,6 +403,13 @@ def send_message(session_id, user, text):
                     session.itinerary["edits"] = old_itinerary["edits"]
                 session.itinerary["weather"] = {"summary":"Dates changed. Recheck weather for the revised window.","confidence":"UNKNOWN"}
                 session.itinerary["sources"] = []
+                for key in ("weather_result","hotels_result","flights_result","trains_result","buses_result","permit_result"):
+                    session.itinerary[key] = {"freshness":"UNKNOWN","status":"needs_refresh","error":"trip_dates_changed","payload":{}}
+                session.itinerary["weather_proposals"] = []
+                session.itinerary["web_research"] = []
+                from .travel.links import external_links
+                session.itinerary["external_links"] = external_links(session.state,selected)
+                session.itinerary["quality"] = {"verified":[],"estimated":["budget"],"recheck":["Dates changed; refresh volatile research"]}
                 say(session, "Updated the dates and duration. Review the revised plan and recheck weather before saving.", ["Recheck trip"])
         else:
             edited, reply = edit_itinerary(session.itinerary, text, session.state)
@@ -367,6 +457,7 @@ def save_plan(session, draft=False):
     plan.full_clean()
     plan.save()
     session.plan = plan
+    session.status = "draft" if draft else "planned"
     session.save()
     if not draft:
         for key, val in {"typical_duration":plan.duration_days, "typical_spend":plan.budget, "preferred_transport":plan.transport_mode}.items():

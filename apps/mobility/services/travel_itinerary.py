@@ -5,6 +5,7 @@ from rest_framework.exceptions import ValidationError
 
 from .travel_discovery import budget_for, value
 from .travel_catalog import ACTIVITY_TAGS
+from .travel.money import decimal_amount, rupees
 
 
 def build_itinerary(state, destination):
@@ -61,15 +62,18 @@ def build_itinerary(state, destination):
         packing += ["Helmet and riding protection", "Rain gear and waterproof luggage", "Puncture kit", "Vehicle documents", "Check tyres, brakes and chain/lube before departure"]
         mileage, tank = value(state, "vehicle_mileage"), value(state, "vehicle_tank_litres")
         bike = {"profile": value(state, "vehicle_name", "No vehicle profile selected"),
+                "condition": value(state, "vehicle_condition", {}),
                 "nominal_range_km": round(mileage*tank) if mileage and tank and mileage > 0 and tank > 0 else None,
                 "range_note": "Mileage × tank capacity from your profile; practical range varies. Identify open fuel stations before riding and refuel with a reserve.",
                 "pillion": value(state, "pillion", False),
                 "notes": "Allow more breaks with pillion/luggage. Avoid unverified shortcuts and unpaved routes; do not ride through flooded roads."}
     return {"destination": destination["name"], "origin": origin, "summary": f"{days} days in {destination['name']} with flexible activity blocks.",
+        **{key:deepcopy(destination.get(key, [] if key in {"weather_proposals","mode_comparison","web_research","external_links"} else {})) for key in
+           ("route_result","weather_result","places_result","permit_result","hotels_result","flights_result","trains_result","buses_result","discovery_result","weather_proposals","map","quality","mode_comparison","web_research","external_links")},
         "status": "preliminary", "days": itinerary_days, "budget": budget, "weather": destination["weather"],
         "route": {"summary": f"{origin} → {destination['name']} → {origin}", "distance_km_one_way": destination.get("distance_km"),
-                  "hours_one_way": destination.get("travel_hours"), "confidence": "ESTIMATED",
-                  "note": "Town-centre estimate only. Confirm a paved, legal route, current closures and fuel stops with a routing provider before departure.",
+                  "hours_one_way": destination.get("travel_hours"), "confidence": destination.get("route_result",{}).get("confidence","ESTIMATED"),
+                  "note": destination.get("distance_basis","Town-centre estimate only.") + " Confirm a legal route, closures and fuel stops before departure.",
                   "options": [{"name": "Fastest", "status": "Needs current routing verification"},
                               {"name": "Scenic", "status": "Use verified public roads only; no shortcut suggested"},
                               {"name": "Easier", "status": "Prefer main roads; add an overnight stop if travel exceeds your comfort limit"}]},
@@ -136,7 +140,7 @@ def edit_itinerary(itinerary, text, state):
     if "budget" in lower or "cheaper" in lower:
         old = result["budget"]["categories"]["Stay"]
         floor = 600 * max(0,len(result["days"])-1) * max(1,(value(state,"number_of_travelers",1)+1)//2)
-        new = max(min(old,floor),round(old * .75))
+        new = max(min(old,floor),rupees(decimal_amount(old) * decimal_amount("0.75")))
         stay_discount += old-new
         result["budget"]["categories"]["Stay"] = new
         nights = max(1, len(result["days"])-1)
@@ -151,11 +155,22 @@ def edit_itinerary(itinerary, text, state):
     if discount:
         result["budget"]["categories"]["Activities"] = max(0, result["budget"]["categories"]["Activities"]-activity_discount)
         result["budget"]["expected"] = max(0, result["budget"]["expected"]-discount)
-        result["budget"]["minimum"] = round(result["budget"]["expected"]*.8)
-        result["budget"]["comfortable"] = round(result["budget"]["expected"]*1.2)
+        result["budget"]["low"] = result["budget"]["minimum"] = rupees(decimal_amount(result["budget"]["expected"]) * decimal_amount("0.8"))
+        result["budget"]["high"] = result["budget"]["comfortable"] = rupees(decimal_amount(result["budget"]["expected"]) * decimal_amount("1.2"))
         result["budget"]["over_budget"] = max(0, result["budget"]["expected"]-result["budget"]["target"]) if result["budget"]["target"] else 0
     if value(state, "budget"):
-        result["budget"]["target"] = value(state, "budget") * (value(state, "number_of_travelers", 1) if value(state, "budget_scope") == "per_person" else 1)
+        result["budget"]["target"] = rupees(value(state, "budget")) * (value(state, "number_of_travelers", 1) if value(state, "budget_scope") == "per_person" else 1)
         result["budget"]["over_budget"] = max(0, result["budget"]["expected"]-result["budget"]["target"])
+    if discount and result["budget"].get("line_items"):
+        for item in result["budget"]["line_items"]:
+            amount = result["budget"]["categories"][item["category"]]
+            if amount != item["expected"]:
+                item["formula"] = f"Revised {item['category'].lower()} allowance after your itinerary edit: INR {amount}"
+            if item["category"] == "Emergency Buffer":
+                item["formula"] = "Original emergency buffer retained after reducing other allowances"
+            item.update(low=rupees(decimal_amount(amount) * decimal_amount("0.8")), expected=amount,
+                        high=rupees(decimal_amount(amount) * decimal_amount("1.2")))
+        result["budget"]["low"] = result["budget"]["minimum"] = sum(i["low"] for i in result["budget"]["line_items"])
+        result["budget"]["high"] = result["budget"]["comfortable"] = sum(i["high"] for i in result["budget"]["line_items"])
     result["edits"].append({"request": text, "day": day_number})
     return result, f"Updated {f'day {day_number}' if day_number else 'your plan'}. " + ("The other days are unchanged." if day_number else "Review the revised allowances before booking.")

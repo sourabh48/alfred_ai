@@ -8,8 +8,7 @@ window.TravelPlanner = (() => {
     const field = key => state.session?.state?.[key]?.value;
     function alert(message) { $("plannerAlert").textContent = message; $("plannerAlert").hidden = !message; }
     function link(url, title) {
-        try { if (new URL(url).protocol === "https:") return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a>`; } catch (_) { /* no link */ }
-        return esc(title);
+        return window.TravelResearchPanels.link(url,title);
     }
     function sourceMarkup(sources) {
         return (sources || []).map(s => `<div class="travel-source"><strong>${esc(s.data_type)} · ${esc(s.confidence)}${s.freshness === "stale" ? " · STALE" : ""}</strong><div>${esc(s.finding?.summary || s.finding?.assumptions?.join(" ") || "Planning allowance")}</div><div>${link(s.source_url, s.source_name)} · ${s.retrieved_at ? `Checked ${esc(new Date(s.retrieved_at).toLocaleString())}` : "Not live-verified"}</div>${(s.finding?.reports || []).map(r=>`<p>${link(r.link,r.title)}<br>${esc(r.source)} · ${esc(r.published)}</p>`).join("")}</div>`).join("") || "No live evidence yet. Research is pending.";
@@ -90,6 +89,7 @@ window.TravelPlanner = (() => {
         $("plannerRecheck").hidden = !session.candidates?.length;
         $("plannerResults").hidden = !session.candidates.length;
         candidates(); comparison(); itinerary();
+        window.TravelResearchPanels.render(session);
         if (session.plan_id) populateDetails(session.plan_id);
         else $("planDetails").hidden = true;
         if (field("vehicle_profile")) $("plannerVehicle").value = String(field("vehicle_profile"));

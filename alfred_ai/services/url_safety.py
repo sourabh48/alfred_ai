@@ -15,14 +15,18 @@ ALLOWED_SCHEMES = {"http", "https"}
 
 def validate_public_http_url(raw_url: str) -> str:
     url = (raw_url or "").strip()
+    if any(ord(c) < 32 or ord(c) == 127 for c in url) or "\\" in url:
+        raise ValueError("Invalid URL characters.")
     parsed = urlparse(url)
     scheme = (parsed.scheme or "").lower()
-    hostname = (parsed.hostname or "").strip().lower()
+    hostname = (parsed.hostname or "").strip().lower().rstrip(".")
 
     if scheme not in ALLOWED_SCHEMES:
         raise ValueError("Only public HTTP(S) URLs are allowed.")
     if not hostname:
         raise ValueError("A valid URL host is required.")
+    if parsed.username is not None or parsed.password is not None or parsed.fragment:
+        raise ValueError("Credentials and fragments are not allowed in request URLs.")
     if hostname in BLOCKED_HOSTNAMES or hostname.endswith(".local") or hostname.endswith(".internal"):
         raise ValueError("Local or internal hosts are not allowed.")
 

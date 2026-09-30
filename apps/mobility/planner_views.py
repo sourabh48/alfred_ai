@@ -4,7 +4,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,6 +14,11 @@ from .serializers import TravelPlanSerializer
 from .services.travel_conversation import STYLE_WORDS, new_session, save_plan, send_message
 from .services.travel_discovery import fact, learn, profile_for, value
 from .services.travel_research import STAGES, TERMINAL, evidence_payload, queue_research
+from .services.travel.presentation import age_saved_facts
+from .services.travel.mapping import map_configuration
+from .services.travel.cache import usage_summary
+from .services.travel.discovery import remember, place_key
+from .services.travel.intent import PROFILE_KEYS, validate_preference
 
 
 class PlannerWriteThrottle(UserRateThrottle):
@@ -32,7 +37,7 @@ def session_payload(session):
     for candidate in candidates:
         for source in candidate.get("sources", []):
             if source.get("valid_until") and source["valid_until"] <= now:
-                source["freshness"] = "stale"
+                source["freshness"] = "CACHED"
                 source["confidence"] = "UNKNOWN"
                 if source["data_type"] == "weather":
                     candidate["weather"] = {"summary":"This forecast is stale. Recheck this trip for current information.","confidence":"UNKNOWN"}
@@ -41,18 +46,19 @@ def session_payload(session):
     if itinerary:
         for source in itinerary.get("sources", []):
             if source.get("valid_until") and source["valid_until"] <= now:
-                source["freshness"] = "stale"
+                source["freshness"] = "CACHED"
                 source["confidence"] = "UNKNOWN"
                 if source["data_type"] == "weather":
                     itinerary["weather"] = {"summary":"This forecast is stale. Recheck Trip before relying on it.","confidence":"UNKNOWN"}
-    return {"id": session.id, "title": session.title, "state": session.state, "status": session.status,
+    return age_saved_facts({"id": session.id, "title": session.title, "state": session.state, "status": session.status,
+            "map_config":map_configuration(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),
             "research": ({"id": run.id, "status": run.status, "stage": STAGES.get(run.status, run.status),
                           "deep": run.deep, "summary": run.summary, "error": run.error, "changes": run.changes,
                           "sources_checked": run.sources_checked, "candidate_count": run.candidate_count,
                           "created_at": run.created_at, "completed_at": run.completed_at,
-                          "evidence": [evidence_payload(e) for e in run.evidence.all()]} if run else None)}
+                          "evidence": [evidence_payload(e) for e in run.evidence.all()]} if run else None)})
 
 
 class TravelSessionList(APIView):
@@ -86,8 +92,9 @@ class TravelSessionDetail(APIView):
         session = get_object_or_404(TravelPlanningSession, pk=pk, user=request.user)
         return Response(session_payload(session))
 
+    @transaction.atomic
     def post(self, request, pk):
-        session = get_object_or_404(TravelPlanningSession, pk=pk, user=request.user)
+        session = get_object_or_404(TravelPlanningSession.objects.select_for_update(), pk=pk, user=request.user)
         action = request.data.get("action", "message")
         if action == "message":
             session = send_message(pk, request.user, request.data.get("text", ""))
@@ -105,6 +112,7 @@ class TravelSessionDetail(APIView):
             chosen = next((c for c in session.candidates if c["name"] == request.data.get("destination")), None)
             if not chosen:
                 raise ValidationError("Choose one of this session's destinations.")
+            remember(request.user,chosen,"rejected")
             # Rejection is tentative, not a permanent dislike of every activity there.
             learn(request.user, "destination:"+chosen["name"], False, "Rejected recommendation", .5)
             avoided = value(session.state, "must_avoid", [])
@@ -112,9 +120,51 @@ class TravelSessionDetail(APIView):
             session.revision += 1
             session.save()
             queue_research(session)
+        elif action == "refresh":
+            queue_research(session,recheck=True,force=request.data.get("force") is True)
+        elif action == "place":
+            places = list(session.candidates)
+            for candidate in session.candidates:
+                places.extend(candidate.get("places_result",{}).get("payload",{}).get("places",[]))
+            chosen = next((p for p in places if place_key(p) == request.data.get("place_key")),None)
+            if not chosen:
+                raise ValidationError("Choose a place returned in this conversation.")
+            remember(request.user,chosen,request.data.get("event"))
+        elif action == "status":
+            status = request.data.get("status")
+            if status not in {"draft","planned","completed","cancelled"}:
+                raise ValidationError("Choose a valid trip status.")
+            if status in {"planned","completed"} and not session.plan_id:
+                raise ValidationError("Save a planned trip before marking its status.")
+            session.status = status
+            session.save(update_fields=["status","updated_at"])
+            if session.plan_id:
+                session.plan.status = status
+                session.plan.full_clean()
+                session.plan.save(update_fields=["status","updated_at"])
+            if status == "completed" and value(session.state,"selected_destination"):
+                remember(request.user,{"name":value(session.state,"selected_destination")},"visited")
         else:
             raise ValidationError("Unknown planner action.")
         return Response(session_payload(session))
+
+
+class TravelProviderUsage(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from .services.travel.providers.geocoding import OpenMeteoGeocoding
+        from .services.travel.providers.weather import OpenMeteoWeather
+        from .services.travel.providers.routing import OpenRouteService
+        from .services.travel.providers.places import OverpassPlaces
+        from .services.travel.providers.accommodation import DuffelAccommodation
+        from .services.travel.providers.transport import DuffelFlights, IndianRailProvider
+        from .services.travel.providers.web import BraveSearch, SearXNGSearch, WikivoyageSearch, WikivoyageDestinations
+        providers = [OpenMeteoGeocoding(),OpenMeteoWeather(),OpenRouteService(),OverpassPlaces(),
+                     DuffelAccommodation(),DuffelFlights(),IndianRailProvider(),BraveSearch(),
+                     SearXNGSearch(),WikivoyageSearch(),WikivoyageDestinations()]
+        return Response({"usage":usage_summary(),"configuration":[{"provider":p.name,"category":p.category,
+            "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits} for p in providers]})
 
 
 class TravelPreferencesView(APIView):
@@ -143,15 +193,14 @@ class TravelPreferencesView(APIView):
             p.reset_at = timezone.now()
         if "key" in data:
             key = str(data["key"])
-            if key not in STYLE_WORDS and key not in p.preferences and key not in {"typical_duration", "typical_spend", "preferred_transport", "preferred_stay", "daily_distance", "climate", "riding_hours", "time_of_day", "companions"}:
+            if key not in STYLE_WORDS and key not in PROFILE_KEYS and key not in p.preferences and key not in {"typical_duration", "typical_spend", "preferred_transport", "preferred_stay", "daily_distance", "climate", "riding_hours", "time_of_day", "companions"}:
                 raise ValidationError("Unknown travel preference.")
             if data.get("action") == "remove":
                 # Explicit suppression prevents learning it back without user intent.
                 p.preferences[key] = {**fact(False, "user_removed", True), "reasons": ["Removed by you"]}
             else:
                 val = data.get("value")
-                if not isinstance(val, (bool, str, int, float)) or len(str(val)) > 160:
-                    raise ValidationError("Use a short preference value.")
+                validate_preference(key,val)
                 p.preferences[key] = {**fact(val, "settings", True), "reasons": ["Edited by you"]}
         p.save()
         return self.get(request)

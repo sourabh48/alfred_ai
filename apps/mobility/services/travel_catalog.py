@@ -62,8 +62,8 @@ def lookup(name):
     return next((dict(d) for d in DESTINATIONS if d["name"].lower() == name.lower()), None)
 
 
-def approximate_road_km(origin, destination):
-    coords = CITIES.get(str(origin).lower())
+def approximate_road_km(origin, destination, coordinates=None):
+    coords = coordinates or CITIES.get(str(origin).lower())
     if not coords:
         return None
     a, b, c, d = map(radians, (*coords, destination["lat"], destination["lon"]))
