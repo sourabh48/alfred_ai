@@ -1,4 +1,8 @@
-# Travel preview release continuation — 29 September 2026
+﻿# Travel preview release continuation — 29 September 2026
+
+For subsequent uncommitted provider/frontend development and its separate
+validation, see [30 September continuation](TRAVEL_CONTINUATION_VERIFICATION_20260930.md).
+The release fingerprints below describe the published preview only.
 
 The interrupted **1.1.0-preview.1** release was resumed from commit
 `3bd5bbb9a04c7096b7697af3917f43fd6d5f4c73`. ALFRED remains a local/LAN application.
@@ -97,6 +101,9 @@ Clean second-PC installation/reboot, a completed continuous observation of
 scheduled outcomes, human screen-reader checks and independently reviewed
 real-data/model accuracy remain open.
 
-The initial local upgrade finished before GitHub publication. Public release
-publication and remote link/download verification are tracked separately from
-the local package and installation checks above.
+The public v1.1.0-preview.1 release and Pages site are published. The live audit
+passed 119 checks across 43 URLs, including README links, local fragments, images,
+the site, guide, sitemap and release assets. Both Windows downloads were fetched
+in full anonymously and matched their public SHA-256 checksums and manifest.
+Evidence: `artifacts/ops/public-links-live-20260929.json`. This verifies the
+published downloads and links; the remaining acceptance items above still apply.

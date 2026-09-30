@@ -77,7 +77,7 @@ def inspect_bundle(bundle):
             raise RuntimeError(f"Bundled template is stale: {name}")
     if digest(bundle / "_internal/static/alfred.ico") != digest(ROOT / "static/alfred.ico"):
         raise RuntimeError("Bundled Windows icon is stale")
-    for name in ("js/travel_planner.js", "js/travel_preferences.js", "js/mobility.js", "css/travel_planner.css"):
+    for name in ("js/travel_planner.js", "js/travel_research_panels.js", "js/travel_preferences.js", "js/mobility.js", "css/travel_planner.css", "vendor/leaflet/leaflet.js", "vendor/leaflet/leaflet.css", "vendor/leaflet/LICENSE"):
         if digest(bundle / "_internal/static" / name) != digest(ROOT / "static" / name):
             raise RuntimeError(f"Bundled travel asset is stale: {name}")
     return files

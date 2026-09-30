@@ -1,5 +1,6 @@
 """Bounded, resumable research through the existing verified public-source cache."""
 from datetime import date, timedelta
+from copy import deepcopy
 import logging
 from uuid import uuid4
 
@@ -8,9 +9,8 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from apps.integrations.services import verified_intelligence
 from apps.mobility.models import TravelMessage, TravelPlanningSession, TravelResearchEvidence, TravelResearchSession
-from .travel_discovery import candidates_for, value
+from .travel_discovery import candidates_for, value, fact
 
 TERMINAL = {"ready", "failed", "superseded"}
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ STAGES = {"queued": "Queued", "destinations": "Researching Destinations", "weath
           "recommendations": "Building Recommendations", "ready": "Ready", "failed": "Failed", "superseded": "Request updated"}
 
 
-def queue_research(session, deep=False, recheck=False):
+def queue_research(session, deep=False, recheck=False, force=False):
     active = session.research_runs.exclude(status__in=TERMINAL).filter(revision=session.revision).first()
     if active:
         if deep and not active.deep:
@@ -31,7 +31,10 @@ def queue_research(session, deep=False, recheck=False):
             session.save(update_fields=["revision"])
         else:
             return active
-    run = TravelResearchSession.objects.create(session=session, request=session.state, revision=session.revision,
+    request = deepcopy(session.state)
+    if force:
+        request["force_refresh"] = fact(True, "explicit_refresh")
+    run = TravelResearchSession.objects.create(session=session, request=request, revision=session.revision,
                                               deep=deep, recheck=recheck)
     session.status = "researching"
     session.save(update_fields=["status", "updated_at"])
@@ -65,7 +68,7 @@ def store_evidence(run, destination, kind, finding, *, evidence=None, confidence
         research=run, destination=destination, data_type=kind, source_url=evidence.get("source_url", url),
         source_name=evidence.get("source_name", source), retrieved_at=retrieved,
         valid_until=valid, confidence=confidence,
-        freshness="fresh" if fresh else "stale" if retrieved else "unknown", finding=finding)
+        freshness="RECENTLY_VERIFIED" if fresh else "CACHED" if retrieved else "ESTIMATED" if confidence == "ESTIMATED" else "UNKNOWN", finding=finding)
     return evidence_payload(item)
 
 
@@ -74,8 +77,23 @@ def evidence_payload(item):
             "source_url": item.source_url, "source_name": item.source_name,
             "retrieved_at": item.retrieved_at.isoformat() if item.retrieved_at else None,
             "valid_until": item.valid_until.isoformat() if item.valid_until else None,
-            "confidence": item.confidence, "freshness": "stale" if item.valid_until and item.valid_until <= timezone.now() else item.freshness,
+            "confidence": "UNKNOWN" if item.valid_until and item.valid_until <= timezone.now() else item.confidence,
+            "freshness": "CACHED" if item.valid_until and item.valid_until <= timezone.now() else item.freshness,
+            "provider": item.provider, "verified_at": item.verified_at.isoformat() if item.verified_at else None,
+            "status": item.status, "error": item.error, "response_hash": item.response_hash,
             "finding": item.finding}
+
+
+def store_provider_evidence(run, destination, result):
+    kind = {"routing":"route", "hotels":"stay", "permits":"restrictions"}.get(result.category,result.category)
+    item = TravelResearchEvidence.objects.create(research=run, destination=destination, data_type=kind,
+        provider=result.provider, source_name=result.provider, source_url=result.source_url,
+        retrieved_at=parse_datetime(result.retrieved_at or ""), verified_at=parse_datetime(result.verified_at or ""),
+        valid_until=parse_datetime(result.expires_at or ""), response_hash=result.response_hash,
+        request_parameters=result.request_parameters, status=result.status, error=result.error,
+        confidence=result.confidence, freshness=result.freshness,
+        finding={**result.payload,"attribution":result.attribution,"fallback":result.fallback})
+    return evidence_payload(item)
 
 
 def run_research(run_id):
@@ -95,66 +113,32 @@ def run_research(run_id):
             raise RuntimeError("Research lease expired.")
 
     try:
-        options = candidates_for(run.session.user, run.request)
-        if run.recheck and run.session.candidates:
-            # Recheck existing destinations; don't replace a selected itinerary.
-            names = {d["name"] for d in run.session.candidates}
-            all_options = candidates_for(run.session.user, run.request, limit=50)
-            options = [d for d in all_options if d["name"] in names]
+        from .travel.research import enrich_candidate, research_candidates
+        from .travel.discovery import remember
+        preliminary = candidates_for(run.session.user, run.request, limit=50)
+        options = research_candidates(run.session.user, run.request, preliminary)[:3]
+        if run.recheck and run.session.candidates and not value(run.request, "requested_destination"):
+            options = run.session.candidates
         previous = {d["name"]: d for d in run.session.candidates}
-        verified = 0
-        changes = []
-        for d in options:
-            d["sources"] = []
+        verified, changes, researched = 0, [], []
+        for destination in options:
             stage("weather")
-            start = value(run.request, "available_start_date")
-            end = value(run.request, "available_end_date")
-            weather = None
-            if start and end and 0 <= (date.fromisoformat(start)-timezone.localdate()).days and (date.fromisoformat(end)-timezone.localdate()).days <= 15:
-                try:
-                    result = verified_intelligence.weather_snapshot(d["lat"], d["lon"], date.fromisoformat(start), date.fromisoformat(end))
-                    ev = result.evidence
-                    p = result.payload
-                    valid = parse_datetime(ev.get("stale_after") or "")
-                    if ev.get("status") == "fresh" and valid and valid > timezone.now() and p.get("average_max_temp") is not None:
-                        weather = {**p, "summary": f"Forecast average {p.get('average_min_temp')}–{p.get('average_max_temp')}°C; total rain {p.get('precipitation_total')} mm across your dates.",
-                                   "confidence": "LIKELY"}
-                        verified += 1
-                        d["factors"]["Weather"] = "Rain risk" if (p.get("precipitation_total") or 0) >= 20 else "Forecast available"
-                        if (p.get("precipitation_total") or 0) >= 20:
-                            d["score"] -= 8
-                        old_rain = previous.get(d["name"], {}).get("weather", {}).get("precipitation_total")
-                        if run.recheck and old_rain is not None and abs((p.get("precipitation_total") or 0)-old_rain) >= 10:
-                            changes.append(f"{d['name']}: forecast rain changed from {old_rain} to {p.get('precipitation_total')} mm across the trip.")
-                    d["sources"].append(store_evidence(run, d["name"], "weather", weather or {"summary": "No current forecast could be verified."},
-                                                        evidence=ev, confidence="LIKELY"))
-                except Exception:
-                    d["sources"].append(store_evidence(run, d["name"], "weather", {"summary": "Weather provider unavailable; retry research."}))
-            else:
-                d["sources"].append(store_evidence(run, d["name"], "weather", {"summary": "Choose dates within the next 16 days for a full-trip forecast; no seasonal estimate is presented as a forecast."}))
-            d["weather"] = weather or {"summary": "Current weather for these dates is unverified. Recheck nearer departure.", "confidence": "UNKNOWN"}
-            stage("routes")
-            d["sources"].append(store_evidence(run, d["name"], "route", {"summary": d["distance_basis"], "distance_km": d["distance_km"],
-                "travel_hours": d["travel_hours"]}, confidence="ESTIMATED", source="Alfred town-centre distance estimate"))
-            d["sources"].append(store_evidence(run, d["name"], "restrictions", {"summary": d["caution"] + " Official reference provided for checking; its contents have not been fetched."},
-                source=d["authority"], url=d["source"]))
-            if run.deep:
-                try:
-                    # Destination alone, never home, names, vehicle or private history.
-                    news = verified_intelligence.google_news_search(f"{d['name']} travel road closures permits official")
-                    d["sources"].append(store_evidence(run, d["name"], "notices", {"summary": "Related news leads only, not confirmation of access or safety.",
-                        "reports": news.payload.get("articles", news.payload.get("items", []))[:5]}, evidence=news.evidence, confidence="UNKNOWN"))
-                except Exception:
-                    d["sources"].append(store_evidence(run, d["name"], "notices", {"summary": "Public notices search unavailable."}))
-            stage("stays")
-            d["sources"].append(store_evidence(run, d["name"], "stay", {"summary": f"Suggested area: {d['stay']}. Cost allowance only; no rooms or booking availability verified."},
-                confidence="ESTIMATED", source="Alfred budget assumptions"))
+            d, results = enrich_candidate(run.session.user, run.request, destination)
+            d["sources"] = [store_provider_evidence(run, d["name"], result) for result in results]
+            d["sources"].append(store_evidence(run, d["name"], "budget", d["budget"],
+                confidence="ESTIMATED", source="ALFRED budget formulas"))
+            weather = d.get("weather_result", {})
+            if weather.get("success") and not weather.get("stale"):
+                verified += 1
+            old_rain = previous.get(d["name"], {}).get("weather", {}).get("precipitation_total")
+            rain = d["weather"].get("precipitation_total")
+            if run.recheck and rain is not None and old_rain is not None and abs(rain-old_rain) >= 10:
+                changes.append(f"{d['name']}: forecast rain changed from {old_rain} to {rain} mm across the trip.")
+            researched.append(d)
             stage("costs")
-            d["sources"].append(store_evidence(run, d["name"], "budget", d["budget"], confidence="ESTIMATED", source="Alfred budget assumptions"))
-            TravelResearchSession.objects.filter(pk=run_id, lease_token=token).update(
-                sources_checked=run.evidence.exclude(retrieved_at=None).count(), candidate_count=len(options), result=options)
+        options = researched
         stage("recommendations")
-        options.sort(key=lambda d: -d["score"])
+        options.sort(key=(lambda d: d["budget"]["expected"]) if value(run.request,"sort_by") == "cost" else (lambda d: -d["score"]))
         summary = (f"Compared {len(options)} destinations; {verified} current weather forecast(s) available. " if verified else
                    "Preliminary suggestions are ready. I couldn't verify live weather for these dates. ")
         summary += "Road conditions, permits, entry fees and room availability remain unverified."
@@ -164,16 +148,37 @@ def run_research(run_id):
             current = TravelPlanningSession.objects.select_for_update().get(pk=run.session_id)
             status = "ready" if current.revision == run.revision else "superseded"
             updated = TravelResearchSession.objects.filter(pk=run_id, lease_token=token).update(
-                status=status, completed_at=timezone.now(), lease_until=None, summary=summary, changes=changes, result=options)
+                status=status, completed_at=timezone.now(), lease_until=None, summary=summary, changes=changes, result=options,
+                candidate_count=len(options), sources_checked=run.evidence.exclude(retrieved_at=None).count())
             if status == "ready" and updated:
                 current.candidates = options[:3]
-                current.status = "itinerary_ready" if current.itinerary else "destination_selected" if value(current.state, "selected_destination") else "suggestions_ready"
+                current.status = "ready" if current.itinerary else "researched"
+                if value(current.state,"requested_destination") and len(options) == 1 and not current.itinerary:
+                    from .travel_itinerary import build_itinerary
+                    current.state["selected_destination"] = fact(options[0]["name"])
+                    current.itinerary = build_itinerary(current.state,options[0])
+                    current.status = "ready"
+                for candidate in current.candidates:
+                    remember(current.user, candidate, "shown")
+                    for place in candidate.get("places_result", {}).get("payload", {}).get("places", []):
+                        remember(current.user, place, "shown")
                 if current.itinerary:
                     selected = next((c for c in options if c["name"] == current.itinerary.get("destination")), None)
                     if selected:
                         current.itinerary["weather"] = selected["weather"]
                         current.itinerary["sources"] = selected["sources"]
-                current.save(update_fields=["candidates", "status", "itinerary", "updated_at"])
+                        for key in ("route_result", "weather_result", "places_result", "permit_result", "hotels_result", "flights_result", "trains_result", "buses_result", "discovery_result", "weather_proposals", "map", "quality", "mode_comparison", "web_research", "external_links"):
+                            current.itinerary[key] = selected.get(key, {})
+                        current.itinerary["route"].update(distance_km_one_way=selected.get("distance_km"),hours_one_way=selected.get("travel_hours"),note=selected["distance_basis"])
+                        if current.itinerary.get("edits"):
+                            current.itinerary["budget"]["recheck_note"] = "Research updated; your edited budget allowances were retained. Review changed route/prices before saving."
+                        else:
+                            current.itinerary["budget"] = selected["budget"]
+                            days = current.itinerary["days"]
+                            for i, day in enumerate(days):
+                                total = selected["budget"]["expected"]
+                                day["estimated_cost"] = total//len(days)+(total%len(days) if i == len(days)-1 else 0)
+                current.save(update_fields=["candidates", "status", "itinerary", "state", "updated_at"])
                 if current.plan_id and current.plan.status == "researching":
                     current.plan.status = "suggestions_ready"
                     current.plan.save(update_fields=["status","updated_at"])

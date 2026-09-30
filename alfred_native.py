@@ -91,8 +91,19 @@ def configure(data):
     runtime_directory(data)
     config = data / "config"
     config.mkdir(exist_ok=True)
+    # Choose the backend before importing any alfred_ai module: its package
+    # initializer otherwise starts Celery before native settings are selected.
+    os.environ.update({
+        "DJANGO_SETTINGS_MODULE": "alfred_ai.native_settings",
+        "ALFRED_TASK_BACKEND": "huey",
+        "ALFRED_LOCAL_RUNTIME": "true",
+        "ALFRED_AUTO_TRAIN_ON_STARTUP": "false",
+        "ALFRED_DATA_DIR": str(data),
+        "ALFRED_REGISTRY_PATH": str(data / "ml_models" / "alfred" / "model_registry"),
+    })
     import environ
-    environ.Env.read_env(data / ".env")
+    from alfred_ai.local_config import load_local_environment
+    load_local_environment(data)
     previous_secret = os.environ.get("DJANGO_SECRET_KEY", "alfred-local-development-key")
     secret_file = config / "native.env"
     if not secret_file.exists():
@@ -108,14 +119,6 @@ def configure(data):
     environ.Env.read_env(secret_file, overwrite=True)
     if not os.environ.get("DJANGO_SECRET_KEY"):
         raise RuntimeError(f"Set DJANGO_SECRET_KEY in {secret_file}.")
-    os.environ.update({
-        "DJANGO_SETTINGS_MODULE": "alfred_ai.native_settings",
-        "ALFRED_TASK_BACKEND": "huey",
-        "ALFRED_LOCAL_RUNTIME": "true",
-        "ALFRED_AUTO_TRAIN_ON_STARTUP": "false",
-        "ALFRED_DATA_DIR": str(data),
-        "ALFRED_REGISTRY_PATH": str(data / "ml_models" / "alfred" / "model_registry"),
-    })
     os.chdir(data)
     import django
     django.setup()

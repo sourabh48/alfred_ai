@@ -156,6 +156,7 @@ class TravelPlan(models.Model):
         ("ride", "Bike Ride"),
         ("roadtrip", "Road Trip"),
         ("train", "Train"),
+        ("bus", "Bus"),
         ("flight", "Flight"),
         ("mixed", "Mixed Mode"),
     ]
@@ -278,6 +279,50 @@ class TravelResearchEvidence(models.Model):
     confidence = models.CharField(max_length=16, default="UNKNOWN")
     freshness = models.CharField(max_length=20, default="unknown")
     finding = models.JSONField(default=dict)
+    provider = models.CharField(max_length=80, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    response_hash = models.CharField(max_length=64, blank=True)
+    request_parameters = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=32, default="unverified")
+    error = models.CharField(max_length=240, blank=True)
+
+
+class TravelProviderState(models.Model):
+    """Shared provider lease and backoff, including across local worker processes."""
+
+    provider = models.CharField(max_length=80, unique=True)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    lease_token = models.CharField(max_length=36, blank=True)
+    next_allowed_at = models.DateTimeField(null=True, blank=True)
+    quota_remaining = models.PositiveIntegerField(null=True, blank=True)
+
+
+class TravelProviderRequest(models.Model):
+    provider = models.CharField(max_length=80, db_index=True)
+    category = models.CharField(max_length=40)
+    cache_key = models.CharField(max_length=160)
+    # Public search parameters only: no tokens, headers, conversation or user IDs.
+    parameters = models.JSONField(default=dict)
+    status = models.CharField(max_length=32)
+    network_call = models.BooleanField(default=False)
+    latency_ms = models.PositiveIntegerField(default=0)
+    error = models.CharField(max_length=240, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["provider", "created_at"], name="travel_provider_time_idx")]
+
+
+class UserDestinationHistory(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="destination_history")
+    place_key = models.CharField(max_length=200)
+    name = models.CharField(max_length=200)
+    events = models.JSONField(default=dict)
+    shown_count = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "place_key"], name="unique_user_travel_place")]
 
 
 class TravelPreferenceProfile(models.Model):

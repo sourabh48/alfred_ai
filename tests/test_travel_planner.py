@@ -15,13 +15,14 @@ from apps.mobility.services.travel_conversation import extract, new_session, sav
 from apps.mobility.services.travel_discovery import budget_for, candidates_for, fact, history_for, learn, value
 from apps.mobility.services.travel_itinerary import build_itinerary, edit_itinerary
 from apps.mobility.services.travel_research import queue_research, run_research
+from apps.mobility.services.travel.providers.base import ProviderResult
 
 
 def weather_fixture(*args, **kwargs):
     now = timezone.now()
-    return SimpleNamespace(payload={"average_min_temp": 20, "average_max_temp": 26, "precipitation_total": 2, "wind_max": 12},
-        evidence={"status": "fresh", "source_url": "https://api.open-meteo.com/v1/forecast", "source_name": "Open-Meteo",
-                  "fetched_at": now.isoformat(), "stale_after": (now+timedelta(hours=8)).isoformat()})
+    return ProviderResult("open_meteo","weather",success=True,status="ok",freshness="LIVE",confidence="LIKELY",
+        payload={"average_min_temp":20,"average_max_temp":26,"precipitation_total":2,"wind_max":12,"days":[]},
+        source_url="https://open-meteo.com/en/docs",retrieved_at=now.isoformat(),verified_at=now.isoformat(),expires_at=(now+timedelta(hours=2)).isoformat())
 
 
 class TravelPlannerTests(TestCase):
@@ -31,8 +32,8 @@ class TravelPlannerTests(TestCase):
         self.client.force_login(self.user)
         self.dispatch = patch("apps.mobility.services.travel_research.dispatch").start()
         self.addCleanup(patch.stopall)
-        patch("apps.mobility.services.travel_research.verified_intelligence.weather_snapshot", side_effect=weather_fixture).start()
-        patch("apps.mobility.services.travel_research.verified_intelligence.google_news_search", return_value=SimpleNamespace(payload={}, evidence={})).start()
+        patch("apps.mobility.services.travel.research.weather_result", side_effect=weather_fixture).start()
+        patch("apps.mobility.services.travel.providers.base.request", side_effect=AssertionError("Tests must mock travel providers")).start()
         self.today = timezone.localdate()
 
     def post(self, url, body):
@@ -73,12 +74,12 @@ class TravelPlannerTests(TestCase):
         self.assertEqual(state["budget"]["source"], "user_message")
         self.assertTrue(state["budget"]["confirmed_by_user"])
 
-    def test_origin_is_inferred_but_requires_confirmation(self):
+    def test_configured_origin_is_reused_without_repeated_question(self):
         s = new_session(self.user)
         self.assertFalse(s.state["origin"]["confirmed_by_user"])
         s = send_message(s.id, self.user, "3 days ₹12000")
-        self.assertIn("Use that?", s.messages.last().text)
-        self.assertFalse(s.research_runs.exists())
+        self.assertNotIn("Use that?", s.messages.last().text)
+        self.assertTrue(s.research_runs.exists())
         s = send_message(s.id, self.user, "Yes use that")
         self.assertTrue(s.research_runs.exists())
 
@@ -162,6 +163,24 @@ class TravelPlannerTests(TestCase):
         self.assertEqual(sum(s.itinerary["budget"]["categories"].values()),s.itinerary["budget"]["expected"])
         self.assertEqual(sum(d["estimated_cost"] for d in s.itinerary["days"]),s.itinerary["budget"]["expected"])
 
+    def test_day_edit_after_hotel_research_survives_recheck(self):
+        s = self.chosen()
+        s = send_message(s.id, self.user, "Show cheaper hotels")
+        self.assertEqual(run_research(s.research_runs.first().id)["status"], "ready")
+        s.refresh_from_db()
+        before = deepcopy(s.itinerary)
+        s = send_message(s.id, self.user, "Day 2 is too busy. Make it relaxed.")
+        for index in (0, 2, 3):
+            self.assertEqual(s.itinerary["days"][index], before["days"][index])
+        edited = deepcopy(s.itinerary)
+        s = send_message(s.id, self.user, "Recheck trip")
+        self.assertEqual(run_research(s.research_runs.first().id)["status"], "ready")
+        s.refresh_from_db()
+        self.assertEqual(s.itinerary["days"], edited["days"])
+        self.assertEqual(s.itinerary["budget"]["expected"], edited["budget"]["expected"])
+        self.assertEqual(sum(d["estimated_cost"] for d in s.itinerary["days"]), s.itinerary["budget"]["expected"])
+        self.assertEqual(s.itinerary["external_links"], edited["external_links"])
+
     def test_budget_sum_range_and_adaptation(self):
         s=self.ready(); b=budget_for({**s.state,"budget":fact(500)},s.candidates[0])
         self.assertEqual(sum(b["categories"].values()),b["expected"])
@@ -175,6 +194,46 @@ class TravelPlannerTests(TestCase):
         self.assertLess(s.itinerary["budget"]["expected"],before)
         self.assertEqual(sum(s.itinerary["budget"]["categories"].values()),s.itinerary["budget"]["expected"])
         self.assertEqual(sum(d["estimated_cost"] for d in s.itinerary["days"]),s.itinerary["budget"]["expected"])
+
+    def test_budget_edit_rounds_half_up_and_preserves_totals(self):
+        session = self.chosen()
+        state = {**session.state, "trip_duration": fact(2), "number_of_travelers": fact(1),
+                 "budget": fact(20000)}
+        original = build_itinerary(state, {**session.candidates[0], "nightly": 1006})
+        before = deepcopy(original)
+        self.assertEqual(original["budget"]["categories"]["Stay"], 1006)
+
+        edited, _ = edit_itinerary(original, "Reduce the budget", state)
+
+        self.assertEqual(edited["budget"]["categories"]["Stay"], 755)  # 754.50 rounds up.
+        self.assertEqual(edited["budget"]["expected"], before["budget"]["expected"] - 251)
+        self.assertEqual(edited["budget"]["categories"]["Emergency Buffer"],
+                         before["budget"]["categories"]["Emergency Buffer"])
+        self.assertEqual(edited["days"][-1], before["days"][-1])
+        self.assertEqual(sum(day["estimated_cost"] for day in edited["days"]), edited["budget"]["expected"])
+        self.assertEqual(sum(edited["budget"]["categories"].values()), edited["budget"]["expected"])
+        for total, item_key in (("expected", "expected"), ("minimum", "low"), ("comfortable", "high")):
+            self.assertEqual(edited["budget"][total], sum(item[item_key] for item in edited["budget"]["line_items"]))
+        stay = next(item for item in edited["budget"]["line_items"] if item["category"] == "Stay")
+        self.assertEqual((stay["low"], stay["expected"], stay["high"]), (604, 755, 906))
+        self.assertEqual(original, before)
+        self.assertEqual(json.loads(json.dumps(edited))["budget"], edited["budget"])
+        legacy = deepcopy(original)
+        del legacy["budget"]["line_items"]
+        edited_legacy, _ = edit_itinerary(legacy, "Reduce the budget", state)
+        self.assertEqual(edited_legacy["budget"]["categories"]["Stay"], 755)
+        self.assertEqual(edited_legacy["budget"]["low"], edited_legacy["budget"]["minimum"])
+        self.assertEqual(edited_legacy["budget"]["high"], edited_legacy["budget"]["comfortable"])
+
+    def test_edit_normalizes_decimal_budget_target_like_initial_budget(self):
+        session = self.chosen()
+        state = {**session.state, "budget": fact("333.50"), "budget_scope": fact("per_person"),
+                 "number_of_travelers": fact(3)}
+        edited, _ = edit_itinerary(session.itinerary, "Add one waterfall", state)
+        self.assertEqual(edited["budget"]["target"], 1002)
+        self.assertIsInstance(edited["budget"]["target"], int)
+        self.assertEqual(edited["budget"]["target"], budget_for(state, session.candidates[0])["target"])
+        self.assertEqual(edited["budget"]["over_budget"], max(0, edited["budget"]["expected"] - 1002))
 
     def test_add_day_updates_window(self):
         s=self.chosen(); end=value(s.state,"available_end_date")
@@ -214,7 +273,7 @@ class TravelPlannerTests(TestCase):
 
     def test_failed_source_produces_offline_suggestions(self):
         s=self.ready();run=s.research_runs.first()
-        with patch("apps.mobility.services.travel_research.verified_intelligence.weather_snapshot",side_effect=TimeoutError):
+        with patch("apps.mobility.services.travel.research.weather_result",side_effect=TimeoutError):
             self.assertEqual(run_research(run.id)["status"],"ready")
         run.refresh_from_db()
         self.assertIn("couldn't verify",run.summary)
@@ -299,12 +358,14 @@ class TravelPlannerTests(TestCase):
 
     def test_research_queries_do_not_include_private_context(self):
         s=self.ready();run=s.research_runs.first();run.deep=True;run.save()
-        with patch("apps.mobility.services.travel_research.verified_intelligence.google_news_search",return_value=SimpleNamespace(payload={},evidence={})) as search:
+        with patch("apps.mobility.services.travel.research.query_with_fallback",return_value=ProviderResult("fixture","web",error="offline")) as search:
             run_research(run.id)
+        self.assertTrue(search.called)
         for call in search.call_args_list:
-            query=call.args[0]
-            for private in (self.user.username,"Bengaluru","15000"):
+            query=str(call.args[1])
+            for private in (self.user.username,"15000"):
                 self.assertNotIn(private,query)
+            self.assertLessEqual(set(call.args[1]),{"destination","origin","topic","date","mode"})
 
     def test_media_preferences_require_opt_in_and_favorite(self):
         photo=TripPhoto.objects.create(user=self.user,image="trip_photos/test.jpg",preference_tags=["photography"])
@@ -380,7 +441,7 @@ class TravelMigrationTests(TransactionTestCase):
         from django.db import connection
         from django.db.migrations.executor import MigrationExecutor
         before=("mobility","0008_bikeservicerecord_source_document")
-        after=("mobility","0009_travelplan_itinerary_travelplan_planning_state_and_more")
+        after=("mobility","0012_travel_bus_mode")
         executor=MigrationExecutor(connection)
         executor.migrate([before])
         old=executor.loader.project_state([before]).apps
