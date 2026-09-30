@@ -9,11 +9,12 @@ from pathlib import Path
 from datetime import timedelta
 
 from django.core.exceptions import ImproperlyConfigured
+from .local_config import load_local_environment
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-env.read_env(os.path.join(BASE_DIR, ".env"))
+load_local_environment(Path(os.environ.get("ALFRED_DATA_DIR") or BASE_DIR))
 
 
 def _is_local_runtime(argv: list[str] | None = None) -> bool:

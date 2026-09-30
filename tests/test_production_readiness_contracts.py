@@ -197,6 +197,8 @@ class ProductionReadinessContractTests(SimpleTestCase):
             "DJANGO_SECRET_KEY": "production-secret",
             "ALLOWED_HOSTS": "alfred.example.com",
             "CSRF_TRUSTED_ORIGINS": "https://alfred.example.com",
+            # Exercise DB_ENGINE independently of the parent test runner's DB URL.
+            "DATABASE_URL": "",
             "DB_ENGINE": "django.db.backends.sqlite3",
             "DB_NAME": ":memory:",
             "CACHE_BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -225,6 +227,8 @@ class ProductionReadinessContractTests(SimpleTestCase):
             "DJANGO_SECRET_KEY": "production-secret",
             "ALLOWED_HOSTS": "alfred.example.com",
             "CSRF_TRUSTED_ORIGINS": "https://alfred.example.com",
+            # Exercise DB_ENGINE independently of the parent test runner's DB URL.
+            "DATABASE_URL": "",
             "DB_ENGINE": "django.db.backends.postgresql",
             "DB_NAME": "alfred",
             "DB_USER": "alfred",
