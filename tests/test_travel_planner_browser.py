@@ -48,6 +48,8 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         super().tearDownClass()
 
     def setUp(self):
+        self.browser.execute_cdp_cmd("Emulation.clearDeviceMetricsOverride", {})
+        self.browser.set_window_size(1440, 1100)
         cache.clear()
         self.offline = _offline_fixture_patches()
         self.addCleanup(self.offline.close)
@@ -97,7 +99,9 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
 
     def click(self,selector):
         element=self.browser.find_element(self.By.CSS_SELECTOR,selector)
-        self.browser.execute_script("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",element)
+        # WebDriver also scrolls before a native click; its scroll must finish
+        # immediately instead of racing the main panel's smooth scrolling.
+        self.browser.execute_script("const main=arguments[0].closest('.alfred-main');if(main)main.style.scrollBehavior='auto';arguments[0].scrollIntoView({block:'center',behavior:'instant'});",element)
         self.wait.until(lambda _: self.browser.execute_script("const e=arguments[0],r=e.getBoundingClientRect(),h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return h===e||e.contains(h);",element))
         element.click()
 
