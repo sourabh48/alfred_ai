@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import timedelta
 
 from django.core.exceptions import ImproperlyConfigured
-from .local_config import load_local_environment
+from .local_config import load_local_environment, native_secret_file
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -36,9 +36,14 @@ def _is_local_runtime(argv: list[str] | None = None) -> bool:
 
 
 def _default_secret_key(local_runtime: bool) -> str:
-    if local_runtime:
-        return "alfred-local-development-key"
-    return ""
+    if not local_runtime:
+        return ""
+    configured = os.environ.get("DJANGO_SECRET_KEY")
+    if configured:
+        return configured
+    data = Path(os.environ.get("ALFRED_DATA_DIR") or BASE_DIR)
+    environ.Env.read_env(native_secret_file(data), overwrite=False)
+    return os.environ.get("DJANGO_SECRET_KEY", "")
 
 
 def _default_allowed_hosts(local_runtime: bool) -> list[str]:
@@ -93,6 +98,7 @@ def _require_production(condition: bool, message: str) -> None:
 LOCAL_RUNTIME = env.bool("ALFRED_LOCAL_RUNTIME", default=_is_local_runtime())
 DEBUG = env.bool("DEBUG", default=LOCAL_RUNTIME)
 SECRET_KEY = env("DJANGO_SECRET_KEY", default=_default_secret_key(LOCAL_RUNTIME))
+SECRET_KEY_FALLBACKS = env.json("DJANGO_SECRET_KEY_FALLBACKS", default=[])
 if not SECRET_KEY:
     raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when local runtime mode is disabled.")
 

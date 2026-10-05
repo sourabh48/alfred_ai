@@ -11,6 +11,8 @@ from django.conf import settings
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from alfred_ai.local_config import is_public_default_secret
+
 
 PRODUCTION_DEPLOYMENT_PROOF_ENV = "ALFRED_PRODUCTION_DEPLOYMENT_PROOF"
 PRODUCTION_DEPLOYMENT_PROOF_DEFAULT_PATH = "artifacts/ops/production_readiness_summary.json"
@@ -552,7 +554,7 @@ def _security_runtime_probe() -> dict:
         "debug": bool(getattr(settings, "DEBUG", True)),
         "local_runtime": bool(getattr(settings, "LOCAL_RUNTIME", False)),
         "allowed_hosts_configured": bool(allowed_hosts) and "*" not in allowed_hosts,
-        "secret_key_configured": bool(_env_value("DJANGO_SECRET_KEY")) and secret_key != "alfred-local-development-key",
+        "secret_key_configured": bool(_env_value("DJANGO_SECRET_KEY")) and not is_public_default_secret(secret_key),
         "secure_cookies": bool(getattr(settings, "SESSION_COOKIE_SECURE", False))
         and bool(getattr(settings, "CSRF_COOKIE_SECURE", False)),
         "session_cookie_httponly": bool(getattr(settings, "SESSION_COOKIE_HTTPONLY", False)),
@@ -835,7 +837,7 @@ def _celery_config_check() -> dict:
 def _security_config_check() -> dict:
     allowed_hosts = list(getattr(settings, "ALLOWED_HOSTS", []) or [])
     secret_key = str(getattr(settings, "SECRET_KEY", "") or "")
-    local_secret = secret_key == "alfred-local-development-key"
+    local_secret = is_public_default_secret(secret_key)
     ready = (
         not bool(getattr(settings, "LOCAL_RUNTIME", False))
         and not bool(getattr(settings, "DEBUG", True))

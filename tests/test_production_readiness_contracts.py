@@ -284,7 +284,7 @@ class ProductionReadinessContractTests(SimpleTestCase):
     @override_settings(
         LOCAL_RUNTIME=True,
         DEBUG=True,
-        SECRET_KEY="alfred-local-development-key",
+        SECRET_KEY="synthetic-local-secret",
         ALLOWED_HOSTS=["localhost", "127.0.0.1"],
         DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
         CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "test"}},
@@ -387,7 +387,7 @@ class ProductionReadinessContractTests(SimpleTestCase):
     @override_settings(
         LOCAL_RUNTIME=True,
         DEBUG=True,
-        SECRET_KEY="alfred-local-development-key",
+        SECRET_KEY="synthetic-local-secret",
         ALLOWED_HOSTS=["localhost", "127.0.0.1"],
         DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
         CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "test"}},
