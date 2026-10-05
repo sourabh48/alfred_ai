@@ -166,13 +166,21 @@ chosen new location; do not blindly reuse absolute paths from the old manifest.
 |---|---|---|
 | `repository-runtime` | Source/default native data | `$SourceRoot` |
 | `external-runtime-01` | Packaged/native profile | `$env:LOCALAPPDATA\ALFRED` |
+| `external-runtime-02` | Historical first-start native profile with retained state | `$env:LOCALAPPDATA\ALFRED_RECOVERED_HISTORY\external-runtime-02` |
 | `additional-private-00` | Historical Docker data disk | `%LOCALAPPDATA%\ALFRED_RECOVERED_DOCKER`, pending compatibility review |
+| Remaining `additional-private-*` | Historical cleanup/pre-update backups, private validation inputs and earlier operator snapshots | `$env:LOCALAPPDATA\ALFRED_RECOVERED_HISTORY\<label>` |
 
 Confirm the labels against the internal `sources` table before copying. Extra
 runtime or additional-private labels require their own explicit mapping. Any
 `configured-state/ALFRED_REGISTRY_PATH` or `configured-state/ALFRED_PERSONALITY_PATH`
 data needs its configuration path updated privately to the selected new location.
 Do not merge the two profile databases or replace one profile's key with another.
+The real pre-wipe inventory found the historical first-start profile, private
+cleanup/pre-update snapshots, unique validation inputs and six older operator
+backup directories. Preserve their reviewed selection as well as the two main
+profiles. Their detailed original paths are in the encrypted internal manifest.
+Keep historical snapshots and their signing-key containers separate; do not
+start them, merge their databases or automatically overwrite a current profile.
 
 Use fresh target data locations, before bootstrap creates secret files. Refuse
 to overwrite an existing private database or `config/native.env`. Copy labelled
@@ -195,6 +203,18 @@ robocopy (Join-Path $PrivateCheckpoint 'external-runtime-01') $FrozenRoot /E /CO
 if ($LASTEXITCODE -ge 8) { throw 'Frozen runtime copy failed.' }
 $Internal = Get-Content -LiteralPath (Join-Path $PrivateCheckpoint 'manifest.json') -Raw | ConvertFrom-Json
 $Mappings = @{'repository-runtime'=$SourceRoot; 'external-runtime-01'=$FrozenRoot}
+$HistoryRoot = Join-Path $env:LOCALAPPDATA 'ALFRED_RECOVERED_HISTORY'
+New-Item -ItemType Directory -Path $HistoryRoot -ErrorAction Stop | Out-Null
+Copy-Item -LiteralPath (Join-Path $PrivateCheckpoint 'manifest.json') -Destination (Join-Path $HistoryRoot 'manifest.json')
+$HistoricalLabels = Get-ChildItem -LiteralPath $PrivateCheckpoint -Directory | Where-Object {
+    $_.Name -match '^additional-private-(?!00$)\d+$|^external-runtime-(?!01$)\d+$'
+}
+foreach ($HistoricalLabel in $HistoricalLabels) {
+    $HistoricalTarget = Join-Path $HistoryRoot $HistoricalLabel.Name
+    robocopy $HistoricalLabel.FullName $HistoricalTarget /E /COPY:DAT /DCOPY:DAT /R:1 /W:1 /NFL /NDL /NP
+    if ($LASTEXITCODE -ge 8) { throw 'Historical private recovery copy failed.' }
+    $Mappings[$HistoricalLabel.Name] = $HistoricalTarget
+}
 foreach ($File in $Internal.files) {
     $Segments = $File.backup_path -split '/',2
     if ($Mappings.ContainsKey($Segments[0])) {
@@ -364,7 +384,11 @@ Check the web interface as well if deletion/access is ambiguous. An authenticati
 failure is not evidence of deletion. Record successful remote deletion. Only
 after recovery is proven, remote deletion confirmed and retained application
 copies verified should reviewed local encrypted clones, extraction/staging and
-verification folders be removed. Resolve each absolute folder and confirm it is
+verification folders be removed. First verify that every required historical
+profile, operator backup and private validation input has a retained hash-checked
+copy outside those temporary folders, along with its private original-path map.
+Do not discard a historical key or snapshot merely because the main profile
+starts. Resolve each absolute folder and confirm it is
 the intended temporary recovery directory before recursive deletion; never run
 cleanup against the source checkout, active runtime profiles or their sole
 remaining private-data copy.
