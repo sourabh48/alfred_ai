@@ -1,6 +1,8 @@
 <#
 Back up ALFRED's private native data before reinstalling Windows.
-Close ALFRED and its workers first. Keep the destination on a disk you will retain.
+Close ALFRED and its workers first. This script creates a PLAINTEXT private copy.
+For a complete PC wipe, use temporary staging outside Git, then follow the encrypted
+GitHub recovery procedure. Never upload this plaintext output directly.
 Example: .\scripts\backup_before_windows_reinstall.ps1 -Destination 'E:\ALFRED_PRIVATE_BACKUP' -Quiesced
 The manifest contains private file paths; keep the whole backup private.
 Source/Compose PostgreSQL installations use scripts/local_stack_ops.py backup instead.

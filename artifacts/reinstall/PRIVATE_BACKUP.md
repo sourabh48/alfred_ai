@@ -1,5 +1,12 @@
 # Private ALFRED backup before Windows reinstall
 
+The current complete-PC-cleanup plan has no retained local disk. This document
+describes the plaintext staging helper only. Stage outside the source tree, then
+follow [encrypted GitHub recovery](../../docs/WINDOWS_ENCRYPTED_RECOVERY.md).
+Only encrypted archives and safe metadata may enter the separate temporary
+PRIVATE repository. The retained-disk examples below describe the earlier option
+and do not satisfy the current wipe gate.
+
 The current active installation is the native application using `F:\ALFRED\db.sqlite3`, `media\`, `config\`, `ml_models\`, and the durable queue at `artifacts\native\jobs.sqlite3`. A second native data directory exists at `%LOCALAPPDATA%\ALFRED`; preserve it separately even though its last recorded runtime state is stopped. The script discovers both locations, any process `ALFRED_DATA_DIR`, and explicitly supplied `-AdditionalDataDirectory` values.
 
 The source `config\local.env` also configures the inactive local Compose PostgreSQL route. Native settings override that route with SQLite. Docker/pg_dump are unavailable in the inspected installation, no PostgreSQL process was found, and the Compose host is unreachable. A historical Docker disk still exists at `%LOCALAPPDATA%\Docker\wsl\main\ext4.vhdx`; preserve it because its contents have not been mounted or classified. If a live Compose installation is discovered, use the existing `scripts/local_stack_ops.py backup` procedure and its verification before reinstalling. This native script refuses `-Runtime Source` when that source route is not SQLite.
