@@ -1,6 +1,6 @@
 # ALFRED agent tooling before Windows reinstall
 
-Inventory date: 2026-10-05. Repository root: `F:\ALFRED` on this machine; `alfred_ai/` is its Python package. This records the current installation and later reinstall commands. No tool installation, authentication restoration or post-Windows application restore was performed as part of this inventory.
+Inventory date: 2026-10-06. Repository root: `F:\ALFRED` on this machine; `alfred_ai/` is its Python package. Versions were rechecked for the final pre-wipe checkpoint. This records the current installation and later reinstall commands. No tool installation, authentication restoration or post-Windows application restore was performed as part of this inventory.
 
 ## Current machine installation
 
@@ -12,7 +12,7 @@ Inventory date: 2026-10-05. Repository root: `F:\ALFRED` on this machine; `alfre
 | Graphify (`graphifyy`) | 0.9.76 | `%APPDATA%\uv\tools\graphifyy`; launcher `%USERPROFILE%\.local\bin\graphify.exe`; isolated user tool | `graphify --version` and scoped query against the current project graph |
 | uv | 0.12.23 | WinGet installation of `astral-sh.uv` | `uv --version` |
 | gstack | 1.91.22.0; source commit `f97aefe654fbe265a3c978d34865b5aa493e7453` | Source `%USERPROFILE%\gstack`; generated user Codex skills `%USERPROFILE%\.codex\skills\gstack*` | `./setup --status` in Git Bash: global Codex install current, experimental tier; 20 router section links resolve |
-| Ponytail | 4.12.0 | Codex user plugin cache `%USERPROFILE%\.codex\plugins\cache\ponytail\ponytail\4.12.0` | Both plugin manifests inspected; `codex.cmd plugin --help` confirms plugin commands exist |
+| Ponytail | 4.13.0 | Codex user plugin cache `%USERPROFILE%\.codex\plugins\cache\ponytail\ponytail\4.13.0` | Both plugin manifests inspected; `codex.cmd plugin --help` confirms plugin commands exist |
 | skills CLI | 1.7.0 | npm `npx` cache, not a project dependency or global executable | Cached CLI run with `node <cached skills path> --version` |
 | Node / npm | Node 24.13.0 / npm 11.6.2 | IDE-managed runtime `%LOCALAPPDATA%\JetBrains\PyCharm2026.2\acp-agents\.runtimes\node\24.13.0` | `node --version`, `npm.cmd --version` |
 | Bun | 1.4.2 | `%USERPROFILE%\.bun\bin\bun.exe`; user-global | `bun --version` |
@@ -33,7 +33,7 @@ Node/npm/Bun are agent-tool prerequisites here, not ALFRED's Django application 
 - `.codex/skills/graphify/`: existing project-local Graphify instructions/references and version marker 0.9.76.
 - `.codex/hooks.json`: existing relative `graphify hook-check` command; no embedded credential or machine path.
 
-The five ALFRED-specific definitions were absent at inventory time and were created during this preparation using the agreed current engineering rules. They are concise instruction-only skills; cloning the project preserves them without an installer. Current Codex discovers repository `.agents/skills` automatically. [Official skill discovery documentation](https://learn.chatgpt.com/docs/build-skills).
+The five ALFRED-specific definitions were created during the earlier pre-wipe preparation using the agreed current engineering rules and are now committed. They are concise instruction-only skills; cloning the project preserves them without an installer. Current Codex discovers repository `.agents/skills` automatically. [Official skill discovery documentation](https://learn.chatgpt.com/docs/build-skills).
 
 The upstream `project-context-ingestion`, integration, observability, performance, migration, transaction and test-builder skills explicitly target Kotlin/Spring. They are preserved reusable definitions, not instructions to install Java or convert this Django project. Use `alfred-project-context` for ALFRED orientation.
 
@@ -97,7 +97,7 @@ codex.cmd plugin add ponytail@ponytail
 codex.cmd plugin list
 ```
 
-Later, review/trust the plugin's lifecycle hooks in `/hooks` and start a new thread. Check the installed plugin version; the command installs the marketplace version available then and does not guarantee 4.12.0. Claude Code's alternative is two separate interactive prompts, `/plugin marketplace add DietrichGebert/ponytail` then `/plugin install ponytail@ponytail`. [Ponytail's upstream instructions](https://github.com/DietrichGebert/ponytail#install).
+Later, review/trust the plugin's lifecycle hooks in `/hooks` and start a new thread. Check the installed plugin version; the command installs the marketplace version available then and does not guarantee 4.13.0. Claude Code's alternative is two separate interactive prompts, `/plugin marketplace add DietrichGebert/ponytail` then `/plugin install ponytail@ponytail`. [Ponytail's upstream instructions](https://github.com/DietrichGebert/ponytail#install).
 
 ### skills CLI and repository skills
 
@@ -133,3 +133,5 @@ foreach ($skill in $alfredSkills) {
 ```
 
 No fresh Windows reinstall or tool reinstall is claimed. Tools require their public distribution sources and, for provider-backed sessions, the user's account/access recovery. Global conversation history and plugin caches are not required to rebuild or resume ALFRED from its versioned checkpoint. A general `setup_agent_tools.ps1` was intentionally omitted: host-specific installers, interactive sign-in and hook trust should remain explicit instead of a script silently changing every tool installation.
+
+Ollama is deferred until ALFRED has been restored and verified. See [HARDWARE_BASELINE.md](HARDWARE_BASELINE.md) and [OLLAMA_CODEX_HYBRID_PLAN.md](OLLAMA_CODEX_HYBRID_PLAN.md); no model installation is part of this pre-wipe inventory.
