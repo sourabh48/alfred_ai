@@ -1,29 +1,51 @@
-# Windows recovery from the temporary encrypted GitHub backup
+# Windows recovery from the encrypted ALFRED backup
 
 Prepared before the PC wipe. These are later recovery instructions; no Windows
-reinstall, private-data restore or backup-repository deletion was performed by
-writing this document. A repository name or command example is not evidence of
-a completed backup. Use the final verified backup evidence for the actual
-temporary repository, archive names and source commit.
+reinstall, private-data restore or backup deletion was performed by writing this
+document. A command example is not evidence of a completed backup. Use the final
+verified backup evidence for the retained device, archive names and source commit.
 
-The permanent source repository is `sourabh48/alfred_ai`. The temporary backup
-repository must be a **different, private** repository containing only encrypted
-archives and safe metadata. The proposed name is
-`sourabh48/alfred-private-recovery-202610`; confirm the actual name in the final
-evidence. The five source preparation commits were pushed and verified at
-`3ab4aa487bcd0095a799dc9b2d4116104b88605c`. Later preparation documentation may
-advance that commit; `source_git_head` in the verified public backup manifest is
-the recovery checkpoint to use.
+The permanent source repository is `sourabh48/alfred_ai`. The chosen handoff is a
+**Desktop recovery folder**, which the user will copy to a **6 GB pendrive**
+before wiping. The pendrive must be separate from the Windows target disk. The
+Desktop folder alone is temporary and will not survive the wipe. No temporary
+GitHub backup repository has been created. Git LFS and its
+quota are not required for this chosen method. The encrypted archive is
+`alfred-private-backup-20261006.7z.001`, one part of 67,915,749 bytes, bound to
+source commit `5bf9cbe3e4c0c609e5fff5adf135ebcdc6a213b4`. Its local archive,
+extraction, private hashes and all 17 SQLite checks passed. These local results
+do not prove a pendrive copy: require the separate USB verification below.
+
+Keep only the five approved backup files together in the encrypted folder:
+`.gitattributes`, `README_RECOVERY.md`, `backup-manifest-public.json`,
+`encrypted-backup-sha256.txt` and the encrypted archive part. The prepared Desktop
+bundle is `ALFRED_RECOVERY_20261006`, with those five files in `encrypted/`,
+portable `tools/7za.exe`, and recovery documentation in `docs/`. Copy the **whole
+bundle** to the pendrive; after reinstall, copy it back to the new Desktop before
+following the restore steps.
+Later safe source documentation may advance HEAD; the archive's verified
+`source_git_head` remains the application recovery checkpoint.
 
 ## Before wiping
 
-Do not wipe until the final evidence confirms a private repository, complete
-archive-part upload, a fresh GitHub download, matching SHA256 hashes, successful
-decryption/archive test, representative extraction and SQLite integrity checks.
+Saving the bundle on this PC's Desktop is not the retained backup. After manually
+copying it to the pendrive, run the hash/decryption/extraction/private-data checks
+below against the pendrive folder itself before wiping. The current local tests
+do not prove the manual copy.
+For that pre-wipe verification, use the existing Git root `F:\ALFRED` as
+`$SourceRoot` and the actual USB `ALFRED_RECOVERY_20261006\encrypted` folder as
+`$BackupClone`. The later restore example clones source into a new location.
+
+Do not wipe until the final evidence confirms the complete pendrive copy,
+matching SHA256 hashes read from that device, successful decryption/archive test,
+extraction, every private-file hash and all SQLite integrity checks.
 Both runtime profiles and the historical Docker disk must be included unless
 the disk is explicitly proved unnecessary. Keep originals until that gate
 passes. Keep the archive password in a trusted source that survives the wipe;
 never paste it into an agent/chat, command argument, script, Git or a manifest.
+Safely eject and disconnect the verified pendrive before Windows installation or
+disk cleanup. It must survive the wipe. Do not reformat it, select it as the
+Windows target disk or use it to create Windows installation media.
 
 The prepared helper uses `-p` only when creating the encrypted archive. With
 the verified Windows 7-Zip 26.03 console, test/extract commands omit that switch
@@ -37,7 +59,11 @@ installation media and the intended target disk. Required ALFRED signing keys,
 fallback keys, provider configuration and OAuth state must survive inside the
 encrypted backup or another independently recoverable secure source.
 
-7z AES-256 must use encrypted headers. The planned 1500 MiB volumes fit the
+7z AES-256 must use encrypted headers. If choosing the optional GitHub alternative
+instead of the pendrive, use a **different, private** repository containing only
+encrypted archives and safe metadata; never use `sourabh48/alfred_ai`. The
+proposed temporary name is `sourabh48/alfred-private-recovery-202610`; verify the
+actual repository and private visibility. The planned 1500 MiB volumes fit the
 2 GB per-file Git LFS limit for GitHub Free/Pro, but check current account
 storage/bandwidth usage and limits before uploading. At preparation time the
 published Free/Pro allowances are 10 GiB storage and 10 GiB download bandwidth.
@@ -47,21 +73,21 @@ fit a quota. [Git LFS file limits](https://docs.github.com/en/repositories/worki
 
 ## Install recovery prerequisites after Windows reinstall
 
-Install Git for Windows, Git LFS, GitHub CLI (or another working authenticated
-GitHub Git client), official 7-Zip, and 64-bit Python 3.12. Follow
+Install Git for Windows, a working authenticated GitHub Git client, and 64-bit
+Python 3.12. Use the official portable 7-Zip included in the retained bundle, or
+install official 7-Zip if needed. Git LFS and GitHub CLI are needed only for the
+optional GitHub backup alternative. Follow
 [Windows setup](WINDOWS_SETUP.md) for ALFRED's actual browser/OCR/runtime
 requirements. Agent Node/Bun tools are separate from application dependencies.
 Use [official 7-Zip](https://www.7-zip.org/) and [Git LFS](https://git-lfs.com/).
 
 ```powershell
 git --version
-git lfs version
-git lfs install
-gh auth login
-gh auth status
 py -3.12 --version
-$SevenZip = 'C:\Program Files\7-Zip\7z.exe'
-if (-not (Test-Path -LiteralPath $SevenZip -PathType Leaf)) { throw 'Install 7-Zip first.' }
+$BundleRoot = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'ALFRED_RECOVERY_20261006'
+$SevenZip = Join-Path $BundleRoot 'tools\7za.exe'
+if (-not (Test-Path -LiteralPath $SevenZip -PathType Leaf)) { $SevenZip = 'C:\Program Files\7-Zip\7z.exe' }
+if (-not (Test-Path -LiteralPath $SevenZip -PathType Leaf)) { throw 'Restore the portable 7-Zip tool or install official 7-Zip first.' }
 ```
 
 Authenticate through the normal interactive flow. Do not transfer tokens into
@@ -69,20 +95,55 @@ the source or backup checkout. Use a recovery working folder with sufficient
 free space for the archives, extracted private data and migration safety copies.
 Protect this folder as private; decrypted data must never be committed.
 
-## Clone source and the private backup
+## Clone source and use the retained Desktop bundle
 
 Do not clone over an existing checkout. These example locations are new paths;
 the source root is the folder containing `manage.py`, not its `alfred_ai` package.
+The complete bundle should now have been copied from the retained pendrive to
+the new Desktop. Keep the pendrive untouched through recovery verification.
 
 ```powershell
+$ErrorActionPreference = 'Stop'
 $SourceRoot = 'F:\ALFRED\alfred_ai'
 $RecoveryRoot = 'C:\ALFRED_RECOVERY'
-$BackupClone = Join-Path $RecoveryRoot 'encrypted-backup'
+$BackupClone = Join-Path $BundleRoot 'encrypted'
 $Recovered = Join-Path $RecoveryRoot 'decrypted-checkpoint'
-$BackupRepository = 'sourabh48/alfred-private-recovery-202610' # Use the verified actual name.
+$ExpectedSourceHead = '5bf9cbe3e4c0c609e5fff5adf135ebcdc6a213b4'
 New-Item -ItemType Directory -Path 'F:\ALFRED', $RecoveryRoot -Force | Out-Null
 git clone --branch codex/native-runtime-hardening-20260918 https://github.com/sourabh48/alfred_ai.git $SourceRoot
 if ($LASTEXITCODE -ne 0) { throw 'Source clone failed.' }
+if (-not (Test-Path -LiteralPath $BackupClone -PathType Container)) { throw 'Retained encrypted backup folder is unavailable.' }
+```
+
+Check every encrypted part after copying the retained bundle back to Desktop.
+For the mandatory **pre-wipe pendrive test**, set `$BackupClone` to the actual
+USB `encrypted` folder instead; read both the hash list and archive bytes from
+that device, not the Desktop or original staging folder:
+
+```powershell
+$HashRecords = @(Get-Content -LiteralPath (Join-Path $BackupClone 'encrypted-backup-sha256.txt') | Where-Object { $_.Trim() })
+if ($HashRecords.Count -eq 0) { throw 'Encrypted archive hashes are missing.' }
+foreach ($HashRecord in $HashRecords) {
+    if ($HashRecord -notmatch '^([a-f0-9]{64})  (alfred-private-backup-\d{8}\.7z\.\d{3})$') { throw 'Invalid encrypted archive hash record.' }
+    $ExpectedHash = $Matches[1]
+    $Part = Join-Path $BackupClone $Matches[2]
+    if ((Get-FileHash -LiteralPath $Part -Algorithm SHA256).Hash.ToLowerInvariant() -ne $ExpectedHash) { throw 'Retained archive hash mismatch.' }
+}
+```
+
+### Optional alternative: private GitHub backup
+
+Skip this section for the chosen pendrive recovery. Only if a complete PRIVATE
+GitHub backup was subsequently uploaded and its fresh download tested, replace
+`$BackupClone` with a new local clone path and use its actual repository name:
+
+```powershell
+$BackupClone = Join-Path $RecoveryRoot 'encrypted-backup'
+$BackupRepository = 'sourabh48/alfred-private-recovery-202610' # Use the verified actual name.
+git lfs version
+git lfs install
+gh auth login
+gh auth status
 $RepositoryInfo = gh repo view $BackupRepository --json nameWithOwner,visibility | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0 -or $RepositoryInfo.visibility -ne 'PRIVATE') { throw 'Private backup repository cannot be confirmed.' }
 git clone "https://github.com/$BackupRepository.git" $BackupClone
@@ -91,16 +152,24 @@ git -C $BackupClone lfs pull
 if ($LASTEXITCODE -ne 0) { throw 'Git LFS download failed.' }
 git -C $BackupClone lfs fsck
 if ($LASTEXITCODE -ne 0) { throw 'Git LFS verification failed.' }
+```
+
+### Check the archive-bound source commit
+
+For either method, cross-check the public manifest against the final pre-wipe
+evidence and checkout the exact archive-bound source:
+
+```powershell
 $Public = Get-Content -LiteralPath (Join-Path $BackupClone 'backup-manifest-public.json') -Raw | ConvertFrom-Json
-if ($Public.source_git_head -notmatch '^[0-9a-f]{40}$') { throw 'Invalid recovery source commit.' }
+if ($Public.source_git_head -notmatch '^[0-9a-f]{40}$' -or $Public.source_git_head -ne $ExpectedSourceHead) { throw 'Recovery source commit differs from the verified checkpoint.' }
 git -C $SourceRoot checkout --detach $Public.source_git_head
 if ($LASTEXITCODE -ne 0) { throw 'Recovery source commit is unavailable.' }
 if ((git -C $SourceRoot rev-parse HEAD).Trim() -ne $Public.source_git_head) { throw 'Source HEAD mismatch.' }
 git -C $SourceRoot status --short
 ```
 
-Use the SHA and backup repository recorded in the final pre-wipe evidence to
-cross-check the downloaded public manifest. After recovery validation, create a
+Use the SHA and backup location recorded in the final pre-wipe evidence to
+cross-check the public manifest. After recovery validation, create a
 development branch from this exact commit if continuing engineering work. Do not
 let a newer branch tip silently replace the known recovery checkpoint.
 
@@ -109,14 +178,21 @@ count/total, archive filename pattern and source/frozen/Docker inclusion flags.
 Per-part names and SHA256 hashes are in `encrypted-backup-sha256.txt`; detailed
 private filenames, counts and hashes remain inside the encrypted archive.
 
-## Verify downloaded encrypted volumes and decrypt interactively
+## Verify encrypted volumes from the retained backup and decrypt interactively
 
-Run the versioned verifier from the exact source checkpoint, against the newly
-downloaded backup clone. It checks every allowed file and volume, contiguous part
+Run the versioned verifier from the exact source checkpoint against the retained
+encrypted folder: the USB folder for the pre-wipe copy test, the new Desktop
+copy after reinstall, or a newly downloaded GitHub clone for that alternative.
+It checks every
+allowed file and volume, contiguous part
 numbers, counts, sizes, SHA256, the independent hash file, archive test,
 decryption, extraction, private manifest and SQLite databases. LFS pointer text
 is not archive content and fails the size/hash check. The verifier uses only
-Python's standard library; the application venv need not exist yet.
+Python's standard library; the application venv need not exist yet. Despite its
+`VerifyDownloaded` mode name, this operation works directly on the retained folder
+and makes no GitHub call. It does not require a temporary repository to exist.
+Run this helper from the cloned source's `scripts/` directory as shown; its
+source/runtime path checks depend on that location.
 
 ```powershell
 $RecoveryPython = (py -3.12 -c "import sys; print(sys.executable)").Trim()
@@ -124,8 +200,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Python 3.12 is unavailable.' }
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $SourceRoot 'scripts/prepare_encrypted_recovery.ps1') `
     -Mode VerifyDownloaded -RepositoryDirectory $BackupClone `
     -SevenZipExecutable $SevenZip -PythonExecutable $RecoveryPython `
-    -ExtractionDirectory $Recovered -BackupRepository $BackupRepository
-if ($LASTEXITCODE -ne 0) { throw 'Downloaded encrypted recovery verification failed.' }
+    -ExtractionDirectory $Recovered
+if ($LASTEXITCODE -ne 0) { throw 'Retained encrypted recovery verification failed.' }
 ```
 
 Enter the password only at the local 7-Zip console prompt. The helper never
@@ -138,8 +214,10 @@ hashes; keep them inside the private recovery folder.
 
 The archive root contains the complete backup manifest and labelled data
 directories. The preceding verifier checks every recorded private file, not only
-a representative sample. Its safe `remote-verification.local.json` result is
-written beside the downloaded clone. Keep the decrypted checkpoint private.
+a representative sample, including all 17 SQLite databases and historical WAL
+state. Its safe `remote-verification.local.json` result is written beside the
+backup folder; that filename records the chosen input verification, rather than
+proving a GitHub download. Keep the decrypted checkpoint private.
 For a separate read-only recheck:
 
 ```powershell
@@ -356,6 +434,10 @@ key destructively before proving all protected data can be read and re-encrypted
 
 ## Delete the temporary remote repository only after verified recovery
 
+This section applies only to the optional GitHub backup method. No temporary
+GitHub repository exists for the chosen pendrive backup, so there is no remote
+repository to delete and no remote-deletion gate for that method.
+
 Keep the temporary GitHub repository until downloaded hashes and decryption,
 SQLite integrity, application records/finance, media, source Git, rebuilt native
 runtime and required tooling have all been verified. Resolve the signing-key
@@ -381,10 +463,21 @@ gh api "repos/$BackupRepository"
 ```
 
 Check the web interface as well if deletion/access is ambiguous. An authentication
-failure is not evidence of deletion. Record successful remote deletion. Only
-after recovery is proven, remote deletion confirmed and retained application
-copies verified should reviewed local encrypted clones, extraction/staging and
-verification folders be removed. First verify that every required historical
+failure is not evidence of deletion. Record successful remote deletion.
+
+## Retain the pendrive until ALFRED recovery is verified
+
+Keep the encrypted USB backup until SQLite integrity, finance/data records,
+documents/media, Travel state, both required runtime profiles, native queue,
+source Git and the rebuilt native runtime are verified after reinstall. Resolve
+the compromised-key recovery/rotation requirements before discarding their only
+protected copy. Obtain the user's explicit confirmation before erasing this
+retained backup.
+
+Only after recovery is proven and retained application copies verified should
+reviewed local encrypted clones, extraction/staging and verification folders be
+removed. For the optional GitHub method, also require confirmed remote deletion
+as described above. First verify that every required historical
 profile, operator backup and private validation input has a retained hash-checked
 copy outside those temporary folders, along with its private original-path map.
 Do not discard a historical key or snapshot merely because the main profile
