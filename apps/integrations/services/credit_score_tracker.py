@@ -106,10 +106,11 @@ class CreditScoreTrackerService:
         from apps.loans.models import Loan
         from apps.expenses.models import BankAccount
 
-        active_loans = Loan.objects.filter(user=user, is_active=True)
+        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed")
         accounts = BankAccount.objects.filter(user=user, is_active=True)
         analysis = self.analyze_score_factors(user)
-        total_credit_limit = active_loans.aggregate(Sum('principal'))['principal__sum'] or 0
+        # Portfolio totals can exceed the currency limit for a single loan.
+        total_credit_limit = float(active_loans.aggregate(Sum('principal'))['principal__sum'] or 0)
         total_accounts = accounts.count() + active_loans.count()
         active_accounts = accounts.count() + active_loans.count()
         min_score, max_score = self.BUREAUS[bureau]['score_range']
@@ -276,7 +277,7 @@ class CreditScoreTrackerService:
         }
 
         # 1. Payment History (35% weight)
-        active_loans = Loan.objects.filter(user=user, is_active=True)
+        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed")
         missed_payments = sum(loan.missed_payments for loan in active_loans)
 
         payment_score = max(0, 100 - (missed_payments * 10))
@@ -298,7 +299,8 @@ class CreditScoreTrackerService:
         # 2. Credit Utilization (30% weight)
         accounts = BankAccount.objects.filter(user=user, is_active=True)
         total_balance = accounts.aggregate(Sum('current_balance'))['current_balance__sum'] or 0
-        total_loans = active_loans.aggregate(Sum('remaining_balance'))['remaining_balance__sum'] or 0
+        # Portfolio totals can exceed the currency limit for a single loan.
+        total_loans = float(active_loans.aggregate(Sum('remaining_balance'))['remaining_balance__sum'] or 0)
 
         if total_balance > 0:
             utilization = (total_loans / (total_balance + total_loans)) * 100
@@ -364,7 +366,7 @@ class CreditScoreTrackerService:
             )
 
         # 5. Recent Inquiries (10% weight)
-        recent_inquiries = Loan.objects.filter(user=user, created_at__gte=timezone.now() - timedelta(days=180)).count()
+        recent_inquiries = Loan.objects.filter(user=user, verification_status="confirmed", created_at__gte=timezone.now() - timedelta(days=180)).count()
         inquiry_score = max(0, 100 - (recent_inquiries * 15))
 
         analysis['factors'].append({
@@ -629,7 +631,7 @@ class CreditScoreTrackerService:
             })
 
         # Missed payments
-        active_loans = Loan.objects.filter(user=user, is_active=True)
+        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed")
         missed_payments = sum(loan.missed_payments for loan in active_loans)
         if missed_payments > 0:
             alerts.append({

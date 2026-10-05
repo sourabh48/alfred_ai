@@ -3,6 +3,7 @@ import os
 import tempfile
 import unittest
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
@@ -13,7 +14,7 @@ from django.test import Client
 from apps.expenses.models import StatementUpload
 from apps.career.models import CareerResume
 from apps.integrations.models import CreditReportUpload
-from apps.loans.models import LoanImportDocument
+from apps.loans.models import Loan, LoanClosureDocument, LoanImportDocument
 from apps.ml_engine.models import DocumentParserLearningMemory
 from apps.mobility.models import BikeDocument, BikeProfile, BikeServiceRecord
 
@@ -455,6 +456,27 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self._save_family_correction_in_browser("loan_document", document, {
             "lender": "Test Bank", "loan_account_number": "TEST-LOAN-042", "document_type": "sanction_letter",
         })
+
+    def test_closure_review_rounds_money_and_preserves_source_amount(self):
+        loan = Loan.objects.create(
+            user=self.user, lender="Test Bank", loan_account_number="TEST-CLOSURE-042",
+            principal="1000.00", remaining_balance="500.00", emi="100.00",
+            interest_rate=0, start_date=date(2026, 1, 1),
+        )
+        document = LoanClosureDocument.objects.create(
+            loan=loan, file_name="checked-closure.pdf", parser_status="needs_review",
+            parse_confidence=.2, closure_amount="1.00",
+            extracted_payload={"raw_source_amount": "2.675"},
+        )
+        self._save_family_correction_in_browser("loan_closure_document", document, {"closure_amount": "2.675"})
+        self.assertEqual(document.closure_amount, Decimal("2.68"))
+        self.assertEqual(document.foreclosure_snapshot.total_amount_payable, Decimal("2.68"))
+        self.assertEqual(document.extracted_payload["raw_source_amount"], "2.675")
+        loan.refresh_from_db()
+        self.assertEqual(loan.remaining_balance, Decimal("500.00"))
+        closure_row = self.selenium.find_element(self.By.XPATH, "//*[contains(text(), 'checked-closure.pdf')]")
+        self.selenium.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'});", closure_row)
+        self._capture_browser_artifacts()
 
     def _create_unknown_statement_upload(self):
         return StatementUpload.objects.create(

@@ -139,6 +139,12 @@ class BikeProfileDetailView(RetrieveUpdateDestroyAPIView):
     def perform_update(self, serializer):
         profile = serializer.save()
         manual_overrides = _profile_manual_overrides(serializer)
+        # Catalog specifications cannot replace an owner's recorded financial values.
+        # The saved profile includes explicit edits, including zero-value corrections.
+        manual_overrides.update({
+            field: getattr(profile, field)
+            for field in ("usage_pattern", "estimated_market_value", "monthly_income_support")
+        })
         payload = build_profile_payload(profile.display_name or profile.model_name, profile.vehicle_number, profile.variant, profile.make)
         payload["vehicle_type"] = profile.vehicle_type or payload.get("vehicle_type", "motorcycle")
         payload.update(manual_overrides)

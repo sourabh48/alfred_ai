@@ -237,7 +237,7 @@ def _match_bureau_account_to_loan(account: dict, loans) -> tuple[object | None, 
         if account_category and account_category == loan.loan_type:
             score += 0.1
             reasons.append("loan_type")
-        if account_balance and loan.remaining_balance and abs(account_balance - float(loan.remaining_balance or 0)) <= max(account_balance, loan.remaining_balance) * 0.35:
+        if account_balance and loan.remaining_balance and abs(account_balance - float(loan.remaining_balance or 0)) <= max(account_balance, float(loan.remaining_balance)) * 0.35:
             score += 0.08
             reasons.append("balance")
         if score > best_score:
@@ -383,7 +383,7 @@ def _detect_loan_disbursements(*, expenses, loans, bureau_accounts: dict[int, di
             if day_gap <= 15:
                 score += 0.24
                 evidence.append("Transaction date lines up with the tracked loan start window.")
-            if loan.principal and float(expense.amount or 0) >= loan.principal * 0.4 and float(expense.amount or 0) <= loan.principal * 1.05:
+            if loan.principal and float(expense.amount or 0) >= float(loan.principal) * 0.4 and float(expense.amount or 0) <= float(loan.principal) * 1.05:
                 score += 0.26
                 evidence.append("Credit amount fits the recorded loan principal band.")
             if _expense_mentions_loan(expense, loan):

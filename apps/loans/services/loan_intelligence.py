@@ -4,12 +4,14 @@ Automatically detects loan payments from expense transactions and tracks loan li
 """
 from __future__ import annotations
 
+from decimal import Decimal
 from uuid import uuid4
 from django.utils import timezone
 from typing import Dict, List, Optional
 
 from apps.expenses.models import Expense
 from apps.loans.models import Loan, LoanPaymentHistory
+from apps.loans.money import loan_money, loan_money_float
 from apps.reports.services import reporting_service
 
 
@@ -49,7 +51,7 @@ class LoanIntelligenceService:
         else:
             loan_expenses = [
                 item for item in expenses
-                if item.direction == "debit" and item.classification == "loan"
+                if item.user_id == user.pk and item.direction == "debit" and item.classification == "loan"
             ]
 
         detected_loans = []
@@ -172,17 +174,18 @@ class LoanIntelligenceService:
             loan_type=self._infer_loan_type(lender, expense.description),
             lender=lender[:120],
             loan_account_number=expense.external_reference[:64] if expense.external_reference else "",
-            principal=estimated_principal,
+            principal=loan_money(estimated_principal),
             interest_rate=10.0,  # Default estimate
-            emi=emi,
+            emi=loan_money(emi),
             tenure_months=24,  # Default estimate
-            remaining_balance=estimated_principal,
+            remaining_balance=loan_money(estimated_principal),
             start_date=first_payment.transaction_date,
             is_active=True,
             status="active",
             auto_detected=True,
-            last_payment_date=expense.transaction_date,
-            total_paid=emi,
+            verification_status="estimated",
+            verification_source="emi_pattern",
+            total_paid=loan_money(0),
         )
 
         return loan
@@ -190,17 +193,24 @@ class LoanIntelligenceService:
     def _create_payment_record(self, loan: Loan, expense: Expense, match: Optional[Dict[str, any]] = None) -> LoanPaymentHistory:
         """Create payment history record from expense."""
         # Calculate principal vs interest split
-        remaining = loan.remaining_balance or loan.principal
-        interest_component = (remaining * loan.interest_rate / 100) / 12
-        principal_component = expense.amount - interest_component
+        remaining = loan_money(loan.remaining_balance if loan.remaining_balance is not None else loan.principal)
+        interest_component = loan_money(remaining * Decimal(str(loan.interest_rate or 0)) / Decimal("1200"))
+        principal_component = loan_money(expense.amount) - interest_component
         confidence = float((match or {}).get("confidence", 0) or 0)
         reason = (match or {}).get("reason", "")
-        match_status = "matched" if confidence >= 70 else "review"
+        current_terms = loan.is_confirmed and not (
+            loan.verified_at and expense.transaction_date <= timezone.localtime(loan.verified_at).date()
+        )
+        match_status = "matched" if current_terms and confidence >= 70 else "review"
+        if not current_terms:
+            # Only the payment amount is observed; its allocation is unknown.
+            principal_component = interest_component = loan_money(0)
+            reason = f"Loan terms are unconfirmed or the payment predates the confirmed balance. {reason}"
 
         payment = LoanPaymentHistory.objects.create(
             loan=loan,
             payment_date=expense.transaction_date,
-            amount=expense.amount,
+            amount=loan_money(expense.amount),
             principal_component=max(0, principal_component),
             interest_component=max(0, interest_component),
             principal_paid=max(0, principal_component),
@@ -208,7 +218,7 @@ class LoanIntelligenceService:
             charges_paid=0,
             penalties_paid=0,
             tax_paid=0,
-            remaining_balance=max(0, remaining - principal_component),
+            remaining_balance=max(0, remaining - principal_component) if current_terms else None,
             is_auto_detected=True,
             detection_confidence=confidence,
             detection_reason=reason[:255],
@@ -221,16 +231,18 @@ class LoanIntelligenceService:
 
     def _update_loan_from_payment(self, loan: Loan, payment: LoanPaymentHistory):
         """Update loan status based on new payment."""
+        if not loan.is_confirmed:
+            return
         loan.last_payment_date = payment.payment_date
-        loan.total_paid += payment.amount
-        loan.remaining_balance = payment.remaining_balance
+        loan.total_paid = loan_money(loan.total_paid) + loan_money(payment.amount)
+        loan.remaining_balance = loan_money(payment.remaining_balance)
 
         # Check if loan is paid off
         if loan.remaining_balance <= 100:  # Allow small rounding differences
             loan.is_active = False
             loan.status = "closed"
             loan.closed_on = payment.payment_date
-            loan.remaining_balance = 0
+            loan.remaining_balance = loan_money(0)
 
         loan.save(update_fields=[
             "last_payment_date",
@@ -276,17 +288,19 @@ class LoanIntelligenceService:
         start_date,
         notes: str = "",
     ) -> Loan:
+        if any(loan.user_id != user.pk or not loan.is_confirmed for loan in source_loans):
+            raise ValueError("Only your confirmed loans can be consolidated.")
         consolidation_group = uuid4().hex[:12]
         consolidated_loan = Loan.objects.create(
             user=user,
             loan_type=consolidated_loan_type,
             lender=lender,
             loan_account_number=loan_account_number,
-            principal=principal,
+            principal=loan_money(principal),
             interest_rate=interest_rate,
-            emi=emi,
+            emi=loan_money(emi),
             tenure_months=tenure_months,
-            remaining_balance=principal,
+            remaining_balance=loan_money(principal),
             start_date=start_date,
             status="active",
             is_active=True,
@@ -330,6 +344,8 @@ class LoanIntelligenceService:
         pending_foreclosure_balance = 0.0
 
         for loan in all_loans:
+            if not loan.is_confirmed:
+                continue
             balance = _loan_reporting_balance(loan, today=today)
             if loan.status == "foreclosure_pending" and round(float(balance or 0), 2) > 0:
                 pending_foreclosure_balance += float(balance or 0)
@@ -403,10 +419,10 @@ class LoanIntelligenceService:
             reasons.append(f"Lender tokens matched: {', '.join(token_hits[:3])}.")
 
         amount_delta = abs(float(loan.emi or 0) - float(expense.amount or 0))
-        if loan.emi and amount_delta <= max(loan.emi * 0.02, 50):
+        if loan.emi and amount_delta <= max(loan_money_float(loan.emi) * 0.02, 50):
             score += 30
             reasons.append("Expense amount closely matches the configured EMI.")
-        elif loan.emi and amount_delta <= max(loan.emi * 0.05, 150):
+        elif loan.emi and amount_delta <= max(loan_money_float(loan.emi) * 0.05, 150):
             score += 16
             reasons.append("Expense amount is within the EMI tolerance band.")
 

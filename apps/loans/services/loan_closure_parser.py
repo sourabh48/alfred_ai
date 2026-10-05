@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import BinaryIO
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
+from apps.loans.money import loan_money
 
 
 class LoanClosureParser:
@@ -134,7 +135,7 @@ class LoanClosureParser:
         return ""
 
     def _extract_amount_for_labels(self, text: str, labels: list[str]) -> float:
-        amount_pattern = r"(?:INR|RS\.?|₹)?\s*([0-9,]+(?:\.\d{1,2})?)"
+        amount_pattern = r"(?:INR|RS\.?|₹)?\s*([0-9,]+(?:\.\d+)?)"
         for label in labels:
             pattern = rf"{re.escape(label)}\s*[:.]?\s*{amount_pattern}"
             match = re.search(pattern, text, re.IGNORECASE)
@@ -144,15 +145,15 @@ class LoanClosureParser:
 
     def _extract_total_amount(self, text: str) -> float:
         patterns = [
-            r"(?:TOTAL|FINAL|FULL\s+AND\s+FINAL|TOTAL\s+AMOUNT\s+PAYABLE|AMOUNT\s+PAYABLE)\s*(?:AMOUNT|AMT)?\s*[:.]?\s*(?:INR|RS\.?|₹)?\s*([0-9,]+(?:\.\d{1,2})?)",
-            r"(?:FORECLOSURE|CLOSURE|SETTLEMENT)\s+(?:AMOUNT|AMT)\s*[:.]?\s*(?:INR|RS\.?|₹)?\s*([0-9,]+(?:\.\d{1,2})?)",
+            r"(?:TOTAL|FINAL|FULL\s+AND\s+FINAL|TOTAL\s+AMOUNT\s+PAYABLE|AMOUNT\s+PAYABLE)\s*(?:AMOUNT|AMT)?\s*[:.]?\s*(?:INR|RS\.?|₹)?\s*([0-9,]+(?:\.\d+)?)",
+            r"(?:FORECLOSURE|CLOSURE|SETTLEMENT)\s+(?:AMOUNT|AMT)\s*[:.]?\s*(?:INR|RS\.?|₹)?\s*([0-9,]+(?:\.\d+)?)",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 return self._parse_amount(match.group(1))
         total_from_components = sum(
-            value or 0
+            loan_money(value)
             for value in [
                 self._extract_amount_for_labels(text, ["OUTSTANDING PRINCIPAL", "PRINCIPAL OUTSTANDING"]),
                 self._extract_amount_for_labels(text, ["ACCRUED INTEREST", "INTEREST AMOUNT"]),
@@ -161,7 +162,7 @@ class LoanClosureParser:
                 self._extract_amount_for_labels(text, ["OVERDUE CHARGES", "PENALTY", "PENAL CHARGES"]),
             ]
         )
-        return round(total_from_components, 2) if total_from_components else 0.0
+        return float(total_from_components)
 
     def _parse_amount(self, value: str) -> float:
         cleaned = re.sub(r"[^0-9.]", "", value or "")

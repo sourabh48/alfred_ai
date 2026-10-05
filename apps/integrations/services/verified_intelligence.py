@@ -547,24 +547,37 @@ class VerifiedIntelligenceService:
         )
 
     def tax_regime_reference(self, stale_days: int = 45, *, force: bool = False) -> InsightResult:
-        return self._static_reference(
+        from apps.ml_engine.services.tax_policy import NEW, OLD, POLICY_VERSION, OFFICIAL_SOURCE
+
+        result = self._static_reference(
             scope="tax",
-            cache_key="india-income-tax-regimes",
+            cache_key=f"india-income-tax-regimes:{POLICY_VERSION}",
             title="India income tax regime reference",
             source_name="Income Tax Department",
-            source_url="https://www.incometax.gov.in/iec/foportal/",
+            source_url=OFFICIAL_SOURCE,
             ttl=timedelta(days=stale_days),
             payload={
-                "assessment_year": "2026-27",
+                "financial_year": NEW.financial_year,
+                "assessment_year": NEW.assessment_year,
+                "policy_version": POLICY_VERSION,
+                "rules_verified_at": NEW.verified_at,
+                "freshness": "STATIC_REFERENCE",
                 "old_regime_basic_exemption": 250000,
-                "new_regime_basic_exemption": 300000,
-                "standard_deduction_old": 50000,
-                "standard_deduction_new": 75000,
+                "new_regime_basic_exemption": 400000,
+                "standard_deduction_old": int(OLD.standard_deduction),
+                "standard_deduction_new": int(NEW.standard_deduction),
             },
-            summary="Official income tax regime reference payload for current slab and standard-deduction comparisons.",
-            notes="This record is source-backed and refreshed on a slower cadence because tax slab references do not change intraday.",
+            summary="Versioned FY 2025-26 / AY 2026-27 ordinary-income tax policy reference.",
+            notes="Static official-source rules verified 2026-10-01. Cache refresh does not re-verify legislation or extend support to another year.",
             force=force,
         )
+        if result.payload.get("policy_version") == POLICY_VERSION and result.evidence.get("status") == "fresh":
+            # Preserve obsolete evidence for history, but stop refreshing or
+            # presenting the unversioned (and incorrect) rule table as active.
+            VerifiedExternalInsight.objects.filter(
+                scope="tax", cache_key="india-income-tax-regimes", is_active=True,
+            ).update(is_active=False)
+        return result
 
     def nps_tax_reference(self, stale_days: int = 45, *, force: bool = False) -> InsightResult:
         return self._static_reference(
@@ -1053,7 +1066,8 @@ class VerifiedIntelligenceService:
                 elif record.cache_key.startswith("remoteok:"):
                     return self._run_refresh_adapter(record, lambda: self.remoteok_jobs(record.query, force=True))
                 return self._run_refresh_adapter(record, lambda: self.remotive_jobs(record.query, force=True))
-            if record.scope == "tax" and record.cache_key == "india-income-tax-regimes":
+            if record.scope == "tax" and (record.cache_key == "india-income-tax-regimes"
+                                           or record.cache_key.startswith("india-income-tax-regimes:")):
                 return self._run_refresh_adapter(record, lambda: self.tax_regime_reference(force=True))
             if record.scope == "tax" and record.cache_key == "india-nps-tax-benefit":
                 return self._run_refresh_adapter(record, lambda: self.nps_tax_reference(force=True))

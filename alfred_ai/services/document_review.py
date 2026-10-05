@@ -20,6 +20,7 @@ from apps.integrations.views import _persist_uploaded_credit_score
 from apps.investments.models import Investment, InvestmentImportDocument
 from apps.investments.services import portfolio_intelligence_service
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument
+from apps.loans.money import loan_money, loan_money_float
 from apps.loans.services.loan_pdf_parser import loan_pdf_parser
 from apps.loans.services import loan_foreclosure_service
 from apps.loans.services.loan_closure_parser import loan_closure_parser
@@ -1032,7 +1033,8 @@ def _retry_loan_closure_document(user, document_id: int) -> dict:
     document.parser_status = _best_status(document.parser_status, parsed.get("parser_status") or "needs_review")
     document.verification_status = "verified" if verified else "rejected"
     document.verification_notes = notes
-    document.closure_amount = float(merged_payload.get("closure_amount") or document.closure_amount or 0)
+    amount = merged_payload.get("closure_amount")
+    document.closure_amount = loan_money(document.closure_amount if amount in (None, "") else amount)
     document.closure_date = _parse_date(merged_payload.get("closure_date")) or document.closure_date
     document.save(
         update_fields=[
@@ -2017,11 +2019,11 @@ def _serialize_loan_closure(document: LoanClosureDocument) -> dict:
             "lender_name": (snapshot.lender_name if snapshot else "") or payload.get("lender_name", ""),
             "borrower_name": (snapshot.borrower_name if snapshot else "") or payload.get("borrower_name", ""),
             "loan_account_number": payload.get("loan_account_number") or document.loan.loan_account_number,
-            "closure_amount": document.closure_amount or payload.get("closure_amount") or 0,
+            "closure_amount": loan_money_float(document.closure_amount),
             "closure_date": document.closure_date.isoformat() if document.closure_date else payload.get("closure_date") or "",
             "matched_keyword": payload.get("matched_keyword", ""),
             "reconciliation_status": snapshot.get_reconciliation_status_display() if snapshot else "",
-            "matched_payment_total": snapshot.matched_payment_total if snapshot else 0,
+            "matched_payment_total": loan_money_float(snapshot.matched_payment_total) if snapshot else 0.0,
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
@@ -2645,6 +2647,7 @@ def _apply_loan_correction(user, document_id: int, corrections: dict) -> dict:
     return _serialize_loan(document)
 
 
+@transaction.atomic
 def _apply_loan_closure_correction(user, document_id: int, corrections: dict) -> dict:
     document = LoanClosureDocument.objects.select_related("loan").get(loan__user=user, pk=document_id)
     payload = dict(document.extracted_payload or {})
@@ -2656,9 +2659,9 @@ def _apply_loan_closure_correction(user, document_id: int, corrections: dict) ->
         payload["loan_account_number"] = str(corrections["loan_account_number"]).strip()
     if corrections.get("matched_keyword"):
         payload["matched_keyword"] = str(corrections["matched_keyword"]).strip()
-    closure_amount = _parse_float(corrections.get("closure_amount"))
-    if closure_amount is not None:
-        payload["closure_amount"] = closure_amount
+    if "closure_amount" in corrections:
+        closure_amount = loan_money(corrections["closure_amount"])
+        payload["closure_amount"] = loan_money_float(closure_amount)
         document.closure_amount = closure_amount
     closure_date = _parse_date(corrections.get("closure_date"))
     if closure_date:

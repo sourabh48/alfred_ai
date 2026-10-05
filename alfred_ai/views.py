@@ -243,13 +243,18 @@ def document_review_queue_api_view(request):
 @login_required
 @require_http_methods(["POST"])
 def document_review_correction_api_view(request):
-    payload = json.loads(request.body or "{}")
-    item = apply_correction(
-        request.user,
-        scope=str(payload.get("scope") or ""),
-        document_id=int(payload.get("id") or 0),
-        corrections=payload.get("corrections") or {},
-    )
+    try:
+        payload = json.loads(request.body or "{}")
+        if not isinstance(payload, dict) or not isinstance(payload.get("corrections") or {}, dict):
+            raise ValueError("Document corrections must be an object.")
+        item = apply_correction(
+            request.user,
+            scope=str(payload.get("scope") or ""),
+            document_id=int(payload.get("id") or 0),
+            corrections=payload.get("corrections") or {},
+        )
+    except (ValueError, TypeError) as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
     return JsonResponse({"item": item}, encoder=DjangoJSONEncoder)
 
 

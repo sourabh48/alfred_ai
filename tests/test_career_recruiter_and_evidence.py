@@ -1,3 +1,4 @@
+from ipaddress import ip_address
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
@@ -160,7 +161,9 @@ class CareerRecruiterAndEvidenceTests(TestCase):
         """
         response.raise_for_status = Mock()
 
-        with patch("apps.career.services.job_intelligence.requests.get", return_value=response):
+        with patch(
+            "alfred_ai.services.url_safety._resolve_host_ips", return_value=[ip_address("93.184.215.14")],
+        ), patch("apps.career.services.job_intelligence.requests.get", return_value=response):
             snapshot = job_intelligence.parse_job_page(
                 "https://example.wd5.myworkdayjobs.com/en-US/careers/job/Bengaluru/Senior-Data-Analyst_JR-1"
             )
@@ -192,7 +195,9 @@ class CareerRecruiterAndEvidenceTests(TestCase):
         """
         response.raise_for_status = Mock()
 
-        with patch("apps.career.services.job_intelligence.requests.get", return_value=response):
+        with patch(
+            "alfred_ai.services.url_safety._resolve_host_ips", return_value=[ip_address("93.184.215.14")],
+        ), patch("apps.career.services.job_intelligence.requests.get", return_value=response):
             snapshot = job_intelligence.parse_job_page("https://jobs.ashbyhq.com/northwind/abcd-1234")
 
         self.assertEqual(snapshot.source_name, "Ashby")

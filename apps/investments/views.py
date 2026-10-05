@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 from django.db import transaction
+from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import materialize_payload
 from alfred_ai.services import record_parser_learning
@@ -82,13 +83,14 @@ class InvestmentGrowthView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        revision = _investment_revision(request.user)
+        as_of = timezone.localdate()
+        revision = f"{_investment_revision(request.user)}:growth-v2:{as_of:%Y-%m}"
         payload = materialize_payload(
             namespace="investments-growth",
             user_id=request.user.id,
             revision=revision,
             ttl_seconds=90,
-            builder=lambda: _investment_growth_payload(request.user),
+            builder=lambda: _investment_growth_payload(request.user, as_of=as_of),
         )
         return Response(payload)
 
@@ -165,13 +167,14 @@ def _investment_allocation_payload(user) -> dict:
     }
 
 
-def _investment_growth_payload(user) -> dict:
+def _investment_growth_payload(user, *, as_of: date | None = None) -> dict:
     investments = list(Investment.objects.filter(user=user))
-    today = date.today().replace(day=1)
+    today = (as_of or timezone.localdate()).replace(day=1)
     labels = []
     values = []
+    months_elapsed = list(range(13))
 
-    for month_index in range(12):
+    for month_index in months_elapsed:
         target_year = today.year + ((today.month - 1 + month_index) // 12)
         target_month = ((today.month - 1 + month_index) % 12) + 1
         labels.append(date(target_year, target_month, 1).strftime("%b %Y"))
@@ -185,7 +188,18 @@ def _investment_growth_payload(user) -> dict:
             )
         values.append(round(projected_value, 2))
 
-    return {"labels": labels, "values": values}
+    return {
+        "labels": labels,
+        "values": values,
+        "months_elapsed": months_elapsed,
+        "assumptions": {
+            "month_zero": "recorded_current_value",
+            "contribution_timing": "beginning_of_month",
+            "annual_return_rate_source": "user_entered",
+            "monthly_return_rate_formula": "annual_return_rate / 1200",
+            "note": "Future months add the entered monthly SIP before applying one month's assumed return; actual returns can differ.",
+        },
+    }
 
 
 def _portfolio_risk(investments: list[Investment]) -> str:
@@ -207,10 +221,16 @@ def _portfolio_risk(investments: list[Investment]) -> str:
 
 
 def _project_position_value(*, current_value: float, monthly_sip: float, annual_return_rate: float, months: int) -> float:
+    """Start at the recorded value; each future month adds SIP before growth.
+
+    The user-entered annual percentage is divided by 1200 to obtain the
+    assumed monthly rate. Month zero includes no new contribution or growth.
+    """
     value = float(current_value or 0)
     monthly_rate = float(annual_return_rate or 0) / 1200
-    for _ in range(months + 1):
-        value = (value + float(monthly_sip or 0)) * (1 + monthly_rate)
+    contribution = float(monthly_sip or 0)
+    for _ in range(months):
+        value = (value + contribution) * (1 + monthly_rate)
     return value
 
 

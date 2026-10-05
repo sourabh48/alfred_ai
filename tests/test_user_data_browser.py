@@ -86,6 +86,123 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.save_screenshot(str(self.artifacts / f"{name}.png"))
         (self.artifacts / f"{name}.txt").write_text(self.browser.find_element(self.By.TAG_NAME, "body").text, encoding="utf-8")
 
+    def test_tax_planning_uses_selected_year_and_income(self):
+        self.login()
+        self.browser.get(self.live_server_url + "/tax-optimizer/")
+        self.wait.until(lambda _: "Official-source rules verified" in self.text("taxPolicyCopy"))
+        self.assertIn("FY 2025-26", self.text("taxPolicyCopy"))
+        self.assertIn("AY 2026-27", self.text("taxPolicyCopy"))
+        income = self.browser.find_element(self.By.ID, "taxAnnualIncome")
+        income.clear()
+        income.send_keys("1500000")
+        self.browser.find_element(self.By.CSS_SELECTOR, "#taxInputForm button[type=submit]").click()
+        self.wait.until(lambda _: "97,500" in self.text("taxAnnualValue"))
+        self.assertEqual(self.text("taxRegimeValue"), "NEW")
+        self.assertEqual(self.browser.find_element(self.By.ID, "taxFinancialYear").get_attribute("value"), "2025-26")
+        self.capture("tax-policy-2025-26")
+
+    def test_inferred_loan_requires_explicit_confirmation_on_real_page(self):
+        from django.utils import timezone
+        from apps.loans.models import Loan
+        from selenium.common.exceptions import StaleElementReferenceException
+
+        user = get_user_model().objects.get(username="acceptance_demo")
+        loan = Loan.objects.create(
+            user=user, loan_type="personal", lender="Estimated Test Lender",
+            principal=240000, remaining_balance=240000, interest_rate=10, emi=10000,
+            tenure_months=24, start_date=timezone.localdate(), auto_detected=True,
+            verification_status="estimated", verification_source="emi_pattern",
+        )
+        self.login()
+        self.browser.get(self.live_server_url + "/loans/")
+        self.wait.until(lambda _: "1 estimated loan(s)" in self.text("loanVerificationNotice"))
+        self.assertIn("1,00,000", self.text("loanSummaryCards"))
+        self.assertNotIn("3,40,000", self.text("loanSummaryCards"))
+        self.assertIn("Excluded from financial totals", self.text("loanTableBody"))
+        self.capture("loan-estimate-excluded")
+        def open_review(driver):
+            try:
+                driver.find_element(self.By.CSS_SELECTOR, f'button[onclick="editLoan({loan.pk})"]').click()
+                return True
+            except StaleElementReferenceException:
+                # The live summary may replace a row between locating and clicking it.
+                return False
+
+        self.wait.until(open_review)
+        self.assertFalse(self.browser.find_element(self.By.ID, "loanConfirmEstimate").is_selected())
+        for field_id, value in (("manualLoanPrincipal", "200000"), ("manualLoanInterest", "8"),
+                                ("manualLoanEmi", "9000"), ("manualLoanBalance", "150000")):
+            field = self.browser.find_element(self.By.ID, field_id)
+            field.clear()
+            field.send_keys(value)
+        self.browser.find_element(self.By.ID, "loanConfirmEstimate").click()
+        self.browser.execute_script("document.getElementById('loanVerificationFields').scrollIntoView({behavior: 'instant', block: 'center'});")
+        self.capture("loan-terms-review")
+        self.browser.find_element(self.By.ID, "loanSubmitButton").click()
+        self.wait.until(lambda _: "2,50,000" in self.text("loanSummaryCards"))
+        self.assertIn("19,000", self.text("loanSummaryCards"))
+        self.assertFalse(self.browser.find_element(self.By.ID, "loanVerificationNotice").is_displayed())
+        loan.refresh_from_db()
+        self.assertEqual(loan.verification_status, "confirmed")
+        self.assertEqual(loan.remaining_balance, 150000)
+        self.browser.execute_script("document.getElementById('loanSummaryCards').scrollIntoView({behavior: 'instant', block: 'center'});")
+        self.wait.until(lambda driver: driver.execute_script(
+            "const r = document.getElementById('loanSummaryCards').getBoundingClientRect(); return r.top >= 78 && r.bottom <= innerHeight;"
+        ))
+        self.capture("loan-estimate-confirmed")
+
+    def test_vehicle_value_and_running_costs_are_separate_on_real_page(self):
+        from django.utils import timezone
+        from apps.mobility.models import BikeProfile, BikeServiceRecord
+
+        user = get_user_model().objects.get(username="acceptance_demo")
+        profile = BikeProfile.objects.create(
+            user=user, display_name="Personal Test Scooter", model_name="Test Scooter",
+            usage_pattern="personal", estimated_market_value=50000,
+        )
+        BikeServiceRecord.objects.create(
+            user=user, bike_profile=profile, bike_name=profile.display_name,
+            service_date=timezone.localdate(), cost=6000,
+        )
+        self.login()
+        self.browser.get(self.live_server_url + "/expenses/")
+        self.wait.until(lambda _: "Personal Test Scooter" in self.text("balanceSheetPanel"))
+        cards = self.text("balanceSheetCards")
+        self.assertIn("2,10,000", cards)
+        self.assertIn("1,00,000", cards)
+        panel = self.text("balanceSheetPanel")
+        self.assertIn("Estimated asset ₹50,000", panel)
+        self.assertIn("Recorded running costs ₹6,000", panel)
+        self.assertIn("all history", panel)
+        self.assertNotIn("Lifestyle vehicle burden", panel)
+        self.browser.execute_script("document.getElementById('balanceSheetPanel').scrollIntoView({behavior: 'instant', block: 'center'});")
+        self.capture("vehicle-value-and-running-costs")
+
+    def test_investment_projection_starts_with_recorded_value_on_real_page(self):
+        self.login()
+        self.browser.get(self.live_server_url + "/investments/")
+        self.wait.until(lambda _: "1,10,000" in self.text("investmentHeroValue"))
+        self.wait.until(lambda driver: driver.execute_script(
+            "return Boolean(Chart.getChart(document.getElementById('growthChart')));"
+        ))
+        chart = self.browser.execute_script(
+            "const d = Chart.getChart(document.getElementById('growthChart')).data; "
+            "return {labels: d.labels, values: d.datasets[0].data};"
+        )
+        self.assertEqual(len(chart["labels"]), 13)
+        self.assertEqual(len(chart["values"]), 13)
+        self.assertEqual(chart["values"][0], 110000)
+        self.assertEqual(chart["values"][1], 115766.67)
+        factor = 1 + 8 / 1200
+        expected_year = 110000 * factor ** 12 + 5000 * factor * (factor ** 12 - 1) / (factor - 1)
+        self.assertAlmostEqual(chart["values"][12], expected_year, places=2)
+        assumptions = self.text("investmentGrowthAssumptions")
+        self.assertIn("Month 0", assumptions)
+        self.assertIn("beginning of each month", assumptions)
+        (self.artifacts / "investment-growth-values.json").write_text(json.dumps(chart, indent=2), encoding="utf-8")
+        self.browser.execute_script("document.getElementById('growthChart').scrollIntoView({behavior: 'instant', block: 'center'});")
+        self.capture("investment-month-zero-projection")
+
     def test_sample_totals_and_explanations_on_real_pages(self):
         self.login()
         summary = self.text("dashboardSummaryCards")

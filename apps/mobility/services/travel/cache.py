@@ -140,7 +140,7 @@ def query_with_fallback(providers, parameters, *, force=False):
 
 def usage_summary():
     now = timezone.now()
-    rows = TravelProviderRequest.objects.filter(created_at__date=now.date()).values("provider").annotate(
+    rows = TravelProviderRequest.objects.filter(created_at__date=timezone.localdate(now)).values("provider").annotate(
         calls_today=Count("id", filter=Q(network_call=True)), requests=Count("id"),
         cache_hits=Count("id", filter=Q(status="cache_hit")),
         failures=Count("id", filter=Q(network_call=True) & ~Q(status="ok")),

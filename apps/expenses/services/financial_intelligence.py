@@ -15,6 +15,7 @@ from apps.expenses.services.cashflow_treatment import classify_cashflow, variabl
 from apps.integrations.models import CreditReportUpload
 from apps.investments.models import Investment
 from apps.loans.models import Loan, LoanForeclosureSnapshot, LoanPaymentHistory
+from apps.loans.money import loan_money, loan_money_float
 from apps.loans.services.payment_history_access import fetch_payment_history_rows
 from apps.ml_engine.behavior.anomaly_detector import anomaly_detector
 from apps.ml_engine.behavior.behavior_signature import behavior_signature
@@ -39,7 +40,7 @@ PERCENT_QUANT = Decimal("0.01")
 BASELINE_FORMULAS = {
     "monthly_income": "Normalized reliable monthly income from salary credits, reported income, career salary, or observed credit inflow fallback.",
     "annual_income": "monthly_income * 12",
-    "recurring_emi_burden": "Sum of active loan EMIs that still report an outstanding balance.",
+    "recurring_emi_burden": "Sum of confirmed active loan EMIs that still report an outstanding balance.",
     "rent_burden": "User-reported monthly rent or housing obligation.",
     "fixed_obligations": "rent_burden + recurring_emi_burden",
     "disposable_cash_flow": "monthly_income - fixed_obligations",
@@ -306,6 +307,7 @@ def _financial_revision(user) -> str:
     return "|".join(
         str(value or "")
         for value in [
+            "loan-related-money-v1",
             user.monthly_income, user.variable_income, user.rent_or_emi, user.city,
             expense_meta["count"], expense_meta["max_id"], expense_meta["max_date"],
             loan_meta["count"], loan_meta["max_id"], loan_meta["max_updated"],
@@ -980,7 +982,7 @@ def _serialize_recent_transactions(expenses: list[Expense], transaction_relation
 
 def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], current_bucket: dict, *, payment_rows: list[dict] | None = None) -> dict:
     manual_loans = _serialize_loans(loans, timezone.localdate())
-    active_manual_loans = [item for item in manual_loans if item["is_active"]]
+    active_manual_loans = [item for item in manual_loans if item["counts_toward_recurring_emi"]]
     liability_manual_loans = [item for item in manual_loans if item["counts_toward_liabilities"]]
     pending_manual_loans = [item for item in liability_manual_loans if item["status"] == "foreclosure_pending"]
     total_outstanding = sum(item["estimated_balance"] for item in liability_manual_loans)
@@ -1001,11 +1003,11 @@ def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], curren
     }
     home_ownership_positions, home_ownership_summary = _build_home_ownership_positions(loans=loans, payment_rows=payment_rows)
     payment_component_totals = {
-        "principal_paid": round(sum(float(item.get("principal_paid") or item.get("principal_component") or 0) for item in linked_payment_rows), 2),
-        "interest_paid": round(sum(float(item.get("interest_paid") or item.get("interest_component") or 0) for item in linked_payment_rows), 2),
-        "charges_paid": round(sum(float(item.get("charges_paid") or 0) for item in linked_payment_rows), 2),
-        "penalties_paid": round(sum(float(item.get("penalties_paid") or 0) for item in linked_payment_rows), 2),
-        "tax_paid": round(sum(float(item.get("tax_paid") or 0) for item in linked_payment_rows), 2),
+        "principal_paid": _money_float(sum((loan_money(item.get("principal_paid") or item.get("principal_component")) for item in linked_payment_rows), Decimal("0"))),
+        "interest_paid": _money_float(sum((loan_money(item.get("interest_paid") or item.get("interest_component")) for item in linked_payment_rows), Decimal("0"))),
+        "charges_paid": _money_float(sum((loan_money(item.get("charges_paid")) for item in linked_payment_rows), Decimal("0"))),
+        "penalties_paid": _money_float(sum((loan_money(item.get("penalties_paid")) for item in linked_payment_rows), Decimal("0"))),
+        "tax_paid": _money_float(sum((loan_money(item.get("tax_paid")) for item in linked_payment_rows), Decimal("0"))),
     }
     detected_repayments = [
         {
@@ -1016,11 +1018,11 @@ def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], curren
             "category": dict(Expense.CATEGORY_CHOICES).get(item.category, item.category.title()),
             "linked_loan": linked_payments[item.id].get("loan__lender", "") if item.id in linked_payments else "",
             "match_status": linked_payments[item.id].get("match_status", "") if item.id in linked_payments else "",
-            "principal_paid": round(float(linked_payments[item.id].get("principal_paid") or linked_payments[item.id].get("principal_component") or 0), 2) if item.id in linked_payments else 0.0,
-            "interest_paid": round(float(linked_payments[item.id].get("interest_paid") or linked_payments[item.id].get("interest_component") or 0), 2) if item.id in linked_payments else 0.0,
-            "charges_paid": round(float(linked_payments[item.id].get("charges_paid") or 0), 2) if item.id in linked_payments else 0.0,
-            "penalties_paid": round(float(linked_payments[item.id].get("penalties_paid") or 0), 2) if item.id in linked_payments else 0.0,
-            "tax_paid": round(float(linked_payments[item.id].get("tax_paid") or 0), 2) if item.id in linked_payments else 0.0,
+            "principal_paid": loan_money_float(linked_payments[item.id].get("principal_paid") or linked_payments[item.id].get("principal_component")) if item.id in linked_payments else 0.0,
+            "interest_paid": loan_money_float(linked_payments[item.id].get("interest_paid") or linked_payments[item.id].get("interest_component")) if item.id in linked_payments else 0.0,
+            "charges_paid": loan_money_float(linked_payments[item.id].get("charges_paid")) if item.id in linked_payments else 0.0,
+            "penalties_paid": loan_money_float(linked_payments[item.id].get("penalties_paid")) if item.id in linked_payments else 0.0,
+            "tax_paid": loan_money_float(linked_payments[item.id].get("tax_paid")) if item.id in linked_payments else 0.0,
         }
         for item in sorted(debt_entries, key=lambda value: (value.transaction_date, value.id), reverse=True)[:8]
     ]
@@ -1038,8 +1040,8 @@ def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], curren
             "document_type": item.get_document_type_display(),
             "status": item.get_reconciliation_status_display(),
             "effective_closure_date": item.effective_closure_date.isoformat() if item.effective_closure_date else "",
-            "amount_payable": round(item.total_amount_payable or 0, 2),
-            "matched_payment_total": round(item.matched_payment_total or 0, 2),
+            "amount_payable": loan_money_float(item.total_amount_payable),
+            "matched_payment_total": loan_money_float(item.matched_payment_total),
             "settlement_allocation": dict((item.audit_payload or {}).get("settlement_allocation") or {}),
             "notes": item.reconciliation_notes,
         }
@@ -1047,7 +1049,8 @@ def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], curren
     ]
 
     return {
-        "active_loans": sum(1 for item in manual_loans if item["is_active"]),
+        "active_loans": len(active_manual_loans),
+        "unconfirmed_loan_count": sum(1 for item in manual_loans if item["verification_status"] != "confirmed"),
         "manual_total_outstanding": round(total_outstanding, 2),
         "manual_total_emi": round(total_emi, 2),
         "manual_interest_remaining": round(interest_remaining, 2),
@@ -1092,12 +1095,12 @@ def _serialize_loans(loans: list[Loan], today: date) -> list[dict]:
                 "loan_type_label": loan.get_loan_type_display(),
                 "lender": loan.lender,
                 "loan_account_number": loan.loan_account_number,
-                "principal": round(loan.principal, 2),
+                "principal": _money_float(loan.principal),
                 "interest_rate": round(loan.interest_rate, 2),
-                "emi": round(loan.emi, 2),
+                "emi": _money_float(loan.emi),
                 "tenure_months": loan.tenure_months,
                 "start_date": loan.start_date.isoformat(),
-                "remaining_balance": round(loan.remaining_balance, 2) if loan.remaining_balance is not None else None,
+                "remaining_balance": _money_float(loan.remaining_balance) if loan.remaining_balance is not None else None,
                 "home_purchase_price": home_purchase_price,
                 "home_down_payment": home_down_payment,
                 "home_other_upfront_payments": home_other_upfront_payments,
@@ -1105,6 +1108,10 @@ def _serialize_loans(loans: list[Loan], today: date) -> list[dict]:
                 "home_property_acquisition_cost": home_property_acquisition_cost,
                 "estimated_balance": round(estimated_balance, 2),
                 "status": loan.status,
+                "verification_status": loan.verification_status,
+                "verification_label": loan.get_verification_status_display(),
+                "verification_source": loan.verification_source,
+                "verified_at": loan.verified_at.isoformat() if loan.verified_at else None,
                 "closure_reason": loan.closure_reason,
                 "consolidation_group": loan.consolidation_group,
                 "consolidated_into_id": loan.consolidated_into_id,
@@ -1112,10 +1119,11 @@ def _serialize_loans(loans: list[Loan], today: date) -> list[dict]:
                 "months_remaining": max(months_remaining, 0),
                 "interest_remaining": round(interest_remaining, 2),
                 "projected_end_date": projected_end_date.isoformat(),
-                "recommended_prepayment": round(min(max(loan.emi * 2, 0), estimated_balance * 0.1 if estimated_balance else 0), 2),
+                "recommended_prepayment": _money_float(min(max(_decimal_amount(loan.emi) * 2, 0), _decimal_amount(estimated_balance) * Decimal("0.1"))),
                 "notes": loan.notes,
                 "is_active": loan.is_active and estimated_balance > 0,
                 "counts_toward_liabilities": _loan_counts_toward_liabilities(loan, estimated_balance),
+                "counts_toward_recurring_emi": _loan_counts_toward_recurring_emi(loan, estimated_balance),
             }
         )
 
@@ -1165,8 +1173,7 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     loan_liability = round(open_loan_liability + pending_foreclosure_balance, 2)
 
     vehicle_positions = _build_vehicle_positions(vehicle_profiles, vehicle_services, trip_logs)
-    vehicle_assets = round(sum(item["recognized_value"] for item in vehicle_positions if item["bucket"] == "asset"), 2)
-    vehicle_liabilities = round(sum(item["recognized_value"] for item in vehicle_positions if item["bucket"] == "liability"), 2)
+    vehicle_assets = round(sum(item["recognized_value"] for item in vehicle_positions), 2)
 
     assets = [
         {"label": "Cash and bank balances", "amount": liquid_cash},
@@ -1175,7 +1182,7 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     if home_loan_asset_proxy_total:
         assets.append({"label": "Home property acquisition-cost base (proxy)", "amount": home_loan_asset_proxy_total})
     if vehicle_assets:
-        assets.append({"label": "Utility and income-supporting vehicles", "amount": vehicle_assets})
+        assets.append({"label": "Vehicles (estimated current market value)", "amount": vehicle_assets})
 
     liabilities = []
     if open_loan_liability:
@@ -1184,8 +1191,6 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
         liabilities.append({"label": "Pending foreclosure liabilities", "amount": pending_foreclosure_balance})
     if credit_liability:
         liabilities.append({"label": "Credit card liability", "amount": credit_liability})
-    if vehicle_liabilities:
-        liabilities.append({"label": "Lifestyle vehicle burden", "amount": vehicle_liabilities})
 
     total_assets = round(sum(item["amount"] for item in assets), 2)
     total_liabilities = round(sum(item["amount"] for item in liabilities), 2)
@@ -1243,10 +1248,12 @@ def _loan_reporting_balance(loan: Loan, *, today: date, months_elapsed: int | No
 
 
 def _loan_counts_toward_liabilities(loan: Loan, estimated_balance: float) -> bool:
-    return loan.status not in {"foreclosed", "closed", "prepaid"} and round(float(estimated_balance or 0), 2) > 0
+    return loan.is_confirmed and loan.status not in {"foreclosed", "closed", "prepaid"} and round(float(estimated_balance or 0), 2) > 0
 
 
 def _loan_counts_toward_recurring_emi(loan: Loan, estimated_balance: float) -> bool:
+    if not loan.is_confirmed:
+        return False
     if round(float(estimated_balance or 0), 2) <= 0:
         return False
     if loan.status in {"foreclosed", "closed", "prepaid", "foreclosure_pending"}:
@@ -1270,38 +1277,30 @@ def _build_vehicle_positions(
 
     positions = []
     for profile in vehicle_profiles:
-        annual_service = service_by_profile.get(profile.id, 0.0)
-        annual_trip_spend = trip_by_profile.get(profile.id, 0.0)
-        annual_cost = annual_service + annual_trip_spend
-        monthly_cost = annual_cost / 12 if annual_cost else 0.0
-        market_value = profile.estimated_market_value or 0.0
+        recorded_cost = service_by_profile.get(profile.id, 0.0) + trip_by_profile.get(profile.id, 0.0)
+        market_value = _money_float(max(_decimal_amount(profile.estimated_market_value), Decimal("0")))
         monthly_income_support = profile.monthly_income_support or 0.0
-
-        if profile.usage_pattern == "commercial" or (
-            profile.usage_pattern == "mixed" and monthly_income_support >= monthly_cost and monthly_income_support > 0
-        ):
-            bucket = "asset"
-            recognized_value = market_value or max(monthly_income_support * 6, 0)
-            rationale = "Vehicle is treated as an asset because its usage pattern or income support offsets the running cost."
-        elif profile.usage_pattern == "essential":
-            bucket = "asset"
-            recognized_value = round(market_value * 0.35, 2) if market_value else round(monthly_cost * 6, 2)
-            rationale = "Vehicle is treated as a utility asset because it supports essential mobility even if it is not directly income generating."
-        else:
-            bucket = "liability"
-            recognized_value = round(max(monthly_cost * 12, market_value * 0.15 if market_value else 0), 2)
-            rationale = "Vehicle is treated as a liability because current usage is primarily personal and the running cost is not offset by utility income."
 
         positions.append(
             {
                 "vehicle": profile.display_name,
                 "usage_pattern": profile.get_usage_pattern_display(),
-                "bucket": bucket,
-                "recognized_value": round(recognized_value, 2),
+                "bucket": "asset",
+                "recognized_value": market_value,
                 "estimated_market_value": round(market_value, 2),
+                "valuation_status": "user_estimate" if market_value > 0 else "no_positive_value_recorded",
                 "monthly_income_support": round(monthly_income_support, 2),
-                "monthly_running_cost": round(monthly_cost, 2),
-                "rationale": rationale,
+                "recorded_running_cost_total": round(recorded_cost, 2),
+                "running_cost_period": "all_recorded_history",
+                "monthly_running_cost": None,
+                "rationale": (
+                    "The recorded current market-value estimate is an asset for every usage pattern. "
+                    "Vehicle loans are counted separately in confirmed loan liabilities. "
+                    "Recorded running costs describe spending and do not change the asset value or debt."
+                    if market_value > 0 else
+                    "No positive current market value is recorded. Costs and income support do not supply a resale value. "
+                    "Any confirmed vehicle loan still counts separately as debt."
+                ),
             }
         )
 
@@ -1344,43 +1343,43 @@ def _build_pattern_flags(
 
 def _build_home_ownership_positions(*, loans: list[Loan], payment_rows: list[dict]) -> tuple[list[dict], dict]:
     today = timezone.localdate()
-    payment_totals_by_loan: dict[int, dict[str, float]] = defaultdict(
+    payment_totals_by_loan: dict[int, dict[str, Decimal]] = defaultdict(
         lambda: {
-            "principal_paid": 0.0,
-            "interest_and_cost_paid": 0.0,
+            "principal_paid": Decimal("0"),
+            "interest_and_cost_paid": Decimal("0"),
         }
     )
     for item in payment_rows:
         loan_id = item.get("loan_id")
         if not loan_id:
             continue
-        payment_totals_by_loan[loan_id]["principal_paid"] += float(item.get("principal_paid") or item.get("principal_component") or 0)
+        payment_totals_by_loan[loan_id]["principal_paid"] += loan_money(item.get("principal_paid") or item.get("principal_component"))
         payment_totals_by_loan[loan_id]["interest_and_cost_paid"] += (
-            float(item.get("interest_paid") or item.get("interest_component") or 0)
-            + float(item.get("charges_paid") or 0)
-            + float(item.get("penalties_paid") or 0)
-            + float(item.get("tax_paid") or 0)
+            loan_money(item.get("interest_paid") or item.get("interest_component"))
+            + loan_money(item.get("charges_paid"))
+            + loan_money(item.get("penalties_paid"))
+            + loan_money(item.get("tax_paid"))
         )
 
     positions = []
     for loan in loans:
-        if loan.loan_type != "home" or loan.status in {"foreclosed", "defaulted"}:
+        if not loan.is_confirmed or loan.loan_type != "home" or loan.status in {"foreclosed", "defaulted"}:
             continue
-        financed_asset_value = round(max(float(loan.principal or 0), 0), 2)
-        purchase_price = loan.resolved_home_purchase_price
-        down_payment = loan.resolved_home_down_payment
-        other_upfront_payments = loan.resolved_home_other_upfront_payments
-        upfront_cash_invested = loan.resolved_home_upfront_cash_invested
-        property_acquisition_cost = loan.resolved_home_property_acquisition_cost
+        financed_asset_value = max(loan_money(loan.principal), 0)
+        purchase_price = _decimal_amount(loan.resolved_home_purchase_price)
+        down_payment = _decimal_amount(loan.resolved_home_down_payment)
+        other_upfront_payments = _decimal_amount(loan.resolved_home_other_upfront_payments)
+        upfront_cash_invested = _decimal_amount(loan.resolved_home_upfront_cash_invested)
+        property_acquisition_cost = _decimal_amount(loan.resolved_home_property_acquisition_cost)
         if property_acquisition_cost <= 0:
             continue
-        current_loan_balance = _loan_reporting_balance(loan, today=today)
+        current_loan_balance = _decimal_amount(_loan_reporting_balance(loan, today=today))
         estimated_principal_repaid = round(max(financed_asset_value - current_loan_balance, 0), 2)
         equity_built = round(max(upfront_cash_invested + estimated_principal_repaid, 0), 2)
         recorded = payment_totals_by_loan.get(loan.id, {})
-        principal_paid_recorded = round(float(recorded.get("principal_paid") or 0), 2)
-        interest_and_cost_paid_recorded = round(float(recorded.get("interest_and_cost_paid") or 0), 2)
-        ownership_progress_pct = round((equity_built / property_acquisition_cost) * 100, 1) if property_acquisition_cost else 0.0
+        principal_paid_recorded = recorded.get("principal_paid", Decimal("0"))
+        interest_and_cost_paid_recorded = recorded.get("interest_and_cost_paid", Decimal("0"))
+        ownership_progress_pct = float(round((equity_built / property_acquisition_cost) * 100, 1)) if property_acquisition_cost else 0.0
         positions.append(
             {
                 "loan_id": loan.id,
@@ -1388,7 +1387,7 @@ def _build_home_ownership_positions(*, loans: list[Loan], payment_rows: list[dic
                 "loan_account_number": loan.loan_account_number,
                 "status": loan.status,
                 "status_label": loan.get_status_display(),
-                "monthly_emi": round(float(loan.emi or 0), 2),
+                "monthly_emi": loan_money(loan.emi),
                 "financed_asset_value": financed_asset_value,
                 "purchase_price": purchase_price,
                 "property_acquisition_cost": property_acquisition_cost,
@@ -1412,16 +1411,21 @@ def _build_home_ownership_positions(*, loans: list[Loan], payment_rows: list[dic
 
     summary = {
         "positions": len(positions),
-        "financed_asset_value_total": round(sum(item["financed_asset_value"] for item in positions), 2),
-        "purchase_price_total": round(sum(item["purchase_price"] for item in positions), 2),
-        "property_acquisition_cost_total": round(sum(item["property_acquisition_cost"] for item in positions), 2),
-        "down_payment_total": round(sum(item["down_payment"] for item in positions), 2),
-        "other_upfront_payments_total": round(sum(item["other_upfront_payments"] for item in positions), 2),
-        "upfront_cash_invested_total": round(sum(item["upfront_cash_invested"] for item in positions), 2),
-        "equity_built_total": round(sum(item["equity_built"] for item in positions), 2),
-        "principal_paid_recorded_total": round(sum(item["principal_paid_recorded"] for item in positions), 2),
-        "interest_and_cost_paid_recorded_total": round(sum(item["interest_and_cost_paid_recorded"] for item in positions), 2),
+        "financed_asset_value_total": _money_float(sum((item["financed_asset_value"] for item in positions), Decimal("0"))),
+        "purchase_price_total": _money_float(sum((item["purchase_price"] for item in positions), Decimal("0"))),
+        "property_acquisition_cost_total": _money_float(sum((item["property_acquisition_cost"] for item in positions), Decimal("0"))),
+        "down_payment_total": _money_float(sum((item["down_payment"] for item in positions), Decimal("0"))),
+        "other_upfront_payments_total": _money_float(sum((item["other_upfront_payments"] for item in positions), Decimal("0"))),
+        "upfront_cash_invested_total": _money_float(sum((item["upfront_cash_invested"] for item in positions), Decimal("0"))),
+        "equity_built_total": _money_float(sum((item["equity_built"] for item in positions), Decimal("0"))),
+        "principal_paid_recorded_total": _money_float(sum((item["principal_paid_recorded"] for item in positions), Decimal("0"))),
+        "interest_and_cost_paid_recorded_total": _money_float(sum((item["interest_and_cost_paid_recorded"] for item in positions), Decimal("0"))),
     }
+    for position in positions:
+        for field in ("monthly_emi", "financed_asset_value", "purchase_price", "property_acquisition_cost",
+                      "down_payment", "other_upfront_payments", "upfront_cash_invested", "current_loan_balance",
+                      "equity_built", "estimated_principal_repaid", "principal_paid_recorded", "interest_and_cost_paid_recorded"):
+            position[field] = _money_float(position[field])
     return positions, summary
 
 
@@ -1544,40 +1548,42 @@ def _months_between(start: date, end: date) -> int:
 
 
 def _amortized_balance(*, principal: float, annual_rate: float, emi: float, months_elapsed: int, tenure_months: int) -> float:
-    balance = principal
-    monthly_rate = annual_rate / 1200 if annual_rate else 0
+    balance = _decimal_amount(principal)
+    payment = _decimal_amount(emi)
+    monthly_rate = _decimal_amount(annual_rate) / Decimal("1200")
 
     for _ in range(min(months_elapsed, tenure_months)):
         if balance <= 0:
             break
         interest = balance * monthly_rate
-        principal_component = emi - interest if emi > interest else 0
+        principal_component = payment - interest if payment > interest else 0
         if principal_component <= 0:
             break
         balance = max(balance - principal_component, 0)
 
-    return balance
+    return float(balance)
 
 
 def _forecast_payoff_months(*, balance: float, annual_rate: float, emi: float) -> tuple[int, float]:
     if balance <= 0 or emi <= 0:
         return 0, 0.0
 
-    monthly_rate = annual_rate / 1200 if annual_rate else 0
+    monthly_rate = _decimal_amount(annual_rate) / Decimal("1200")
+    payment = _decimal_amount(emi)
     months = 0
-    interest_total = 0.0
-    current_balance = balance
+    interest_total = Decimal("0")
+    current_balance = _decimal_amount(balance)
 
     while current_balance > 0 and months < 600:
         interest = current_balance * monthly_rate
-        principal_component = emi - interest if emi > interest else 0
+        principal_component = payment - interest if payment > interest else 0
         if principal_component <= 0:
-            return 600, interest_total
+            return 600, float(interest_total)
         current_balance = max(current_balance - principal_component, 0)
         interest_total += interest
         months += 1
 
-    return months, interest_total
+    return months, float(interest_total)
 
 
 def _shift_month(target: date, delta_months: int) -> date:

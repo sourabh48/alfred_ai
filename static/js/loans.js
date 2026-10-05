@@ -92,6 +92,12 @@ function renderLoanSummary(payload) {
     `).join("");
 
     renderPendingForeclosureNotice(summary, payload.balance_sheet || {});
+    const verificationNotice = document.getElementById("loanVerificationNotice");
+    const unconfirmed = Number(summary.unconfirmed_loan_count || 0);
+    verificationNotice.className = unconfirmed ? "alert alert-warning mb-4" : "d-none mb-4";
+    verificationNotice.textContent = unconfirmed
+        ? `${unconfirmed} estimated loan(s) need review. Their balances, EMI commitments and home values are excluded from financial totals. Edit a loan to check and confirm its terms.`
+        : "";
     renderLoanChart(payload.chart);
     renderLoanTable(summary.manual_loans);
     renderRecentClosures(payload.recent_closures || []);
@@ -156,7 +162,7 @@ function renderLoanChart(chart) {
 function renderLoanTable(loans) {
     loanIndex = new Map();
     const target = document.getElementById("loanTableBody");
-    const activeIds = new Set(loans.filter(item => item.is_active).map(item => item.id));
+    const activeIds = new Set(loans.filter(item => item.is_active && item.verification_status === "confirmed").map(item => item.id));
     selectedLoanIds.forEach(id => {
         if (!activeIds.has(id)) {
             selectedLoanIds.delete(id);
@@ -176,6 +182,7 @@ function renderLoanTable(loans) {
 
     target.innerHTML = loans.map(item => {
         loanIndex.set(item.id, item);
+        const confirmed = item.verification_status === "confirmed";
         const loanLabel = Alfred.escapeHtml(item.loan_type_label || formatLoanType(item.loan_type));
         const accountRef = item.loan_account_number
             ? `<div class="muted small">A/C ${Alfred.escapeHtml(item.loan_account_number)}</div>`
@@ -196,10 +203,11 @@ function renderLoanTable(loans) {
         return `
             <tr>
                 <td>
-                    ${item.is_active ? `<input type="checkbox" class="form-check-input" aria-label="Select loan ${item.id} for consolidation" ${selectedLoanIds.has(item.id) ? "checked" : ""} onchange="toggleLoanSelection(${item.id}, this.checked)">` : `<span class="muted small">-</span>`}
+                    ${item.is_active && confirmed ? `<input type="checkbox" class="form-check-input" aria-label="Select loan ${item.id} for consolidation" ${selectedLoanIds.has(item.id) ? "checked" : ""} onchange="toggleLoanSelection(${item.id}, this.checked)">` : `<span class="muted small">-</span>`}
                 </td>
                 <td>
                     <div class="fw-semibold">${loanLabel}</div>
+                    <div class="small ${confirmed ? "muted" : "text-warning-emphasis"}">${Alfred.escapeHtml(item.verification_label)}${confirmed ? "" : " | Excluded from financial totals"}</div>
                     <div class="muted small">${Alfred.escapeHtml(item.lender || "Unspecified lender")}</div>
                     ${accountRef}
                     ${homeCashCopy}
@@ -210,12 +218,12 @@ function renderLoanTable(loans) {
                 <td class="text-end">${Alfred.formatCurrency(item.estimated_balance)}</td>
                 <td class="text-end">${item.months_remaining}</td>
                 <td class="small">
-                    <div>${Alfred.formatCurrency(item.recommended_prepayment)}</div>
-                    <div class="muted">Projected end: ${Alfred.formatDate(item.projected_end_date)}</div>
+                    ${confirmed ? `<div>${Alfred.formatCurrency(item.recommended_prepayment)}</div>
+                    <div class="muted">Projected end: ${Alfred.formatDate(item.projected_end_date)}</div>` : "Review loan terms first"}
                 </td>
                 <td class="text-end">
                     <button class="btn btn-sm btn-outline-primary me-2" type="button" onclick="editLoan(${item.id})">Edit</button>
-                    ${item.is_active ? `<button class="btn btn-sm btn-soft-primary me-2" type="button" onclick="prepareForeclosure(${item.id})">Foreclose</button>` : ""}
+                    ${item.is_active && confirmed ? `<button class="btn btn-sm btn-soft-primary me-2" type="button" onclick="prepareForeclosure(${item.id})">Foreclose</button>` : ""}
                     <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteLoan(${item.id})">Delete</button>
                 </td>
             </tr>
@@ -326,6 +334,7 @@ function submitLoanForm(event) {
     payload.home_other_upfront_payments = Number(payload.home_other_upfront_payments || 0);
     payload.loan_account_number = payload.loan_account_number || "";
     payload.is_active = true;
+    payload.confirm_estimate = form.elements.confirm_estimate.checked;
 
     const errorBox = document.getElementById("loanFormError");
     errorBox.classList.add("d-none");
@@ -355,6 +364,8 @@ function resetLoanForm() {
     form.elements.home_purchase_price.value = 0;
     form.elements.home_down_payment.value = 0;
     form.elements.home_other_upfront_payments.value = 0;
+    form.elements.confirm_estimate.checked = false;
+    document.getElementById("loanVerificationFields").classList.add("d-none");
     document.getElementById("loanSubmitButton").textContent = "Save Loan";
     document.getElementById("loanFormError").classList.add("d-none");
     toggleHomeLoanFields();
@@ -394,12 +405,14 @@ function editLoan(id) {
     form.elements.interest_rate.value = loan.interest_rate;
     form.elements.emi.value = loan.emi;
     form.elements.tenure_months.value = loan.tenure_months;
-    form.elements.remaining_balance.value = loan.remaining_balance || "";
+    form.elements.remaining_balance.value = loan.remaining_balance ?? "";
     form.elements.home_purchase_price.value = loan.home_purchase_price || 0;
     form.elements.home_down_payment.value = loan.home_down_payment || 0;
     form.elements.home_other_upfront_payments.value = loan.home_other_upfront_payments || 0;
     form.elements.start_date.value = loan.start_date;
     form.elements.notes.value = loan.notes || "";
+    form.elements.confirm_estimate.checked = false;
+    document.getElementById("loanVerificationFields").classList.toggle("d-none", loan.verification_status === "confirmed");
     document.getElementById("loanSubmitButton").textContent = "Update Loan";
     toggleHomeLoanFields();
     window.scrollTo({ top: 0, behavior: "smooth" });

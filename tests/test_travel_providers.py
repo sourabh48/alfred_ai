@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from unittest.mock import Mock, patch
 
 import requests
@@ -59,6 +59,39 @@ class TravelProviderTests(TestCase):
         self.assertEqual(b.request_parameters, {"latitude": 12})
         self.assertNotIn("never-store", str(list(TravelProviderRequest.objects.values())))
         self.assertEqual(usage_summary()[0]["cache_hit_ratio"], .5)
+
+    def test_usage_summary_uses_the_local_day_on_both_sides_of_utc_midnight(self):
+        for zone, utc_now in (
+            ("America/Chicago", datetime(2026, 10, 5, 0, 30, tzinfo=datetime_timezone.utc)),
+            ("Asia/Kolkata", datetime(2026, 10, 4, 20, 0, tzinfo=datetime_timezone.utc)),
+        ):
+            with self.subTest(timezone=zone), timezone.override(zone), patch(
+                "apps.mobility.services.travel.cache.timezone.now", return_value=utc_now,
+            ):
+                TravelProviderRequest.objects.all().delete()
+                local_start = timezone.localtime(utc_now).replace(
+                    hour=0, minute=0, second=0, microsecond=0,
+                ).astimezone(datetime_timezone.utc)
+                for created, status, network in (
+                    (local_start - timedelta(seconds=1), "ok", True),
+                    (utc_now - timedelta(minutes=10), "ok", True),
+                    (utc_now, "cache_hit", False),
+                    (local_start + timedelta(days=1), "ok", True),
+                ):
+                    event = TravelProviderRequest.objects.create(
+                        provider=self.provider.name, category="weather", cache_key="fixture-day",
+                        parameters={}, status=status, network_call=network,
+                    )
+                    TravelProviderRequest.objects.filter(pk=event.pk).update(created_at=created)
+
+                rows = usage_summary()
+
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0]["provider"], self.provider.name)
+                self.assertEqual(rows[0]["requests"], 2)
+                self.assertEqual(rows[0]["calls_today"], 1)
+                self.assertEqual(rows[0]["cache_hits"], 1)
+                self.assertEqual(rows[0]["cache_hit_ratio"], .5)
 
     def test_expiry_and_explicit_refresh_call_provider(self):
         query(self.provider, {})

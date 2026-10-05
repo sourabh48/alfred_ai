@@ -506,9 +506,12 @@ class DocumentCenterAndStatementImportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["summary"]["risk_level"], "Limited data")
-        self.assertGreater(payload["balance_sheet"]["total_assets"], 0)
+        self.assertEqual(payload["balance_sheet"]["total_assets"], 195000)
+        self.assertEqual(payload["balance_sheet"]["total_liabilities"], 0)
+        self.assertEqual(payload["balance_sheet"]["net_worth"], 195000)
         self.assertEqual(len(payload["balance_sheet"]["vehicle_positions"]), 1)
-        self.assertEqual(payload["balance_sheet"]["vehicle_positions"][0]["bucket"], "liability")
+        self.assertEqual(payload["balance_sheet"]["vehicle_positions"][0]["bucket"], "asset")
+        self.assertEqual(payload["balance_sheet"]["vehicle_positions"][0]["recognized_value"], 70000)
 
     def test_partial_overlap_statement_still_imports_new_rows_when_reference_repeats(self):
         first = StatementParseResult(

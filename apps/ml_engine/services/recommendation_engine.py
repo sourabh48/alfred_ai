@@ -216,7 +216,7 @@ class FinancialRecommendationEngine:
         profile['savings_rate'] = float(baseline.get('savings_rate', 0) or 0)
 
         # Loan analysis
-        active_loans = Loan.objects.filter(user=user, is_active=True)
+        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed")
         profile['has_loans'] = active_loans.exists()
         profile['total_emi'] = float(baseline.get('recurring_emi_burden', 0) or 0)
         profile['dti_ratio'] = float(baseline.get('debt_burden_ratio', 0) or 0)

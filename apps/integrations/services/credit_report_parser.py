@@ -383,10 +383,11 @@ class CreditReportParser:
             line,
             ["sanctioned amount", "high credit", "credit limit", "loan amount"],
         )
-        current["current_balance"] = current.get("current_balance") or self._extract_amount_from_line(
-            line,
-            ["current balance", "current outstanding", "outstanding balance", "balance outstanding"],
-        )
+        if current.get("current_balance") is None:
+            current["current_balance"] = self._extract_optional_amount_from_line(
+                line,
+                ["current balance", "current outstanding", "outstanding balance", "balance outstanding"],
+            )
         current["overdue_amount"] = current.get("overdue_amount") or self._extract_amount_from_line(
             line,
             ["amount overdue", "overdue amount", "past due amount"],
@@ -428,6 +429,7 @@ class CreditReportParser:
             "closed_on": closed_on,
             "sanctioned_amount": round(float(current.get("sanctioned_amount") or 0), 2),
             "current_balance": round(current_balance, 2),
+            "balance_reported": current.get("current_balance") is not None,
             "overdue_amount": round(float(current.get("overdue_amount") or 0), 2),
             "emi_amount": round(float(current.get("emi_amount") or 0), 2),
             "payment_status": payment_status[:120],
@@ -442,6 +444,9 @@ class CreditReportParser:
         return ""
 
     def _extract_amount_from_line(self, line: str, labels: list[str]) -> float:
+        return self._extract_optional_amount_from_line(line, labels) or 0.0
+
+    def _extract_optional_amount_from_line(self, line: str, labels: list[str]) -> float | None:
         for label in labels:
             pattern = re.compile(
                 rf"{re.escape(label)}\s*[:#-]?\s*(?:INR|RS\.?|â‚¹)?\s*([0-9,]+(?:\.\d{{1,2}})?)",
@@ -450,7 +455,7 @@ class CreditReportParser:
             match = pattern.search(line)
             if match:
                 return float(match.group(1).replace(",", ""))
-        return 0.0
+        return None
 
     def _extract_date_from_line(self, line: str, labels: list[str]) -> str:
         for label in labels:

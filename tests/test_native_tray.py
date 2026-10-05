@@ -40,7 +40,7 @@ class NativeTrayTests(unittest.TestCase):
         guide.write_text("installation instructions")
         with patch("alfred_tray.webbrowser.open") as browser:
             self.tray.open_guide()
-        browser.assert_called_once_with(guide.as_uri())
+        browser.assert_called_once_with(guide.resolve().as_uri())
 
     def test_data_folder_action_preserves_spaces(self):
         with patch("alfred_tray.os.startfile", create=True) as open_folder:

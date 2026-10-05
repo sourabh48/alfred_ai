@@ -27,8 +27,10 @@ from .services.credit_loan_sync import sync_credit_report_loans
 from .services.credit_report_parser import credit_report_parser
 from .services.credit_score_tracker import credit_score_service
 from apps.loans.models import Loan
+from apps.loans.money import loan_money_float
 from apps.ml_engine.services.recommendation_engine import recommendation_engine
 from apps.ml_engine.services.tax_optimizer import tax_optimizer
+from apps.ml_engine.services.tax_policy import POLICY_VERSION, TaxPolicyError, amount, get_policy
 
 
 def _query_float(request, key, default):
@@ -762,11 +764,20 @@ def _build_recommendation_overview_payload(request) -> dict:
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def tax_optimizer_overview(request):
-    """Return a user-ready tax dashboard based on current profile defaults."""
+    """Return a dated planning estimate; reject unsupported years explicitly."""
+    try:
+        get_policy(financial_year=request.query_params.get("financial_year"),
+                   assessment_year=request.query_params.get("assessment_year"))
+        for key in ("annual_income", "basic_salary", "hra_received", "rent_paid"):
+            if key in request.query_params:
+                amount(request.query_params[key], key.replace("_", " ").capitalize())
+    except TaxPolicyError as exc:
+        return Response({"error": str(exc)}, status=400)
     revision = "|".join(
         (
+            POLICY_VERSION,
             _integration_dashboard_revision(request.user),
-            _request_params_token(request, ["annual_income", "basic_salary", "hra_received", "rent_paid", "metro"]),
+            _request_params_token(request, ["annual_income", "basic_salary", "hra_received", "rent_paid", "metro", "financial_year", "assessment_year"]),
         )
     )
     payload = materialize_payload(
@@ -781,13 +792,11 @@ def tax_optimizer_overview(request):
 
 def _build_tax_optimizer_overview_payload(request) -> dict:
     """Build a user-ready tax dashboard based on current profile defaults."""
+    policy = get_policy(financial_year=request.query_params.get("financial_year"),
+                        assessment_year=request.query_params.get("assessment_year"))
     financial_baseline = resolve_canonical_financial_baseline(request.user)
-    annual_income = _query_float(
-        request,
-        "annual_income",
-        financial_baseline.get("annual_income", 0) or 0,
-    )
-    deductions = tax_optimizer._calculate_current_deductions(request.user)
+    annual_income = amount(request.query_params.get("annual_income", financial_baseline.get("annual_income", 0) or 0), "Annual income")
+    deductions = tax_optimizer._calculate_current_deductions(request.user, financial_year=policy.financial_year)
     basic_salary = _query_float(request, "basic_salary", annual_income / 24 if annual_income else 0)
     hra_received = _query_float(request, "hra_received", basic_salary * 0.4)
     rent_paid = _query_float(request, "rent_paid", financial_baseline.get("rent_burden", 0) or basic_salary * 0.45)
@@ -797,13 +806,13 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
     else:
         metro_city = str(metro_city).lower() in {"1", "true", "yes", "on"}
 
-    home_loan = Loan.objects.filter(user=request.user, loan_type="home", is_active=True).order_by("-id").first()
+    home_loan = Loan.objects.filter(user=request.user, loan_type="home", is_active=True, verification_status="confirmed").order_by("-id").first()
     home_loan_benefits = None
     if home_loan:
-        annual_emi = (home_loan.emi or 0) * 12
+        annual_emi = loan_money_float(home_loan.emi or 0) * 12
         estimated_interest = min(
             annual_emi,
-            ((home_loan.remaining_balance or home_loan.principal or 0) * (home_loan.interest_rate or 0) / 100),
+            (loan_money_float(home_loan.remaining_balance or home_loan.principal or 0) * (home_loan.interest_rate or 0) / 100),
         )
         principal_paid = max(annual_emi - estimated_interest, 0)
         home_loan_benefits = tax_optimizer.calculate_home_loan_benefits(
@@ -819,8 +828,11 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
 
     return {
         "annual_income": annual_income,
+        "tax_policy": policy.metadata(),
         "financial_baseline": financial_baseline,
         "inputs": {
+            "financial_year": policy.financial_year,
+            "assessment_year": policy.assessment_year,
             "annual_income": annual_income,
             "basic_salary": basic_salary,
             "hra_received": hra_received,
@@ -828,8 +840,10 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
             "metro": metro_city,
         },
         "deductions": deductions,
-        "regime_comparison": tax_optimizer.compare_regimes(annual_income, deductions),
-        "tax_savings": tax_optimizer.suggest_tax_saving_investments(request.user),
+        "regime_comparison": tax_optimizer.compare_regimes(annual_income, deductions, financial_year=policy.financial_year),
+        "tax_savings": tax_optimizer.suggest_tax_saving_investments(
+            request.user, annual_income=annual_income, deductions=deductions, financial_year=policy.financial_year,
+        ),
         "hra": tax_optimizer.calculate_hra_exemption(
             basic_salary=basic_salary,
             hra_received=hra_received,
@@ -856,6 +870,8 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
                 advisory_surface="tax_optimizer",
             ),
             "notes": [
+                "This scenario assumes a resident individual under 60 with salary income only; review these assumptions before relying on it.",
+                "The selected FY/AY is explicit. Other years and special-rate income require separately verified rules.",
                 "Tax guidance is grounded in stored user deductions plus official reference sources for regime and instrument treatment.",
                 "This overview is still planning guidance, not a substitute for a chartered accountant or filed return review.",
             ],

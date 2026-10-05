@@ -19,6 +19,7 @@ from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extracti
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
 from apps.investments.models import Investment
+from apps.mobility.models import BikeProfile
 from alfred_ai.services import record_parser_learning
 from apps.reports.services import operational_logging_service
 from apps.loans.services.loan_pdf_parser import loan_pdf_parser
@@ -27,6 +28,7 @@ from apps.loans.services.payment_review import review_loan_payment_match, serial
 from apps.reports.services import reporting_service
 
 from .models import Loan, LoanClosureDocument, LoanImportDocument, LoanPaymentHistory
+from .money import LOAN_MONEY_FIELDS, loan_money, loan_money_float
 from .serializers import LoanClosureDocumentSerializer, LoanImportDocumentSerializer, LoanSerializer
 
 
@@ -70,6 +72,9 @@ def _loan_dashboard_revision(user) -> str:
         latest_expense=Max("transaction_date"),
         total_amount=Sum("amount"),
     )
+    vehicle_meta = BikeProfile.objects.filter(user=user).aggregate(
+        count=Count("id"), latest_update=Max("updated_at"), total_value=Sum("estimated_market_value"),
+    )
     profile_token = ":".join(
         str(value or "")
         for value in (
@@ -81,7 +86,7 @@ def _loan_dashboard_revision(user) -> str:
     return "|".join(
         str(value or "")
         for value in (
-            "loan-dashboard-v2",
+            "loan-dashboard-v6-related-money",
             loan_meta["count"],
             loan_meta["max_id"],
             loan_meta["latest_update"],
@@ -105,6 +110,9 @@ def _loan_dashboard_revision(user) -> str:
             expense_meta["max_id"],
             expense_meta["latest_expense"],
             expense_meta["total_amount"],
+            vehicle_meta["count"],
+            vehicle_meta["latest_update"],
+            vehicle_meta["total_value"],
             profile_token,
         )
     )
@@ -248,9 +256,9 @@ class LoanConsolidationView(APIView):
         if len(loan_ids) < 2:
             return Response({"detail": "Select at least two active loans to consolidate."}, status=status.HTTP_400_BAD_REQUEST)
 
-        source_loans = list(Loan.objects.filter(user=request.user, pk__in=loan_ids, is_active=True).order_by("id"))
+        source_loans = list(Loan.objects.filter(user=request.user, pk__in=loan_ids, is_active=True, verification_status="confirmed").order_by("id"))
         if len(source_loans) != len(set(loan_ids)):
-            return Response({"detail": "One or more selected loans are invalid or already inactive."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Choose active, confirmed loans from your own register."}, status=status.HTTP_400_BAD_REQUEST)
 
         start_date_value = request.data.get("start_date") or timezone.localdate().isoformat()
         try:
@@ -258,13 +266,17 @@ class LoanConsolidationView(APIView):
         except ValueError:
             return Response({"detail": "Provide a valid consolidation start date."}, status=status.HTTP_400_BAD_REQUEST)
 
-        total_balance = sum((loan.remaining_balance if loan.remaining_balance is not None else loan.principal) for loan in source_loans)
+        total_balance = sum((loan_money(loan.remaining_balance if loan.remaining_balance is not None else loan.principal)
+                             for loan in source_loans), loan_money(0))
         lender = (request.data.get("lender") or "").strip()
         if not lender:
             return Response({"detail": "Provide the new lender for the consolidated loan."}, status=status.HTTP_400_BAD_REQUEST)
-        principal = float(request.data.get("principal") or total_balance or 0)
+        try:
+            principal = loan_money(request.data.get("principal") or total_balance)
+            emi = loan_money(request.data.get("emi") or 0)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         interest_rate = float(request.data.get("interest_rate") or 0)
-        emi = float(request.data.get("emi") or 0)
         tenure_months = int(request.data.get("tenure_months") or 0)
         if principal <= 0 or emi <= 0 or tenure_months <= 0:
             return Response({"detail": "Principal, EMI, and tenure must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
@@ -319,6 +331,10 @@ def import_loan_pdf(request):
         with transaction.atomic():
             created_loans = []
             for loan_data in loans_data:
+                loan_data = {
+                    key: loan_money(value) if key in LOAN_MONEY_FIELDS and value is not None else value
+                    for key, value in loan_data.items()
+                }
                 loan_account_number = (loan_data.get("loan_account_number") or "").strip()
                 lender = (loan_data.get("lender") or "").strip()
                 principal = loan_data.get("principal", 0)
@@ -485,7 +501,8 @@ def payoff_loan(request, pk):
                 selected_loan=loan,
                 closure_file=closure_file,
                 parsed=parsed,
-                requested_closure_amount=float(request.data.get("final_payment_amount") or 0) or None,
+                requested_closure_amount=(loan_money(request.data["final_payment_amount"])
+                                          if request.data.get("final_payment_amount") not in (None, "") else None),
                 requested_closure_date=(request.data.get("closure_date") or "").strip() or None,
             )
         except ValueError as exc:
@@ -537,7 +554,7 @@ def payoff_loan(request, pk):
             "raw_file_retention": raw_file_retention,
             "reconciliation": {
                 "status": getattr(result.snapshot, "reconciliation_status", "unmatched"),
-                "matched_payment_total": getattr(result.snapshot, "matched_payment_total", 0),
+                "matched_payment_total": loan_money_float(getattr(result.snapshot, "matched_payment_total", 0)),
                 "notes": getattr(result.snapshot, "reconciliation_notes", ""),
                 "settlement_allocation": dict((getattr(result.snapshot, "audit_payload", {}) or {}).get("settlement_allocation") or {}),
             },
@@ -664,7 +681,9 @@ def _build_networth_payload(user) -> dict:
         "cash": asset_lookup.get("Cash and bank balances", 0.0),
         "investments": asset_lookup.get("Investments", 0.0),
         "home_property_acquisition_cost": asset_lookup.get("Home property acquisition-cost base (proxy)", 0.0),
-        "utility_and_income_supporting_vehicles": asset_lookup.get("Utility and income-supporting vehicles", 0.0),
+        "vehicles": asset_lookup.get("Vehicles (estimated current market value)", 0.0),
+        # Compatibility alias; totals use the canonical asset rows only.
+        "utility_and_income_supporting_vehicles": asset_lookup.get("Vehicles (estimated current market value)", 0.0),
         "total": total_assets,
     }
 
@@ -676,7 +695,7 @@ def _build_networth_payload(user) -> dict:
         ),
         "pending_foreclosure_excluded_balance": round(balance_sheet.get("pending_foreclosure_excluded_balance", 0.0), 2),
         "credit_card_liability": liability_lookup.get("Credit card liability", 0.0),
-        "lifestyle_vehicle_burden": liability_lookup.get("Lifestyle vehicle burden", 0.0),
+        "lifestyle_vehicle_burden": 0.0,
         "total": total_debt,
     }
 
@@ -688,7 +707,7 @@ def _build_networth_payload(user) -> dict:
         investment_by_type[asset_type] += inv.current_value
 
     loan_by_type = {}
-    for loan in Loan.objects.filter(user=user).exclude(status__in=["foreclosed", "closed", "prepaid"]):
+    for loan in Loan.objects.filter(user=user, verification_status="confirmed").exclude(status__in=["foreclosed", "closed", "prepaid"]):
         loan_type = loan.get_loan_type_display()
         if loan_type not in loan_by_type:
             loan_by_type[loan_type] = 0
@@ -723,14 +742,14 @@ def _build_networth_payload(user) -> dict:
         "assets": assets_breakdown,
         "liabilities": liabilities_breakdown,
         "investment_breakdown": {k: round(v, 2) for k, v in investment_by_type.items()},
-        "loan_breakdown": {k: round(v, 2) for k, v in loan_by_type.items()},
+        "loan_breakdown": {k: float(round(v, 2)) for k, v in loan_by_type.items()},
         "metrics": {
             "debt_to_asset_ratio": round(debt_to_asset_ratio, 2),
             "asset_allocation": {
                 "cash_percentage": round((assets_breakdown["cash"] / total_assets * 100) if total_assets > 0 else 0, 2),
                 "investment_percentage": round((assets_breakdown["investments"] / total_assets * 100) if total_assets > 0 else 0, 2),
                 "home_property_percentage": round((assets_breakdown["home_property_acquisition_cost"] / total_assets * 100) if total_assets > 0 else 0, 2),
-                "vehicle_asset_percentage": round((assets_breakdown["utility_and_income_supporting_vehicles"] / total_assets * 100) if total_assets > 0 else 0, 2),
+                "vehicle_asset_percentage": round((assets_breakdown["vehicles"] / total_assets * 100) if total_assets > 0 else 0, 2),
             }
         },
         "health": {

@@ -16,7 +16,7 @@ from apps.expenses.models import BankAccount, Expense, StatementUpload
 from apps.family.models import Dependent, FamilyAccountLink
 from apps.integrations.models import CreditReportUpload, CreditScore, EmailConnection, VerifiedExternalInsight
 from apps.investments.models import Investment, InvestmentImportDocument
-from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument, LoanPaymentHistory
+from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument, LoanMoneySnapshot, LoanPaymentHistory, LoanRelatedMoneySnapshot
 from apps.ml_engine.models.parser_memory import DocumentParserLearningMemory
 from apps.mobility.models import (
     BikeConditionSnapshot,
@@ -108,6 +108,8 @@ def clear_user_fed_data(user) -> dict:
         "loan_import_documents": loan_import_qs.count(),
         "loan_closure_documents": loan_closure_qs.count(),
         "loan_foreclosure_snapshots": LoanForeclosureSnapshot.objects.filter(loan__user=user).count(),
+        "loan_money_snapshots": LoanMoneySnapshot.objects.filter(user=user).count(),
+        "loan_related_money_snapshots": LoanRelatedMoneySnapshot.objects.filter(user=user).count(),
         "investments": Investment.objects.filter(user=user).count(),
         "investment_import_documents": investment_doc_qs.count(),
         "vehicle_profiles": BikeProfile.objects.filter(user=user).count(),
@@ -138,6 +140,8 @@ def clear_user_fed_data(user) -> dict:
         LoanForeclosureSnapshot.objects.filter(loan__user=user).delete()
         loan_closure_qs.delete()
         loan_import_qs.delete()
+        LoanMoneySnapshot.objects.filter(user=user).delete()
+        LoanRelatedMoneySnapshot.objects.filter(user=user).delete()
         Loan.objects.filter(user=user).delete()
 
         investment_doc_qs.delete()

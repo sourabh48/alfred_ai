@@ -20,6 +20,7 @@
 <section class="soft-grid four-up mb-4" id="loanSummaryCards"></section>
 
 <div id="loanPendingForeclosureNotice" class="d-none mb-4"></div>
+<div id="loanVerificationNotice" class="d-none mb-4" role="status"></div>
 
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
@@ -99,6 +100,13 @@
                     <div class="col-12">
                         <label class="form-label" for="manualLoanNotes">Notes</label>
                         <textarea id="manualLoanNotes" name="notes" rows="3" class="form-control" placeholder="Prepayment options, floating rate notes, etc."></textarea>
+                    </div>
+                </div>
+                <div id="loanVerificationFields" class="d-none">
+                    <p class="small">These loan terms are estimates. Check the lender, principal, rate, EMI, tenure, start date and current balance against your records.</p>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="loanConfirmEstimate" name="confirm_estimate">
+                        <label class="form-check-label" for="loanConfirmEstimate">I have checked these terms and the current balance. Include this loan in my financial totals.</label>
                     </div>
                 </div>
                 <div id="loanFormError" class="alert alert-danger d-none mb-0"></div>
@@ -266,5 +274,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/loans.js?v=2.9"></script>
+<script src="/static/js/loans.js?v=2.10"></script>
 {% endblock %}
