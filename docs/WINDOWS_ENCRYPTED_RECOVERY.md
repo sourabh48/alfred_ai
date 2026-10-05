@@ -92,8 +92,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Git LFS download failed.' }
 git -C $BackupClone lfs fsck
 if ($LASTEXITCODE -ne 0) { throw 'Git LFS verification failed.' }
 $Public = Get-Content -LiteralPath (Join-Path $BackupClone 'backup-manifest-public.json') -Raw | ConvertFrom-Json
-if ($Public.source_repository -ne 'sourabh48/alfred_ai') { throw 'Unexpected source repository.' }
-if ($Public.backup_repository -ne $BackupRepository) { throw 'Unexpected backup repository.' }
 if ($Public.source_git_head -notmatch '^[0-9a-f]{40}$') { throw 'Invalid recovery source commit.' }
 git -C $SourceRoot checkout --detach $Public.source_git_head
 if ($LASTEXITCODE -ne 0) { throw 'Recovery source commit is unavailable.' }
@@ -105,6 +103,11 @@ Use the SHA and backup repository recorded in the final pre-wipe evidence to
 cross-check the downloaded public manifest. After recovery validation, create a
 development branch from this exact commit if continuing engineering work. Do not
 let a newer branch tip silently replace the known recovery checkpoint.
+
+The public manifest contains only its timestamp, source SHA, encrypted part
+count/total, archive filename pattern and source/frozen/Docker inclusion flags.
+Per-part names and SHA256 hashes are in `encrypted-backup-sha256.txt`; detailed
+private filenames, counts and hashes remain inside the encrypted archive.
 
 ## Verify downloaded encrypted volumes and decrypt interactively
 

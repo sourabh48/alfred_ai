@@ -91,7 +91,7 @@ if ($Mode -eq 'Encrypt') {
     $extracted = Get-PrivateVerification -Directory $ExtractionDirectory -ExpectedHead $head
     if ($extracted.file_count -ne $verification.file_count -or $extracted.total_bytes -ne $verification.total_bytes) { throw 'Extracted backup differs.' }
     $partRecords = @($parts | ForEach-Object { [pscustomobject]@{name=$_.Name; bytes=$_.Length; sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()} })
-    $public = [ordered]@{format_version=1; created_at_utc=[DateTime]::UtcNow.ToString('o'); source_repository='sourabh48/alfred_ai'; source_branch=$branch; source_git_head=$head; backup_repository=$BackupRepository; archive_format='7z'; encryption='AES-256'; encrypted_headers=$true; archive_parts=$partRecords; included=$verification.included; file_count=$verification.file_count; total_plaintext_bytes=$verification.total_bytes}
+    $public = [ordered]@{created_at_utc=[DateTime]::UtcNow.ToString('o'); source_git_head=$head; archive_part_count=$parts.Count; archive_total_bytes=($parts | Measure-Object Length -Sum).Sum; archive_filename_pattern=$archiveName+'.*'; included=[ordered]@{source_runtime=$verification.included.source_runtime; frozen_runtime=$verification.included.frozen_runtime; docker_vhdx=$verification.included.docker_vhdx}}
     $public | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $repository 'backup-manifest-public.json') -Encoding UTF8
     @($partRecords | ForEach-Object { $_.sha256 + '  ' + $_.name }) | Set-Content -LiteralPath (Join-Path $repository 'encrypted-backup-sha256.txt') -Encoding ASCII
     $readme = @'
@@ -120,22 +120,40 @@ recovery until protected data is re-encrypted and verified, then retire it safel
     [pscustomobject]@{archive_test='PASS'; test_extraction='PASS'; sqlite_quick_check='PASS'; archive_part_count=$parts.Count; archive_total_bytes=($parts | Measure-Object Length -Sum).Sum; source_head=$head} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $repository '..\encryption-verification.local.json') -Encoding UTF8
 } else {
     $public = Get-Content -LiteralPath (Join-Path $repository 'backup-manifest-public.json') -Raw | ConvertFrom-Json
-    if ($public.format_version -ne 1 -or $public.source_git_head -notmatch '^[a-f0-9]{40}$' -or $public.source_repository -ne 'sourabh48/alfred_ai' -or $public.backup_repository -ne $BackupRepository -or $public.archive_format -ne '7z') { throw 'Recovery checkpoint metadata is invalid or belongs to another repository.' }
-    $records = @($public.archive_parts)
-    if ($records.Count -eq 0 -or $public.encryption -ne 'AES-256' -or $public.encrypted_headers -ne $true) { throw 'Expected encrypted backup metadata is missing.' }
+    $publicKeys = 'created_at_utc','source_git_head','archive_part_count','archive_total_bytes','archive_filename_pattern','included'
+    $includedKeys = 'source_runtime','frozen_runtime','docker_vhdx'
+    $timestamp = [DateTimeOffset]::MinValue
+    if ((($public.PSObject.Properties.Name | Sort-Object) -join ',') -ne (($publicKeys | Sort-Object) -join ',') -or
+        (($public.included.PSObject.Properties.Name | Sort-Object) -join ',') -ne (($includedKeys | Sort-Object) -join ',') -or
+        @($public.included.PSObject.Properties | Where-Object { $_.Value -isnot [bool] }).Count -ne 0 -or
+        $public.created_at_utc -isnot [string] -or $public.source_git_head -isnot [string] -or
+        $public.archive_filename_pattern -isnot [string] -or
+        -not [DateTimeOffset]::TryParse([string]$public.created_at_utc, [ref]$timestamp) -or
+        $public.source_git_head -notmatch '^[a-f0-9]{40}$' -or
+        $public.archive_filename_pattern -notmatch '^alfred-private-backup-\d{8}\.7z\.\*$' -or
+        ($public.archive_part_count -isnot [int] -and $public.archive_part_count -isnot [long]) -or
+        $public.archive_part_count -lt 1 -or $public.archive_part_count -gt 999 -or
+        ($public.archive_total_bytes -isnot [int] -and $public.archive_total_bytes -isnot [long]) -or
+        $public.archive_total_bytes -lt 1) { throw 'Recovery checkpoint metadata is invalid or contains unapproved fields.' }
     $allowed = @('README_RECOVERY.md','backup-manifest-public.json','encrypted-backup-sha256.txt','.gitattributes')
     foreach ($required in $allowed) { if (-not (Test-Path -LiteralPath (Join-Path $repository $required) -PathType Leaf)) { throw 'Recovery repository metadata is incomplete.' } }
-    $expectedHashes = @()
-    for ($index = 0; $index -lt $records.Count; $index++) {
-        $record = $records[$index]
-        if ($record.name -notmatch '^alfred-private-backup-\d{8}\.7z\.\d{3}$' -or -not $record.name.EndsWith(('.{0:d3}' -f ($index+1))) -or ($record.name -replace '\.\d{3}$','') -ne ($records[0].name -replace '\.\d{3}$','') -or $record.sha256 -notmatch '^[a-f0-9]{64}$') { throw 'Invalid or missing archive volume.' }
-        $allowed += $record.name
-        $path = Join-Path $repository $record.name
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path).Length -ne $record.bytes -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $record.sha256) { throw 'Downloaded archive size or SHA256 differs; LFS may not have downloaded content.' }
-        $expectedHashes += $record.sha256 + '  ' + $record.name
-    }
     $actualHashes = @(Get-Content -LiteralPath (Join-Path $repository 'encrypted-backup-sha256.txt') | Where-Object { $_.Trim() })
-    if (($actualHashes -join "`n") -ne ($expectedHashes -join "`n")) { throw 'Public hash manifests differ.' }
+    if ($actualHashes.Count -ne $public.archive_part_count) { throw 'Archive part count differs from the public manifest.' }
+    $records = @()
+    for ($index = 0; $index -lt $actualHashes.Count; $index++) {
+        if ($actualHashes[$index] -notmatch '^([a-f0-9]{64})  (alfred-private-backup-\d{8}\.7z\.\d{3})$') { throw 'Invalid archive hash record.' }
+        $hash = $Matches[1]
+        $name = $Matches[2]
+        $expectedName = $public.archive_filename_pattern.TrimEnd('*') + ('{0:d3}' -f ($index+1))
+        if ($name -ne $expectedName) { throw 'Invalid or missing archive volume.' }
+        $allowed += $name
+        $path = Join-Path $repository $name
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+            (Get-Item -LiteralPath $path).Length -lt 1 -or (Get-Item -LiteralPath $path).Length -gt 1500MB -or
+            (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $hash) { throw 'Downloaded archive size or SHA256 differs; LFS may not have downloaded content.' }
+        $records += [pscustomobject]@{name=$name; bytes=(Get-Item -LiteralPath $path).Length}
+    }
+    if (($records | Measure-Object bytes -Sum).Sum -ne $public.archive_total_bytes) { throw 'Downloaded encrypted total differs from the public manifest.' }
     if (@(Get-ChildItem -LiteralPath $repository -Force | Where-Object { $_.Name -ne '.git' -and ($_.PSIsContainer -or $_.Name -notin $allowed) }).Count -ne 0) { throw 'Unexpected plaintext or unlisted file in encrypted repository.' }
     & $SevenZipExecutable t -bsp0 -bb0 (Join-Path $repository $records[0].name)
     if ($LASTEXITCODE -ne 0) { throw 'Downloaded archive test failed.' }
@@ -144,7 +162,8 @@ recovery until protected data is re-encrypted and verified, then retire it safel
     & $SevenZipExecutable x -bsp0 -bb0 (Join-Path $repository $records[0].name) "-o$ExtractionDirectory"
     if ($LASTEXITCODE -ne 0) { throw 'Downloaded archive extraction failed.' }
     $verification = Get-PrivateVerification -Directory $ExtractionDirectory -ExpectedHead $public.source_git_head
-    if ($verification.file_count -ne $public.file_count -or $verification.total_bytes -ne $public.total_plaintext_bytes -or @($verification.included.PSObject.Properties | Where-Object { $_.Value -ne $true }).Count -ne 0) { throw 'Downloaded recovery coverage differs.' }
+    if (@($verification.included.PSObject.Properties | Where-Object { $_.Value -ne $true }).Count -ne 0 -or
+        @($includedKeys | Where-Object { $verification.included.$_ -ne $public.included.$_ }).Count -ne 0) { throw 'Downloaded recovery coverage differs.' }
     [pscustomobject]@{hash_verification='PASS'; archive_test='PASS'; test_extraction='PASS'; sqlite_quick_check='PASS'; archive_part_count=$records.Count; archive_total_bytes=($records | Measure-Object bytes -Sum).Sum; source_head=$public.source_git_head} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $repository '..\remote-verification.local.json') -Encoding UTF8
 }
 Write-Host 'Verification complete. Originals, private staging and encrypted archives are retained.'
