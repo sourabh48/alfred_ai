@@ -3,47 +3,60 @@
 Prepared before the PC wipe. These are later recovery instructions; no Windows
 reinstall, private-data restore or backup deletion was performed by writing this
 document. A command example is not evidence of a completed backup. Use the final
-verified backup evidence for the retained device, archive names and source commit.
+verified backup evidence for the retained copy, archive names and source commit.
 
-The permanent source repository is `sourabh48/alfred_ai`. The chosen handoff is a
-**Desktop recovery folder**, which the user will copy to a **6 GB pendrive**
-before wiping. The pendrive must be separate from the Windows target disk. The
-Desktop folder alone is temporary and will not survive the wipe. No temporary
-GitHub backup repository has been created. Git LFS and its
-quota are not required for this chosen method. The encrypted archive is
+The permanent source repository is `sourabh48/alfred_ai`. The user reports uploading
+the **Desktop recovery folder** to **OneDrive**. That report is not yet proof of
+cloud recovery: a fresh download and the complete verification below are required.
+A **6 GB pendrive** remains an alternative retained copy, separate from the Windows
+target disk. The Desktop folder alone is temporary and will not survive the wipe.
+No temporary GitHub backup repository has been created. Git LFS and its quota are
+not required for OneDrive or the pendrive. The encrypted archive is
 `alfred-private-backup-20261006.7z.001`, one part of 67,915,749 bytes, bound to
 source commit `5bf9cbe3e4c0c609e5fff5adf135ebcdc6a213b4`. Its local archive,
 extraction, private hashes and all 17 SQLite checks passed. These local results
-do not prove a pendrive copy: require the separate USB verification below.
+do not prove the OneDrive or pendrive copy: verify the actual retained copy below.
 
 Keep only the five approved backup files together in the encrypted folder:
 `.gitattributes`, `README_RECOVERY.md`, `backup-manifest-public.json`,
 `encrypted-backup-sha256.txt` and the encrypted archive part. The prepared Desktop
 bundle is `ALFRED_RECOVERY_20261006`, with those five files in `encrypted/`,
 portable `tools/7za.exe`, and recovery documentation in `docs/`. Copy the **whole
-bundle** to the pendrive; after reinstall, copy it back to the new Desktop before
-following the restore steps.
+bundle** to the retained destination; after reinstall, download it from OneDrive
+or copy it from the pendrive to the new Desktop before following the restore steps.
 Later safe source documentation may advance HEAD; the archive's verified
 `source_git_head` remains the application recovery checkpoint.
 
 ## Before wiping
 
-Saving the bundle on this PC's Desktop is not the retained backup. After manually
-copying it to the pendrive, run the hash/decryption/extraction/private-data checks
-below against the pendrive folder itself before wiping. The current local tests
-do not prove the manual copy.
-For that pre-wipe verification, use the existing Git root `F:\ALFRED` as
-`$SourceRoot` and the actual USB `ALFRED_RECOVERY_20261006\encrypted` folder as
-`$BackupClone`. The later restore example clones source into a new location.
+Saving the bundle on this PC's Desktop or in a local OneDrive sync folder is not
+proof of the retained backup. For OneDrive, use its normal web **Download** command
+to download the whole uploaded folder into a new `C:\ALFRED_ONEDRIVE_REMOTE_VERIFY`
+folder, outside OneDrive sync, the Desktop bundle and original staging. Keep the
+downloaded ZIP if OneDrive supplies one. Extract it into a new folder using trusted
+tools; reject absolute paths, `..` traversal and symbolic-link/reparse entries that
+could write outside that folder. Do not overwrite an existing copy. Locate the
+bundle root beneath any ZIP wrapper directory and confirm the entire bundle is
+present, including `encrypted/.gitattributes`. Follow Microsoft's
+[normal download instructions](https://support.microsoft.com/en-gb/onedrive/download-files-and-folders-from-onedrive-or-sharepoint).
 
-Do not wipe until the final evidence confirms the complete pendrive copy,
-matching SHA256 hashes read from that device, successful decryption/archive test,
+Use the trusted existing checkout and local 7-Zip for pre-wipe verification.
+Compare the downloaded encrypted archive and portable tool hashes against the
+trusted local recovery evidence before running any downloaded script or tool.
+Set `$SourceRoot` to `F:\ALFRED` and `$BackupClone` to the fresh cloud download's
+`ALFRED_RECOVERY_20261006\encrypted` folder. For the pendrive alternative, use its
+actual `encrypted` folder and read the bytes directly from that device. The later
+restore example clones source into a new location.
+
+Do not wipe until the final evidence confirms the complete retained copy,
+matching SHA256 hashes read from the fresh cloud download or physical device,
+successful decryption/archive test,
 extraction, every private-file hash and all SQLite integrity checks.
 Both runtime profiles and the historical Docker disk must be included unless
 the disk is explicitly proved unnecessary. Keep originals until that gate
 passes. Keep the archive password in a trusted source that survives the wipe;
 never paste it into an agent/chat, command argument, script, Git or a manifest.
-Safely eject and disconnect the verified pendrive before Windows installation or
+If using a pendrive, safely eject and disconnect it before Windows installation or
 disk cleanup. It must survive the wipe. Do not reformat it, select it as the
 Windows target disk or use it to create Windows installation media.
 
@@ -58,9 +71,12 @@ authentication can be recovered independently of this PC. Confirm Windows
 installation media and the intended target disk. Required ALFRED signing keys,
 fallback keys, provider configuration and OAuth state must survive inside the
 encrypted backup or another independently recoverable secure source.
+For OneDrive recovery, separately confirm Microsoft-account login, 2FA/recovery
+and recovery email are accessible after the wipe. GitHub readiness does not prove
+Microsoft-account readiness. Request YES/NO only, never passwords or recovery codes.
 
 7z AES-256 must use encrypted headers. If choosing the optional GitHub alternative
-instead of the pendrive, use a **different, private** repository containing only
+instead of OneDrive or the pendrive, use a **different, private** repository containing only
 encrypted archives and safe metadata; never use `sourabh48/alfred_ai`. The
 proposed temporary name is `sourabh48/alfred-private-recovery-202610`; verify the
 actual repository and private visibility. The planned 1500 MiB volumes fit the
@@ -99,8 +115,9 @@ Protect this folder as private; decrypted data must never be committed.
 
 Do not clone over an existing checkout. These example locations are new paths;
 the source root is the folder containing `manage.py`, not its `alfred_ai` package.
-The complete bundle should now have been copied from the retained pendrive to
-the new Desktop. Keep the pendrive untouched through recovery verification.
+The complete bundle should now have been downloaded from OneDrive or copied from
+the retained pendrive to the new Desktop. Keep the retained backup untouched
+through recovery verification.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -116,9 +133,10 @@ if (-not (Test-Path -LiteralPath $BackupClone -PathType Container)) { throw 'Ret
 ```
 
 Check every encrypted part after copying the retained bundle back to Desktop.
-For the mandatory **pre-wipe pendrive test**, set `$BackupClone` to the actual
-USB `encrypted` folder instead; read both the hash list and archive bytes from
-that device, not the Desktop or original staging folder:
+For the mandatory **pre-wipe retained-copy test**, set `$BackupClone` to the fresh
+OneDrive download's `encrypted` folder or the actual USB `encrypted` folder;
+read both the hash list and archive bytes from that copy, not the original Desktop,
+sync cache or staging folder. Cross-check against the trusted final backup evidence:
 
 ```powershell
 $HashRecords = @(Get-Content -LiteralPath (Join-Path $BackupClone 'encrypted-backup-sha256.txt') | Where-Object { $_.Trim() })
@@ -133,7 +151,7 @@ foreach ($HashRecord in $HashRecords) {
 
 ### Optional alternative: private GitHub backup
 
-Skip this section for the chosen pendrive recovery. Only if a complete PRIVATE
+Skip this section for OneDrive or pendrive recovery. Only if a complete PRIVATE
 GitHub backup was subsequently uploaded and its fresh download tested, replace
 `$BackupClone` with a new local clone path and use its actual repository name:
 
@@ -156,7 +174,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Git LFS verification failed.' }
 
 ### Check the archive-bound source commit
 
-For either method, cross-check the public manifest against the final pre-wipe
+For every method, cross-check the public manifest against the final pre-wipe
 evidence and checkout the exact archive-bound source:
 
 ```powershell
@@ -181,8 +199,9 @@ private filenames, counts and hashes remain inside the encrypted archive.
 ## Verify encrypted volumes from the retained backup and decrypt interactively
 
 Run the versioned verifier from the exact source checkpoint against the retained
-encrypted folder: the USB folder for the pre-wipe copy test, the new Desktop
-copy after reinstall, or a newly downloaded GitHub clone for that alternative.
+encrypted folder: the fresh OneDrive download or USB folder for the pre-wipe
+copy test, the new Desktop copy after reinstall, or a newly downloaded GitHub
+clone for that alternative.
 It checks every
 allowed file and volume, contiguous part
 numbers, counts, sizes, SHA256, the independent hash file, archive test,
@@ -217,7 +236,9 @@ directories. The preceding verifier checks every recorded private file, not only
 a representative sample, including all 17 SQLite databases and historical WAL
 state. Its safe `remote-verification.local.json` result is written beside the
 backup folder; that filename records the chosen input verification, rather than
-proving a GitHub download. Keep the decrypted checkpoint private.
+proving where the input was downloaded. Record fresh OneDrive download provenance
+separately in the safe final evidence; no sharing URL or access token belongs in Git.
+Keep the decrypted checkpoint private.
 For a separate read-only recheck:
 
 ```powershell
@@ -435,8 +456,8 @@ key destructively before proving all protected data can be read and re-encrypted
 ## Delete the temporary remote repository only after verified recovery
 
 This section applies only to the optional GitHub backup method. No temporary
-GitHub repository exists for the chosen pendrive backup, so there is no remote
-repository to delete and no remote-deletion gate for that method.
+GitHub repository exists for OneDrive or pendrive recovery, so there is no remote
+GitHub repository to delete and no GitHub-deletion gate for those methods.
 
 Keep the temporary GitHub repository until downloaded hashes and decryption,
 SQLite integrity, application records/finance, media, source Git, rebuilt native
@@ -465,9 +486,9 @@ gh api "repos/$BackupRepository"
 Check the web interface as well if deletion/access is ambiguous. An authentication
 failure is not evidence of deletion. Record successful remote deletion.
 
-## Retain the pendrive until ALFRED recovery is verified
+## Retain the OneDrive or pendrive backup until ALFRED recovery is verified
 
-Keep the encrypted USB backup until SQLite integrity, finance/data records,
+Keep the encrypted OneDrive folder or USB backup until SQLite integrity, finance/data records,
 documents/media, Travel state, both required runtime profiles, native queue,
 source Git and the rebuilt native runtime are verified after reinstall. Resolve
 the compromised-key recovery/rotation requirements before discarding their only
