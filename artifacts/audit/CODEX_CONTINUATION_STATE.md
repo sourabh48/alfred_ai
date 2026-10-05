@@ -1,230 +1,193 @@
-﻿# ALFRED CODEX CONTINUATION STATE
+# ALFRED CODEX CONTINUATION STATE
 
 ## Repository
 
 Branch: codex/native-runtime-hardening-20260918
-Base commit: e68e8fd1c49085ed714b315d7982b77a7554b334
-Current commit: HEAD (this documentation checkpoint; resolve exact SHA with git rev-parse HEAD).
-Validated implementation commit: 46113c968b1e6d85d4c0d05cbcfa0270174a5a56; runtime configuration commit: a610ab3.
-Working tree: source, tests, docs and the four selected audit files are committed as this checkpoint; generated runtime data, binaries and raw logs remain ignored/local. User authorized commit/push on 2026-10-01. Delivery target: origin/codex/native-runtime-hardening-20260918 at https://github.com/sourabh48/alfred_ai.git. No release/installer promotion performed.
+Base commit: b4e89742717d0f4ce1d8b6e49ccb7b6b6abde525 (clean starting point for master note).
+Verified engineering source commit: db2f86d4f0101665abb0666a98644f91a3eda5ac, created during pre-Windows preparation on 2026-10-05. It preserves Phase 0/1, M12A/B/C and M13A/B source, migrations, tests and phase documentation. Read `git rev-parse HEAD` for the latest preparation commit.
+Working tree at this checkpoint update: Windows setup, dependency constraints, private-backup scripts, project-local skills and reinstall documents are being finalized. Generated logs, browser proof and private/runtime data remain local/ignored. Safe audit/reinstall documents are now explicitly allowed in Git. No installer promotion.
 
-## Main phase
+## Active pre-Windows task
 
-PHASE 9 Travel Planner, at regression/Windows validation boundary with PHASE 10 release audit. Earlier main phases are preserved, not restarted.
+The user has superseded engineering continuation with pre-Windows-reinstall preparation only. Do not resume M13C or execute post-Windows restoration now. Read `artifacts/reinstall/PRE_WINDOWS_REINSTALL_CHECKPOINT.md`, the setup/checklist files and the generated `artifacts/reinstall/PRE_REINSTALL_FINAL_STATUS.md`. Both native data roots and the historical Docker VHDX need a verified private backup to a user-confirmed untouched destination. The destination and independent GitHub/secret/install-media recovery confirmations were still pending at this update. No actual private backup has been created. `SAFE TO REINSTALL WINDOWS = NO` until the final gate explicitly proves otherwise.
 
-## Travel phase
+The engineering verification entries below retain their historical pre-commit state; they do not override the newer source-preservation commit or active reinstall task.
 
-Expanded user sequence (latest 2026-09-30 brief): TRAVEL PHASE 14 regression checkpoint, with T07 cost remediation now complete. Current T07 source passed travel/backend/browser and source-native checks. Earlier full-suite/frozen proof predates T07; provider-live, clean-machine and eventual updated frozen-release acceptance remain open. Previous checkpoint's TRAVEL 10 frontend/regression maps to expanded phases 12–14; this is a numbering reconciliation, not a restart.
-Phases 1–11 provider/web/discovery/routing/weather/permits/costs/stays/transport/conversation/history implemented with known limitations. Phase 12 frontend implemented and browser-validated. Phase 13 shared cache, leases, budgets and basic telemetry implemented; targeted enrichment/retention/circuit display remain P2. T07 Decimal travel money remediation is complete: existing core cost/bike/provider normalization preserved; itinerary edits/ranges/targets and selected-price string filtering fixed with regression coverage. Deferred T09 telemetry retention/performance is next.
+Additional local changes observed during this continuation: AGENTS.md Graphify guidance, .codex/ skill/hooks and graphify-out/ cache. These were preserved. The required code-graph refresh passed using an isolated temporary helper installation; see Repository housekeeping below. Do not remove or overwrite those local instructions/tool files.
+
+## Active master phase
+
+Master remediation note dated 2026-10-01; resumed 2026-10-05: Phase 0 complete; Phase 1 dependency/tax full gate passed; M12A/B/C implemented and 156 combined finance tests passed. M13A/B Loan currency stages complete: latest full backend 671 passed / 17 browser skips / exit 0, plus 2 separate Chrome workflows passed. Next is scoped M13C Investment register money, followed by remaining M13 domains and M14. This replaces the earlier Travel-only T09 priority. Do not restart completed Travel work or conduct another whole-repository audit.
 
 ## Active subtask
 
-T07 complete and validated. Exact Decimal itinerary discount/range/target handling, compatible decimal-string quote filtering, malformed-evidence guards and bounded quote serialization (28 fractional digits) implemented. Focused 10/0/0; broader travel 95/0/0; Chrome 3/0/0; Django check and source-native offline save/restart/recovery passed. No unfinished edits or pending test processes. No migration, provider selection or key changes. Next independent task: T09 bounded request-telemetry retention. September frozen candidate predates T07 and must be rebuilt before later release promotion.
+M13B is complete. Seventeen ancillary Loan fields now use bounded Decimal cents, with retained related snapshots/reset/migration 0015, exact foreclosure allocation, numeric JSON and history/canonical/tax/document compatibility. Finalized-settlement review cannot overwrite the register; explicit zero cannot infer closure; corrections roll back atomically. Final full backend: 688 run / 671 passed / 17 browser skips / zero failures/errors, 641.053 s, exit 0 at 2026-10-05 15:40:05 +05:30; artifacts/m13b-backend-verified-20261005.log/result JSON. Root sessions 75653 and 75735 are closed. Focused and Chrome evidence is below and in docs/MASTER_M13B_VERIFICATION_20261005.md. Final Graphify refresh passed, 7,220 nodes/18,817 edges; artifacts/m13b-graphify-update-complete-20261005.log/result JSON. No active test/refresh process remains. No operator DB migration, commit or release. Next subtask: M13C Investment register's three currency fields; see Exact next task. All application checks use isolated local-runtime SQLite/locmem and no helper PYTHONPATH.
 
-## Work completed
+## Travel phase
 
-- Git delivery authorized: a610ab3 records isolated runtime configuration; 46113c968b1e6d85d4c0d05cbcfa0270174a5a56 records travel research, frontend, migrations, Decimal fixes and regressions. This following documentation commit preserves the continuation/audit/backlog/provider research in Git. Only those four audit Markdown files are force-added from ignored artifacts; raw logs and runtime/build data stay local. Exact commands/counts remain in tracked verification documents.
+Prior T07 Decimal travel cost work remains complete. The new master note identifies origin/discovery/pagination/mode/alternatives/corridor/detour gaps for targeted remediation after higher-priority financial/security P0s. Prior recorded Travel phases are not proof of the newly expanded requirements. T09 telemetry retention remains open (master Phase 15), followed by scoped invalidation/telemetry (Phase 16).
 
-- T07 continuation: reproduced 2 failures and 1 error before implementation, then fixed half-up stay discount rounding (1006 -> 755), normalized edited per-person budget targets consistently with initial estimates, and made low/high aliases agree for legacy plans without line items. Totals and original emergency buffer preserved.
-- Selected price snapshots accept exact decimal strings, normalize legacy numbers to strings and preserve currency/scope/availability/source/expiry gates. Invalid evidence cannot crash estimated budgets. Quote strings retain precision up to 28 fractional places; excessive exponent expansion raises a visible normalization error instead of allocating huge output. No quote becomes an estimate or booking.
-- Current-state T07 validation: 10 focused passed (6.276 s), 95 travel backend passed (78.424 s), 3 Chrome passed (34.977 s, 44.328 s runner), zero failed/skipped. Django check passed. Source-native offline probe passed with 0.078 s handoff, save/scoped edits and queued work/context through restart. Details: docs/TRAVEL_T07_VERIFICATION_20261001.md.
+## Completed work
 
-- Final durable full backend regression on 2026-10-01 passed 517/0/12 in 562.575 s, exit 0. artifacts/travel-backend-20261001.log and travel-backend-20261001-result.json. Initial PostgreSQL fixture failure fixed by clearing inherited DATABASE_URL in test subprocesses; production guards unchanged. Later interrupted rerun has no success claim. All pre-T07 backend code and test edits validated in that full run.
-
-- Isolated PyInstaller build completed successfully (577.819 s build log clock), assets/private-file inspection passed for 12,637 files. Current assets include final search-link wording. artifacts/ops/travel-candidate-inspection-20260930.json. Candidate ALFRED.exe SHA256 1d3174cf8c9a3ad80063aacd624a8f355537d780c4f07eca086c6ac9c20b9c0c. Frozen offline runtime check passed: 0.078 s handoff, save/scoped edit, queued recovery and saved context through restart; sources 0, weather UNKNOWN. Report artifacts/ops/travel-runtime-frozen-20260930.json; log artifacts/travel-continuation-frozen-20260930.log.
-
-- Read checkpoint before edits, verified branch/HEAD/history/staged/unstaged/untracked files, migrations, test logs, audits/backlog/provider research and docs. Refreshed recovery after latest user steering. artifacts/audit/alfred_engineering_audit.md and alfred_improvement_backlog.md do not exist; docs/COMPLETION_AUDIT.md holds prior main acceptance limitations.
-- Prior browser run had 1 failure/1 error, not pending. Day allowance baseline was captured before hotel research completed; added Ready wait and backend edit/recheck regression. No itinerary implementation change needed for that failure.
-- Browser runner's existing isolated file SQLite resolves the prior in-memory cross-thread API misuse. 12 Chrome workflows pass, zero skips, including document/user-data tests and 3 travel workflows; desktop map/mobile screenshots inspected.
-- Staff usage/config panel now includes all implemented weather/flight/web/discovery categories, no credentials. Upgrade preservation test now targets migration 0012.
-- Map preserves pan/zoom for unchanged geometry, fits without animation, reports tiles disabled. Browser route fixture verifies actual LineString, marker dimensions and disabled tile requests.
-- config/local.env is now loaded for selected source/native data directory. Process environment > local.env > legacy .env. Native config/native.env signing secrets remain authoritative. Native backend selected BEFORE importing package helper, avoiding Celery initialization.
-- Source-native offline verification passed: migrations, 0.078-second research handoff, saved/scoped edits and queued work/context through restart. Zero checked sources, all weather UNKNOWN. No live inventory claim.
-- Latest user wording implemented for unchecked links: 'Search link — open to check latest availability.' Static references have a separate source-verification label. JS syntax passed; focused browser rerun passed 3 tests, 0 failed, 0 skipped in 35.365 s.
-- Reconciled T07 against source: money.py, Decimal core costs/bike values and decimal-string Duffel prices were already implemented before this continuation. Those remaining itinerary-edit calculations and quote filtering were subsequently fixed by the T07 continuation above; earlier recovery had preserved the existing monetary code.
-- No unfinished function/class/TODO found in targeted scan. Provider base abstract normalize is intentional; URL/date exception fallbacks retain safe unknown/reference behavior.
+- Master M00: tray test now expects guide.resolve().as_uri(); production unchanged. 7 tray and 32 native/recovery tests passed.
+- Master M01A: official current 6.0-series release verified on 2026-10-01; requirements and PyCharm venv updated from Django 6.0 to 6.0.8. System/migration checks and 53 settings/auth/finance tests passed. Resumed full gate passed 543 with 13 skips.
+- Master M01B: immutable versioned Decimal tax policy for FY 2025-26 / AY 2026-27; corrected new-regime slabs/rebate, cess ordering, rebate/surcharge marginal relief, residency/age/income-type handling, bounds/invalid-input checks, explicit unsupported-year errors and official metadata. API/cache/UI use explicit year; comparison and savings use the same income; payment deductions use selected FY. Legacy wrong static reference preserved but deactivated after replacement. 54 domain tests and one targeted Chrome test passed; screenshot inspected.
+- Added master backlog (all requested phases, reported gaps not presumed fixed). Exact commands, sources, limitations and failed-attempt history: docs/MASTER_PHASE01_VERIFICATION_20261001.md.
+- Master M12A: loan-level estimated/review/confirmed state, provenance and confirmation timestamp; explicit owner confirmation with complete terms; unconfirmed loans excluded from canonical debt, EMI, home proxies and direct loan advisories. Payment matching cannot confirm guessed terms or restore a pre-confirmation balance. Owned bureau evidence remains supported; missing EMI does not inherit a guess. Migration 0013 backfills safely without changing monetary values/history. 89 domain/migration tests and one Chrome workflow passed. Exact evidence and limitations: docs/MASTER_M12A_VERIFICATION_20261001.md.
+- M12A follow-up: parser retains explicit balance presence; legacy default zero requires review. Migration confirmation now requires matching raw/sync/loan identity and supported retained terms. User-created explicit current balances get a timestamp; unknown bureau EMI permits metadata edits while submitted zero remains invalid. 5 evidence/migration + 4 API tests passed, followed by the final combined 156-test gate.
+- Master M12B: every usage type counts positive recorded market value as an estimated asset; confirmed Loan ledger debt counted once; costs/income do not manufacture asset values or liabilities. Net-worth vehicle cache revision and API aliases updated, all-history costs labelled separately. Catalog updates preserve omitted owner financial values and explicit zeros. Initial 77-test run exposed this reset; fix passed 21 targeted tests and final combined gate. Chrome passed (9.374 s), screenshot inspected. Exact evidence: docs/MASTER_M12B_VERIFICATION_20261001.md.
+- Master M12C: month 0 recorded value; exact elapsed-month SIP/growth; 13 points 0..12; beginning-of-month contribution and rate assumptions explicit; growth cache version/local month anchor. 20 targeted tests passed, followed by final combined gate. Chrome passed (13.817 s), actual Chart.js values checked and screenshot inspected. Exact evidence: docs/MASTER_M12C_VERIFICATION_20261001.md.
+- Master M13A: seven Loan register fields use bounded Decimal cents with HALF_UP; numeric API output, exact register posting/home arithmetic, cache revisions and nullable zero semantics preserved. Migration 0014 retains source money/owner identity, applies once and reverses unchanged values without losing later edits. Data reset removes owned snapshots including orphans. Targeted migration/field/runtime/reset checks, 2 Chrome workflows and final whole-backend gate passed (628 passed, 16 browser skips, exit 0). The gate also corrected an old Decimal/float assertion and Travel usage's UTC/local-day mismatch, with deterministic midnight coverage. No operator DB migration. Exact evidence: docs/MASTER_M13A_VERIFICATION_20261005.md.
+- Master M13B: remaining 17 Loan-domain currency fields use the same bounded cents boundary. Migration 0015 retains raw values/linkage, applies once, guards rollback and owner reset, and reports child/register rounding differences without rewriting the register. Computed foreclosure allocation conserves each component and transaction; preserved history may retain different component amounts. Finalized evidence makes reconciliation repeat-safe and prevents review from erasing settlement state. Explicit accepted/requested zero cannot infer an unfinalized closure; later corrections do not reverse an already posted settlement. Numeric API/cache/canonical/tax/document boundaries and atomic correction passed focused gates, 2 distinct Chrome workflows and the final whole backend (671 passed / 17 browser skips / exit 0). Career DNS-only fixture repair also passed without changing runtime URL validation. Exact evidence/limits: docs/MASTER_M13B_VERIFICATION_20261005.md.
+- Prior T07: exact itinerary discount/range/target and quote-string fixes; 95 travel tests, 3 Chrome tests, Django check and source-native offline/restart verification passed. See docs/TRAVEL_T07_VERIFICATION_20261001.md. No redo.
+- Prior source/native config precedence, durable recovery, travel source/freshness/map/provider work remains. See docs/TRAVEL_CONTINUATION_VERIFICATION_20260930.md. Prior frozen candidate predates T07 and this master remediation.
 
 ## Files changed
 
-Latest T07 continuation: apps/mobility/services/travel_itinerary.py, travel/costs.py, travel/money.py; tests/test_travel_planner.py, tests/test_travel_providers.py; docs/TRAVEL_PLANNER.md, TRAVEL_PROVIDERS.md, TRAVEL_CONTINUATION_VERIFICATION_20260930.md, new TRAVEL_T07_VERIFICATION_20261001.md; audit/backlog/checkpoint.
-Previous continuation: alfred_ai/local_config.py (new), alfred_ai/settings.py, alfred_native.py; apps/mobility/planner_views.py; static/js/travel_research_panels.js; tests/test_local_config.py (new), test_travel_continuation.py, test_travel_planner.py, test_travel_planner_browser.py, test_production_readiness_contracts.py; docs/TRAVEL_PLANNER.md, TRAVEL_PROVIDERS.md, TRAVEL_RELEASE_VERIFICATION_20260929.md, new TRAVEL_CONTINUATION_VERIFICATION_20260930.md; audit/backlog/checkpoint.
-Preserved prior edits: shared public_http/url_safety, mobility models/URLs/catalog/conversation/discovery/itinerary/research/provider package, migrations 0010–0012, JS/CSS/templates, Leaflet assets, packaging checks, provider/http/web tests. Use git status for complete inventory. artifacts/ remains ignored except the four explicitly tracked audit Markdown files. Keep generated proof logs/binaries/private runtime data local; test commands/counts are recorded in tracked docs. Never commit runtime data/secrets.
+M13A additionally: apps/loans/money.py and migrations/0014_loan_money_decimal.py (new); Loan model/snapshot, serializers, loan_intelligence/payment_review/views updates; loan_foreclosure_service.py; financial_intelligence.py/financial_relationships.py; bureau/credit/integrations tax/voice updates; apps/users/services.py reset. New tests/test_loan_money_field.py, test_loan_money_migration.py, test_loan_money_runtime.py, test_loan_money_retention.py; docs/MASTER_M13A_VERIFICATION_20261005.md. Gate follow-up: travel/cache.py usage local date and tests/test_travel_providers.py midnight coverage; test_loan_lifecycle_and_reports.py exact Decimal assertions.
 
-## Migrations created
+M13B additionally: migrations/0015_related_loan_money_decimal.py, LoanRelatedMoneySnapshot and 17 fields; shared Loan serializers/runtime/foreclosure/parser, financial_intelligence, tax_optimizer, user reset, document_review and public correction API; tests/test_related_loan_money_migration.py, test_loan_foreclosure_money.py, test_loan_related_money_runtime.py, expanded field/runtime/browser checks and fixed historical migration-test target states. docs/MASTER_M13B_PLAN_20261005.md records scope; docs/MASTER_M13B_VERIFICATION_20261005.md records actual evidence. See git status for exact dirty inventory.
 
-No new migration in this continuation. Existing:
-0010_travel_provider_evidence: metadata/provider state/request telemetry.
-0011_destination_history: owner-scoped history.
-0012_travel_bus_mode: transport choice.
-Read-only checkout: 0001–0009 applied; 0010–0012 pending. Applied successfully in isolated test and source-native databases. No real user runtime database migrated; disposable source and frozen runtime databases migrated successfully.
+M13B full-gate follow-up: tests/test_career_recruiter_and_evidence.py mocks public DNS alongside the existing mocked page responses, avoiding live lookup failures. Production URL validation is unchanged. apps/loans/money.py docstring now reflects its related-field use; behavior unchanged.
 
-## Tests run
+requirements.txt; apps/ml_engine/services/tax_policy.py (new), tax_optimizer.py; apps/integrations/views.py and services/verified_intelligence.py; templates/integrations/tax_optimizer.html; static/js/tax_optimizer.js; tests/test_native_tray.py, test_tax_policy.py (new), test_user_data_browser.py; docs/MASTER_PHASE01_VERIFICATION_20261001.md (new); this checkpoint and ALFRED_DEEP_REVIEW_BACKLOG.md (new).
 
-Interpreter: F:\ALFRED\.venv\Scripts\python.exe (PyCharm Python 3.12.2). Before EVERY Python invocation call get_python_environment(filePath="manage.py").
-Isolated validation environment:
-ALFRED_LOCAL_RUNTIME=true; ALFRED_AUTO_TRAIN_ON_STARTUP=false;
-ALFRED_DATA_DIR=F:\ALFRED\artifacts\travel-validation-config-20260930;
-DATABASE_URL=sqlite:///:memory:;
-CACHE_BACKEND=django.core.cache.backends.locmem.LocMemCache;
-CACHE_LOCATION=alfred-validation.
-ALFRED_RUN_BROWSER_TESTS=false for backend; browser runner enables true and alfred_ai.browser_test_settings.
+M12A additionally: apps/loans/models.py, serializers.py, views.py, services/loan_intelligence.py, payment_review.py, migrations/0013_loan_verification.py (new); apps/expenses/services/financial_intelligence.py; apps/integrations/services/credit_loan_sync.py, credit_score_tracker.py; apps/ml_engine/services/recommendation_engine.py, voice_assistant.py; templates/loans/list.html; static/js/loans.js; tests/test_loan_lifecycle_and_reports.py, test_loan_verification.py (new); docs/MASTER_M12A_VERIFICATION_20261001.md (new). Also updates the shared integrations/tax/browser files above. Use git status for the exact current inventory.
 
-Command: manage.py test tests.test_travel_planner.TravelPlannerTests.test_day_edit_after_hotel_research_survives_recheck tests.test_travel_planner.TravelPlannerTests.test_relax_one_day_retains_other_days tests.test_travel_continuation tests.test_travel_web tests.test_travel_http --noinput --verbosity 1
-Result: OK, 3.757 s; artifacts/travel-resume-focused-20260930.log.
-Passed: 25
-Failed: 0
-Skipped: 0
+M12A/B follow-up: credit_report_parser.py; tests/test_bureau_balance_evidence.py and test_loan_verification_api.py (new); apps/mobility/views.py; alfred_ai/services/calculation_risk.py; static/js/expenses.js; templates/expenses/list.html; tests/test_vehicle_accounting.py (new), test_document_center_and_statement_import.py; docs/MASTER_M12B_VERIFICATION_20261001.md (new). M12C: apps/investments/views.py, templates/investments/list.html, tests/test_investment_projection.py and docs/MASTER_M12C_VERIFICATION_20261001.md (new), plus shared browser test.
 
-Command: manage.py test tests.test_travel_continuation tests.test_travel_planner.TravelMigrationTests --noinput --verbosity 1
-Result: OK, 2.599 s; artifacts/travel-resume-usage-migration-20260930.log.
-Passed: 9
-Failed: 0
-Skipped: 0
+## Migrations
 
-Command: manage.py test tests.test_local_config tests.test_native_runtime tests.test_platform_hardening.SettingsHardeningTests --noinput --verbosity 1
-Result: OK, 0.599 s; artifacts/travel-resume-config-20260930.log.
-Passed: 11
-Failed: 0
-Skipped: 0
+Created loans/0013 verification, 0014 Loan-register Decimal currency/snapshot and 0015 related Loan currency/snapshot migrations. Upgrade, reconciliation, repeat-safe application and edit-preserving rollback validated on disposable SQLite databases only, including a nondefault alias for 0015. No migration applied to a user database. Model/migration drift check passed. Existing mobility 0010-0012 were previously validated in isolated runtimes; older user database status unchanged. Other monetary-domain stages remain pending.
 
-Command: scripts/run_browser_regressions.py --browser Chrome --require-browser --artifact-dir artifacts/browser-all-isolated-20260930 --proof-label all-isolated-20260930
-Result: OK, 101.572 s (runner 111.016 s). artifacts/travel-resume-isolated-browser-20260930.log and browser-all-isolated-20260930/browser_regression_summary.json. Predates final search-link wording only.
-Passed: 12
-Failed: 0
-Skipped: 0
+## Focused tests
 
-Command: manage.py test --noinput --verbosity 2
-Result: 529 run, 631.591 s; artifacts/travel-continuation-backend-20260930.log. One failure: production-settings subprocess inherited DATABASE_URL=sqlite:///:memory:. Fixture isolation fix made; focused rerun passed. Later rerun interrupted; durable 20261001 rerun subsequently passed 517/0/12 (below). Earlier verbosity 1 run interrupted without summary.
-Passed: 516
-Failed: 1
-Skipped: 12 (browser cases intentionally disabled)
+Interpreter: F:\ALFRED\.venv\Scripts\python.exe, PyCharm Python 3.12.2, pip. MUST get_python_environment(filePath="manage.py") before every Python invocation.
 
-Command: scripts/run_browser_regressions.py tests.test_travel_planner_browser --browser Chrome --require-browser --artifact-dir artifacts/browser-travel-label-20260930 --proof-label travel-label-20260930
-Result: OK, 35.365 s; artifacts/travel-resume-browser-label-20260930.log.
-Passed: 3
-Failed: 0
-Skipped: 0
+Isolated backend variables: ALFRED_LOCAL_RUNTIME=true; ALFRED_AUTO_TRAIN_ON_STARTUP=false; ALFRED_DATA_DIR=F:\ALFRED\artifacts\master-validation-20261001; DATABASE_URL=sqlite:///:memory:; CACHE_BACKEND=django.core.cache.backends.locmem.LocMemCache; CACHE_LOCATION=alfred-master-validation; ALFRED_RUN_BROWSER_TESTS=false. Browser runner selects isolated file SQLite; browser data dir master-browser-validation-20261001. Do not load the operator's real config/local.env for validation.
 
-Command: scripts/verify_travel_runtime.py --report artifacts/ops/travel-runtime-isolated-20260930.json
-Result: passed=true, source-native disposable data, providers disabled. artifacts/travel-resume-native-final-20260930.log. Startup/migrations, save/edit, queued recovery and persisted context passed; not a unit-test count.
+Command: -m unittest tests.test_native_tray -v
+Passed: 7; Failed: 0; Skipped: 0; 0.033 s. artifacts/phase0-tray-20261001.log.
+Command: manage.py test tests.test_native_tray tests.test_native_runtime tests.test_native_launcher tests.test_native_observation tests.test_durable_queue --noinput --verbosity 1
+Passed: 32; Failed: 0; Skipped: 0; 2.209 s. artifacts/phase0-native-20261001.log.
+Command: manage.py test tests.test_auth_pages tests.test_platform_hardening tests.test_production_readiness_contracts tests.test_local_config tests.test_financial_baseline_alignment tests.test_financial_relationships --noinput --verbosity 1
+Passed: 53; Failed: 0; Skipped: 0; 48.544 s. artifacts/phase1-django-regression-20261001.log.
+Command: manage.py test tests.test_tax_policy tests.test_remaining_task_closures.TaxDeductionTests tests.test_financial_baseline_alignment tests.test_advisory_evidence_freshness tests.test_operational_hardening tests.test_application_smoke --noinput --verbosity 1
+Passed: 54; Failed: 0; Skipped: 0; 32.608 s. artifacts/phase1-tax-domain-final-20261001.log.
+Command: scripts/run_browser_regressions.py tests.test_user_data_browser.UserDataBrowserTests.test_tax_planning_uses_selected_year_and_income --browser Chrome --require-browser --artifact-dir artifacts/browser-tax-policy-20261001 --proof-label tax-policy-20261001
+Passed: 1; Failed: 0; Skipped: 0; 10.724 s (19.672 s runner). Screenshot inspected. artifacts/phase1-tax-browser-20261001.log.
+Command: manage.py check; manage.py makemigrations --check --dry-run (separate invocations with environment preflight)
+Passed: both exit 0, no issues/drift. artifacts/phase1-check-20261001.log and phase1-migrations-20261001.log.
+Command: node --check static/js/tax_optimizer.js; git diff --check
+Passed: both exit 0.
 
-Command: manage.py makemigrations --check --dry-run
-Result: no changes detected, exit 0; artifacts/travel-resume-final-migrations-20260930.log. Earlier read-only showmigrations output: artifacts/travel-resume-migrations-20260930.log.
-Command: manage.py check
-Result: exit 0, no issues; artifacts/travel-resume-django-check-20260930.log.
-Command: node --check static/js/travel_research_panels.js; node --check static/js/travel_planner.js
-Result: passed. Python compileall and normal git diff --check also passed (do not disable autocrlf for check; that incorrectly treats CRLF as whitespace).
+Earlier failed attempts: initial tax test had a cold reference-cache fixture failure; first domain run found stale legacy-reference refresh behavior (fixed); a follow-up fixture omitted stale_after (fixed). Final domain run above passed all 54 including these regressions. Do not count failed attempts as passing evidence.
 
-Historical/failed attempts preserved: prior browser 0 passed/1 failed/1 error/0 skipped, 39.324 s; first recovered rerun 2 passed, 27.886 s; expanded staff fixture 2 passed/1 error (budget omitted, fixed). Early full run interrupted after loader changed. Post-loader DB setup failed before tests, then cache-error runs interrupted. Native first attempt failed from early Celery import; fixed and rerun passed. These attempts are NOT passing full regressions.
+M12A command: manage.py test tests.test_loan_verification tests.test_loan_lifecycle_and_reports tests.test_financial_baseline_alignment tests.test_financial_relationships tests.test_document_center_and_statement_import tests.test_remaining_task_closures tests.test_tax_policy --noinput --verbosity 1
+Passed: 89; Failed/Skipped: 0; 48.680 s; exit 0. artifacts/m12a-domain-final-20261001.log and result JSON. Data dir loan-validation-20261001; otherwise same isolated variables. System check, migration drift, node --check static/js/loans.js, and git diff --check also passed. Initial migration-test historical user-state error was fixed; earlier 88-domain run also passed. Chrome workflow passed (11.179 s) after a stale live-refresh button click was handled by bounded retry; final screenshot proof is recorded in the M12A verification note.
 
-Command: manage.py test tests.test_production_readiness_contracts tests.test_local_config tests.test_native_runtime tests.test_platform_hardening.SettingsHardeningTests --noinput --verbosity 1
-Result: OK, 2.964 s; artifacts/travel-continuation-config-final-20260930.log. Production guards unchanged; both production-setting fixtures explicitly isolate DATABASE_URL.
-Passed: 23
-Failed: 0
-Skipped: 0
+Final M12A/B/C command: manage.py test tests.test_loan_verification tests.test_loan_verification_api tests.test_bureau_balance_evidence tests.test_vehicle_accounting tests.test_mobility_vehicle_dashboard tests.test_loan_lifecycle_and_reports tests.test_financial_baseline_alignment tests.test_financial_relationships tests.test_document_center_and_statement_import tests.test_remaining_task_closures tests.test_tax_policy tests.test_calculation_risk_snapshot tests.test_user_data_acceptance tests.test_investment_projection tests.test_investment_and_relationship_advisory --noinput --verbosity 1
+Passed: 156; Failed/Skipped: 0; 120.950 s; exit 0, finish 23:46:30 +05:30. artifacts/m12-finance-final-20261001.log and result JSON. Data dir finance-m12-validation-20261001; local runtime true, startup training false, in-memory DB, locmem cache. Final system/drift checks clear in m12-finance-check/migrations-20261001.log. Node syntax checks for expenses/loans/investments and whitespace check clear. Intentional mocked database-lock traceback is passing resilience coverage.
+Vehicle Chrome: 1 passed / 0 skips, 9.374 s, exit 0; artifacts/m12b-browser-20261001.log and browser-vehicle-accounting-20261001 summary. Projection Chrome: 1 passed / 0 skips, 13.817 s, exit 0; artifacts/m12c-browser-20261001.log and browser-investment-projection-20261001 summary. Both screenshots inspected. Projection narrow 20-test log has mistaken 20261002 filename suffix; actual run was Oct 1, and the final combined gate uses the correct suffix/standard flags.
 
-Command: -m PyInstaller packaging/ALFRED.spec --noconfirm --distpath artifacts/travel-candidate-20260930/dist --workpath artifacts/travel-candidate-20260930/build
-Result: exit 0, 577.819 s build log clock; artifacts/travel-continuation-build-20260930.log. inspect_bundle passed current assets and private-file exclusions (12,637 files), artifacts/ops/travel-candidate-inspection-20260930.json. No installer/release promotion.
+## Full-suite evidence
 
-Command: scripts/verify_travel_runtime.py --executable artifacts/travel-candidate-20260930/dist/ALFRED/ALFRED.exe --report artifacts/ops/travel-runtime-frozen-20260930.json
-Result: passed=true, disposable frozen runtime, providers disabled; artifacts/travel-continuation-frozen-20260930.log. Startup/migrations, 0.078 s handoff, saving/scoped edits, queued recovery and saved context passed. Zero live sources, weather UNKNOWN.
+Current M13B final gate: manage.py test --noinput --verbosity 1; 688 run, 671 passed, 17 disabled-browser skips, zero failures/errors, 641.053 s; exit 0 at 2026-10-05 15:40:05 +05:30. artifacts/m13b-backend-verified-20261005.log and result JSON. All M13A/B application paths and the deterministic Career fixtures are covered. Data dir related-loan-backend-verified-validation-20261005, memory SQLite, locmem; no operator configuration/helper PYTHONPATH. Initial M13B attempt: 688 run / 669 passed / 17 skipped / 2 Career fixture DNS errors, 746.737 s, exit 1; artifacts/m13b-backend-final-20261005.log/result JSON. The five-test Career module passed after fixture repair and the final full rerun cleared both errors. Do not count the initial attempt as passing evidence.
 
-Command: F:\ALFRED\.venv\Scripts\python.exe manage.py test --noinput --verbosity 2
-Result: OK, 529 run in 562.575 s, 588.422 s wrapper wall time, exit 0. artifacts/travel-backend-20261001.log; exit/duration evidence artifacts/travel-backend-20261001-result.json. Executed under documented isolated variables by hidden powershell.exe -NoProfile -ExecutionPolicy Bypass -File F:\ALFRED\artifacts\run-travel-backend-20261001.ps1. Process finished; do not resume or duplicate it. Prior artifacts/travel-continuation-backend-final-20260930.log was interrupted before summary and is not passing evidence.
-Passed: 517
-Failed: 0
-Skipped: 12 (Selenium cases; all passed in separate Chrome suite)
+M13A gate: manage.py test --noinput --verbosity 1; 644 run, 628 passed, 16 disabled-browser skips, zero failures/errors, 617.345 s; exit 0 at 2026-10-05 06:14:12 +05:30. artifacts/m13-loan-backend-final-20261005.log and result JSON. This includes M12A/B/C and M13A runtime changes, final migration-marker/field/reset tests, exact-value assertion and Travel midnight fix, and predates the new M13B changes. Earlier initial M13A run: 643 run, 625 passed, 16 skipped, one failure/error each, 639.053 s, exit 1; artifacts/m13-loan-backend-20261005.log and result JSON. Fixes passed targeted tests and the final whole gate; do not count the first attempt as passing.
+Master Phase 1: original run interrupted with no summary/result and no surviving process. Resumed manage.py test --noinput --verbosity 2 completed: 556 run, 543 passed, 13 skipped, 0 failed; 576.488 s; exit 0 at 2026-10-01 18:36:16 +05:30. Evidence artifacts/phase1-backend-gate-resumed-20261001.log and phase1-backend-gate-resumed-20261001-result.json. This predates M12A/B/C runtime changes; the current gate above supplies whole-backend evidence for them and M13A.
+Historical pre-T07 full backend: 529 run, 517 passed/0 failed/12 skipped, 562.575 s, exit 0; artifacts/travel-backend-20261001.log and result JSON. Historical 12 Chrome workflows passed separately. These predate current changes.
+Historical frozen build/offline runtime: 12,637 inspected files, private-file scan passed; frozen offline handoff 0.078 s, save/edit/restart/queue recovery passed, zero live sources. SHA256 1d3174cf8c9a3ad80063aacd624a8f355537d780c4f07eca086c6ac9c20b9c0c. September candidate does not contain T07 or master remediation; do not promote it as current.
 
-Command: manage.py test tests.test_travel_planner.TravelPlannerTests.test_budget_edit_rounds_half_up_and_preserves_totals tests.test_travel_planner.TravelPlannerTests.test_edit_normalizes_decimal_budget_target_like_initial_budget tests.test_travel_providers.TravelCostBikeTests.test_current_quote_preserves_decimal_precision_without_replacing_estimates --noinput --verbosity 1
-Result: expected pre-fix regression reproduction, 3.070 s; artifacts/travel-t07-before-20261001.log.
-Passed: 0
-Failed: 2 assertion failures + 1 error
-Skipped: 0
+## Travel status
 
-Command: manage.py test tests.test_travel_providers.TravelCostBikeTests tests.test_travel_planner.TravelPlannerTests.test_budget_edit_rounds_half_up_and_preserves_totals tests.test_travel_planner.TravelPlannerTests.test_edit_normalizes_decimal_budget_target_like_initial_budget tests.test_travel_planner.TravelPlannerTests.test_budget_edit_decreases_cost tests.test_travel_planner.TravelPlannerTests.test_day_edit_after_hotel_research_survives_recheck --noinput --verbosity 1
-Result: OK, 6.276 s; artifacts/travel-t07-focused-20261001.log.
-Passed: 10
-Failed: 0
-Skipped: 0
+Dynamic origin: M02 explicit/default/bare-city and around semantics pending focused remediation.
+Dynamic discovery: existing Wikivoyage provider; master dynamic-first/fallback behavior pending.
+Candidate pool: M03 >3 pool not yet verified/remediated.
+Pagination: M03 durable batches/show-more pending.
+Primary route: existing ORS implementation; M04 mode resolution pending.
+Alternative routes: structural support exists; M05 actual provider alternatives pending.
+Selected route: M05 persistence/scoped recalculation pending.
+Route POIs: M07 route-corridor implementation pending.
+50-km detour: M07 actual road-detour verification pending.
+Map: existing Leaflet geometry/markers/pan work preserved; master route selection/layer matrix pending.
+Weather: existing Open-Meteo/freshness/horizon guards; M09 focused reconciliation pending.
+Hotels: opt-in authorized Duffel stays; unverified external search links labelled; no new live proof.
+Flights: opt-in Duffel; estimates separate; no new live proof.
+Trains: live inventory unverified; official links only.
+Buses: live inventory unverified; external links only.
+Permits: authority/reference trust guards preserved; no new live checks.
+Caching: shared cache/lease/quota work exists; retention/scoped invalidation/circuit telemetry pending.
 
-Command: manage.py test tests.test_travel_providers tests.test_travel_planner tests.test_travel_continuation tests.test_travel_http tests.test_travel_web --noinput --verbosity 1
-Result: OK, 78.424 s; artifacts/travel-t07-backend-20261001.log.
-Passed: 95
-Failed: 0
-Skipped: 0
+## Finance status
 
-Command: scripts/run_browser_regressions.py tests.test_travel_planner_browser --browser Chrome --require-browser --artifact-dir artifacts/browser-travel-t07-20261001 --proof-label travel-t07-20261001
-Result: OK, 34.977 s, 44.328 s runner; artifacts/travel-t07-browser-20261001.log and artifacts/browser-travel-t07-20261001/browser_regression_summary.json.
-Passed: 3
-Failed: 0
-Skipped: 0
+Tax: FY 2025-26 / AY 2026-27 ordinary-income Decimal engine and tests implemented. All other FY/AY rejected; no claim to implement TY 2026-27 or complete filed-return rules. Dashboard explicitly assumes resident/under-60/salary. Automatic deduction leads and HRA/home-loan/action eligibility still need focused work (M01C); planning assumptions labelled.
+Money Decimal migration: Travel T07 calculations complete. M13A/B cover 24 Loan-domain currency fields in source and disposable SQLite; originals/linkage retained, numeric JSON preserved, exact runtime allocation and finalized settlement guards implemented. M13B focused gates, 2 distinct Chrome workflows and final full backend (671 passed / 17 browser skips / exit 0) passed. Next M13C Investment register has three currency fields; Expense/BankAccount normalization requires a later dedicated deduplication/source-evidence stage. No operator database migration.
+Loan detection: M12A implemented; estimated/review loans remain visible but do not count toward debt/EMI/home proxies. Explicit owner confirmation or supported owned raw bureau evidence is required. Parser missing/explicit-zero evidence is preserved. Migration 0013 preserves values/history and is test-validated only. Payment-level acceptance is distinct from loan verification. Full M12A evidence is in its verification note.
+Vehicle net-worth semantics: M12B implemented; recorded positive market-value estimate is an asset for all usage types; actual confirmed loans count once; operating costs remain separate. Owner values survive catalog edits. Focused vehicle/mobility/browser and combined finance gates passed; no schema change or user DB migration.
+Investment projections: M12C implemented; exactly months iterations; month0 recorded value, 0..12 elapsed months, beginning-of-month SIP and entered annual rate/1200 assumptions, month-aware/versioned cache. Domain/browser and combined finance gates passed.
 
-Command: manage.py check
-Result: no issues, exit 0; artifacts/travel-t07-check-20261001.log. git diff --check passed.
-Command: scripts/verify_travel_runtime.py --report artifacts/ops/travel-t07-source-runtime-20261001.json
-Result: passed=true, disposable source-native data; providers disabled using the exact variables in docs/TRAVEL_CONTINUATION_VERIFICATION_20260930.md. Startup/migrations, save/scoped edits, queued recovery and saved context passed; 0.078 s handoff, zero sources, weather UNKNOWN. artifacts/travel-t07-native-20261001.log. No real data migrated. This is source proof, not an updated frozen-bundle proof.
+## Security status
 
-## Providers implemented
-
-Open-Meteo geocoding/weather, ORS routing, authorized Overpass, dated official permit references, opt-in Duffel stays/flights, explicit unavailable rail/bus inventory, Wikivoyage discovery/search, optional Brave/SearXNG, external links. Secure shared pinned HTTPS transport, cache/normalization/error contracts remain. No booking/payment actions.
-
-## Providers researched
-
-Existing dated 29/30 September review: artifacts/audit/TRAVEL_PROVIDER_RESEARCH.md, docs/TRAVEL_PROVIDERS.md. No new paid-provider choice or pricing claim made this continuation. Public Nominatim/shared Overpass not default; Amadeus rejected in prior verified research. Recheck current official terms before any new paid-provider choice.
-
-## API keys required
-
-TRAVEL_USE_MODE=personal_noncommercial OR licensed TRAVEL_OPEN_METEO_API_KEY;
-TRAVEL_ORS_API_KEY; authorized public HTTPS TRAVEL_OVERPASS_URL;
-TRAVEL_DUFFEL_API_KEY + Stays access + TRAVEL_DUFFEL_ALLOW_PAID_SEARCH=true;
-TRAVEL_BRAVE_API_KEY + TRAVEL_BRAVE_STORAGE_ALLOWED=true + TRAVEL_BRAVE_ALLOW_PAID_SEARCH=true;
-OR authorized public HTTPS TRAVEL_SEARXNG_URL + TRAVEL_SEARXNG_TERMS_CONFIRMED=true.
-Rail/bus inventory require actual authorized API agreements, not guessed keys.
-Secrets only untracked runtime config/local.env. No key required for wiki; TRAVEL_WEB_ENABLED=false disables wiki calls. Map tiles opt-in; empty TRAVEL_MAP_TILE_URL disables tiles.
-
-## Current live capabilities
-
-No new keyed live proof. Prior no-key Wikivoyage check returned 20 normalized destination guides; artifacts/travel-wikivoyage-live-20260930.log. Search results are leads, not verified rules/inventory. No current hotel/rail/flight/bus availability validated. No paid searches.
-
-## Current cached capabilities
-
-VerifiedExternalInsight reuse, leases/budgets, original timestamps, stale fallback. Geocoding 90d, routing 5d, weather 2h, POIs 7d, wiki destinations 14d, web leads 6h (inventory topics 30min), hotel/flight 15min capped by offer expiry, permits 6–24h. Read-time ageing and action-time weather guards. Cache never LIVE.
-
-## Current estimated-only capabilities
-
-Trip budgets, fallback distance/duration, fuel/tolls/activity/public-transport allowances. No fabricated seats/rooms/access legality. Core costs already use Decimal arithmetic with whole-rupee estimates; provider prices use decimal strings. T07 fixed itinerary edit discounts/ranges/targets and exact selected quote filtering; planning values stay ESTIMATED and quotes remain separate evidence. No ledger schema change made here.
+HTTP: shared Travel public-HTTPS transport preserved; remaining Career/direct fetch paths reported unsafe (M14A), pending.
+Uploads: existing document/OCR/privacy protections preserved; master central resource-cap requirements pending.
+Passwords: M14B standard validators pending focused remediation.
+Authentication: M14C-D BasicAuthentication/TLS and scoped throttles pending.
+Privacy: family opt-in defaults and explicit source-retention modes pending reconciliation (M14G-H).
+Token encryption: current encryption exists; verified re-encryption/key retirement workflow pending (M14I).
+Django: patched to 6.0.8; Phase 1 full regression passed (543 passed / 13 skipped).
 
 ## Remaining P0
 
-None confirmed; no claim of complete security certification.
+M13 staged monetary storage; M14 HTTP/auth/upload/error/privacy/key-rotation gaps. User note reports these; only targeted reads were made, and no blanket security/finance completion is claimed. Core M01B and M12A/B/C implemented; complete tax deduction evidence/eligibility tracked separately as M01C.
 
 ## Remaining P1
 
-No confirmed unresolved P1 code defect after current automated suite. Acceptance remains: keyed/licensed provider live checks; valid DB/cache configuration before source startup with the operator's existing local.env; clean second-PC/installer/LAN and manual acceptance tracked in docs/COMPLETION_AUDIT.md. Source and frozen native offline acceptance passed. No release/installer promotion performed. The September frozen candidate predates T07; rebuild/reverify before any release promotion. These external/configuration limits do not block independent T09 work.
+M02-M10 expanded Travel behavior/test matrix; M01C tax deduction provenance/eligibility; M12D planning assumptions; dependency/package reproducibility; master CI/protection; new frozen/clean-second-PC/installer/LAN/manual release acceptance. Phase 1 full gate passed; final master release gate and remote CI remain pending.
 
 ## Remaining P2
 
-T07 complete. T09 targeted enrichment, telemetry retention/cache miss/circuit display; T12 legacy non-travel HTTP migration. Broader language, clean second-PC/LAN/manual screen-reader and real-data ML validation remain. Existing typed preferences/pillion/scoped edit changes already pass; do not reimplement.
+M15 bounded Travel telemetry retention preserving current-month quota/active rows and all evidence/plans/history. M16 scoped enrichment/invalidation and telemetry. M17 unsupported experimental ML exclusion. No obsolete “no remaining P0” claim from the old Travel checkpoint applies to the master note.
 
-## Blockers
+## API keys required
 
-Missing provider keys/licensing affect only related live checks. Existing checkout config/local.env contains previously unused PostgreSQL/Redis targets that failed resolution; file untouched. Always use isolated validation variables above. Do not start source Django against that file without explicit valid local overrides. Native uses its own SQLite/disk cache/Huey. No external calls in CI/mocked tests.
+No keys needed for current tax/financial work. Existing Travel configuration: TRAVEL_USE_MODE=personal_noncommercial or licensed TRAVEL_OPEN_METEO_API_KEY; TRAVEL_ORS_API_KEY; authorized public HTTPS TRAVEL_OVERPASS_URL; optional Duffel Stays/flight access plus TRAVEL_DUFFEL_ALLOW_PAID_SEARCH=true; optional Brave storage/paid-search authorization or authorized SearXNG. Rail/bus require real authorized inventory agreements. Keys only in untracked config/local.env. Wiki no key; disable with TRAVEL_WEB_ENABLED=false. No paid calls this session.
+
+## Current blockers
+
+None for independent code remediation. Keyed/licensed live checks and clean-PC/manual release checks remain external acceptance limits. Existing operator config/local.env had previously unresolved PostgreSQL/Redis targets; not touched. Always use isolated variables for tests. No cloud wiring or credentials added.
 
 ## Decisions made
 
-Local/LAN Windows-first. Reuse models/outbox/workers/cache. Preserve ownership, leases, supersession and saved edits. Seven freshness labels retained. Authoritative rules require authority evidence; wiki/blog/search links are leads only. No raw secrets, cloud wiring, bookings, reservations, payment or card collection.
+Local/LAN Windows-first; preserve existing models/ownership/history/native durability. Current master P0s outrank old T09 continuation. Same-series Django security patch only. Tax policies are source-reviewed version tables, not live scraped rules. Correctly reject unsupported years/special-rate income. Retain old reference history while deactivating obsolete tax table. No bookings/payments/card collection, secret changes or release promotion.
 
 ## Do not redo
 
-Do not republish verified preview/public download audit. Do not reset working code or replace providers. Do not redo T07 or rewrite existing Decimal/provider normalization. Current monetary edits and their 95-test travel regression are complete. Do not touch live frozen runtimes/data/config for tests. Use UTF8 reads/writes. Do not rerun all 12 browser workflows absent new cross-module changes; final wording already passed its 3-test browser rerun. The prior full backend suite is complete; it predates T07 edits. Do not repeat it absent a new cross-cutting concern. Additional engineering audit/backlog named by user are absent; do not invent prior completion claims.
+Do not repeat the whole repository audit, T07 monetary travel work, historical preview audit, Phase 1 gate or completed focused tests without new failures/changes. M13B's final full gate passed and its session is closed; do not rerun it before new source changes justify another gate. Existing failed attempts are documented, not blockers after passing reruns. Do not use real runtime DB/config or old frozen binaries for current acceptance. Read UTF8. Preserve remaining backlog and this resumable checkpoint.
 
 ## Exact next task
 
-Start T09 with bounded retention for TravelProviderRequest telemetry. Inspect apps/mobility/tasks.py and travel/cache.py; implement a configurable retention task through existing local/native worker scheduling. Preserve all rows needed for current-month provider quotas and active requests; never delete VerifiedExternalInsight, TravelResearchEvidence, provider lease/state, saved plans or user history as telemetry cleanup. Add tests for expired-row removal, recent/in-progress preservation, unchanged quota accounting, idempotency and both scheduler registrations. Then address targeted enrichment and missing cache-miss/circuit telemetry separately. No provider key needed. Rebuild the frozen candidate only when preparing a later release; do not promote the older candidate as containing T07.
+Implement M13C: Investment.invested_amount, monthly_sip and current_value only. Reuse the strict HALF_UP currency/retained-original/apply-marker/owned rollback pattern; preserve annual_return_rate, parse_confidence, provider NAV/rates/scores and raw portfolio evidence. Cover numeric serializer/output, Decimal/rate arithmetic in investment summary/allocation/portfolio mix, canonical asset/tax totals, document correction/retry persistence, nullable/zero compatibility and owned reset. Preserve projection semantics already verified in M12C. Scoped orientation is retained in artifacts/m13c-storage-scope-graph-query-20261005.log. Expense.amount, Expense.closing_balance and BankAccount.current_balance are a later stage because normalized money also affects import fingerprints/deduplication, bank syncing and Loan detection. No real-data migration or blanket FloatField replacement. Do not restart the whole-repository audit or resume T09 first.
+
+## Repository housekeeping
+
+Normal git diff --check passed (artifacts/m13-final-diff-check-20261005.log/result JSON). Do not use core.autocrlf=false as a workaround for warnings; it makes CRLF content look like wholesale whitespace changes. No files were rewritten by that failed check.
+
+Graphify code refresh passed: 6,524 nodes / 17,885 edges, AST-only, no clustering/semantic extraction/model calls/HTML. Graphify was missing from PATH and the application environment. Temporary graphifyy 0.9.76 helper dependencies were installed with pip --target outside the repository; the application venv/requirements were not changed. Temporary target is recorded in artifacts/m13-graphify-tool-path-20261005.txt. Read the local .codex/skills/graphify/SKILL.md before using its workflow; follow new AGENTS.md guidance to query the graph before codebase questions and refresh it after source changes. The code index omits 24 unsupported files and 33 symbol-free sources; do not treat it as full semantic evidence.
+
+M13B first source refresh passed, 7,220 nodes / 18,816 edges; final refresh after the Career fixture and money helper docstring updates passed, 7,220 nodes / 18,817 edges. Both use the same AST-only/no-cluster mode and 24 unsupported / 33 symbol-free limitations. Latest evidence: artifacts/m13b-graphify-update-complete-20261005.log/result JSON. Application behavior was unchanged by the docstring update. Full backend, Chrome, system/drift and whitespace gates passed; no active process remains.
+
+The helper path may disappear when temporary files are cleaned; if missing, set up an isolated helper again. Set its PYTHONPATH only inside the separate Graphify command process, never for application tests/runtime (helper NumPy dependencies differ). Use the configured Python executable and perform the mandatory preflight for every Python command. Refresh evidence: artifacts/m13-graphify-update-final-20261005.log/result JSON. Initial missing-module attempt is retained as failed housekeeping history, not an application blocker. No active process remains.
 
 ## Exact next command
 
-Get-Content -Encoding UTF8 apps/mobility/tasks.py
-Get-Content -Encoding UTF8 apps/mobility/services/travel/cache.py
-
-After implementation, first get_python_environment(filePath="manage.py"), then use isolated variables above and run focused retention/provider tests before broadening.
+M13B verification passed; all root test/refresh sessions are closed. Next-stage orientation starts with:
+Get-Content -Encoding UTF8 docs/MASTER_M13B_VERIFICATION_20261005.md
+Before code exploration, in a separate Graphify command process after Python preflight:
+$loanGraphToolTarget=(Get-Content -Encoding UTF8 artifacts/m13-graphify-tool-path-20261005.txt -Raw).Trim()
+$env:PYTHONPATH=$loanGraphToolTarget
+& 'F:\ALFRED\.venv\Scripts\python.exe' -m graphify query 'Investment monetary storage summary allocation portfolio correction retry'
+Then use focused source reads after graph orientation:
+rg -n 'FloatField|invested_amount|monthly_sip|current_value|annual_return_rate' apps/investments/models.py apps/investments/serializers.py apps/investments/views.py
+rg -n '_create_or_update_investment|_portfolio_mix|_apply_investment_correction|_retry_investment_document' apps/investments/services/portfolio_intelligence.py alfred_ai/services/document_review.py
+Before any Python command: get_python_environment(filePath="manage.py"), then the isolated variables above.

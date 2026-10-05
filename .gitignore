@@ -23,6 +23,8 @@ alfred_env/
 venv/
 .env
 .env.*
+!.env.example
+env/
 
 # =========================
 # ML Models & Artifacts
@@ -54,7 +56,22 @@ coverage.xml
 .ruff_cache/
 logs/
 reports/generated/
-artifacts/
+# Generated/runtime evidence stays local; reviewed audit/reinstall documents are source.
+/artifacts/*
+!/artifacts/audit/
+/artifacts/audit/*
+!/artifacts/audit/*.md
+!/artifacts/reinstall/
+/artifacts/reinstall/*
+!/artifacts/reinstall/*.md
+# Generated final verification receipt records the final commit without self-reference.
+/artifacts/reinstall/PRE_REINSTALL_FINAL_STATUS.md
+graphify-out/
+runtime/
+diskcache/
+screenshots/
+downloads/
+htmlcov/
 
 # =========================
 # Celery / Redis
@@ -76,6 +93,9 @@ python-installer.exe
 *.temp
 *.bak
 *.orig
+*.old
+*.copy
+*.iml
 
 # =========================
 # Node / PWA / Mobile (later)
@@ -103,3 +123,6 @@ config/alfred_ui.json
 config/*.local.json
 config/*.env
 !config/*.example.json
+!config/*.env.example
+# Claude aliases here are absolute junctions into this machine's skill directory.
+/.claude/skills/
