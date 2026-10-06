@@ -654,3 +654,111 @@ Next-command runner verification: existing family-link baseline 7 passed / 0
 failures/skips / 11.787 s, exit 0. No family source changed yet. Log:
 F:\ALFRED_DEV\isolated-tests\next-family-baseline.log. Do not count this
 overlapping gate as a new complete backend run.
+
+## Latest development checkpoint - M14G COMPLETE - 2026-10-07
+
+Actual worktree: F:\ALFRED_DEV\m13c.
+Branch: codex/expense-bank-money-m13d-20261006.
+Validated M14G SOURCE commit: b1ba243364b5a844f19afd55811a70c5b442f94e.
+Parent: 909ab5a6d312ed7fe581333f8303ce82cf52ead0.
+Checkpoint/backlog metadata is committed separately; read git rev-parse HEAD
+with the explicit development worktree for the final current HEAD.
+Current task: M14G per-owner explicit opt-in for family financial summaries.
+Status COMPLETE in development; not deployed and not applied to private data.
+
+New financial sharing defaults OFF for both participants. Creating or accepting
+an invitation never grants financial access, including injected permission flags.
+Accepted-link PATCH /api/family/account-links/<id>/financial-sharing/ requires
+only share_financial_summary as a JSON boolean and authenticated session/CSRF.
+Each account controls its own summary only; share_financial_summary stores the
+creator's grant, linked_user_share_financial_summary stores the member's grant.
+Snapshot share_financial_summary is the requesting user's own grant;
+receives_financial_summary is the other participant's grant. Unrelated, pending,
+expired, revoked and missing links cannot grant access. No transitive grants.
+Settings UI offers an explicit confirmation naming disclosed financial fields,
+plus immediate stop-sharing, separate from disconnecting. Admin UI cannot edit
+owners, relationship status or either grant, or create links on others' behalf.
+
+Financial queries/aggregate totals/members exclude accounts without that owner's
+grant. Nested financial summaries also honor profile sharing: disabled identity
+and location fields are redacted. Profile/dependent defaults remain unchanged.
+Revocation invalidates both participants' caches; relationship disconnect clears
+both grants. A financial-consent revision prevents reuse of pre-M14G cached
+summaries. Financial writes invalidate authorized recipients' cached summaries,
+including asymmetric sharing with dependent sharing disabled.
+
+Migration: family.0004_financial_sharing_opt_in, depends only on family.0003.
+Historical True has no consent provenance. Forward clears both financial grants
+on every existing link; connected accounts stay connected and must choose again.
+IDs, owners, statuses, invite hashes/hints, timestamps, dependent/profile flags
+and all relationships are preserved. Synthetic migration reconciliation verified
+4 links across accepted/pending/revoked/expired, 2 users and 1 dependent.
+Forward, rollback and replay PASS; isolated plan applies only family.0004.
+Rollback clears grants, including subsequent opt-ins, before dropping the new
+field. It intentionally does not restore ambiguous historical True values.
+Old code/schema can default new links to sharing True: keep family linking and
+sharing unavailable during any reversal; do not restart unsafe old sharing flows.
+No live migration is authorized. Future live promotion requires a fresh verified
+consistent backup, disposable rehearsal, reviewed plan and explicit approval.
+
+Regressions first: original 18-test family gate failed 16 assertions/subtests,
+zero errors; initial full family fix passed 18. Review found profile metadata
+leakage inside opted-in financial summaries; new regression failed and fix passed.
+Final family/migration gate: 22 passed, 0 failures/skips, 36.803 s (20 family,
+2 migration tests). Relevant integration gate: 61 passed, 0 failures/skips,
+77.694 s across family/migration/session/password/auth/profile/data-reset/
+synthetic acceptance. It preceded the final nested-profile guard, which the
+final family gate covers. Settings live-HTTP/static contract: 1 passed / 6.273 s.
+Final real Chrome settings + recipient Family workflow: 1 passed, no skips,
+21.422 s; cancellation, directional opt-in, refresh persistence, revoke and
+recipient financial display verified using synthetic accounts only. Earlier
+Chrome passed too; do not count repeated workflow runs as distinct workflows.
+Backend gates overlap; no new full-suite total. Prior 718/19 baseline not repeated.
+Initial migration harness error used a historical User instance in a current
+model service; corrected test lookup, then integration and migration gates passed.
+All red/failure evidence retained in F:\ALFRED_DEV\isolated-tests\m14g-*.log.
+Chrome artifacts/summaries in m14g-browser-final. No private records in prompts.
+
+Source changed: alfred_ai/middleware.py; apps/family/models.py, services.py,
+serializers.py, views.py, urls.py, admin.py; family/migrations/0004; settings.js;
+templates/settings/account.html; tests/test_family_account_links.py,
+test_family_consent_migration.py, test_user_data_browser.py.
+makemigrations family --check --dry-run PASS (no drift, no generated files).
+node --check settings.js and staged whitespace review PASS. Graphify final
+AST/no-cluster update PASS: 7585 nodes, 19715 edges; no semantic/provider calls.
+All backend and Chrome storage/config are synthetic isolated test environments,
+with training disabled. Live checkout remains a9d096ea55839269fe6fce14d4f11ea2cbf05336;
+no live DB access/write, source promotion, credential change or backup deletion.
+Pre-existing restoration document remains untracked, untouched and unstaged.
+
+Next action after this committed milestone and preserved checkpoint: inspect
+existing inferred-loan verification/exclusion and its focused tests, without
+repeating completed financial work. If already protected, select the next
+verified unresolved security/financial item. Hosted Codex for sensitive changes.
+
+Post-M14G next-task assessment (source committed and checkpoint preserved first):
+M12A inferred-loan financial protection is ALREADY IMPLEMENTED in the actual
+current development source. EMI guesses are verification_status=estimated;
+canonical liability and recurring EMI predicates require is_confirmed. API
+verification fields are read-only, confirmation defaults False and requires
+reviewed terms; setting status alone cannot confirm an estimate. Existing
+loan-verification tests cover repeated detection, API exclusion, explicit terms,
+status bypass, ownership, payment acceptance and evidence provenance. Prior
+real-Chrome estimate-confirmation test remains present. These files are unchanged
+since the validated a9d096e baseline. No loan implementation or repeat test gate
+was needed; do not report these inspected tests as newly executed.
+
+NEXT PRIORITY: remaining M14F family-growth API exception disclosure, hosted
+Codex. Actual apps/family/views.py still returns str(e) on unexpected exceptions;
+Career's bounded error hardening is already complete and must not be repeated.
+Trace existing safe error helpers/callers, add a focused response/log redaction
+regression, then implement the smallest complete boundary. M14D throttles,
+M14E upload caps, M14H retention and other verified backlog items remain open.
+No additional high-risk implementation started after M14G.
+
+EXACT NEXT COMMAND (absolute development source path):
+rg -n 'family_growth|except Exception|str\(e\)' F:\ALFRED_DEV\m13c\apps\family\views.py
+For subsequent Django regressions, first obtain the configured interpreter,
+then use the existing isolated run-development-tests.ps1 runner with relevant
+labels. Never load or migrate F:\ALFRED\restored-runtime\db.sqlite3 in development.
+Development remains ACTIVE. M14G is source-validated, not a live rollout.
