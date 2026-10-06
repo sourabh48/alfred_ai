@@ -922,3 +922,82 @@ unresolved P0 upload/privacy/error boundary. Do not repeat M14G/M14H, Decimal
 migrations or inferred-loan protection. Broad global throttling, M14E caps,
 other HTTP/error paths, raw-document retention and token re-encryption remain
 open pending scoped checks; Travel T09 stays behind unresolved P0s.
+
+## 2026-10-07 - Final M14D review and independent P0 follow-up
+
+M14D implementation: 56b50cf944042cd728e53167e86657b363e2443a.
+M14D configuration hardening: 7fc264fd0292f1e2486747b444645e7a6701d364.
+Follow-up shared cleanup diagnostics: 63d0728dc5c48f38b4625dc1bf419a4fc7daedb8.
+These are independent validated source commits. The f38791d checkpoint preserved
+M14D before the next scoped P0 was implemented; this later metadata commit
+records the final actual state. Current HEAD can be obtained with git rev-parse.
+
+Final review reproduced invalid-directory fail-open: diskcache creates a new
+temporary cache when given None. New regression received 201 instead of required
+503 (one test, one failure, 1.477 s). Guard now rejects missing/relative directories
+before opening the store, alongside nonpositive limits/windows. Defaults remain
+absolute under the runtime data directory. Operator document updated. Final
+M14D API + synchronized thread/process gate: 16 passed, 0 failures/skips,
+24.703 s, including guarded None/relative paths. Original 69 integration and
+2 Chrome gates preceded this validation-only path guard; nominal configuration,
+public messages, valid invitation behavior and UI remain unchanged. No repeat
+full audit or full suite. Logs: m14d-path-red.log, m14d-final-focused.log.
+
+NEXT P0 ADDRESSED in independent commit 63d0728: shared source-upload cleanup
+failure metadata stored raw exception strings and exposed them through upload
+serializers. The shared producer used by nine call sites across statement,
+loan/closure, investment, Career, vehicle and credit document flows now stores
+only a fixed safe error and opaque reference; ERROR logs contain class/reference
+without evaluating exception text. safe_error_details shares the existing API
+policy; safe_error_response keeps all existing response/status/field contracts.
+Failed deletion still leaves the file, model reference and extracted payload
+intact, with deleted=False and an explicit error marker. Retention defaults and
+successful deletion behavior are unchanged; no historical records rewritten.
+
+Files changed in follow-up: alfred_ai/services/api_errors.py, upload_privacy.py;
+tests/test_upload_privacy_retention.py. Regressions first: 5 upload privacy tests,
+2 failures, 3.697 s; evidence retained. Final affected gate: 47 passed,
+0 failures/skips, 40.257 s across cleanup/retry integrity, Family Growth, Career
+errors and invitation API/atomic checks. Includes real API reading of new safe
+metadata and an exception whose __str__ must never be evaluated. This gate
+precedes the final directory guard; the final 16 cover that additional change.
+Backend gates overlap, never add totals or claim a new complete-suite baseline.
+No additional browser gate needed for the shared diagnostic producer; existing
+M14D driver-backed workflows remain recorded. Logs m14f-cleanup-{red,integration}.
+Final source/staged whitespace review PASS; final graphify AST/no-cluster PASS:
+7661 nodes, 19933 edges. No semantic/provider call or new dependency.
+
+Hybrid use: hosted Codex for security design/implementation/privacy regressions;
+local Ollama Codex (alfred-routine:latest, read-only, empty isolated working dir)
+completed an operator-summary draft from static non-sensitive configuration facts.
+Draft reviewed against docs/FAMILY_INVITATION_THROTTLING.md. Initial Windows .cmd
+multiline argument lost fact lines; corrected stdin-file invocation completed
+successfully. Outputs/logs retained in m14d-local-doc-* outside the source tree.
+No private data/credentials/runtime databases supplied to either documentation
+run or hosted model. Model metadata fallback warnings did not prevent completion;
+no global tooling/credential configuration changed.
+
+NEXT PRIORITY: M14E shared upload-size/resource caps, hosted Codex. Confirmed
+ExpenseStatementImportView checks missing file/PDF suffix, then calls the parser
+without an application size check. No configured custom FILE_UPLOAD_HANDLERS or
+file/body limits found in settings. Before implementing, verify native transport
+and multipart behavior so memory-spool thresholds are not mistaken for hard
+upload limits; bound parsing/temp-file work, reject oversize input before model
+writes, and use isolated boundary/rejection/cleanup/auth tests. Retain existing
+source files and ownership; never test against private documents. Historical
+stored exception metadata still needs separate public filtering/review, without
+rewriting live records. Other API errors, HTTP callers, raw-retention policy,
+token re-encryption, remaining money domains and global abuse limits stay open.
+T09 Travel remains behind unresolved P0s. Docker classification stays deferred
+recovery housekeeping and is not a development blocker.
+
+EXACT NEXT COMMAND:
+rg -n 'class ExpenseStatementImportView|statement_file|FILE_UPLOAD|DATA_UPLOAD' F:\ALFRED_DEV\m13c\apps\expenses\views.py F:\ALFRED_DEV\m13c\alfred_ai\settings.py
+Obtain the configured Python environment before each toolchain invocation, then
+run new focused cases through the existing isolated development-test runner.
+
+Live DB UNCHANGED: no private DB access/write/migration. No live source promotion,
+backup deletion, credential changes or paid external calls. All database/media/
+limiter fixtures were synthetic and isolated. Backups and restoration assets
+preserved; pre-existing restoration document remains untracked and untouched.
+Development ACTIVE; M14D COMPLETE, next scoped source task M14E above.
