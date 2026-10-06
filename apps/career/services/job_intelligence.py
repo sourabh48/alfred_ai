@@ -8,12 +8,11 @@ import re
 from statistics import median
 from urllib.parse import quote_plus, urlparse
 
-import requests
 from bs4 import BeautifulSoup
 from django.utils import timezone
 
 from alfred_ai.services import extract_document_text
-from alfred_ai.services.url_safety import validate_public_http_url
+from alfred_ai.services import public_http
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot
 
@@ -196,10 +195,12 @@ class JobIntelligenceService:
     USER_AGENT = "AlfredAI/1.0 (career-intelligence)"
 
     def parse_job_page(self, job_url: str) -> JobPostingSnapshot:
-        job_url = validate_public_http_url(job_url)
-        response = requests.get(job_url, headers={"User-Agent": self.USER_AGENT}, timeout=15)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
+        response = public_http.request(
+            "GET", job_url, headers={"User-Agent": self.USER_AGENT},
+            content_types=("text/html", "application/xhtml+xml"), max_bytes=2_000_000,
+        )
+        job_url = public_http.normalized_link(job_url)
+        soup = BeautifulSoup(response.content, "html.parser")
         ld_json = self._extract_job_posting_json_ld(soup)
         domain = urlparse(job_url).netloc.replace("www.", "")
         if "greenhouse.io" in domain:

@@ -297,3 +297,136 @@ DB/WAL/SHM, promote validated development source to the runtime checkout, apply
 only the two named migrations, reconcile and restart. If bytes changed after
 capture, make and independently verify another fresh backup first. Keep all
 historical backups. Do not restart completed audits or M13C/D implementation.
+
+## Controlled M13C + M13D LIVE completion - 2026-10-07
+
+This supersedes earlier private-DB-not-migrated and authorization-pending entries.
+The user explicitly authorized this controlled live operation. Live source is
+F:\ALFRED\alfred_ai, HEAD a9d096ea55839269fe6fce14d4f11ea2cbf05336. It was safely
+fast-forwarded from 5687a82ecb43702e90822f19e958b164dfe4cfdd. Original local changes
+and conflicting untracked documents were preserved outside Git before promotion.
+No new product source changes, deployment commit, release or push were made.
+
+Live DB F:\ALFRED\restored-runtime\db.sqlite3 has exactly the two authorized
+migrations applied: investments.0004_investment_money_decimal and
+expenses.0005_expense_bank_money_decimal. Dependencies were already applied;
+full plan afterward is empty. Native runtime writers were gracefully stopped,
+process/lock checks passed, and the fresh backup was independently reverified
+before application. Runtime secrets/media/models were preserved unchanged.
+
+Protected pre-migration backup:
+F:\ALFRED_RECOVERY\m13cd-private-rehearsal-20261006\fresh-pre-migration-backup.sqlite3
+SHA256 29b06e610ea008b1d5cb042a21b7e50bf9ee2ef95f11a1083ee957ce5c8ffcb0.
+It matched the live DB/WAL/SHM capture before application and remains intact.
+All 66 original SQLite tables passed independent schema/counts/bidirectional
+SQL EXCEPT/integrity/foreign-key checks. Original backup and proof are unchanged.
+
+Operation evidence: F:\ALFRED_RECOVERY\m13cd-live-migration-20261007.
+Post-migration-before-restart.sqlite3 SHA256:
+971228fd90387e4947d42d3e3a0f3aff12e97b7440ac7878c1a4e92cefeaf4ed.
+Post-final-running.sqlite3 consistent snapshot SHA256:
+02e42ebd7d0d0a55d097191d51489919f7b56c35d268e4b664f67a653630c267.
+Detailed before/after source-file hashes, snapshots and private totals are in
+live-migration-result.json and final-operation-result.json outside Git.
+
+Pre-restart reconciliation passed all 66 original tables including sequence state,
+with exactly 3 new snapshot tables (69 tables after migration). 1,739 Expenses,
+2 BankAccounts, 2 Investments and their owned conversion snapshots retained;
+1,735 fingerprints/reference signatures unchanged; 834 transfer legs preserved;
+155 monthly groups reconciled. Zero currency/balance/aggregate/identity/ownership/
+reference mismatches, duplicate fingerprint excess or foreign-key violations.
+Private currency values already had exact cents: zero rounding adjustments.
+Only the two intended migration-state entries were added. Exact resulting schema
+matches the successful private-copy rehearsal. Database integrity passes.
+
+The initial post-apply harness stopped on cached executor state after successful
+application. Failure log/snapshot are retained. A fresh executor confirmed both
+migrations recorded with no pending plan; resumed reconciliation passed without
+reapplying either migration. No unexplained data mismatch or rollback occurred.
+Checkout CRLF/LF differences were verified as line endings only; exact tested
+migration file bytes and Git blobs were checked before application. Git index
+stat refresh confirmed no product source changes afterward.
+
+ALFRED restarted, gracefully stopped, and restarted again to verify persistence.
+It is running at http://127.0.0.1:8000/. Both actual queued startup worker probes
+completed. Final native readiness is 5/5: DB, cache, worker, scheduler and local
+security ready. All four health endpoints HTTP 200; DB/cache/ML runtime/startup
+checks ok. No pending/scheduled jobs or interrupted claims at final check; a
+consistent native queue backup passes integrity. All 69 post-migration tables
+were compared across restart with zero business-table changes. Startup added
+expected snapshot-model content types (3) and permissions (12); one existing
+account login timestamp and session records changed as authentication activity.
+All other user fields and credentials are unchanged. Private config/media/model
+file hashes remain identical; all 3 referenced uploaded media files are present.
+Readonly live Decimal ORM/numeric serialization checks passed all 1,743 affected
+register rows. Loan/Travel/document data are preserved by exact table comparisons.
+
+Prior validated source tests remain 718 backend passed / 19 disabled-browser
+skips / 737 run; serial Chrome 19 passed / no skips. Completed engineering suites
+were not repeated. Live manual page acceptance remains PENDING: browser automation
+has no Chrome or in-app browser surface. An operator sign-in question was sent;
+UI review has not been confirmed. A login timestamp change does not establish
+visual finance/Travel/document acceptance. Do not claim it passed.
+
+Rollback required: NO. Protected verified backup, exact reverse rehearsal,
+private runtime config/local source preservation, consistent post snapshots and
+failure evidence remain available. Keep every recovery asset. Live DB changed
+only through the authorized conversion and recorded normal runtime/auth metadata.
+
+Exact next task: complete existing-account Finance/Expenses/BankAccounts/
+Investments/Loans/Travel and uploaded document/media UI acceptance at the live URL.
+Then classify preserved historical Docker data before unrelated engineering.
+Read LIVE_MIGRATION_REPORT.md and final-operation-result.json in the private
+operation evidence directory. Do not restart M13C/D work or completed audits;
+do not delete backups. Preserve source HEAD a9d096ea55839269fe6fce14d4f11ea2cbf05336
+for the deployed state; this continuation record is a local documentation update.
+
+## Recovery closure and resumed development — 2026-10-07
+
+This supersedes the recovery-only next action above. The user reports opening
+ALFRED and finding the data apparently intact. Recovery is closed for development
+as USER-REVIEWED PRELIMINARY UI ACCEPTANCE. No systematic Finance, Loans, Travel,
+uploaded document/media or other untested UI coverage is claimed passed. Prior
+live migration/reconciliation and 718 backend / 19 Chrome results remain recorded;
+they were not rerun. Live source remains a9d096ea55839269fe6fce14d4f11ea2cbf05336.
+
+Historical Docker data classification is DEFERRED, not complete. Preserve all
+Docker/VHDX, historical databases, encrypted/pristine backups, WAL/SHM, source
+preservation and recovery evidence. Later classify from disposable read-only
+copies and document provenance/unique data before considering any cleanup. No
+backup or recovery asset was deleted, modified or classified during this task.
+
+Development resumed in F:\ALFRED_DEV\m13c on the existing M13D development branch.
+Hosted Codex selected M14A Career job-page HTTP because current code still used
+requests.get after separate DNS validation, allowing redirects, a second DNS
+resolution and unbounded downloads. Reused existing public_http.request: public
+HTTPS only, one DNS resolution with pinned peer/TLS hostname, no redirects,
+HTML/XHTML MIME allowlist, 2,000,000-byte cap, compression rejection and bounded
+transport timeouts. BeautifulSoup consumes bounded bytes for encoding detection.
+Existing Workday/Ashby parser fixtures now mock the shared response boundary.
+
+Focused isolated gate: 17 tests passed, zero failures/skips; 3.947 seconds;
+Django system checks passed. Command: manage.py test tests.test_career_job_http
+ tests.test_career_recruiter_and_evidence tests.test_travel_http --noinput
+ --verbosity 1. Python: F:\ALFRED\alfred_ai\.venv\Scripts\python.exe.
+Explicit synthetic ALFRED_DATA_DIR, secret, in-memory SQLite and locmem cache
+prevented loading live private config/database. No network job fetch was made.
+Five new tests exercise actual shared transport from Career: pinned DNS/TLS,
+unsafe/private targets, blocked redirects, MIME/compression/declared and streamed
+size bounds, sanitized timeout and cleanup. No migration/full audit/full backend
+or browser suite was repeated. No runtime promotion, push or release.
+
+M14A is complete for this Career job-page bypass only; other HTTP callers remain
+unverified. M14B-I/privacy and remaining monetary domains remain open. T09/M15
+retention remains deferred behind these P0s. Exact next atomic task: inspect
+current password-validator enforcement at signup/password-change boundaries
+(M14B); implement the smallest missing boundary with focused tests using hosted
+Codex. If already enforced, advance to M14C/D auth/throttles. Do not repeat whole
+repository audits. Local Ollama remains for low-risk work; this security task
+used hosted Codex as directed by the hybrid policy.
+
+M14A housekeeping: AST-only Graphify update passed (7,509 nodes / 19,549 edges;
+26 unclassified / 35 symbol-free sources). Whitespace checks passed. Graphify's
+stale uv launcher failed initially; direct tool interpreter succeeded without
+installation or application dependency changes. Git commands use explicit
+--work-tree because automatic worktree detection fails in this restored checkout.
