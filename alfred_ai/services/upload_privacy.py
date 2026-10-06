@@ -6,6 +6,8 @@ from typing import Any
 from django.conf import settings
 from django.utils import timezone
 
+from .api_errors import safe_error_details
+
 
 RAW_FILE_RETENTION_KEY = "raw_file_retention"
 
@@ -49,8 +51,9 @@ def purge_uploaded_file_after_extraction(
             metadata["deleted"] = True
             metadata["deleted_at"] = now
             update_fields.add(field_name)
-        except Exception as exc:  # pragma: no cover - depends on storage backend failure.
-            metadata["error"] = f"{type(exc).__name__}: {exc}"
+        except Exception as exc:
+            metadata.update(safe_error_details(exc, "Source upload cleanup failed. Please retry.",
+                                               logger_name=__name__, field="error"))
     else:
         metadata["deleted"] = True
         metadata["deleted_at"] = now

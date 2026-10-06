@@ -1,6 +1,7 @@
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+from uuid import UUID
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -32,6 +33,46 @@ class UploadPrivacyRetentionTests(TestCase):
     def tearDown(self):
         self.override.disable()
         self.tempdir.cleanup()
+
+    def test_storage_failure_never_exposes_exception_in_persisted_or_public_metadata(self):
+        upload = StatementUpload.objects.create(user=self.user, file_name="synthetic.pdf",
+            original_file=SimpleUploadedFile("synthetic.pdf", b"synthetic content", content_type="application/pdf"),
+            extracted_payload={"parser_notes": "Preserved extraction"})
+        stored_path = Path(upload.original_file.path)
+        marker = r"SyntheticFamilyIdentity; 123456.78; Bearer synthetic-token; F:\synthetic-private\ledger.db"
+        with patch.object(upload.original_file.storage, "delete", side_effect=OSError(marker)):
+            metadata = purge_uploaded_file_after_extraction(upload, "original_file", reason="test_failed_cleanup")
+        upload.refresh_from_db()
+        self.assertFalse(metadata["deleted"])
+        self.assertTrue(stored_path.exists())
+        self.assertTrue(upload.original_file)
+        self.assertEqual(upload.extracted_payload["parser_notes"], "Preserved extraction")
+        self.assertEqual(metadata["error"], "Source upload cleanup failed. Please retry.")
+        UUID(metadata["error_id"])
+        response = self.client.get(f"/api/expenses/uploads/{upload.pk}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("synthetic-token", response.content.decode())
+        self.assertNotIn("SyntheticFamilyIdentity", response.content.decode())
+        self.assertEqual(response.json()["extracted_payload"]["raw_file_retention"], metadata)
+
+    def test_cleanup_failure_logs_only_class_and_reference_without_evaluating_error_text(self):
+        class UnprintableError(Exception):
+            def __str__(self):
+                raise AssertionError("Private exception text must not be read")
+        resume = CareerResume.objects.create(user=self.user,
+            uploaded_file=SimpleUploadedFile("synthetic.pdf", b"synthetic content", content_type="application/pdf"),
+            file_name="synthetic.pdf")
+        with patch.object(resume.uploaded_file.storage, "delete", side_effect=UnprintableError()), self.assertLogs(
+            "alfred_ai.services.upload_privacy", level="ERROR") as logs:
+            metadata = purge_uploaded_file_after_extraction(resume, "uploaded_file", reason="test_failed_cleanup")
+        self.assertFalse(metadata["deleted"])
+        self.assertEqual(len(logs.records), 1)
+        record = logs.records[0]
+        self.assertEqual(record.error_id, metadata["error_id"])
+        self.assertEqual(record.exception_type, "UnprintableError")
+        self.assertEqual(record.args, (metadata["error_id"], "UnprintableError"))
+        self.assertIsNone(record.exc_info)
+        self.assertIsNone(record.stack_info)
 
     def test_raw_file_cleanup_removes_saved_document_file_and_records_metadata(self):
         resume = CareerResume.objects.create(
