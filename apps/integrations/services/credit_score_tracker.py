@@ -298,7 +298,7 @@ class CreditScoreTrackerService:
 
         # 2. Credit Utilization (30% weight)
         accounts = BankAccount.objects.filter(user=user, is_active=True)
-        total_balance = accounts.aggregate(Sum('current_balance'))['current_balance__sum'] or 0
+        total_balance = float(accounts.aggregate(Sum('current_balance'))['current_balance__sum'] or 0)
         # Portfolio totals can exceed the currency limit for a single loan.
         total_loans = float(active_loans.aggregate(Sum('remaining_balance'))['remaining_balance__sum'] or 0)
 

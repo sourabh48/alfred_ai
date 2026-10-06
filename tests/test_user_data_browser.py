@@ -253,6 +253,51 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn("—", self.text("dashboardFocusStrip"))
         self.capture("empty-dashboard")
 
+    def test_expense_form_preserves_import_identity_and_bank_cents(self):
+        from decimal import Decimal
+        from types import SimpleNamespace
+        from apps.expenses.models import BankAccount
+        from apps.expenses.serializers import ExpenseSerializer
+        from apps.expenses.services.statement_lifecycle import _import_statement_transactions
+        from tests.test_expense_money_identity import parsed_fixture
+        from apps.expenses.models import StatementUpload
+        from django.utils import timezone
+
+        user = self.scenario["user"]
+        account = BankAccount.objects.create(user=user, account_number="TEST0001", current_balance="10.005")
+        serializer = ExpenseSerializer(data={"amount": "2.675", "closing_balance": "10.005", "bank_account": account.pk, "transaction_date": timezone.localdate().isoformat(), "source": "bank_statement", "raw_description": "UPI SAMPLE MERCHANT", "description": "UPI SAMPLE MERCHANT", "external_reference": "REF-001", "category": "shopping"}, context={"request": SimpleNamespace(user=user)})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        row = serializer.save(user=user)
+        row.refresh_from_db()
+        fingerprint, identity = row.transaction_fingerprint, row.transaction_identity
+        self.login()
+        self.browser.get(self.live_server_url + "/expenses/")
+        self.wait.until(lambda driver: driver.execute_script("return expenseIndex.has(arguments[0]);", row.pk))
+        self.browser.execute_script("openEditModal(arguments[0]);", row.pk)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "expenseSubmitBtn").is_displayed())
+        form = self.browser.find_element(self.By.ID, "expenseForm")
+        self.assertEqual(form.find_element(self.By.NAME, "amount").get_attribute("value"), "2.68")
+        from selenium.webdriver.support.ui import Select
+        Select(form.find_element(self.By.NAME, "category")).select_by_value("food")
+        self.browser.find_element(self.By.ID, "expenseSubmitBtn").click()
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, "expenseSubmitBtn").is_displayed())
+        row.refresh_from_db()
+        account.refresh_from_db()
+        self.assertEqual(row.category, "food")
+        self.assertEqual((row.transaction_fingerprint, row.transaction_identity), (fingerprint, identity))
+        self.assertEqual((row.amount, row.closing_balance, account.current_balance), (Decimal("2.68"), Decimal("10.01"), Decimal("10.01")))
+        upload = StatementUpload.objects.create(user=user, bank_account=account, file_name="synthetic.pdf")
+        parsed = parsed_fixture(closing=15.005)
+        parsed.transactions[0].transaction_date = row.transaction_date
+        created, skipped = _import_statement_transactions(user=user, upload=upload, bank_account=account, parsed=parsed)
+        self.assertEqual((len(created), skipped), (0, 1))
+        payload = self.browser.execute_async_script("const done=arguments[0]; fetch('/api/expenses/').then(r=>r.json()).then(done);")
+        rows = payload if isinstance(payload, list) else payload["results"]
+        displayed = next(item for item in rows if item["id"] == row.pk)
+        self.assertEqual(displayed["amount"], 2.68)
+        self.assertEqual(displayed["closing_balance"], 10.01)
+        self.capture("expense-money-identity")
+
     def test_old_transactions_show_their_actual_reporting_month(self):
         Expense.objects.filter(user=self.scenario["user"]).update(transaction_date=month_start(-1))
         cache.clear()

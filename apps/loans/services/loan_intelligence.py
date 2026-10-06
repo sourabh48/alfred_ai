@@ -154,8 +154,8 @@ class LoanIntelligenceService:
             direction="debit",
             classification="loan",
             company_name__iexact=expense.company_name or "",
-            amount__gte=expense.amount * 0.95,
-            amount__lte=expense.amount * 1.05,
+            amount__gte=Decimal(str(expense.amount)) * Decimal("0.95"),
+            amount__lte=Decimal(str(expense.amount)) * Decimal("1.05"),
         ).order_by("transaction_date")
 
         if similar_expenses.count() < 2:

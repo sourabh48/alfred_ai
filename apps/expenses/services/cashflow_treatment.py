@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from collections import defaultdict
 from decimal import Decimal
 
+from apps.expenses.money import expense_money, money_float
+
 
 CASHFLOW_REVIEW_AMOUNT_THRESHOLD = 50000.0
 SUSPICIOUS_OTHER_DEBIT_TERMS = (
@@ -107,7 +109,7 @@ def classify_cashflow(expense) -> CashflowTreatment:
 
 
 def empty_cashflow_bucket() -> dict:
-    return {
+    return {key: Decimal("0") if isinstance(value, float) else value for key, value in {
         "income_total": 0.0,
         "transfer_in_total": 0.0,
         "other_credit_total": 0.0,
@@ -123,7 +125,7 @@ def empty_cashflow_bucket() -> dict:
         "bank_debit_total": 0.0,
         "outflow_total": 0.0,
         "count": 0,
-    }
+    }.items()}
 
 
 def add_expense_to_cashflow_bucket(bucket: dict, expense) -> CashflowTreatment:
@@ -195,16 +197,13 @@ def variable_spend_rows(expenses, *, monthly_housing=0):
 def rounded_cashflow_bucket(bucket: dict) -> dict:
     payload = {}
     for key, value in bucket.items():
-        if isinstance(value, float):
-            payload[key] = round(value, 2)
+        if isinstance(value, (float, Decimal)):
+            payload[key] = money_float(value)
         else:
             payload[key] = value
-    payload["net_total"] = round(payload.get("income_total", 0.0) - payload.get("outflow_total", 0.0), 2)
+    payload["net_total"] = money_float(bucket.get("income_total", 0) - bucket.get("outflow_total", 0))
     payload["transaction_count"] = int(payload.get("count", 0))
-    payload["excluded_transfer_total"] = round(
-        payload.get("transfer_in_total", 0.0) + payload.get("transfer_out_total", 0.0),
-        2,
-    )
+    payload["excluded_transfer_total"] = money_float(bucket.get("transfer_in_total", 0) + bucket.get("transfer_out_total", 0))
     return payload
 
 
@@ -231,8 +230,5 @@ def _normalized(value) -> str:
     return str(value or "").strip().lower()
 
 
-def _amount(expense) -> float:
-    try:
-        return float(getattr(expense, "amount", 0) or 0)
-    except (TypeError, ValueError):
-        return 0.0
+def _amount(expense) -> Decimal:
+    return expense_money(getattr(expense, "amount", 0) or 0)

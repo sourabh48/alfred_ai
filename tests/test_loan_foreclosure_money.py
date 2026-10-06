@@ -11,6 +11,7 @@ from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from apps.expenses.models import Expense
+from apps.expenses.money import identity_values
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanPaymentHistory
 from apps.loans.services.loan_closure_parser import loan_closure_parser
 from apps.loans.services.loan_foreclosure_service import (
@@ -136,6 +137,7 @@ class ForeclosureMoneyPostingTests(TestCase):
             user=self.user, amount=amount, direction="debit", classification="loan", category="loan",
             merchant="Axis Bank", description="Axis Bank FORECLOSURE CENT001", source="bank_statement",
             transaction_date=timezone.localdate() + timedelta(days=days),
+            transaction_identity=identity_values(amount, None),
         )
 
     def test_split_half_cent_source_evidence_posts_once_and_audit_is_numeric(self):
@@ -156,7 +158,8 @@ class ForeclosureMoneyPostingTests(TestCase):
         json.dumps(before)
         for expense in expenses:
             expense.refresh_from_db()
-            self.assertEqual(expense.amount, 1000.005)
+            self.assertEqual(expense.amount, Decimal("1000.01"))
+            self.assertEqual(expense.transaction_identity["amount"], "1000.005")
         self.assertTrue(loan_foreclosure_service.reconcile_snapshot(snapshot, expenses=expenses))
         snapshot.refresh_from_db()
         self.loan.refresh_from_db()

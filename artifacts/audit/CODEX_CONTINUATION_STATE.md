@@ -242,3 +242,40 @@ private finance/Travel/media UI acceptance remain unconfirmed, and historical da
 plus the Docker VHDX require classification. Keep the Desktop backup, pristine
 copies and recovery repositories. Do not promote M13C to the operator runtime as
 part of development testing.
+
+## Current development checkpoint: M13D — 2026-10-06
+
+This supersedes the historical pre-Windows and uncommitted-M13C instructions above.
+Continue in `F:\ALFRED_DEV\m13c`, branch
+`codex/expense-bank-money-m13d-20261006`. The verified M13C implementation is
+already preserved at `4ac6c100dad83193244d2933814bf1d48dbbcde9`; do not restart it
+or completed audits. Hosted Codex completed the existing partial M13D changes.
+
+Expense.amount/closing_balance and BankAccount.current_balance now use bounded
+HALF_UP Decimal cents. Migration `expenses.0005_expense_bank_money_decimal`
+retains original values, ownership, links, normalization and apply markers;
+guards rollback and owned reset; and retains original transaction identity for
+historical fingerprints/reference deduplication. Transfers and independently
+recorded bank balances remain authoritative. Raw evidence, null/zero semantics,
+numeric API totals, atomic invalid-input rejection, account posting and Loan
+callers are covered. Remaining monetary domains and M14 remain outside this stage.
+
+Final backend: 737 run / 718 passed / 19 disabled-browser skips / no failures or
+errors, exit 0, 641.684 s. Full serial Chrome: 19 passed / no skips / exit 0,
+125.521 s, driver-backed. Focused M13D gate: 34 passed; combined synthetic rehearsal:
+1 passed; Loan/foreclosure compatibility gate: 38 passed; focused Expense Chrome:
+1 passed. Drift and whitespace gates passed. Final AST-only index: 7,498 nodes /
+19,529 edges, with the recorded 26 unclassified / 35 symbol-free limitations.
+Detailed failed-attempt history and contracts are in
+`docs/MASTER_M13D_VERIFICATION_20261006.md`. Logs/proof remain outside Git under
+`F:\ALFRED_RECOVERY\m13d-*`. An unrelated untracked restoration verification
+document is preserved and excluded from the M13D commit.
+
+Next action after this source checkpoint: run
+`scripts/rehearse_money_migrations.py --source F:\ALFRED\restored-runtime\db.sqlite3
+--output-dir F:\ALFRED_RECOVERY\m13cd-private-rehearsal-20261006`, then independently
+verify its fresh backup and update this checkpoint with reconciliation results.
+The rehearsal opens SQLite only on disposable copies after stable DB/WAL/SHM
+capture. Do not apply M13C or M13D to any live database during this task. Controlled
+live migration requires successful reconciliation, an independently verified fresh
+backup, stopped writers and explicit authorization. Keep all historical backups.

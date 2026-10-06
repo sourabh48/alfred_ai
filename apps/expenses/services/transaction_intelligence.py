@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from apps.behavioral.models import BehavioralSignal
 from apps.expenses.models import BankAccount, Expense
+from apps.expenses.money import expense_money, identity_amount, identity_values
 from apps.expenses.services.statement_import import classify_transaction_text
 from apps.ml_engine.core.alfred_inference import alfred_engine
 
@@ -98,6 +99,21 @@ def hydrate_expense_data(*, user, payload: dict, initial_data: dict | None = Non
     provided_fields = set((initial_data or {}).keys())
 
     direction = data.get("direction") or getattr(instance, "direction", "debit")
+    evidence = getattr(instance, "transaction_identity", {})
+    identity = {}
+    for field in ("amount", "closing_balance"):
+        current = data.get(field, getattr(instance, field, None))
+        previous = getattr(instance, field, None)
+        unchanged = instance is not None and (
+            (current is None and previous is None)
+            or (current is not None and previous is not None and expense_money(current) == expense_money(previous))
+        )
+        identity[field] = (
+            (initial_data or {})[field]
+            if field in provided_fields and not unchanged
+            else identity_amount(evidence, field, current)
+        )
+    data["transaction_identity"] = identity_values(identity["amount"], identity["closing_balance"])
     amount = float(data.get("amount", getattr(instance, "amount", 0)) or 0)
     transaction_date = data.get("transaction_date") or getattr(instance, "transaction_date", timezone.localdate())
     source_text = (
@@ -147,11 +163,11 @@ def hydrate_expense_data(*, user, payload: dict, initial_data: dict | None = Non
     data["transaction_fingerprint"] = build_transaction_fingerprint(
         bank_account=data.get("bank_account", getattr(instance, "bank_account", None)),
         transaction_date=transaction_date,
-        amount=amount,
+        amount=identity["amount"],
         direction=direction,
         external_reference=data.get("external_reference", getattr(instance, "external_reference", "")),
         raw_description=data.get("raw_description") or source_text,
-        closing_balance=data.get("closing_balance", getattr(instance, "closing_balance", None)),
+        closing_balance=identity["closing_balance"],
     )
     data["is_emotional"] = emotional["is_emotional"]
     data["model_confidence"] = emotional["confidence"]
@@ -412,6 +428,8 @@ def resolve_bank_account(
     account_type: str = "savings",
     current_balance: float | None = None,
 ) -> BankAccount | None:
+    if current_balance is not None:
+        current_balance = expense_money(current_balance)
     normalized_number = _normalize_account_number(account_number)
     if not normalized_number:
         return None
@@ -502,12 +520,13 @@ def build_reference_signature(
 def sync_account_balance(bank_account: BankAccount | None, closing_balance: float | None) -> None:
     if bank_account is None or closing_balance is None:
         return
-    bank_account.current_balance = closing_balance
+    bank_account.current_balance = expense_money(closing_balance)
     bank_account.last_synced_at = timezone.now()
     bank_account.save(update_fields=["current_balance", "last_synced_at"])
 
 
 def _detect_emotional_spend(*, user, amount: float, category: str, direction: str, merchant: str, description: str, transaction_date, instance: Expense | None = None) -> dict:
+    amount = float(amount)
     if direction == "credit" or amount <= 0:
         return {"is_emotional": False, "confidence": 0.05, "reason": "Cash-in transactions are not treated as emotional spend."}
 
@@ -539,7 +558,7 @@ def _detect_emotional_spend(*, user, amount: float, category: str, direction: st
         score += 0.25
         reasons.append("category is discretionary")
 
-    comparison_base = category_avg or overall_avg
+    comparison_base = float(category_avg or overall_avg)
     if comparison_base and amount >= comparison_base * 1.35:
         score += 0.25
         reasons.append("ticket size is above your normal pattern")

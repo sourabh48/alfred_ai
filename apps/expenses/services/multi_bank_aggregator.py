@@ -10,6 +10,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from apps.expenses.models import BankAccount, Expense
+from apps.expenses.money import money_float
 
 
 class MultiBankAggregatorService:
@@ -65,11 +66,11 @@ class MultiBankAggregatorService:
                 "bank_name": account.bank_name,
                 "account_type": account.get_account_type_display(),
                 "masked_account": account.masked_account_number,
-                "balance": round(balance, 2),
+                "balance": money_float(balance),
                 "is_primary": account.is_primary,
                 "transaction_count": txn_count,
                 "last_transaction": last_txn.isoformat() if last_txn else None,
-                "monthly_spending": round(monthly_spending, 2),
+                "monthly_spending": money_float(monthly_spending),
                 "last_synced": account.last_synced_at.isoformat() if account.last_synced_at else None,
             })
 
@@ -78,7 +79,7 @@ class MultiBankAggregatorService:
 
         return {
             "total_accounts": accounts.count(),
-            "total_balance": round(total_balance, 2),
+            "total_balance": money_float(total_balance),
             "accounts": account_details,
             "primary_account": next((a for a in account_details if a["is_primary"]), None),
         }
@@ -123,8 +124,8 @@ class MultiBankAggregatorService:
             if cat_total > 0:
                 category_breakdown.append({
                     "category": label,
-                    "amount": round(cat_total, 2),
-                    "percentage": round((cat_total / total_debits * 100) if total_debits > 0 else 0, 2),
+                    "amount": money_float(cat_total),
+                    "percentage": round(float(cat_total / total_debits * 100) if total_debits > 0 else 0, 2),
                 })
 
         # Sort by amount
@@ -154,9 +155,9 @@ class MultiBankAggregatorService:
 
             monthly_trend.append({
                 "month": month_start.strftime("%b %Y"),
-                "debits": round(month_debits, 2),
-                "credits": round(month_credits, 2),
-                "net": round(month_credits - month_debits, 2),
+                "debits": money_float(month_debits),
+                "credits": money_float(month_credits),
+                "net": money_float(month_credits - month_debits),
             })
 
         monthly_trend.reverse()
@@ -167,12 +168,12 @@ class MultiBankAggregatorService:
                 "display_name": account.display_name,
                 "bank_name": account.bank_name,
                 "account_type": account.get_account_type_display(),
-                "balance": account.current_balance or 0,
+                "balance": money_float(account.current_balance),
             },
             "last_30_days": {
-                "total_debits": round(total_debits, 2),
-                "total_credits": round(total_credits, 2),
-                "net_flow": round(total_credits - total_debits, 2),
+                "total_debits": money_float(total_debits),
+                "total_credits": money_float(total_credits),
+                "net_flow": money_float(total_credits - total_debits),
                 "transaction_count": expenses.count(),
             },
             "category_breakdown": category_breakdown,
@@ -216,7 +217,7 @@ class MultiBankAggregatorService:
 
                 if distinct_accounts > 1:
                     duplicates.append({
-                        "amount": exp_group["amount"],
+                        "amount": money_float(exp_group["amount"]),
                         "date": exp_group["transaction_date"].isoformat(),
                         "merchant": exp_group["merchant"],
                         "count": exp_group["count"],
@@ -303,7 +304,7 @@ class MultiBankAggregatorService:
             "suggested_account": {
                 "id": best_account.id,
                 "display_name": best_account.display_name,
-                "balance": best_account.current_balance or 0,
+                "balance": money_float(best_account.current_balance),
                 "confidence": min(account_scores[0]["score"], 100) if account_scores else 0,
             } if best_account else None,
         }

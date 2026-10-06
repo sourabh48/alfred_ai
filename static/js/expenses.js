@@ -17,7 +17,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
-    expenseModal = new bootstrap.Modal(document.getElementById("expenseModal"));
+    const modalElement = document.getElementById("expenseModal");
+    // Keep Bootstrap's dialog above its body-level backdrop, outside the
+    // animated, scrolling workspace's stacking context.
+    document.body.appendChild(modalElement);
+    expenseModal = new bootstrap.Modal(modalElement);
 
     document.getElementById("expenseForm").addEventListener("submit", submitExpenseForm);
     document.getElementById("uploadStatementBtn").addEventListener("click", uploadStatement);

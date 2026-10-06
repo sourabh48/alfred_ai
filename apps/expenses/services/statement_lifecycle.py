@@ -13,6 +13,7 @@ from apps.reports.models import SystemTicket
 from apps.reports.services import operational_logging_service, reporting_service
 
 from ..models import Expense, StatementUpload
+from ..money import expense_money, identity_amount, identity_values
 from .statement_import import StatementParseResult, parse_bank_statement, summarize_transactions
 from .transaction_intelligence import (
     build_user_merchant_profiles,
@@ -56,17 +57,17 @@ class StatementLifecycleResult:
 
 
 def apply_parsed_statement_upload(*, user, parsed: StatementParseResult, statement_kind: str, statement_file=None, existing_upload: StatementUpload | None = None) -> StatementLifecycleResult:
+    _validate_transaction_money(parsed)
     latest_closing = parsed.transactions[-1].closing_balance if parsed.transactions else None
-    bank_account = resolve_bank_account(
-        user=user,
-        bank_name=parsed.bank_name,
-        account_holder=parsed.account_holder,
-        account_number=parsed.account_number,
-        account_type=STATEMENT_ACCOUNT_TYPE_MAP.get(statement_kind, "other"),
-        current_balance=latest_closing,
-    )
-
     with transaction.atomic():
+        bank_account = resolve_bank_account(
+            user=user,
+            bank_name=parsed.bank_name,
+            account_holder=parsed.account_holder,
+            account_number=parsed.account_number,
+            account_type=STATEMENT_ACCOUNT_TYPE_MAP.get(statement_kind, "other"),
+            current_balance=latest_closing,
+        )
         upload = _save_upload_metadata(
             user=user,
             statement_file=statement_file,
@@ -473,7 +474,17 @@ def _cleanup_redundant_statement_uploads(upload: StatementUpload) -> None:
         duplicate.delete()
 
 
+def _validate_transaction_money(parsed):
+    for item in parsed.transactions:
+        if item.amount is None:
+            raise ValueError("Statement transaction amount is required.")
+        expense_money(item.amount)
+        if item.closing_balance is not None:
+            expense_money(item.closing_balance)
+
+
 def _import_statement_transactions(*, user, upload: StatementUpload, bank_account, parsed: StatementParseResult) -> tuple[list, int]:
+    _validate_transaction_money(parsed)
     if not parsed.transactions:
         return [], 0
 
@@ -493,12 +504,13 @@ def _import_statement_transactions(*, user, upload: StatementUpload, bank_accoun
         "direction",
         "external_reference",
         "raw_description",
+        "transaction_identity",
     )
     existing_fingerprints = {item["transaction_fingerprint"] for item in existing_expenses if item["transaction_fingerprint"]}
     existing_reference_signatures = {
         build_reference_signature(
             transaction_date=item["transaction_date"],
-            amount=item["amount"],
+            amount=identity_amount(item["transaction_identity"], "amount", item["amount"]),
             direction=item["direction"],
             external_reference=item["external_reference"],
             raw_description=item["raw_description"],
@@ -559,7 +571,7 @@ def _import_statement_transactions(*, user, upload: StatementUpload, bank_accoun
                 user=user,
                 bank_account=bank_account,
                 statement_upload=upload,
-                amount=item.amount,
+                amount=expense_money(item.amount),
                 classification=enriched["classification"],
                 category=enriched["category"],
                 payment_mode=enriched["payment_mode"],
@@ -571,7 +583,8 @@ def _import_statement_transactions(*, user, upload: StatementUpload, bank_accoun
                 source="bank_statement",
                 external_reference=enriched["external_reference"],
                 transaction_fingerprint=fingerprint,
-                closing_balance=item.closing_balance,
+                transaction_identity=identity_values(item.amount, item.closing_balance),
+                closing_balance=None if item.closing_balance is None else expense_money(item.closing_balance),
                 counterparty=enriched["counterparty"],
                 company_name=enriched["company_name"],
                 ai_summary=enriched["ai_summary"],

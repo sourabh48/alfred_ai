@@ -431,27 +431,30 @@ def parse_bank_statement(file_obj: BinaryIO, user=None, *, ocr_page_limit: int |
 
 
 def summarize_transactions(transactions: list[ParsedTransaction]) -> dict[str, float | int]:
+    from apps.expenses.money import expense_money, money_float
+
     summary = {
-        "expense_total": 0.0,
-        "loan_total": 0.0,
-        "other_total": 0.0,
-        "income_total": 0.0,
+        "expense_total": expense_money(0),
+        "loan_total": expense_money(0),
+        "other_total": expense_money(0),
+        "income_total": expense_money(0),
         "transaction_count": len(transactions),
     }
 
     for item in transactions:
+        amount = expense_money(item.amount)
         if item.direction == "credit":
-            summary["income_total"] += item.amount
+            summary["income_total"] += amount
             continue
 
         if item.classification == "expense":
-            summary["expense_total"] += item.amount
+            summary["expense_total"] += amount
         elif item.classification == "loan":
-            summary["loan_total"] += item.amount
+            summary["loan_total"] += amount
         else:
-            summary["other_total"] += item.amount
+            summary["other_total"] += amount
 
-    return summary
+    return {key: value if key == "transaction_count" else money_float(value) for key, value in summary.items()}
 
 
 def _read_file_bytes(file_obj: BinaryIO) -> bytes:

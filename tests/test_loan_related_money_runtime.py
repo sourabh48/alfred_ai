@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from alfred_ai.services.document_review import apply_correction
 from apps.expenses.models import Expense
+from apps.expenses.money import identity_values
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanPaymentHistory
 from apps.loans.services.loan_foreclosure_service import loan_foreclosure_service
 from apps.loans.services.loan_intelligence import loan_intelligence_service
@@ -53,6 +54,7 @@ class LoanRelatedMoneyRuntimeTests(TestCase):
             external_reference=loan.loan_account_number, transaction_date=timezone.localdate(),
         )
         values.update(changes)
+        values["transaction_identity"] = identity_values(values["amount"], values.get("closing_balance"))
         return Expense.objects.create(**values)
 
     def payment(self, loan, **changes):
@@ -93,7 +95,8 @@ class LoanRelatedMoneyRuntimeTests(TestCase):
         loan.refresh_from_db()
         expense.refresh_from_db()
         self.assertEqual(loan.total_paid, Decimal("0.01"))
-        self.assertEqual(expense.amount, .005)
+        self.assertEqual(expense.amount, Decimal("0.01"))
+        self.assertEqual(expense.transaction_identity["amount"], "0.005")
 
     def test_unconfirmed_detection_keeps_nullable_balance_and_no_loan_effect(self):
         loan = self.loan(emi="0.01", verification_status="estimated")

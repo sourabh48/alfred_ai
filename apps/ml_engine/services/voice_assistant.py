@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from django.utils import timezone
+from apps.expenses.money import money_float
 
 try:
     import speech_recognition as sr
@@ -297,7 +298,7 @@ class VoiceAssistantService:
         from apps.expenses.models import BankAccount
 
         accounts = BankAccount.objects.filter(user=user, is_active=True)
-        total_balance = sum(acc.current_balance for acc in accounts)
+        total_balance = sum(acc.current_balance or 0 for acc in accounts)
 
         if accounts.count() == 1:
             response = f"Your current balance is {total_balance:,.0f} rupees."
@@ -307,7 +308,7 @@ class VoiceAssistantService:
         return {
             'success': True,
             'intent': 'get_balance',
-            'total_balance': total_balance,
+            'total_balance': money_float(total_balance),
             'account_count': accounts.count(),
             'response': response
         }
@@ -353,7 +354,7 @@ class VoiceAssistantService:
             'success': True,
             'intent': 'get_expenses',
             'period': period_name,
-            'total': total,
+            'total': money_float(total),
             'count': count,
             'response': response
         }

@@ -1,10 +1,12 @@
 from rest_framework import serializers
 
 from .models import BankAccount, Expense, StatementUpload
+from .money import NumericMoneySerializerField
 from .services.transaction_intelligence import hydrate_expense_data
 
 
 class BankAccountSerializer(serializers.ModelSerializer):
+    current_balance = NumericMoneySerializerField(allow_null=True, required=False)
     masked_account_number = serializers.CharField(read_only=True)
     display_name = serializers.CharField(read_only=True)
 
@@ -74,6 +76,8 @@ class StatementUploadSerializer(serializers.ModelSerializer):
 
 
 class ExpenseSerializer(serializers.ModelSerializer):
+    amount = NumericMoneySerializerField()
+    closing_balance = NumericMoneySerializerField(allow_null=True, required=False)
     classification_label = serializers.CharField(source="get_classification_display", read_only=True)
     category_label = serializers.CharField(source="get_category_display", read_only=True)
     source_label = serializers.CharField(source="get_source_display", read_only=True)

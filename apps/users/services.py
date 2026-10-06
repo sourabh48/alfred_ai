@@ -12,7 +12,7 @@ from alfred_ai.services.materialized_cache import invalidate_user_materialized_p
 from apps.behavioral.models import BehavioralSignal
 from apps.budgets.models import Budget
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, CareerResumeLearningMemory
-from apps.expenses.models import BankAccount, Expense, StatementUpload
+from apps.expenses.models import BankAccount, BankAccountMoneySnapshot, Expense, ExpenseMoneySnapshot, StatementUpload
 from apps.family.models import Dependent, FamilyAccountLink
 from apps.integrations.models import CreditReportUpload, CreditScore, EmailConnection, VerifiedExternalInsight
 from apps.investments.models import Investment, InvestmentImportDocument, InvestmentMoneySnapshot
@@ -104,6 +104,8 @@ def clear_user_fed_data(user) -> dict:
         "bank_accounts": BankAccount.objects.filter(user=user).count(),
         "statement_uploads": statement_upload_qs.count(),
         "expenses": Expense.objects.filter(user=user).count(),
+        "expense_money_snapshots": ExpenseMoneySnapshot.objects.filter(user=user).count(),
+        "bank_account_money_snapshots": BankAccountMoneySnapshot.objects.filter(user=user).count(),
         "loans": Loan.objects.filter(user=user).count(),
         "loan_import_documents": loan_import_qs.count(),
         "loan_closure_documents": loan_closure_qs.count(),
@@ -133,6 +135,8 @@ def clear_user_fed_data(user) -> dict:
         CareerResumeLearningMemory.objects.filter(user=user).delete()
         CareerProfile.objects.filter(user=user).delete()
 
+        ExpenseMoneySnapshot.objects.filter(user=user).delete()
+        BankAccountMoneySnapshot.objects.filter(user=user).delete()
         Expense.objects.filter(user=user).delete()
         statement_upload_qs.delete()
         BankAccount.objects.filter(user=user).delete()

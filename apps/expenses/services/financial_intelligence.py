@@ -115,7 +115,7 @@ def _build_financial_intelligence_uncached(user) -> dict:
                 "ALFRED has balance-sheet data, but it still needs transaction history to learn spending patterns."
             ]
             intelligence["behavior"]["strategy"] = "Import a statement to combine cash-flow behavior with the balance-sheet view."
-        return intelligence
+        return _numeric_currency_payload(intelligence)
 
     current_key = (reference_date.year, reference_date.month)
     previous_date = _shift_month(reference_date, -1)
@@ -138,19 +138,19 @@ def _build_financial_intelligence_uncached(user) -> dict:
         if treatment.bucket in {"other", "credit_card_payment", "investment"}
     )
     discretionary_total = sum(item.amount for item in debit_expenses if item.category in DISCRETIONARY_CATEGORIES)
-    savings_rate = ((income_total - debit_total) / income_total) if income_total else 0.0
-    loan_ratio = (loan_total / debit_total) if debit_total else 0.0
-    debt_service_ratio = (sum(item.amount for item in debt_entries) / income_total) if income_total else 0.0
-    discretionary_ratio = (discretionary_total / debit_total) if debit_total else 0.0
+    savings_rate = float((income_total - debit_total) / income_total) if income_total else 0.0
+    loan_ratio = float(loan_total / debit_total) if debit_total else 0.0
+    debt_service_ratio = float(sum(item.amount for item in debt_entries) / income_total) if income_total else 0.0
+    discretionary_ratio = float(discretionary_total / debit_total) if debit_total else 0.0
 
     category_distribution = _build_category_distribution(debit_expenses)
-    lifestyle = _build_lifestyle_profile(category_distribution, debit_total, discretionary_ratio)
+    lifestyle = _build_lifestyle_profile(category_distribution, float(debit_total), discretionary_ratio)
     recurring_commitments = _build_recurring_commitments(debit_expenses)
     spike_days = _build_spike_days(debit_expenses)
     recent_transactions = _serialize_recent_transactions(expenses, transaction_relationships)
     manual_loans = _serialize_loans(loans, today)
     debt_trend = _build_debt_trend(monthly_buckets)
-    monthly_outflows = [bucket["outflow"] for _, bucket in sorted(monthly_buckets.items())]
+    monthly_outflows = [float(bucket["outflow"]) for _, bucket in sorted(monthly_buckets.items())]
     monthly_stress = [
         _build_monthly_stress_score(
             bucket["expense"],
@@ -282,7 +282,7 @@ def _build_financial_intelligence_uncached(user) -> dict:
         }
     )
 
-    return intelligence
+    return _numeric_currency_payload(intelligence)
 
 
 def _financial_revision(user) -> str:
@@ -308,7 +308,7 @@ def _financial_revision(user) -> str:
     return "|".join(
         str(value or "")
         for value in [
-            "loan-related-money-v1",
+            "expense-bank-money-v1",
             user.monthly_income, user.variable_income, user.rent_or_emi, user.city,
             expense_meta["count"], expense_meta["max_id"], expense_meta["max_date"],
             loan_meta["count"], loan_meta["max_id"], loan_meta["max_updated"],
@@ -490,6 +490,17 @@ def _decimal_average(values) -> Decimal:
 
 def _money_float(value) -> float:
     return float(_decimal_amount(value).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP))
+
+
+def _numeric_currency_payload(value):
+    """Django JSON embeds Decimal as strings; retain the numeric finance API."""
+    if isinstance(value, Decimal):
+        return _money_float(value)
+    if isinstance(value, dict):
+        return {key: _numeric_currency_payload(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_numeric_currency_payload(item) for item in value]
+    return value
 
 
 def _percent_float(value) -> float:
@@ -830,7 +841,7 @@ def _build_monthly_buckets(expenses: list[Expense]) -> dict[tuple[int, int], dic
         key = (item.transaction_date.year, item.transaction_date.month)
         bucket = buckets[key]
         treatment = classify_cashflow(item)
-        amount = float(item.amount or 0)
+        amount = _decimal_amount(item.amount)
         if item.direction == "credit":
             bucket["bank_credit"] += amount
         elif item.direction == "debit":
@@ -864,7 +875,7 @@ def _build_monthly_buckets(expenses: list[Expense]) -> dict[tuple[int, int], dic
 
 
 def _empty_month_bucket() -> dict:
-    return {
+    return {key: Decimal("0") if isinstance(value, float) else value for key, value in {
         "income": 0.0,
         "transfer_in": 0.0,
         "other_credit": 0.0,
@@ -879,7 +890,7 @@ def _empty_month_bucket() -> dict:
         "bank_debit": 0.0,
         "outflow": 0.0,
         "count": 0,
-    }
+    }.items()}
 
 
 def _build_category_distribution(expenses: list[Expense]) -> list[dict]:
@@ -890,14 +901,14 @@ def _build_category_distribution(expenses: list[Expense]) -> list[dict]:
         totals[item.category] += item.amount
 
     return [
-        {"key": key, "label": labels.get(key, key.replace("_", " ").title()), "amount": round(amount, 2)}
+        {"key": key, "label": labels.get(key, key.replace("_", " ").title()), "amount": _money_float(amount)}
         for key, amount in totals.most_common(6)
     ]
 
 
 def _build_recurring_commitments(expenses: list[Expense]) -> list[dict]:
     grouped: dict[tuple[str, str], dict] = defaultdict(
-        lambda: {"count": 0, "total": 0.0, "months": set(), "category": "other", "merchant": "Unspecified"}
+        lambda: {"count": 0, "total": Decimal("0"), "months": set(), "category": "other", "merchant": "Unspecified"}
     )
     labels = dict(Expense.CATEGORY_CHOICES)
 
@@ -920,7 +931,7 @@ def _build_recurring_commitments(expenses: list[Expense]) -> list[dict]:
             {
                 "merchant": value["merchant"],
                 "category": labels.get(value["category"], value["category"].title()),
-                "average_amount": round(value["total"] / value["count"], 2),
+                "average_amount": _money_float(value["total"] / value["count"]),
                 "count": value["count"],
                 "cadence": "Recurring",
             }
@@ -931,7 +942,7 @@ def _build_recurring_commitments(expenses: list[Expense]) -> list[dict]:
 
 
 def _build_spike_days(expenses: list[Expense]) -> list[dict]:
-    daily_totals: dict[date, float] = defaultdict(float)
+    daily_totals = defaultdict(lambda: Decimal("0"))
     daily_merchants: dict[date, list[str]] = defaultdict(list)
 
     for item in expenses:
@@ -942,7 +953,7 @@ def _build_spike_days(expenses: list[Expense]) -> list[dict]:
     if len(daily_totals) < 3:
         return []
 
-    totals = list(daily_totals.values())
+    totals = [float(value) for value in daily_totals.values()]
     threshold = mean(totals) + (_series_std(totals) * 1.35)
     spikes = [
         {
@@ -1149,8 +1160,8 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     if loans and not payment_rows:
         payment_rows = fetch_payment_history_rows(user=user)
 
-    liquid_cash = round(sum(max(account.current_balance or 0, 0) for account in accounts if account.account_type != "credit"), 2)
-    credit_liability = round(sum(abs(account.current_balance or 0) for account in accounts if account.account_type == "credit"), 2)
+    liquid_cash = _money_float(sum(max(account.current_balance or 0, 0) for account in accounts if account.account_type != "credit"))
+    credit_liability = _money_float(sum(abs(account.current_balance or 0) for account in accounts if account.account_type == "credit"))
     investment_assets = investment_total_float(sum(item.current_value or 0 for item in investments))
     home_ownership_positions, home_ownership_summary = _build_home_ownership_positions(loans=loans, payment_rows=payment_rows)
     home_loan_asset_proxy_total = round(home_ownership_summary["property_acquisition_cost_total"], 2)
@@ -1193,9 +1204,9 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     if credit_liability:
         liabilities.append({"label": "Credit card liability", "amount": credit_liability})
 
-    total_assets = round(sum(item["amount"] for item in assets), 2)
-    total_liabilities = round(sum(item["amount"] for item in liabilities), 2)
-    net_worth = round(total_assets - total_liabilities, 2)
+    total_assets = _money_float(sum(_decimal_amount(item["amount"]) for item in assets))
+    total_liabilities = _money_float(sum(_decimal_amount(item["amount"]) for item in liabilities))
+    net_worth = _money_float(_decimal_amount(total_assets) - _decimal_amount(total_liabilities))
     ratio = round((total_assets / total_liabilities), 2) if total_liabilities else 0.0
     if total_assets or total_liabilities:
         summary = f"Tracked assets total INR {total_assets:,.0f} and liabilities total INR {total_liabilities:,.0f}."
@@ -1309,6 +1320,7 @@ def _build_vehicle_positions(
 
 
 def _build_monthly_stress_score(expense: float, loan: float, other: float, income: float) -> float:
+    expense, loan, other, income = map(float, (expense, loan, other, income))
     total_outflow = expense + loan + other
     loan_ratio = _safe_ratio(loan, max(total_outflow, 1))
     liquidity_pressure = max(0.0, 1 - _safe_ratio(income, max(total_outflow, 1)))

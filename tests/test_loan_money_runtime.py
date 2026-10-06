@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from apps.expenses.models import Expense
+from apps.expenses.money import identity_values
 from apps.loans.models import Loan, LoanPaymentHistory
 from apps.loans.services.loan_intelligence import loan_intelligence_service
 from apps.loans.services.payment_review import review_loan_payment_match
@@ -87,6 +88,7 @@ class LoanMoneyRuntimeTests(TestCase):
         expense = Expense.objects.create(
             user=self.user, amount=.005, direction="debit",
             transaction_date=timezone.localdate(), description="Legacy half-cent evidence",
+            transaction_identity=identity_values(.005, None),
         )
         LoanPaymentHistory.objects.create(
             loan=loan, payment_date=timezone.localdate() - timedelta(days=1), amount=.005,
@@ -104,7 +106,8 @@ class LoanMoneyRuntimeTests(TestCase):
         self.assertEqual(payment.amount, Decimal("0.01"))
         self.assertEqual(payment.principal_paid, Decimal("0.01"))
         expense.refresh_from_db()
-        self.assertEqual(expense.amount, .005)
+        self.assertEqual(expense.amount, Decimal("0.01"))
+        self.assertEqual(expense.transaction_identity["amount"], "0.005")
 
     def test_detected_half_cent_amount_keeps_cash_evidence_and_half_up_register_cents(self):
         loan = self.loan(remaining_balance="500.10", total_paid="0.01", emi="0.01", interest_rate=0)
@@ -113,6 +116,7 @@ class LoanMoneyRuntimeTests(TestCase):
             merchant=loan.lender, company_name=loan.lender,
             description="Example Housing Finance EMI HOME123456", external_reference="HOME123456",
             transaction_date=timezone.localdate(),
+            transaction_identity=identity_values(.005, None),
         )
         loan_intelligence_service.detect_loan_payments(self.user, [expense])
         loan.refresh_from_db()
@@ -122,7 +126,8 @@ class LoanMoneyRuntimeTests(TestCase):
         self.assertEqual(payment.amount, Decimal("0.01"))
         self.assertEqual(payment.principal_paid, Decimal("0.01"))
         expense.refresh_from_db()
-        self.assertEqual(expense.amount, .005)
+        self.assertEqual(expense.amount, Decimal("0.01"))
+        self.assertEqual(expense.transaction_identity["amount"], "0.005")
 
     def terms(self, **changes):
         values = dict(
