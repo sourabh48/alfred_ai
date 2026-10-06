@@ -271,11 +271,29 @@ Detailed failed-attempt history and contracts are in
 `F:\ALFRED_RECOVERY\m13d-*`. An unrelated untracked restoration verification
 document is preserved and excluded from the M13D commit.
 
-Next action after this source checkpoint: run
-`scripts/rehearse_money_migrations.py --source F:\ALFRED\restored-runtime\db.sqlite3
---output-dir F:\ALFRED_RECOVERY\m13cd-private-rehearsal-20261006`, then independently
-verify its fresh backup and update this checkpoint with reconciliation results.
-The rehearsal opens SQLite only on disposable copies after stable DB/WAL/SHM
-capture. Do not apply M13C or M13D to any live database during this task. Controlled
-live migration requires successful reconciliation, an independently verified fresh
-backup, stopped writers and explicit authorization. Keep all historical backups.
+Validated M13D source commit: `a78ba533b39285745e696b52569a69dafd952d69`.
+The subsequent combined private-copy rehearsal passed for exactly
+`investments.0004_investment_money_decimal` and
+`expenses.0005_expense_bank_money_decimal`: 2 Investment, 1,739 Expense and
+2 BankAccount records/snapshots reconciled, zero currency or aggregate balance
+mismatches, all unrelated fields/tables unchanged, 1,735 unchanged statement
+fingerprints/reference signatures, and 834 preserved transfer legs. The private
+values already had exact cents; no rounding adjustment was needed. Repeat apply
+changed nothing; a second copy reversed to exact original application data.
+SQLite integrity passed and foreign-key violations were zero before/after.
+
+A separate verification process independently proved the fresh backup's schema,
+all 66 SQLite table counts/values through bidirectional SQL EXCEPT, integrity,
+foreign keys and SHA256. Source DB/WAL/SHM bytes still match the capture.
+Private DB unchanged: YES. Readiness for controlled live migration: YES for this
+verified source/database state. No M13C/D live migration, runtime promotion, push,
+release or installer promotion was performed. Detailed private evidence/copies
+are retained at `F:\ALFRED_RECOVERY\m13cd-private-rehearsal-20261006`; safe summary
+is `artifacts/audit/M13D_VERIFICATION_RESULT_20261006.json`.
+
+Exact next action: obtain explicit controlled-live-migration authorization; stop
+all runtime writers, revalidate the independently verified backup against current
+DB/WAL/SHM, promote validated development source to the runtime checkout, apply
+only the two named migrations, reconcile and restart. If bytes changed after
+capture, make and independently verify another fresh backup first. Keep all
+historical backups. Do not restart completed audits or M13C/D implementation.

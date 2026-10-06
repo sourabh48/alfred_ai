@@ -95,8 +95,44 @@ repeat application, and reverses a second copy to the exact original data.
 Detailed hashes and financial totals remain in private evidence outside Git.
 Fresh backup verification must also run independently of its creation helper.
 
-The private-copy rehearsal is pending until both full application gates pass.
-Neither migration is authorized for the live private database by this development
-task. Controlled live migration requires successful reconciliation, an independently
-verified fresh backup, stopped writers and explicit live-migration authorization.
-Keep all retained recovery backups and pristine historical data.
+Both full application gates passed and the validated source was committed as
+`a78ba533b39285745e696b52569a69dafd952d69` before the private-copy rehearsal.
+The combined rehearsal passed against a disposable capture of the restored
+private database. Exactly these two migrations were planned and applied:
+
+- `investments.0004_investment_money_decimal`
+- `expenses.0005_expense_bank_money_decimal`
+
+All 2 Investments, 1,739 Expenses and 2 BankAccounts have owned, applied snapshots
+and reconcile against independently expected cents, with zero per-field or
+aggregate balance mismatches. No original currency value needed rounding in
+this private capture; synthetic tests cover fractional-cent conversion. All
+unrelated columns and application tables, ownership, IDs, source payloads and
+links are unchanged. All 1,735 statement fingerprints and reference signatures
+are identical before/after, preserving the import deduplication contract; 834
+transfer legs remain intact. No account balance was recomputed from transactions.
+SQLite integrity passed; foreign-key violations were zero before and after.
+Repeat migration/apply changed nothing. Reverse on a second disposable copy
+restored the original application data exactly. Live DB/WAL/SHM hashes matched
+before capture, after rehearsal and during independent backup verification.
+
+The fresh pre-migration backup also passed a separate process that does not import
+the creation helper: schema equality, all 66 SQLite table counts, bidirectional
+SQL EXCEPT with zero row mismatches, full integrity, zero foreign-key violations
+and unchanged SHA256. Its evidence and private financial totals/hashes remain in
+`F:\ALFRED_RECOVERY\m13cd-private-rehearsal-20261006`, including
+`private-rehearsal-result.json`, `independent-backup-verification.json`, the fresh
+backup, source shadow, migrated copy and reversed copy. The verifier is retained
+at `F:\ALFRED_RECOVERY\m13d-independent-backup-verification.py`. Keep all copies.
+
+M13D completion: YES. Private DB unchanged: YES. Readiness for a controlled live
+M13C/D migration of this verified source/database state: YES. This is migration
+readiness, not an installer promotion or completion of separate restoration UI
+acceptance. Neither migration has been applied to the live database.
+
+Exact next action: obtain explicit controlled-live-migration authorization; stop
+all runtime writers, recheck that the independently verified backup still matches
+the current DB/WAL/SHM, promote the validated development source to the runtime
+checkout, apply only the two migrations above, reconcile again, then restart.
+If any bytes have changed since capture, create and independently verify a new
+fresh backup before proceeding. Keep historical recovery backups and pristine data.
