@@ -203,3 +203,42 @@ Then use focused source reads after graph orientation:
 rg -n 'FloatField|invested_amount|monthly_sip|current_value|annual_return_rate' apps/investments/models.py apps/investments/serializers.py apps/investments/views.py
 rg -n '_create_or_update_investment|_portfolio_mix|_apply_investment_correction|_retry_investment_document' apps/investments/services/portfolio_intelligence.py alfred_ai/services/document_review.py
 Before any Python command: get_python_environment(filePath="manage.py"), then the isolated variables above.
+
+## M13C completion after Windows restoration — 2026-10-06
+
+M13C Investment currency storage is implemented and verified in the isolated
+`F:\ALFRED_DEV\m13c` worktree on `codex/investment-money-m13c-20261006`, based on
+`5687a82ecb43702e90822f19e958b164dfe4cfdd`. Continue development there. The restored
+source remains in `F:\ALFRED\alfred_ai` on the original development branch and its
+native runtime remains active using `F:\ALFRED\restored-runtime`. No M13C migration
+has been applied to private/operator databases. The code changes are uncommitted
+and have not been merged or pushed.
+
+The three Investment currency fields use bounded HALF_UP Decimal cents and owned
+retained-original/apply-marker/guarded rollback evidence. Numeric API output,
+summary/allocation/rate arithmetic, portfolio mix, canonical assets/tax callers,
+document correction/retry, atomic PDF persistence, explicit-zero behavior and
+owned orphan-snapshot reset are covered. Rates, confidence, NAV and raw evidence
+remain separate. Projection timing and local-month cache semantics are preserved.
+
+Final backend: 709 run, 692 passed, 17 browser skips, exit 0. Full serial Chrome:
+18 passed, zero skips, exit 0. Investment-specific Chrome also passed independently.
+The initial concurrent browser attempt crashed in Windows Python during test-user
+password creation; its log is retained and the serial retry passed. System/drift,
+whitespace and AST-only graph gates passed (7,398 nodes / 19,142 edges).
+Evidence: development `docs/MASTER_M13C_VERIFICATION_20261006.md` and
+`artifacts/audit/M13C_VERIFICATION_RESULT_20261006.json`; logs/proof summaries under
+`F:\ALFRED_RECOVERY\m13c-*`.
+
+Exact next development task: the dedicated Expense.amount, Expense.closing_balance
+and BankAccount.current_balance stage. Start with a scoped Graphify query tracing
+normalization, import fingerprints/deduplication, bank syncing and Loan detection.
+Preserve source evidence, ownership and linkage, and continue isolated validation.
+Do not repeat completed M13C gates without new source changes or failures.
+
+Restoration and safe operator signing-key retirement were completed separately;
+see `docs/WINDOWS_RESTORATION_VERIFIED_20261006.md`. Local real-account sign-in and
+private finance/Travel/media UI acceptance remain unconfirmed, and historical data
+plus the Docker VHDX require classification. Keep the Desktop backup, pristine
+copies and recovery repositories. Do not promote M13C to the operator runtime as
+part of development testing.

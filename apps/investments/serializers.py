@@ -1,8 +1,25 @@
 from rest_framework import serializers
+from .money import investment_money, investment_total_float
 from .models import Investment, InvestmentImportDocument
 
 
+class InvestmentCurrencySerializerField(serializers.Field):
+    def to_internal_value(self, data):
+        if data is None:
+            raise serializers.ValidationError("Investment amounts cannot be null.")
+        try:
+            return investment_money(data)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
+    def to_representation(self, value):
+        return investment_total_float(value)
+
+
 class InvestmentSerializer(serializers.ModelSerializer):
+    invested_amount = InvestmentCurrencySerializerField(required=False)
+    monthly_sip = InvestmentCurrencySerializerField(required=False)
+    current_value = InvestmentCurrencySerializerField(required=False)
     gain_loss = serializers.FloatField(read_only=True)
 
     class Meta:

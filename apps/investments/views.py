@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import date
+from decimal import Decimal
 
 from django.db.models import Count, Max
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
@@ -19,6 +20,7 @@ from apps.reports.services import operational_logging_service
 from apps.integrations.services.verified_intelligence import proof_contract_payload
 from .services.portfolio_intelligence import portfolio_intelligence_service
 from .models import Investment, InvestmentImportDocument
+from .money import investment_money, investment_total_float
 from .serializers import InvestmentImportDocumentSerializer, InvestmentSerializer
 
 
@@ -97,7 +99,7 @@ class InvestmentGrowthView(APIView):
 
 def _investment_revision(user) -> str:
     state = Investment.objects.filter(user=user).aggregate(count=Count("id"), latest=Max("updated_at"))
-    return f"investments:{state['count']}:{state['latest'].isoformat() if state['latest'] else '0'}"
+    return f"investments-money-v1:{state['count']}:{state['latest'].isoformat() if state['latest'] else '0'}"
 
 
 def _investment_summary_payload(user) -> dict:
@@ -106,7 +108,7 @@ def _investment_summary_payload(user) -> dict:
     total_invested = sum(item.invested_amount for item in investments)
     total_sip = sum(item.monthly_sip for item in investments)
     weighted_return = (
-        sum(item.current_value * item.annual_return_rate for item in investments) / total_value if total_value else 0.0
+        sum(item.current_value * Decimal(str(item.annual_return_rate)) for item in investments) / total_value if total_value else 0.0
     )
     gain_loss = total_value - total_invested
     analysis = portfolio_intelligence_service.analyze_portfolio_risk(user)
@@ -117,11 +119,11 @@ def _investment_summary_payload(user) -> dict:
 
     return {
         "summary": {
-            "total_value": round(total_value, 2),
-            "total_invested": round(total_invested, 2),
-            "monthly_sip": round(total_sip, 2),
-            "annual_return": round(weighted_return, 2),
-            "gain_loss": round(gain_loss, 2),
+            "total_value": investment_total_float(total_value),
+            "total_invested": investment_total_float(total_invested),
+            "monthly_sip": investment_total_float(total_sip),
+            "annual_return": float(round(weighted_return, 2)),
+            "gain_loss": investment_total_float(gain_loss),
             "risk": _portfolio_risk(investments),
             "positions": len(investments),
         },
@@ -132,9 +134,9 @@ def _investment_summary_payload(user) -> dict:
         "grounding": {
             "history": {
                 "positions": len(investments),
-                "total_value": round(total_value, 2),
-                "total_invested": round(total_invested, 2),
-                "monthly_sip": round(total_sip, 2),
+                "total_value": investment_total_float(total_value),
+                "total_invested": investment_total_float(total_invested),
+                "monthly_sip": investment_total_float(total_sip),
             },
             "evidence": evidence,
             "freshness": evidence_freshness,
@@ -154,7 +156,7 @@ def _investment_summary_payload(user) -> dict:
 
 def _investment_allocation_payload(user) -> dict:
     investments = list(Investment.objects.filter(user=user))
-    buckets: dict[str, float] = defaultdict(float)
+    buckets: dict[str, Decimal] = defaultdict(Decimal)
     labels = dict(Investment.ASSET_TYPES)
 
     for item in investments:
@@ -163,7 +165,7 @@ def _investment_allocation_payload(user) -> dict:
     ordered = sorted(buckets.items(), key=lambda pair: pair[1], reverse=True)
     return {
         "labels": [labels.get(key, key.replace("_", " ").title()) for key, _ in ordered],
-        "values": [round(value, 2) for _, value in ordered],
+        "values": [investment_total_float(value) for _, value in ordered],
     }
 
 
@@ -178,15 +180,15 @@ def _investment_growth_payload(user, *, as_of: date | None = None) -> dict:
         target_year = today.year + ((today.month - 1 + month_index) // 12)
         target_month = ((today.month - 1 + month_index) % 12) + 1
         labels.append(date(target_year, target_month, 1).strftime("%b %Y"))
-        projected_value = 0.0
+        projected_value = Decimal("0")
         for item in investments:
-            projected_value += _project_position_value(
+            projected_value += _project_position_money(
                 current_value=item.current_value,
                 monthly_sip=item.monthly_sip,
                 annual_return_rate=item.annual_return_rate,
                 months=month_index,
             )
-        values.append(round(projected_value, 2))
+        values.append(investment_total_float(projected_value))
 
     return {
         "labels": labels,
@@ -206,29 +208,34 @@ def _portfolio_risk(investments: list[Investment]) -> str:
     if not investments:
         return "No data"
 
-    total_value = sum(item.current_value for item in investments) or 1.0
+    total_value = sum(item.current_value for item in investments) or Decimal("1")
     high_risk_weight = sum(
         item.current_value
         for item in investments
         if item.asset_type in {"equity", "crypto", "reit"} or item.risk_level.lower() == "high"
     )
     ratio = high_risk_weight / total_value
-    if ratio >= 0.65:
+    if ratio >= Decimal("0.65"):
         return "High"
-    if ratio >= 0.35:
+    if ratio >= Decimal("0.35"):
         return "Moderate"
     return "Conservative"
 
 
-def _project_position_value(*, current_value: float, monthly_sip: float, annual_return_rate: float, months: int) -> float:
+def _project_position_value(**kwargs) -> float:
+    """Preserve the numeric helper contract for existing projection callers."""
+    return float(_project_position_money(**kwargs))
+
+
+def _project_position_money(*, current_value, monthly_sip, annual_return_rate, months: int) -> Decimal:
     """Start at the recorded value; each future month adds SIP before growth.
 
     The user-entered annual percentage is divided by 1200 to obtain the
     assumed monthly rate. Month zero includes no new contribution or growth.
     """
-    value = float(current_value or 0)
-    monthly_rate = float(annual_return_rate or 0) / 1200
-    contribution = float(monthly_sip or 0)
+    value = investment_money(current_value)
+    monthly_rate = Decimal(str(annual_return_rate or 0)) / Decimal("1200")
+    contribution = investment_money(monthly_sip)
     for _ in range(months):
         value = (value + contribution) * (1 + monthly_rate)
     return value
@@ -262,7 +269,10 @@ def import_investment_pdf(request):
     if not upload:
         return Response({"error": "Upload an investment PDF or statement first."}, status=status.HTTP_400_BAD_REQUEST)
 
-    parsed = portfolio_intelligence_service.parse_portfolio_pdf(upload, request.user, filename=upload.name)
+    try:
+        parsed = portfolio_intelligence_service.parse_portfolio_pdf(upload, request.user, filename=upload.name)
+    except ValueError:
+        return Response({"error": "Investment document contains an invalid currency amount."}, status=status.HTTP_400_BAD_REQUEST)
     linked_investments = list(parsed.get("investments") or [])
 
     with transaction.atomic():

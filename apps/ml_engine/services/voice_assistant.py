@@ -426,7 +426,7 @@ class VoiceAssistantService:
             'success': True,
             'intent': 'get_investments',
             'investment_count': count,
-            'total_value': total_value,
+            'total_value': float(total_value),
             'response': response
         }
 

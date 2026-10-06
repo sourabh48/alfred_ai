@@ -741,7 +741,7 @@ def _build_networth_payload(user) -> dict:
         "net_worth": net_worth,
         "assets": assets_breakdown,
         "liabilities": liabilities_breakdown,
-        "investment_breakdown": {k: round(v, 2) for k, v in investment_by_type.items()},
+        "investment_breakdown": {k: float(round(v, 2)) for k, v in investment_by_type.items()},
         "loan_breakdown": {k: float(round(v, 2)) for k, v in loan_by_type.items()},
         "metrics": {
             "debt_to_asset_ratio": round(debt_to_asset_ratio, 2),

@@ -18,6 +18,7 @@ from apps.integrations.models import CreditReportUpload, CreditScore
 from apps.integrations.services.credit_report_parser import credit_report_parser
 from apps.integrations.views import _persist_uploaded_credit_score
 from apps.investments.models import Investment, InvestmentImportDocument
+from apps.investments.money import INVESTMENT_MONEY_FIELDS, investment_money, investment_total_float
 from apps.investments.services import portfolio_intelligence_service
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument
 from apps.loans.money import loan_money, loan_money_float
@@ -547,6 +548,10 @@ def build_review_queue(user, *, limit: int = 24) -> list[dict]:
 
 
 def apply_correction(user, *, scope: str, document_id: int, corrections: dict) -> dict:
+    if scope == "investment_document":
+        for field in INVESTMENT_MONEY_FIELDS:
+            if field in corrections and corrections[field] in (None, ""):
+                raise ValueError("Investment currency corrections require a finite amount.")
     normalized = {key: value for key, value in (corrections or {}).items() if value not in (None, "", [])}
     if scope == "statement_document":
         item = _apply_statement_correction(user, document_id, normalized)
@@ -1720,7 +1725,7 @@ def _upsert_retry_investments(
             for key in ("invested_amount", "monthly_sip", "current_value", "annual_return_rate"):
                 if item.get(key) in (None, ""):
                     continue
-                value = float(item[key])
+                value = float(item[key]) if key == "annual_return_rate" else investment_money(item[key])
                 # Portfolio extraction uses zero when an amount was not found.
                 # Only an explicit correction should erase a saved amount.
                 if preserve_existing and value == 0 and not (index == 0 and key in (primary_corrections or {})):
@@ -2061,8 +2066,8 @@ def _serialize_investment(document: InvestmentImportDocument) -> dict:
                 or first_payload.get("account_number", "")
                 or payload.get("account_number", "")
             ),
-            "invested_amount": (first_linked.invested_amount if first_linked else 0) or first_payload.get("invested_amount", 0),
-            "current_value": (first_linked.current_value if first_linked else 0) or first_payload.get("current_value", 0),
+            "invested_amount": investment_total_float(first_linked.invested_amount) if first_linked else first_payload.get("invested_amount", 0),
+            "current_value": investment_total_float(first_linked.current_value) if first_linked else first_payload.get("current_value", 0),
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
@@ -2712,6 +2717,9 @@ def _apply_loan_closure_correction(user, document_id: int, corrections: dict) ->
 
 @transaction.atomic
 def _apply_investment_correction(user, document_id: int, corrections: dict) -> dict:
+    for field in INVESTMENT_MONEY_FIELDS:
+        if field in corrections and corrections[field] in (None, ""):
+            raise ValueError("Investment currency corrections require a finite amount.")
     document = InvestmentImportDocument.objects.prefetch_related("linked_investments").get(user=user, pk=document_id)
     payload = dict(document.extracted_payload or {})
     accepted = dict(payload.get("accepted_corrections") or {})
@@ -2729,7 +2737,7 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
     )), None) if primary_item else (previous_investments[0] if previous_investments else None)
     if previous_primary:
         primary_item = {
-            **{field: getattr(previous_primary, field) for field in (
+            **{field: (investment_total_float(getattr(previous_primary, field)) if field in INVESTMENT_MONEY_FIELDS else getattr(previous_primary, field)) for field in (
                 "asset_name", "asset_type", "institution", "account_number", "invested_amount",
                 "current_value", "monthly_sip", "annual_return_rate", "risk_level", "notes",
             )},
@@ -2741,12 +2749,14 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
         primary_item["asset_type"] = str(corrections["asset_type"]).strip()
     if corrections.get("account_number"):
         primary_item["account_number"] = str(corrections["account_number"]).strip()
-    invested_amount = _parse_float(corrections.get("invested_amount"))
+    invested_amount = investment_money(corrections["invested_amount"]) if "invested_amount" in corrections else None
     if invested_amount is not None:
-        primary_item["invested_amount"] = invested_amount
-    current_value = _parse_float(corrections.get("current_value"))
+        primary_item["invested_amount"] = investment_total_float(invested_amount)
+    current_value = investment_money(corrections["current_value"]) if "current_value" in corrections else None
     if current_value is not None:
-        primary_item["current_value"] = current_value
+        primary_item["current_value"] = investment_total_float(current_value)
+    if "monthly_sip" in corrections:
+        primary_item["monthly_sip"] = investment_total_float(investment_money(corrections["monthly_sip"]))
     if corrections.get("broker_name"):
         document.broker_name = str(corrections["broker_name"]).strip()
         payload["broker_name"] = document.broker_name

@@ -13,6 +13,7 @@ from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.models import BankAccount, Expense
 from apps.expenses.services.cashflow_treatment import classify_cashflow, variable_spend_rows
 from apps.integrations.models import CreditReportUpload
+from apps.investments.money import investment_total_float
 from apps.investments.models import Investment
 from apps.loans.models import Loan, LoanForeclosureSnapshot, LoanPaymentHistory
 from apps.loans.money import loan_money, loan_money_float
@@ -1150,7 +1151,7 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
 
     liquid_cash = round(sum(max(account.current_balance or 0, 0) for account in accounts if account.account_type != "credit"), 2)
     credit_liability = round(sum(abs(account.current_balance or 0) for account in accounts if account.account_type == "credit"), 2)
-    investment_assets = round(sum(item.current_value or 0 for item in investments), 2)
+    investment_assets = investment_total_float(sum(item.current_value or 0 for item in investments))
     home_ownership_positions, home_ownership_summary = _build_home_ownership_positions(loans=loans, payment_rows=payment_rows)
     home_loan_asset_proxy_total = round(home_ownership_summary["property_acquisition_cost_total"], 2)
     home_loan_upfront_cash_total = round(home_ownership_summary["upfront_cash_invested_total"], 2)

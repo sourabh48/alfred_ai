@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from .money import InvestmentMoneyField, investment_money, investment_total_float
 
 
 class Investment(models.Model):
@@ -18,9 +19,9 @@ class Investment(models.Model):
     asset_name = models.CharField(max_length=120)
     institution = models.CharField(max_length=120, blank=True)
     account_number = models.CharField(max_length=64, blank=True)
-    invested_amount = models.FloatField(default=0)
-    monthly_sip = models.FloatField(default=0)
-    current_value = models.FloatField(default=0)
+    invested_amount = InvestmentMoneyField(max_digits=14, decimal_places=2, default=0)
+    monthly_sip = InvestmentMoneyField(max_digits=14, decimal_places=2, default=0)
+    current_value = InvestmentMoneyField(max_digits=14, decimal_places=2, default=0)
     annual_return_rate = models.FloatField(default=0)
     risk_level = models.CharField(max_length=20, blank=True)
     notes = models.TextField(blank=True)
@@ -35,7 +36,7 @@ class Investment(models.Model):
 
     @property
     def gain_loss(self) -> float:
-        return round((self.current_value or 0) - (self.invested_amount or 0), 2)
+        return investment_total_float(investment_money(self.current_value) - investment_money(self.invested_amount))
 
 
 class InvestmentImportDocument(models.Model):
@@ -69,3 +70,14 @@ class InvestmentImportDocument(models.Model):
     def __str__(self):
         broker = self.broker_name or "investment"
         return f"{self.user.username} - {broker} - {self.file_name}"
+
+
+class InvestmentMoneySnapshot(models.Model):
+    original_investment_id = models.PositiveBigIntegerField(unique=True)
+    investment = models.ForeignKey(Investment, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="investment_money_snapshots")
+    source_values = models.JSONField()
+    normalized_values = models.JSONField()
+    policy = models.CharField(max_length=30, default="investment-money-v1")
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)

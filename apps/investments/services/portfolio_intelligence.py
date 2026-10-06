@@ -13,12 +13,13 @@ from typing import Dict, List, Optional, BinaryIO
 from bs4 import BeautifulSoup
 import requests
 from django.core.cache import cache
-from django.db.models import Sum, F
+from django.db import transaction
 from django.utils import timezone
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot
+from apps.investments.money import investment_money, investment_total_float
 from apps.investments.models import Investment
 
 
@@ -105,12 +106,13 @@ class PortfolioIntelligenceService:
                 "payload": parsed.get("payload", {}),
             }
 
-        for inv_data in parsed.get("investments", []):
-            investment, created = self._create_or_update_investment(user, inv_data)
-            if created:
-                investments_created.append(investment)
-            else:
-                investments_updated.append(investment)
+        with transaction.atomic():
+            for inv_data in parsed.get("investments", []):
+                investment, created = self._create_or_update_investment(user, inv_data)
+                if created:
+                    investments_created.append(investment)
+                else:
+                    investments_updated.append(investment)
 
         return {
             "success": True,
@@ -299,9 +301,9 @@ class PortfolioIntelligenceService:
 
     def analyze_portfolio_risk(self, user) -> Dict[str, any]:
         """Analyze portfolio risk profile and diversification."""
-        investments = Investment.objects.filter(user=user)
+        investments = list(Investment.objects.filter(user=user))
 
-        if not investments.exists():
+        if not investments:
             return {
                 "risk_score": 0,
                 "risk_level": "UNKNOWN",
@@ -309,18 +311,16 @@ class PortfolioIntelligenceService:
                 "recommendations": ["No investments found. Start investing to build wealth."],
             }
 
-        total_value = investments.aggregate(total=Sum("current_value"))["total"] or 0
+        total_value = sum(item.current_value for item in investments)
 
         # Calculate asset allocation
         asset_breakdown = {}
         for asset_type, label in Investment.ASSET_TYPES:
-            type_value = investments.filter(asset_type=asset_type).aggregate(
-                total=Sum("current_value")
-            )["total"] or 0
+            type_value = sum(item.current_value for item in investments if item.asset_type == asset_type)
             if type_value > 0:
                 asset_breakdown[label] = {
-                    "value": round(type_value, 2),
-                    "percentage": round((type_value / total_value * 100), 2),
+                    "value": investment_total_float(type_value),
+                    "percentage": float(round((type_value / total_value * 100), 2)),
                 }
 
         # Risk scoring (0-100)
@@ -340,7 +340,7 @@ class PortfolioIntelligenceService:
             "risk_score": round(risk_score, 2),
             "risk_level": risk_level,
             "diversification_score": round(diversification_score, 2),
-            "total_portfolio_value": round(total_value, 2),
+            "total_portfolio_value": investment_total_float(total_value),
             "asset_allocation": asset_breakdown,
             "recommendations": recommendations,
         }
@@ -374,14 +374,12 @@ class PortfolioIntelligenceService:
             })
 
         # Analyze user's portfolio and suggest actions
-        user_investments = Investment.objects.filter(user=user)
+        user_investments = list(Investment.objects.filter(user=user))
 
         # Suggest rebalancing if needed
-        if user_investments.exists():
-            total_value = user_investments.aggregate(total=Sum("current_value"))["total"] or 0
-            equity_percentage = (user_investments.filter(
-                asset_type="equity"
-            ).aggregate(total=Sum("current_value"))["total"] or 0) / total_value * 100 if total_value > 0 else 0
+        if user_investments:
+            total_value = sum(item.current_value for item in user_investments)
+            equity_percentage = sum(item.current_value for item in user_investments if item.asset_type == "equity") / total_value * 100 if total_value > 0 else 0
 
             if equity_percentage > 70:
                 suggestions.append({
@@ -842,17 +840,17 @@ class PortfolioIntelligenceService:
 
     def _portfolio_mix(self, user) -> dict:
         investments = list(Investment.objects.filter(user=user).only("asset_type", "current_value"))
-        total_value = sum(float(item.current_value or 0) for item in investments) or 0.0
+        total_value = sum(item.current_value for item in investments)
         if not total_value:
             return {"equity_pct": 0.0, "debt_pct": 0.0, "gold_pct": 0.0, "hybrid_pct": 0.0}
         equity_types = {"equity", "mutual_fund", "reit", "crypto"}
         debt_types = {"debt", "cash"}
         gold_types = {"gold"}
         return {
-            "equity_pct": round(sum(item.current_value for item in investments if item.asset_type in equity_types) / total_value * 100, 2),
-            "debt_pct": round(sum(item.current_value for item in investments if item.asset_type in debt_types) / total_value * 100, 2),
-            "gold_pct": round(sum(item.current_value for item in investments if item.asset_type in gold_types) / total_value * 100, 2),
-            "hybrid_pct": round(sum(item.current_value for item in investments if item.asset_type == "mutual_fund") / total_value * 100, 2),
+            "equity_pct": float(round(sum(item.current_value for item in investments if item.asset_type in equity_types) / total_value * 100, 2)),
+            "debt_pct": float(round(sum(item.current_value for item in investments if item.asset_type in debt_types) / total_value * 100, 2)),
+            "gold_pct": float(round(sum(item.current_value for item in investments if item.asset_type in gold_types) / total_value * 100, 2)),
+            "hybrid_pct": float(round(sum(item.current_value for item in investments if item.asset_type == "mutual_fund") / total_value * 100, 2)),
         }
 
     def _market_regime(self, *, market_return: float, vix: float) -> dict:
@@ -1034,8 +1032,8 @@ class PortfolioIntelligenceService:
             institution=inv_data.get("institution", ""),
             defaults={
                 "asset_type": inv_data.get("asset_type", "equity"),
-                "invested_amount": inv_data.get("invested_amount", 0),
-                "current_value": inv_data.get("current_value", 0),
+                "invested_amount": investment_money(inv_data.get("invested_amount", 0)),
+                "current_value": investment_money(inv_data.get("current_value", 0)),
                 "annual_return_rate": inv_data.get("annual_return_rate", 0),
             },
         )
