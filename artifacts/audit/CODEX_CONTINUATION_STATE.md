@@ -762,3 +762,83 @@ For subsequent Django regressions, first obtain the configured interpreter,
 then use the existing isolated run-development-tests.ps1 runner with relevant
 labels. Never load or migrate F:\ALFRED\restored-runtime\db.sqlite3 in development.
 Development remains ACTIVE. M14G is source-validated, not a live rollout.
+
+## 2026-10-07 - M14H Family Growth error hardening (development only)
+
+User milestone M14H is COMPLETE. This names the Family Growth error slice of
+backlog M14F; the older M14H raw-document-retention issue remains open.
+Implementation commit: 391bad5def84dab31611923ffce0fe6e08aa4230.
+Development checkout: F:\ALFRED_DEV\m13c.
+Branch: codex/expense-bank-money-m13d-20261006. Source started at ea0747d.
+
+Fixed endpoint: GET /api/family/growth/. Unexpected baseline, ORM, cache,
+projection, and reference failures preserve HTTP 500 with a fixed safe message
+and an opaque error_id. Shared safe_error_response extracts the already-tested
+Career policy: ERROR-level logs contain only exception class/reference and
+structured error_id/exception_type; no exception body, chain, stack, request
+body or financial payload. Career's three existing callers retain their API
+status/message/field contracts. No financial arithmetic or consent changes.
+Family public reference evidence excludes notes and last_refresh_error,
+including nested proof/freshness output. New cache revision bypasses pre-fix
+materialized payloads containing diagnostic text. Stored evidence is unmodified.
+Expected controlled validation, 400/403/404/405, session-only auth, CSRF,
+participant scoping and M14G ownership/opt-in/revocation remain enforced.
+No migration, dependency, runtime configuration or UI source change.
+
+Files: alfred_ai/services/api_errors.py; apps/family/views.py;
+apps/career/views.py; tests/test_family_api_errors.py;
+tests/test_career_api_errors.py; tests/test_user_data_browser.py.
+
+Regressions first: 9 new Family tests reproduced 10 failing assertions/subtests,
+0 errors in 7.831 s. Initial focused Family/Career gate: 14 passed, 0 failures,
+11.285 s. Final affected integration gate: 62 passed, 0 failures/skips,
+76.357 s across Family errors/links, Career errors/recruiter/projection,
+session/CSRF and auth pages; includes strengthened root/Django log assertions.
+Gates overlap; do not add them as distinct backend tests. No full suite rerun.
+Final real Chrome gate: 2 passed, 0 failures/skips, 37.744 s; driver-backed
+summary true. Safe failure display/recovery plus owner sharing opt-in and
+revocation verified using synthetic accounts only. Initial Chrome recovery
+assertion timed out because CSS uppercases the label; assertion now casefolds
+displayed text. Failed run evidence preserved, not claimed as a passing gate.
+No production UI correction was required. Actual screenshots and text captures
+are under m14h-browser-final\user-data (summary's artifact inventory is empty).
+Backend/red/Chrome logs: F:\ALFRED_DEV\isolated-tests\m14h-*.log.
+Final Chrome summary: m14h-browser-final\browser_regression_summary.json.
+
+All backend/browser storage and credentials are synthetic isolated fixtures;
+auto-training disabled, providers mocked. Source/staged whitespace review PASS.
+Final graphify AST/no-cluster update PASS: 7608 nodes, 19787 edges; no semantic
+provider/API calls. Prior 718 backend/19 Chrome baseline was not repeated.
+Live checkout remains a9d096ea55839269fe6fce14d4f11ea2cbf05336. Live private DB
+was not opened, written or migrated; source not promoted. Backup/recovery assets
+preserved. Pre-existing untracked restoration document remains untouched.
+No credential changes or external paid services. Development remains ACTIVE.
+
+Current task: preserve this validated checkpoint and select the next verified
+unresolved P0 security item. M14D throttles, M14E upload caps, other HTTP/error
+paths, raw-document retention, token re-encryption and remaining monetary
+fields stay open until targeted checks establish completion. Do not repeat
+M13C/D, M14G, completed Career fixes or inferred-loan protection.
+
+Post-M14H assessment (validated source committed and checkpoint preserved first):
+NEXT PRIORITY: M14D scoped Family invitation creation/acceptance throttling,
+hosted Codex. Current FamilyAccountLinkListCreateView/AcceptView have no throttle;
+REST_FRAMEWORK has no DEFAULT_THROTTLE_CLASSES/RATES; configured middleware and
+Family services contain no rate-limit guard. This is a verified unresolved P0,
+not a rerun of completed auth/password/CSRF work. Preserve read-only snapshots,
+sharing revocation and participant scoping; bound invite generation and invalid
+code attempts, with isolated 429/retry/account-isolation/CSRF regressions first.
+Do not claim a global authentication brute-force fix from this bounded slice.
+No throttle implementation or tests added in the M14H commit.
+T09 telemetry remains deferred behind open P0 issues. Historical Docker
+classification remains deferred recovery housekeeping, not a development block.
+M14G consent migration remains source-only, not applied to the live database.
+
+EXACT NEXT COMMAND:
+rg -n 'FamilyAccountLink(ListCreate|Accept)View|THROTTLE|throttle_classes' F:\ALFRED_DEV\m13c\apps\family\views.py F:\ALFRED_DEV\m13c\alfred_ai\settings.py
+Then add scoped throttle regressions before the guard. Get the configured Python
+environment before using the existing isolated run-development-tests.ps1 runner
+with Family/session test labels. Never load the live private DB for development.
+The implementation SHA above identifies validated source; the later checkpoint
+commit contains only this file and ALFRED_DEEP_REVIEW_BACKLOG.md. Use git rev-parse
+HEAD for the current checkpoint SHA; do not confuse it with the live source HEAD.
