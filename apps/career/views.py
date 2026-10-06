@@ -1,4 +1,6 @@
 from datetime import timedelta
+import logging
+from uuid import uuid4
 
 from django.db.models import Count, Max
 from django.utils import timezone
@@ -21,6 +23,14 @@ from apps.reports.services import operational_logging_service
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 from .serializers import CareerJobAnalysisSerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
+
+
+def _career_error_response(exc, message, *, field="detail", status_code=status.HTTP_400_BAD_REQUEST):
+    error_id = uuid4().hex
+    logging.getLogger(__name__).error(
+        "Career request failed; error_id=%s; exception_type=%s", error_id, type(exc).__name__,
+    )
+    return Response({field: message, "error_id": error_id}, status=status_code)
 
 
 def _get_profile(user):
@@ -436,7 +446,7 @@ class CareerRecruiterMatchView(APIView):
                 filename=getattr(attachment, "name", ""),
             )
         except Exception as exc:
-            return Response({"detail": f"Recruiter intake could not be parsed: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
+            return _career_error_response(exc, "Recruiter intake could not be parsed. Check the text or attachment and try again.")
 
         fit = job_intelligence.compare_resume_to_job(resume_payload, snapshot)
         market = job_intelligence.market_outlook(snapshot.title or profile.role, snapshot.company, macro=macro)
@@ -563,7 +573,7 @@ class CareerJobMatchView(APIView):
         try:
             job_snapshot = job_intelligence.parse_job_page(job_url)
         except Exception as exc:
-            return Response({"detail": f"Job page could not be parsed: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
+            return _career_error_response(exc, "Job page could not be parsed. Check the URL and try again.")
 
         fit = job_intelligence.compare_resume_to_job(resume_payload, job_snapshot)
         market = job_intelligence.market_outlook(job_snapshot.title or profile.role, job_snapshot.company, macro=macro)
@@ -712,8 +722,11 @@ def career_projection(request):
                 "employment_signals": income_signals,
             }
         )
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
+    except Exception as exc:
+        return _career_error_response(
+            exc, "Career projection is temporarily unavailable. Please try again.",
+            field="error", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(["GET"])
