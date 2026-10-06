@@ -216,12 +216,15 @@ class FamilyInvitationThrottleTests(TestCase):
             self.assertTrue(all(record.exc_info is None for record in logs.records))
             self.assertFalse(FamilyAccountLink.objects.exists())
 
-    def test_nonpositive_configuration_cannot_disable_protection(self):
+    def test_invalid_configuration_cannot_disable_protection(self):
         for config in ({"ALFRED_FAMILY_INVITE_CREATE_LIMIT": 0},
-                       {"ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS": -1}):
-            with override_settings(**config):
+                       {"ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS": -1},
+                       {"ALFRED_FAMILY_INVITE_THROTTLE_DIR": None},
+                       {"ALFRED_FAMILY_INVITE_THROTTLE_DIR": "relative-protection-store"}):
+            with override_settings(**config), patch("apps.family.throttles.Cache") as store:
                 response = self.post(self.owner_client, CREATE)
             self.assertEqual(response.status_code, 503)
+            store.assert_not_called()
             self.assertFalse(FamilyAccountLink.objects.exists())
 
     def test_unexpected_invitation_service_failures_use_class_only_logs(self):

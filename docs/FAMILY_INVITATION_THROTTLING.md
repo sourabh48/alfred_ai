@@ -17,7 +17,7 @@ Set these environment variables in untracked local configuration:
 
 Limits and windows must be positive. `ALFRED_FAMILY_INVITE_THROTTLE_DIR` defaults
 to `ALFRED_DATA_DIR/artifacts/security/family-invites` (checkout root when the data
-directory is unset). Use a separate directory on local disk, shared by all app
+directory is unset). Use an absolute, separate directory on local disk, shared by all app
 processes on this one host; do not reuse the ordinary cache or clear active
 protection state. This store uses the already installed diskcache dependency.
 

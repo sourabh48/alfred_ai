@@ -1,4 +1,6 @@
 """Account-scoped, atomic invitation limits for the local/LAN runtime."""
+from pathlib import Path
+
 from django.conf import settings
 from django.utils import timezone
 from diskcache import Cache
@@ -17,8 +19,11 @@ def reserve_invitation_attempt(user_id, scope, limit, window_seconds):
     """Return a retry delay, or atomically reserve one rolling-window attempt."""
     if limit < 1 or window_seconds < 1:
         raise ValueError("Invitation limits must be positive")
+    directory = settings.ALFRED_FAMILY_INVITE_THROTTLE_DIR
+    if not directory or not Path(directory).is_absolute():
+        raise ValueError("Invitation protection requires an absolute persistent directory")
     # Dedicated, non-evicting store: ordinary cache clearing cannot reset quotas.
-    with Cache(settings.ALFRED_FAMILY_INVITE_THROTTLE_DIR, timeout=5,
+    with Cache(directory, timeout=5,
                eviction_policy="none", cull_limit=0) as store, store.transact():
         now = timezone.now().timestamp()
         store.expire()
