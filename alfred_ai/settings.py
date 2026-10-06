@@ -303,6 +303,14 @@ REST_FRAMEWORK = {
     ],
 }
 
+# Persistent, account-scoped Family invitation abuse protection (not global).
+ALFRED_FAMILY_INVITE_THROTTLE_DIR = env("ALFRED_FAMILY_INVITE_THROTTLE_DIR", default=str(
+    Path(os.environ.get("ALFRED_DATA_DIR") or BASE_DIR) / "artifacts" / "security" / "family-invites"))
+ALFRED_FAMILY_INVITE_CREATE_LIMIT = env.int("ALFRED_FAMILY_INVITE_CREATE_LIMIT", default=5)
+ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS = env.int("ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS", default=3600)
+ALFRED_FAMILY_INVITE_ACCEPT_LIMIT = env.int("ALFRED_FAMILY_INVITE_ACCEPT_LIMIT", default=10)
+ALFRED_FAMILY_INVITE_ACCEPT_WINDOW_SECONDS = env.int("ALFRED_FAMILY_INVITE_ACCEPT_WINDOW_SECONDS", default=600)
+
 
 # ---------------------------------------------------------
 # CACHE

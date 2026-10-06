@@ -16,6 +16,7 @@ from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 from .models import Dependent, FamilyAccountLink
 from .serializers import DependentSerializer, FamilyFinancialSharingSerializer
+from .throttles import FamilyInvitationAcceptThrottle, FamilyInvitationCreateThrottle
 from .services import (
     accept_family_link_code,
     accepted_family_links_for_user,
@@ -57,29 +58,44 @@ class DependentDetailView(RetrieveUpdateDestroyAPIView):
 
 class FamilyAccountLinkListCreateView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [FamilyInvitationCreateThrottle]
 
     def get(self, request):
         return Response(build_family_link_snapshot(request.user))
 
     def post(self, request):
-        link, code = create_family_link_invite(request.user)
-        invalidate_user_materialized_payloads(request.user.id, reason="family_link_invite_created")
-        payload = build_family_link_snapshot(request.user)
-        payload["invite"] = _serialize_one_time_invite(link, code)
-        return Response(payload, status=status.HTTP_201_CREATED)
+        try:
+            link, code = create_family_link_invite(request.user)
+            invalidate_user_materialized_payloads(request.user.id, reason="family_link_invite_created")
+            payload = build_family_link_snapshot(request.user)
+            payload["invite"] = _serialize_one_time_invite(link, code)
+            return Response(payload, status=status.HTTP_201_CREATED)
+        except Exception as exc:
+            return safe_error_response(exc, "Invitation creation is temporarily unavailable. Please try again.",
+                                       logger_name=__name__, status_code=500)
 
 
 class FamilyAccountLinkAcceptView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [FamilyInvitationAcceptThrottle]
 
     def post(self, request):
+        data = request.data if isinstance(request.data, dict) else {}
+        code = data.get("invite_code") or data.get("code") or ""
+        if not isinstance(code, str) or len(code) > 64:
+            code = ""
         try:
-            link = accept_family_link_code(request.user, request.data.get("invite_code") or request.data.get("code") or "")
+            link = accept_family_link_code(request.user, code)
+            invalidate_user_materialized_payloads(request.user.id, reason="family_link_accepted")
+            invalidate_user_materialized_payloads(link.created_by_id, reason="family_link_accepted")
+            return Response(build_family_link_snapshot(request.user))
         except ValidationError as exc:
-            return Response({"detail": _validation_detail(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        invalidate_user_materialized_payloads(request.user.id, reason="family_link_accepted")
-        invalidate_user_materialized_payloads(link.created_by_id, reason="family_link_accepted")
-        return Response(build_family_link_snapshot(request.user))
+            detail = (_validation_detail(exc) if getattr(exc, "code", None) == "invalid_format" else
+                      "This invitation cannot be accepted. Check the code or request a new invitation.")
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return safe_error_response(exc, "Invitation acceptance is temporarily unavailable. Please try again.",
+                                       logger_name=__name__, status_code=500)
 
 
 class FamilyFinancialSharingView(APIView):

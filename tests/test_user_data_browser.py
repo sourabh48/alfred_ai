@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 import threading
 from unittest.mock import patch
@@ -10,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import cache
 from django.core.handlers.base import BaseHandler
+from django.test import override_settings
 
 from apps.expenses.models import Expense
 from scripts.exercise_materialized_cache_traffic import _offline_fixture_patches
@@ -53,6 +55,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         super().tearDownClass()
 
     def setUp(self):
+        directory = self.enterContext(TemporaryDirectory(prefix="alfred-browser-invite-limits-"))
+        self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=directory))
         self.browser.get("about:blank")
         cache.clear()
         self.offline = _offline_fixture_patches()
@@ -85,6 +89,49 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def capture(self, name):
         self.browser.save_screenshot(str(self.artifacts / f"{name}.png"))
         (self.artifacts / f"{name}.txt").write_text(self.browser.find_element(self.By.TAG_NAME, "body").text, encoding="utf-8")
+
+    def test_family_invitation_limits_show_safe_feedback_then_allow_valid_acceptance(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.family.models import FamilyAccountLink
+        from apps.family.services import create_family_link_invite, family_financial_user_ids
+        self.login()
+        owner = get_user_model().objects.get(username="acceptance_demo")
+        inviter = get_user_model().objects.create_user(username="browser_inviter", password=PASSWORD)
+        link, code = create_family_link_invite(inviter)
+        now = timezone.now()
+        with override_settings(ALFRED_FAMILY_INVITE_CREATE_LIMIT=1, ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS=60,
+                               ALFRED_FAMILY_INVITE_ACCEPT_LIMIT=1, ALFRED_FAMILY_INVITE_ACCEPT_WINDOW_SECONDS=60), patch(
+                                   "django.utils.timezone.now", side_effect=lambda: now):
+            self.browser.get(self.live_server_url + "/settings/")
+            self.browser.find_element(self.By.ID, "settingsGenerateInviteBtn").click()
+            self.wait.until(lambda _: "code generated" in self.text("settingsLinkFeedback"))
+            self.assertTrue(self.text("settingsInviteCode").startswith("ALF-"))
+            count = FamilyAccountLink.objects.count()
+            self.browser.find_element(self.By.ID, "settingsGenerateInviteBtn").click()
+            self.wait.until(lambda _: "throttled" in self.text("settingsLinkFeedback"))
+            self.assertEqual(FamilyAccountLink.objects.count(), count)
+            self.capture("family-create-throttled")
+            field = self.browser.find_element(self.By.ID, "settingsInviteCodeInput")
+            submit = self.browser.find_element(self.By.CSS_SELECTOR, '#settingsAcceptInviteForm button[type="submit"]')
+            field.send_keys("ALF-AAAA-AAAA")
+            submit.click()
+            self.wait.until(lambda _: "cannot be accepted" in self.text("settingsLinkFeedback"))
+            field.clear()
+            field.send_keys(code)
+            submit.click()
+            self.wait.until(lambda _: "throttled" in self.text("settingsLinkFeedback"))
+            link.refresh_from_db()
+            self.assertEqual(link.status, "pending")
+            self.capture("family-accept-throttled")
+            now += timedelta(seconds=60)
+            submit.click()
+            self.wait.until(lambda _: "account connected" in self.text("settingsLinkFeedback"))
+            self.wait.until(lambda _: "browser_inviter" in self.text("settingsLinkedAccountsList"))
+            link.refresh_from_db()
+            self.assertEqual(link.linked_user_id, owner.pk)
+            self.assertEqual(family_financial_user_ids(owner), [owner.pk])
+            self.capture("family-accept-after-retry")
 
     def test_family_growth_failure_shows_safe_message_and_can_recover(self):
         self.login()

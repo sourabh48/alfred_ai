@@ -1,11 +1,12 @@
 import json
 from datetime import timedelta
 from types import SimpleNamespace
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from apps.family.models import Dependent, FamilyAccountLink
@@ -26,6 +27,8 @@ def _fresh_evidence(source_name: str) -> dict:
 
 class FamilyAccountLinkTests(TestCase):
     def setUp(self):
+        directory = self.enterContext(TemporaryDirectory(prefix="alfred-family-limits-"))
+        self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=directory))
         cache.clear()
         user_model = get_user_model()
         self.owner = user_model.objects.create_user(
@@ -122,7 +125,7 @@ class FamilyAccountLinkTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(self_response.status_code, 400)
-        self.assertIn("different signed-in user", self_response.json()["detail"])
+        self.assertIn("cannot be accepted", self_response.json()["detail"])
 
         link.expires_at = timezone.now() - timedelta(minutes=1)
         link.save(update_fields=["expires_at", "updated_at"])
@@ -149,7 +152,7 @@ class FamilyAccountLinkTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(duplicate_response.status_code, 400)
-        self.assertIn("already linked", duplicate_response.json()["detail"])
+        self.assertEqual(duplicate_response.json(), self_response.json())
         second_link.refresh_from_db()
         third_link.refresh_from_db()
         self.assertEqual(second_link.status, FamilyAccountLink.STATUS_ACCEPTED)

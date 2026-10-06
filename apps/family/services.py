@@ -30,7 +30,7 @@ def normalize_family_link_code(value: str) -> str:
         groups.append(compact[cursor:cursor + length])
         cursor += length
     if any(len(group) != length for group, length in zip(groups, CODE_GROUP_LENGTHS)):
-        raise ValidationError("Enter a complete family link code.")
+        raise ValidationError("Enter a complete family link code.", code="invalid_format")
     return "-".join([CODE_PREFIX, *groups])
 
 

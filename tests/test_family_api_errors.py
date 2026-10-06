@@ -3,6 +3,7 @@ import base64
 import json
 from datetime import timedelta
 from types import SimpleNamespace
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from uuid import UUID
 
@@ -10,7 +11,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import materialize_payload
@@ -26,6 +27,8 @@ SAFE_MESSAGE = "Family growth is temporarily unavailable. Please try again."
 
 class FamilyApiErrorTests(TestCase):
     def setUp(self):
+        directory = self.enterContext(TemporaryDirectory(prefix="alfred-family-error-limits-"))
+        self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=directory))
         cache.clear()
         self.addCleanup(cache.clear)
         self.user = get_user_model().objects.create_user(username="family_error_user", password="Orbit-X8!Lantern")
