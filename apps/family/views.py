@@ -6,7 +6,7 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Q
 
 from alfred_ai.services.materialized_cache import invalidate_user_materialized_payloads
 from alfred_ai.services.materialized_cache import materialize_payload
@@ -14,14 +14,16 @@ from apps.expenses.services.financial_intelligence import resolve_canonical_fina
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 from .models import Dependent, FamilyAccountLink
-from .serializers import DependentSerializer
+from .serializers import DependentSerializer, FamilyFinancialSharingSerializer
 from .services import (
     accept_family_link_code,
+    accepted_family_links_for_user,
     build_family_link_snapshot,
     create_family_link_invite,
     family_context_user_ids,
     family_financial_user_ids,
     revoke_family_link,
+    set_family_financial_sharing,
 )
 
 class DependentListCreateView(ListCreateAPIView):
@@ -79,6 +81,21 @@ class FamilyAccountLinkAcceptView(APIView):
         return Response(build_family_link_snapshot(request.user))
 
 
+class FamilyFinancialSharingView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        serializer = FamilyFinancialSharingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            link = set_family_financial_sharing(request.user, pk, serializer.validated_data["share_financial_summary"])
+        except ValidationError as exc:
+            return Response({"detail": _validation_detail(exc)}, status=status.HTTP_404_NOT_FOUND)
+        for user_id in (link.created_by_id, link.linked_user_id):
+            invalidate_user_materialized_payloads(user_id, reason="family_financial_consent_changed")
+        return Response(build_family_link_snapshot(request.user))
+
+
 class FamilyAccountLinkRevokeView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -123,6 +140,7 @@ def _family_growth_revision(user, baseline: dict) -> str:
     return "|".join(
         str(value or "")
         for value in [
+            "financial-consent-v1",
             ",".join(str(item) for item in context_user_ids),
             ",".join(str(item) for item in financial_user_ids),
             dependent_meta["count"],
@@ -268,14 +286,17 @@ def _family_financial_summary(user, *, own_baseline: dict) -> dict:
 
 
 def _family_member_financial_summary(*, requesting_user, member, baseline: dict) -> dict:
+    shares_profile = member.id == requesting_user.id or accepted_family_links_for_user(requesting_user).filter(
+        Q(created_by=member) | Q(linked_user=member), share_profile_summary=True,
+    ).exists()
     full_name = f"{member.first_name} {member.last_name}".strip()
     return {
         "user_id": member.id,
-        "username": member.username,
-        "display_name": full_name or member.username,
+        "username": member.username if shares_profile else None,
+        "display_name": (full_name or member.username) if shares_profile else "Linked member",
         "role": "self" if member.id == requesting_user.id else "linked",
-        "city": member.city,
-        "country": member.country,
+        "city": member.city if shares_profile else None,
+        "country": member.country if shares_profile else None,
         "monthly_income": round(float(baseline.get("monthly_income", 0) or 0), 2),
         "savings_capacity": round(float(baseline.get("savings_capacity", 0) or 0), 2),
         "total_assets": round(float(baseline.get("total_assets", 0) or 0), 2),

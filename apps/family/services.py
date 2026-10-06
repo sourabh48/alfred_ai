@@ -116,7 +116,23 @@ def revoke_family_link(user, link_id: int) -> FamilyAccountLink:
 
         link.status = FamilyAccountLink.STATUS_REVOKED
         link.revoked_at = timezone.now()
-        link.save(update_fields=["status", "revoked_at", "updated_at"])
+        link.share_financial_summary = False
+        link.linked_user_share_financial_summary = False
+        link.save(update_fields=["status", "revoked_at", "share_financial_summary", "linked_user_share_financial_summary", "updated_at"])
+        return link
+
+
+def set_family_financial_sharing(user, link_id: int, enabled: bool) -> FamilyAccountLink:
+    if not isinstance(enabled, bool):
+        raise ValidationError("Financial sharing requires an explicit boolean choice.")
+    with transaction.atomic():
+        try:
+            link = accepted_family_links_for_user(user).select_for_update().get(id=link_id)
+        except FamilyAccountLink.DoesNotExist as exc:
+            raise ValidationError("Accepted family link was not found.") from exc
+        field = "share_financial_summary" if link.created_by_id == user.id else "linked_user_share_financial_summary"
+        setattr(link, field, enabled)
+        link.save(update_fields=[field, "updated_at"])
         return link
 
 
@@ -140,7 +156,20 @@ def family_financial_user_ids(user) -> list[int]:
     user_ids = {user.id}
     for link in accepted_family_links_for_user(user).select_related("created_by", "linked_user"):
         other_user_id = link.linked_user_id if link.created_by_id == user.id else link.created_by_id
-        if other_user_id and link.share_financial_summary:
+        shares = link.linked_user_share_financial_summary if link.created_by_id == user.id else link.share_financial_summary
+        if other_user_id and shares:
+            user_ids.add(other_user_id)
+    return sorted(user_ids)
+
+
+def family_financial_viewer_ids(user) -> list[int]:
+    """Accounts whose cached summaries can contain this user's financial data."""
+    user_ids = {user.id}
+    for link in accepted_family_links_for_user(user):
+        is_creator = link.created_by_id == user.id
+        shares = link.share_financial_summary if is_creator else link.linked_user_share_financial_summary
+        other_user_id = link.linked_user_id if is_creator else link.created_by_id
+        if other_user_id and shares:
             user_ids.add(other_user_id)
     return sorted(user_ids)
 
@@ -200,7 +229,8 @@ def _serialize_family_link(user, link: FamilyAccountLink) -> dict:
         "revoked_at": link.revoked_at.isoformat() if link.revoked_at else None,
         "share_profile_summary": link.share_profile_summary,
         "share_dependents": link.share_dependents,
-        "share_financial_summary": link.share_financial_summary,
+        "share_financial_summary": link.share_financial_summary if is_creator else link.linked_user_share_financial_summary,
+        "receives_financial_summary": link.linked_user_share_financial_summary if is_creator else link.share_financial_summary,
         "linked_user_id": linked_user.id if linked_user else None,
         "linked_profile": _safe_user_summary(linked_user) if linked_user and link.share_profile_summary else None,
     }
