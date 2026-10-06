@@ -430,3 +430,227 @@ M14A housekeeping: AST-only Graphify update passed (7,509 nodes / 19,549 edges;
 stale uv launcher failed initially; direct tool interpreter succeeded without
 installation or application dependency changes. Git commands use explicit
 --work-tree because automatic worktree detection fails in this restored checkout.
+
+## Current post-migration recovery status - 2026-10-07
+
+This section supersedes earlier pre-M13C continuation text. Live source remains
+HEAD a9d096ea55839269fe6fce14d4f11ea2cbf05336. Both investments.0004 and
+expenses.0005 Decimal migrations remain APPLIED LIVE. No migration, engineering
+implementation, financial-record write or cleanup occurred during acceptance.
+
+Read-only consistent snapshot SHA256:
+02e42ebd7d0d0a55d097191d51489919f7b56c35d268e4b664f67a653630c267,
+identical to the prior verified post-migration snapshot. Integrity PASS,
+foreign-key violations 0, 69 total tables (68 application tables plus
+sqlite_sequence). All 24 scoped financial/Travel/document tables unchanged:
+1739 Expenses, 2 BankAccounts, 2 Investments, 1735 statement identities,
+834 transfer legs, 155 monthly groups, financial mismatches 0, fingerprint
+duplicates 0. Saved Travel and all 3 referenced media files locally readable.
+Private config/media/model hashes unchanged. Protected pre-migration backup
+and Desktop encrypted recovery archive retain verified hashes. All preserved.
+
+Native readiness 5/5 PASS, four health endpoints HTTP 200, worker/scheduler
+healthy, no interrupted claims/queued/scheduled jobs. ALFRED remains running
+at http://127.0.0.1:8000/ without an acceptance-phase restart. Actual local
+configured Codex and hosted Codex neutral-response smoke PASS. Finance/migration
+routing HOSTED and README routing LOCAL. Ollama uses its existing installation;
+no private data included in coding prompts and persistent execution policy unchanged.
+
+Historical Docker classification COMPLETE for the verified inventory. Sole
+historical VHDX is Docker bootstrap Linux data; no reachable ALFRED/database/
+PostgreSQL/volume payload identified. The initially UNKNOWN inode 12 is empty
+ext4 orphan bookkeeping, confirmed by superblock and all 35 blocks. Restored
+copy REGENERABLE; identical pristine backup RECOVERED and retained. Each is
+100663296 bytes (96 MiB), combined standalone storage 192 MiB. Wider recovery
+archive and rollback SQLite remain REQUIRED. Docker/WSL unnecessary for current
+native ALFRED or its verified recovery. No install, writable original mount or
+deletion. Detailed HISTORICAL_DOCKER_CLASSIFICATION.md is in private evidence.
+
+Every real-account screen and console/network acceptance item remains PENDING:
+no connected browser surface is available. Storage readability does not prove
+UI acceptance. Checklist: docs/POST_MIGRATION_UI_ACCEPTANCE_20261007.md in live
+checkout. Report only statuses and sanitized blockers, keeping credentials,
+financial figures, screenshots and document contents local. Operator checklist
+completion request sent; no verification yet received. Recovery closure PENDING.
+
+Evidence: F:\ALFRED_RECOVERY\post-migration-acceptance-20261007,
+RECOVERY_CLOSURE_REPORT.md, closure-readonly-checks.json, source-verification.json,
+hybrid-smoke-result.json and offline ext4 evidence. Initial checker used application
+table count against the historical total including sqlite_sequence; fixed count
+convention, no data/schema mismatch. First script/log/snapshot preserved.
+
+IMPORTANT CURRENT development HEAD: 6001a4ece2ab37ffba956625cba7b16c59fa5cac
+already contains the completed focused M14A Career HTTP fix. It was not promoted;
+live remains a9d096e. Do not repeat M14A, M13C/D or completed broad audits.
+Prior live baseline: backend 718 passed / 19 disabled-browser skips; Chrome 19
+passed. Completed suites not rerun. The existing development 17-test M14A gate
+is prior evidence. No high-risk modification began during recovery acceptance.
+
+Exact next action: operator completes the ten local read-only UI checks, compares
+figures locally and reports only PASS/FAIL/PENDING plus sanitized blockers.
+After acceptance, next provisional engineering task from CURRENT development
+checkpoint is M14B signup/password-change password-validator enforcement,
+using hosted Codex. If already enforced, advance to M14C/D as recorded.
+Keep every backup and recovery asset. No cleanup is authorized.
+
+## M14B password validation completed - 2026-10-07
+
+Development source commit: 18457eff06a1b964c9208093f378f93ec2e86922.
+Parent: 6001a4ece2ab37ffba956625cba7b16c59fa5cac (completed M14A Career HTTP fix).
+Worktree F:\ALFRED_DEV\m13c; branch codex/expense-bank-money-m13d-20261006.
+Current task: M14B standard Django password validation at user-facing writes.
+Confirmed root cause: AUTH_PASSWORD_VALIDATORS absent, although signup already
+uses UserCreationForm and admin uses Django's password-change form. Enabled
+similarity, minimum length (8), common-password and numeric-password validators
+in shared settings, inherited by native settings. No custom password API added.
+Existing credentials/login are unaffected; no user-row migration or rotation.
+Modified source: alfred_ai/settings.py, tests/test_password_security.py.
+
+Five focused new tests cover seven independent weak-signup cases, rejected
+password change without hash mutation, rejected and accepted actual admin
+password-change requests, and continued login with an existing weak credential.
+Before fix: five tests ran, nine failing assertions/subtests, zero errors.
+After fix: 30 tests passed, zero failures/skips, 22.486 s; system checks PASS.
+Integration gate included tests.test_auth_pages, tests.test_user_profile_api
+and tests.test_native_runtime. Test configuration explicitly selects synthetic
+ALFRED_DATA_DIR, synthetic signing key, in-memory SQLite, locmem cache and
+training disabled. No live private configuration/database/media accessed.
+Logs F:\ALFRED_DEV\isolated-tests\m14b-red.log and m14b-green.log.
+AST-only Graphify update --no-cluster PASS (7523 nodes / 19565 edges), no model/API.
+Whitespace/staged review PASS. Commit reused existing repository author identity
+per command; no global Git identity or credential setting changed.
+
+User now provisionally closes recovery and prioritizes development. Reported
+visual inspection satisfactory; individually unverified UI checks remain
+unclaimed and non-blocking. Docker classification previously completed; retained
+Docker/backup/repository cleanup remains deferred housekeeping, never automatic.
+Live checkout remains a9d096e and M13C/D stay applied; no source promotion or
+live private data mutation. Earlier 718 backend/19 Chrome baseline not rerun.
+
+Next atomic task: M14C remove unused API BasicAuthentication fallback and verify
+session authentication/CSRF at the actual profile API using hosted Codex.
+Current source still globally allows Basic auth and no application/script caller
+uses it. M14D throttles, M14F error leaks and M14G/H privacy remain open; do not
+repeat completed M14A/M14B, M13C/D, inferred-loan fixes or comprehensive audits.
+Exact next command (in F:\ALFRED_DEV\m13c, with the same isolated environment):
+F:\ALFRED\alfred_ai\.venv\Scripts\python.exe manage.py test tests.test_api_session_security --noinput --verbosity 1
+
+## M14C session-only API authentication completed - 2026-10-07
+
+Development source commit: 3497afedc41b090895422b0f1bda7119ec6d8d08.
+Parent: 18457eff06a1b964c9208093f378f93ec2e86922 (M14B).
+Removed unused global BasicAuthentication fallback. APIs now use existing Django
+sessions and require CSRF for authenticated writes; Basic credentials alone are
+rejected on HTTP and HTTPS. Application/scripts had no Basic-auth caller. This
+is an intentional source API contract change; future API clients must use the
+existing login/session/CSRF flow. No live deployment or credential changes.
+Modified: alfred_ai/settings.py, tests/test_api_session_security.py,
+tests/user_acceptance_scenario.py. Five new actual-profile-API tests verify
+blocked Basic reads/writes, session reads, CSRF rejection and valid CSRF writes.
+Before fix: 5 ran / 3 failing assertions/subtests. Final integration: 36 passed,
+0 failures/skips, 37.727 s (auth policy/pages/profile/family). Synthetic acceptance
+fixture suite: 8 passed / 0 failures/skips / 11.508 s. Relevant real Chrome
+login/dashboard workflow: 1 passed / 0 skips / 11.996 s. No full suite rerun.
+Initial Chrome fixture failed signup because its password resembled its username;
+changed only the synthetic shared password to an unrelated valid password and
+reran successfully. Production password validation remains unchanged. Logs in
+F:\ALFRED_DEV\isolated-tests\m14c-*.log; initial failure evidence preserved.
+All tests isolated synthetic configuration, SQLite/locmem or temporary browser
+SQLite/media, training disabled. No private runtime/database/provider credentials
+loaded. Graphify AST update requested; completion recorded in final checkpoint.
+
+Next verified P0: M14F Career API raw exception disclosure. Current unexpected
+exception handlers in recruiter intake, job-page parsing and career projection
+return exception text directly. Inspect relevant callers, add focused regression
+cases and replace the shared error boundary with safe messages/correlation IDs.
+Keep intentionally controlled serializer/outcome validation separate.
+Exact next command after configured-Python preflight and isolated environment:
+F:\ALFRED\alfred_ai\.venv\Scripts\python.exe manage.py test tests.test_career_api_errors --noinput --verbosity 1
+
+## Latest development checkpoint - M14B/M14C/M14F - 2026-10-07
+
+DEVELOPMENT STATUS: ACTIVE. Recovery is provisionally closed for development by
+explicit user instruction; visual inspection reportedly satisfactory. Untested
+individual operator screens remain unclaimed, but do not block development.
+Historical Docker classification was completed; retained-file cleanup is deferred
+housekeeping. Preserve encrypted backups, SQLite copies, VHDX and recovery Git repo.
+
+Actual development worktree: F:\ALFRED_DEV\m13c.
+Branch: codex/expense-bank-money-m13d-20261006.
+Last validated SOURCE HEAD: fb471b619b569b7647bcff1cab590539ae9f6d33.
+Completed source commits:
+- 6001a4ece2ab37ffba956625cba7b16c59fa5cac: prior M14A Career pinned HTTP fix.
+- 18457eff06a1b964c9208093f378f93ec2e86922: M14B Django password validators.
+- 3497afedc41b090895422b0f1bda7119ec6d8d08: M14C session-only API/CSRF.
+- fb471b619b569b7647bcff1cab590539ae9f6d33: M14F Career exception disclosure.
+Checkpoint/backlog metadata is committed separately after these source commits;
+use git --work-tree=F:\ALFRED_DEV\m13c rev-parse HEAD for the actual current HEAD.
+
+Last completed task: bounded M14F Career API unexpected-error handling. Confirmed
+raw exception disclosure in recruiter intake, job-page parsing and projection.
+All three now reuse _career_error_response: public message plus opaque error_id,
+preserving detail/error fields and prior 400/500 status contracts. Logs contain
+only error_id and exception class, with no raw message/traceback/document/URL.
+Intentional outcome ValidationError messages remain; inspected controlled raises.
+No projection arithmetic, ownership, parsed evidence or success payload changed.
+Five new endpoint/log/anonymous regression tests reproduced four failures before
+fix; final Career integration 31 passed / 0 failures/skips / 32.505 s. Included
+recruiter/evidence, confidence, income signals, adaptive outcomes and pinned HTTP.
+Source files: apps/career/views.py, tests/test_career_api_errors.py.
+Logs: F:\ALFRED_DEV\isolated-tests\m14f-red.log and m14f-green.log.
+
+Earlier gates in this session: M14B 30 passed / 0 final failures/skips; M14C
+36 auth/profile/family + 8 synthetic acceptance = 44 passed / 0 final failures/
+skips, plus 1 real Chrome login/dashboard workflow passed / 0 skips. These are
+separate focused gates with overlapping coverage, not a new full-suite total.
+Initial browser fixture failure was fixed by changing only its identity-similar
+synthetic password; rerun PASS. No production validator weakened. All initial
+red/error logs retained. Other modified code: alfred_ai/settings.py,
+tests/test_password_security.py, tests/test_api_session_security.py,
+tests/user_acceptance_scenario.py. Backlog updated for completed bounded phases.
+
+All tests use synthetic config/signing key, in-memory SQLite/locmem, training off;
+Chrome uses isolated temporary SQLite/media and synthetic account. No live
+private configuration, credentials, records or runtime database entered models.
+Existing application credentials remain unchanged. No DB migration, source
+promotion, live deployment, live private-data write, backup deletion or paid
+provider action. Live root checkout remains a9d096ea55839269fe6fce14d4f11ea2cbf05336;
+both M13C/D remain applied as previously verified. Prior 718 backend / 19 Chrome
+baseline not repeated; do not label focused gates as a comprehensive rerun.
+
+Graphify AST-only/no-cluster updates PASS: M14B 7523 nodes/19565 edges,
+M14C 7534/19580, M14F 7546/19605. No semantic/API extraction. Whitespace and
+staged reviews PASS. No new application dependencies or runtime templates.
+Security implementation and regression review used hosted Codex. Local Ollama
+Codex generated a documentation draft from verified counts in an empty isolated
+directory, without file tools or private records. Draft reviewed and reused for
+M14B/C milestone wording; its then-in-progress M14F note is superseded here.
+Local draft/log: F:\ALFRED_DEV\isolated-tests\local-checkpoint-summary.*.
+Reference framework contracts: https://docs.djangoproject.com/en/6.0/topics/auth/passwords/
+and https://www.django-rest-framework.org/api-guide/authentication/.
+
+NEXT PRIORITY: M14G explicit opt-in and permissions for new family financial
+sharing, using hosted Codex. Relevant code now checked: FamilyAccountLink all
+three sharing flags default True; invite creation omits sharing choices and the
+invite API ignores request sharing flags; accepted financial scope honors the
+stored share_financial_summary. Existing tests assert automatic sharing and
+exclusion when the flag is manually disabled. Next implement the smallest
+complete opt-in flow with ownership/accepted-link/consent regressions. Preserve
+existing grants and historical data; any migration is development/test only,
+never apply to live DB without separate authorization. Inspect only relevant
+family model/service/views/serializer/UI and tests. Do not redo whole audits.
+Remaining M14D throttles, M14E caps, other API error paths, other HTTP callers,
+M14H privacy, remaining money domains and tax work stay open. Completed inferred-
+loan fixes stay preserved; T09 Travel telemetry remains behind these P0s.
+
+Exact next command after Python-environment preflight:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File F:\ALFRED_DEV\isolated-tests\run-development-tests.ps1 -Labels tests.test_family_account_links
+This tested local runner selects F:\ALFRED_DEV\m13c, explicit synthetic config,
+in-memory SQLite, locmem, isolated registry and disabled training/browser mode.
+Read current family tests/flows, write the focused opt-in regression, then rerun
+this command. Do not repeat this baseline without relevant changes or a concern.
+
+Next-command runner verification: existing family-link baseline 7 passed / 0
+failures/skips / 11.787 s, exit 0. No family source changed yet. Log:
+F:\ALFRED_DEV\isolated-tests\next-family-baseline.log. Do not count this
+overlapping gate as a new complete backend run.
