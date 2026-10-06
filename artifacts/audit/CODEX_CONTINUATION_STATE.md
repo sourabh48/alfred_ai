@@ -842,3 +842,83 @@ with Family/session test labels. Never load the live private DB for development.
 The implementation SHA above identifies validated source; the later checkpoint
 commit contains only this file and ALFRED_DEEP_REVIEW_BACKLOG.md. Use git rev-parse
 HEAD for the current checkpoint SHA; do not confuse it with the live source HEAD.
+
+## 2026-10-07 - M14D Family invitation abuse protection (development only)
+
+M14D Family invitation creation/acceptance is COMPLETE.
+Implementation commit: 56b50cf944042cd728e53167e86657b363e2443a.
+Development checkout/branch: F:\ALFRED_DEV\m13c,
+codex/expense-bank-money-m13d-20261006; started at 65e4908.
+
+Only POST /api/family/account-links/ and /api/family/account-links/accept/
+are throttled, after authentication/permissions/CSRF and before services/parser
+access. Separate scopes key authenticated account PK, never headers/IP/target.
+Creation has no target parameter; repeated/changed payload targets cannot evade
+the account quota. Defaults: 5 creation attempts/3600 seconds; 10 acceptance
+attempts/600 seconds. Each positive limit/window is configurable via the four
+ALFRED_FAMILY_INVITE_{CREATE,ACCEPT}_{LIMIT,WINDOW_SECONDS} environment names.
+All admitted attempts count, including invalid/malformed/failed operations.
+
+Existing default LocMemCache and native diskcache.DjangoCache/DRF read-modify-
+write throttles are not treated as strict shared quotas. Reuse installed
+pinned diskcache.Cache with one transact() reservation, non-evicting separate
+persistent store and rolling timestamp histories. Location defaults to
+ALFRED_DATA_DIR/artifacts/security/family-invites; can override with
+ALFRED_FAMILY_INVITE_THROTTLE_DIR. One local host, same local-disk directory for
+all processes; not network filesystems or cross-host deployment. Never reuse
+or clear ordinary cache/protection state interchangeably. Active quotas survive
+ordinary cache.clear() and process restart; expired history removed lazily.
+Store contains account IDs, scope names and timestamps, no codes or finances.
+Local privileged filesystem/clock changes and multi-account attacks are outside
+these per-account guarantees; no global login or general network-DoS claim.
+
+Quota exhaustion returns 429 plus Retry-After, without invitation creation,
+acceptance, expiration/revocation updates, cache invalidation or permission
+changes. Storage/invalid-config failures fail closed with safe 503/reference.
+Unexpected invitation service failures use the existing class/reference-only
+ERROR logging and safe 500 responses. No request bodies or raw exception strings
+logged. Complete invalid/expired/revoked/consumed/self/duplicate invitation codes
+share one controlled 400 response, avoiding invitation-state enumeration; blank
+or malformed codes keep safe format guidance. Input aliases remain supported,
+non-dictionary/non-string/overlong code input returns controlled 400.
+Ownership, accepted links, one-time codes, CSRF, consent/revocation and financial
+sharing defaults are preserved. Reads and unrelated endpoints are not limited.
+
+Changed files: alfred_ai/settings.py; apps/family/throttles.py, views.py,
+services.py; docs/FAMILY_INVITATION_THROTTLING.md;
+tests/test_family_invitation_throttling.py, test_family_invitation_atomic.py,
+test_family_account_links.py, test_family_api_errors.py,
+test_user_data_browser.py. Existing test fixtures now isolate limiter stores;
+two older API message assertions use the uniform response, preserving statuses.
+No model/ownership-field changes, Django migration or new dependency.
+
+Regressions first: 11 API tests exposed missing limits/state-enumeration and
+malformed-input failures: 8 failures, 2 errors, 16.683 s. Evidence retained.
+Focused final-new-tests gate: 16 passed, 0 failures/skips, 23.254 s.
+Strengthened process concurrency with a four-process synchronization barrier;
+final affected integration gate covers that change: 69 passed, 0 failures/skips,
+86.217 s (new API/atomic, family links/error, session/CSRF/auth, Career errors).
+Twelve simultaneous threads and forty reservations across four simultaneous
+spawned processes each admit exactly the configured three attempts; reopened
+instances retain the quota and other users/scopes retain independent capacity.
+Backend gates overlap; do not add totals. No comprehensive backend rerun.
+Chrome: 2 real-driver workflows passed, 0 failures/skips, 29.266 s; generated
+codes, safe creation/acceptance 429 UI feedback, no throttled writes, valid
+acceptance at retry expiry, plus existing opt-in/cancel/revoke/privacy workflow.
+Driver-backed summary true. Artifacts under m14d-browser/user-data; all synthetic.
+All logs/summaries retained under F:\ALFRED_DEV\isolated-tests\m14d-*.
+Source and staged whitespace review PASS; graphify AST/no-cluster update PASS:
+7654 nodes, 19919 edges. No semantic/API extraction. Test storage, passwords and
+financial fixtures synthetic; providers offline/mocked and training disabled.
+
+No live private DB read/write/migration, source promotion, credential changes,
+paid external service or backup deletion. Live source remains at prior a9d096e
+baseline. Recovery assets preserved. Pre-existing restoration document remains
+untracked/untouched. Documented defaults apply only when this tested source is
+separately promoted; no live rollout occurred. Development remains ACTIVE.
+
+Current task: preserve M14D validated source/checkpoint, then inspect the next
+unresolved P0 upload/privacy/error boundary. Do not repeat M14G/M14H, Decimal
+migrations or inferred-loan protection. Broad global throttling, M14E caps,
+other HTTP/error paths, raw-document retention and token re-encryption remain
+open pending scoped checks; Travel T09 stays behind unresolved P0s.
