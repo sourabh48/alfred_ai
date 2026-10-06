@@ -86,6 +86,20 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.save_screenshot(str(self.artifacts / f"{name}.png"))
         (self.artifacts / f"{name}.txt").write_text(self.browser.find_element(self.By.TAG_NAME, "body").text, encoding="utf-8")
 
+    def test_family_growth_failure_shows_safe_message_and_can_recover(self):
+        self.login()
+        cache.clear()
+        marker = "synthetic-private-family-finance-token"
+        with patch("apps.family.views._family_growth_payload", side_effect=RuntimeError(marker)):
+            self.browser.get(self.live_server_url + "/family/")
+            self.wait.until(lambda _: "Family growth is temporarily unavailable. Please try again." in self.text("familyRoot"))
+            self.assertNotIn(marker, self.browser.find_element(self.By.TAG_NAME, "body").text)
+            self.capture("family-growth-safe-error")
+        self.browser.refresh()
+        self.wait.until(lambda _: "current net worth" in self.text("familySummaryCards").casefold())
+        self.assertNotIn("temporarily unavailable", self.text("familyRoot"))
+        self.capture("family-growth-safe-error-recovery")
+
     def test_family_financial_sharing_requires_owner_opt_in_and_can_be_revoked(self):
         from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
         from apps.family.services import accept_family_link_code, create_family_link_invite, family_financial_user_ids

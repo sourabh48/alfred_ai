@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Count, Max, Q
 
+from alfred_ai.services.api_errors import safe_error_response
 from alfred_ai.services.materialized_cache import invalidate_user_materialized_payloads
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
@@ -126,8 +127,11 @@ def family_growth(request):
             builder=lambda: _family_growth_payload(request.user, baseline),
         )
         return Response(payload)
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
+    except Exception as exc:
+        return safe_error_response(
+            exc, "Family growth is temporarily unavailable. Please try again.",
+            logger_name=__name__, field="error", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 def _family_growth_revision(user, baseline: dict) -> str:
@@ -140,6 +144,7 @@ def _family_growth_revision(user, baseline: dict) -> str:
     return "|".join(
         str(value or "")
         for value in [
+            "family-growth-safe-errors-v1",
             "financial-consent-v1",
             ",".join(str(item) for item in context_user_ids),
             ",".join(str(item) for item in financial_user_ids),
@@ -170,7 +175,8 @@ def _family_growth_payload(user, baseline: dict) -> dict:
     savings_capacity = float(family_baseline.get("savings_capacity", 0) or 0)
     evidence = []
     for result in (verified_intelligence.ppf_reference(), verified_intelligence.nps_tax_reference()):
-        evidence.append(result.evidence)
+        # Stored refresh diagnostics can contain internal exception details.
+        evidence.append({key: value for key, value in result.evidence.items() if key not in {"notes", "last_refresh_error"}})
     evidence_freshness = freshness_snapshot(evidence)
 
     projections = []

@@ -1,6 +1,4 @@
 from datetime import timedelta
-import logging
-from uuid import uuid4
 
 from django.db.models import Count, Max
 from django.utils import timezone
@@ -13,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from alfred_ai.services import record_parser_learning
+from alfred_ai.services.api_errors import safe_error_response
 from alfred_ai.services.materialized_cache import materialize_payload
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.expenses.models import BankAccount
@@ -26,11 +25,7 @@ from .services import build_employment_income_signals, build_projection_simulati
 
 
 def _career_error_response(exc, message, *, field="detail", status_code=status.HTTP_400_BAD_REQUEST):
-    error_id = uuid4().hex
-    logging.getLogger(__name__).error(
-        "Career request failed; error_id=%s; exception_type=%s", error_id, type(exc).__name__,
-    )
-    return Response({field: message, "error_id": error_id}, status=status_code)
+    return safe_error_response(exc, message, logger_name=__name__, field=field, status_code=status_code)
 
 
 def _get_profile(user):

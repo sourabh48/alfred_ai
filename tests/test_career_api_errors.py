@@ -58,6 +58,9 @@ class CareerApiErrorTests(TestCase):
         self.assertIn(second.json()["error_id"], log_text)
         self.assertNotEqual(first.json()["error_id"], second.json()["error_id"])
         self.assertTrue(all(record.exc_info is None for record in captured.records))
+        for record, response in zip(captured.records, (first, second)):
+            self.assertEqual(record.error_id, response.json()["error_id"])
+            self.assertEqual(record.exception_type, "RuntimeError")
 
     def test_anonymous_projection_does_not_execute_private_handler(self):
         with patch("apps.career.views._get_profile") as get_profile:
