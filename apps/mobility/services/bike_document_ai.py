@@ -12,6 +12,7 @@ import re
 from typing import BinaryIO
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
+from alfred_ai.services.upload_limits import document_source, upload_deadline
 import pdfplumber
 from pypdf import PdfReader
 
@@ -164,7 +165,7 @@ class BikeDocumentAI:
         raw_bytes = self._read_bytes(upload)
         name = filename or getattr(upload, "name", "") or "document"
         extraction = extract_document_text(raw_bytes, name)
-        text = self._clean_extracted_text(extraction.text or self._extract_text(raw_bytes, name))
+        text = self._clean_extracted_text(extraction.text or ("" if upload_deadline.get() is not None else self._extract_text(raw_bytes, name)))
         normalized_text = text.upper()
 
         document_type, confidence = self._guess_document_type(normalized_text, name)
@@ -281,7 +282,7 @@ class BikeDocumentAI:
         current = upload.tell() if hasattr(upload, "tell") else None
         if hasattr(upload, "seek"):
             upload.seek(0)
-        content = upload.read()
+        content = document_source(upload)
         if current is not None and hasattr(upload, "seek"):
             upload.seek(current)
         return content

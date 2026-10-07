@@ -3,6 +3,7 @@ import json
 from django.core.serializers.json import DjangoJSONEncoder
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -416,6 +417,8 @@ def import_loan_pdf(request):
             "raw_file_retention": raw_file_retention,
         }, status=status.HTTP_201_CREATED)
 
+    except APIException:
+        raise
     except Exception as e:
         if "pdf_file" in locals() and getattr(pdf_file, "name", "").lower().endswith(".pdf"):
             parsed = {
@@ -565,6 +568,8 @@ def payoff_loan(request, pk):
             {"error": "Loan not found"},
             status=status.HTTP_404_NOT_FOUND
         )
+    except APIException:
+        raise
     except Exception as e:
         return Response(
             {"error": str(e)},

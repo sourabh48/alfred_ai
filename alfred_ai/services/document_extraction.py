@@ -20,6 +20,7 @@ from xml.etree import ElementTree
 import zipfile
 
 from pypdf import PdfReader
+from .upload_limits import upload_deadline
 
 from alfred_ai.services.pdf_recovery import rebuild_orphaned_pdf
 from alfred_ai.services.ocr_process import ocr_command, hidden_process_options
@@ -176,6 +177,9 @@ def _document_hint_from_filename(filename: str) -> str:
 
 
 def extract_document_text(raw_bytes: bytes, filename: str, *, ocr_page_limit: int = 6) -> ExtractedDocumentText:
+    if upload_deadline.get() is not None:
+        from .bounded_parser import run_bounded_parser
+        return ExtractedDocumentText(**run_bounded_parser("document", raw_bytes, filename, ocr_page_limit=ocr_page_limit))
     extension = os.path.splitext((filename or "").lower())[1]
     notes: list[str] = []
     document_hint = _document_hint_from_filename(filename)

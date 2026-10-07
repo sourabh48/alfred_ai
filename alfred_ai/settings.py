@@ -166,6 +166,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "alfred_ai.services.upload_limits.UploadProtectionMiddleware",
     "alfred_ai.middleware.UserDataCacheMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -310,6 +311,20 @@ ALFRED_FAMILY_INVITE_CREATE_LIMIT = env.int("ALFRED_FAMILY_INVITE_CREATE_LIMIT",
 ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS = env.int("ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS", default=3600)
 ALFRED_FAMILY_INVITE_ACCEPT_LIMIT = env.int("ALFRED_FAMILY_INVITE_ACCEPT_LIMIT", default=10)
 ALFRED_FAMILY_INVITE_ACCEPT_WINDOW_SECONDS = env.int("ALFRED_FAMILY_INVITE_ACCEPT_WINDOW_SECONDS", default=600)
+
+# Absolute upload limits are independent of Django's memory thresholds.
+from .upload_config import UPLOAD_LIMIT_DEFAULTS
+for _upload_setting, _upload_default in UPLOAD_LIMIT_DEFAULTS.items():
+    globals()[_upload_setting] = env.int(_upload_setting, default=_upload_default)
+DATA_UPLOAD_MAX_NUMBER_FILES = env.int("ALFRED_UPLOAD_FILES", default=4)
+DATA_UPLOAD_MAX_NUMBER_FIELDS = env.int("ALFRED_UPLOAD_FIELDS", default=1000)
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("ALFRED_UPLOAD_FORM_BYTES", default=256 * 1024)
+# Always stream files to disk: no Content-Length-dependent memory allocation.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 0
+FILE_UPLOAD_HANDLERS = [
+    "alfred_ai.services.upload_limits.BoundedUploadHandler",
+    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+]
 
 
 # ---------------------------------------------------------

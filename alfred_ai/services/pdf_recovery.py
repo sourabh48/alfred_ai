@@ -5,6 +5,7 @@ from io import BytesIO
 import re
 
 from pypdf import PdfReader
+from .upload_limits import limit, UploadLimitExceeded
 
 
 OBJECT_RE = re.compile(rb"(?m)^([0-9]+)\s+([0-9]+)\s+obj\s*(.*?)\s*endobj", re.S)
@@ -46,8 +47,12 @@ def rebuild_orphaned_pdf(raw_bytes: bytes) -> RecoveredPdf | None:
             continue
         objects.append((object_id, generation, body))
         max_object_id = max(max_object_id, object_id)
+        if max_object_id > limit("ALFRED_UPLOAD_PDF_OBJECTS"):
+            raise UploadLimitExceeded()
         if PAGE_RE.search(body) and not PAGES_RE.search(body):
             page_object_ids.append(object_id)
+            if len(page_object_ids) > limit("ALFRED_UPLOAD_PDF_PAGES"):
+                raise UploadLimitExceeded()
 
     if len(objects) < 3 or not page_object_ids:
         return None

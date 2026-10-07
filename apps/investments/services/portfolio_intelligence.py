@@ -17,6 +17,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
+from alfred_ai.services.upload_limits import document_source
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot
 from apps.investments.money import investment_money, investment_total_float
@@ -128,7 +129,7 @@ class PortfolioIntelligenceService:
         }
 
     def parse_portfolio_document(self, pdf_file: BinaryIO, *, user, filename: str = "") -> Dict[str, any]:
-        raw_bytes = pdf_file.read()
+        raw_bytes = document_source(pdf_file)
         extracted = extract_document_text(raw_bytes, filename or getattr(pdf_file, "name", "portfolio.pdf"), ocr_page_limit=8)
         full_text = extracted.text or ""
         broker = self._detect_broker(full_text)

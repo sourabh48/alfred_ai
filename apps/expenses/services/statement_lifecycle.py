@@ -15,6 +15,7 @@ from apps.reports.services import operational_logging_service, reporting_service
 from ..models import Expense, StatementUpload
 from ..money import expense_money, identity_amount, identity_values
 from .statement_import import StatementParseResult, parse_bank_statement, summarize_transactions
+from alfred_ai.services.upload_limits import parser_budget
 from .transaction_intelligence import (
     build_user_merchant_profiles,
     build_reference_signature,
@@ -178,6 +179,7 @@ def queue_statement_retry(upload: StatementUpload, *, reason: str = "") -> State
     return upload
 
 
+@parser_budget
 def retry_statement_upload(upload: StatementUpload, *, ocr_page_limit: int = 8) -> StatementLifecycleResult | None:
     if not upload.original_file:
         return None

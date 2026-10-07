@@ -90,6 +90,70 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.save_screenshot(str(self.artifacts / f"{name}.png"))
         (self.artifacts / f"{name}.txt").write_text(self.browser.find_element(self.By.TAG_NAME, "body").text, encoding="utf-8")
 
+    def click_upload_button(self, form_id):
+        button = self.browser.find_element(self.By.CSS_SELECTOR, f"#{form_id} button[type=submit]")
+        self.browser.execute_script("arguments[0].scrollIntoView({behavior: 'instant', block: 'center'});", button)
+        self.wait.until(lambda _: button.is_enabled())
+        button.click()
+
+    @override_settings(ALFRED_UPLOAD_FILE_BYTES=1024, ALFRED_UPLOAD_REQUEST_BYTES=4096)
+    def test_document_size_limit_feedback_then_valid_resume(self):
+        from apps.career.models import CareerResume
+        directory = self.enterContext(TemporaryDirectory(prefix="alfred-browser-upload-fixture-"))
+        oversized = Path(directory) / "oversized.txt"
+        valid = Path(directory) / "resume.txt"
+        oversized.write_bytes(b"X" * 1025)
+        valid.write_text("Synthetic Analyst\nPython SQL\n4 years experience", encoding="utf-8")
+        before = CareerResume.objects.count()
+        self.login()
+        self.browser.get(self.live_server_url + "/documents/")
+        field = self.wait.until(lambda driver: driver.find_element(self.By.ID, "documentResumeFile"))
+        field.send_keys(str(oversized))
+        self.click_upload_button("documentResumeForm")
+        self.wait.until(lambda _: "configured" in self.text("documentResumeFeedback"))
+        self.assertEqual(CareerResume.objects.count(), before)
+        self.capture("upload-size-rejected")
+        self.browser.execute_script("document.getElementById('documentResumeFile').value = '';")
+        self.browser.find_element(self.By.ID, "documentResumeFile").send_keys(str(valid))
+        self.click_upload_button("documentResumeForm")
+        self.wait.until(lambda _: CareerResume.objects.count() == before + 1)
+        self.wait.until(lambda _: "uploaded" in self.text("documentResumeFeedback").casefold())
+        self.capture("upload-valid-resume")
+
+    def test_statement_real_pdf_reimport_preserves_fingerprints_and_balance(self):
+        import fitz
+        from apps.expenses.models import BankAccount, StatementUpload
+        directory = self.enterContext(TemporaryDirectory(prefix="alfred-browser-statement-fixture-"))
+        statement = Path(directory) / "synthetic-statement.pdf"
+        header = (f"{'Date':<12}{'Narration':<35}{'Chq./Ref.No.':<18}{'Value Dt':<12}"
+                  f"{'Withdrawal Amt.':<20}{'Deposit Amt.':<20}Closing Balance")
+        line = (f"{'31/03/26':<12}{'UPI-SYNTHETIC-SHOP':<35}{'123456789012':<18}{'31/03/26':<12}"
+                f"{'40.00':>16}    {'':>16}    {'1,210.00':>16}")
+        with fitz.open() as pdf:
+            page = pdf.new_page(width=1100, height=800)
+            for top, text in ((40, "HDFC BANK Statement From: 01/03/2026 To: 31/03/2026"),
+                              (55, "Account No: 999988887777"), (70, header), (100, line)):
+                page.insert_text((30, top), text, fontname="cour", fontsize=9)
+            statement.write_bytes(pdf.tobytes())
+        self.login()
+        self.browser.get(self.live_server_url + "/documents/")
+        self.wait.until(lambda driver: driver.find_element(self.By.ID, "documentStatementFile"))
+        for attempt in (1, 2):
+            self.browser.execute_script("document.getElementById('documentStatementFile').value = '';")
+            self.browser.find_element(self.By.ID, "documentStatementFile").send_keys(str(statement))
+            self.click_upload_button("documentStatementForm")
+            self.wait.until(lambda _: StatementUpload.objects.filter(file_name=statement.name).count() == attempt)
+            self.wait.until(lambda _: "processed" in self.text("documentStatementFeedback").casefold())
+            rows = list(Expense.objects.filter(source="bank_statement", bank_account__account_number="999988887777").values_list("transaction_fingerprint", "external_reference", "amount"))
+            balances = list(BankAccount.objects.filter(account_number="999988887777").values_list("current_balance", flat=True))
+            if attempt == 1:
+                self.assertEqual(len(rows), 1)
+                expected_rows, expected_balances = rows, balances
+            else:
+                self.assertEqual(rows, expected_rows)
+                self.assertEqual(balances, expected_balances)
+        self.capture("upload-statement-deduplication")
+
     def test_family_invitation_limits_show_safe_feedback_then_allow_valid_acceptance(self):
         from datetime import timedelta
         from django.utils import timezone

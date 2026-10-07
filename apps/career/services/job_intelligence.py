@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from django.utils import timezone
 
 from alfred_ai.services import extract_document_text
+from alfred_ai.services.upload_limits import document_source
 from alfred_ai.services import public_http
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot
@@ -1557,7 +1558,7 @@ class JobIntelligenceService:
         current = upload.tell() if hasattr(upload, "tell") else None
         if hasattr(upload, "seek"):
             upload.seek(0)
-        raw = upload.read()
+        raw = document_source(upload)
         if current is not None and hasattr(upload, "seek"):
             upload.seek(current)
         return raw

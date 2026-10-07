@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import BinaryIO
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
+from alfred_ai.services.upload_limits import document_source
 from apps.loans.money import loan_money
 
 
@@ -18,7 +19,7 @@ class LoanClosureParser:
     )
 
     def parse_document(self, file_obj: BinaryIO, file_name: str, *, user=None) -> dict:
-        raw_bytes = file_obj.read()
+        raw_bytes = document_source(file_obj)
         extracted = extract_document_text(raw_bytes, file_name, ocr_page_limit=8)
         extracted_text = extracted.text or ""
         normalized = " ".join(extracted_text.split())

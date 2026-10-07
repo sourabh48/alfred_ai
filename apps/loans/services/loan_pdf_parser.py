@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import List, Dict, BinaryIO
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
+from alfred_ai.services.upload_limits import document_source
+from rest_framework.exceptions import APIException
 
 
 class LoanPDFParser:
@@ -71,6 +73,8 @@ class LoanPDFParser:
                 confidence=confidence,
             )
 
+        except APIException:
+            raise
         except Exception as e:
             print(f"Error parsing loan PDF: {e}")
 
@@ -92,7 +96,7 @@ class LoanPDFParser:
         current = upload.tell() if hasattr(upload, "tell") else None
         if hasattr(upload, "seek"):
             upload.seek(0)
-        content = upload.read()
+        content = document_source(upload)
         if current is not None and hasattr(upload, "seek"):
             upload.seek(current)
         return content

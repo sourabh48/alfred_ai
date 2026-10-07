@@ -11,6 +11,7 @@ import re
 from typing import BinaryIO
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
+from alfred_ai.services.upload_limits import document_source, upload_deadline
 from pypdf import PdfReader
 
 try:
@@ -178,7 +179,7 @@ class CreditReportParser:
         current = upload.tell() if hasattr(upload, "tell") else None
         if hasattr(upload, "seek"):
             upload.seek(0)
-        content = upload.read()
+        content = document_source(upload)
         if current is not None and hasattr(upload, "seek"):
             upload.seek(current)
         return content
@@ -186,6 +187,9 @@ class CreditReportParser:
     def _extract_pdf_metadata(self, raw_bytes: bytes, filename: str) -> dict:
         if not filename.lower().endswith(".pdf"):
             return {}
+        if upload_deadline.get() is not None:
+            from alfred_ai.services.bounded_parser import run_bounded_parser
+            return run_bounded_parser("credit_metadata", raw_bytes, filename)
         try:
             metadata = PdfReader(BytesIO(raw_bytes)).metadata or {}
         except Exception:

@@ -10,6 +10,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from alfred_ai.services import record_parser_correction, record_parser_learning
+from .upload_limits import parser_budget
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services import job_intelligence, resume_intelligence
 from apps.expenses.models import StatementUpload
@@ -822,6 +823,7 @@ def delete_document(user, *, scope: str, document_id: int) -> None:
     raise ValueError("Unsupported delete scope.")
 
 
+@parser_budget
 def retry_review_item(user, *, scope: str, document_id: int) -> dict:
     if scope == "statement_document":
         return _retry_statement_document(user, document_id)
