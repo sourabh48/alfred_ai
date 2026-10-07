@@ -1001,3 +1001,127 @@ backup deletion, credential changes or paid external calls. All database/media/
 limiter fixtures were synthetic and isolated. Backups and restoration assets
 preserved; pre-existing restoration document remains untracked and untouched.
 Development ACTIVE; M14D COMPLETE, next scoped source task M14E above.
+
+## 2026-10-08 - M14E shared upload/resource protection COMPLETE (development only)
+
+Resume from this entry. Development branch codex/expense-bank-money-m13d-20261006
+in F:\ALFRED_DEV\m13c. Validated implementation commit:
+8cecd65748d333f7487bf008a835854a4ac10e50
+Parent checkpoint 3bcab836381e5b39744da8a25db083e47399eaf1. A following metadata
+commit records this entry/readiness/backlog; use actual Git HEAD, not the parent.
+Live source independently rechecked with Git -C in the LIVE checkout:
+a9d096ea55839269fe6fce14d4f11ea2cbf05336. Source not promoted; no live database
+access/write/migration. Public app was already running at 127.0.0.1:8000 and
+returned HTTP 200 when the user requested it. No restart was needed. Opening
+the default browser with Start-Process was policy rejected; user received link.
+No private browser session, credentials, documents or financial records read.
+
+M14E implementation:
+- Shared multipart middleware/handler counts actual framed body and decoded file
+  bytes before disk writes; independent of Content-Length and memory thresholds.
+- Defaults: file 25 MiB, request 32 MiB including multipart overhead, 4 files,
+  1000 fields, 256 KiB form data. All files spool to disk in 64 KiB chunks.
+  Positive-integer configuration, file <= request; invalid config fails closed.
+- Windows native Waitress transport uses matching cap (inclusive via +1 for its
+  >= comparison), including chunked bodies; 16 connections / 4 task threads.
+  Its chunked cap counts framing; unframed WSGI without valid length isn't
+  imported. Tests separately exercise unknown/understated framed streams.
+- Upload/retry extraction streams to the existing local/frozen-worker dispatch;
+  no whole-file parent RAM copy, cloud call or new framework/dependency.
+  Shared 90s extraction deadline; actual Windows Job Object 1 GiB process/job
+  commit-memory limit, OCR children inherit job and die with timed-out worker.
+  Worker config is explicitly non-sensitive; no local.env/application/DB init.
+- PDF 500 pages / 50000 objects (including sparse recovery IDs), 64 MiB decoded
+  streams, 20M input/rendered pixels; DOCX/ODT 256 members / 64 MiB actual
+  streamed expansion without path extraction; text/CSV 2 MiB / 50000 lines;
+  recovered statement text bounded before transaction grouping; result JSON 4MiB.
+  Existing PDF/OCR/damaged-file recovery and review behavior remain available.
+  There is no existing Excel workbook statement importer; bank endpoint remains
+  PDF-only. CSV text-document compatibility tested; CSV/XLSX bank rejection kept.
+- Free temporary disk reserve 128 MiB + request budget, safe 503 on unavailability;
+  size/processing/count limits 413, malformed forms/archive 400. New unexpected
+  diagnostics use existing class/reference-only safe helper. No raw bodies logged.
+  Completed/incomplete Django spools and bounded worker/OCR temp directories close
+  after success/rejection. Existing source retention and cleanup redaction kept.
+- Write transaction starts only after heavy extraction succeeds; no SQLite
+  IMMEDIATE writer held during OCR. Failed post-extraction writes roll back.
+  Recruiter profile creation moved after successful parsing. APIException
+  resource failures bypass loan review fallback and Career generic error wrapper.
+- Statement fingerprints, reference signatures, deduplication, transfer/balance
+  logic unchanged; no monetary model/migration or ownership changes.
+
+Protected paths: expenses import-statement; loans import-pdf and payoff evidence;
+investments import-pdf; Career resume/recruiter attachments; credit report upload;
+Mobility bike document/service uploads and multipart serializer paths. Manual
+review retries and background statement retries use the same extraction budget.
+POSIX memory code exists but Windows-native behavior is verified; POSIX tree
+termination and a new frozen-package smoke test are NOT claimed as passed.
+See docs/UPLOAD_RESOURCE_LIMITS.md and M14_SECURITY_RELEASE_READINESS.md.
+
+Modified source: alfred_ai/upload_config.py; services/upload_limits.py,
+bounded_parser.py, document_extraction.py, document_review.py, native_web.py,
+ocr_process.py, pdf_recovery.py; settings.py; Career resume/job services + views;
+Expense statement_import/lifecycle; Credit parser; Investment portfolio service;
+Loan PDF/closure parsers + views; Mobility document AI. Tests: test_upload_limits.py
+and 2 UserDataBrowserTests workflows. Operator docs: UPLOAD_RESOURCE_LIMITS.md.
+Only explicit source/docs/tests staged; private assets/migrations staged = 0;
+secret-marker and source/staged whitespace scans PASS. Existing untracked
+WINDOWS_RESTORATION_VERIFIED_20261006.md preserved and unstaged.
+
+Final validation on this implementation:
+- 31 focused M14E methods passed (30-method focused gate 34.592s, extra rollback
+  case 2.802s), included in final combined gate below. Actual stream chunks,
+  exact boundaries, unknown/inaccurate lengths, multi-file aggregate/body/fields,
+  formats, disk failures, temp cleanup, safe logs, auth/CSRF, parser error/timeout,
+  PDF/archive/image/text/output bounds, actual Windows memory allocation refusal,
+  real native HTTP chunked cap, no added writer during extraction, post-write
+  rollback, and rejection without import mutations covered with synthetic data.
+- FINAL combined affected/security gate: 198 passed, 0 failed/skipped, 243.503s.
+  Includes upload/import/financial identity/statement columns/uploader persistence,
+  document recovery/retry/integrity, Career/credit/Mobility/native boundaries,
+  Family consent/invitation thread/process atomicity/growth errors, passwords,
+  session/CSRF, Career HTTPS/SSRF and upload-cleanup redaction.
+- FINAL Chrome gate: 3 passed, 0 skipped, 55.666s; driver_backed_success=true.
+  Document rejection feedback -> valid resume; real synthetic PDF import/reimport
+  verifies unchanged fingerprint/reference/amount rows + balances; existing
+  login/statement/vehicle/dashboard workflow. Synthetic isolated SQLite/media.
+- Django system checks PASS; isolated makemigrations --check --dry-run reports
+  No changes detected (no file generated); graphify AST/no-cluster PASS:
+  7760 nodes, 20264 edges. No semantic/provider call or complete-suite rerun.
+
+Evidence: F:\ALFRED_DEV\isolated-tests\m14e-release-gate.log;
+m14e-release-chrome.log + m14e-release-chrome/browser_regression_summary.json
+and synthetic captures; m14e-migration-drift.log; m14e-final-graphify.log.
+Earlier gates overlap; do not add totals or replace historical 718/19 baseline.
+Initial red 8 methods: 12 failures/2 errors (oversize/400/raw exception); retained
+m14e-red.log. First Chrome 3: 2 off-screen click errors before upload; fixed
+scrolling, retained failed artifacts. Intermediate security gate 97 had 1 Windows
+connection-abort in test that sent an already rejected Content-Length body;
+changed header rejection proof to receive 413 before sending body, retained
+chunked actual-byte proof. Subsequent 97, 196 and final 198 gates pass. Earlier
+123 affected and 25/29/30 focused gates pass; repeated only after relevant code
+changes. No unresolved test failures; previous failed-run evidence retained.
+
+Hybrid: hosted Codex implemented all security/resource design and regression work.
+Local Ollama Codex documentation-only attempt used static non-sensitive facts,
+empty read-only directory, no repository/private input; service unavailable and
+CLI retried network. Owned stalled Codex process stopped, draft exit -1; NOT a
+successful local-model result. Hosted operator docs completed. Logs/prompt kept
+outside source. Check local Ollama before the next routine-model task; no model,
+credential or live runtime configuration changed to repair it in this milestone.
+
+NEXT PRIORITY: hosted M14F loan upload diagnostic production + public historical
+filtering. Verified current loan fallback embeds str(e) in summary/payload and
+operational logs; LoanPDFParser prints it; LoanImportDocumentSerializer exposes
+extracted_payload. Preserve usable review uploads, ownership, successful imports
+and inferred-loan confirmation; never rewrite historical live data. Do not repeat
+M14D/G/H, Career HTTP/password/session security, cleanup producer or Decimal work.
+Other HTTP callers, raw retention, token re-encryption and global abuse limits
+remain unresolved. Broad security release NOT READY; no deployment authorized.
+Travel T09 stays behind these P0 issues. Docker classification is deferred
+housekeeping; backups, recovery DBs/repos/VHDX and archives remain preserved.
+
+EXACT NEXT COMMAND (source inspection only):
+rg -n 'str\(e\)|Error parsing loan PDF|LoanImportDocumentSerializer' F:\ALFRED_DEV\m13c\apps\loans\views.py F:\ALFRED_DEV\m13c\apps\loans\services\loan_pdf_parser.py F:\ALFRED_DEV\m13c\apps\loans\serializers.py
+Obtain the configured Python environment before each Python invocation; keep
+future tests under isolated synthetic configuration. Development ACTIVE.
