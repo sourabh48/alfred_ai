@@ -1,126 +1,92 @@
 # M14 security release readiness - 2026-10-11
 
-Status: M14E and M14F source COMPLETE; broad security release NOT READY;
-no live release authorized. FINAL requested M14 regression integration PASS.
-M14F implementation: `895ce13ee86bf5fddbd1332f5326389b7a3b7c5c`.
-M14E implementation: `8cecd65748d333f7487bf008a835854a4ac10e50`.
-Live source remains `a9d096ea55839269fe6fce14d4f11ea2cbf05336`.
-The private database has not been accessed or changed by this development work.
-Recovery and restoration assets remain preserved.
+M14 DEVELOPMENT = COMPLETE
+M14 RELEASE READY = YES
+FINAL M14 INTEGRATION = PASS
+LIVE SOURCE MODIFIED = NO
+LIVE DATABASE MODIFIED = NO
 
-M14E adds shared streamed multipart limits, native transport caps, bounded local
-document extraction, temporary-storage checks/cleanup, and safe resource errors.
-It creates no Django migration or dependency. See
-[upload configuration](../../docs/UPLOAD_RESOURCE_LIMITS.md) for defaults,
-endpoint coverage, transport framing, Windows limits and platform caveats.
+This is the local/native M14 source release candidate. Live promotion, private
+migration, token rotation and real-account acceptance require separate explicit
+authorization. No broad audit or completed M14D/E/F/G/H redo was performed.
 
-Final gate: **198 backend tests passed, 0 failures/skips**, including **31 M14E
-regressions** (243.503 seconds). **3 Chrome workflows passed, 0 skips**
-(55.666 seconds); driver-backed summary confirms success. Django system checks
-passed; isolated `makemigrations --check --dry-run` reported no changes.
-AST-only graph update passed (7,760 nodes / 20,264 edges).
+Validated source/test candidate: 495a184c7a44bfe169978f8e0c018f8a286fb208.
+Stable source (Git-only verification): a9d096ea55839269fe6fce14d4f11ea2cbf05336.
+The following evidence-only commit freezes HEAD on release/m14-20261011. Exact
+final HEAD/full range are in F:/ALFRED_DEV/isolated-tests/m14-promotion-manifest.json.
+All application/test changes were committed before the gate; the freeze commit
+changes documentation only. M15 is isolated from this release candidate.
 
-Evidence is preserved outside source in `F:\ALFRED_DEV\isolated-tests`:
-`m14e-release-gate.log`, `m14e-release-chrome.log`,
-`m14e-release-chrome/browser_regression_summary.json`,
-`m14e-migration-drift.log`, and `m14e-final-graphify.log`.
+## Retained blockers resolved or explicitly deferred
 
-The final gate combines upload/resource, statement/financial identity, retries,
-uploader compatibility, Family permissions/invitation concurrency/errors,
-authentication/password/CSRF, Career HTTP and cleanup-redaction regressions.
-Chrome uses only synthetic local fixtures and isolated database/media storage;
-the new PDF reimport workflow compares fingerprints, references, amounts and
-account balances after both imports. Historical live reconciliation is not
-repeated or claimed as a new result.
+Four retained issue groups were found in the previous authoritative report:
 
-M14F now protects loan import/payoff errors, historical import/closure serializers,
-review/resolve/retry responses, loan operational-log responses, nested settlement
-diagnostics and cached foreclosure watchlists. New parser failures retain only
-safe messages/codes/references; logs retain class/reference/stage without
-exception text. New loan cleanup metadata is filtered before persistence.
-Historical forensic data and document files are not rewritten. Normal owned loan
-fields, statuses, links, corrections, settlement amounts and balances remain.
-No M14F migration, dependency, monetary calculation or ownership change.
-See [loan diagnostic boundary](../../docs/LOAN_DIAGNOSTIC_PRIVACY.md).
+| Item | Final disposition | Evidence |
+| --- | --- | --- |
+| Other outbound HTTP callers | RESOLVED | 7bb5086: twelve Investment/Verified Intelligence adapters reuse pinned public HTTPS, no redirects, public-only DNS, streamed caps and MIME/timeouts; safe class/reference failures. Six new regressions; related 41 passed. |
+| Raw document retention | DEFERRED | Protected local owner vault and extraction-only option; native private-media/retained-review tests and release configuration pass. No historical purge. Concrete M15 vault/privacy and Travel T09 follow-ups with risk, mitigation, owner and required evidence. |
+| Email token fallback re-encryption | RESOLVED in source | 64d21f3: count-only dry-run and atomic verified apply, primary-only re-read, mixed keys/legacy/nulls, rollback/conflicts/idempotence, no secret output. Seven new tests; related 18 passed. No live rotation/key removal. |
+| Login/expensive-endpoint abuse | RESOLVED | cf799d4: shared atomic persistent reservations, username/IP/account/global budgets, all login paths/signup/API/processing, 429/Retry-After before writes, safe fail-closed 503. Existing Family budgets/auth/CSRF/M14E limits retained. Twelve new tests; related 55 and Chrome 2 passed. |
 
-M14F validation: 19 focused regressions pass; final focused cleanup/retry gate
-36 passed, 0 failures/skips, 19.551 seconds. Affected backend gate: 192 passed,
-0 failures/skips, 112.330 seconds (before the final cleanup-metadata filter,
-covered by the final 36 and combined gate). Chrome: 4 passed, 0 skipped,
-51.461 seconds; driver-backed success true. System checks and migration drift
-pass. AST-only update: 7,804 nodes / 20,474 edges, no API/semantic extraction.
-
-Remaining reported release issues (not cleared by this scoped M14F work):
-
-2026-10-11 scoped follow-up: dispositions are now authoritative in
+family.0004 consent reset was already resolved in development; forward/rollback/
+replay rehearsals pass again in the final gate. It is an authorized-promotion
+prerequisite, not an unresolved source blocker. No release-blocking item remains.
+Full classification and all required deferral fields are recorded in
 [M14_RETAINED_BLOCKER_DISPOSITIONS.md](M14_RETAINED_BLOCKER_DISPOSITIONS.md).
-Other HTTP adapters are resolved (41 passing tests); token rotation is resolved
-(7 focused / 18 related tests). Global abuse protection is resolved (12 focused,
-55 related and 2 Chrome tests); the updated combined M14 gate is still pending.
-Raw local-vault
-and Travel telemetry retention are explicitly deferred with configuration and
-ownership safeguards, evidence requirements and concrete follow-up milestones.
-The older list below records the state at M14F completion.
+Retention proof is committed separately at 495a184.
 
-- Other reported direct HTTP callers have not yet been verified after the
-  completed Career SSRF fix. Do not treat them as cleared.
-- Raw document-retention policy and integration-token fallback re-encryption
-  remain separate unresolved security items. Signing-key rotation is complete.
-- Global login/other expensive-endpoint abuse limits remain outside the
-  completed M14D account-scoped Family invitation milestone.
-- M14G's consent-reset migration is tested development source, not a live
-  permission to change private records. Any eventual promotion needs separate
-  migration-plan, fresh-backup and reconciliation review plus authorization.
+## Actual updated combined gate
 
-The user's current checkpoint names M14F as the remaining verified blocker;
-the previous readiness report also carries the separate reported issues above.
-This work resolves M14F without declaring those unverified entries safe. Their
-release scope must be explicitly resolved or deferred before broad readiness
-can be YES. Completed M14 milestones are not reopened and no broad audit ran.
-FINAL combined gate on application HEAD 895ce13:
-**297 backend tests passed, 0 failures/skips, 243.888 seconds**, including all
-**19 M14F** and **31 M14E** regressions and both family.0004 forward/rollback/replay
-rehearsal methods. **10 Chrome workflows passed, 0 failures/skips, 113.447
-seconds**; driver_backed_success=true (runner elapsed 124.453 seconds).
-This is an actual single combined backend run and a single combined browser run;
-earlier overlapping totals are not added. No full repository suite was run.
+On candidate 495a184, one combined backend run: **356 passed, 0 failures, 0 skips,
+354.594 seconds**. One combined Chrome run: **12 passed, 0 failures, 0 skips,
+138.356 seconds** (runner 148.546 s); driver_backed_success=true.
+These are actual new results, not sums of the earlier overlapping gates.
 
-Backend coverage: Loan/import/payoff/serializer compatibility, password validation,
-session-only API auth and CSRF, Career exception disclosure and pinned HTTPS,
-Family directional financial opt-in/revocation/Growth exceptions, invitation
-synchronized thread/process throttles, streamed multipart/native/parser resource
-limits, cleanup/retry integrity, document extraction/uploader/statement identity.
-Chrome covers the four Loan workflows, three Family workflows and three shared
-upload/login/import workflows. All SQLite/media/limiter data are synthetic and
-isolated. The migration rehearsal does not apply anything to the live database.
-System/config checks and migration-drift checks PASS; no model changes detected.
+Coverage: passwords, session-only API authentication/CSRF; Career/Family Growth
+safe errors; Family opt-in/revocation and consent migration; invitations and
+shared reservation threads/processes; M14E streamed/parser/native limits; M14F
+current/historical loan diagnostics, persistence/log filtering; loan/import/
+payoff/serializer/financial identity compatibility; all retained blocker fixes;
+retention source deletion, retries/manual correction and native owner-only media.
+Chrome covers the prior ten affected workflows plus login-limit recovery and
+Investment compatibility. All fixtures/databases/media/limiter data are synthetic.
 
-Evidence: F:\ALFRED_DEV\isolated-tests\m14-final-backend.log,
-m14-final-chrome.log, m14-final-chrome/browser_regression_summary.json,
-m14f-system-check.log, m14f-drift-check.log and m14f-graphify-complete.log.
-M14F/combined source is committed separately from this final evidence update.
+Native configuration proof PASS: DEBUG=false, authenticated private media,
+explicit source deletion option, session auth/CSRF, positive limits, absolute
+persistent protection directories. Django checks PASS; isolated native migration
+check reports no changes. AST-only graph update PASS: 7892 nodes / 20678 edges.
+No migration/dependency created by these blocker fixes; source comparison adds
+only the previously tested family.0004 relative to stable. No live migration
+table/private database/config/tokens/keys/backups were read or modified.
 
-Promotion is prepared only in [the hold plan](M14_CONTROLLED_PROMOTION_PLAN.md).
-Source comparison adds only `family.0004_financial_sharing_opt_in`; M14F adds
-no migration. No live migration table/private database was read. The plan
-requires a fresh verified backup, consent-impact rehearsal, explicit live
-authorization, rollback and real-account acceptance. No promotion performed.
+Evidence under F:/ALFRED_DEV/isolated-tests:
+- m14-blockers-combined-backend.log
+- m14-blockers-combined-browser.log
+- m14-blockers-chrome/browser_regression_summary.json
+- m14-native-config-proof-final.log
+- m14-blockers-final-graph.log
+- m14-http-before.log / m14-http-after.log
+- m14-token-focused.log / m14-token-integration.log
+- m14-abuse-before.log / m14-abuse-focused-final.log / m14-abuse-related-final.log
+- m14-abuse-fixture-recheck.log / m14-blockers-chrome-verified.log
 
-Next action: resolve the retained release scope. No scope response was received
-while the requested gates ran, so the previous reported blockers remain.
-M14 DEVELOPMENT is not marked COMPLETE until release readiness is PASS; M15
-has not started. The named completed M14 milestones and M14F are COMPLETE.
-Do not rewrite historical live data or start M15 before readiness is PASS.
-Travel T09 remains behind these P0 issues. Historical Docker classification is
-deferred recovery housekeeping and does not block development.
+Initial synthetic fixture failures were corrected and their logs preserved;
+zero unresolved failure remains. Earlier 297/10 M14F baseline is preserved in
+Git history and prior evidence. No full-repository/installer/clean-PC or live
+provider/real-account acceptance is claimed by this security source gate.
 
-Local Ollama Codex was attempted for a static configuration-only documentation
-draft, in an empty read-only working directory. The local service was unavailable;
-the owned stalled CLI was stopped. No private data, credentials or runtime DB
-were provided. Hosted Codex completed source/security work and operator docs;
-no successful local documentation result is claimed. Local Ollama availability
-should be checked before the next routine-model task.
+## Frozen promotion and M15
 
-A broad security release is not ready until verified blockers are resolved.
-Do not deploy or apply migrations without explicit authorization. Do not delete
-recovery databases, backups, private repositories or historical Docker assets.
+[Controlled promotion plan](M14_CONTROLLED_PROMOTION_PLAN.md) includes exact
+source range/final HEAD, source and protected DB/config/media backups, fresh-copy
+migration rehearsal, historical sharing OFF impact, verified token rotation,
+configuration/privacy checks, rollback, runtime smoke and real-account acceptance.
+No promotion, private migration, token mutation or key retirement was performed.
+
+M15 DEVELOPMENT READY = YES. Start ALFRED Persistent Intelligence & Memory Engine
+on codex/m15-persistent-memory-20261011 in F:/ALFRED_DEV/m15, from the frozen M14
+HEAD. First local vertical slice only: verified structured memory/provenance/
+sensitivity, local Ollama embedding, semantic retrieval in a fresh session,
+owner isolation, append-only encrypted event, restart/restore/retrieve.
+Cloud reasoning stays optional/privacy-gated; no cloud sync or broad autonomous
+learning until the local slice is stable. Frozen M14 receives no M15 commits.

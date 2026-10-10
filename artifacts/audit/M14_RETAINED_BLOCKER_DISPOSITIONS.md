@@ -3,12 +3,12 @@
 Authoritative scope: M14_SECURITY_RELEASE_READINESS.md at development HEAD
 97c06fada2572c7c4c08f383abd6a124173dadc3. No new broad audit.
 
-| Retained item | Classification | Concrete boundary |
+| Retained item | Initial classification / final disposition | Concrete boundary |
 | --- | --- | --- |
-| Other direct HTTP callers | RELEASE-BLOCKING | Investment AMFI/news and Verified Intelligence provider adapters bypassed pinned public HTTPS, redirect and response limits. Reuse public_http; focused reproduction and compatibility gate required. |
+| Other direct HTTP callers | RELEASE-BLOCKING / RESOLVED | Investment AMFI/news and Verified Intelligence provider adapters now use pinned public HTTPS, redirect and response limits. 7bb5086; focused reproduction and compatibility gate pass. |
 | Raw upload retention | DEFERRABLE subject to release configuration | Local source documents support review/retry and forensic recovery. Existing extraction-only deletion is configurable; production/native configuration requests it. No historical deletion is authorized. Details below. |
-| Integration token fallback re-encryption | RELEASE-BLOCKING | EmailConnection OAuth access/refresh values use MultiFernet with SECRET_KEY_FALLBACKS; fallback reads alone do not permit verified old-key retirement. Add dry-run/transactional verified rotation; no live token writes. |
-| Global login / expensive-endpoint limits | RELEASE-BLOCKING | Family invitation quotas cover only that operation. Protect all login entry points and authenticated expensive operations with the existing atomic diskcache pattern; preserve auth/CSRF and per-account isolation. |
+| Integration token fallback re-encryption | RELEASE-BLOCKING / RESOLVED in source | EmailConnection OAuth access/refresh values use MultiFernet with SECRET_KEY_FALLBACKS. 64d21f3 adds dry-run/transactional verified rotation; no live token writes/key retirement. |
+| Global login / expensive-endpoint limits | RELEASE-BLOCKING / RESOLVED | cf799d4 protects all login paths/signup/authenticated API and expensive operations through the existing atomic diskcache pattern; auth/CSRF, Family quotas and per-account isolation pass. |
 | family.0004 consent reset | ALREADY RESOLVED in development | Forward/rollback/replay tests passed in the combined 297 gate. Deployment still requires fresh backup, disposable rehearsal, consent reconciliation and explicit authorization. This is a promotion prerequisite, not an unresolved source flaw. |
 
 ## Explicit retention deferral
@@ -109,3 +109,14 @@ migration drift pass (m14-native-config-proof-final.log), with synthetic storage
 The first proof harness lacked the native queue parent directory; it was created
 inside isolated test storage and the corrected proof passed. No live config read
 or changed, no live cleanup, migration, key retirement or database access.
+
+## Final combined gate and completion
+
+Candidate 495a184: 356 backend passed, 0 failures/skips, 354.594 s;
+12 Chrome passed, 0 failures/skips, 138.356 s, driver-backed success true.
+System/native config and migration drift pass. Both consent migration rehearsal
+methods pass in this gate. Four retained groups: three resolved source blockers,
+one explicit retention deferral; consent migration already resolved development.
+No remaining release blocker. M14 DEVELOPMENT COMPLETE; M14 RELEASE READY YES.
+The freeze commit changes evidence/docs only. No live promotion or private
+database/key/token/config mutation. M15 proceeds in a separate worktree.

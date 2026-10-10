@@ -1290,3 +1290,47 @@ including DEBUG=false, private media, deletion option, session/CSRF and limits.
 No historical evidence deleted, no cleanup migration/job created/applied, no
 live source/database/config/token/key/backups touched. M14 completion now waits
 for one new combined backend/Chrome gate on the complete source candidate.
+
+## M14 DEVELOPMENT COMPLETE / release candidate frozen - 2026-10-11
+
+Source candidate: 495a184c7a44bfe169978f8e0c018f8a286fb208.
+Resolved separately: HTTP 7bb5086ac1046382f4abb84fc0e6c1ad647304b7;
+token rotation 64d21f37607b1a765c0ea7ca746216c3cb014c69;
+abuse limits cf799d46c17d7241acc4cfb33c8b5ef2fc9d8f60.
+Raw local-vault/Travel T09 retention explicitly deferred with rationale, owner,
+mitigations and required evidence in M14_RETAINED_BLOCKER_DISPOSITIONS.md.
+Consent-reset source already resolved; private promotion remains unauthorized.
+
+Actual updated gate on candidate 495a184: 356 backend passed, 0 failures/skips,
+354.594 s; 12 Chrome passed, 0 failures/skips, 138.356 s (runner 148.546 s),
+driver_backed_success=true. All old 19 M14F/31 M14E methods and both family.0004
+forward/rollback/replay methods included. No overlapping totals added.
+Native config/check/drift PASS; no changes detected. Graph AST-only update PASS
+7892 nodes / 20678 edges. No new migration/dependency. Only family.0004 differs
+from stable source; no live migration table or private DB access.
+Evidence: m14-blockers-combined-backend.log, m14-blockers-combined-browser.log,
+m14-blockers-chrome/browser_regression_summary.json,
+m14-native-config-proof-final.log, m14-blockers-final-graph.log, scoped logs.
+Initial synthetic fixture failures corrected/preserved; zero unresolved failure.
+
+M14 DEVELOPMENT = COMPLETE. M14 RELEASE READY = YES. Freeze the evidence-only
+commit containing this checkpoint on release/m14-20261011, and write exact HEAD /
+full source range to isolated-tests/m14-promotion-manifest.json. Application/test
+source is identical to the validated candidate. Promotion plan includes source,
+DB/config/media backups, disposable consent/token rehearsals, OFF-consent impact,
+primary-only token verification, config checks, rollback/smoke/real acceptance.
+No live source/database/config/key/token/backups modified; stable Git-only HEAD
+remains a9d096ea55839269fe6fce14d4f11ea2cbf05336. No promotion authorized/performed.
+Existing untracked docs/WINDOWS_RESTORATION_VERIFIED_20261006.md remains untouched.
+
+M15 DEVELOPMENT READY = YES. Next create F:/ALFRED_DEV/m15 on separate branch
+codex/m15-persistent-memory-20261011 from frozen release HEAD and implement only
+verified local structured memory/provenance/sensitivity, Ollama embedding,
+semantic new-session retrieval/owner isolation, append-only encrypted event,
+restart/restore/retrieve. Cloud reasoning optional/privacy-gated; no cloud sync
+or broad autonomous learning. Never mix M15 commits into frozen M14.
+No full repository/installer/live-provider/real-account acceptance claimed.
+
+NEXT ACTION: start the isolated M15 vertical slice; live M14 awaits authorization.
+EXACT NEXT COMMAND:
+git -C F:/ALFRED_DEV/m13c worktree add -b codex/m15-persistent-memory-20261011 F:/ALFRED_DEV/m15 release/m14-20261011

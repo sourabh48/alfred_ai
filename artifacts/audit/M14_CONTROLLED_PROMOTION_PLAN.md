@@ -5,20 +5,23 @@ Stable checkout: `F:\ALFRED\alfred_ai`.
 Stable source baseline, rechecked through Git only:
 `a9d096ea55839269fe6fce14d4f11ea2cbf05336`.
 Validated M14F implementation: `895ce13ee86bf5fddbd1332f5326389b7a3b7c5c`.
-Exact application-source range:
-`a9d096ea55839269fe6fce14d4f11ea2cbf05336..895ce13ee86bf5fddbd1332f5326389b7a3b7c5c`.
-The following documentation commit records the final gates without changing
-application source. Its final development HEAD and full promotion range are
-frozen after commit in `F:\ALFRED_DEV\isolated-tests\m14-promotion-manifest.json`.
+Final application/test candidate:
+`495a184c7a44bfe169978f8e0c018f8a286fb208`.
+Exact validated source range:
+`a9d096ea55839269fe6fce14d4f11ea2cbf05336..495a184c7a44bfe169978f8e0c018f8a286fb208`.
+HTTP, token rotation and abuse source commits are 7bb5086, 64d21f3 and cf799d4.
+The following evidence-only commit records the final gates. Its final development
+HEAD/full promotion range are frozen in `F:\ALFRED_DEV\isolated-tests\m14-promotion-manifest.json`
+and branch `release/m14-20261011`; no M15 commit belongs to this candidate.
 Verify that manifest and both actual Git HEADs before authorizing any promotion.
 
-This is a hold plan. A passing regression gate does not clear the additional
-reported blockers retained in M14_SECURITY_RELEASE_READINESS.md. Resolve their
-release scope before requesting promotion authorization. No live source,
-database, configuration, credential or backup has been modified by M14F.
+This is a controlled plan, not live authorization. Release readiness requires the
+new combined gate and the documented retention disposition. No live source,
+database, configuration, credential or backup has been modified. M15 starts in
+its own worktree after freeze and does not wait for live deployment.
 
 1. Before any live action, require explicit authorization for source promotion
-   and the private-database migration. Confirm a clean stable source baseline,
+   and the private-database migration/token rotation. Confirm a clean stable source baseline,
    final development HEAD, local/LAN configuration, and successful combined M14
    proof. Preserve untracked operator files; never copy development SQLite,
    uploads, limiter stores, test credentials, caches or registry into stable.
@@ -27,6 +30,9 @@ database, configuration, credential or backup has been modified by M14F.
    backup, including media and local configuration/keys needed for recovery.
    Account for WAL/SHM state; verify hashes, integrity and a disposable restore.
    Preserve the original recovery archive and earlier backups unchanged. Record
+   a verified source Git bundle/archive at the stable baseline plus a protected
+   backup of untracked operator files before fast-forward. Verify a disposable
+   source restore as well as the DB/config/media recovery set.
    baseline loan/document/account counts and balances locally, without private
    values in Git or hosted diagnostics. Keep public/LAN access closed through
    acceptance so rollback cannot discard later user writes.
@@ -44,13 +50,28 @@ database, configuration, credential or backup has been modified by M14F.
    deliberately keeps permissions OFF. This privacy change needs real-account
    acceptance; it does not change loan balances or financial calculations.
 5. After the approved migration, start only the local testable stable service.
+   Before exposing it, rehearse and explicitly authorize email-token rotation
+   as described in docs/EMAIL_TOKEN_ROTATION.md: new primary, temporary fallback
+   reads, count-only dry-run, atomic apply, primary-only re-read verification,
+   zero remaining fallback/legacy/invalid counts. Keep old recovery keys/backups;
+   remove runtime fallback only after token and other signing-key consumers are
+   verified. No live rotation or fallback removal has been performed here.
+   Validate native_settings: DEBUG=false, private owner-checked media, session
+   auth/CSRF, positive limits and absolute persistent protection directories.
+   Select the source-retention mode explicitly (extraction-only recommended);
+   never run an automatic historical source purge. Preserve limiter stores on
+   upgrade; do not replace them with development caches or reset quotas.
    Smoke-test login/password validation, session-only API authentication and
    authenticated-write CSRF; Career and Family safe failure messages; family
    invitation throttling/expiry and opt-in/revocation; upload-size rejection then
    a valid synthetic import; safe loan parser failure, historical payload
    filtering, document access, successful import/reimport and payoff evidence.
-   Check status codes, correlation references and class-only logs. Reconcile
-   pre/post counts and monetary balances locally. Do not use private documents
+   Check status codes, correlation references and class-only logs.
+   Check login/signup/API/expensive 429/Retry-After and valid recovery, invitation
+   quotas, transport private/redirect refusal and safe provider fallback using
+   synthetic fixtures. Check backend evidence, native configuration/migration
+   drift and the 12-workflow Chrome driver-backed summary before acceptance.
+   Reconcile pre/post counts and monetary balances locally. Do not use private documents
    in automated regression tests.
 6. Real-account acceptance must confirm existing loan/import history loads,
    retained documents open, balances/deduplication remain unchanged, historical
@@ -66,9 +87,15 @@ database, configuration, credential or backup has been modified by M14F.
    restoring access. The older baseline lacks these security protections, so
    keep LAN access closed until safe recovery is accepted. Do not restore over
    later accepted user writes; reconcile them separately if the window was opened.
+   Token rollback requires the pre-rotation DB and its compatible key set;
+   restoring source alone does not restore token encryption keys. Preserve
+   current limiter histories, revoke exposed credentials separately if needed,
+   and keep LAN closed until recovery is accepted. No balance/schema overwrite
+   after acceptance is authorized by this plan.
 
-M15 has not started. Its initial verified-local-memory/Ollama/retrieval/encrypted
-journal/restart slice can begin only after M14 release readiness is explicitly
-PASS. A future sync abstraction must keep runtime local; cloud deployment wiring,
+After M14 readiness PASS, M15's first verified-local-memory/Ollama/retrieval/
+encrypted-journal/restart slice starts on `codex/m15-persistent-memory-20261011`
+in `F:\ALFRED_DEV\m15`, branched from the frozen manifest HEAD.
+A future sync abstraction must keep runtime local; cloud deployment wiring,
 credentials or cloud-specific runtime templates require a separate decision
 under AGENTS.md. This local/LAN release adds no cloud wiring or secrets.
