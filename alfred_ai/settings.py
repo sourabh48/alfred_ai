@@ -167,6 +167,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "alfred_ai.services.upload_limits.UploadProtectionMiddleware",
+    "alfred_ai.services.abuse_protection.AbuseProtectionMiddleware",
     "alfred_ai.middleware.UserDataCacheMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -311,6 +312,17 @@ ALFRED_FAMILY_INVITE_CREATE_LIMIT = env.int("ALFRED_FAMILY_INVITE_CREATE_LIMIT",
 ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS = env.int("ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS", default=3600)
 ALFRED_FAMILY_INVITE_ACCEPT_LIMIT = env.int("ALFRED_FAMILY_INVITE_ACCEPT_LIMIT", default=10)
 ALFRED_FAMILY_INVITE_ACCEPT_WINDOW_SECONDS = env.int("ALFRED_FAMILY_INVITE_ACCEPT_WINDOW_SECONDS", default=600)
+
+ALFRED_ABUSE_THROTTLE_DIR = env('ALFRED_ABUSE_THROTTLE_DIR', default=str(
+    Path(os.environ.get('ALFRED_DATA_DIR') or BASE_DIR) / 'artifacts' / 'security' / 'runtime-limits'))
+for _scope, _count, _window in (
+    ('LOGIN_ACCOUNT', 10, 600), ('LOGIN_IP', 30, 600), ('LOGIN_GLOBAL', 100, 600),
+    ('SIGNUP_IP', 20, 3600), ('SIGNUP_GLOBAL', 50, 3600),
+    ('API_ACCOUNT', 120, 60), ('API_GLOBAL', 600, 60),
+    ('EXPENSIVE_ACCOUNT', 30, 3600), ('EXPENSIVE_GLOBAL', 120, 3600),
+):
+    globals()[f'ALFRED_{_scope}_LIMIT'] = env.int(f'ALFRED_{_scope}_LIMIT', default=_count)
+    globals()[f'ALFRED_{_scope}_WINDOW_SECONDS'] = env.int(f'ALFRED_{_scope}_WINDOW_SECONDS', default=_window)
 
 # Absolute upload limits are independent of Django's memory thresholds.
 from .upload_config import UPLOAD_LIMIT_DEFAULTS

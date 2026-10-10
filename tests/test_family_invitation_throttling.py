@@ -207,7 +207,7 @@ class FamilyInvitationThrottleTests(TestCase):
     def test_storage_failures_are_safe_and_fail_closed_without_invitation_writes(self):
         marker = "SyntheticFamilyIdentity-123456.78-Bearer-private-F:\\secret\\cache"
         for path in (CREATE, ACCEPT):
-            with patch("apps.family.throttles.Cache", side_effect=OSError(marker)), self.assertLogs(level="ERROR") as logs:
+            with patch("alfred_ai.services.abuse_protection.reserve_attempts", return_value=0), patch("alfred_ai.services.throttling.Cache", side_effect=OSError(marker)), self.assertLogs(level="ERROR") as logs:
                 response = self.post(self.member_client, path, {"invite_code": marker})
             self.assertEqual(response.status_code, 503)
             self.assertIn("error_id", response.json())
@@ -221,7 +221,7 @@ class FamilyInvitationThrottleTests(TestCase):
                        {"ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS": -1},
                        {"ALFRED_FAMILY_INVITE_THROTTLE_DIR": None},
                        {"ALFRED_FAMILY_INVITE_THROTTLE_DIR": "relative-protection-store"}):
-            with override_settings(**config), patch("apps.family.throttles.Cache") as store:
+            with override_settings(**config), patch("alfred_ai.services.abuse_protection.reserve_attempts", return_value=0), patch("alfred_ai.services.throttling.Cache") as store:
                 response = self.post(self.owner_client, CREATE)
             self.assertEqual(response.status_code, 503)
             store.assert_not_called()

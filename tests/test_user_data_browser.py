@@ -56,7 +56,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def setUp(self):
         directory = self.enterContext(TemporaryDirectory(prefix="alfred-browser-invite-limits-"))
-        self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=directory))
+        self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=directory,
+            ALFRED_ABUSE_THROTTLE_DIR=str(Path(directory) / 'runtime-limits')))
         self.browser.get("about:blank")
         cache.clear()
         self.offline = _offline_fixture_patches()
@@ -85,6 +86,27 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def text(self, element_id):
         return self.browser.find_element(self.By.ID, element_id).text
+
+    def test_login_limit_shows_feedback_then_recovers_after_window(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from selenium.webdriver.support import expected_conditions as EC
+        now = timezone.now()
+        with override_settings(ALFRED_LOGIN_ACCOUNT_LIMIT=1), patch('django.utils.timezone.now', return_value=now):
+            self.browser.get(self.live_server_url + '/login/')
+            self.browser.find_element(self.By.NAME, 'username').send_keys('acceptance_demo')
+            self.browser.find_element(self.By.NAME, 'password').send_keys('synthetic-wrong-password')
+            self.browser.find_element(self.By.CSS_SELECTOR, 'button[type="submit"]').click()
+            self.wait.until(EC.text_to_be_present_in_element((self.By.TAG_NAME, 'body'), 'Invalid username or password'))
+            self.browser.get(self.live_server_url + '/login/')
+            self.browser.find_element(self.By.NAME, 'username').send_keys('acceptance_demo')
+            self.browser.find_element(self.By.NAME, 'password').send_keys(PASSWORD)
+            self.browser.find_element(self.By.CSS_SELECTOR, 'button[type="submit"]').click()
+            self.wait.until(EC.text_to_be_present_in_element((self.By.TAG_NAME, 'body'), 'Too many requests'))
+            self.capture('m14-login-limit-feedback')
+        with patch('django.utils.timezone.now', return_value=now + timedelta(seconds=601)):
+            self.login()
+            self.capture('m14-login-limit-recovered')
 
     def capture(self, name):
         self.browser.save_screenshot(str(self.artifacts / f"{name}.png"))

@@ -1262,3 +1262,18 @@ conflict detection, mixed-key/legacy/idempotence/timestamp tests passed:
 No live token/key mutation, schema migration or dependency. Source commit is the
 commit containing this checkpoint. Next: reuse atomic invitation reservation
 pattern for login and authenticated expensive-endpoint abuse protection.
+
+## M14 retained blocker resolution: abuse protection - 2026-10-11
+
+Token source commit: 64d21f37607b1a765c0ea7ca746216c3cb014c69.
+Login/signup/account/global API and expensive-operation protection now reuses the
+invitation atomic rolling-window pattern through a shared helper, with the
+existing invitation wrapper and independent persistent scopes preserved.
+Safe 429/Retry-After precedes view writes; invalid/unavailable store fails 503;
+HMAC identities, no forwarding-header trust, safe reference/class logging.
+No auth/CSRF bypass, dependency, migration, live mutation or money changes.
+Focused 12 passed (12.335 s); related 55 passed (79.462 s); Chrome 2 passed
+(16.940 s), zero failures/skips and driver-backed success true. Fixture-only
+failures were corrected (scoped mock, complete URLconf, navigation wait/helper).
+Source commit is the commit containing this checkpoint. Final combined gate and
+retention deferral evidence/config verification still precede M14 completion.

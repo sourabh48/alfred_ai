@@ -48,6 +48,9 @@
                 <a href="{% url 'signup' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">{{ ui_config.auth.login.secondary_cta }}</a>
             </div>
 
+            {% if protection_message %}
+            <div class="alert alert-warning" role="alert">{{ protection_message }}</div>
+            {% endif %}
             {% if form.errors %}
             <div class="alert alert-danger" role="alert">
                 Invalid username or password.

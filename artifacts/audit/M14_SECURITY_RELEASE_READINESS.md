@@ -55,7 +55,8 @@ Remaining reported release issues (not cleared by this scoped M14F work):
 2026-10-11 scoped follow-up: dispositions are now authoritative in
 [M14_RETAINED_BLOCKER_DISPOSITIONS.md](M14_RETAINED_BLOCKER_DISPOSITIONS.md).
 Other HTTP adapters are resolved (41 passing tests); token rotation is resolved
-(7 focused / 18 related tests). Global abuse protection remains release-blocking.
+(7 focused / 18 related tests). Global abuse protection is resolved (12 focused,
+55 related and 2 Chrome tests); the updated combined M14 gate is still pending.
 Raw local-vault
 and Travel telemetry retention are explicitly deferred with configuration and
 ownership safeguards, evidence requirements and concrete follow-up milestones.

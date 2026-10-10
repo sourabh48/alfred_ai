@@ -1,13 +1,10 @@
 """Account-scoped, atomic invitation limits for the local/LAN runtime."""
-from pathlib import Path
-
 from django.conf import settings
-from django.utils import timezone
-from diskcache import Cache
 from rest_framework.exceptions import APIException
 from rest_framework.throttling import BaseThrottle
 
 from alfred_ai.services.api_errors import safe_error_response
+from alfred_ai.services.throttling import reserve_attempts
 
 
 class InvitationProtectionUnavailable(APIException):
@@ -17,22 +14,8 @@ class InvitationProtectionUnavailable(APIException):
 
 def reserve_invitation_attempt(user_id, scope, limit, window_seconds):
     """Return a retry delay, or atomically reserve one rolling-window attempt."""
-    if limit < 1 or window_seconds < 1:
-        raise ValueError("Invitation limits must be positive")
-    directory = settings.ALFRED_FAMILY_INVITE_THROTTLE_DIR
-    if not directory or not Path(directory).is_absolute():
-        raise ValueError("Invitation protection requires an absolute persistent directory")
-    # Dedicated, non-evicting store: ordinary cache clearing cannot reset quotas.
-    with Cache(directory, timeout=5,
-               eviction_policy="none", cull_limit=0) as store, store.transact():
-        now = timezone.now().timestamp()
-        store.expire()
-        key = (scope, user_id)
-        history = [stamp for stamp in store.get(key, []) if stamp > now - window_seconds]
-        if len(history) >= limit:
-            return min(history) + window_seconds - now
-        store.set(key, history + [now], expire=window_seconds)
-    return 0
+    return reserve_attempts(settings.ALFRED_FAMILY_INVITE_THROTTLE_DIR,
+        [((scope, user_id), limit, window_seconds)])
 
 
 class FamilyInvitationThrottle(BaseThrottle):

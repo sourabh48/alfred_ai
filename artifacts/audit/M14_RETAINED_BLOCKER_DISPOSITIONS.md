@@ -74,3 +74,21 @@ Seven focused tests passed (0.041 s); related security gate: 18 passed,
 0 failures/skips, 11.529 s (m14-token-focused.log, m14-token-integration.log).
 The source workflow blocker is resolved; applying it to private tokens remains
 an explicitly authorized promotion operation, with keys/backups retained.
+
+## Abuse-limit resolution
+
+Token implementation commit: 64d21f37607b1a765c0ea7ca746216c3cb014c69.
+Shared atomic non-evicting diskcache reservations now protect all login entry
+points, signup, authenticated APIs and expensive operations, with independent
+account/IP and global quotas. Existing invitation scopes/budgets remain intact;
+no duplicate invitation throttle. Rejection precedes view execution, returns
+429/Retry-After, and makes no application mutation. Store failures fail closed
+503 with safe class/reference logging. Authentication/ownership/CSRF and M14E
+resource limits remain independent. See [ABUSE_PROTECTION.md](../../docs/ABUSE_PROTECTION.md).
+The pre-fix login regression failed across all three entry points. Final focused
+12 tests passed (12.335 s); related security gate 55 passed, 0 failures/skips,
+79.462 s. Chrome login recovery and Investment compatibility: 2 passed,
+0 failures/skips, 16.940 s, driver-backed success true. Initial fixture failures
+and corrected logs remain in isolated-tests; no unresolved failure remains.
+No migration, dependency, live source/database/config/key change. Final combined
+M14 gate is still required before marking development complete.
