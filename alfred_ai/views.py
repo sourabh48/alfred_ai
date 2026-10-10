@@ -254,6 +254,10 @@ def document_review_correction_api_view(request):
             corrections=payload.get("corrections") or {},
         )
     except (ValueError, TypeError) as exc:
+        if isinstance(locals().get("payload"), dict) and payload.get("scope") in {"loan_document", "loan_closure_document"}:
+            from .services.api_errors import safe_error_details
+            return JsonResponse(safe_error_details(exc, "Check the loan document correction values.",
+                                                  logger_name=__name__, field="error"), status=400)
         return JsonResponse({"error": str(exc)}, status=400)
     return JsonResponse({"item": item}, encoder=DjangoJSONEncoder)
 
@@ -262,11 +266,21 @@ def document_review_correction_api_view(request):
 @require_http_methods(["POST"])
 def document_review_retry_api_view(request):
     payload = json.loads(request.body or "{}")
-    item = retry_review_item(
-        request.user,
-        scope=str(payload.get("scope") or ""),
-        document_id=int(payload.get("id") or 0),
-    )
+    try:
+        item = retry_review_item(
+            request.user,
+            scope=str(payload.get("scope") or ""),
+            document_id=int(payload.get("id") or 0),
+        )
+    except Exception as exc:
+        if payload.get("scope") not in {"loan_document", "loan_closure_document"}:
+            raise
+        from .services.api_errors import safe_error_details
+        from .services.upload_limits import UploadLimitExceeded, UploadFormatError, UploadStorageUnavailable, UploadProtectionUnavailable
+        resource_error = isinstance(exc, (UploadLimitExceeded, UploadFormatError, UploadStorageUnavailable, UploadProtectionUnavailable))
+        message = type(exc).default_detail if resource_error else "Loan document retry could not be completed. Please retry."
+        return JsonResponse(safe_error_details(exc, message, logger_name=__name__, field="error"),
+                            status=exc.status_code if resource_error else 500)
     return JsonResponse({"item": item}, encoder=DjangoJSONEncoder)
 
 

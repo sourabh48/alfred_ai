@@ -23,6 +23,7 @@ def purge_uploaded_file_after_extraction(
     reason: str,
     payload_field: str = "extracted_payload",
     update_timestamp: bool = True,
+    metadata_filter=None,
 ) -> dict[str, Any]:
     field_file = getattr(instance, field_name, None)
     storage_name = str(getattr(field_file, "name", "") or "")
@@ -41,7 +42,7 @@ def purge_uploaded_file_after_extraction(
     }
 
     if not raw_upload_cleanup_enabled():
-        return metadata
+        return metadata_filter(metadata) if metadata_filter else metadata
 
     update_fields: set[str] = set()
     if storage_name:
@@ -57,6 +58,9 @@ def purge_uploaded_file_after_extraction(
     else:
         metadata["deleted"] = True
         metadata["deleted_at"] = now
+
+    if metadata_filter:
+        metadata = metadata_filter(metadata)
 
     if payload_field and hasattr(instance, payload_field):
         current_payload = getattr(instance, payload_field, None)

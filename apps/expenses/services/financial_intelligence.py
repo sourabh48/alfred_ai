@@ -10,6 +10,7 @@ from django.db.models import Count, Max
 from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import materialize_payload
+from apps.loans.diagnostics import public_allocation, reconciliation_message
 from apps.expenses.models import BankAccount, Expense
 from apps.expenses.services.cashflow_treatment import classify_cashflow, variable_spend_rows
 from apps.integrations.models import CreditReportUpload
@@ -308,7 +309,7 @@ def _financial_revision(user) -> str:
     return "|".join(
         str(value or "")
         for value in [
-            "expense-bank-money-v1",
+            "expense-bank-money-v2-safe-loan-diagnostics",
             user.monthly_income, user.variable_income, user.rent_or_emi, user.city,
             expense_meta["count"], expense_meta["max_id"], expense_meta["max_date"],
             loan_meta["count"], loan_meta["max_id"], loan_meta["max_updated"],
@@ -1054,8 +1055,8 @@ def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], curren
             "effective_closure_date": item.effective_closure_date.isoformat() if item.effective_closure_date else "",
             "amount_payable": loan_money_float(item.total_amount_payable),
             "matched_payment_total": loan_money_float(item.matched_payment_total),
-            "settlement_allocation": dict((item.audit_payload or {}).get("settlement_allocation") or {}),
-            "notes": item.reconciliation_notes,
+            "settlement_allocation": public_allocation((item.audit_payload or {}).get("settlement_allocation")),
+            "notes": reconciliation_message(item.reconciliation_status),
         }
         for item in snapshots[:6]
     ]

@@ -430,7 +430,8 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
             self.assertEqual(str(record.extracted_payload["accepted_corrections"][name]), value)
         self.selenium.refresh()
         self.wait.until(self.EC.presence_of_element_located((self.By.ID, "documentCenterRoot")))
-        self.wait.until(lambda driver: record.file_name in driver.find_element(self.By.ID, "documentCenterRoot").text)
+        if scope != "loan_closure_document":
+            self.wait.until(lambda driver: record.file_name in driver.find_element(self.By.ID, "documentCenterRoot").text)
         self.assertFalse(self.selenium.find_elements(self.By.ID, form_id))
 
     def test_resume_review_form_preserves_and_saves_decimal_experience(self):
@@ -475,6 +476,8 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(document.extracted_payload["raw_source_amount"], "2.675")
         loan.refresh_from_db()
         self.assertEqual(loan.remaining_balance, Decimal("500.00"))
+        self.selenium.get(self.live_server_url + "/loans/")
+        self.wait.until(lambda driver: "checked-closure.pdf" in driver.find_element(self.By.ID, "loanClosureActivity").text)
         closure_row = self.selenium.find_element(self.By.XPATH, "//*[contains(text(), 'checked-closure.pdf')]")
         self.selenium.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'});", closure_row)
         self._capture_browser_artifacts()

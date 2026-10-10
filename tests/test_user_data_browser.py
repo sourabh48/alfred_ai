@@ -120,6 +120,54 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: "uploaded" in self.text("documentResumeFeedback").casefold())
         self.capture("upload-valid-resume")
 
+    def test_loan_diagnostics_are_safe_then_real_pdf_import_and_reimport_work(self):
+        import fitz
+        from apps.loans.models import Loan, LoanImportDocument
+        directory = self.enterContext(TemporaryDirectory(prefix="alfred-m14f-browser-"))
+        file = Path(directory) / "synthetic-loan.pdf"
+        with fitz.open() as pdf:
+            page = pdf.new_page()
+            page.insert_text((40, 40), "HDFC PERSONAL LOAN\nLoan Number TESTM14F42\nLoan Amount 1000.00\n"
+                             "EMI Amount 100.00\nOutstanding Amount 500.00\nTenure 10 months")
+            file.write_bytes(pdf.tobytes())
+        owner = get_user_model().objects.get(username="acceptance_demo")
+        marker = r"C:\synthetic-private\loan.pdf; fake-token-M14F-browser; OCR PRIVATE LOAN"
+        LoanImportDocument.objects.create(user=owner, file_name="historical-loan.pdf", parser_status="failed",
+                                         summary=marker, extracted_payload={"error": marker, "raw_text_excerpt": marker})
+        self.login()
+        self.browser.get(self.live_server_url + "/loans/")
+        self.wait.until(lambda _: "historical-loan.pdf" in self.text("loanImportHistory"))
+        self.assertNotIn(marker, self.browser.page_source)
+        self.browser.find_element(self.By.ID, "loanPdfFile").send_keys(str(file))
+        button = self.browser.find_element(self.By.ID, "loanImportBtn")
+        self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant', block:'center'});", button)
+        self.wait.until(lambda driver: driver.execute_script(
+            "const r = document.getElementById('loanImportBtn').getBoundingClientRect(); return r.top >= 78 && r.bottom <= innerHeight;"))
+        with patch("apps.loans.views.loan_pdf_parser.parse_document", side_effect=RuntimeError(marker)):
+            button.click()
+            self.wait.until(lambda _: LoanImportDocument.objects.filter(file_name=file.name, parser_status="failed").exists())
+            self.wait.until(lambda _: "review" in self.text("loanImportStatus").casefold())
+        self.assertNotIn(marker, self.browser.page_source)
+        self.capture("loan-safe-parser-failure")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "loanImportBtn").is_enabled())
+        for attempt in (1, 2):
+            self.browser.find_element(self.By.ID, "loanPdfFile").send_keys(str(file))
+            self.browser.execute_script("document.getElementById('loanImportBtn').scrollIntoView({behavior:'instant', block:'center'});")
+            self.browser.find_element(self.By.ID, "loanImportBtn").click()
+            self.wait.until(lambda _: LoanImportDocument.objects.filter(file_name=file.name, parser_status="parsed").count() == attempt)
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID, "loanImportBtn").is_enabled())
+            rows = list(Loan.objects.filter(user=owner, loan_account_number="TESTM14F42").values_list("pk", "principal", "remaining_balance", "emi"))
+            self.assertEqual(len(rows), 1)
+            if attempt == 1:
+                expected = rows
+            else:
+                self.assertEqual(rows, expected)
+        self.capture("loan-real-pdf-reimport")
+        self.browser.get(self.live_server_url + "/documents/")
+        self.wait.until(lambda _: "historical-loan.pdf" in self.browser.find_element(self.By.TAG_NAME, "body").text)
+        self.assertNotIn(marker, self.browser.page_source)
+        self.capture("loan-safe-historical-review")
+
     def test_statement_real_pdf_reimport_preserves_fingerprints_and_balance(self):
         import fitz
         from apps.expenses.models import BankAccount, StatementUpload

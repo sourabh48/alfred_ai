@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 from .models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument
 from .money import loan_money, loan_money_float
+from .diagnostics import import_message, public_allocation, public_payload, verification_message, reconciliation_message
 
 
 class LoanForeclosureSnapshotSerializer(serializers.ModelSerializer):
@@ -48,10 +49,12 @@ class LoanForeclosureSnapshotSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_settlement_allocation(self, obj):
-        return dict((obj.audit_payload or {}).get("settlement_allocation") or {})
+        return public_allocation((obj.audit_payload or {}).get("settlement_allocation"))
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        data["linkage_notes"] = "Closure document linkage was evaluated against the selected loan."
+        data["reconciliation_notes"] = reconciliation_message(instance.reconciliation_status)
         for field in ("outstanding_principal", "accrued_interest", "foreclosure_charges", "taxes_gst",
                       "overdue_charges", "total_amount_payable", "matched_payment_total"):
             data[field] = loan_money_float(getattr(instance, field))
@@ -270,6 +273,8 @@ class LoanClosureDocumentSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["closure_amount"] = loan_money_float(instance.closure_amount)
+        data["extracted_payload"] = public_payload(instance.extracted_payload)
+        data["verification_notes"] = verification_message(instance.verification_status)
         return data
 
 
@@ -302,3 +307,9 @@ class LoanImportDocumentSerializer(serializers.ModelSerializer):
         if request is not None:
             return request.build_absolute_uri(obj.uploaded_file.url)
         return obj.uploaded_file.url
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["summary"] = import_message(instance.parser_status)
+        data["extracted_payload"] = public_payload(instance.extracted_payload)
+        return data

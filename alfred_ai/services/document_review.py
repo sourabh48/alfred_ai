@@ -23,6 +23,7 @@ from apps.investments.money import INVESTMENT_MONEY_FIELDS, investment_money, in
 from apps.investments.services import portfolio_intelligence_service
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument
 from apps.loans.money import loan_money, loan_money_float
+from apps.loans.diagnostics import import_message, verification_message, public_retry
 from apps.loans.services.loan_pdf_parser import loan_pdf_parser
 from apps.loans.services import loan_foreclosure_service
 from apps.loans.services.loan_closure_parser import loan_closure_parser
@@ -926,7 +927,6 @@ def _retry_loan_document(user, document_id: int) -> dict:
             "document_type": parsed.get("document_type") or "",
             "confidence": float(parsed.get("confidence") or 0),
             "loans": parsed.get("loans") or [],
-            "extracted_text_excerpt": (parsed.get("extracted_text") or "")[:1500],
         },
     )
     retry_resolution = "loan_rows_updated" if created_loans else "still_needs_review"
@@ -1981,25 +1981,27 @@ def _serialize_statement(upload: StatementUpload) -> dict:
 
 
 def _serialize_loan(document: LoanImportDocument) -> dict:
-    payload = document.extracted_payload or {}
-    first_loan = (payload.get("loans") or [{}])[0] if payload.get("loans") else {}
+    payload = document.extracted_payload if isinstance(document.extracted_payload, dict) else {}
+    rows = payload.get("loans")
+    first_loan = next((row for row in rows if isinstance(row, dict)), {}) if isinstance(rows, list) else {}
     return {
         "scope": "loan_document",
         "id": document.id,
         "file_name": document.file_name,
         "parser_status": document.parser_status,
         "parse_confidence": document.parse_confidence,
-        "summary": document.summary,
-        "notes": (payload.get("parser_notes") or payload.get("error") or ""),
+        "summary": import_message(document.parser_status),
+        "notes": import_message(document.parser_status),
         "fields": {
             "document_type": document.document_type,
             "lender": first_loan.get("lender", ""),
             "loan_type": first_loan.get("loan_type", ""),
             "loan_account_number": first_loan.get("loan_account_number", ""),
         },
-        "background_retry": payload.get("background_retry", {}),
-        "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text, scope="loan_document"),
+        "background_retry": public_retry(payload.get("background_retry")),
+        "accepted_corrections": {key: value for key, value in _accepted_corrections_payload(payload).items()
+                                 if key in {"document_type", "lender", "loan_type", "loan_account_number"}},
+        "review_artifacts": {},
         "review_fields": REVIEW_FIELD_SCHEMAS["loan_document"],
         "created_at": document.created_at.isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -2007,7 +2009,7 @@ def _serialize_loan(document: LoanImportDocument) -> dict:
 
 
 def _serialize_loan_closure(document: LoanClosureDocument) -> dict:
-    payload = document.extracted_payload or {}
+    payload = document.extracted_payload if isinstance(document.extracted_payload, dict) else {}
     snapshot = getattr(document, "foreclosure_snapshot", None)
     return {
         "scope": "loan_closure_document",
@@ -2020,7 +2022,7 @@ def _serialize_loan_closure(document: LoanClosureDocument) -> dict:
             if document.verification_status == "verified"
             else "Closure document retained for review"
         ),
-        "notes": (payload.get("parser_notes") or document.verification_notes or ""),
+        "notes": verification_message(document.verification_status),
         "fields": {
             "document_type": (snapshot.get_document_type_display() if snapshot else "") or payload.get("document_type", ""),
             "lender_name": (snapshot.lender_name if snapshot else "") or payload.get("lender_name", ""),
@@ -2032,9 +2034,10 @@ def _serialize_loan_closure(document: LoanClosureDocument) -> dict:
             "reconciliation_status": snapshot.get_reconciliation_status_display() if snapshot else "",
             "matched_payment_total": loan_money_float(snapshot.matched_payment_total) if snapshot else 0.0,
         },
-        "background_retry": payload.get("background_retry", {}),
-        "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text, scope="loan_closure_document"),
+        "background_retry": public_retry(payload.get("background_retry")),
+        "accepted_corrections": {key: value for key, value in _accepted_corrections_payload(payload).items()
+                                 if key in {"loan_account_number", "closure_amount", "closure_date", "matched_keyword"}},
+        "review_artifacts": {},
         "review_fields": REVIEW_FIELD_SCHEMAS["loan_closure_document"],
         "created_at": (document.updated_at or document.created_at).isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -2201,7 +2204,8 @@ def _serialize_credit(upload: CreditReportUpload) -> dict:
 
 
 def _accepted_corrections_payload(payload: dict | None) -> dict:
-    corrections = dict((payload or {}).get("accepted_corrections") or {})
+    source = (payload or {}).get("accepted_corrections")
+    corrections = source if isinstance(source, dict) else {}
     return {
         key: value
         for key, value in corrections.items()

@@ -39,10 +39,6 @@ class LoanClosureParser:
             "overdue_charges": self._extract_amount_for_labels(normalized, ["OVERDUE CHARGES", "PENALTY", "PENAL CHARGES", "LATE PAYMENT CHARGES"]),
             "total_amount_payable": self._extract_total_amount(normalized),
             "matched_keyword": self._extract_keyword(normalized),
-            "extraction_method": extracted.method,
-            "extraction_notes": extracted.notes[:6],
-            "raw_text_excerpt": " ".join(extracted_text.split())[:600],
-            "extraction_review": extracted.review_payload,
         }
         payload["closure_amount"] = payload["total_amount_payable"]
         payload["closure_date"] = payload["effective_closure_date"] or payload["statement_date"]
@@ -57,7 +53,7 @@ class LoanClosureParser:
         if document_type != "other":
             base_confidence += 0.08
         base_confidence = min(0.97, max(0.08, base_confidence))
-        confidence, learning_notes = apply_parser_learning(
+        confidence, _ = apply_parser_learning(
             user=user,
             scope="loan_closure_document",
             filename=file_name,
@@ -76,7 +72,7 @@ class LoanClosureParser:
             "payload": payload,
             "confidence": confidence,
             "parser_status": parser_status,
-            "parser_notes": " ".join([*extracted.notes, *learning_notes]).strip(),
+            "parser_notes": "Closure document extraction completed.",
         }
 
     def verify_document(self, loan, parsed: dict) -> tuple[bool, str]:

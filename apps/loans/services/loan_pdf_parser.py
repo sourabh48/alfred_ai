@@ -8,7 +8,6 @@ from typing import List, Dict, BinaryIO
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
 from alfred_ai.services.upload_limits import document_source
-from rest_framework.exceptions import APIException
 
 
 class LoanPDFParser:
@@ -51,45 +50,34 @@ class LoanPDFParser:
         document_type = "other"
         confidence = 0.0
 
-        try:
-            raw_bytes = self._read_bytes(pdf_file)
-            extraction = extract_document_text(raw_bytes, filename or getattr(pdf_file, "name", "loan.pdf"))
-            full_text = extraction.text
-            document_type = self._detect_document_type(full_text)
-            if document_type == "loan_book":
-                loans = self._parse_loan_book(full_text)
-            else:
-                loan = self._parse_single_loan_statement(full_text)
-                if loan and any(loan.values()):
-                    loans = [loan]
-            confidence = max(self._document_confidence(full_text, loans, document_type), extraction.confidence * 0.75 if full_text.strip() else 0.0)
-            confidence, _ = apply_parser_learning(
-                user=user,
-                scope="loan_document",
-                filename=filename or getattr(pdf_file, "name", "loan.pdf"),
-                detected_type=document_type,
-                text=full_text,
-                field_names=sorted({key for loan in loans for key, value in loan.items() if value not in ("", None, 0)}),
-                confidence=confidence,
-            )
-
-        except APIException:
-            raise
-        except Exception as e:
-            print(f"Error parsing loan PDF: {e}")
+        raw_bytes = self._read_bytes(pdf_file)
+        extraction = extract_document_text(raw_bytes, filename or getattr(pdf_file, "name", "loan.pdf"))
+        full_text = extraction.text
+        document_type = self._detect_document_type(full_text)
+        if document_type == "loan_book":
+            loans = self._parse_loan_book(full_text)
+        else:
+            loan = self._parse_single_loan_statement(full_text)
+            if loan and any(loan.values()):
+                loans = [loan]
+        confidence = max(self._document_confidence(full_text, loans, document_type), extraction.confidence * 0.75 if full_text.strip() else 0.0)
+        confidence, _ = apply_parser_learning(
+            user=user,
+            scope="loan_document",
+            filename=filename or getattr(pdf_file, "name", "loan.pdf"),
+            detected_type=document_type,
+            text=full_text,
+            field_names=sorted({key for loan in loans for key, value in loan.items() if value not in ("", None, 0)}),
+            confidence=confidence,
+        )
 
         return {
             "document_type": document_type,
             "confidence": confidence,
             "extracted_text": full_text[:20000],
             "loans": loans,
-            "parser_notes": " ".join(extraction.notes[:6]).strip() if 'extraction' in locals() else "",
-            "payload": {
-                "extraction_method": extraction.method if 'extraction' in locals() else "",
-                "extraction_notes": extraction.notes[:6] if 'extraction' in locals() else [],
-                "raw_text_excerpt": " ".join((full_text or "").split())[:600],
-                "extraction_review": extraction.review_payload if 'extraction' in locals() else {},
-            },
+            "parser_notes": "Loan document extraction completed.",
+            "payload": {},
         }
 
     def _read_bytes(self, upload: BinaryIO) -> bytes:

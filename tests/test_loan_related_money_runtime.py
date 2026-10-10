@@ -199,7 +199,9 @@ class LoanRelatedMoneyRuntimeTests(TestCase):
         self.assertEqual(watch["amount_payable"], 2.78)
         self.assertIsInstance(watch["matched_payment_total"], float)
         self.assertEqual(watch["settlement_allocation"]["payment_total"], 2.68)
-        self.assertEqual(closure["extracted_payload"]["raw_source_amount"], "2.675")
+        self.assertNotIn("raw_source_amount", closure["extracted_payload"])
+        document.refresh_from_db()
+        self.assertEqual(document.extracted_payload["raw_source_amount"], "2.675")
         snapshot.refresh_from_db()
         self.assertEqual(snapshot.outstanding_principal, Decimal("2.68"))
 

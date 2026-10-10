@@ -1162,6 +1162,9 @@ class DocumentReviewAndRetryTests(TestCase):
         for key, field_names in expected_aliases.items():
             with self.subTest(queue_item=key):
                 self.assertIn(key, items)
+                if key[0] in {"loan_document", "loan_closure_document"}:
+                    self.assertEqual(items[key]["review_artifacts"], {})
+                    continue
                 alias_field_names = {
                     candidate["field_name"]
                     for candidate in items[key]["review_artifacts"]["field_candidates"]
