@@ -52,6 +52,14 @@ pass. AST-only update: 7,804 nodes / 20,474 edges, no API/semantic extraction.
 
 Remaining reported release issues (not cleared by this scoped M14F work):
 
+2026-10-11 scoped follow-up: dispositions are now authoritative in
+[M14_RETAINED_BLOCKER_DISPOSITIONS.md](M14_RETAINED_BLOCKER_DISPOSITIONS.md).
+Other HTTP adapters are resolved (41 passing tests); token rotation and global
+abuse protection remain release-blocking until their own gates. Raw local-vault
+and Travel telemetry retention are explicitly deferred with configuration and
+ownership safeguards, evidence requirements and concrete follow-up milestones.
+The older list below records the state at M14F completion.
+
 - Other reported direct HTTP callers have not yet been verified after the
   completed Career SSRF fix. Do not treat them as cleared.
 - Raw document-retention policy and integration-token fallback re-encryption

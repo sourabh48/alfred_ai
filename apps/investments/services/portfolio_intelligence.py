@@ -11,13 +11,14 @@ from math import sqrt
 from statistics import mean, pstdev
 from typing import Dict, List, Optional, BinaryIO
 from bs4 import BeautifulSoup
-import requests
+from alfred_ai.services import public_http
 from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
 from alfred_ai.services.upload_limits import document_source
+from alfred_ai.services.api_errors import safe_error_details
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot
 from apps.investments.money import investment_money, investment_total_float
@@ -503,17 +504,18 @@ class PortfolioIntelligenceService:
             return cached
         fetched_at = timezone.now()
         try:
-            response = requests.get(AMFI_OPEN_NAV_URL, timeout=30)
-            response.raise_for_status()
-            text = response.text
+            response = public_http.request("GET", AMFI_OPEN_NAV_URL,
+                content_types=("text/plain",), max_bytes=8_000_000)
+            text = response.content.decode("utf-8-sig", errors="replace")
             items = self._parse_amfi_nav_report(text, history_mode=False)
         except Exception as exc:
+            safe_error_details(exc, "AMFI latest NAV report could not be loaded.", logger_name=__name__)
             report = {
                 "items": [],
                 "evidence": self._external_evidence(
                     source_name="AMFI",
                     source_url=AMFI_OPEN_NAV_URL,
-                    summary=f"AMFI latest NAV report could not be loaded: {exc}",
+                    summary="AMFI latest NAV report could not be loaded.",
                     fetched_at=fetched_at,
                     ttl_seconds=AMFI_FAILURE_CACHE_TTL_SECONDS,
                     notes="Official AMFI latest NAV fetch failed; short-horizon watchlist degrades to unavailable instead of failing the portfolio dashboard.",
@@ -546,24 +548,24 @@ class PortfolioIntelligenceService:
         fetched_at = timezone.now()
         source_url = f"{AMFI_HISTORY_URL}?frmdt={from_date.strftime('%d-%b-%Y')}&todt={to_date.strftime('%d-%b-%Y')}"
         try:
-            response = requests.get(
+            response = public_http.request("GET",
                 AMFI_HISTORY_URL,
                 params={
                     "frmdt": from_date.strftime("%d-%b-%Y"),
                     "todt": to_date.strftime("%d-%b-%Y"),
                 },
-                timeout=40,
+                content_types=("text/plain", "text/html"), max_bytes=16_000_000,
             )
-            response.raise_for_status()
-            text = response.text
+            text = response.content.decode("utf-8-sig", errors="replace")
             series = self._parse_amfi_nav_report(text, history_mode=True)
         except Exception as exc:
+            safe_error_details(exc, "AMFI NAV history could not be loaded.", logger_name=__name__)
             report = {
                 "series": [],
                 "evidence": self._external_evidence(
                     source_name="AMFI",
                     source_url=source_url,
-                    summary=f"AMFI NAV history could not be loaded: {exc}",
+                    summary="AMFI NAV history could not be loaded.",
                     fetched_at=fetched_at,
                     ttl_seconds=AMFI_FAILURE_CACHE_TTL_SECONDS,
                     notes="Official AMFI history fetch failed; short-horizon watchlist degrades to unavailable instead of failing the portfolio dashboard.",
@@ -1137,7 +1139,7 @@ class PortfolioIntelligenceService:
             if p > 0:
                 entropy -= p * math.log(p)
 
-        # Normalize (max entropy for 7 asset types = log(7) ≈ 1.95)
+        # Normalize (max entropy for 7 asset types = log(7) ÃƒÂ¢Ã¢â‚¬Â°Ã‹â€  1.95)
         max_entropy = math.log(7)
         return min(100, (entropy / max_entropy) * 100)
 
@@ -1197,20 +1199,19 @@ class PortfolioIntelligenceService:
             # Example: Scrape Moneycontrol or Economic Times (respect robots.txt)
             url = "https://www.moneycontrol.com/news/business/markets/"
             headers = {"User-Agent": "Mozilla/5.0"}
-            response = requests.get(url, headers=headers, timeout=10)
-
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.content, "html.parser")
-                headlines = soup.find_all("h2", limit=3)
-                for headline in headlines:
-                    text = headline.get_text(strip=True)
-                    if "IT" in text.upper() or "BANK" in text.upper() or "AUTO" in text.upper():
-                        suggestions.append({
-                            "type": "trending_sector",
-                            "message": f"Market buzz: {text[:100]}",
-                        })
-        except Exception:
-            pass
+            response = public_http.request("GET", url, headers=headers,
+                content_types=("text/html", "application/xhtml+xml"), max_bytes=2_000_000)
+            soup = BeautifulSoup(response.content, "html.parser")
+            headlines = soup.find_all("h2", limit=3)
+            for headline in headlines:
+                text = headline.get_text(strip=True)
+                if "IT" in text.upper() or "BANK" in text.upper() or "AUTO" in text.upper():
+                    suggestions.append({
+                        "type": "trending_sector",
+                        "message": f"Market buzz: {text[:100]}",
+                    })
+        except Exception as exc:
+            safe_error_details(exc, "Market news could not be loaded.", logger_name=__name__)
 
         return suggestions
 

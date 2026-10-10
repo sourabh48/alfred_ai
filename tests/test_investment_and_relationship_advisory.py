@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from unittest.mock import patch
 
-import requests
+from alfred_ai.services.public_http import PublicHTTPError, PublicResponse
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -90,8 +90,8 @@ class InvestmentAndRelationshipAdvisoryTests(TestCase):
             "apps.investments.services.portfolio_intelligence.verified_intelligence.world_bank_indicator",
             return_value=_insight({"latest_value": 4.9, "latest_year": 2025}, "World Bank", "Inflation snapshot is fresh."),
         ), patch(
-            "apps.investments.services.portfolio_intelligence.requests.get",
-            side_effect=requests.Timeout("AMFI timeout"),
+            "apps.investments.services.portfolio_intelligence.public_http.request",
+            side_effect=PublicHTTPError("timeout"),
         ):
             first = self.client.get("/api/investments/summary/")
             second = self.client.get("/api/investments/summary/")
@@ -316,13 +316,13 @@ class InvestmentAndRelationshipAdvisoryTests(TestCase):
             history_lines.append(f"120001;ICICI Prudential Balanced Advantage Fund - Direct Plan - Growth;INF000000003;INF000000004;{nav:.4f};;;{nav_date}")
         history_report = "\n".join(history_lines)
 
-        def fake_requests_get(url, params=None, timeout=0):
+        def fake_requests_get(method, url, **kwargs):
             if "NAVOpen.txt" in url:
                 return _text_response(latest_report)
             return _text_response(history_report)
 
         with patch(
-            "apps.investments.services.portfolio_intelligence.requests.get",
+            "apps.investments.services.portfolio_intelligence.public_http.request",
             side_effect=fake_requests_get,
         ), patch(
             "apps.investments.services.portfolio_intelligence.verified_intelligence.market_snapshot",
@@ -406,11 +406,4 @@ def _future_stale_after():
 
 
 def _text_response(text):
-    class DummyResponse:
-        def __init__(self, body):
-            self.text = body
-
-        def raise_for_status(self):
-            return None
-
-    return DummyResponse(text)
+    return PublicResponse(text.encode('utf-8'), 'text/plain')

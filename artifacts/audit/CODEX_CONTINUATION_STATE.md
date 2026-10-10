@@ -1237,3 +1237,16 @@ NEXT ACTION: combined M14 regression integration PASS; resolve the retained rele
 scope before M14 readiness/PASS, promotion authorization or M15 work.
 EXACT NEXT COMMAND:
 Get-Content -LiteralPath F:\ALFRED_DEV\m13c\artifacts\audit\M14_SECURITY_RELEASE_READINESS.md
+
+## M14 retained blocker resolution: HTTP - 2026-10-11
+
+Continued from 97c06fa. Authoritative four reported issue groups classified in
+M14_RETAINED_BLOCKER_DISPOSITIONS.md; no broad audit or completed milestone redo.
+Remaining Investment/Verified Intelligence direct GET adapters now reuse the
+existing pinned, bounded public HTTPS transport, with typed text/RSS/HTML caps.
+Safe provider failure observations replace raw exception persistence/logging.
+Six synthetic regressions first reproduced the gap; related gate: 41 passed,
+0 failures/skips, 11.585 seconds (m14-http-after.log). No live modification,
+dependency, migration or monetary calculation change. Source commit is the commit
+containing this checkpoint; exact SHA is recorded in the next checkpoint.
+Next: transactional verified EmailConnection token rotation, then abuse limits.
