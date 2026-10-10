@@ -54,8 +54,9 @@ Remaining reported release issues (not cleared by this scoped M14F work):
 
 2026-10-11 scoped follow-up: dispositions are now authoritative in
 [M14_RETAINED_BLOCKER_DISPOSITIONS.md](M14_RETAINED_BLOCKER_DISPOSITIONS.md).
-Other HTTP adapters are resolved (41 passing tests); token rotation and global
-abuse protection remain release-blocking until their own gates. Raw local-vault
+Other HTTP adapters are resolved (41 passing tests); token rotation is resolved
+(7 focused / 18 related tests). Global abuse protection remains release-blocking.
+Raw local-vault
 and Travel telemetry retention are explicitly deferred with configuration and
 ownership safeguards, evidence requirements and concrete follow-up milestones.
 The older list below records the state at M14F completion.

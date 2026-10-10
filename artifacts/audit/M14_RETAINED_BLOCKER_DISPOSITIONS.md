@@ -58,3 +58,19 @@ Evidence: m14-http-before.log reproduces the bypass without external requests;
 m14-http-after.log: 41 tests passed, 0 failures/skips, 11.585 seconds, including
 6 new regressions plus existing transport, Career and advisory/integration tests.
 No dependency, schema, financial calculation or live data change.
+
+## Token re-encryption resolution
+
+HTTP implementation commit: 7bb5086ac1046382f4abb84fc0e6c1ad647304b7.
+Email OAuth tokens remain encrypted under the existing key derivation. The new
+reencrypt_email_tokens command defaults to count-only dry-run; --apply verifies
+all values under primary-only decryption within one atomic transaction. Fallback
+reads remain until independently authorized verification/retirement. Invalid
+tokens, verification errors and concurrent write conflicts roll back all writes;
+current-primary values and repeated runs remain unchanged. No secret output,
+new dependency, schema migration or live rotation. Operator procedure:
+[EMAIL_TOKEN_ROTATION.md](../../docs/EMAIL_TOKEN_ROTATION.md).
+Seven focused tests passed (0.041 s); related security gate: 18 passed,
+0 failures/skips, 11.529 s (m14-token-focused.log, m14-token-integration.log).
+The source workflow blocker is resolved; applying it to private tokens remains
+an explicitly authorized promotion operation, with keys/backups retained.

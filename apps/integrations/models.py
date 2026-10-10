@@ -13,8 +13,10 @@ from django.utils import timezone
 TOKEN_PREFIX = "enc::"
 
 
-def _email_token_cipher() -> MultiFernet:
-    keys = [settings.SECRET_KEY, *getattr(settings, "SECRET_KEY_FALLBACKS", [])]
+def _email_token_cipher(*, include_fallbacks=True) -> MultiFernet:
+    keys = [settings.SECRET_KEY]
+    if include_fallbacks:
+        keys.extend(getattr(settings, "SECRET_KEY_FALLBACKS", []))
     return MultiFernet([
         Fernet(base64.urlsafe_b64encode(hashlib.sha256(key.encode("utf-8")).digest()))
         for key in keys

@@ -1250,3 +1250,15 @@ Six synthetic regressions first reproduced the gap; related gate: 41 passed,
 dependency, migration or monetary calculation change. Source commit is the commit
 containing this checkpoint; exact SHA is recorded in the next checkpoint.
 Next: transactional verified EmailConnection token rotation, then abuse limits.
+
+## M14 retained blocker resolution: token rotation - 2026-10-11
+
+HTTP commit: 7bb5086ac1046382f4abb84fc0e6c1ad647304b7.
+Implemented the count-only dry-run / explicitly applied atomic email-token
+rotation command and operator recovery/key-retirement procedure. Existing
+fallback reads remain. Primary-only re-read verification, invalid-token rollback,
+conflict detection, mixed-key/legacy/idempotence/timestamp tests passed:
+7 focused (0.041 s), 18 integration (11.529 s), zero failures/skips.
+No live token/key mutation, schema migration or dependency. Source commit is the
+commit containing this checkpoint. Next: reuse atomic invitation reservation
+pattern for login and authenticated expensive-endpoint abuse protection.
