@@ -1125,3 +1125,115 @@ EXACT NEXT COMMAND (source inspection only):
 rg -n 'str\(e\)|Error parsing loan PDF|LoanImportDocumentSerializer' F:\ALFRED_DEV\m13c\apps\loans\views.py F:\ALFRED_DEV\m13c\apps\loans\services\loan_pdf_parser.py F:\ALFRED_DEV\m13c\apps\loans\serializers.py
 Obtain the configured Python environment before each Python invocation; keep
 future tests under isolated synthetic configuration. Development ACTIVE.
+
+## 2026-10-11 — M14F loan diagnostic protection COMPLETE (development only)
+
+Resume from this entry. Development checkout F:\ALFRED_DEV\m13c, branch
+codex/expense-bank-money-m13d-20261006. Starting checkpoint:
+a9d06a0b6450ce6b5914df5da85398edcb799869.
+M14F implementation and validated application HEAD:
+895ce13ee86bf5fddbd1332f5326389b7a3b7c5c.
+The following evidence-only commit contains this checkpoint/readiness/hold plan;
+read actual current HEAD with git rev-parse HEAD. Its exact final HEAD and full
+promotion range are frozen outside Git in isolated-tests/m14-promotion-manifest.json.
+Stable source rechecked through Git only remains
+a9d096ea55839269fe6fce14d4f11ea2cbf05336. No live source promotion or private DB
+read/write/migration; no private documents, credentials or backups were used.
+The pre-existing untracked restoration document remains untouched and unstaged.
+
+Scoped inspection confirmed the remaining Loan fallback str(e), parser print,
+unfiltered import/closure payloads, nested settlement notes, review artifacts and
+operational-log responses. Read AGENTS, the latest checkpoint/readiness/backlog,
+used the existing scoped graph query, traced parser/serializer callers and reused
+safe_error_details/safe_error_response. No broad audit or completed milestone redo.
+
+M14F behavior:
+- Loan import parser failures retain the reviewable-upload HTTP 201 contract,
+  success=false, failed status, fixed safe error/code and opaque correlation ID.
+  Persistence failures are logged 500s, not mistaken for parser review outcomes.
+  Payoff operational errors are safe 500s; validation/resource/404/202/200 statuses
+  remain. Other existing direct Loan error responses now use the same safe helper.
+- Parser exceptions propagate to the appropriate API boundary; no exception text,
+  nested cause, traceback, uploaded bytes, OCR text or private amount is formatted
+  into diagnostics/logs. ERROR logs retain class/reference and parser/persistence
+  stage. New failure records/operational events contain only safe error metadata.
+- Import/closure serializers regenerate safe status messages and allowlist public
+  diagnostics. Historical arbitrary errors/warnings/parser output, OCR snippets,
+  raw notes, unknown nested keys and settlement diagnostics cannot be returned.
+  Review/resolve/retry and operational-log responses use the same boundary.
+  Loan/financial cache revisions invalidate older serialized watchlist content.
+- New parsers keep extracted source evidence in the existing private extracted-text
+  field and structured business fields, without text copies in diagnostic payloads.
+  Loan cleanup metadata is filtered before persistence/response, excluding paths
+  and filenames. Shared cleanup defaults and other domains are unchanged.
+- Historical forensic records remain unchanged; no migration/rewrite/dependency.
+  Normal owned Loan fields, monetary values, document links, statuses, business
+  corrections and structured settlement components remain. Public raw loan OCR
+  review artifacts are intentionally omitted; retained local files/manual review
+  remain usable. Source retention policy, financial calculations, ownership,
+  deduplication and inferred-loan confirmation rules are preserved.
+
+Validation:
+- 19 focused M14F tests passed, 0 failures/skips, 15.078s; final focused gate after
+  cleanup-metadata producer filtering: 36 passed, 0 failures/skips, 19.551s,
+  including all 19 M14F plus shared cleanup/retry integrity. Exceptions containing
+  synthetic paths/loan IDs/amounts/OCR/tokens/stack fragments and uploaded bytes,
+  unprintable/nested errors, actual parser-stage failures, image/payoff failures,
+  historical serializer/API filtering, cleanup, successful import/dedup/payoff,
+  HTTP statuses, owner scoping/authentication/CSRF covered.
+- Affected backend: 192 passed, 0 failures/skips, 112.330s (before final producer
+  filtering; final 36 and final combined gate cover that small change).
+- M14F Chrome: 4 passed, 0 skipped, 51.461s, driver_backed_success=true: safe
+  historical/current errors then real PDF import/reimport; loan/closure manual
+  correction; existing inferred-loan confirmation. All fixtures synthetic.
+- FINAL combined backend: 297 passed, 0 failures/skips, 243.888s. One actual gate includes the final M14F
+  source, all 31 M14E regressions, Loan/serializer/import compatibility, password,
+  session/CSRF/auth, Career disclosure/HTTPS transport/uploads, Family opt-in and
+  Growth errors, invitation synchronized thread/process quotas, cleanup/retries,
+  statement fingerprints/columns/uploader compatibility, and both family.0004
+  forward/rollback/replay migration-rehearsal methods. Do not add earlier counts.
+- FINAL combined Chrome: 10 passed, 0 failures/skips, 113.447s;
+  driver_backed_success=true. All four Loan workflows above plus Family
+  invitation throttling/expiry, opt-in/revocation, Growth safe-error recovery,
+  upload limit/valid resume, real PDF statement reimport fingerprint/reference/
+  amount/balance preservation, and login/statement/vehicle/dashboard workflow.
+- System check PASS; isolated makemigrations --check --dry-run: No changes
+  detected. No M14F migration created/applied. Source comparison adds only the
+  already-tested family.0004 migration relative to stable; live migration table
+  was not read. Graphify AST/no-cluster PASS: 7804 nodes / 20474 edges, no API cost.
+- First focused run: 17 run, one erroneous pagination assertion, corrected.
+  First Chrome run: off-screen click and wrong in-memory harness caused failure;
+  switched to existing run_browser_regressions.py/browser_test_settings. Next
+  Chrome run relied on an operational-log filename now deliberately hidden;
+  expectation now verifies the actual saved closure on the Loans page. Corrected
+  gates pass; failed logs/screenshots/proof summaries remain preserved.
+
+Evidence under F:\ALFRED_DEV\isolated-tests: m14f-focused-final.log,
+m14f-final-focused.log, m14f-affected.log, m14f-chrome-verified.log and
+m14f-chrome-final/browser_regression_summary.json, m14-final-backend.log,
+m14-final-chrome.log and m14-final-chrome/browser_regression_summary.json,
+m14f-system-check.log, m14f-drift-check.log, m14f-graphify-complete.log.
+No full repository suite, frozen-package gate or real-account acceptance claimed.
+
+Release scope: the user's latest note identifies M14F as the remaining verified
+blocker. The existing readiness report separately retains unverified HTTP callers,
+raw-retention policy, token fallback re-encryption and global abuse protection.
+A clarification was requested while the combined gate continued. Until explicitly
+resolved/deferred, retain those reported entries; a passing regression gate does
+not establish their safety. Broad M14 RELEASE READY remains NO, and M14 DEVELOPMENT
+is not marked COMPLETE. M15 has not begun. Do not reopen completed M14D/E/G/H or
+M13C/D and do not run a broad audit to resolve this scope question.
+
+Promotion is prepared only in M14_CONTROLLED_PROMOTION_PLAN.md: exact source
+range, final HEAD manifest, family.0004 OFF-consent impact, fresh verified encrypted
+backup, disposable rehearsal, rollback, smoke tests and real-account acceptance.
+No live action is authorized by this plan. Originals/backups/recovery assets and
+financial balances remain preserved. All automated data/media/limiter stores are
+synthetic and isolated. Git identity was absent; the implementation commit used
+the established previous-commit identity via command-scoped -c only, without
+editing global/local configuration.
+
+NEXT ACTION: combined M14 regression integration PASS; resolve the retained release
+scope before M14 readiness/PASS, promotion authorization or M15 work.
+EXACT NEXT COMMAND:
+Get-Content -LiteralPath F:\ALFRED_DEV\m13c\artifacts\audit\M14_SECURITY_RELEASE_READINESS.md

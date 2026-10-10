@@ -41,7 +41,10 @@ Validation uses synthetic data and isolated SQLite/media only. Focused M14F:
 seconds (before the final cleanup-metadata producer filter; covered by the final
 36 and subsequent combined gate). Chrome: 4 passed, 0 skipped, 51.461 seconds;
 driver-backed success confirmed. System checks and migration-drift checks pass.
-Combined M14 evidence is recorded in the security readiness report.
+Final combined M14: 297 backend tests passed, 0 failures/skips, 243.888 seconds,
+including all 19 M14F and 31 M14E cases plus family migration rehearsal. Final
+Chrome: 10 passed, 0 failures/skips, 113.447 seconds; driver-backed success true.
+Combined evidence and remaining release scope are in the security readiness report.
 
 Evidence: `F:\ALFRED_DEV\isolated-tests\m14f-*`. Earlier failed test runs are
 retained: the initial focused test expected pagination incorrectly; the first
