@@ -44,11 +44,14 @@ def main():
         if proof.get('synthetic') is not True:
             parser.error('This directory is not a synthetic proof; no data changed.')
         store = MemoryStore(root)
+        with closing(sqlite3.connect(store.database)) as db, db:
+            if db.execute('SELECT COUNT(*) FROM memories').fetchone()[0] != 1 or db.execute('SELECT COUNT(*) FROM events').fetchone()[0] != 1:
+                parser.error('The synthetic proof vault contains additional records; no data changed.')
         before = store.retrieve(owner, query, limit=1)
         assert before[0]['id'] == proof['memory_id']
         # Remove only the disposable derived index to prove encrypted event recovery.
         with closing(sqlite3.connect(store.database)) as db, db:
-            db.execute('DELETE FROM memories')
+            db.execute('DELETE FROM memories WHERE id=?', (proof['memory_id'],))
         assert store.restore_owner(owner) == 1
         after = store.retrieve(owner, query, limit=1)
         assert after[0]['id'] == proof['memory_id']

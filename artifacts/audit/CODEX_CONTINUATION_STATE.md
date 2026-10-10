@@ -1382,3 +1382,17 @@ NEXT ACTION: review the frozen controlled M14 promotion plan; authorization is
 still required. Continue M15 local lifecycle/controller acceptance in this branch.
 EXACT NEXT COMMAND:
 Get-Content -LiteralPath F:/ALFRED_DEV/m13c/artifacts/audit/M14_CONTROLLED_PROMOTION_PLAN.md
+
+### M15 synthetic proof safety follow-up
+
+Initial engine slice source: 812260505ae8255eaecbdd3e7ef5092775453795.
+The restore harness now refuses any extra vault records and deletes only the
+matching synthetic memory ID. A focused regression proves other records/events
+stay intact after rejection. Final actual related gate: 26 passed, 0 failures/
+skips, 12.544 s, including 17 new memory/embedding cases. Real local restore again
+PASS with the same ID/score 0.518286/provenance/sensitivity/owner isolation and
+zero cloud calls. AST update: 7946 nodes / 20834 edges. Latest evidence:
+m15-memory-guarded-final.log, m15-memory-guarded-restore.log,
+m15-memory-guard-graph.log. Final M15 HEAD is recorded after this commit in
+isolated-tests/m15-memory-manifest.json. No frozen M14/live source or private
+database modification; no new migration, cloud/API/UI/reset lifecycle work.

@@ -66,20 +66,21 @@ With the configured Python interpreter, first use a new empty proof directory:
 ```
 
 Save refuses to overwrite an existing non-empty directory. Restore requires the
-synthetic proof marker and removes only its disposable derived memory index to
+synthetic proof marker, refuses any additional records, and removes only the
+matching disposable derived memory row to
 prove encrypted event recovery. It prints counts/status only, never memory text
 or key material. Production callers use the service, not this synthetic harness.
 
-Validated 2026-10-11: 25 backend tests passed, 0 failures/skips, 14.489 s,
-including 16 new memory/embedding cases and existing brain/authentication tests.
+Validated 2026-10-11: 26 backend tests passed, 0 failures/skips, 12.544 s,
+including 17 new memory/embedding cases and existing brain/authentication tests.
 System checks pass. Two actual Python processes using local Ollama generated
 384-dimensional vectors, retrieved the same memory after restart, rebuilt its
 index from the encrypted event and preserved provenance/sensitivity/ownership;
 semantic score 0.518286 for the synthetic paraphrased travel query. Cloud calls 0.
 Installed local model digest:
 1b226e2802dbb772b5fc32a58f103ca1804ef7501331012de126ab22f67475ef (45,960,996 bytes).
-AST-only graph update passed: 7944 nodes / 20827 edges. No new Django migration,
+AST-only graph update passed: 7946 nodes / 20834 edges. No new Django migration,
 dependency, live source/database/config/key/token change or private input.
 Initial Windows fixture handles were explicitly closed; corrected tests pass.
-Proofs/logs remain under F:/ALFRED_DEV/isolated-tests (m15-memory-release-slice.log,
-m15-memory-final-save.log, m15-memory-verified-restore.log, m15-memory-graph.log).
+Proofs/logs remain under F:/ALFRED_DEV/isolated-tests (m15-memory-guarded-final.log,
+m15-memory-final-save.log, m15-memory-guarded-restore.log, m15-memory-guard-graph.log).

@@ -1,5 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from contextlib import redirect_stderr
+from io import StringIO
+import json
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 import sqlite3
@@ -145,6 +148,18 @@ class PersistentMemoryTests(TestCase):
         result = self.store.retrieve(self.alice, 'mountain')[0]
         self.assertEqual(result['content']['preference'], 'Quiet mountain travel')
         self.assertEqual(result['provenance']['source'], 'synthetic verified source')
+
+    def test_synthetic_restore_harness_refuses_any_additional_records(self):
+        from scripts.verify_local_memory_slice import main
+        identity = self.save()
+        self.save(self.bob)
+        (self.store.directory / 'synthetic-proof.json').write_text(json.dumps({'synthetic': True, 'memory_id': identity}))
+        with patch('sys.argv', ['proof', '--phase', 'restore', '--proof-dir', self.directory]), redirect_stderr(StringIO()), self.assertRaises(SystemExit) as error:
+            main()
+        self.assertEqual(error.exception.code, 2)
+        with closing(sqlite3.connect(self.store.database)) as db, db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM memories').fetchone()[0], 2)
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0], 2)
 
 
 class LocalEmbeddingBoundaryTests(SimpleTestCase):
