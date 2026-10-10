@@ -1334,3 +1334,51 @@ No full repository/installer/live-provider/real-account acceptance claimed.
 NEXT ACTION: start the isolated M15 vertical slice; live M14 awaits authorization.
 EXACT NEXT COMMAND:
 git -C F:/ALFRED_DEV/m13c worktree add -b codex/m15-persistent-memory-20261011 F:/ALFRED_DEV/m15 release/m14-20261011
+
+## M15 initial local memory slice verified - 2026-10-11
+
+M14 remains frozen unchanged in F:/ALFRED_DEV/m13c at
+6050234e6da66d38d558be1976371e9d541f0319, branch release/m14-20261011.
+Exact promotion range: a9d096ea55839269fe6fce14d4f11ea2cbf05336..
+6050234e6da66d38d558be1976371e9d541f0319. M14 gate 356 backend / 12 Chrome,
+zero failures/skips; readiness YES. Protected promotion manifest/plan prepared;
+no live source/database/token/key mutation or promotion authorized/performed.
+
+Created F:/ALFRED_DEV/m15, codex/m15-persistent-memory-20261011, from that frozen
+HEAD. Only the first engine/CLI slice implemented: explicit verified structured
+memory, provenance/sensitivity snapshot, persisted owner isolation, fixed local
+Ollama embeddings/model digest, bounded cosine retrieval, atomic encrypted
+append-only SQLite event/index writes, persistent key and restart/restore.
+No raw document auto-ingestion, UI/API route, broad learning or cloud sync.
+Cloud context is disabled unless explicit consent and public classification;
+the engine dispatches no OpenAI/cloud requests. Local index is plaintext:
+private OS storage/backups and lifecycle/reset/retention acceptance are required
+before private-account/UI exposure. Details: docs/M15_LOCAL_MEMORY.md.
+
+Local Ollama was running with generative models only. Added all-minilm:latest
+(45,960,996 bytes), digest 1b226e2802dbb772b5fc32a58f103ca1804ef7501331012de126ab22f67475ef.
+Only synthetic fixture text sent to fixed 127.0.0.1:11434; zero cloud reasoning.
+Actual save and second-process restore PASS: 384 dimensions, same memory ID,
+score 0.518286 for a paraphrased query, owner isolation and provenance/sensitivity
+preserved, idempotent journal rebuild. No physical host reboot claimed.
+Final related gate: 25 passed, 0 failures/skips, 14.489 s, including 16 new
+memory/embedding cases. Existing brain/session-auth behavior passes. System
+checks PASS; no new Django model/migration/dependency. Source is newly added
+files only; financial arithmetic/import/ownership code remains unchanged.
+AST-only Graphify update PASS: 7944 nodes / 20827 edges; no API extraction cost.
+Initial test connection handles held temporary SQLite files on Windows; fixtures
+now explicitly close connections and corrected gates pass. Failed logs retained.
+
+Evidence: isolated-tests/m15-memory-release-slice.log,
+m15-memory-final-save.log, m15-memory-verified-restore.log,
+m15-memory-graph.log, m15-ollama-model-pull.log. Recovery journal/key are synthetic
+and outside source. The commit containing this checkpoint is the M15 slice;
+its exact SHA is recorded in the isolated M15 manifest and final report.
+M15 first engine/CLI slice VERIFIED; M15 as a whole is not marked COMPLETE.
+No UI/reset lifecycle or private-account/cloud acceptance claimed. No broad
+M15 implementation started; the frozen M14 candidate contains no M15 commits.
+
+NEXT ACTION: review the frozen controlled M14 promotion plan; authorization is
+still required. Continue M15 local lifecycle/controller acceptance in this branch.
+EXACT NEXT COMMAND:
+Get-Content -LiteralPath F:/ALFRED_DEV/m13c/artifacts/audit/M14_CONTROLLED_PROMOTION_PLAN.md
