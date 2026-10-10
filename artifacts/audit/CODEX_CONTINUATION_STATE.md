@@ -1277,3 +1277,16 @@ Focused 12 passed (12.335 s); related 55 passed (79.462 s); Chrome 2 passed
 failures were corrected (scoped mock, complete URLconf, navigation wait/helper).
 Source commit is the commit containing this checkpoint. Final combined gate and
 retention deferral evidence/config verification still precede M14 completion.
+
+## M14 retention disposition verified - 2026-10-11
+
+Abuse implementation: cf799d46c17d7241acc4cfb33c8b5ef2fc9d8f60.
+Raw local-vault/Travel telemetry retention is explicitly deferred with all seven
+required fields in M14_RETAINED_BLOCKER_DISPOSITIONS.md. Native private-media
+ownership/traversal checks and retaining active review evidence pass (3 new
+methods, in the 55-test related gate; corrected fixture recheck 5 passed).
+Native release config/check/migration-drift proof PASS in synthetic directories,
+including DEBUG=false, private media, deletion option, session/CSRF and limits.
+No historical evidence deleted, no cleanup migration/job created/applied, no
+live source/database/config/token/key/backups touched. M14 completion now waits
+for one new combined backend/Chrome gate on the complete source candidate.

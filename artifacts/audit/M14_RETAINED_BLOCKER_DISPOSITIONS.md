@@ -92,3 +92,20 @@ The pre-fix login regression failed across all three entry points. Final focused
 and corrected logs remain in isolated-tests; no unresolved failure remains.
 No migration, dependency, live source/database/config/key change. Final combined
 M14 gate is still required before marking development complete.
+
+## Retention deferral evidence
+
+Abuse implementation commit: cf799d46c17d7241acc4cfb33c8b5ef2fc9d8f60.
+Three new synthetic native-media/vault tests pass within the final 55-test
+related gate, and the corrected five-test fixture recheck passes (3.007 s).
+Owner download remains available/private/no-store; anonymous, other-account,
+traversal and unregistered-file access are denied; retained review evidence is
+unchanged. Existing cleanup and missing-source/manual-review tests are included
+in the final combined gate. No cleanup job or source-file migration is created.
+Native configuration proof PASS: DEBUG=false, native private-media route,
+extraction-only source deletion enabled, session-only auth, CSRF present, all
+limits positive and both persistent directories absolute. Native check and
+migration drift pass (m14-native-config-proof-final.log), with synthetic storage.
+The first proof harness lacked the native queue parent directory; it was created
+inside isolated test storage and the corrected proof passed. No live config read
+or changed, no live cleanup, migration, key retirement or database access.
