@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--launcher", type=Path, help="Use the bundled desktop launcher for start/stop")
     parser.add_argument("--port", type=int, default=8030)
     parser.add_argument("--browser", action="store_true", help="Check the real UI using headless Chrome")
+    parser.add_argument("--memory", action="store_true", help="Synthetic M15 memory/grounding checks using installed local Ollama")
     parser.add_argument("--extended", action="store_true", help="Concurrent users, mobile and accessibility checks")
     parser.add_argument("--load-users", type=int, default=12)
     parser.add_argument("--load-writes", type=int, default=5, help="Transactions per synthetic concurrent user")
@@ -34,6 +35,8 @@ def main():
     args = parser.parse_args()
     if args.launcher and not args.executable:
         parser.error("--launcher requires --executable from the same bundle")
+    if args.memory and not args.browser:
+        parser.error("--memory requires --browser")
     if args.load_users < 1 or args.load_writes < 1 or args.load_seconds < 0:
         parser.error("load-users/load-writes must be positive and load-seconds cannot be negative")
     run = uuid.uuid4().hex[:10]
@@ -186,6 +189,11 @@ def main():
         assert other.get(file_url, timeout=10).status_code == 404
         passed("private_upload_ownership")
 
+        memory_state = None
+        if args.memory:
+            from scripts.verify_memory_acceptance import before_restart
+            memory_state = before_restart(base, session, user, data, passed)
+
         # Exercise the packaged parser through HTTP, including the first deposit
         # and a transaction whose posting month differs from its value date.
         import fitz
@@ -290,6 +298,9 @@ def main():
         assert all(restored_summary[key] == summary[key] for key in expected)
         assert session.get(file_url, timeout=10).content == owner.content
         passed("queued_job_and_account_persist_after_restart")
+        if args.memory:
+            from scripts.verify_memory_acceptance import after_restart
+            after_restart(base, session, data, memory_state, passed)
         command("stop")
 
         backup_probe = native_runtime_probe(run + "-backup-queue")
@@ -304,6 +315,8 @@ def main():
             source.backup(target)
         shutil.copytree(data / "media", backup / "media")
         shutil.copytree(data / "config", backup / "config")
+        if args.memory:
+            shutil.copytree(data / "artifacts/private-memory-v2", backup / "artifacts/private-memory-v2")
         shutil.copytree(backup, restored)
         assert hashlib.sha256((data / "media" / upload.original_file.name).read_bytes()).digest() == hashlib.sha256((restored / "media" / upload.original_file.name).read_bytes()).digest()
         result = subprocess.run([*prefix, "start", "--data-dir", str(restored), "--port", str(args.port + 1), "--no-browser"],
@@ -316,6 +329,9 @@ def main():
             assert all(restored_response.json()["summary"][key] == summary[key] for key in expected)
             assert session.get(restore_base + upload.original_file.url, timeout=10).content == owner.content
             passed("backup_restore_http_data_and_upload")
+            if args.memory:
+                from scripts.verify_memory_acceptance import after_backup_restore
+                after_backup_restore(restore_base, session, memory_state, passed)
             deadline = time.monotonic() + 30
             restored_job = None
             while time.monotonic() < deadline:

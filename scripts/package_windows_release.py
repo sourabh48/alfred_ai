@@ -45,7 +45,9 @@ def inspect_bundle(bundle):
                 "_internal/static/vendor/bootstrap.min.css", "_internal/static/vendor/chart.umd.min.js",
                 "_internal/templates/mobility/planner.html", "_internal/templates/mobility/preferences.html",
                 "_internal/static/js/travel_planner.js", "_internal/static/css/travel_planner.css",
-                "_internal/templates/career/list.html", "_internal/templates/integrations/credit_score.html")
+                "_internal/templates/career/list.html", "_internal/templates/integrations/credit_score.html",
+                "_internal/templates/ai_insights.html", "_internal/templates/settings/memory.html",
+                "_internal/static/js/intelligence.js", "_internal/static/js/memory.js")
     missing = [name for name in required if not (bundle / name).is_file()]
     for pattern in ("_internal/rapidocr_onnxruntime/models/*.onnx", "_internal/onnxruntime/capi/*.dll",
                     "_internal/_tcl_data/init.tcl", "_internal/_tk_data/tk.tcl"):
@@ -72,12 +74,12 @@ def inspect_bundle(bundle):
             raise RuntimeError(f"Private runtime path found in release: {relative}")
         files.append(path)
     for name in ("career/list.html", "integrations/credit_score.html", "mobility/dashboard.html",
-                 "mobility/planner.html", "mobility/preferences.html"):
+                 "mobility/planner.html", "mobility/preferences.html", "ai_insights.html", "settings/memory.html"):
         if digest(bundle / "_internal/templates" / name) != digest(ROOT / "templates" / name):
             raise RuntimeError(f"Bundled template is stale: {name}")
     if digest(bundle / "_internal/static/alfred.ico") != digest(ROOT / "static/alfred.ico"):
         raise RuntimeError("Bundled Windows icon is stale")
-    for name in ("js/travel_planner.js", "js/travel_research_panels.js", "js/travel_preferences.js", "js/mobility.js", "css/travel_planner.css", "vendor/leaflet/leaflet.js", "vendor/leaflet/leaflet.css", "vendor/leaflet/LICENSE"):
+    for name in ("js/travel_planner.js", "js/travel_research_panels.js", "js/travel_preferences.js", "js/mobility.js", "js/intelligence.js", "js/memory.js", "css/travel_planner.css", "vendor/leaflet/leaflet.js", "vendor/leaflet/leaflet.css", "vendor/leaflet/LICENSE"):
         if digest(bundle / "_internal/static" / name) != digest(ROOT / "static" / name):
             raise RuntimeError(f"Bundled travel asset is stale: {name}")
     return files

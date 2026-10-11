@@ -1,5 +1,23 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15 extended acceptance tooling - source drill PASS, fresh package next
+
+2026-10-12. Corrected runtime commits: 556f180 (closure evidence conflict) and
+b7a819f (bounded Windows status retry); gated provider/recovery preparation 835f00e.
+Extended existing native verifier with --memory, using synthetic normal-session
+HTTP and actual installed Ollama, three additional Chrome memory/grounding/
+correction observations, index/journal plaintext exclusion, restart/retrieval,
+delete/reset/retention, owner preservation and encrypted-vault backup restoration.
+Source drill: 29 PASS, run c9a3e7b413; graceful stops complete. Source mode is not
+packaged acceptance. Expected no pending sync before enrollment; the initial
+fixture assumption and scroll-timing failure were corrected in test tooling.
+Initial shutdown error and all prior evidence retained. Packaging inspector now
+requires/digest-checks M15 templates and scripts; actual fresh bundle inspection
+still required. Next: build corrected commit to entirely fresh output/work/cache
+directories, run packaged launcher/native --memory acceptance, combined backend/
+Chrome/config gates, and record hashes/remaining recovery/provider blockers.
+No real cloud/paid calls, private data, frozen/live modifications or key export.
+
 ## M15 native acceptance - transient Windows status replacement correction
 
 2026-10-12, separate hardening worktree only. Extended synthetic source acceptance
