@@ -43,7 +43,14 @@ def runtime_directory(data):
 def write_json(path, payload):
     temporary = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
     temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.replace(temporary, path)
+    # Windows readers/scanners can briefly deny replacement without denying writes.
+    for attempt in range(6):
+        try:
+            os.replace(temporary, path)
+            return
+        except PermissionError:
+            if attempt==5: raise
+            time.sleep(0.05 * 2**attempt)
 
 
 def read_state(data):

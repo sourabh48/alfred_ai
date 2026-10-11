@@ -1,5 +1,19 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15 native acceptance - transient Windows status replacement correction
+
+2026-10-12, separate hardening worktree only. Extended synthetic source acceptance
+completed inference/correction/encryption/restart/delete checks but exposed a final
+runtime.json replacement PermissionError during graceful shutdown. Workers had
+drained; stale status made stop wait/fail. A real Windows open-reader regression
+reproduces the same WinError 5. Shared write_json now retries only PermissionError
+for at most 1.55s, retaining atomic replacement and prior-state/temp evidence;
+persistent/unexpected failures still propagate. Focused native/launcher/tray/sync
+gate: 33 PASS in 12.154s, zero failures/skips, including three new regressions.
+Evidence: m15-package-shutdown-{reproduction,focused}.log under isolated-tests.
+Original source drill/failure logs retained; disposable processes stopped.
+Extended source/packaged acceptance is still pending. No frozen/live changes.
+
 ## M15 frozen-candidate review - scoped document conflict correction
 
 2026-10-12. Preserve original frozen review HEAD/branch/archive at
