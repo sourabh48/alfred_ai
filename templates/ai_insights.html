@@ -20,6 +20,40 @@
 
 <section class="soft-grid four-up mb-4" id="aiInsightSummary"></section>
 
+<section class="surface-card mb-4" id="intelligencePanel">
+    <h2 class="page-section-title">Ask ALFRED</h2>
+    <p>Ollama answers locally using your verified memories and selected records. AI advice is a hypothesis; financial values below come from ALFRED's verified records. Questions and answers are not saved automatically.</p>
+    <form id="intelligenceForm" data-live-refresh-hold="true">
+        <label for="intelligenceQuery" class="form-label">Your question</label>
+        <textarea id="intelligenceQuery" class="form-control mb-2" rows="2" maxlength="1024" required autocomplete="off"></textarea>
+        <label for="intelligenceScope" class="form-label">Include local records</label>
+        <select id="intelligenceScope" class="form-select mb-2">
+            <option value="general">Verified memories</option><option value="finance">My financial snapshot</option>
+            <option value="travel">My Travel preferences</option><option value="documents">Verified loan closure evidence</option>
+        </select>
+        <div id="intelligenceDocumentField" class="d-none mb-2"><label for="intelligenceDocument" class="form-label">Verified evidence</label>
+            <select id="intelligenceDocument" class="form-select" disabled required></select></div>
+        <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
+            This question is public. Allow approved cloud fallback for this question if Ollama fails.</label>
+        <p class="small">Financial, document and Travel reasoning stays local. Cloud reasoning requires separate provider authorization, an enabled owner policy and spending limits.</p>
+        <button class="btn btn-primary" type="submit">Ask ALFRED</button>
+    </form>
+    <p id="intelligenceFeedback" role="status" aria-live="polite" class="mt-2"></p>
+    <div id="intelligenceAnswers" role="log" aria-live="polite" class="data-stack"></div>
+    <details class="mt-3"><summary>Save a verified memory</summary>
+        <p>Only save information you have checked. AI answers may be incorrect. Manage corrections, deletion and retention in <a href="/settings/">Settings</a>.</p>
+        <form id="intelligenceMemoryForm" data-live-refresh-hold="true">
+            <label for="intelligenceMemoryText" class="form-label">Information I have verified</label>
+            <textarea id="intelligenceMemoryText" class="form-control mb-2" rows="2" maxlength="8192" required autocomplete="off"></textarea>
+            <label for="intelligenceMemorySensitivity" class="form-label">Privacy level</label>
+            <select id="intelligenceMemorySensitivity" class="form-select mb-2"><option value="sensitive">Sensitive — local reasoning only</option><option value="personal">Personal — local reasoning only</option><option value="public">Public — eligible for approved cloud reasoning</option></select>
+            <p class="small">Separately enabled encrypted synchronization may back up memories at every privacy level.</p>
+            <label class="d-block mb-2"><input id="intelligenceMemoryVerified" type="checkbox" required> I have verified this information.</label>
+            <button class="btn btn-outline-primary" type="submit">Save Verified Memory</button>
+        </form>
+    </details>
+</section>
+
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
@@ -81,4 +115,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1"></script>
+<script src="/static/js/intelligence.js?v=1"></script>
 {% endblock %}

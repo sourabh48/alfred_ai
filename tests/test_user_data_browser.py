@@ -200,6 +200,85 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(sync.status(owner)['revision'],2)
         self.capture('memory-encrypted-mock-sync-session')
 
+    def test_hybrid_insights_local_sources_verified_save_and_fresh_settings(self):
+        from unittest.mock import Mock
+        from selenium.webdriver.support.ui import Select
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-hybrid-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(); local.reason.return_value='Synthetic hypothesis <img src=x onerror="window.memoryLeak=true">'
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
+        store=MemoryStore(root/'vault'); owner=self.scenario['user']
+        identity=store.save_verified(owner,{'statement':'synthetic mountain preference'},{'source':'synthetic owner review'},verified=True)
+        self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').is_displayed())
+        self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_enabled())
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('synthetic mountain question')
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertIn(identity,self.text('intelligenceAnswers')); self.assertFalse(self.browser.execute_script('return Boolean(window.memoryLeak)'))
+        self.assertEqual(len(store.list_memories(owner)),1)
+        Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('finance')
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('show my financial snapshot')
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'canonical-finance' in self.text('intelligenceAnswers'))
+        self.assertIn('canonical_financial_baseline',self.text('intelligenceAnswers'))
+        from apps.mobility.models import TravelPreferenceProfile
+        TravelPreferenceProfile.objects.update_or_create(user=owner,defaults={'novelty':0.4,'preferences':{'pace':'quiet'}})
+        Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('travel')
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('show my Travel preferences')
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'travel-preferences' in self.text('intelligenceAnswers'))
+        self.assertIn('novelty: 0.4',self.text('intelligenceAnswers'))
+        self.memory_click('#intelligencePanel details summary')
+        self.browser.find_element(self.By.ID,'intelligenceMemoryText').send_keys('synthetic owner checked hiking fact')
+        self.memory_click('#intelligenceMemoryForm button')
+        self.assertEqual(len(store.list_memories(owner)),1)
+        self.memory_click('#intelligenceMemoryVerified'); self.memory_click('#intelligenceMemoryForm button')
+        self.wait.until(lambda _: 'Verified memory saved locally.' in self.text('intelligenceFeedback'))
+        self.assertEqual(len(store.list_memories(owner)),2)
+        self.capture('hybrid-insights-local-grounding-verified-memory')
+        self.browser.get(self.live_server_url+'/settings/')
+        self.wait.until(lambda _: 'synthetic owner checked hiking fact' in self.text('memoryList'))
+        self.assertEqual(MemoryStore(root/'vault').restore_owner(owner),2)
+
+    def test_settings_sync_consent_budgets_and_explicit_public_mock_fallback(self):
+        from unittest.mock import Mock
+        from apps.ml_engine.services.persistent_memory import MemoryStore, _owner
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-policy-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_SYNC_MOCK_DIR=str(root/'mock'),
+            ALFRED_MEMORY_SYNC_PROVIDER='',ALFRED_MEMORY_MOCK_REASONING=True))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(); local.reason.side_effect=EmbeddingUnavailable('synthetic local failure')
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
+        store=MemoryStore(root/'vault'); owner=self.scenario['user']
+        store.save_verified(owner,{'statement':'synthetic public mountain preference'},{'source':'synthetic review'},verified=True,sensitivity='public')
+        self.login(); self.browser.get(self.live_server_url+'/settings/')
+        self.wait.until(lambda _: 'Provider: mock.' in self.text('memorySyncStatus'))
+        self.memory_click('#memorySyncEnabled'); self.memory_click('#memorySyncForm button[type=submit]')
+        self.wait.until(lambda _: 'Synchronization consent saved.' in self.text('memoryCloudFeedback'))
+        self.memory_click('#memorySyncNow')
+        self.wait.until(lambda _: 'Revision 1;' in self.text('memorySyncStatus'))
+        self.memory_click('#memoryReasoningEnabled')
+        tokens=self.browser.find_element(self.By.ID,'memoryReasoningTokens'); tokens.clear(); tokens.send_keys('2000')
+        dollars=self.browser.find_element(self.By.ID,'memoryReasoningDollars'); dollars.clear(); dollars.send_keys('0.005')
+        self.memory_click('#memoryReasoningForm button')
+        self.wait.until(lambda _: 'Reasoning policy saved.' in self.text('memoryCloudFeedback'))
+        with store._transaction() as db:
+            self.assertEqual(store._sync_state(db,_owner(owner))['reasoning_policy']['daily_microusd'],5000)
+        self.browser.get(self.live_server_url+'/ai/insights/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_enabled())
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('synthetic public mountain question')
+        self.memory_click('#intelligenceCloudConsent'); self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertIn('mock',self.text('intelligenceAnswers'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_selected())
+        self.capture('hybrid-public-consent-sync-policy')
+
     def test_private_memory_delete_retention_reset_keep_family_isolated(self):
         from datetime import datetime, timezone, timedelta
         from selenium.webdriver.support import expected_conditions as EC
@@ -232,11 +311,11 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         days = self.browser.find_element(self.By.ID, 'memoryRetentionDays')
         days.clear()
         days.send_keys('1')
-        self.browser.find_element(self.By.CSS_SELECTOR, '#memoryRetentionForm button').click()
+        self.memory_click('#memoryRetentionForm button')
         self.wait.until(lambda _: self.text('memoryFeedback') == 'Memory retention saved.')
         self.assertNotIn('synthetic-expiring-memory', self.text('memoryList'))
         self.assertIn('synthetic-current-memory', self.text('memoryList'))
-        self.browser.find_element(self.By.ID, 'memoryResetButton').click()
+        self.memory_click('#memoryResetButton')
         self.wait.until(EC.alert_is_present()).accept()
         self.wait.until(lambda _: self.text('memoryFeedback') == 'Your memories were reset.')
         self.assertIn('No verified memories saved.', self.text('memoryList'))

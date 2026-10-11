@@ -121,9 +121,12 @@ def reason_with_memory(store,user,query,*,consent=False,query_sensitivity=None,p
         live={r[0] for r in db.execute('SELECT id FROM memory_keys WHERE owner=?',(owner,))}
         if any(item['id'] not in live for item in memories): raise PermissionError('Context was revoked before reasoning.')
         state=store._sync_state(db,owner)
+        policy=state.get('reasoning_policy',{})
         if isinstance(provider,OpenAIReasoner):
-            policy=state.get('reasoning_policy',{})
             if not real_reasoning_authorized() or policy.get('enabled') is not True or policy.get('public_only') is not True:
+                raise PermissionError('Owner cloud reasoning policy is disabled.')
+        if policy:
+            if policy.get('enabled') is not True or policy.get('public_only') is not True:
                 raise PermissionError('Owner cloud reasoning policy is disabled.')
             daily_tokens=min(daily_tokens,policy['daily_tokens']); daily_microusd=min(daily_microusd,policy['daily_microusd'])
         ledger=state.get('reasoning',{'day':day,'reserved':0})

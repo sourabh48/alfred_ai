@@ -21,4 +21,23 @@
         <p id="memoryEvaluationResult" role="status" aria-live="polite" class="mt-2"></p>
     </form>
     <button id="memoryResetButton" class="btn btn-outline-danger" type="button">Reset My Memories</button>
+    <h3 class="h5 mt-4">Encrypted Memory Synchronization</h3>
+    <p id="memorySyncStatus" role="status" aria-live="polite">Checking local synchronization status.</p>
+    <form id="memorySyncForm" data-live-refresh-hold="true">
+        <label class="d-block mb-2"><input id="memorySyncEnabled" type="checkbox" disabled> Allow encrypted synchronization with my approved storage provider.</label>
+        <button class="btn btn-outline-primary" type="submit" disabled>Save Sync Consent</button>
+        <button id="memorySyncNow" class="btn btn-outline-secondary" type="button" disabled>Sync Now</button>
+    </form>
+    <p>Provider connection requires separate operator authorization and recoverable keys. Old backups can retain deleted memories. Recovery material stays separate from cloud objects.</p>
+    <h3 class="h5 mt-4">Optional Public Cloud Reasoning</h3>
+    <p id="memoryReasoningStatus" role="status">Checking local reasoning policy.</p>
+    <form id="memoryReasoningForm" data-live-refresh-hold="true">
+        <label class="d-block mb-2"><input id="memoryReasoningEnabled" type="checkbox"> Allow approved cloud reasoning for public questions. Each request still needs consent.</label>
+        <label for="memoryReasoningTokens" class="form-label">Daily token limit</label>
+        <input id="memoryReasoningTokens" class="form-control mb-2" type="number" min="1" max="65536" required>
+        <label for="memoryReasoningDollars" class="form-label">Daily spending limit (USD)</label>
+        <input id="memoryReasoningDollars" class="form-control mb-2" type="number" min="0.000001" max="1" step="0.000001" required>
+        <button class="btn btn-outline-primary" type="submit">Save Reasoning Policy</button>
+    </form>
+    <p id="memoryCloudFeedback" role="status" aria-live="polite"></p>
 </section>

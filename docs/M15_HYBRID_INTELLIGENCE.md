@@ -38,9 +38,25 @@ negative abstention both 1.0 at 0.20; positive top scores 0.229-0.619, negatives
 establish universal relevance; repeat evaluation when changing the embedding model
 or memory domain. Cosine scores are not confidence probabilities.
 
-Focused reasoning gate: 57 PASS, including 13 new hybrid regressions. Local actual
-qwen3.5:4b synthetic generation PASS in 9.437s with 96 output tokens and zero cloud
-calls. Full UI/combined/native gates follow in the continuation checkpoint.
+Existing Insights now presents questions, source records and separate hypothesis
+answers. No generated answer is automatically verified or stored. Explicit owner
+verification saves through the encrypted memory API. Settings retains correction,
+deletion and retention controls and adds local-only sync status, explicit sync
+consent and owner reasoning budgets. Status GETs never connect to a provider or
+return credentials. Cloud fallback is cleared after each question and disabled
+for domain questions. Page exit clears rendered conversations/drafts; bfcache
+entry reloads the current owner's controls. Source data and model text use text
+nodes, including hostile synthetic HTML. Travel numeric preferences are not money.
+Privacy labels distinguish local-only reasoning from separately enabled encrypted
+storage synchronization. Configured owner policy/caps also apply to mock reasoning.
+
+Focused application gate: 77 PASS in 33.265s, including 15 hybrid regressions and
+an exact-dedup JSON type regression. Six actual Chrome workflows PASS in 50.160s,
+zero failures/skips. An initial older retention-test click was outside the viewport;
+the test now uses its existing scroll-and-click helper. Initial evidence is retained.
+Real local all-minilm + qwen3.5:4b save/reopen/journal restore/retrieval/256-token-cap
+reasoning PASS in 11.109s, with an owned source and zero cloud calls. Combined and
+native integration results follow in the continuation checkpoint.
 
 Existing S3/CAS/queue/lifecycle/tombstone/checkpoint implementation is reused.
 Real connection still needs separate provider selection, least-privilege IAM/cost

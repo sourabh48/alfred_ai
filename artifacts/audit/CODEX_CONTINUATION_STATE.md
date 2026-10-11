@@ -1,5 +1,27 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15 hybrid milestone 3 - existing application conversation and privacy controls
+
+2026-10-12. Reasoning source f977e3130741e86431bfc6d4d088f36b7e2e57ad.
+Verified exact-dedup JSON type correction: a65d048 (boolean/number are distinct).
+Existing Insights now supports grounded local conversation, checked memory save
+and source/hypothesis separation. Existing Settings adds local sync status,
+owner sync consent and cloud reasoning budgets alongside corrections/deletion.
+Status reads are offline/local only; no credentials returned. Configured owner
+policies/caps also constrain mock fallback. Domain context cannot fall back to
+cloud. Browser text rendering/page-exit clearing and current-owner refresh apply.
+77 focused backend PASS in 33.265s; 6 actual Chrome PASS in 50.160s; zero final
+failures/skips. An older offscreen retention-test click now uses the existing
+scroll-and-click helper; initial failure evidence remains outside Git.
+Actual Ollama all-minilm/qwen3.5:4b encrypted save/reopen/journal restoration/
+owned-source retrieval/256-token-cap answer PASS in 11.109s, zero cloud calls.
+Native configuration/system/migration drift PASS; no new migration/dependency.
+Next: one combined source gate, actual native source/Chrome restart/backup drill,
+AST graph refresh and release-candidate readiness record. Real providers/private
+acceptance remain unauthorized; live source/DB and recovery materials untouched.
+Off-device/key recovery PENDING; cancelled passphrase workflow stays cancelled.
+Evidence: F:/ALFRED_DEV/isolated-tests/m15-hybrid-{ui-final-focused,chrome,restart,native-config}.log.
+
 ## M15 hybrid milestone 2 - Ollama-first reasoning and read-only sources
 
 2026-10-12, quality milestone 43f1b1b95ceee5909d9ac00d5f8327655791b035.

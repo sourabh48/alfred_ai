@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from alfred_ai.services.api_errors import safe_error_response
 from apps.ml_engine.services.persistent_memory import MemoryStore, MemoryConflict
-from apps.ml_engine.services.memory_sync import SyncConflict
+from apps.ml_engine.services.memory_sync import SyncConflict, MemorySynchronizer
 from apps.ml_engine.services.memory_reasoning import ReasoningBudgetExceeded, reason_with_memory, reasoning_provider, configure_reasoning, real_reasoning_authorized
 from apps.ml_engine.services.memory_learning import MemoryLearning
 from apps.ml_engine.services.memory_cloud import synchronizer, configured_provider
@@ -107,7 +107,12 @@ class MemoryRetrieveAPI(MemoryAPI):
 
 class MemorySyncAPI(MemoryAPI):
     def get(self,request):
-        return Response({'provider':configured_provider() or 'disabled','status':memory_sync(request.user).status(request.user)})
+        store=memory_store(); kind=configured_provider()
+        from apps.ml_engine.services.persistent_memory import _owner
+        with store._transaction() as db: state=store._sync_state(db,_owner(request.user))
+        available=(kind=='mock' and bool(settings.ALFRED_MEMORY_SYNC_MOCK_DIR)) or (kind=='s3' and settings.ALFRED_MEMORY_CLOUD_AUTHORIZED and bool(state.get('cloud')))
+        return Response({'provider':kind or 'disabled','available':bool(available),
+            'status':MemorySynchronizer(store,None).status(request.user)})
 
     def post(self,request):
         data=self.payload(('action','enabled','consent','confirm'))
@@ -127,8 +132,11 @@ class MemoryReasoningAPI(MemoryAPI):
     def get(self,request):
         from apps.ml_engine.services.persistent_memory import _owner
         store=memory_store()
-        with store._transaction() as db: policy=store._sync_state(db,_owner(request.user)).get('reasoning_policy',{'enabled':False,'public_only':True})
-        return Response({'policy':policy,'real_provider_enabled':bool(real_reasoning_authorized())})
+        with store._transaction() as db: state=store._sync_state(db,_owner(request.user))
+        policy=state.get('reasoning_policy',{'enabled':False,'public_only':True,
+            'daily_tokens':settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,'daily_microusd':settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD})
+        return Response({'policy':policy,'real_provider_enabled':bool(real_reasoning_authorized()),
+            'provider_available':bool(settings.ALFRED_MEMORY_MOCK_REASONING or (real_reasoning_authorized() and state.get('openai_key')))})
 
     def put(self,request):
         data=self.payload(('enabled','consent','daily_tokens','daily_microusd'))

@@ -12,7 +12,7 @@ from django.utils import timezone
 from apps.ml_engine.services.persistent_memory import MemoryStore, MemoryConflict, _owner
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 from apps.ml_engine.services.hybrid_intelligence import hybrid_answer, OllamaReasoner, source_context
-from apps.ml_engine.services.memory_reasoning import MockReasoner
+from apps.ml_engine.services.memory_reasoning import MockReasoner, configure_reasoning, ReasoningBudgetExceeded
 from tests.test_persistent_memory import SyntheticEmbeddings
 
 
@@ -69,6 +69,22 @@ class HybridIntelligenceTests(TestCase):
     def test_sensitive_memory_cannot_leave_device_even_when_query_is_marked_public(self):
         self.save(); self.local.reason.side_effect=EmbeddingUnavailable('synthetic local failure')
         with self.assertRaises(PermissionError): self.answer(cloud_consent=True,query_sensitivity='public')
+
+    def test_configured_owner_policy_and_caps_also_apply_to_mock_fallback(self):
+        self.save(sensitivity='public'); self.local.reason.side_effect=EmbeddingUnavailable('synthetic unavailable')
+        configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=1,daily_microusd=1000)
+        with self.assertRaises(ReasoningBudgetExceeded): self.answer(cloud_consent=True,query_sensitivity='public')
+        configure_reasoning(self.store,self.alice,enabled=False,daily_tokens=4096,daily_microusd=1000)
+        with self.assertRaises(PermissionError): self.answer(cloud_consent=True,query_sensitivity='public')
+
+    def test_disabled_provider_status_reads_only_local_owner_state_without_network(self):
+        self.client.force_login(self.alice)
+        with patch('apps.ml_engine.api.memory.memory_sync',side_effect=AssertionError('status must not connect')):
+            response=self.client.get('/api/ai/memories/sync/')
+        self.assertEqual(response.status_code,200); self.assertFalse(response.json()['available'])
+        self.assertEqual(response.json()['provider'],'disabled'); self.assertIn('no-store',response['Cache-Control'])
+        reason=self.client.get('/api/ai/memories/reason/').json()
+        self.assertFalse(reason['provider_available']); self.assertNotIn('openai_key',str(reason))
 
     def test_deleted_context_during_local_and_cloud_inference_is_not_returned(self):
         identity=self.save()
