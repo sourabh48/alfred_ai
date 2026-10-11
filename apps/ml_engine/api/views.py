@@ -11,6 +11,8 @@ from apps.ml_engine.behavior.behavior_signature import behavior_signature
 from apps.ml_engine.behavior.anomaly_detector import anomaly_detector
 from apps.ml_engine.behavior.personalizer import personalizer
 from apps.ml_engine.behavior.insight_generator import insight_generator
+from .memory import MemoryAPI, memory_store
+from apps.ml_engine.services.hybrid_intelligence import hybrid_answer
 
 class EmotionalSpendAPI(APIView):
     permission_classes = [IsAuthenticated]
@@ -51,12 +53,21 @@ class AlfredExplainAPI(APIView):
         })
 
 
-class AlfredPersonalInsightsAPI(APIView):
+class AlfredPersonalInsightsAPI(MemoryAPI):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        intelligence = build_financial_intelligence(request.user)
+        from apps.loans.models import LoanClosureDocument
+        intelligence = dict(build_financial_intelligence(request.user))
+        intelligence['assistant_documents']=[{'id':identity,'label':f'Verified loan closure #{identity}'} for identity in
+            LoanClosureDocument.objects.filter(loan__user=request.user,verification_status='verified').order_by('-id').values_list('id',flat=True)[:20]]
         return Response(intelligence)
+
+    def post(self,request):
+        data=self.payload(('query','scope','document_id','cloud_consent','query_sensitivity'))
+        return Response(hybrid_answer(memory_store(),request.user,data.get('query'),scope=data.get('scope','general'),
+            document_id=data.get('document_id'),cloud_consent=data.get('cloud_consent',False),
+            query_sensitivity=data.get('query_sensitivity','sensitive')))
 
 
 class SelfImproveAPI(APIView):

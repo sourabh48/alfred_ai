@@ -1,6 +1,7 @@
 """Bounded embedding calls to the fixed local Ollama listener; no cloud fallback."""
 from http.client import HTTPConnection, HTTPException
 import json
+import time
 from math import isfinite, hypot
 
 
@@ -19,28 +20,41 @@ def validate_vector(value):
 class OllamaEmbeddings:
     model = 'all-minilm:latest'
 
-    def _request(self, method, path, payload=None):
-        connection = HTTPConnection('127.0.0.1', 11434, timeout=30)
+    def _request(self, method, path, payload=None, *, deadline=None):
+        timeout=30 if deadline is None else min(30,deadline-time.monotonic())
+        if timeout<=0: raise EmbeddingUnavailable('Local inference deadline exceeded.')
+        connection = HTTPConnection('127.0.0.1', 11434, timeout=timeout)
         try:
             body = json.dumps(payload, allow_nan=False).encode() if payload is not None else None
             connection.request(method, path, body=body, headers={'Content-Type': 'application/json', 'Accept-Encoding': 'identity'})
             response = connection.getresponse()
             if response.status != 200 or response.getheader('Content-Encoding', 'identity') != 'identity':
                 raise EmbeddingUnavailable('Local embedding service is unavailable.')
-            raw = response.read(256 * 1024 + 1)
+            if deadline is None:
+                raw = response.read(256 * 1024 + 1)
+            else:
+                raw=bytearray()
+                while len(raw)<=256*1024:
+                    left=deadline-time.monotonic()
+                    if left<=0: raise EmbeddingUnavailable('Local inference deadline exceeded.')
+                    sock=connection.sock or response.fp.raw._sock
+                    sock.settimeout(left)
+                    chunk=response.read1(min(8192,256*1024+1-len(raw)))
+                    if not chunk: break
+                    raw.extend(chunk)
             if len(raw) > 256 * 1024:
                 raise EmbeddingUnavailable('Local embedding response exceeds its limit.')
             result = json.loads(raw)
             if not isinstance(result, dict):
                 raise ValueError()
             return result
-        except (OSError, HTTPException, ValueError, KeyError, TypeError):
+        except (OSError, HTTPException, ValueError, KeyError, TypeError, UnicodeError):
             raise EmbeddingUnavailable('Local embedding service is unavailable.') from None
         finally:
             connection.close()
 
-    def _digest(self):
-        models = self._request('GET', '/api/tags').get('models', [])
+    def _digest(self, *, deadline=None):
+        models = self._request('GET', '/api/tags', **({'deadline':deadline} if deadline is not None else {})).get('models', [])
         if not isinstance(models, list) or any(not isinstance(item, dict) for item in models):
             raise EmbeddingUnavailable('Local embedding response is invalid.')
         item = next((item for item in models if item.get('name') == self.model), {})

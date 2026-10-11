@@ -7,7 +7,7 @@ from django.conf import settings
 from alfred_ai.services.public_http import request
 
 from .memory_sync import encoded, remaining, SyncUnavailable
-from .persistent_memory import _owner
+from .persistent_memory import _owner, MemoryConflict
 
 
 class ReasoningBudgetExceeded(RuntimeError):
@@ -136,6 +136,11 @@ def reason_with_memory(store,user,query,*,consent=False,query_sensitivity=None,p
         if not isinstance(answer,str) or len(answer.encode())>8192: raise ValueError()
     except Exception:
         raise SyncUnavailable('Optional reasoning is unavailable; its reserved budget is retained.') from None
+    with store._transaction() as db:
+        store._expire(db,owner)
+        live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
+        if any(item['id'] not in live for item in memories): raise MemoryConflict('Reasoning context was revoked during inference.')
     return {'answer':answer,'provider':getattr(provider,'name','mock'),'classification':'ai_generated_hypothesis',
+        'sources':[{'ref':item['id'],'classification':'owner_verified_public_statement'} for item in memories],
         'grounding':'user_verified_public_context','financial_authority':False,'reserved_tokens':reserve,
         'remaining_tokens':daily_tokens-ledger['reserved'],'reserved_microusd':cost,'remaining_microusd':daily_microusd-ledger['reserved_microusd']}

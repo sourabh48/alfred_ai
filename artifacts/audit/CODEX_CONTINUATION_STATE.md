@@ -1,5 +1,23 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15 hybrid milestone 2 - Ollama-first reasoning and read-only sources
+
+2026-10-12, quality milestone 43f1b1b95ceee5909d9ac00d5f8327655791b035.
+POST on existing Insights API adds Ollama-first bounded generation, canonical
+Finance, owned Travel preferences and verified Loan closure evidence. No parallel
+assistant/models, financial writes or raw OCR disclosure. Explicit public general
+fallback retains existing disabled OpenAI policy/filter/durable caps. Sources and
+revocation are checked after inference, including optional cloud reasoning.
+Focused gate: 57 PASS in 12.480s, zero failures/skips, including 13 hybrid regressions.
+Local actual generation PASS: qwen3.5:4b, 96 tokens, 9.437s, zero cloud requests.
+All-minilm calibration at 0.20: 6 positives/6 negatives, recall@3=1, abstention=1.
+The failed 0.30 held-out check and initial wrong-field synthetic fixture are retained;
+no production validation was weakened. This is a small fixture, not universal accuracy.
+Next milestone: existing Insights conversation/verified-memory controls and Settings
+sync status/consent/budgets, then a combined/backend/Chrome/native integration gate.
+Evidence: F:/ALFRED_DEV/isolated-tests/m15-hybrid-{reasoning,calibration,ollama}.log.
+Live source/DB, real cloud/OpenAI and recovery keys unchanged; off-device PENDING.
+
 ## M15 hybrid milestone 1 - verified deduplication and relevance
 
 2026-10-12, starting 81942711ba96a77c35c76926db3e9262bc571888, isolated M15 only.
