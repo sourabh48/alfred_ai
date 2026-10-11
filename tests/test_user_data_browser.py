@@ -87,6 +87,49 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def text(self, element_id):
         return self.browser.find_element(self.By.ID, element_id).text
 
+    def test_private_memory_delete_retention_reset_keep_family_isolated(self):
+        from datetime import datetime, timezone, timedelta
+        from selenium.webdriver.support import expected_conditions as EC
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = self.enterContext(TemporaryDirectory(prefix='alfred-memory-browser-synthetic-'))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=root))
+        store = MemoryStore(root, embedder=SyntheticEmbeddings())
+        owner = self.scenario['user']
+        other = get_user_model().objects.create_user(username='synthetic-memory-browser-family')
+        removed = store.save_verified(owner, {'note': 'synthetic-delete <img src=x onerror="window.memoryLeak=true">'}, {'source': 'synthetic'}, verified=True)
+        other_id = store.save_verified(other, {'note': 'synthetic-other-owner-private'}, {'source': 'synthetic'}, verified=True)
+        store.save_verified(owner, {'note': 'synthetic-current-memory'}, {'source': 'synthetic'}, verified=True)
+        with patch('apps.ml_engine.services.persistent_memory.datetime') as clock:
+            clock.now.return_value = datetime.now(timezone.utc) - timedelta(days=10)
+            clock.fromisoformat = datetime.fromisoformat
+            store.save_verified(owner, {'note': 'synthetic-expiring-memory'}, {'source': 'synthetic'}, verified=True)
+        self.login()
+        self.browser.get(self.live_server_url + '/settings/')
+        self.wait.until(lambda _: 'synthetic-delete' in self.text('memoryList'))
+        self.assertNotIn('synthetic-other-owner-private', self.text('memoryList'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.memoryLeak)'))
+        self.browser.execute_script("document.getElementById('privateMemoryPanel').scrollIntoView({behavior: 'instant', block: 'center'});")
+        self.browser.find_element(self.By.XPATH, "//div[@id='memoryList']/div[p[contains(.,'synthetic-delete')]]/button").click()
+        self.wait.until(EC.alert_is_present()).accept()
+        self.wait.until(lambda _: self.text('memoryFeedback') == 'Memory deleted.')
+        self.assertNotIn('synthetic-delete', self.text('memoryList'))
+        self.assertNotIn(removed, [r['id'] for r in store.list_memories(owner)])
+        self.assertEqual(store.restore_owner(owner), 2)
+        days = self.browser.find_element(self.By.ID, 'memoryRetentionDays')
+        days.clear()
+        days.send_keys('1')
+        self.browser.find_element(self.By.CSS_SELECTOR, '#memoryRetentionForm button').click()
+        self.wait.until(lambda _: self.text('memoryFeedback') == 'Memory retention saved.')
+        self.assertNotIn('synthetic-expiring-memory', self.text('memoryList'))
+        self.assertIn('synthetic-current-memory', self.text('memoryList'))
+        self.browser.find_element(self.By.ID, 'memoryResetButton').click()
+        self.wait.until(EC.alert_is_present()).accept()
+        self.wait.until(lambda _: self.text('memoryFeedback') == 'Your memories were reset.')
+        self.assertIn('No verified memories saved.', self.text('memoryList'))
+        self.assertEqual(store.restore_owner(owner), 0)
+        self.assertEqual(store.list_memories(other)[0]['id'], other_id)
+
     def test_login_limit_shows_feedback_then_recovers_after_window(self):
         from datetime import timedelta
         from django.utils import timezone

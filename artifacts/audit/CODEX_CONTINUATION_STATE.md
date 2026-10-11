@@ -1,5 +1,50 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - M15 protected memory lifecycle, synthetic gate PASS
+
+2026-10-11: ONLY F:/ALFRED_DEV/m15 on codex/m15-persistent-memory-20261011.
+M14 master integration is separate in F:/ALFRED_DEV/m14-stable and receives NO
+M15 source. Frozen M14 remains 6050234; native source-worker compatibility
+correction master d84a5e5 is cherry-picked here as 80a5d3c. The following M15
+implementation commit's HEAD is recorded in the external manifest
+F:/ALFRED_DEV/isolated-tests/m15-private-memory-manifest.json after committing.
+
+New private-memory-v2 storage encrypts index content/provenance/embeddings and
+journal events, per-record wrapped keys, current-user DPAPI master key, Windows
+ACLs, secure_delete and encrypted temporary SQLite rollback data. Old plaintext
+schemas/keys are refused and preserved; synthetic fixtures only. No raw content,
+key/path/exception logging, browser storage or response caching. Owner/session
+plus immutable creation time; client owner fields rejected; family grants never
+share memory. APIs and Settings delete/reset/retention implemented; existing
+account-data reset/User pre_delete revoke memory first; vault failure prevents
+financial mutation. Shared auth/CSRF/account/global/expensive limits retained.
+
+Deletion/expiry removes wrapped keys and indexes, appends encrypted revocation;
+current-journal recovery cannot revive revoked data. Reset generation blocks
+in-flight old saves; retrieval rechecks revocation after inference. Default
+30-day owner retention, 1-365 days, immediate shortening; expiry at access,
+native startup/daily 03:00 UTC plus explicit idempotent prune_private_memory.
+Current-journal recovery validates first; corrupt/missing keys preserve data.
+Old backups require separate retirement/revocation reconciliation; no cloud sync
+or global backup revocation/portable DPAPI export is claimed. Canonical finance
+is untouched by memory retention. Cross-store finance failure keeps memory revoked.
+
+Actual gates: focused 33 PASS; related backend 91 passed, 149.649 s, no failures/
+skips; Chrome combined 3 passed, 40.208 s, zero failures/skips. Native source/
+Chrome 19 checks PASS; native config/system/drift PASS, no new migration/dependency.
+Two real local Ollama/Python processes: 384 dimensions, encrypted recovery/same
+ID, score 0.518286, provenance/sensitivity/ownership PASS, cloud calls 0. Graph
+AST 8026/20640 PASS. See docs/M15_LOCAL_MEMORY.md for contracts/proof paths.
+Corrected CLI-array/scroll/config fixture failures retained as evidence.
+
+M15 PRIVATE MEMORY PROTECTION COMPLETE for this Windows v2 synthetic gate.
+Whole M15 INCOMPLETE; no real private-memory/account acceptance, cloud sync or
+broad learning. Current-user DPAPI protects disk copies, not a compromised app/
+Windows user, and needs the same protected profile for recovery. Continue ONLY
+this worktree; do not merge M15 into master or modify installed private data.
+M14 promotion awaits explicit user source+family migration approval; live token
+re-encryption is separately authorized and requires its own fresh backup.
+
 ## Repository
 
 Branch: codex/native-runtime-hardening-20260918

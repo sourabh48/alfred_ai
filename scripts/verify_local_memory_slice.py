@@ -34,7 +34,8 @@ def main():
         with closing(sqlite3.connect(store.database)) as db, db:
             ciphertext = db.execute('SELECT ciphertext FROM events').fetchone()[0]
             assert b'travel_preference' not in ciphertext
-            dimensions = len(json.loads(db.execute('SELECT record FROM memories').fetchone()[0])['embedding'])
+            identity, owner_hash, encrypted = db.execute('SELECT id,owner,record FROM memories').fetchone()
+            dimensions = len(store._decode(db, identity, owner_hash, encrypted)['embedding'])
         marker.write_text(json.dumps({'synthetic': True, 'memory_id': identity, 'dimensions': dimensions}))
         print(json.dumps({'phase': 'save', 'status': 'PASS', 'embedding_dimensions': dimensions, 'owner_isolation': 'PASS', 'encrypted_event': 'PASS', 'cloud_calls': 0}))
     else:

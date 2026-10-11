@@ -447,6 +447,7 @@ ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION = env.bool(
     default=not LOCAL_RUNTIME,
 )
 ALFRED_FAMILY_LINK_CODE_TTL_HOURS = env.int("ALFRED_FAMILY_LINK_CODE_TTL_HOURS", default=24)
+ALFRED_MEMORY_DIR = str(Path(os.environ.get('ALFRED_DATA_DIR') or BASE_DIR) / 'artifacts' / 'private-memory-v2')
 
 
 # ---------------------------------------------------------

@@ -28,7 +28,11 @@ class UserDataResetView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        deleted = clear_user_fed_data(request.user)
+        try:
+            deleted = clear_user_fed_data(request.user)
+        except Exception as exc:
+            from alfred_ai.services.api_errors import safe_error_response
+            return safe_error_response(exc, 'Account reset could not finish. Please try again.', logger_name=__name__, status_code=503)
         serializer = UserSerializer(request.user)
         return Response(
             {

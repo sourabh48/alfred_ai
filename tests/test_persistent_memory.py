@@ -79,12 +79,15 @@ class PersistentMemoryTests(TestCase):
 
     def test_corrupt_journal_preserves_existing_index(self):
         identity = self.save()
+        with closing(sqlite3.connect(self.store.database)) as db:
+            before = db.execute('SELECT record FROM memories WHERE id=?', (identity,)).fetchone()[0]
         with closing(sqlite3.connect(self.store.database)) as db, db:
             db.execute('DROP TRIGGER events_no_update')
             db.execute('UPDATE events SET ciphertext=?', (b'synthetic-corrupt-ciphertext',))
         with self.assertRaisesRegex(RuntimeError, 'verification failed'):
             self.store.restore_owner(self.alice)
-        self.assertEqual(self.store.retrieve(self.alice, 'mountain')[0]['id'], identity)
+        with closing(sqlite3.connect(self.store.database)) as db:
+            self.assertEqual(db.execute('SELECT record FROM memories WHERE id=?', (identity,)).fetchone()[0], before)
 
     def test_missing_key_is_never_replaced_when_events_exist(self):
         self.save()

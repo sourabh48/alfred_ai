@@ -70,6 +70,11 @@ def _delete_generated_report_paths(paths: list[str]) -> None:
 
 
 def clear_user_fed_data(user) -> dict:
+    # Revoke memory recovery first; a vault failure must stop an account-data reset.
+    memory_count = 0
+    if (Path(settings.ALFRED_MEMORY_DIR) / 'verified.sqlite3').exists():
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        memory_count = MemoryStore(settings.ALFRED_MEMORY_DIR).reset_owner(user)
     career_resume_qs = CareerResume.objects.filter(user=user)
     statement_upload_qs = StatementUpload.objects.filter(user=user)
     credit_report_qs = CreditReportUpload.objects.filter(user=user)
@@ -99,6 +104,7 @@ def clear_user_fed_data(user) -> dict:
     generated_paths = list(generated_report_qs.values_list("file_path", flat=True))
 
     summary = {
+        "private_memories": memory_count,
         "career_resumes": career_resume_qs.count(),
         "career_job_analyses": CareerJobAnalysis.objects.filter(user=user).count(),
         "bank_accounts": BankAccount.objects.filter(user=user).count(),

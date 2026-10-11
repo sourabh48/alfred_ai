@@ -1,0 +1,13 @@
+<section class="surface-card mb-4" id="privateMemoryPanel">
+    <h2 class="page-section-title mb-1">Private Memory</h2>
+    <p class="page-section-copy">Verified memories stay on this computer. Connected family members cannot read them. Deleting a memory also revokes journal recovery of it.</p>
+    <p class="page-section-copy">Retention runs whenever memories are accessed and at local startup. Old recovery backups retain their original data and must be retired separately.</p>
+    <form id="memoryRetentionForm" class="d-flex align-items-end gap-3 mb-3" data-live-refresh-hold="true">
+        <div><label for="memoryRetentionDays" class="form-label">Keep memories for (days)</label>
+        <input id="memoryRetentionDays" class="form-control" type="number" min="1" max="365" value="30" required></div>
+        <button class="btn btn-outline-primary" type="submit">Save Retention</button>
+    </form>
+    <div id="memoryFeedback" role="status" aria-live="polite"></div>
+    <div id="memoryList" class="data-stack my-3"></div>
+    <button id="memoryResetButton" class="btn btn-outline-danger" type="button">Reset My Memories</button>
+</section>

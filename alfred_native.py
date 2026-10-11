@@ -226,6 +226,7 @@ def serve(data, port):
         with sqlite3.connect(data / "db.sqlite3", timeout=30) as connection:
             connection.execute("PRAGMA journal_mode=WAL")
         call_command("migrate", interactive=False, verbosity=1)
+        call_command("prune_private_memory", verbosity=0)
         call_command("collectstatic", interactive=False, verbosity=0)
         child = spawn("worker", data, "--instance", instance, "--parent-pid", str(os.getpid()))
         # This is an actual queued task, not eager execution or a process ping.

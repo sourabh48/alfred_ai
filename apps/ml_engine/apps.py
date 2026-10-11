@@ -7,6 +7,7 @@ class MlEngineConfig(AppConfig):
     verbose_name = "ALFRED ML Engine"
 
     def ready(self):
+        from . import memory_signals  # noqa: F401
         from .auto_training import bootstrap_startup_training
 
         bootstrap_startup_training()

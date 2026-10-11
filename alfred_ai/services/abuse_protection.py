@@ -49,7 +49,7 @@ class AbuseProtectionMiddleware(MiddlewareMixin):
                 account = _identity(f'{request.user.pk}:{request.user.date_joined.isoformat()}')
                 budget('API-account', account, 'API_ACCOUNT')
                 budget('API-global', 'all', 'API_GLOBAL')
-                if (request.content_type == 'multipart/form-data' and request.FILES) or EXPENSIVE_PATH.search(path):
+                if (request.content_type == 'multipart/form-data' and request.FILES) or EXPENSIVE_PATH.search(path) or (path.startswith('/api/ai/memories/') and request.method == 'POST'):
                     budget('EXPENSIVE-account', account, 'EXPENSIVE_ACCOUNT')
                     budget('EXPENSIVE-global', 'all', 'EXPENSIVE_GLOBAL')
             retry = reserve_attempts(settings.ALFRED_ABUSE_THROTTLE_DIR, buckets)
