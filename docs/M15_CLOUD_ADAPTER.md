@@ -152,3 +152,83 @@ the same verified memory: 384 dimensions, score 0.518286, zero external calls.
 Focused results and the final combined result are recorded in the continuation
 checkpoint and F:/ALFRED_DEV/isolated-tests/m15-cloud-manifest.json after commit.
 Real-provider permissions/costs/device-loss recovery remain awaiting authorization.
+
+## Proposed AWS acceptance after explicit provider approval
+
+2026-10-12 preparation only. AWS S3 is the existing adapter's supported real
+provider, not a selected or authorized destination. No bucket, credentials, IAM
+policy, cloud object or real request has been created by this preparation.
+Use a dedicated private general-purpose bucket with no past versioning, all
+four Public Access Block settings and BucketOwnerEnforced ownership. Review
+Object Lock, replication, external backups and retention separately. Reject
+those that can preserve old current key manifests without an accepted deletion
+policy. Expected bucket-owner account, region, budget and destination must be
+approved before provisioning. Do not reuse the private financial/recovery bucket.
+
+The following IAM example is an uninstalled review template. Replace placeholders
+only after selection; give each synthetic owner separate restricted credentials.
+The action/resource split follows [AWS's S3 permission mapping](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-policy-actions.html).
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Effect":"Allow","Action":["s3:GetBucketVersioning","s3:GetBucketPublicAccessBlock","s3:GetBucketOwnershipControls"],"Resource":"arn:aws:s3:::APPROVED_BUCKET"},
+    {"Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::APPROVED_BUCKET","Condition":{"StringLike":{"s3:prefix":["alfred-memory-v1/OWNER_SHA256/snapshots/*"]}}},
+    {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject"],"Resource":["arn:aws:s3:::APPROVED_BUCKET/alfred-memory-v1/OWNER_SHA256/head","arn:aws:s3:::APPROVED_BUCKET/alfred-memory-v1/OWNER_SHA256/snapshots/*"]},
+    {"Effect":"Allow","Action":"s3:DeleteObject","Resource":"arn:aws:s3:::APPROVED_BUCKET/alfred-memory-v1/OWNER_SHA256/snapshots/*"},
+    {"Effect":"Deny","Action":"s3:*","Resource":["arn:aws:s3:::APPROVED_BUCKET","arn:aws:s3:::APPROVED_BUCKET/*"],"Condition":{"Bool":{"aws:SecureTransport":"false"}}}
+  ]
+}
+```
+
+An operator must independently check effective permissions, including other
+attached policies and bucket principals; this template is not proof of isolation.
+With two pre-created synthetic namespaces, require owner A's credential to get,
+put and delete A's test objects but receive authorization denial on B's known test
+object/list/write/delete and on bucket configuration changes. Use an independent
+AWS permission test; the adapter's client-side owner refusal is not an IAM test.
+Do not treat missing-object 404 as evidence of authorization denial. Keep test
+object names/content synthetic; never use real account or recovery identifiers.
+
+Connection diagnostics use existing gates: masked local configure_memory_cloud
+provisioning remains source-CLI only, encrypted owner profile, operator real-contact
+authorization, explicit owner consent, and MemorySyncAPI status/result. Status GET
+is local only; configured availability does not prove authentication or IAM.
+After approval, the first bounded sync checks bucket controls/expected ownership
+and authenticated head/schema/history. Record result/category/reference/revision/
+pending/conflict only; no credentials, payloads, upstream bodies or HTTP wire logs.
+An expired credential, wrong owner, invalid bucket control or failed signature
+must preserve local state and fail closed. A credential failure must not trigger
+provisioning/recovery/key rotation automatically. Packaged provisioning currently
+requires the operator's source management CLI; no browser credential field exists.
+
+Synthetic-only live acceptance, AFTER authorization and independent key recovery:
+
+1. Create two isolated canonical synthetic accounts and separate owner profiles.
+   Export/retain their approved recovery material and trusted checkpoint separately
+   from the provider. Keep OpenAI disabled and all real financial data excluded.
+2. Save one verified synthetic memory locally; consent to encrypted sync; run a
+   bounded upload. Independently inspect that objects are ciphertext with AES256
+   SSE and owned prefixes, never SQLite/WAL/SHM or document files.
+3. Restart a second synthetic vault with the same account identity and independently
+   recovered owner key/latest checkpoint. Enable download explicitly; authenticate
+   and retrieve the same memory using local Ollama. Require owner B rejection.
+4. Make an incremental local update and observe the next minute worker tick.
+   Stop with a pending edit and verify bounded final upload or durable pending state.
+5. Disconnect network, update/correct locally, restart offline and prove retention
+   of encrypted pending changes. Reconnect and verify acknowledged publication.
+6. Force two stale-head concurrent edits. Require conflict preservation and explicit
+   confirmed recovery; no silent overwrite. Inject a truncated download/corrupt
+   object and an interrupted/lost-ack upload; require no partial index mutation,
+   correct retry/acknowledgement and unchanged local verified data.
+7. Delete/reset/expire a memory and propagate tombstones. Reconcile a stale replica
+   and old authenticated snapshot against the trusted checkpoint; require no
+   resurrection. Test bounded explicit pruning only on synthetic objects.
+8. Record exact lifecycle/ownership/recovery results, object/request counts and cost
+   within the approved limit. Keep evidence and existing backups. Removing the
+   synthetic test bucket/objects is a separate approved action, not automatic cleanup.
+
+Current record: real provider AWAITING APPROVAL; synthetic wire/mock tests only.
+Private cloud use and a production readiness claim remain blocked by real IAM/
+cost/retention acceptance and separately recoverable keys/checkpoints.
