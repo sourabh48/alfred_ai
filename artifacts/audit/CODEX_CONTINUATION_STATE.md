@@ -1,5 +1,69 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - M15 owner correction and retrieval quality PASS
+
+2026-10-12: Continue ONLY F:/ALFRED_DEV/m15 on
+codex/m15-persistent-memory-20261011. Verified clean starting HEAD:
+14ab9de91f0018044c472daf104449be8364377f.
+Validated implementation: fceba9b636f15db2af29d5b43f1419699a0cb7de.
+The following documentation-only checkpoint commit does not change tested code;
+its final HEAD is recorded in external m15-quality-manifest.json after commit.
+
+Settings now supports owner-confirmed correction through the existing atomic
+replacement/re-embedding/revocation pipeline and transient retrieval-quality checks.
+Corrections replace the memory body with a checked statement while preserving
+source history/sensitivity. Conflicts preserve the draft and committed winner;
+no automatic retries. A synthetic regression reproduced changed candidate content
+silently receiving HTTP 200 before the fix. Changed retries and stale/concurrent
+corrections/promotions now return safe 409 with a redacted reference/classification.
+Identical retries remain idempotent without extra embeddings/events.
+
+Evaluation adds explicit no-match cases (expected_id null), positive/negative
+counts, top-1 accuracy, false-positive and abstention rates. Existing positive-only
+recall@3/MRR stay compatible. Queries/results are transient, never persisted or
+echoed as private context; the browser clears drafts/checks on exit. Owner memory
+changes during evaluation invalidate the report with 409. Current nearest-memory
+retrieval has no calibrated relevance cutoff: a match on a negative case is measured
+as a false positive, not accepted as knowledge. Hypotheses remain unverified and
+canonical financial records are unchanged. No schema/dependency/config change.
+
+Actual FINAL combined related gate: 133 backend PASS in 73.910 seconds, zero
+failures/skips, including nine new learning regressions. Focused learning run:
+21 PASS in 4.676 seconds (overlaps combined; do not add counts). Four actual Chrome
+workflows PASS in 34.930 seconds, zero failures/skips: explicit correction/checks,
+stale draft/conflict/refresh, existing mock sync/reasoning and delete/retention/reset
+owner isolation. Initial two browser viewport click errors were corrected with
+real scrolled clicks; initial evidence retained separately. Synthetic data only.
+System check PASS; isolated migration drift: No changes detected. Graphify AST-only
+update PASS (8335 nodes/21760 edges); no paid labeling or new external service.
+Evidence: F:/ALFRED_DEV/isolated-tests/m15-quality-{reproduction,focused,combined,
+chrome,chrome-initial-evidence,system,migrations,graphify}.log and Chrome receipts.
+No completed M14/native/Ollama proof was unnecessarily repeated. Ollama's prior
+restart/retrieval PASS remains recorded, not represented as a new run.
+
+Recovery verifier inspected and documented in docs/M15_MEMORY_LEARNING.md and
+the existing Desktop README_TRANSFER.txt. VERIFY_TRANSFER.ps1 counts archive
+files and checks listed file sizes/SHA-256; it does not decrypt/restore archives,
+check SQLite, authenticate the manifest or prove external placement/key separation.
+Current manifest has no key records: even -KeyPath verifies no recovery key.
+Only the public README's manifest size/hash was refreshed; staged verifier PASS.
+Original/current archives, backup inventory (9694 protected files/3 SQLite DBs)
+and original keys are preserved. Key-sealing workflow CANCELLED: never restart
+dialogs or request a new passphrase. OFF_DEVICE_BACKUP=PENDING;
+INDEPENDENT RECOVERY KEY=PENDING until actual external copies and separate-key
+restoration are verified. No approved external destinations or key exports invented.
+
+Stable live HEAD remains 30e0b3f75e785f639897ad36c19090c6a4e8675f; existing operator
+changes preserved. GitHub master remains at its already verified synced checkpoint.
+No live source/DB/token changes, real cloud uploads, paid OpenAI calls or M15
+deployment/merge/push. Whole M15 remains in development.
+
+This bounded milestone is COMPLETE. Next unfinished M15 source gate: calibrate
+local relevance/abstention against synthetic held-out positive/no-match questions
+using the new owner-scoped quality reports; preserve the current retrieval contract
+until evidence supports a cutoff. Private/cloud acceptance remains separately gated
+on independent recovery and explicit provider authorization. Keep M14 frozen.
+
 ## Latest checkpoint - M15 password-free trusted recovery checkpoint PASS
 
 2026-10-12: Continue ONLY F:/ALFRED_DEV/m15, starting clean c94421bfd0ed704d6dd22d3c5a650c37c880a178.
