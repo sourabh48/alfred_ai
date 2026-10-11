@@ -1,5 +1,49 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - M14 stable Git integration, awaiting deployment approval
+
+2026-10-11: Target stable branch master was refreshed from origin/master
+da74570681165cfa46dd3186f95ee400643c41d6 in F:/ALFRED_DEV/m14-stable. Ordinary
+merge ffe2b7cfc64cf37e1a0ff90ec89de129269cc356 includes frozen 6050234 and required
+M13C/M13D ancestry, preserving the remote merge; no M15 commit is included.
+Native compatibility defect reproduced and corrected independently at
+d84a5e5b0d0c35a62d9290c1e403629e69ff17c6 (trusted source root in OCR subprocess).
+Final combined gate: 357 backend (342.618 s), 12 Chrome (136.881 s), zero failures/
+skips; separate native source/Chrome restart/recovery proof 19 checks PASS.
+The first repeat reused persistent synthetic limiter state; fixed test harness
+uses a fresh UUID runtime for each run. Evidence is preserved, including failures.
+
+Fresh verified recovery set F:/ALFRED_BACKUPS/m14-prepromotion-20261011-1645:
+read-only SQLite backup API, integrity/foreign keys/hash/independent restored DB,
+current-user DPAPI config/keys/media/models/limiter history/queue/operator edits,
+source Git bundle independently restored to installed a9d096e. Disposable private
+DB copies removed after verification. Protected set has 9690 files; profile-bound
+DPAPI is not an off-PC reinstall backup. Original portable backups preserved.
+Restored-copy actual plan is ONLY family.0004_financial_sharing_opt_in. Forward/
+rollback/replay preserve all canonical finance/family/user counts and row hashes
+except consent fields; historical grants OFF, relationships intact. No unexpected
+migration/drift; native configuration PASS. No live SQL mutation/service change.
+
+M14 DEVELOPMENT COMPLETE / RELEASE READY YES. Local master integration COMPLETE;
+remote origin/master remains unchanged. No push/PR or live source switch. Freeze
+master on release/m14-integrated-20261011 and record final integrated SHA/ranges in
+F:/ALFRED_DEV/isolated-tests/m14-stable-integration-manifest.json after this docs
+commit. Live source remains a9d096ea55839269fe6fce14d4f11ea2cbf05336 with original
+documentation/skill-lock edits and untracked operator documents preserved.
+Update only the existing promotion plan; local-edit replay must be reconciled
+before an authorized switch. User Step 5 requires explicit source+family migration
+Local-edit replay already rehearsed on the independent source clone: preserve
+all 193 operator-added checkpoint lines, skill lock and two untracked documents;
+runtime source diff empty. Prepared replay is protected outside Git.
+approval; live token re-encryption is separately authorized/backed up. No deployment.
+Expected downtime 15-30 min plus any work drain/acceptance delay; preserve keys,
+OFF consent, limiter histories and later writes under the tested rollback plan.
+
+M15 continues ONLY F:/ALFRED_DEV/m15 on codex/m15-persistent-memory-20261011.
+It receives the native compatibility correction as a one-way cherry-pick 80a5d3c;
+no M15 memory/UI/privacy change belongs in master. See its own checkpoint for
+synthetic protected-memory, delete/reset/retention and offline recovery evidence.
+
 ## Repository
 
 Branch: codex/native-runtime-hardening-20260918
