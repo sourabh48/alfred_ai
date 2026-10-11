@@ -10,6 +10,7 @@ from alfred_ai.services.api_errors import safe_error_response
 from apps.ml_engine.services.persistent_memory import MemoryStore
 from apps.ml_engine.services.memory_sync import MemorySynchronizer, MockCloudProvider, SyncUnavailable, SyncConflict
 from apps.ml_engine.services.memory_reasoning import MockReasoner, ReasoningBudgetExceeded, reason_with_memory
+from apps.ml_engine.services.memory_learning import MemoryLearning
 
 
 def memory_store():
@@ -127,3 +128,22 @@ class MemoryReasoningAPI(MemoryAPI):
             query_sensitivity=data.get('query_sensitivity'),provider=MockReasoner() if settings.ALFRED_MEMORY_MOCK_REASONING else None,
             daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS)
         return Response(result)
+
+
+class MemoryLearningAPI(MemoryAPI):
+    def get(self,request):
+        return Response({'candidates':MemoryLearning(memory_store()).candidates(request.user)})
+
+    def post(self,request):
+        data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases'))
+        allowed={'extract':{'action','text','provenance','sensitivity'},'verify':{'action','id','verified','content'},
+            'correct':{'action','id','content','verified'},'consolidate':{'action','ids','content','verified'},
+            'reembed':{'action','id','verified'},'evaluate':{'action','cases'}}
+        action=data.get('action')
+        if not isinstance(action,str) or action not in allowed or set(data)-allowed[action]: raise ValueError()
+        learning=MemoryLearning(memory_store()); user=request.user
+        if action=='extract': return Response({'candidate_ids':learning.extract(user,data.get('text'),data.get('provenance'),sensitivity=data.get('sensitivity','sensitive'))},status=201)
+        if action=='verify': return Response({'id':learning.verify(user,data.get('id'),verified=data.get('verified',False),content=data.get('content'))})
+        if action=='evaluate': return Response(learning.evaluate(user,data.get('cases')))
+        identities=data.get('ids') if action=='consolidate' else [data.get('id')]
+        return Response({'id':learning.revise(user,identities,data.get('content'),verified=data.get('verified',False),reembed=action=='reembed')})

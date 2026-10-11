@@ -1,5 +1,28 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - M15 local candidate review and correction PASS
+
+2026-10-11: ONLY F:/ALFRED_DEV/m15, starting verified b05c3b0. Encrypted,
+owner-isolated candidates retain source/confidence/sensitivity and require
+explicit verification before embedding/retrieval/sync. Exact deduplication,
+atomic correction/consolidation, incremental re-embedding/index updates,
+evaluation, candidate retention and reset races are covered. No canonical
+finance writes, private fixture, new dependency or Django migration.
+Actual focused gate: 79 PASS, 23.567 seconds, zero failures/skips. See
+docs/M15_MEMORY_LEARNING.md and isolated m15-learning-focused.log.
+Commit SHA is recorded externally after commit, avoiding a self-referential SHA.
+
+Existing encrypted supplement SHA-256 remains
+670a495a2114b92dd5c0782195725eb4e7700db1733025dc172e1b0cf875a061.
+Off-device archive/key destinations and export approval are missing; both BLOCKED.
+No key regeneration/export or backup deletion. Fresh stable fetch confirms
+origin/master da74570681165cfa46dd3186f95ee400643c41d6 is ancestor of frozen
+30e0b3f75e785f639897ad36c19090c6a4e8675f; ordinary push AWAITING APPROVAL.
+Stable operator changes preserved. Real-account visual acceptance still pending.
+Next disabled S3 adapter development uses synthetic signed-HTTP fixtures;
+real cloud connection/private upload/paid OpenAI calls require authorization.
+Live source/database/services/tokens unchanged, unfinished M15 isolated.
+
 ## Latest checkpoint - M15 mock encrypted sync runtime/API and budget gate PASS
 
 2026-10-11: ONLY F:/ALFRED_DEV/m15, codex/m15-persistent-memory-20261011. Protocol

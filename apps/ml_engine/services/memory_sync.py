@@ -229,6 +229,8 @@ class MemorySynchronizer:
                 if row and row[0]!=owner: raise SyncConflict('Memory identity belongs to another owner.')
             if identity in current['records'] and (ciphertext!=current['records'][identity] or snapshot['keys'][identity]!=current['keys'][identity]):
                 raise SyncConflict('Immutable memory identity collision; existing data is retained.')
+            indexed=db.execute('SELECT record FROM memories WHERE id=? AND owner=?',(identity,owner)).fetchone()
+            if identity in current['records'] and indexed and indexed[0]==ciphertext.encode(): continue
             db.execute('INSERT INTO memory_keys VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET wrapped=excluded.wrapped',
                 (identity,owner,master.encrypt(snapshot['keys'][identity].encode())))
             db.execute('INSERT OR IGNORE INTO events(id,owner,ciphertext) VALUES(?,?,?)',(identity,owner,ciphertext.encode()))

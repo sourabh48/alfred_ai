@@ -61,6 +61,7 @@ class MemoryStore:
                 CREATE TABLE IF NOT EXISTS policies (owner TEXT PRIMARY KEY, encrypted BLOB NOT NULL);
                 CREATE TABLE IF NOT EXISTS owner_epochs (owner TEXT PRIMARY KEY, epoch INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS memory_sync (owner TEXT PRIMARY KEY, encrypted BLOB NOT NULL);
+                CREATE TABLE IF NOT EXISTS memory_candidates (id TEXT PRIMARY KEY, owner TEXT NOT NULL, record BLOB NOT NULL);
                 CREATE TABLE IF NOT EXISTS events (
                     sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE,
                     owner TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'save', ciphertext BLOB NOT NULL);
@@ -159,6 +160,7 @@ class MemoryStore:
         for identity in identities:
             db.execute('DELETE FROM memories WHERE id=? AND owner=?', (identity, owner))
             db.execute('DELETE FROM memory_keys WHERE id=? AND owner=?', (identity, owner))
+            db.execute('DELETE FROM memory_candidates WHERE id=? AND owner=?', (identity, owner))
         self._sync_dirty(db, owner)
         return len(identities)
 
@@ -169,6 +171,10 @@ class MemoryStore:
             record = self._decode(db, identity, owner, ciphertext)
             if datetime.fromisoformat(record['verified_at']) <= cutoff:
                 expired.append(identity)
+        for identity, ciphertext in db.execute('SELECT id,record FROM memory_candidates WHERE owner=?', (owner,)):
+            candidate=json.loads(self._memory_cipher(db,identity,owner).decrypt(ciphertext))
+            if candidate['owner']!=owner or candidate['id']!=identity: raise RuntimeError('Candidate ownership verification failed.')
+            if datetime.fromisoformat(candidate['created_at'])<=cutoff: expired.append(identity)
         return self._revoke(db, owner, expired, kind='expire')
 
     def list_memories(self, user):
@@ -212,13 +218,15 @@ class MemoryStore:
             owners = [r[0] for r in db.execute('SELECT DISTINCT owner FROM memory_keys ORDER BY owner')]
             return sum(self._expire(db, owner) for owner in owners)
 
-    def save_verified(self, user, content, provenance, *, sensitivity='sensitive', verified=False):
+    def save_verified(self, user, content, provenance, *, sensitivity='sensitive', verified=False, supersedes=(), candidate_id=None):
         owner = _owner(user)
         if verified is not True or not isinstance(content, dict) or not content or not isinstance(provenance, dict) or not isinstance(provenance.get('source'), str) or not provenance['source'].strip() or sensitivity not in SENSITIVITIES:
             raise ValueError('Confirm a structured memory, its source and sensitivity before saving.')
         text = _json(content)
         content = json.loads(text)
         provenance = json.loads(_json(provenance))
+        if not isinstance(supersedes,(list,tuple)) or len(supersedes)>20 or any(not isinstance(i,str) for i in supersedes) or len(set(supersedes))!=len(supersedes):
+            raise ValueError('Choose at most twenty distinct owned memories to replace.')
         with self._transaction() as db:
             row = db.execute('SELECT epoch FROM owner_epochs WHERE owner=?', (owner,)).fetchone()
             epoch = row[0] if row else 0
@@ -235,16 +243,22 @@ class MemoryStore:
             if (row[0] if row else 0) != epoch:
                 raise ValueError('Memory verification must be repeated after an account reset.')
             self._expire(db, owner)
-            if db.execute('SELECT COUNT(*) FROM memories WHERE owner=?', (owner,)).fetchone()[0] >= 512:
+            for identity in supersedes:
+                if not db.execute('SELECT 1 FROM memories WHERE id=? AND owner=?',(identity,owner)).fetchone():
+                    raise ValueError('A replaced memory is no longer available.')
+            if candidate_id and not db.execute('SELECT 1 FROM memory_candidates WHERE id=? AND owner=?',(candidate_id,owner)).fetchone():
+                raise ValueError('Candidate verification is no longer available.')
+            if db.execute('SELECT COUNT(*) FROM memories WHERE owner=?', (owner,)).fetchone()[0]-len(supersedes) >= 512:
                 raise ValueError('The local memory slice supports at most 512 verified memories per owner.')
             # shortcut: bound retained encrypted history; add tested journal compaction before raising this cap.
-            if db.execute('SELECT COUNT(*) FROM events WHERE owner=?', (owner,)).fetchone()[0] >= 4096:
+            if db.execute('SELECT COUNT(*) FROM events WHERE owner=?', (owner,)).fetchone()[0]+1+bool(supersedes or candidate_id) > 4096:
                 raise ValueError('The local encrypted memory history limit has been reached.')
             key = Fernet.generate_key()
             ciphertext = Fernet(key).encrypt(encoded)
             db.execute('INSERT INTO memory_keys(id,owner,wrapped) VALUES(?,?,?)', (record['id'], owner, self._cipher(db).encrypt(key)))
             db.execute('INSERT INTO events(id,owner,ciphertext) VALUES(?,?,?)', (record['id'], owner, ciphertext))
             db.execute('INSERT INTO memories(id,owner,record) VALUES(?,?,?)', (record['id'], owner, ciphertext))
+            self._revoke(db,owner,[*supersedes,*([candidate_id] if candidate_id else [])])
             self._sync_dirty(db, owner)
         return record['id']
 
