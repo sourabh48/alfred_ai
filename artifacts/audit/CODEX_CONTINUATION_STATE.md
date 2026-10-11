@@ -30,12 +30,12 @@ master on release/m14-integrated-20261011 and record final integrated SHA/ranges
 F:/ALFRED_DEV/isolated-tests/m14-stable-integration-manifest.json after this docs
 commit. Live source remains a9d096ea55839269fe6fce14d4f11ea2cbf05336 with original
 documentation/skill-lock edits and untracked operator documents preserved.
-Update only the existing promotion plan; local-edit replay must be reconciled
-before an authorized switch. User Step 5 requires explicit source+family migration
+Update only the existing promotion plan; recheck local-edit replay before an
+authorized switch. User Step 5 requires explicit source+family migration approval.
 Local-edit replay already rehearsed on the independent source clone: preserve
 all 193 operator-added checkpoint lines, skill lock and two untracked documents;
 runtime source diff empty. Prepared replay is protected outside Git.
-approval; live token re-encryption is separately authorized/backed up. No deployment.
+Live token re-encryption is separately authorized/backed up. No deployment.
 Expected downtime 15-30 min plus any work drain/acceptance delay; preserve keys,
 OFF consent, limiter histories and later writes under the tested rollback plan.
 
