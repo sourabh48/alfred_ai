@@ -1,6 +1,7 @@
 """Masked local provisioning only; never enables synchronization or cloud contact."""
-from getpass import getpass
+from getpass import getpass, GetPassWarning
 import sys
+import warnings
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -23,9 +24,11 @@ class Command(BaseCommand):
         if not sys.stdin.isatty(): raise CommandError('Use an interactive terminal with masked credential prompts.')
         try:
             user=get_user_model().objects.get(pk=options['user'],is_active=True)
-            profile=validate_profile({k:options[k] for k in ('bucket','region','account')}|{
-                'access_key':getpass('Restricted access key (masked): '),'secret_key':getpass('Restricted secret key (masked): '),
-                'session_token':getpass('Temporary session token, blank for no token (masked): ')})
+            with warnings.catch_warnings():
+                warnings.simplefilter('error',GetPassWarning)
+                profile=validate_profile({k:options[k] for k in ('bucket','region','account')}|{
+                    'access_key':getpass('Restricted access key (masked): '),'secret_key':getpass('Restricted secret key (masked): '),
+                    'session_token':getpass('Temporary session token, blank for no token (masked): ')})
             store=MemoryStore(settings.ALFRED_MEMORY_DIR)
             with store._transaction() as db:
                 state=store._sync_state(db,_owner(user)); old=state.get('cloud')

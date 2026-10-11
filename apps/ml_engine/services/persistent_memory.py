@@ -154,14 +154,15 @@ class MemoryStore:
     def _revoke(self, db, owner, identities, *, kind='delete'):
         if not identities:
             return 0
-        cipher = self._cipher(db)
-        event = cipher.encrypt(json.dumps({'kind': kind, 'ids': identities}).encode())
-        db.execute('INSERT INTO events(id,owner,kind,ciphertext) VALUES(?,?,?,?)', (uuid4().hex, owner, kind, event))
+        published=[identity for identity in identities if db.execute('SELECT 1 FROM events WHERE id=? AND owner=? AND kind="save"',(identity,owner)).fetchone()]
+        if published:
+            event = self._cipher(db).encrypt(json.dumps({'kind': kind, 'ids': published}).encode())
+            db.execute('INSERT INTO events(id,owner,kind,ciphertext) VALUES(?,?,?,?)', (uuid4().hex, owner, kind, event))
         for identity in identities:
             db.execute('DELETE FROM memories WHERE id=? AND owner=?', (identity, owner))
             db.execute('DELETE FROM memory_keys WHERE id=? AND owner=?', (identity, owner))
             db.execute('DELETE FROM memory_candidates WHERE id=? AND owner=?', (identity, owner))
-        self._sync_dirty(db, owner)
+        if published: self._sync_dirty(db, owner)
         return len(identities)
 
     def _expire(self, db, owner):
@@ -251,7 +252,7 @@ class MemoryStore:
             if db.execute('SELECT COUNT(*) FROM memories WHERE owner=?', (owner,)).fetchone()[0]-len(supersedes) >= 512:
                 raise ValueError('The local memory slice supports at most 512 verified memories per owner.')
             # shortcut: bound retained encrypted history; add tested journal compaction before raising this cap.
-            if db.execute('SELECT COUNT(*) FROM events WHERE owner=?', (owner,)).fetchone()[0]+1+bool(supersedes or candidate_id) > 4096:
+            if db.execute('SELECT COUNT(*) FROM events WHERE owner=?', (owner,)).fetchone()[0]+1+bool(supersedes) > 4096:
                 raise ValueError('The local encrypted memory history limit has been reached.')
             key = Fernet.generate_key()
             ciphertext = Fernet(key).encrypt(encoded)

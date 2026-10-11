@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from alfred_ai.services.api_errors import safe_error_response
 from apps.ml_engine.services.persistent_memory import MemoryStore
 from apps.ml_engine.services.memory_sync import SyncConflict
-from apps.ml_engine.services.memory_reasoning import MockReasoner, ReasoningBudgetExceeded, reason_with_memory
+from apps.ml_engine.services.memory_reasoning import ReasoningBudgetExceeded, reason_with_memory, reasoning_provider, configure_reasoning, real_reasoning_authorized
 from apps.ml_engine.services.memory_learning import MemoryLearning
 from apps.ml_engine.services.memory_cloud import synchronizer, configured_provider
 
@@ -122,11 +122,23 @@ class MemorySyncAPI(MemoryAPI):
 
 
 class MemoryReasoningAPI(MemoryAPI):
+    def get(self,request):
+        from apps.ml_engine.services.persistent_memory import _owner
+        store=memory_store()
+        with store._transaction() as db: policy=store._sync_state(db,_owner(request.user)).get('reasoning_policy',{'enabled':False,'public_only':True})
+        return Response({'policy':policy,'real_provider_enabled':bool(real_reasoning_authorized())})
+
+    def put(self,request):
+        data=self.payload(('enabled','consent','daily_tokens','daily_microusd'))
+        return Response({'policy':configure_reasoning(memory_store(),request.user,enabled=data.get('enabled'),consent=data.get('consent',False),
+            daily_tokens=data.get('daily_tokens'),daily_microusd=data.get('daily_microusd'))})
+
     def post(self,request):
         data=self.payload(('query','consent','query_sensitivity'))
-        result=reason_with_memory(memory_store(),request.user,data.get('query'),consent=data.get('consent',False),
-            query_sensitivity=data.get('query_sensitivity'),provider=MockReasoner() if settings.ALFRED_MEMORY_MOCK_REASONING else None,
-            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS)
+        store=memory_store()
+        result=reason_with_memory(store,request.user,data.get('query'),consent=data.get('consent',False),
+            query_sensitivity=data.get('query_sensitivity'),provider=reasoning_provider(store,request.user),
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD)
         return Response(result)
 
 

@@ -87,6 +87,41 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def text(self, element_id):
         return self.browser.find_element(self.By.ID, element_id).text
 
+    def memory_post(self,path,payload,csrf=True):
+        return self.browser.execute_async_script('''
+            const [path,payload,csrf,done]=arguments;
+            const headers={'Content-Type':'application/json'};
+            if(csrf) headers['X-CSRFToken']=decodeURIComponent(document.cookie.split('; ').find(x=>x.startsWith('csrftoken=')).split('=')[1]);
+            fetch('/api/ai/memories/'+path+'/',{method:'POST',headers,body:JSON.stringify(payload)})
+              .then(async response=>done({status:response.status,data:await response.json(),cache:response.headers.get('Cache-Control')}));
+        ''',path,payload,csrf)
+
+    def test_candidate_verification_and_correction_refresh_owned_settings(self):
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-learning-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        store=MemoryStore(root/'vault'); owner=self.scenario['user']
+        self.login(); self.browser.get(self.live_server_url+'/settings/')
+        self.wait.until(lambda _: 'No verified memories saved.' in self.text('memoryList'))
+        payload={'action':'extract','text':'synthetic mountain <img src=x onerror="window.memoryLeak=true">','provenance':{'source':'synthetic browser review'},'sensitivity':'public'}
+        self.assertEqual(self.memory_post('learning',payload,False)['status'],403)
+        extracted=self.memory_post('learning',payload); self.assertEqual(extracted['status'],201); self.assertIn('no-store',extracted['cache'])
+        self.assertEqual(store.list_memories(owner),[])
+        candidate=extracted['data']['candidate_ids'][0]
+        self.assertEqual(self.memory_post('learning',{'action':'verify','id':candidate,'verified':False})['status'],400)
+        verified=self.memory_post('learning',{'action':'verify','id':candidate,'verified':True})
+        self.assertEqual(verified['status'],200); identity=verified['data']['id']
+        self.browser.refresh(); self.wait.until(lambda _: 'synthetic mountain' in self.text('memoryList'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.memoryLeak)'))
+        corrected=self.memory_post('learning',{'action':'correct','id':identity,'content':{'statement':'synthetic corrected hiking preference'},'verified':True})
+        self.assertEqual(corrected['status'],200)
+        self.browser.refresh(); self.wait.until(lambda _: 'synthetic corrected hiking preference' in self.text('memoryList'))
+        self.assertNotIn('<img',self.browser.find_element(self.By.ID,'memoryList').get_attribute('innerHTML'))
+        self.assertEqual(store.restore_owner(owner),1); self.assertEqual(store.list_memories(owner)[0]['id'],corrected['data']['id'])
+        self.capture('memory-candidate-explicit-verification-correction')
+
     def test_encrypted_memory_sync_and_mock_reasoning_use_session_scope(self):
         from apps.ml_engine.services.persistent_memory import MemoryStore
         from apps.ml_engine.services.memory_sync import MemorySynchronizer, MockCloudProvider
@@ -99,14 +134,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         store.save_verified(owner,{'note':'synthetic public mountain preference'},{'source':'synthetic'},sensitivity='public',verified=True)
         self.login(); self.browser.get(self.live_server_url+'/settings/')
         self.wait.until(lambda _: 'synthetic public mountain preference' in self.text('memoryList'))
-        def post(path,payload,csrf=True):
-            return self.browser.execute_async_script('''
-                const [path,payload,csrf,done]=arguments;
-                const headers={'Content-Type':'application/json'};
-                if(csrf) headers['X-CSRFToken']=decodeURIComponent(document.cookie.split('; ').find(x=>x.startsWith('csrftoken=')).split('=')[1]);
-                fetch('/api/ai/memories/'+path+'/',{method:'POST',headers,body:JSON.stringify(payload)})
-                  .then(async response=>done({status:response.status,data:await response.json(),cache:response.headers.get('Cache-Control')}));
-            ''',path,payload,csrf)
+        post=self.memory_post
         configure={'action':'configure','enabled':True,'consent':True}
         self.assertEqual(post('sync',configure,False)['status'],403)
         self.assertEqual(post('sync',configure)['status'],200)

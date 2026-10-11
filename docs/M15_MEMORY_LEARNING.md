@@ -22,13 +22,17 @@ Sync applies only changed encrypted index records. Evaluation accepts owned,
 verified expected IDs and reports recall@3 and mean reciprocal rank without
 persisting queries. Generated hypotheses are never verified ground truth.
 
+Discarded candidates never enter the sync journal, including tombstone metadata.
 Candidate expiry, delete/reset, account revocation and journal recovery share
 the existing retention/key-revocation controls. Current-replica revocation does
 not erase historical backups. Cloud reasoning cannot make memories authoritative
 financial facts; finance remains in canonical Django models and authorized
 application workflows.
 
-Focused gate: 79 tests PASS, 23.567 seconds, zero failures/skips, including 11
+Initial focused gate: 79 tests PASS, 23.567 seconds, zero failures/skips, including 11
 new learning regressions and existing sync/runtime/privacy/memory suites.
 Evidence: F:/ALFRED_DEV/isolated-tests/m15-learning-focused.log.
-Synthetic data and embedding fixtures only. Full M15 remains in development.
+The candidate-discard follow-up passed 45 memory/privacy/learning regressions,
+9.159 seconds. Final combined gate: 169 backend/3 Chrome PASS, zero failures/skips,
+including verification/correction refreshing the real Settings page and escaping
+synthetic markup. Synthetic data and embedding fixtures only. Full M15 remains in development.

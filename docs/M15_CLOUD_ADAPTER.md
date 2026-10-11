@@ -104,6 +104,9 @@ objects, conditional writes and SSE headers without any real AWS call. Tests cov
 offline startup, interrupted/lost-ack uploads, duplicates, CAS/edit conflicts,
 partial/corrupt downloads, unauthorized scope, tombstones/non-resurrection,
 129-version retention, mock deletion guards and encrypted masked provisioning.
+Focused gate: 73 PASS, 27.313 seconds. Final combined: 169 backend/3 Chrome PASS,
+zero failures/skips. Real two-process Ollama through signed S3 fixtures restores
+the same verified memory: 384 dimensions, score 0.518286, zero external calls.
 Focused results and the final combined result are recorded in the continuation
 checkpoint and F:/ALFRED_DEV/isolated-tests/m15-cloud-manifest.json after commit.
 Real-provider permissions/costs/device-loss recovery remain awaiting authorization.

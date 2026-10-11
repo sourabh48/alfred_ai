@@ -1,5 +1,60 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - M15 cloud/learning/optional-reasoning combined PASS
+
+2026-10-11: Continue ONLY F:/ALFRED_DEV/m15, codex/m15-persistent-memory-20261011.
+Starting verified b05c3b0549241efd206e34f4c214db27c7d23f2a. New source milestones:
+baf13350541dc3b79b46701345b35fbe6894e075 (encrypted candidate review/correction),
+ff4b7766f8ecde1bbab7894972aabfc718552558 (disabled S3/CAS/retention adapter).
+The final reasoning/acceptance commit SHA and current HEAD are recorded after
+commit in F:/ALFRED_DEV/isolated-tests/m15-cloud-manifest.json.
+
+The optional OpenAI Responses adapter is implemented but DISABLED by default.
+Owner credential provisioning is masked/encrypted, no unapproved plaintext keys.
+Real dispatch requires operator authorization/current UTC price review, owner
+public-only policy, per-request explicit consent, conservative sensitive-data
+filtering, atomic durable token/integer micro-USD spending reservations, fixed
+standard-tier model, no tools/storage/background and bounded safe transport.
+Replies remain labeled AI hypotheses, never canonical financial facts or writes.
+Failed calls/reset/restart/concurrency cannot erase the daily reservation ledger.
+Local candidates never synchronize, including their discarded IDs/tombstones;
+verification, correction/consolidation and revocation preserve index/journal safety.
+
+Actual FINAL combined gate (not addition of overlapping runs): 169 backend PASS,
+79.092 seconds; three Chrome workflows PASS, 27.178 seconds; ZERO failures/skips.
+Covers memory/privacy/learning/signed S3/reasoning, account reset, session/CSRF,
+abuse, financial-brain compatibility, native/launcher/tray boundary regressions
+and all current shared-transport consumers' focused tests. No long native runtime
+drill or completed M14 suite was repeated. System check PASS, isolated migration
+drift: No changes detected. No new dependency or Django migration.
+Real two-process Ollama/S3 signed-fixture proof PASS: 384 dimensions, score
+0.518286, encrypted recovery/same ID/provenance/sensitivity/owner isolation.
+External AWS/private uploads and paid OpenAI requests: ZERO.
+Evidence: isolated m15-cloud-combined.log, m15-cloud-chrome.log,
+m15-cloud-system.log, m15-cloud-migrations.log and m15-s3-ollama-*.log.
+Reasoning fixture quota exhaustion and PowerShell invocation errors are preserved;
+corrected final gates have zero unresolved failures. See docs/M15_MEMORY_LEARNING.md,
+docs/M15_CLOUD_ADAPTER.md and docs/M15_OPTIONAL_REASONING.md for contracts/limits.
+
+Release closure remains externally BLOCKED: no approved off-device archive
+destination or separate recovery-key location/authorization was supplied. Existing
+supplement hash verified unchanged; no export/downloaded-material restore, key
+regeneration/rotation, backup deletion or live token mutation. Fresh stable fetch:
+origin/master da74570681165cfa46dd3186f95ee400643c41d6 is still ancestor of live
+30e0b3f75e785f639897ad36c19090c6a4e8675f (41 expected release commits), M15 is
+excluded; ordinary exact M14 push AWAITING APPROVAL. Stable operator changes
+preserved. Real-account eight-screen visual acceptance remains PENDING.
+Live source/private DB/services unchanged. M15 is NOT deployed.
+
+The implemented local-review and S3 adapter development slices are COMPLETE
+under synthetic acceptance. Whole M15 INCOMPLETE; real-provider account/IAM/
+cost checks, separately recoverable owner keys, trusted fresh-device checkpoint
+and explicitly authorized synthetic real-provider acceptance precede private use.
+Historical backups/offline recipients may retain deleted data until their own
+retention/key retirement; irreversible erasure is not claimed. Next obtain the
+approved archive/key destinations and frozen M14 push authorization, then stage
+provider acceptance without private or paid calls until separately authorized.
+
 ## Latest checkpoint - M15 disabled S3 adapter and snapshot retention PASS
 
 2026-10-11: ONLY isolated M15. Learning milestone baf13350541dc3b79b46701345b35fbe6894e075.

@@ -124,3 +124,10 @@ class MemoryLearningTests(TestCase):
         identity=response.json()['candidate_ids'][0]
         self.assertEqual(self.client.post(url,{'action':'verify','id':identity},content_type='application/json').status_code,400)
         self.assertEqual(self.client.post(url,{'action':'verify','id':identity,'verified':True},content_type='application/json').status_code,200)
+
+    def test_discarded_candidates_leave_no_cloud_tombstone_or_journal_growth(self):
+        identity=self.extract(); self.assertEqual(self.store.delete_memory(self.alice,identity),1)
+        with self.store._transaction() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM memory_keys').fetchone()[0],0)
+        self.assertEqual(self.learning.candidates(self.alice),[])
