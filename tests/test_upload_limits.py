@@ -329,6 +329,18 @@ class UploadStreamAndResourceTests(TestCase):
             run_bounded_parser("document", source, "synthetic.csv")
         self.assertEqual(list(self.directory.iterdir()), [])
 
+    def test_real_parser_worker_imports_project_after_native_changes_directory(self):
+        import os
+        from alfred_ai.services.bounded_parser import run_bounded_parser
+        previous = Path.cwd()
+        try:
+            os.chdir(self.directory)
+            result = run_bounded_parser('document', b'Valid synthetic native document', 'synthetic.txt')
+            self.assertEqual(result['text'], 'Valid synthetic native document')
+        finally:
+            os.chdir(previous)
+        self.assertEqual(list(self.directory.iterdir()), [])
+
     def test_extracted_statement_text_is_bounded_before_row_processing(self):
         from alfred_ai.services.upload_limits import UploadLimitExceeded
         from apps.expenses.services.statement_import import parse_bank_statement, StatementTextExtraction
