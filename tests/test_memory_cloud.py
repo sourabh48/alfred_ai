@@ -37,7 +37,9 @@ class MemoryCloudTests(TestCase):
     def second(self):
         store=MemoryStore(self.root/'two',embedder=SyntheticEmbeddings()); filename='sync-'+self.owner+'.key'
         (store.directory/filename).write_bytes((self.store.directory/filename).read_bytes())
-        sync=MemorySynchronizer(store,S3MemoryProvider(self.owner,PROFILE)); sync.configure(self.alice,enabled=True,consent=True)
+        sync=MemorySynchronizer(store,S3MemoryProvider(self.owner,PROFILE))
+        sync.import_checkpoint(self.alice,self.sync.export_checkpoint(self.alice,confirm=True),confirm=True)
+        sync.configure(self.alice,enabled=True,consent=True)
         return store,sync
 
     def retry(self):

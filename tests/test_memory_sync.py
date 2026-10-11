@@ -36,6 +36,7 @@ class MemorySyncTests(TestCase):
         key='sync-'+_owner(self.alice)+'.key'
         (store.directory/key).write_bytes((self.store.directory/key).read_bytes())
         sync=MemorySynchronizer(store,self.provider)
+        sync.import_checkpoint(self.alice,self.sync.export_checkpoint(self.alice,confirm=True),confirm=True)
         sync.configure(self.alice,enabled=True,consent=True)
         return store,sync
 

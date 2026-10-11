@@ -161,6 +161,32 @@ class MemorySynchronizer:
             state=self.store._sync_state(db,_owner(user))
             return {k:state[k] for k in ('enabled','pending','revision','conflict','failures')}
 
+    def export_checkpoint(self,user,*,confirm=False):
+        if confirm is not True: raise PermissionError('Explicit recovery checkpoint export confirmation is required.')
+        owner=_owner(user); cipher=self._key(owner)
+        with self.store._transaction() as db:
+            state=self.store._sync_state(db,owner)
+            if not state['revision'] or not valid_id(state['identity'],64) or state['pending'] or state['conflict'] or state['ack']!=digest(self._snapshot(db,owner)):
+                raise SyncConflict('Synchronize local changes and revocations before exporting a trusted checkpoint.')
+            return cipher.encrypt(encoded({'schema':1,'owner':owner,'revision':state['revision'],'identity':state['identity']}))
+
+    def import_checkpoint(self,user,checkpoint,*,confirm=False):
+        if confirm is not True: raise PermissionError('Explicit trusted checkpoint import confirmation is required.')
+        owner=_owner(user); cipher=self._key(owner)
+        try:
+            if not isinstance(checkpoint,bytes) or not 1<=len(checkpoint)<=4096: raise ValueError()
+            anchor=json.loads(cipher.decrypt(checkpoint))
+            if not isinstance(anchor,dict) or set(anchor)!= {'schema','owner','revision','identity'} or type(anchor['schema']) is not int or anchor['schema']!=1 or anchor['owner']!=owner or type(anchor['revision']) is not int or not 1<=anchor['revision']<2**63 or not valid_id(anchor['identity'],64): raise ValueError()
+        except (InvalidToken,ValueError,TypeError,KeyError,UnicodeError):
+            raise SyncUnavailable('Memory checkpoint verification failed; existing keys and data are retained.') from None
+        floor={'revision':anchor['revision'],'identity':anchor['identity']}
+        with self.store._transaction() as db:
+            state=self.store._sync_state(db,owner); local=self._snapshot(db,owner)
+            if state['revision'] or state['pending'] or local['records'] or local['revoked'] or local['epoch'] or local['retention']!=30 or (state.get('recovery_checkpoint') and state['recovery_checkpoint']!=floor):
+                raise SyncConflict('Import requires an unused owner vault; existing data and checkpoints are preserved.')
+            state.update(recovery_checkpoint=floor,key_created=True,enabled=False)
+            self.store._write_sync_state(db,owner,state)
+
     def prune(self,user,*,confirm=False):
         if confirm is not True: raise PermissionError('Explicit snapshot pruning confirmation is required.')
         owner=_owner(user); deadline=time.monotonic()+5
@@ -312,10 +338,14 @@ class MemorySynchronizer:
             head=self.provider.head(owner,deadline=deadline)
             remote,parent=self._verify(owner,head,cipher,deadline) if head else (None,None)
             revision=head['revision'] if head else 0
-            if revision<state['revision'] or (revision==state['revision'] and head and head['identity']!=state['identity']):
+            anchor=state if state['revision'] else state.get('recovery_checkpoint')
+            # Lost publish responses already have identical authenticated local data.
+            if remote and not anchor and not (state['pending'] and digest(remote)==fingerprint):
+                raise SyncConflict('A fresh vault requires a trusted recovery checkpoint before cloud download.')
+            if anchor and (revision<anchor['revision'] or (revision==anchor['revision'] and head and head['identity']!=anchor['identity'])):
                 raise SyncConflict('Remote history rollback detected; trusted local data is retained.')
-            if head and state['revision'] and revision>state['revision']:
-                self._history(owner,head,parent,state,cipher,deadline)
+            if head and anchor and revision>anchor['revision']:
+                self._history(owner,head,parent,anchor,cipher,deadline)
             if remote and revision>state['revision'] and digest(remote)==fingerprint:
                 # A successful CAS with a lost response is acknowledged without duplicating it.
                 with self.store._transaction(timeout=remaining(deadline)) as db:

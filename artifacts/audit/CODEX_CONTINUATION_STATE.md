@@ -1,5 +1,57 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - M15 password-free trusted recovery checkpoint PASS
+
+2026-10-12: Continue ONLY F:/ALFRED_DEV/m15, starting clean c94421bfd0ed704d6dd22d3c5a650c37c880a178.
+Synthetic regression reproduced a fresh vault accepting an authenticated old cloud
+head after deletion when only the owner key was recovered. New local encrypted
+checkpoint export/import pins owner/revision/head; fresh downloads require this
+trusted floor, including explicit recovery. Older heads, forks and missing heads
+are rejected before index application. Newer heads prove bounded linked history.
+Export requires acknowledged edits/deletions/expiration. Import requires an unused
+owner vault and its existing key; it never replaces keys/data/checkpoints, enables
+consent or contacts a provider. No password prompt, new cipher or API contract.
+Normal sync/lost upload acknowledgements and owner isolation remain compatible.
+
+Actual related combined gate: 124 backend PASS in 53.008 seconds, zero failures
+or skips; includes nine new checkpoint regressions. Original one-test reproduction
+is preserved separately. Two-process real local Ollama plus signed synthetic S3
+fixture PASS through the NEW checkpoint: 384 dimensions, score 0.518286, no real
+cloud calls. System check PASS; migration drift: No changes detected. No dependency
+or Django migration. Unchanged Chrome/native drills and completed M14 suites were
+not repeated. Evidence/committed HEAD: external m15-checkpoint-manifest.json and
+m15-checkpoint-*.log under F:/ALFRED_DEV/isolated-tests.
+
+Recovery closure: GitHub master independently matches live frozen M14 30e0b3f75e785f639897ad36c19090c6a4e8675f.
+User CANCELLED the passphrase workflow: do not prompt again, rotate keys, export
+plaintext keys, or claim sealing/off-device recovery complete. Desktop transfer
+instructions are now a simple copy and one checksum command, without prompts.
+KEY SEALING PENDING; INDEPENDENT SEALED-KEY RECOVERY PENDING; OFF-DEVICE PENDING.
+Existing recovery key is still in its original ACL-private backup location.
+
+New additive capture: F:/ALFRED_BACKUPS/m14-postpromotion-20261012-000606;
+Desktop archive post-m14-20261012-000606.encrypted.zip SHA256
+17558ef52538d9cc4bf750a78a937f9cd8083ce6eb8ff89f767e6d8f901679d7.
+9694 authenticated entries, three SQLite databases, family.0004 APPLIED;
+integrity/FKs and independent in-memory restoration PASS using existing local key.
+Each SQLite database uses read-only online backup; live writers remained active,
+so cross-database quiescence is not claimed. Config/media/models/queue/operator
+edits and exact M14 HEAD source bundle included; no raw WAL/SHM synchronization.
+Old 9691-entry supplement and original portable archive hashes/contents preserved;
+fresh-process archive checks PASS. Initial helper WAL-mode deserialization failure
+was explained with a synthetic fixture, corrected using SQLite's documented copy
+handling, and retained at m14-postpromotion-20261012-000453. No corrupt-source or
+unresolved verification failure. Safe hashes/status in Desktop transfer-manifest.json
+and current-independent-verification.json; external archive/key destinations have
+not been approved/copied/verified. No live application source/DB/token changes.
+
+This M15 checkpoint slice is COMPLETE; whole M15/private cloud use INCOMPLETE.
+Next gate: approved separately recoverable owner keys without new passphrase
+prompts, independently retained latest trusted checkpoint, real IAM/cost review
+and separately authorized synthetic provider acceptance. DPAPI alone does not
+survive Windows loss; old snapshots/backups can retain memories deleted later.
+Real cloud/OpenAI remain OFF; M15 is not deployed or merged into stable master.
+
 ## Latest checkpoint - M15 cloud/learning/optional-reasoning combined PASS
 
 2026-10-11: Continue ONLY F:/ALFRED_DEV/m15, codex/m15-persistent-memory-20261011.

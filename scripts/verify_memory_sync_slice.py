@@ -47,11 +47,13 @@ def run_proof(args,stack,parser):
         destination=store.directory/key
         if destination.exists(): parser.error('Use a fresh restart vault; existing data is preserved.')
         destination.write_bytes((root/'first'/key).read_bytes())
+        sync.import_checkpoint(owner,(root/'trusted-checkpoint.encrypted').read_bytes(),confirm=True)
     sync.configure(owner,enabled=True,consent=True)
     if args.phase=='save':
         identity=store.save_verified(owner,{'travel_preference':'I prefer quiet mountain destinations for hiking holidays.'},
             {'source':'synthetic owner confirmation','reference':'synthetic-sync-proof'},verified=True)
         assert sync.run(owner)=='uploaded'
+        (root/'trusted-checkpoint.encrypted').write_bytes(sync.export_checkpoint(owner,confirm=True))
         marker.write_text(json.dumps({'synthetic':True,'memory_id':identity,'provider':args.provider}))
     else:
         evidence=json.loads(marker.read_text())

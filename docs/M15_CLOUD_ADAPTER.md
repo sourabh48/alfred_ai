@@ -23,7 +23,49 @@ review restricted credentials and bucket policy, export the owner's sync key to
 a separately approved portable recovery location, retain a trusted high-water
 checkpoint, and verify restoration. Windows DPAPI alone is not device-loss
 recovery. Existing M14 backups are preserved and their missing off-device export
-is still BLOCKED. Do not enable private use merely because synthetic tests pass.
+is still PENDING. Do not enable private use merely because synthetic tests pass.
+
+### Trusted fresh-vault recovery checkpoint
+
+Fresh-vault downloads now require an independently retained, latest trusted
+checkpoint as well as the recovered owner sync key. This closes authenticated
+old-head replay after loss of the local revision history. Established vaults
+continue using their existing high-water revision; lost upload responses may
+acknowledge an exactly identical authenticated local snapshot.
+
+Export is local, password-free and contains encrypted owner/revision/head metadata
+only, never an encryption key, memory, embedding or credential. Pending edits,
+deletions, expiration or conflicts must synchronize before export. From the
+isolated M15 configuration, use:
+
+```powershell
+python manage.py memory_sync_checkpoint export --user <id> --file <absolute-checkpoint-file> --confirm
+```
+
+After restoring the SAME canonical account identity and its separately protected
+owner key into an unused vault, import the latest independently trusted file:
+
+```powershell
+python manage.py memory_sync_checkpoint import --user <id> --file <absolute-checkpoint-file> --confirm
+```
+
+Neither command prompts for a password or contacts a provider. Export refuses
+existing destination files. Import validates authenticity, schema, owner and
+bounded size; it preserves existing data/keys/checkpoints and leaves sync consent
+OFF. Explicit consent is still required before any subsequent download. Remote
+revisions below the checkpoint and same-revision forks fail closed, including
+explicit conflict recovery. Newer revisions must prove their bounded linked
+history; deleted memories cannot return from an older cloud head. No API contract,
+Django migration or financial model changes.
+
+This checkpoint is NOT a backup of the owner key. Windows DPAPI-only keys still
+need an approved, separately recoverable storage mechanism before device-loss
+recovery/private cloud use. The latest trusted checkpoint must be retained outside
+the provider's control. An older checkpoint cannot establish deletions made after
+its export; old backups and offline recipients can still retain historical data.
+M14 Desktop archive staging and current SQLite restoration are verified locally,
+but separate-key/off-device recovery remains PENDING. The operator cancelled the
+new passphrase workflow; do not prompt for it or claim sealing is complete.
 
 ## Encryption, ownership and permission review
 
