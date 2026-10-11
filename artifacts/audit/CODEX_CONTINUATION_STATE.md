@@ -1,5 +1,29 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15 frozen-candidate review - scoped document conflict correction
+
+2026-10-12. Preserve original frozen review HEAD/branch/archive at
+03ab0aecdecda72dcb4db7866c46821e7c4264bf. Archive SHA256 freshly matches
+FE495B515008199614F3C72214C1302A8E001F37B42D384AB475B6FED085D47D.
+Separate hardening worktree F:/ALFRED_DEV/m15-hardening on
+codex/m15-release-hardening-20261012. A six-regression scoped document acceptance
+set covers owner/minimal source references, raw injection exclusion, changed/
+deleted/unverified evidence, identical evidence and conflicting evidence including
+a conflict introduced during inference. Contradictory verified closure evidence
+reproduced a missing conflict guard; the assistant now fails closed with the
+existing safe 409/reference convention. No canonical financial changes/migration.
+Focused related gate: 34 PASS in 13.208s, zero failures/skips. Missing personal/
+document facts are explicitly unavailable in the local reasoning instructions;
+actual model/browser abstention still requires observation. Broad ingestion deferred.
+Build tool absent from live SDK: pinned PyInstaller 6.22.3 installed into separate
+F:/ALFRED_DEV/build-tools/m15-20261012, leaving live dependencies unchanged. Initial
+frozen build interrupted/preserved after finding this correction; it is not an
+accepted package. Next: validate the extended synthetic memory/native/browser
+drill, commit its tooling separately, and build fresh from the corrected source.
+Desktop transfer hashes PASS, but verifier has no key records and performs no
+decryption/independent restore. Recovery/provider acceptance remain PENDING;
+no passphrase/key export/live change. Master remotely remains frozen M14 30e0b3f.
+
 ## Latest checkpoint - M15 hybrid source integration PASS, production acceptance pending
 
 2026-10-12. Isolated branch codex/m15-persistent-memory-20261011 only.

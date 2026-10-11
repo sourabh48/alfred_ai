@@ -70,3 +70,21 @@ Existing S3/CAS/queue/lifecycle/tombstone/checkpoint implementation is reused.
 Real connection still needs separate provider selection, least-privilege IAM/cost
 acceptance and separately recoverable owner keys/checkpoints. Off-device recovery
 and independent keys remain PENDING. The passphrase workflow stays cancelled.
+
+## Frozen candidate review and bounded document hardening
+
+The original review branch/archive at 03ab0aecdecda72dcb4db7866c46821e7c4264bf
+remains immutable. Source corrections are on codex/m15-release-hardening-20261012,
+F:/ALFRED_DEV/m15-hardening. A focused regression reproduced competing verified
+closure documents yielding an answer without conflict review. The assistant now
+refuses contradictory verified amount/date evidence before inference and rechecks
+it after inference. Identical independent evidence retains the selected source.
+No loan balances, evidence rows, verification workflows or migrations are changed.
+Missing personal/document facts must be explicitly described as unavailable;
+actual local-model abstention remains an acceptance observation, not a universal
+model-behavior guarantee. Raw OCR/diagnostics and document instructions never
+enter this bounded tool context. Broader document ingestion remains a later feature.
+
+Focused hardening gate: 34 PASS in 13.208s, zero failures/skips, including six new
+document acceptance regressions. Initial failing conflict evidence is retained in
+F:/ALFRED_DEV/isolated-tests/m15-package-grounding-reproduction.log.
