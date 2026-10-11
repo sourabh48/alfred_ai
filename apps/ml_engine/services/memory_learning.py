@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from cryptography.fernet import Fernet
 
-from .persistent_memory import _owner, _json, SENSITIVITIES
+from .persistent_memory import _owner, _json, SENSITIVITIES, MemoryConflict
 from .memory_sync import valid_id
 
 
@@ -57,7 +57,10 @@ class MemoryLearning:
         candidate=next((r for r in self.candidates(user) if r['id']==identity),None)
         if not candidate:
             previous=next((r for r in self.store.list_memories(user) if r['provenance'].get('candidate_id')==identity),None)
-            if previous: return previous['id']
+            if previous:
+                if content is not None and _json(content)!=_json(previous['content']):
+                    raise MemoryConflict('Candidate was already verified with different content.')
+                return previous['id']
             raise ValueError('Candidate is no longer available.')
         provenance=candidate['provenance']|{'candidate_id':identity,'verification':'user_verified','extraction_confidence':candidate['confidence']}
         return self.store.save_verified(user,content if content is not None else candidate['content'],provenance,
@@ -67,7 +70,7 @@ class MemoryLearning:
         if verified is not True or not isinstance(identities,list) or not 1<=len(identities)<=20 or any(not valid_id(i) for i in identities) or len(set(identities))!=len(identities):
             raise PermissionError('Explicit correction/consolidation verification is required.')
         records={r['id']:r for r in self.store.list_memories(user)}
-        if any(identity not in records for identity in identities): raise ValueError('Choose available owner memories.')
+        if any(identity not in records for identity in identities): raise MemoryConflict('Choose available owner memories.')
         selected=[records[i] for i in identities]
         if reembed and len(selected)!=1: raise ValueError('Re-embed one changed memory at a time.')
         sensitivity=max((r['sensitivity'] for r in selected),key=lambda value:['public','personal','sensitive'].index(value))
@@ -80,11 +83,22 @@ class MemoryLearning:
         records={r['id'] for r in self.store.list_memories(user)}
         if not isinstance(cases,list) or not 1<=len(cases)<=20: raise ValueError('Provide at most twenty evaluation cases.')
         for case in cases:
-            if not isinstance(case,dict) or set(case)!= {'query','expected_id'} or not isinstance(case['query'],str) or not case['query'].strip() or len(case['query'].encode())>8192 or not valid_id(case['expected_id']) or case['expected_id'] not in records:
+            if not isinstance(case,dict) or set(case)!= {'query','expected_id'} or not isinstance(case['query'],str) or not case['query'].strip() or len(case['query'].encode())>8192 or (case['expected_id'] is not None and (not valid_id(case['expected_id']) or case['expected_id'] not in records)):
                 raise ValueError('Evaluation requires bounded queries and owned verified ground truth.')
-        ranks=[]
+        ranks=[]; false_positives=0; negative_cases=0
         for case in cases:
             results=self.store.retrieve(user,case['query'],limit=3)
-            ranks.append(next((1/(i+1) for i,r in enumerate(results) if r['id']==case['expected_id']),0))
-        return {'cases':len(cases),'recall_at_3':sum(bool(rank) for rank in ranks)/len(cases),
-            'mean_reciprocal_rank':sum(ranks)/len(cases),'ground_truth':'user_verified','generated_hypotheses_are_facts':False}
+            if case['expected_id'] is None:
+                negative_cases+=1; false_positives+=bool(results)
+            else:
+                ranks.append(next((1/(i+1) for i,r in enumerate(results) if r['id']==case['expected_id']),0))
+        # Immutable IDs make edits/deletions detectable without retaining private queries.
+        if {r['id'] for r in self.store.list_memories(user)}!=records:
+            raise MemoryConflict('Memory changed during evaluation.')
+        return {'cases':len(cases),'positive_cases':len(ranks),'negative_cases':negative_cases,
+            'recall_at_3':sum(bool(rank) for rank in ranks)/len(ranks) if ranks else None,
+            'mean_reciprocal_rank':sum(ranks)/len(ranks) if ranks else None,
+            'top_1_accuracy':sum(rank==1 for rank in ranks)/len(ranks) if ranks else None,
+            'false_positive_rate':false_positives/negative_cases if negative_cases else None,
+            'abstention_rate':1-false_positives/negative_cases if negative_cases else None,
+            'ground_truth':'user_verified','generated_hypotheses_are_facts':False}

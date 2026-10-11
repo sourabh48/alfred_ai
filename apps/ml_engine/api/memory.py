@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from alfred_ai.services.api_errors import safe_error_response
-from apps.ml_engine.services.persistent_memory import MemoryStore
+from apps.ml_engine.services.persistent_memory import MemoryStore, MemoryConflict
 from apps.ml_engine.services.memory_sync import SyncConflict
 from apps.ml_engine.services.memory_reasoning import ReasoningBudgetExceeded, reason_with_memory, reasoning_provider, configure_reasoning, real_reasoning_authorized
 from apps.ml_engine.services.memory_learning import MemoryLearning
@@ -31,6 +31,8 @@ class MemoryAPI(APIView):
         return response
 
     def handle_exception(self, exc):
+        if isinstance(exc,MemoryConflict):
+            return safe_error_response(exc,'Memory changed. Refresh memories and review your request before trying again.',logger_name=__name__,status_code=409)
         if isinstance(exc,SyncConflict):
             return safe_error_response(exc,'Memory synchronization conflict. Local data is retained; explicit recovery is required.',logger_name=__name__,status_code=409)
         if isinstance(exc,ReasoningBudgetExceeded):

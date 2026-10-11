@@ -6,7 +6,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase, Client, override_settings
 
-from apps.ml_engine.services.persistent_memory import MemoryStore, _owner
+from apps.ml_engine.services.persistent_memory import MemoryStore, MemoryConflict, _owner
 from apps.ml_engine.services.memory_learning import MemoryLearning
 from apps.ml_engine.services.memory_sync import MemorySynchronizer, MockCloudProvider
 from tests.test_persistent_memory import SyntheticEmbeddings
@@ -49,6 +49,117 @@ class MemoryLearningTests(TestCase):
         self.store.delete_memory(self.alice,identity)
         with self.assertRaises(ValueError): self.learning.verify(self.alice,candidate,verified=True)
         self.assertEqual(self.store.restore_owner(self.alice),0)
+
+    def test_changed_verification_retry_returns_conflict_without_disclosing_content(self):
+        candidate=self.extract()
+        identity=self.learning.verify(self.alice,candidate,verified=True,content={'statement':'first synthetic choice'})
+        self.client.force_login(self.alice)
+        with self.assertLogs('apps.ml_engine.api.memory',level='ERROR') as logs:
+            response=self.client.post('/api/ai/memories/learning/',{'action':'verify','id':candidate,'verified':True,
+                'content':{'statement':'SYNTHETIC-PRIVATE changed choice'}},content_type='application/json')
+        self.assertEqual(response.status_code,409)
+        self.assertIn('no-store',response['Cache-Control'])
+        self.assertNotIn('SYNTHETIC-PRIVATE',response.content.decode())
+        self.assertNotIn('SYNTHETIC-PRIVATE',' '.join(logs.output))
+        self.assertIn(response.json()['error_id'],' '.join(logs.output))
+        self.assertEqual(logs.records[0].exception_type,'MemoryConflict')
+        self.assertEqual(self.store.list_memories(self.alice)[0]['id'],identity)
+        self.assertEqual(self.store.list_memories(self.alice)[0]['content'],{'statement':'first synthetic choice'})
+
+    def test_identical_verification_retry_preserves_id_and_journal(self):
+        candidate=self.extract(); content={'statement':'synthetic confirmed choice'}
+        identity=self.learning.verify(self.alice,candidate,verified=True,content=content)
+        with patch.object(self.embedder,'embed',side_effect=AssertionError('retry must not infer')):
+            self.assertEqual(self.learning.verify(self.alice,candidate,verified=True,content=content),identity)
+        with self.store._transaction() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0],1)
+
+    def test_competing_corrections_preserve_winner_and_reject_late_writer(self):
+        original=self.learning.verify(self.alice,self.extract(),verified=True)
+        embed=self.embedder.embed; winners=[]
+        def competing(text):
+            with patch.object(self.embedder,'embed',side_effect=embed):
+                winners.append(self.learning.revise(self.alice,[original],{'statement':'synthetic winner'},verified=True))
+            return embed(text)
+        with patch.object(self.embedder,'embed',side_effect=competing),self.assertRaises(MemoryConflict):
+            self.learning.revise(self.alice,[original],{'statement':'synthetic late writer'},verified=True)
+        self.assertEqual(self.store.list_memories(self.alice)[0]['id'],winners[0])
+        self.assertEqual(self.store.restore_owner(self.alice),1)
+        self.client.force_login(self.alice)
+        response=self.client.post('/api/ai/memories/learning/',{'action':'correct','id':original,
+            'content':{'statement':'synthetic stale edit'},'verified':True},content_type='application/json')
+        self.assertEqual(response.status_code,409)
+        self.assertEqual(self.store.list_memories(self.alice)[0]['content'],{'statement':'synthetic winner'})
+
+    def test_competing_candidate_reviews_never_overwrite_verified_winner(self):
+        candidate=self.extract(); embed=self.embedder.embed; winners=[]
+        def competing(text):
+            with patch.object(self.embedder,'embed',side_effect=embed):
+                winners.append(self.learning.verify(self.alice,candidate,verified=True,content={'statement':'synthetic winner'}))
+            return embed(text)
+        with patch.object(self.embedder,'embed',side_effect=competing),self.assertRaises(MemoryConflict):
+            self.learning.verify(self.alice,candidate,verified=True,content={'statement':'synthetic late writer'})
+        self.assertEqual(self.store.list_memories(self.alice)[0]['id'],winners[0])
+        with self.store._transaction() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0],1)
+
+    def test_failed_correction_keeps_original_retrievable_and_recoverable(self):
+        original=self.learning.verify(self.alice,self.extract(),verified=True)
+        with patch.object(self.embedder,'embed',side_effect=OSError('SYNTHETIC-PRIVATE embedding failure')),self.assertRaises(OSError):
+            self.learning.revise(self.alice,[original],{'statement':'synthetic changed'},verified=True)
+        self.assertEqual(self.store.retrieve(self.alice,'hiking')[0]['id'],original)
+        self.assertEqual(self.store.restore_owner(self.alice),1)
+
+    def test_evaluation_measures_ranking_misses_and_no_match_without_retaining_queries(self):
+        def embedding(text):
+            return ([1.0,0.0] if 'mountain' in text else [0.0,1.0]),'synthetic-quality-model'
+        with patch.object(self.embedder,'embed',side_effect=embedding):
+            mountain=self.store.save_verified(self.alice,{'statement':'mountain'}, {'source':'synthetic'},verified=True)
+            coast=self.store.save_verified(self.alice,{'statement':'coast'}, {'source':'synthetic'},verified=True)
+            result=self.learning.evaluate(self.alice,[{'query':'SYNTHETIC-QUALITY-QUERY mountain','expected_id':mountain},
+                {'query':'SYNTHETIC-QUALITY-QUERY coast','expected_id':mountain},
+                {'query':'SYNTHETIC-QUALITY-QUERY unrelated','expected_id':None}])
+        self.assertEqual(result['positive_cases'],2); self.assertEqual(result['negative_cases'],1)
+        self.assertEqual(result['recall_at_3'],1); self.assertEqual(result['mean_reciprocal_rank'],0.75)
+        self.assertEqual(result['top_1_accuracy'],0.5); self.assertEqual(result['false_positive_rate'],1)
+        self.assertEqual(result['abstention_rate'],0)
+        with patch.object(self.store,'retrieve',return_value=[{'id':coast}]):
+            missed=self.learning.evaluate(self.alice,[{'query':'mountain','expected_id':mountain}])
+        self.assertEqual(missed['recall_at_3'],0); self.assertEqual(missed['mean_reciprocal_rank'],0)
+        self.assertIsNone(missed['false_positive_rate'])
+        with self.store._transaction() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0],2)
+        self.assertNotIn('SYNTHETIC-QUALITY-QUERY',str(result))
+        for path in self.root.rglob('*'):
+            if path.is_file(): self.assertNotIn(b'SYNTHETIC-QUALITY-QUERY',path.read_bytes())
+
+    def test_negative_only_evaluation_of_empty_vault_measures_abstention(self):
+        result=self.learning.evaluate(self.alice,[{'query':'synthetic absent memory','expected_id':None}])
+        self.assertEqual(result['positive_cases'],0); self.assertEqual(result['abstention_rate'],1)
+        self.assertEqual(result['false_positive_rate'],0)
+        for key in ('recall_at_3','mean_reciprocal_rank','top_1_accuracy'): self.assertIsNone(result[key])
+
+    def test_evaluation_rejects_malformed_ground_truth_before_inference(self):
+        for case in ({'query':'synthetic','expected_id':False},{'query':'synthetic','expected_id':[]},
+                {'query':'','expected_id':None},{'query':'x'*8193,'expected_id':None},
+                {'query':'synthetic','expected_id':None,'owner':self.bob.pk}):
+            with patch.object(self.embedder,'embed',side_effect=AssertionError('invalid case must not infer')),self.assertRaises(ValueError):
+                self.learning.evaluate(self.alice,[case])
+
+    def test_evaluation_during_correction_reports_conflict_without_private_results(self):
+        original=self.learning.verify(self.alice,self.extract(),verified=True)
+        retrieve=self.store.retrieve
+        def correcting(user,query,**kwargs):
+            self.learning.revise(user,[original],{'statement':'synthetic corrected'},verified=True)
+            return retrieve(user,query,**kwargs)
+        self.client.force_login(self.alice)
+        with patch.object(MemoryStore,'retrieve',side_effect=correcting):
+            response=self.client.post('/api/ai/memories/learning/',{'action':'evaluate',
+                'cases':[{'query':'SYNTHETIC-PRIVATE-QUALITY QUERY','expected_id':original}]},content_type='application/json')
+        self.assertEqual(response.status_code,409)
+        self.assertNotIn('SYNTHETIC-PRIVATE',response.content.decode())
+        self.assertNotIn('recall_at_3',response.json())
+        self.assertEqual(self.store.list_memories(self.alice)[0]['content'],{'statement':'synthetic corrected'})
 
     def test_embedding_failure_preserves_candidate_for_retry(self):
         identity=self.extract()

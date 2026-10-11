@@ -36,3 +36,53 @@ The candidate-discard follow-up passed 45 memory/privacy/learning regressions,
 9.159 seconds. Final combined gate: 169 backend/3 Chrome PASS, zero failures/skips,
 including verification/correction refreshing the real Settings page and escaping
 synthetic markup. Synthetic data and embedding fixtures only. Full M15 remains in development.
+
+## Owner corrections and retrieval quality (2026-10-12)
+
+Settings now offers a correction form for each owned memory. The owner writes a
+replacement statement and explicitly confirms it. This replaces the whole memory
+body; original source history and sensitivity are preserved. The existing atomic
+replacement/re-embedding/revocation pipeline handles the save. No automatic edits,
+financial writes, cloud calls, new storage tables or dependencies were added.
+
+Stale corrections, competing promotions and changed-content verification retries
+return safe HTTP 409 with a reference and exception classification in redacted logs.
+The committed winner remains intact. Identical verification retries keep the same
+ID without adding an event or embedding again. Browser conflicts preserve the draft
+and require the owner to refresh and review; they never automatically retry an edit.
+
+Evaluation keeps the existing `cases` contract (1-20 bounded queries) and now
+accepts `expected_id: null` when the owner expects no memory to match. A non-null
+ID must still be an active verified memory of the requesting owner. Reports contain
+aggregate counts, recall@3, reciprocal rank and top-1 accuracy for positive cases;
+false-positive and abstention rates measure negative cases. Metrics with no applicable
+cases are null. Positive-only recall/MRR remain compatible. No queries, returned
+memory bodies, individual-case results or evaluation history are persisted or echoed.
+
+The current nearest-memory retriever has no calibrated relevance cutoff. Returning
+any memory on a no-match case counts as a false positive, even at a low similarity
+score. These metrics measure retrieval against owner labels, not factual truth or
+model confidence. AI hypotheses remain unverified. Corrections/additions/deletions
+during evaluation invalidate the report with 409 rather than mixing memory versions.
+
+Settings supports one transient quality check at a time, with an owned expected-match
+selector. Successful mutations/refresh clear the check; page exit clears memories,
+drafts, the question and report. Late evaluation responses cannot repopulate them.
+Encrypted memory retention, family exclusion and historical-backup limitations remain
+unchanged. Use synthetic fixtures until separately approved private acceptance.
+
+## Recovery verifier boundary
+
+The existing Desktop `ALFRED_OFFDEVICE_TRANSFER_20261011/VERIFY_TRANSFER.ps1`
+counts files below `archive/` and compares every manifest-listed non-key file's
+existence, size and SHA-256. Key records are skipped without `-KeyPath`; supplying
+it only checks a listed key's size/hash. The current manifest has no key records,
+so it verifies no decryption key, even with that option. It does not authenticate
+the manifest, reject unlisted files outside `archive/`, decrypt or restore archives,
+check SQLite, establish Windows-profile independence or confirm external placement
+and secure archive/key separation. The public Desktop README documents this boundary.
+
+Off-device archives and a separately recoverable key remain PENDING. Existing local
+restore receipts do not establish either requirement. All archives and original keys
+remain preserved; the passphrase workflow stays cancelled. No new passphrase is needed
+for this development milestone, and encryption was not changed.

@@ -9,5 +9,16 @@
     </form>
     <div id="memoryFeedback" role="status" aria-live="polite"></div>
     <div id="memoryList" class="data-stack my-3"></div>
+    <button id="memoryRefreshButton" class="btn btn-outline-secondary mb-3" type="button">Refresh Memories</button>
+    <form id="memoryEvaluationForm" class="mb-3" data-live-refresh-hold="true">
+        <h3 class="h5">Check Memory Retrieval</h3>
+        <p>Test a question against a memory you have verified, or choose that no memory should match. Results measure retrieval, not whether an answer is true. Questions and results are not saved.</p>
+        <label for="memoryEvaluationQuery" class="form-label">Test question</label>
+        <textarea id="memoryEvaluationQuery" class="form-control mb-2" rows="2" maxlength="8192" required autocomplete="off"></textarea>
+        <label for="memoryEvaluationExpected" class="form-label">Expected match</label>
+        <select id="memoryEvaluationExpected" class="form-select mb-2"><option value="">No memory should match</option></select>
+        <button class="btn btn-outline-primary" type="submit">Check Retrieval</button>
+        <p id="memoryEvaluationResult" role="status" aria-live="polite" class="mt-2"></p>
+    </form>
     <button id="memoryResetButton" class="btn btn-outline-danger" type="button">Reset My Memories</button>
 </section>

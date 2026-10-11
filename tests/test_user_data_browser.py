@@ -96,6 +96,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
               .then(async response=>done({status:response.status,data:await response.json(),cache:response.headers.get('Cache-Control')}));
         ''',path,payload,csrf)
 
+    def memory_click(self,selector):
+        element=self.browser.find_element(self.By.CSS_SELECTOR,selector)
+        self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});",element)
+        self.wait.until(lambda _: element.is_displayed() and element.is_enabled())
+        element.click()
+
     def test_candidate_verification_and_correction_refresh_owned_settings(self):
         from apps.ml_engine.services.persistent_memory import MemoryStore
         from tests.test_persistent_memory import SyntheticEmbeddings
@@ -115,12 +121,57 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(verified['status'],200); identity=verified['data']['id']
         self.browser.refresh(); self.wait.until(lambda _: 'synthetic mountain' in self.text('memoryList'))
         self.assertFalse(self.browser.execute_script('return Boolean(window.memoryLeak)'))
-        corrected=self.memory_post('learning',{'action':'correct','id':identity,'content':{'statement':'synthetic corrected hiking preference'},'verified':True})
-        self.assertEqual(corrected['status'],200)
-        self.browser.refresh(); self.wait.until(lambda _: 'synthetic corrected hiking preference' in self.text('memoryList'))
+        self.memory_click('#memoryList summary')
+        correction=self.browser.find_element(self.By.CSS_SELECTOR,'#memoryList textarea')
+        correction.clear(); correction.send_keys('synthetic corrected hiking preference')
+        self.memory_click('#memoryList form button')
+        self.assertEqual(store.list_memories(owner)[0]['id'],identity)
+        self.memory_click('#memoryList input[type="checkbox"]')
+        self.memory_click('#memoryList form button')
+        self.wait.until(lambda _: self.text('memoryFeedback')=='Verified correction saved.')
+        self.wait.until(lambda _: 'synthetic corrected hiking preference' in self.text('memoryList'))
         self.assertNotIn('<img',self.browser.find_element(self.By.ID,'memoryList').get_attribute('innerHTML'))
-        self.assertEqual(store.restore_owner(owner),1); self.assertEqual(store.list_memories(owner)[0]['id'],corrected['data']['id'])
+        self.assertEqual(store.restore_owner(owner),1); self.assertNotEqual(store.list_memories(owner)[0]['id'],identity)
+        from selenium.webdriver.support.ui import Select
+        query=self.browser.find_element(self.By.ID,'memoryEvaluationQuery')
+        query.send_keys('synthetic hiking question')
+        Select(self.browser.find_element(self.By.ID,'memoryEvaluationExpected')).select_by_value(store.list_memories(owner)[0]['id'])
+        self.memory_click('#memoryEvaluationForm button')
+        self.wait.until(lambda _: 'First match correct: yes.' in self.text('memoryEvaluationResult'))
+        Select(self.browser.find_element(self.By.ID,'memoryEvaluationExpected')).select_by_value('')
+        self.memory_click('#memoryEvaluationForm button')
+        self.wait.until(lambda _: 'Unexpected match returned.' in self.text('memoryEvaluationResult'))
         self.capture('memory-candidate-explicit-verification-correction')
+
+    def test_stale_correction_keeps_draft_and_requires_review_of_current_memory(self):
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.memory_learning import MemoryLearning
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-quality-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        store=MemoryStore(root/'vault'); owner=self.scenario['user']
+        original=store.save_verified(owner,{'statement':'synthetic original'}, {'source':'synthetic owner review'},verified=True)
+        self.login(); self.browser.get(self.live_server_url+'/settings/')
+        self.wait.until(lambda _: 'synthetic original' in self.text('memoryList'))
+        self.memory_click('#memoryList summary')
+        correction=self.browser.find_element(self.By.CSS_SELECTOR,'#memoryList textarea')
+        correction.clear(); correction.send_keys('synthetic stale draft <img src=x onerror="window.memoryLeak=true">')
+        self.memory_click('#memoryList input[type="checkbox"]')
+        winner=MemoryLearning(store).revise(owner,[original],{'statement':'synthetic current winner'},verified=True)
+        self.memory_click('#memoryList form button')
+        self.wait.until(lambda _: 'Memory changed.' in self.text('memoryFeedback'))
+        self.assertIn('synthetic stale draft',correction.get_attribute('value'))
+        self.assertEqual(store.list_memories(owner)[0]['id'],winner)
+        self.memory_click('#memoryRefreshButton')
+        self.wait.until(lambda _: 'synthetic current winner' in self.text('memoryList'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.memoryLeak)'))
+        self.browser.find_element(self.By.ID,'memoryEvaluationQuery').send_keys('synthetic transient private query')
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide'));")
+        self.assertEqual(self.text('memoryList'),'')
+        self.assertEqual(self.browser.find_element(self.By.ID,'memoryEvaluationQuery').get_attribute('value'),'')
+        self.assertEqual(self.text('memoryEvaluationResult'),'')
+        self.capture('memory-stale-edit-requires-refresh')
 
     def test_encrypted_memory_sync_and_mock_reasoning_use_session_scope(self):
         from apps.ml_engine.services.persistent_memory import MemoryStore

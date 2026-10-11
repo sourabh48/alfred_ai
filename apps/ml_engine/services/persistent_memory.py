@@ -19,6 +19,10 @@ from .memory_key import private_directory, protect_key, MemoryStorageUnavailable
 SENSITIVITIES = {'public', 'personal', 'sensitive'}
 
 
+class MemoryConflict(ValueError):
+    """A reviewed memory changed before the operation could finish."""
+
+
 def _json(value):
     try:
         encoded = json.dumps(value, sort_keys=True, ensure_ascii=False, allow_nan=False)
@@ -246,9 +250,9 @@ class MemoryStore:
             self._expire(db, owner)
             for identity in supersedes:
                 if not db.execute('SELECT 1 FROM memories WHERE id=? AND owner=?',(identity,owner)).fetchone():
-                    raise ValueError('A replaced memory is no longer available.')
+                    raise MemoryConflict('A replaced memory is no longer available.')
             if candidate_id and not db.execute('SELECT 1 FROM memory_candidates WHERE id=? AND owner=?',(candidate_id,owner)).fetchone():
-                raise ValueError('Candidate verification is no longer available.')
+                raise MemoryConflict('Candidate verification is no longer available.')
             if db.execute('SELECT COUNT(*) FROM memories WHERE owner=?', (owner,)).fetchone()[0]-len(supersedes) >= 512:
                 raise ValueError('The local memory slice supports at most 512 verified memories per owner.')
             # shortcut: bound retained encrypted history; add tested journal compaction before raising this cap.
