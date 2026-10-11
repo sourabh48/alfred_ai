@@ -146,6 +146,14 @@ class PersistentMemoryTests(TestCase):
         for value in (True,'0.45',float('nan'),float('inf'),1.1,-1.1):
             with self.assertRaises(ValueError): self.store.retrieve(self.alice,'mountain',min_score=value)
 
+    def test_exact_deduplication_preserves_json_boolean_and_number_types(self):
+        first=self.store.save_verified(self.alice,{'checked':True},{'source':'synthetic'},verified=True)
+        number=self.store.save_verified(self.alice,{'checked':1},{'source':'synthetic'},verified=True)
+        self.assertNotEqual(first,number)
+        a=self.store.save_verified(self.alice,{'checked':True},{'source':'synthetic','version':True},verified=True)
+        b=self.store.save_verified(self.alice,{'checked':True},{'source':'synthetic','version':1},verified=True)
+        self.assertNotEqual(a,b)
+
     def test_changed_embedding_model_refuses_incompatible_retrieval(self):
         self.save()
         self.store.embedder = Mock()

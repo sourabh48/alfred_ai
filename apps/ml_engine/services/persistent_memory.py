@@ -256,7 +256,7 @@ class MemoryStore:
             if not supersedes and not candidate_id:
                 for identity,ciphertext in db.execute('SELECT id,record FROM memories WHERE owner=? ORDER BY id',(owner,)):
                     existing=self._decode(db,identity,owner,ciphertext)
-                    if existing['content']==content and existing['provenance']==provenance and existing['sensitivity']==sensitivity:
+                    if _json(existing['content'])==_json(content) and _json(existing['provenance'])==_json(provenance) and existing['sensitivity']==sensitivity:
                         return identity
             if db.execute('SELECT COUNT(*) FROM memories WHERE owner=?', (owner,)).fetchone()[0]-len(supersedes) >= 512:
                 raise ValueError('The local memory slice supports at most 512 verified memories per owner.')
