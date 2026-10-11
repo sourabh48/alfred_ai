@@ -1,5 +1,21 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15 hybrid milestone 1 - verified deduplication and relevance
+
+2026-10-12, starting 81942711ba96a77c35c76926db3e9262bc571888, isolated M15 only.
+Atomic exact verified-memory deduplication preserves distinct owners, evidence and
+sensitivity; concurrent identical saves produce one journal event. Corrections and
+re-embedding remain explicit. Optional min_score enables evaluation/abstention
+without changing existing retrieval callers. Focused related gate: 108 PASS in
+45.715s, zero final failures/skips. Fixtures simulating separate edits now carry
+distinct source references; initial dedup-sensitive evidence is retained.
+Local all-minilm calibration uses synthetic memories/questions only. Its exact
+report is m15-hybrid-calibration.json under F:/ALFRED_DEV/isolated-tests.
+No private DB, real provider, paid API, key or backup changes. Off-device/key
+recovery remain PENDING; cancelled passphrase workflow stays cancelled.
+Next source milestone: bounded Ollama-first reasoning on the existing Insights
+API, canonical read-only tools and consent-gated public-only fallback.
+
 ## Latest checkpoint - M15 owner correction and retrieval quality PASS
 
 2026-10-12: Continue ONLY F:/ALFRED_DEV/m15 on

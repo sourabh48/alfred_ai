@@ -127,8 +127,24 @@ class PersistentMemoryTests(TestCase):
     def test_concurrent_initial_writes_share_key_and_survive_restart(self):
         with ThreadPoolExecutor(max_workers=4) as pool:
             identities = list(pool.map(lambda _: self.save(), range(4)))
-        self.assertEqual(len(set(identities)), 4)
-        self.assertEqual(MemoryStore(self.directory, embedder=SyntheticEmbeddings()).restore_owner(self.alice), 4)
+        self.assertEqual(len(set(identities)), 1)
+        self.assertEqual(MemoryStore(self.directory, embedder=SyntheticEmbeddings()).restore_owner(self.alice), 1)
+
+    def test_deduplication_preserves_different_sources_sensitivity_and_owners(self):
+        first=self.save(); self.assertEqual(self.save(),first)
+        content={'preference':'Quiet mountain travel'}; source={'source':'synthetic alternate confirmation'}
+        other=self.store.save_verified(self.alice,content,source,verified=True)
+        public=self.store.save_verified(self.alice,content,source,sensitivity='public',verified=True)
+        self.assertNotEqual(other,public); self.assertNotEqual(first,self.save(self.bob))
+        self.assertEqual(len(self.store.list_memories(self.alice)),3)
+
+    def test_opt_in_relevance_cutoff_abstains_without_changing_legacy_retrieval(self):
+        identity=self.save()
+        self.assertEqual(self.store.retrieve(self.alice,'coast')[0]['id'],identity)
+        self.assertEqual(self.store.retrieve(self.alice,'coast',min_score=0.45),[])
+        self.assertEqual(self.store.retrieve(self.alice,'mountain',min_score=0.45)[0]['id'],identity)
+        for value in (True,'0.45',float('nan'),float('inf'),1.1,-1.1):
+            with self.assertRaises(ValueError): self.store.retrieve(self.alice,'mountain',min_score=value)
 
     def test_changed_embedding_model_refuses_incompatible_retrieval(self):
         self.save()

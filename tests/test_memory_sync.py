@@ -2,6 +2,7 @@ from contextlib import closing
 from datetime import datetime, timezone, timedelta
 from hashlib import sha256
 import json
+from uuid import uuid4
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -29,7 +30,7 @@ class MemorySyncTests(TestCase):
 
     def save(self,store=None,user=None):
         return (store or self.store).save_verified(user or self.alice,{'preference':'SYNTHETIC-PRIVATE-OCR mountain holiday'},
-            {'source':'SYNTHETIC-ACCOUNT-9001'},verified=True)
+            {'source':'SYNTHETIC-ACCOUNT-9001','reference':uuid4().hex},verified=True)
 
     def second(self):
         store=MemoryStore(self.root/'alice-two',embedder=SyntheticEmbeddings())

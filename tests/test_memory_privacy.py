@@ -3,6 +3,7 @@ from contextlib import closing
 from datetime import datetime, timezone, timedelta
 from io import StringIO
 import json
+from uuid import uuid4
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -32,7 +33,7 @@ class MemoryPrivacyTests(TestCase):
 
     def save(self, user=None, **kw):
         return self.store.save_verified(user or self.alice, {'secret': 'SYNTHETIC-PRIVATE-OCR-9001'},
-            {'source': 'SYNTHETIC-PROVENANCE-ACCOUNT-1000'}, verified=True, **kw)
+            {'source': 'SYNTHETIC-PROVENANCE-ACCOUNT-1000','reference':uuid4().hex}, verified=True, **kw)
 
     def test_index_journal_keys_and_files_contain_no_plaintext(self):
         identity = self.save()

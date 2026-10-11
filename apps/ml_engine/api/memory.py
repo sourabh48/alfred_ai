@@ -149,15 +149,15 @@ class MemoryLearningAPI(MemoryAPI):
         return Response({'candidates':MemoryLearning(memory_store()).candidates(request.user)})
 
     def post(self,request):
-        data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases'))
+        data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases','min_score'))
         allowed={'extract':{'action','text','provenance','sensitivity'},'verify':{'action','id','verified','content'},
             'correct':{'action','id','content','verified'},'consolidate':{'action','ids','content','verified'},
-            'reembed':{'action','id','verified'},'evaluate':{'action','cases'}}
+            'reembed':{'action','id','verified'},'evaluate':{'action','cases','min_score'}}
         action=data.get('action')
         if not isinstance(action,str) or action not in allowed or set(data)-allowed[action]: raise ValueError()
         learning=MemoryLearning(memory_store()); user=request.user
         if action=='extract': return Response({'candidate_ids':learning.extract(user,data.get('text'),data.get('provenance'),sensitivity=data.get('sensitivity','sensitive'))},status=201)
         if action=='verify': return Response({'id':learning.verify(user,data.get('id'),verified=data.get('verified',False),content=data.get('content'))})
-        if action=='evaluate': return Response(learning.evaluate(user,data.get('cases')))
+        if action=='evaluate': return Response(learning.evaluate(user,data.get('cases'),min_score=data.get('min_score')))
         identities=data.get('ids') if action=='consolidate' else [data.get('id')]
         return Response({'id':learning.revise(user,identities,data.get('content'),verified=data.get('verified',False),reembed=action=='reembed')})

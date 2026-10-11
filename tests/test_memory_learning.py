@@ -139,6 +139,13 @@ class MemoryLearningTests(TestCase):
         self.assertEqual(result['false_positive_rate'],0)
         for key in ('recall_at_3','mean_reciprocal_rank','top_1_accuracy'): self.assertIsNone(result[key])
 
+    def test_evaluation_compares_opt_in_cutoff_with_unfiltered_false_positive(self):
+        identity=self.store.save_verified(self.alice,{'statement':'mountain hiking'},{'source':'synthetic'},verified=True)
+        cases=[{'query':'mountain','expected_id':identity},{'query':'coast','expected_id':None}]
+        self.assertEqual(self.learning.evaluate(self.alice,cases)['false_positive_rate'],1)
+        result=self.learning.evaluate(self.alice,cases,min_score=0.45)
+        self.assertEqual(result['recall_at_3'],1); self.assertEqual(result['abstention_rate'],1)
+
     def test_evaluation_rejects_malformed_ground_truth_before_inference(self):
         for case in ({'query':'synthetic','expected_id':False},{'query':'synthetic','expected_id':[]},
                 {'query':'','expected_id':None},{'query':'x'*8193,'expected_id':None},

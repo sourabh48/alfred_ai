@@ -79,7 +79,7 @@ class MemoryLearning:
         return self.store.save_verified(user,selected[0]['content'] if reembed else content,provenance,
             sensitivity=sensitivity,verified=True,supersedes=identities)
 
-    def evaluate(self,user,cases):
+    def evaluate(self,user,cases,*,min_score=None):
         records={r['id'] for r in self.store.list_memories(user)}
         if not isinstance(cases,list) or not 1<=len(cases)<=20: raise ValueError('Provide at most twenty evaluation cases.')
         for case in cases:
@@ -87,7 +87,7 @@ class MemoryLearning:
                 raise ValueError('Evaluation requires bounded queries and owned verified ground truth.')
         ranks=[]; false_positives=0; negative_cases=0
         for case in cases:
-            results=self.store.retrieve(user,case['query'],limit=3)
+            results=self.store.retrieve(user,case['query'],limit=3,**({'min_score':min_score} if min_score is not None else {}))
             if case['expected_id'] is None:
                 negative_cases+=1; false_positives+=bool(results)
             else:

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from io import StringIO
 import json
+from uuid import uuid4
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -32,7 +33,7 @@ class MemoryCloudTests(TestCase):
         self.sync.configure(self.alice,enabled=True,consent=True)
 
     def save(self):
-        return self.store.save_verified(self.alice,{'preference':'SYNTHETIC-PRIVATE-MOUNTAIN'}, {'source':'synthetic cloud confirmation'},verified=True)
+        return self.store.save_verified(self.alice,{'preference':'SYNTHETIC-PRIVATE-MOUNTAIN'}, {'source':'synthetic cloud confirmation','reference':uuid4().hex},verified=True)
 
     def second(self):
         store=MemoryStore(self.root/'two',embedder=SyntheticEmbeddings()); filename='sync-'+self.owner+'.key'

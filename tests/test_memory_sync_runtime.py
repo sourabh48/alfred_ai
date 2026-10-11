@@ -3,6 +3,7 @@ from contextlib import closing
 from datetime import datetime, timezone, timedelta
 from io import StringIO
 import json
+from uuid import uuid4
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -35,7 +36,7 @@ class MemorySyncRuntimeTests(TestCase):
 
     def save(self,user=None,*,sensitivity='public'):
         return self.store.save_verified(user or self.alice,{'preference':'synthetic mountain trip'},
-            {'source':'synthetic owner verification'},sensitivity=sensitivity,verified=True)
+            {'source':'synthetic owner verification','reference':uuid4().hex},sensitivity=sensitivity,verified=True)
 
     def post(self,path,payload):
         return self.client.post('/api/ai/memories/'+path+'/',payload,content_type='application/json')

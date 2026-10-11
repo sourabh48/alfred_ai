@@ -39,6 +39,14 @@ synthetic markup. Synthetic data and embedding fixtures only. Full M15 remains i
 
 ## Owner corrections and retrieval quality (2026-10-12)
 
+Exact verified saves now deduplicate atomically by owner, content, provenance and
+sensitivity. Concurrent identical saves share one ID/event; different evidence,
+sensitivity or owners remain separate. This never merges contradictory memories
+or resurrects deleted keys. Explicit correction/re-embedding bypass deduplication.
+Retrieval and evaluation accept an optional finite cosine `min_score` in [-1,1].
+Existing retrieval is unchanged when it is omitted; scores are not confidence
+probabilities. Hybrid reasoning uses a separately configured relevance cutoff.
+
 Settings now offers a correction form for each owned memory. The owner writes a
 replacement statement and explicitly confirms it. This replaces the whole memory
 body; original source history and sensitivity are preserved. The existing atomic

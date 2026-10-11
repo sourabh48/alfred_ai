@@ -3,7 +3,7 @@ from contextlib import contextmanager, closing
 from datetime import datetime, timezone, timedelta
 from hashlib import sha256
 import json
-from math import hypot
+from math import hypot, isfinite
 import os
 from pathlib import Path
 import sqlite3
@@ -253,6 +253,11 @@ class MemoryStore:
                     raise MemoryConflict('A replaced memory is no longer available.')
             if candidate_id and not db.execute('SELECT 1 FROM memory_candidates WHERE id=? AND owner=?',(candidate_id,owner)).fetchone():
                 raise MemoryConflict('Candidate verification is no longer available.')
+            if not supersedes and not candidate_id:
+                for identity,ciphertext in db.execute('SELECT id,record FROM memories WHERE owner=? ORDER BY id',(owner,)):
+                    existing=self._decode(db,identity,owner,ciphertext)
+                    if existing['content']==content and existing['provenance']==provenance and existing['sensitivity']==sensitivity:
+                        return identity
             if db.execute('SELECT COUNT(*) FROM memories WHERE owner=?', (owner,)).fetchone()[0]-len(supersedes) >= 512:
                 raise ValueError('The local memory slice supports at most 512 verified memories per owner.')
             # shortcut: bound retained encrypted history; add tested journal compaction before raising this cap.
@@ -267,12 +272,14 @@ class MemoryStore:
             self._sync_dirty(db, owner)
         return record['id']
 
-    def retrieve(self, user, query, *, limit=3, cloud=False, cloud_consent=False):
+    def retrieve(self, user, query, *, limit=3, cloud=False, cloud_consent=False, min_score=None):
         owner = _owner(user)
         if not isinstance(cloud, bool) or not isinstance(cloud_consent, bool):
             raise ValueError('Cloud reasoning requires explicit boolean consent.')
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
             raise ValueError('Retrieval limit must be between 1 and 20.')
+        if min_score is not None and (isinstance(min_score,bool) or not isinstance(min_score,(int,float)) or not isfinite(min_score) or not -1<=min_score<=1):
+            raise ValueError('Retrieval relevance must be a finite cosine threshold.')
         if cloud and cloud_consent is not True:
             raise PermissionError('Explicit cloud reasoning consent is required.')
         with self._transaction() as db:
@@ -297,7 +304,7 @@ class MemoryStore:
         with self._transaction() as db:
             self._expire(db, owner)
             live = {r[0] for r in db.execute('SELECT id FROM memory_keys WHERE owner=?', (owner,))}
-            results = [item for item in results if item['id'] in live][:limit]
+            results = [item for item in results if item['id'] in live and (min_score is None or item['score']>=min_score)][:limit]
         if cloud and any(item['sensitivity'] != 'public' for item in results):
             raise PermissionError('Private memory is not approved for cloud reasoning.')
         return results
