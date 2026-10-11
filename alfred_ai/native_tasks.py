@@ -62,6 +62,12 @@ def native_private_memory_cleanup():
     call_command('prune_private_memory', verbosity=0)
 
 
+@db_periodic_task(crontab(minute="*"))
+def native_private_memory_sync():
+    from django.core.management import call_command
+    call_command('sync_private_memory', seconds=2, verbosity=0)
+
+
 @db_periodic_task(crontab(minute="0", hour="3"))
 def native_nightly_training():
     return run_global_training_cycle()

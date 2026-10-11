@@ -448,6 +448,9 @@ ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION = env.bool(
 )
 ALFRED_FAMILY_LINK_CODE_TTL_HOURS = env.int("ALFRED_FAMILY_LINK_CODE_TTL_HOURS", default=24)
 ALFRED_MEMORY_DIR = str(Path(os.environ.get('ALFRED_DATA_DIR') or BASE_DIR) / 'artifacts' / 'private-memory-v2')
+ALFRED_MEMORY_SYNC_MOCK_DIR = env('ALFRED_MEMORY_SYNC_MOCK_DIR', default='')
+ALFRED_MEMORY_MOCK_REASONING = env.bool('ALFRED_MEMORY_MOCK_REASONING', default=False)
+ALFRED_MEMORY_REASONING_DAILY_TOKENS = env.int('ALFRED_MEMORY_REASONING_DAILY_TOKENS', default=4096)
 
 
 # ---------------------------------------------------------

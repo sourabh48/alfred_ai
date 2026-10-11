@@ -190,6 +190,28 @@ class MemorySyncTests(TestCase):
         head=self.provider.head(owner,deadline=time.monotonic()+5)
         self.assertEqual(json.loads(cipher.decrypt(head['manifest']))['keys'],{})
 
+    def test_explicit_merge_expiry_queues_remote_key_revocation(self):
+        with patch('apps.ml_engine.services.persistent_memory.datetime') as clock:
+            clock.now.return_value=datetime.now(timezone.utc)-timedelta(days=31)
+            self.save()
+        self.store.set_retention(self.alice,365); self.sync.run(self.alice)
+        other,sync=self.second(); sync.run(self.alice)
+        other.set_retention(self.alice,1)
+        with patch('apps.ml_engine.services.persistent_memory.datetime') as clock:
+            clock.now.return_value=datetime.now(timezone.utc)-timedelta(days=10)
+            clock.fromisoformat=datetime.fromisoformat
+            self.save()
+        self.save(); self.sync.run(self.alice)
+        # The remote policy is longer; recovery takes the shorter local policy,
+        # then expiry changes the merged snapshot after publishing it.
+        self.assertEqual(sync.run(self.alice,recover=True),'uploaded')
+        self.assertTrue(sync.status(self.alice)['pending'])
+        self.assertEqual(len(other.list_memories(self.alice)),1)
+        self.assertEqual(sync.run(self.alice),'uploaded')
+        owner=_owner(self.alice); head=self.provider.head(owner,deadline=time.monotonic()+5)
+        manifest=json.loads(sync._key(owner).decrypt(head['manifest']))
+        self.assertEqual(len(manifest['keys']),1)
+
     def test_missing_master_key_with_only_sync_metadata_is_never_replaced(self):
         original=self.store.key_file.read_bytes(); self.store.key_file.unlink()
         with self.assertRaises(RuntimeError): self.sync.status(self.alice)

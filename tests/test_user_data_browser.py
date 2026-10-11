@@ -87,6 +87,40 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def text(self, element_id):
         return self.browser.find_element(self.By.ID, element_id).text
 
+    def test_encrypted_memory_sync_and_mock_reasoning_use_session_scope(self):
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.memory_sync import MemorySynchronizer, MockCloudProvider
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-sync-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),
+            ALFRED_MEMORY_SYNC_MOCK_DIR=str(root/'mock'),ALFRED_MEMORY_MOCK_REASONING=True))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        store=MemoryStore(root/'vault'); owner=self.scenario['user']
+        store.save_verified(owner,{'note':'synthetic public mountain preference'},{'source':'synthetic'},sensitivity='public',verified=True)
+        self.login(); self.browser.get(self.live_server_url+'/settings/')
+        self.wait.until(lambda _: 'synthetic public mountain preference' in self.text('memoryList'))
+        def post(path,payload,csrf=True):
+            return self.browser.execute_async_script('''
+                const [path,payload,csrf,done]=arguments;
+                const headers={'Content-Type':'application/json'};
+                if(csrf) headers['X-CSRFToken']=decodeURIComponent(document.cookie.split('; ').find(x=>x.startsWith('csrftoken=')).split('=')[1]);
+                fetch('/api/ai/memories/'+path+'/',{method:'POST',headers,body:JSON.stringify(payload)})
+                  .then(async response=>done({status:response.status,data:await response.json(),cache:response.headers.get('Cache-Control')}));
+            ''',path,payload,csrf)
+        configure={'action':'configure','enabled':True,'consent':True}
+        self.assertEqual(post('sync',configure,False)['status'],403)
+        self.assertEqual(post('sync',configure)['status'],200)
+        uploaded=post('sync',{'action':'sync'}); self.assertEqual(uploaded['data']['result'],'uploaded')
+        self.assertIn('no-store',uploaded['cache'])
+        self.assertEqual(post('reason',{'query':'mountain','consent':False,'query_sensitivity':'public'})['status'],400)
+        self.assertEqual(post('reason',{'query':'mountain','consent':True,'query_sensitivity':'public'})['status'],200)
+        self.assertEqual(post('reset',{'confirm':True})['data']['deleted'],1)
+        self.assertEqual(post('sync',{'action':'sync'})['status'],200)
+        self.assertEqual(store.restore_owner(owner),0)
+        sync=MemorySynchronizer(store,MockCloudProvider(root/'mock'))
+        self.assertEqual(sync.status(owner)['revision'],2)
+        self.capture('memory-encrypted-mock-sync-session')
+
     def test_private_memory_delete_retention_reset_keep_family_isolated(self):
         from datetime import datetime, timezone, timedelta
         from selenium.webdriver.support import expected_conditions as EC

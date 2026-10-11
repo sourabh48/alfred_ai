@@ -319,8 +319,9 @@ class MemorySynchronizer:
                 latest=self.store._sync_state(db,owner)
                 changed=digest(self._snapshot(db,owner))!=fingerprint
                 if recover and not changed: self._apply(db,owner,local)
-                latest.update(revision=published['revision'],identity=identity,ack=digest(self._snapshot(db,owner)) if not changed else state['ack'],
-                    pending=changed,failures=0,retry_at=0,conflict=False)
+                applied=digest(self._snapshot(db,owner))
+                latest.update(revision=published['revision'],identity=identity,ack=digest(local),
+                    pending=changed or applied!=digest(local),failures=0,retry_at=0,conflict=False)
                 self.store._write_sync_state(db,owner,latest)
             return 'uploaded'
         except Exception as exc:

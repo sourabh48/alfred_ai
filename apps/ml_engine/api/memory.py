@@ -8,10 +8,18 @@ from rest_framework.views import APIView
 
 from alfred_ai.services.api_errors import safe_error_response
 from apps.ml_engine.services.persistent_memory import MemoryStore
+from apps.ml_engine.services.memory_sync import MemorySynchronizer, MockCloudProvider, SyncUnavailable, SyncConflict
+from apps.ml_engine.services.memory_reasoning import MockReasoner, ReasoningBudgetExceeded, reason_with_memory
 
 
 def memory_store():
     return MemoryStore(Path(settings.ALFRED_MEMORY_DIR))
+
+
+def memory_sync():
+    if not settings.ALFRED_MEMORY_SYNC_MOCK_DIR:
+        raise SyncUnavailable('No approved synchronization provider is configured.')
+    return MemorySynchronizer(memory_store(),MockCloudProvider(settings.ALFRED_MEMORY_SYNC_MOCK_DIR))
 
 
 class MemoryAPI(APIView):
@@ -23,6 +31,14 @@ class MemoryAPI(APIView):
         return response
 
     def handle_exception(self, exc):
+        if isinstance(exc,SyncConflict):
+            return safe_error_response(exc,'Memory synchronization conflict. Local data is retained; explicit recovery is required.',logger_name=__name__,status_code=409)
+        if isinstance(exc,ReasoningBudgetExceeded):
+            response=safe_error_response(exc,'Daily reasoning budget exhausted.',logger_name=__name__,status_code=429)
+            from datetime import datetime, timezone
+            now=datetime.now(timezone.utc)
+            response['Retry-After']=str(86400-now.hour*3600-now.minute*60-now.second)
+            return response
         if isinstance(exc, (ValueError, PermissionError)):
             return safe_error_response(exc, 'Memory request is invalid or not permitted.', logger_name=__name__)
         # DRF authentication/CSRF/HTTP errors retain their status and handling.
@@ -85,3 +101,29 @@ class MemoryRetrieveAPI(MemoryAPI):
         if not isinstance(query, str) or not query.strip() or len(query.encode()) > 8192:
             raise ValueError()
         return Response({'memories': memory_store().retrieve(request.user, query, limit=data.get('limit', 3))})
+
+
+class MemorySyncAPI(MemoryAPI):
+    def get(self,request):
+        return Response({'provider':'local mock','status':memory_sync().status(request.user)})
+
+    def post(self,request):
+        data=self.payload(('action','enabled','consent','confirm'))
+        action=data.get('action')
+        allowed={'configure':{'action','enabled','consent'},'sync':{'action'},'recover':{'action','confirm'}}
+        if not isinstance(action,str) or action not in allowed or set(data)-allowed[action]: raise ValueError()
+        if action=='recover' and data.get('confirm') is not True: raise ValueError()
+        sync=memory_sync()
+        if action=='configure':
+            return Response({'status':sync.configure(request.user,enabled=data.get('enabled'),consent=data.get('consent',False))})
+        result=sync.run(request.user,recover=action=='recover')
+        return Response({'result':result,'status':sync.status(request.user)})
+
+
+class MemoryReasoningAPI(MemoryAPI):
+    def post(self,request):
+        data=self.payload(('query','consent','query_sensitivity'))
+        result=reason_with_memory(memory_store(),request.user,data.get('query'),consent=data.get('consent',False),
+            query_sensitivity=data.get('query_sensitivity'),provider=MockReasoner() if settings.ALFRED_MEMORY_MOCK_REASONING else None,
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS)
+        return Response(result)

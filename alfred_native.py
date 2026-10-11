@@ -11,6 +11,7 @@ import logging
 import os
 from pathlib import Path
 import sqlite3
+from contextlib import closing
 import subprocess
 import sys
 import threading
@@ -216,17 +217,20 @@ def serve(data, port):
     state = {"instance": instance, "pid": os.getpid(), "status": "starting", "port": port}
     write_json(runtime / "runtime.json", state)
     child = server = tray = None
+    configured = False
     try:
         configure(data)
+        configured = True
         from django.core.management import call_command
         from django.core.wsgi import get_wsgi_application
         from alfred_ai.services.native_web import create_native_server
         from alfred_ai.tasks import production_probe_task
 
-        with sqlite3.connect(data / "db.sqlite3", timeout=30) as connection:
+        with closing(sqlite3.connect(data / "db.sqlite3", timeout=30)) as connection:
             connection.execute("PRAGMA journal_mode=WAL")
         call_command("migrate", interactive=False, verbosity=1)
         call_command("prune_private_memory", verbosity=0)
+        call_command("sync_private_memory", seconds=5, verbosity=0)
         call_command("collectstatic", interactive=False, verbosity=0)
         child = spawn("worker", data, "--instance", instance, "--parent-pid", str(os.getpid()))
         # This is an actual queued task, not eager execution or a process ping.
@@ -280,6 +284,8 @@ def serve(data, port):
         if child is not None and child.poll() is None:
             (runtime / f"worker-stop-{instance}").touch()
             child.wait()  # Do not cut off a running document import or model save.
+        if configured:
+            call_command("sync_private_memory", seconds=5, verbosity=0)
         (runtime / f"stop-{instance}").unlink(missing_ok=True)
         if tray is not None:
             tray.close()

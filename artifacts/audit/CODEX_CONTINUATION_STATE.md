@@ -1,5 +1,45 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - M15 mock encrypted sync runtime/API and budget gate PASS
+
+2026-10-11: ONLY F:/ALFRED_DEV/m15, codex/m15-persistent-memory-20261011. Protocol
+commit f29d6d0c49d384c49d99559a85d2dfe959710ae3; runtime/API/reasoning milestone
+HEAD is recorded after commit in F:/ALFRED_DEV/isolated-tests/m15-sync-manifest.json.
+M14 live source remains 30e0b3f75e785f639897ad36c19090c6a4e8675f, no private DB/
+token mutation or new live migration. Existing operator files/backups preserved.
+
+Opt-in mock synchronization is wired to session/CSRF/no-store/abuse-protected APIs,
+native startup, minute worker tick and bounded shutdown after draining writers.
+Shared five-second sync budget, two-second periodic tick, rotating maximum 16
+active accounts, no default provider/contact. Durable encrypted retries survive
+offline/restart; explicit confirmed recovery handles conflicts. Owner isolation,
+reset/deletion/expiry and key revocation apply to current replicas. OpenAI remains
+disconnected; optional mock reasoning requires per-request public query consent,
+public context and encrypted per-owner daily conservative token reservation.
+Failed calls retain reservation; resets/restarts cannot bypass same-day budgets.
+
+Actual updated gate: 108 backend PASS (52.439 s), including 35 new regressions;
+two synthetic Chrome workflows PASS (16.429 s); 19 native source/Chrome checks PASS. Two
+independent real Ollama processes prove encrypted mock upload/new-vault download/
+authentication/journal recovery/same-ID retrieval, 384 dimensions, score 0.518286,
+preserved provenance/sensitivity/ownership and zero external cloud calls.
+System checks and isolated migration drift PASS; no new migration/dependency.
+Graph AST refresh 8146 nodes/21087 edges; git diff checks PASS. See
+docs/M15_ENCRYPTED_MEMORY_SYNC.md for protocol, API, exact proof commands,
+evidence, corrected fixture failure and recovery/deletion limitations.
+
+MOCK SYNC VERTICAL SLICE COMPLETE; whole M15 INCOMPLETE. Real cloud/OpenAI
+integration needs explicit authorization plus portable owner key recovery,
+trusted checkpoint and non-versioned key-manifest retention verification before
+private use. No automatic private cloud AI export or SQLite/WAL/SHM sync.
+
+M14 operational closure: encrypted supplement hash unchanged and local native
+health 200; off-device destination/key location not supplied, no export/retained-
+copy restore performed. Real-account eight-screen visual acceptance PENDING;
+no password requested/changed or replacement account. Fresh origin/master
+da74570681165cfa46dd3186f95ee400643c41d6 remains ancestor of frozen live source;
+fast-forward push awaits explicit authorization and must recheck ancestry first.
+
 ## Latest checkpoint - M15 encrypted synchronization protocol, synthetic PASS
 
 2026-10-11: Continue ONLY F:/ALFRED_DEV/m15 on its existing M15 branch. Base
