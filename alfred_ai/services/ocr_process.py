@@ -1,5 +1,6 @@
 """Run the existing isolated OCR routines from Python or the frozen launcher."""
 import os
+from pathlib import Path
 import subprocess
 import sys
 
@@ -7,6 +8,8 @@ import sys
 def ocr_command(kind, source, path, pages):
     if getattr(sys, "frozen", False):
         return [sys.executable, "--ocr-worker", kind, path, str(max(pages, 1))]
+    # Native startup changes cwd to private data; workers still need the trusted source root.
+    source = f"import sys; sys.path.insert(0, {str(Path(__file__).resolve().parents[2])!r})\n" + source
     return [sys.executable, "-c", source, path, str(max(pages, 1))]
 
 
