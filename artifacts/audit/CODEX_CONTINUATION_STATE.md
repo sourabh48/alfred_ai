@@ -1,5 +1,39 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - M15 hybrid source integration PASS, production acceptance pending
+
+2026-10-12. Isolated branch codex/m15-persistent-memory-20261011 only.
+Tested source: 4aac9c91c972c047304726b0219736f61ca1402d. This following documentation
+checkpoint does not change tested code; final HEAD/candidate archive are recorded
+in F:/ALFRED_DEV/isolated-tests/m15-hybrid-manifest.json.
+New source commits: 43f1b1b (quality), f977e313 (grounded local reasoning),
+a65d048 (exact JSON dedup), ddc4407 (existing application UI/privacy),
+4aac9c9 (local model outage/consent/grounding safety).
+
+Actual final combined gate: 223 backend PASS in 122.787s; 6 focused Chrome
+workflows PASS in 71.941s; 19 actual native source/Chrome checks PASS, run
+93f9d6d45d; zero failures/skips. Native checks include restart, worker retries/
+crash recovery, document ownership and disposable DB/media/queue restoration.
+System/native configuration/migration drift PASS; no new migration/dependency.
+Actual Ollama encrypted save/reopen/recovery/owned-memory retrieval/grounded
+256-token-cap answer PASS in 25.391s with concurrent gates, zero cloud calls.
+All-minilm 0.20 calibration: 6 positives/6 negatives, recall@3=1, abstention=1;
+small fixture, not universal accuracy. Focused counts overlap and are not added.
+Final graph AST refresh: 8388 nodes/21980 edges; no paid semantic extraction.
+Evidence and limitations: artifacts/audit/M15_RELEASE_READINESS.md and
+docs/M15_HYBRID_INTELLIGENCE.md. Initial fixture/calibration/browser evidence kept.
+
+M15 source integration PASS; whole production release NOT READY. Real provider
+selection/authorization, least-privilege IAM/cost/retention acceptance, independent
+owner key/checkpoint recovery and real deployment/account acceptance are pending.
+Real paid OpenAI disabled/unapproved. Document grounding currently covers verified
+owned Loan closure facts or verified owner memories, not arbitrary raw documents.
+Next action: review frozen development candidate and resolve the documented real
+provider/key acceptance requirements; do not deploy/push/enable real contact.
+Off-device recovery/key remain PENDING; no passphrase dialogs or weakened encryption.
+Stable/operator/private DB/token/recovery/backups unchanged; remote master freshly
+verified at 30e0b3f75e785f639897ad36c19090c6a4e8675f. M15 remains separate.
+
 ## M15 hybrid milestone 4 - unavailable local embeddings and fallback safety
 
 2026-10-12, application source ddc4407. A complete Ollama outage previously stopped
