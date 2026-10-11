@@ -5,9 +5,11 @@ import time
 
 from django.conf import settings
 from alfred_ai.services.public_http import request
+from alfred_ai.services.api_errors import safe_error_details
 
 from .memory_sync import encoded, remaining, SyncUnavailable
 from .persistent_memory import _owner, MemoryConflict
+from .local_embeddings import EmbeddingUnavailable
 
 
 class ReasoningBudgetExceeded(RuntimeError):
@@ -107,7 +109,11 @@ def reason_with_memory(store,user,query,*,consent=False,query_sensitivity=None,p
     if type(daily_tokens) is not int or not 1<=daily_tokens<=65536:
         raise ValueError('Reasoning budget must be bounded.')
     if provider is None: raise SyncUnavailable('No approved reasoning provider is configured.')
-    memories=store.retrieve(user,query,cloud=True,cloud_consent=True)
+    retrieval_error=None
+    try: memories=store.retrieve(user,query,cloud=True,cloud_consent=True)
+    except EmbeddingUnavailable as exc:
+        memories=[]
+        retrieval_error=safe_error_details(exc,'Saved-memory retrieval is unavailable; this answer has no saved-memory grounding.',logger_name=__name__)
     payload={'query':query,'memories':[item['content'] for item in memories]}
     public_payload(payload)
     # Reserve a conservative byte-token upper bound plus output/adapter overhead, including failed calls.
@@ -145,5 +151,6 @@ def reason_with_memory(store,user,query,*,consent=False,query_sensitivity=None,p
         if any(item['id'] not in live for item in memories): raise MemoryConflict('Reasoning context was revoked during inference.')
     return {'answer':answer,'provider':getattr(provider,'name','mock'),'classification':'ai_generated_hypothesis',
         'sources':[{'ref':item['id'],'classification':'owner_verified_public_statement'} for item in memories],
-        'grounding':'user_verified_public_context','financial_authority':False,'reserved_tokens':reserve,
+        'memory_retrieval_available':retrieval_error is None,'retrieval_error':retrieval_error,
+        'grounding':'user_verified_public_context' if memories else 'public_query_only','financial_authority':False,'reserved_tokens':reserve,
         'remaining_tokens':daily_tokens-ledger['reserved'],'reserved_microusd':cost,'remaining_microusd':daily_microusd-ledger['reserved_microusd']}

@@ -270,6 +270,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Reasoning policy saved.' in self.text('memoryCloudFeedback'))
         with store._transaction() as db:
             self.assertEqual(store._sync_state(db,_owner(owner))['reasoning_policy']['daily_microusd'],5000)
+        self.capture('memory-sync-reasoning-owner-policy')
         self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_enabled())
         self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('synthetic public mountain question')
@@ -278,6 +279,15 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('mock',self.text('intelligenceAnswers'))
         self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_selected())
         self.capture('hybrid-public-consent-sync-policy')
+        failed=Mock(); failed.embed.side_effect=EmbeddingUnavailable('synthetic local server offline')
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=failed))
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('synthetic public question while offline')
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'unavailable' in self.text('intelligenceFeedback').lower())
+        self.memory_click('#intelligenceCloudConsent'); self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'no saved-memory grounding' in self.text('intelligenceFeedback'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_selected())
+        self.capture('hybrid-local-outage-public-query-only')
 
     def test_private_memory_delete_retention_reset_keep_family_isolated(self):
         from datetime import datetime, timezone, timedelta

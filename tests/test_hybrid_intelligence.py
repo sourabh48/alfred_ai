@@ -66,6 +66,29 @@ class HybridIntelligenceTests(TestCase):
             self.assertGreater(self.store._sync_state(db,_owner(self.alice))['reasoning']['reserved'],0)
         with self.assertRaises(PermissionError): self.answer('loan balance',cloud_consent=True,query_sensitivity='public')
 
+    def test_embedding_outage_preserves_local_first_and_safe_observability(self):
+        identity=self.save()
+        with patch.object(self.store,'retrieve',side_effect=EmbeddingUnavailable('SYNTHETIC-SECRET F:\\synthetic\\private.pdf')), self.assertLogs('apps.ml_engine.services.hybrid_intelligence',level='ERROR') as logs:
+            result=self.answer()
+        self.assertEqual(result['provider'],'ollama'); self.assertFalse(result['memory_retrieval_available'])
+        self.assertEqual(result['sources'],[]); self.assertTrue(result['retrieval_error']['error_id'])
+        self.assertIn('EmbeddingUnavailable',str(logs.output)); self.assertNotIn('SYNTHETIC-SECRET',str(logs.output)+str(result))
+        self.cloud.assert_not_called(); self.assertEqual(self.store.list_memories(self.alice)[0]['id'],identity)
+
+    def test_full_local_outage_only_sends_explicit_public_query_without_memories(self):
+        self.save(); self.local.reason.side_effect=EmbeddingUnavailable('synthetic server offline')
+        provider=Mock(); provider.name='mock'; provider.reason.return_value='Synthetic public hypothesis'
+        self.cloud.return_value=provider
+        with patch.object(self.store,'retrieve',side_effect=EmbeddingUnavailable('synthetic embedding offline')):
+            with self.assertRaises(EmbeddingUnavailable): self.answer()
+            self.cloud.assert_not_called()
+            result=self.answer(cloud_consent=True,query_sensitivity='public')
+            self.assertEqual(provider.reason.call_args.args[0],{'query':'mountain','memories':[]})
+            self.assertEqual(result['grounding'],'public_query_only'); self.assertFalse(result['memory_retrieval_available'])
+            with self.assertRaises(PermissionError): self.answer('loan balance',cloud_consent=True,query_sensitivity='public')
+        with patch.object(self.store,'retrieve',side_effect=RuntimeError('synthetic storage failure')):
+            with self.assertRaises(RuntimeError): self.answer(cloud_consent=True,query_sensitivity='public')
+
     def test_sensitive_memory_cannot_leave_device_even_when_query_is_marked_public(self):
         self.save(); self.local.reason.side_effect=EmbeddingUnavailable('synthetic local failure')
         with self.assertRaises(PermissionError): self.answer(cloud_consent=True,query_sensitivity='public')

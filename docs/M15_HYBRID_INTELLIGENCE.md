@@ -30,6 +30,14 @@ rechecked before returning a result; already authorized in-flight calls cannot b
 recalled. Queries/answers are not automatically persisted. Owners must explicitly
 verify a memory before saving it through the existing encrypted store.
 
+When local embedding inference is unavailable, local reasoning may proceed without
+saved-memory context; the response and UI explicitly disclose missing grounding.
+Only an approved public general query may fall back without any memories when
+both local inference paths fail. Existing payload filters, provider authorization,
+owner policy and budgets still apply. Classification/reference-only diagnostics
+preserve observability; corrupt storage and unexpected failures still fail closed.
+No unauthenticated call, private domain context or automatic paid retry is added.
+
 Settings/environment select ALFRED_MEMORY_OLLAMA_MODEL (default qwen3.5:4b) and
 ALFRED_MEMORY_RELEVANCE_MIN_SCORE (default 0.20). Legacy retrieval remains unchanged.
 All-minilm synthetic calibration: 6 positive/6 negative questions, recall@3 and

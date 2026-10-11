@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             answers.append(row);
             while (answers.children.length > 10) answers.firstElementChild.remove();
-            feedback.textContent = "Answer ready. Review the sources before acting.";
+            feedback.textContent = result.retrieval_error?.detail || "Answer ready. Review the sources before acting.";
             query.value = "";
         } catch (error) { if (active && ticket === generation) feedback.textContent = error.message; }
         finally { consent.checked = false; button.disabled = false; }

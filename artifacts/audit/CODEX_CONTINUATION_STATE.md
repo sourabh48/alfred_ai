@@ -1,5 +1,17 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15 hybrid milestone 4 - unavailable local embeddings and fallback safety
+
+2026-10-12, application source ddc4407. A complete Ollama outage previously stopped
+at embedding retrieval before reaching the approved fallback path. Local reasoning
+now tolerates unavailable embeddings with no saved memories and an explicit safe
+grounding warning. With both local paths unavailable, only an explicitly approved
+public general question can reach the existing provider/filter/policy/budget gate,
+without any memory payload. Domain/private requests remain local. Classified error
+references retain observability; storage/tamper/unexpected failures fail closed.
+Focused related gate: 62 PASS in 13.902s, zero failures/skips. Browser warning and
+combined/native source gates follow. No live/private/provider/key changes.
+
 ## M15 hybrid milestone 3 - existing application conversation and privacy controls
 
 2026-10-12. Reasoning source f977e3130741e86431bfc6d4d088f36b7e2e57ad.

@@ -4,6 +4,7 @@ import re
 import time
 
 from django.conf import settings
+from alfred_ai.services.api_errors import safe_error_details
 
 from .local_embeddings import OllamaEmbeddings, EmbeddingUnavailable
 from .persistent_memory import _owner, MemoryConflict
@@ -71,7 +72,11 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,cloud_cons
             or (scope!='documents' and document_id is not None)):
         raise ValueError('Choose a bounded question and an owned supported source.')
     tools=source_context(user,scope,document_id)
-    memories=store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
+    retrieval_error=None
+    try: memories=store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
+    except EmbeddingUnavailable as exc:
+        memories=[]
+        retrieval_error=safe_error_details(exc,'Saved-memory retrieval is unavailable; this answer has no saved-memory grounding.',logger_name=__name__)
     payload={'query':query,'sources':tools.copy()}; included=[]
     if len(json.dumps(payload,ensure_ascii=False,allow_nan=False).encode())>4096: raise ValueError('Select smaller local source context.')
     for item in memories:
@@ -91,5 +96,6 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,cloud_cons
         if any(item['id'] not in live for item in included): raise MemoryConflict('Answer context changed during inference.')
     if source_context(user,scope,document_id)!=tools: raise MemoryConflict('Canonical source changed during inference.')
     return {'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
+        'memory_retrieval_available':retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
             'score':item['score']} for item in included]+tools,'context_omitted':len(memories)-len(included)}
