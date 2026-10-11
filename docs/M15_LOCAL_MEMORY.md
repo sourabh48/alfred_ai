@@ -1,5 +1,9 @@
 # M15 first local memory slice
 
+This document records the local baseline. The subsequent opt-in synthetic
+encrypted synchronization milestone is documented in
+[M15_ENCRYPTED_MEMORY_SYNC.md](M15_ENCRYPTED_MEMORY_SYNC.md).
+
 Branch: codex/m15-persistent-memory-20261011 in F:/ALFRED_DEV/m15.
 Frozen M14 release: 6050234e6da66d38d558be1976371e9d541f0319 on
 release/m14-20261011. M15 files do not belong to that release candidate.

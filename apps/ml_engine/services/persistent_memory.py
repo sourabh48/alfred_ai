@@ -7,6 +7,7 @@ from math import hypot
 import os
 from pathlib import Path
 import sqlite3
+import time
 from uuid import uuid4
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -36,20 +37,21 @@ def _owner(user):
 
 
 class MemoryStore:
-    def __init__(self, directory, *, embedder=None):
+    def __init__(self, directory, *, embedder=None, timeout=10):
         if not Path(directory).is_absolute():
             raise ValueError('Memory storage requires an absolute persistent directory.')
-        private_directory(Path(directory).absolute())
+        deadline=time.monotonic()+timeout
+        private_directory(Path(directory).absolute(), deadline=deadline)
         self.directory = Path(directory).resolve()
         self.database = self.directory / 'verified.sqlite3'
         self.key_file = self.directory / 'journal.key'
         self.embedder = embedder if embedder is not None else OllamaEmbeddings()
         if self.database.exists():
-            with closing(sqlite3.connect(self.database.as_uri() + '?mode=ro', uri=True)) as old:
+            with closing(sqlite3.connect(self.database.as_uri() + '?mode=ro', uri=True, timeout=max(0.001,deadline-time.monotonic()))) as old:
                 previous = old.execute("SELECT sql FROM sqlite_master WHERE name='memories'").fetchone()
                 if previous and 'record TEXT' in previous[0]:
                     raise MemoryStorageUnavailable('Legacy plaintext memory vault is preserved; use a new protected vault.')
-        with self._transaction() as db:
+        with self._transaction(timeout=max(0.001,deadline-time.monotonic())) as db:
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS memories (
                     id TEXT PRIMARY KEY, owner TEXT NOT NULL, record BLOB NOT NULL);
@@ -58,6 +60,7 @@ class MemoryStore:
                     id TEXT PRIMARY KEY, owner TEXT NOT NULL, wrapped BLOB NOT NULL);
                 CREATE TABLE IF NOT EXISTS policies (owner TEXT PRIMARY KEY, encrypted BLOB NOT NULL);
                 CREATE TABLE IF NOT EXISTS owner_epochs (owner TEXT PRIMARY KEY, epoch INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS memory_sync (owner TEXT PRIMARY KEY, encrypted BLOB NOT NULL);
                 CREATE TABLE IF NOT EXISTS events (
                     sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE,
                     owner TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'save', ciphertext BLOB NOT NULL);
@@ -69,8 +72,8 @@ class MemoryStore:
             ''')
 
     @contextmanager
-    def _transaction(self):
-        db = sqlite3.connect(self.database, timeout=10)
+    def _transaction(self, timeout=10):
+        db = sqlite3.connect(self.database, timeout=timeout)
         try:
             db.execute('PRAGMA journal_mode=DELETE')
             db.execute('PRAGMA secure_delete=ON')
@@ -86,7 +89,8 @@ class MemoryStore:
 
     def _cipher(self, db):
         if not self.key_file.exists():
-            if db.execute('SELECT EXISTS(SELECT 1 FROM events)').fetchone()[0]:
+            if any(db.execute('SELECT EXISTS(SELECT 1 FROM '+table+')').fetchone()[0]
+                   for table in ('events', 'memory_keys', 'policies', 'memory_sync')):
                 raise RuntimeError('Memory recovery key is missing; restore its protected backup.')
             protected = b'M15DPAPI1\0' + protect_key(Fernet.generate_key())
             descriptor = os.open(self.key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -128,6 +132,24 @@ class MemoryStore:
         row = db.execute('SELECT encrypted FROM policies WHERE owner=?', (owner,)).fetchone()
         return json.loads(self._cipher(db).decrypt(row[0]))['days'] if row else 30
 
+    def _sync_state(self, db, owner):
+        row = db.execute('SELECT encrypted FROM memory_sync WHERE owner=?', (owner,)).fetchone()
+        state = json.loads(self._cipher(db).decrypt(row[0])) if row else {'owner': owner, 'enabled': False,
+            'revision': 0, 'identity': None, 'ack': None, 'pending': False, 'failures': 0, 'retry_at': 0, 'conflict': False}
+        if state['owner'] != owner:
+            raise RuntimeError('Memory synchronization ownership verification failed.')
+        return state
+
+    def _write_sync_state(self, db, owner, state):
+        encrypted = self._cipher(db).encrypt(_json(state).encode())
+        db.execute('INSERT INTO memory_sync VALUES(?,?) ON CONFLICT(owner) DO UPDATE SET encrypted=excluded.encrypted', (owner, encrypted))
+
+    def _sync_dirty(self, db, owner):
+        if db.execute('SELECT 1 FROM memory_sync WHERE owner=?', (owner,)).fetchone():
+            state = self._sync_state(db, owner)
+            state['pending'] = True
+            self._write_sync_state(db, owner, state)
+
     def _revoke(self, db, owner, identities, *, kind='delete'):
         if not identities:
             return 0
@@ -137,6 +159,7 @@ class MemoryStore:
         for identity in identities:
             db.execute('DELETE FROM memories WHERE id=? AND owner=?', (identity, owner))
             db.execute('DELETE FROM memory_keys WHERE id=? AND owner=?', (identity, owner))
+        self._sync_dirty(db, owner)
         return len(identities)
 
     def _expire(self, db, owner):
@@ -167,6 +190,7 @@ class MemoryStore:
         with self._transaction() as db:
             encrypted = self._cipher(db).encrypt(json.dumps({'days': days}).encode())
             db.execute('INSERT INTO policies(owner,encrypted) VALUES(?,?) ON CONFLICT(owner) DO UPDATE SET encrypted=excluded.encrypted', (owner, encrypted))
+            self._sync_dirty(db, owner)
             return self._expire(db, owner)
 
     def delete_memory(self, user, identity):
@@ -179,6 +203,7 @@ class MemoryStore:
         owner = _owner(user)
         with self._transaction() as db:
             db.execute('INSERT INTO owner_epochs(owner,epoch) VALUES(?,1) ON CONFLICT(owner) DO UPDATE SET epoch=epoch+1', (owner,))
+            self._sync_dirty(db, owner)
             identities = [r[0] for r in db.execute('SELECT id FROM memory_keys WHERE owner=?', (owner,))]
             return self._revoke(db, owner, identities, kind='reset')
 
@@ -220,6 +245,7 @@ class MemoryStore:
             db.execute('INSERT INTO memory_keys(id,owner,wrapped) VALUES(?,?,?)', (record['id'], owner, self._cipher(db).encrypt(key)))
             db.execute('INSERT INTO events(id,owner,ciphertext) VALUES(?,?,?)', (record['id'], owner, ciphertext))
             db.execute('INSERT INTO memories(id,owner,record) VALUES(?,?,?)', (record['id'], owner, ciphertext))
+            self._sync_dirty(db, owner)
         return record['id']
 
     def retrieve(self, user, query, *, limit=3, cloud=False, cloud_consent=False):

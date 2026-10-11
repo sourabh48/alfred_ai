@@ -1,5 +1,33 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - M15 encrypted synchronization protocol, synthetic PASS
+
+2026-10-11: Continue ONLY F:/ALFRED_DEV/m15 on its existing M15 branch. Base
+a06f3e114f9bb1a53fccfbaedb9e0833dc93a20f was verified clean before this work.
+M14 is DEPLOYED at 30e0b3f75e785f639897ad36c19090c6a4e8675f; its source and
+private database were not modified. Off-device recovery, real-account browser
+acceptance and separately authorized GitHub push remain operational PENDING.
+
+Provider-neutral authenticated encrypted snapshots/current-key manifests now
+work with a local synthetic mock. Explicit owner opt-in, atomic encrypted retries,
+immutable CAS versions, high-water/fork checking, bounded validation, offline
+restart, confirmed deterministic merge, deletion/retention/reset and owner isolation
+are covered. No raw SQLite/WAL/SHM synchronization, private upload, real cloud
+adapter or OpenAI request. Missing keys preserve data; no backup deletion.
+
+20 protocol regressions pass within the current 107-test integration run. Real
+two-process Ollama mock-upload/restart/download/authentication/journal recovery/
+retrieval proof PASS: 384 dimensions, score 0.518286, same ID and provenance/
+sensitivity/ownership, external cloud calls zero. See docs/M15_ENCRYPTED_MEMORY_SYNC.md.
+Runtime/API integration and mock reasoning consent/budget work are validated in
+the working tree and will be committed as the next coherent milestone. No new
+Django migration/dependency. Final commit SHAs go in the external sync manifest.
+
+Current replica revocation does not erase old backups/recipients or versioned old
+key manifests. Fresh-device replay detection needs a trusted checkpoint and
+separate portable key recovery. Whole M15 remains INCOMPLETE; real providers
+need user authorization and those protections before private use.
+
 ## Latest checkpoint - M15 protected memory lifecycle, synthetic gate PASS
 
 2026-10-11: ONLY F:/ALFRED_DEV/m15 on codex/m15-persistent-memory-20261011.
