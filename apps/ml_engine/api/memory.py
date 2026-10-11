@@ -8,19 +8,18 @@ from rest_framework.views import APIView
 
 from alfred_ai.services.api_errors import safe_error_response
 from apps.ml_engine.services.persistent_memory import MemoryStore
-from apps.ml_engine.services.memory_sync import MemorySynchronizer, MockCloudProvider, SyncUnavailable, SyncConflict
+from apps.ml_engine.services.memory_sync import SyncConflict
 from apps.ml_engine.services.memory_reasoning import MockReasoner, ReasoningBudgetExceeded, reason_with_memory
 from apps.ml_engine.services.memory_learning import MemoryLearning
+from apps.ml_engine.services.memory_cloud import synchronizer, configured_provider
 
 
 def memory_store():
     return MemoryStore(Path(settings.ALFRED_MEMORY_DIR))
 
 
-def memory_sync():
-    if not settings.ALFRED_MEMORY_SYNC_MOCK_DIR:
-        raise SyncUnavailable('No approved synchronization provider is configured.')
-    return MemorySynchronizer(memory_store(),MockCloudProvider(settings.ALFRED_MEMORY_SYNC_MOCK_DIR))
+def memory_sync(user):
+    return synchronizer(memory_store(),user)
 
 
 class MemoryAPI(APIView):
@@ -106,15 +105,16 @@ class MemoryRetrieveAPI(MemoryAPI):
 
 class MemorySyncAPI(MemoryAPI):
     def get(self,request):
-        return Response({'provider':'local mock','status':memory_sync().status(request.user)})
+        return Response({'provider':configured_provider() or 'disabled','status':memory_sync(request.user).status(request.user)})
 
     def post(self,request):
         data=self.payload(('action','enabled','consent','confirm'))
         action=data.get('action')
-        allowed={'configure':{'action','enabled','consent'},'sync':{'action'},'recover':{'action','confirm'}}
+        allowed={'configure':{'action','enabled','consent'},'sync':{'action'},'recover':{'action','confirm'},'prune':{'action','confirm'}}
         if not isinstance(action,str) or action not in allowed or set(data)-allowed[action]: raise ValueError()
-        if action=='recover' and data.get('confirm') is not True: raise ValueError()
-        sync=memory_sync()
+        if action in ('recover','prune') and data.get('confirm') is not True: raise ValueError()
+        sync=memory_sync(request.user)
+        if action=='prune': return Response({'removed_snapshots':sync.prune(request.user,confirm=True)})
         if action=='configure':
             return Response({'status':sync.configure(request.user,enabled=data.get('enabled'),consent=data.get('consent',False))})
         result=sync.run(request.user,recover=action=='recover')

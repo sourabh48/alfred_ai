@@ -1,6 +1,6 @@
 """Authenticated encrypted snapshots, current-key manifests and durable owner retries.
 
-The only supplied provider is a local synthetic mock. Real transports must enforce
+All providers must enforce
 authenticated owner scope, immutable objects, atomic CAS and this total deadline.
 """
 from contextlib import closing
@@ -59,6 +59,7 @@ class MockCloudProvider:
                 PRAGMA secure_delete=ON;
                 CREATE TABLE IF NOT EXISTS objects(owner TEXT, identity TEXT, ciphertext BLOB, PRIMARY KEY(owner,identity));
                 CREATE TABLE IF NOT EXISTS heads(owner TEXT PRIMARY KEY, revision INTEGER, identity TEXT, manifest BLOB);
+                CREATE TABLE IF NOT EXISTS object_times(owner TEXT, identity TEXT, created REAL, PRIMARY KEY(owner,identity));
                 CREATE TRIGGER IF NOT EXISTS objects_immutable_update BEFORE UPDATE ON objects BEGIN SELECT RAISE(ABORT,'Immutable snapshot'); END;
                 CREATE TRIGGER IF NOT EXISTS objects_immutable_delete BEFORE DELETE ON objects BEGIN SELECT RAISE(ABORT,'Immutable snapshot'); END;
             ''')
@@ -99,10 +100,29 @@ class MockCloudProvider:
                 raise SyncConflict('Concurrent remote updates require verified recovery.')
             remaining(deadline)
             db.execute('INSERT OR IGNORE INTO objects VALUES(?,?,?)',(owner,identity,ciphertext))
+            db.execute('INSERT OR IGNORE INTO object_times VALUES(?,?,?)',(owner,identity,time.time()))
             db.execute('INSERT INTO heads VALUES(?,?,?,?) ON CONFLICT(owner) DO UPDATE SET revision=excluded.revision,identity=excluded.identity,manifest=excluded.manifest',
                 (owner,expected_revision+1,identity,manifest))
             db.commit()
         return {'revision':expected_revision+1,'identity':identity,'manifest':manifest}
+
+    def snapshots(self,owner,*,deadline):
+        with closing(self._connection(owner,deadline)) as db:
+            rows=db.execute('SELECT objects.identity,COALESCE(object_times.created,?) FROM objects LEFT JOIN object_times USING(owner,identity) WHERE objects.owner=? LIMIT 4097',(time.time(),owner)).fetchall()
+        if len(rows)>4096: raise SyncUnavailable('Snapshot listing exceeds the bounded retention pass.')
+        return rows
+
+    def remove_snapshot(self,owner,identity,*,deadline):
+        if not valid_id(identity,64): raise PermissionError('Invalid snapshot removal scope.')
+        with closing(self._connection(owner,deadline)) as db:
+            db.execute('BEGIN IMMEDIATE')
+            if db.execute('SELECT 1 FROM heads WHERE owner=? AND identity=?',(owner,identity)).fetchone(): raise SyncConflict('Current snapshot cannot be pruned.')
+            # Retention is the sole deletion exception; DDL and removal commit atomically.
+            db.execute('DROP TRIGGER objects_immutable_delete')
+            db.execute('DELETE FROM objects WHERE owner=? AND identity=?',(owner,identity))
+            db.execute('DELETE FROM object_times WHERE owner=? AND identity=?',(owner,identity))
+            db.execute("CREATE TRIGGER objects_immutable_delete BEFORE DELETE ON objects BEGIN SELECT RAISE(ABORT,'Immutable snapshot'); END")
+            remaining(deadline); db.commit()
 
 class MemorySynchronizer:
     def __init__(self, store, provider):
@@ -140,6 +160,41 @@ class MemorySynchronizer:
         with self.store._transaction() as db:
             state=self.store._sync_state(db,_owner(user))
             return {k:state[k] for k in ('enabled','pending','revision','conflict','failures')}
+
+    def prune(self,user,*,confirm=False):
+        if confirm is not True: raise PermissionError('Explicit snapshot pruning confirmation is required.')
+        owner=_owner(user); deadline=time.monotonic()+5
+        with self.store._transaction(timeout=remaining(deadline)) as db:
+            state=self.store._sync_state(db,owner)
+            if not state['enabled'] or state['pending'] or state['conflict']: raise SyncConflict('Synchronize current local changes before pruning.')
+        cipher=self._key(owner); head=self.provider.head(owner,deadline=deadline)
+        if not head: return 0
+        snapshot,parent=self._verify(owner,head,cipher,deadline)
+        if head['revision']!=state['revision'] or head['identity']!=state['identity']: raise SyncConflict('Refresh the current trusted checkpoint before pruning.')
+        retained={head['identity']}; revision=head['revision']-1; downloaded=0
+        cutoff=time.time()-self.store.retention_days(user)*86400
+        # Preserve all ancestors needed by the bounded 128-version recovery window.
+        for _ in range(128):
+            if parent is None: break
+            body=self.provider.download(owner,parent,deadline=deadline)
+            downloaded+=len(body)
+            if downloaded>64*1024*1024: raise SyncUnavailable('Snapshot pruning verification budget exceeded.')
+            try:
+                payload=json.loads(cipher.decrypt(body))
+                if sha256(body).hexdigest()!=parent or type(payload['schema']) is not int or payload['schema']!=1 or payload['owner']!=owner or type(payload['revision']) is not int or payload['revision']!=revision or (revision==1 and payload['parent'] is not None) or (revision>1 and not valid_id(payload['parent'],64)): raise ValueError()
+                cutoff=min(cutoff,cipher.extract_timestamp(body)-86400)
+            except (ValueError,KeyError,InvalidToken): raise SyncUnavailable('Snapshot pruning history verification failed.') from None
+            retained.add(parent); parent=payload['parent']; revision-=1
+        objects=self.provider.snapshots(owner,deadline=deadline)
+        if self.provider.head(owner,deadline=deadline)!=head: raise SyncConflict('Cloud changed during pruning verification.')
+        with self.store._transaction(timeout=remaining(deadline)) as db:
+            latest=self.store._sync_state(db,owner)
+            if not latest['enabled'] or latest['pending'] or latest['revision']!=state['revision']: raise SyncConflict('Local consent or memory changed during pruning.')
+        count=0
+        for identity,created in objects:
+            if identity not in retained and created<cutoff and count<16:
+                self.provider.remove_snapshot(owner,identity,deadline=deadline); count+=1
+        return count
 
     def _snapshot(self, db, owner):
         self.store._expire(db,owner)

@@ -1,5 +1,31 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - M15 disabled S3 adapter and snapshot retention PASS
+
+2026-10-11: ONLY isolated M15. Learning milestone baf13350541dc3b79b46701345b35fbe6894e075.
+S3 now implements the existing encrypted protocol with owner-bound Signature V4,
+private/non-versioned bucket control checks, expected-account ownership, SSE,
+immutable conditional objects and ETag CAS heads. Shared HTTPS transport adds
+conditional binary PUT/DELETE, safe ETag/status metadata and bounded DNS/stream
+deadlines. Profile provisioning is masked, encrypted and does not enable contact.
+Runtime/API factory preserves mock, defaults real cloud OFF; no external call.
+Confirmed snapshot pruning retains current plus 128 verified ancestors, removes
+up to 16 older unreferenced owner objects within five seconds and preserves
+all existing recovery backups. Revocations propagate; old-key/backup/offline-
+recipient erasure is not claimed. See docs/M15_CLOUD_ADAPTER.md before any real
+provider authorization: IAM, costs, portable owner keys and trusted checkpoint
+must be reviewed and tested separately.
+
+Actual focused adapter/transport/runtime gate: 73 PASS, 27.313 seconds, zero
+failures/skips (m15-s3-focused-final.log). Two new independent local Ollama
+processes use the actual S3 adapter against authenticated signed wire fixtures:
+384 dimensions, score 0.518286, same memory/provenance/ownership and encrypted
+journal recovery PASS; seven upload/five restart fixture requests, zero external
+cloud requests. Evidence m15-s3-ollama-save.log and m15-s3-ollama-restore.log.
+No new dependency/Django migration, no live source/database/service/token change.
+Off-device export/separate key location and GitHub push approvals still missing.
+Commit SHA recorded in isolated m15-cloud-manifest.json after commit.
+
 ## Latest checkpoint - M15 local candidate review and correction PASS
 
 2026-10-11: ONLY F:/ALFRED_DEV/m15, starting verified b05c3b0. Encrypted,

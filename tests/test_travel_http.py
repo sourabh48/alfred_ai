@@ -74,3 +74,35 @@ class TravelHTTPTests(SimpleTestCase):
         self.assertEqual(normalized_link("data:hello"), "")
         self.assertEqual(normalized_link("https://example.org/page#entry"), "https://example.org/page#entry")
         self.dns.assert_not_called()
+
+    def test_conditional_binary_put_and_concurrency_response_metadata(self):
+        self.response.status=412; self.response.headers={'Content-Type':'application/xml','ETag':'"version"'}
+        self.response.read.side_effect=[b'<Error/>',b'']
+        result=request('PUT','https://example.org/object',data=b'encrypted bytes',headers={'Content-Type':'application/octet-stream','If-Match':'"old"'},content_types=('application/xml',),accepted_statuses=(200,412))
+        self.assertEqual(result.status,412); self.assertEqual(result.headers['ETag'],'"version"')
+        self.assertEqual(self.pool.urlopen.call_args.kwargs['body'],b'encrypted bytes')
+        self.assertEqual(self.pool.urlopen.call_args.kwargs['headers']['Content-Type'],'application/octet-stream')
+
+    def test_partial_response_and_deadline_are_rejected(self):
+        import time
+        self.response.headers['Content-Length']='100'
+        with self.assertRaisesRegex(PublicHTTPError,'incomplete_response'): request('GET','https://example.org/')
+        self.pool_class.reset_mock()
+        with self.assertRaisesRegex(PublicHTTPError,'timeout'): request('GET','https://example.org/',deadline=time.monotonic()-1)
+        self.pool_class.assert_not_called()
+
+    def test_bounded_dns_timeout_cannot_later_connect_or_send_credentials(self):
+        from threading import Event
+        import time
+        released=Event(); self.addCleanup(released.set)
+        self.dns.side_effect=lambda *args: released.wait(1) or []
+        with self.assertRaisesRegex(PublicHTTPError,'timeout'):
+            request('GET','https://example.org/',headers={'Authorization':'synthetic'},deadline=time.monotonic()+0.02)
+        released.set(); self.pool_class.assert_not_called()
+
+    def test_delete_no_content_and_redirect_rules_remain_enforced(self):
+        self.response.status=204; self.response.headers={}; self.response.read.side_effect=[b'']
+        self.assertEqual(request('DELETE','https://example.org/object',accepted_statuses=(204,)).status,204)
+        self.response.status=302
+        with self.assertRaisesRegex(PublicHTTPError,'redirect_blocked'):
+            request('PUT','https://example.org/object',accepted_statuses=(302,))

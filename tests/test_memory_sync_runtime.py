@@ -143,7 +143,7 @@ class MemorySyncRuntimeTests(TestCase):
         self.assertTrue(self.sync.status(self.alice)['pending']); self.assertNotIn('SYNTHETIC-SECRET',''.join(logs.output))
 
     def test_unconfigured_command_does_not_create_mock_storage(self):
-        with override_settings(ALFRED_MEMORY_SYNC_MOCK_DIR=''),patch('apps.ml_engine.management.commands.sync_private_memory.MockCloudProvider',side_effect=AssertionError('No provider')):
+        with override_settings(ALFRED_MEMORY_SYNC_MOCK_DIR=''),patch('apps.ml_engine.services.memory_cloud.MockCloudProvider',side_effect=AssertionError('No provider')):
             call_command('sync_private_memory',stdout=StringIO())
 
     def test_native_startup_download_and_shutdown_upload_after_writer_drain(self):

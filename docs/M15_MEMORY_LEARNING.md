@@ -2,7 +2,7 @@
 
 2026-10-11, isolated M15 source only. No deployment or financial-record change.
 
-`/api/ml/memories/learning/` uses the existing session, CSRF, owner, abuse and
+`/api/ai/memories/learning/` uses the existing session, CSRF, owner, abuse and
 no-store controls. GET returns the owner's encrypted local candidates. POST
 supports extract, verify, correct, consolidate, reembed and evaluate. Unknown
 fields, including owner overrides, are rejected.
