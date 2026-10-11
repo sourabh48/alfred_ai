@@ -93,9 +93,8 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
 
     vehicle_count = BikeProfile.objects.count()
     vehicle_value_count = BikeProfile.objects.filter(estimated_market_value__gt=0).count()
-    heuristic_vehicle_value_count = BikeProfile.objects.filter(estimated_market_value__gt=0).exclude(
-        verification_status="official"
-    ).count()
+    # Catalog/specification verification does not verify a user's resale value.
+    heuristic_vehicle_value_count = vehicle_value_count
     vehicle_import_review_count = BikeDocument.objects.filter(parser_status__in=PARSER_REVIEW_STATUSES).count()
     vehicle_actual_cost_missing_count = BikeIssueReport.objects.exclude(projected_cost__isnull=True).filter(
         projected_cost__gt=0,
@@ -223,7 +222,7 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
                 "Cash, credit liability, investment value, loan liability, home acquisition-cost proxy, and vehicle treatment are summed in one balance-sheet path",
                 f"{vehicle_value_count} vehicle market value(s) present",
             ],
-            blockers=["Some vehicle values are custom or AI-matched rather than official"] if heuristic_vehicle_value_count else [],
+            blockers=["Vehicle market values are user estimates; catalog matches do not verify resale value"] if heuristic_vehicle_value_count else [],
         ),
         _entry(
             key="investment_position_totals",
@@ -310,13 +309,13 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
             code_path="apps/expenses/services/financial_intelligence.py::_build_vehicle_positions",
             evidence=[
                 f"{vehicle_count} vehicle profile(s)",
-                f"{heuristic_vehicle_value_count} non-official market value(s)",
+                f"{heuristic_vehicle_value_count} user-estimated market value(s)",
                 f"{vehicle_actual_cost_missing_count} projected issue cost(s) without actual-cost outcome",
             ],
             blockers=[
                 blocker
                 for blocker in [
-                    "Vehicle value and asset/liability bucket depend on usage-pattern assumptions" if vehicle_count else "",
+                    "Vehicle market values remain user estimates; operating costs and usage do not establish value or debt" if vehicle_count else "",
                     "Actual repair costs are still missing for projected vehicle issue costs"
                     if vehicle_actual_cost_missing_count
                     else "",
@@ -399,7 +398,7 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
     if document_review_count:
         blockers.append(f"{document_review_count} parser-tracked document import(s) still need review")
     if heuristic_vehicle_value_count:
-        blockers.append(f"{heuristic_vehicle_value_count} vehicle market value(s) are custom or AI-matched")
+        blockers.append(f"{heuristic_vehicle_value_count} vehicle market value(s) remain user estimates")
     if vehicle_actual_cost_missing_count:
         blockers.append(f"{vehicle_actual_cost_missing_count} vehicle issue projection(s) still lack actual-cost outcome")
     if not salary_model_ready:

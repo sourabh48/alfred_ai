@@ -3,8 +3,12 @@ Tax Optimization Engine
 Smart tax-saving suggestions for Indian Income Tax
 """
 from datetime import date
+from decimal import Decimal
 from typing import Dict, List, Optional
 from django.utils import timezone
+from apps.loans.money import loan_money, loan_money_float
+
+from .tax_policy import calculate_income_tax, get_policy
 
 
 class TaxOptimizerService:
@@ -12,24 +16,6 @@ class TaxOptimizerService:
     AI-powered tax optimization for Indian users.
     Provides tax calculations, deductions, and investment suggestions under various IT Act sections.
     """
-
-    # Income Tax Slabs for FY 2025-26 (Old Regime)
-    OLD_REGIME_SLABS = [
-        (250000, 0),      # Up to 2.5L - 0%
-        (500000, 5),      # 2.5L - 5L - 5%
-        (1000000, 20),    # 5L - 10L - 20%
-        (float('inf'), 30)  # Above 10L - 30%
-    ]
-
-    # Income Tax Slabs for FY 2025-26 (New Regime)
-    NEW_REGIME_SLABS = [
-        (300000, 0),      # Up to 3L - 0%
-        (700000, 5),      # 3L - 7L - 5%
-        (1000000, 10),    # 7L - 10L - 10%
-        (1200000, 15),    # 10L - 12L - 15%
-        (1500000, 20),    # 12L - 15L - 20%
-        (float('inf'), 30)  # Above 15L - 30%
-    ]
 
     # Tax Deductions (Old Regime)
     DEDUCTIONS = {
@@ -83,97 +69,11 @@ class TaxOptimizerService:
         }
     }
 
-    def __init__(self):
-        self.cess = 4  # 4% Health and Education Cess
+    def calculate_tax(self, annual_income, regime: str = 'old', deductions=None, **policy_options) -> Dict:
+        """Use the versioned Decimal policy; see returned year, scope and sources."""
+        return calculate_income_tax(annual_income, regime, deductions, **policy_options)
 
-    def calculate_tax(self, annual_income: float, regime: str = 'old',
-                     deductions: Dict[str, float] = None) -> Dict:
-        """
-        Calculate income tax for the given income.
-
-        Args:
-            annual_income: Annual gross income
-            regime: 'old' or 'new' tax regime
-            deductions: Dict of section -> amount deductions
-
-        Returns:
-            Dict with tax calculation breakdown
-        """
-        if deductions is None:
-            deductions = {}
-
-        slabs = self.OLD_REGIME_SLABS if regime == 'old' else self.NEW_REGIME_SLABS
-
-        # Calculate taxable income
-        if regime == 'old':
-            # Old regime: Apply deductions
-            total_deductions = sum(deductions.values())
-            # Standard deduction
-            standard_deduction = 50000
-            taxable_income = annual_income - standard_deduction - total_deductions
-        else:
-            # New regime: No deductions except standard deduction
-            standard_deduction = 75000  # Increased in new regime
-            taxable_income = annual_income - standard_deduction
-
-        # Ensure taxable income is not negative
-        taxable_income = max(0, taxable_income)
-
-        # Calculate tax slab-wise
-        tax = 0
-        previous_limit = 0
-        slab_breakdown = []
-
-        for limit, rate in slabs:
-            if taxable_income > previous_limit:
-                slab_income = min(taxable_income, limit) - previous_limit
-                slab_tax = slab_income * rate / 100
-
-                slab_breakdown.append({
-                    'range': f'₹{previous_limit:,.0f} - ₹{limit:,.0f}' if limit != float('inf') else f'Above ₹{previous_limit:,.0f}',
-                    'rate': rate,
-                    'income_in_slab': slab_income,
-                    'tax': slab_tax
-                })
-
-                tax += slab_tax
-                previous_limit = limit
-
-            if taxable_income <= limit:
-                break
-
-        # Add cess
-        cess_amount = tax * self.cess / 100
-        total_tax = tax + cess_amount
-
-        # Rebate under Section 87A (if applicable)
-        rebate = 0
-        if regime == 'new' and taxable_income <= 700000:
-            rebate = min(total_tax, 25000)  # Max rebate ₹25,000
-        elif regime == 'old' and taxable_income <= 500000:
-            rebate = min(total_tax, 12500)  # Max rebate ₹12,500
-
-        final_tax = max(0, total_tax - rebate)
-
-        return {
-            'annual_income': annual_income,
-            'regime': regime,
-            'standard_deduction': standard_deduction,
-            'total_deductions': sum(deductions.values()) if regime == 'old' else 0,
-            'deduction_breakdown': deductions if regime == 'old' else {},
-            'taxable_income': taxable_income,
-            'base_tax': tax,
-            'cess': cess_amount,
-            'total_tax_before_rebate': total_tax,
-            'rebate_87a': rebate,
-            'final_tax': final_tax,
-            'effective_tax_rate': (final_tax / annual_income * 100) if annual_income > 0 else 0,
-            'slab_breakdown': slab_breakdown,
-            'monthly_tax': final_tax / 12,
-            'take_home_monthly': (annual_income - final_tax) / 12
-        }
-
-    def compare_regimes(self, annual_income: float, deductions: Dict[str, float] = None) -> Dict:
+    def compare_regimes(self, annual_income, deductions=None, **policy_options) -> Dict:
         """
         Compare old vs new tax regime and recommend better option.
 
@@ -187,8 +87,8 @@ class TaxOptimizerService:
         if deductions is None:
             deductions = {}
 
-        old_regime_tax = self.calculate_tax(annual_income, 'old', deductions)
-        new_regime_tax = self.calculate_tax(annual_income, 'new', {})
+        old_regime_tax = self.calculate_tax(annual_income, 'old', deductions, **policy_options)
+        new_regime_tax = self.calculate_tax(annual_income, 'new', deductions, **policy_options)
 
         savings = old_regime_tax['final_tax'] - new_regime_tax['final_tax']
 
@@ -211,7 +111,8 @@ class TaxOptimizerService:
             'comparison_points': self._generate_comparison_points(old_regime_tax, new_regime_tax)
         }
 
-    def suggest_tax_saving_investments(self, user, target_savings: Optional[float] = None) -> Dict:
+    def suggest_tax_saving_investments(self, user, target_savings: Optional[float] = None,
+                                      *, annual_income=None, deductions=None, **policy_options) -> Dict:
         """
         Suggest tax-saving investment strategy.
 
@@ -222,15 +123,17 @@ class TaxOptimizerService:
         Returns:
             Dict with investment suggestions
         """
-        from apps.investments.models import Investment
-
-        annual_income = getattr(user, 'monthly_income', 50000) * 12
+        policy = get_policy('old', **policy_options)
+        if annual_income is None:
+            annual_income = (getattr(user, 'monthly_income', 0) or 0) * 12
 
         # Calculate current deductions
-        current_deductions = self._calculate_current_deductions(user)
+        current_deductions = deductions if deductions is not None else self._calculate_current_deductions(
+            user, financial_year=policy.financial_year,
+        )
 
         # Calculate current tax
-        current_tax = self.calculate_tax(annual_income, 'old', current_deductions)
+        current_tax = self.calculate_tax(annual_income, 'old', current_deductions, **policy_options)
 
         # Suggest additional investments
         suggestions = []
@@ -322,9 +225,17 @@ class TaxOptimizerService:
         new_deductions['80CCD(1B)'] = 50000
         new_deductions['80D'] = 75000
 
-        optimized_tax = self.calculate_tax(annual_income, 'old', new_deductions)
+        optimized_tax = self.calculate_tax(annual_income, 'old', new_deductions, **policy_options)
 
         return {
+            'calculation_status': 'ESTIMATED',
+            'financial_year': policy.financial_year,
+            'assumptions': [
+                'Deduction eligibility must be reviewed; portfolio values are only deduction leads.',
+                'Action-level benefits assume a 30% slab; actual overall savings use the selected tax policy.',
+                'The 80D scenario assumes eligible self/family and senior-parent premiums.',
+                'Investment returns and lock-in descriptions are planning references, not verified offers.',
+            ],
             'current_tax': current_tax['final_tax'],
             'optimized_tax': optimized_tax['final_tax'],
             'potential_savings': current_tax['final_tax'] - optimized_tax['final_tax'],
@@ -427,13 +338,18 @@ class TaxOptimizerService:
             )
         }
 
-    def _calculate_current_deductions(self, user) -> Dict[str, float]:
+    def _calculate_current_deductions(self, user, *, financial_year=None) -> Dict[str, float]:
         """Calculate user's current tax deductions from their financial data."""
         from apps.investments.models import Investment
         from apps.loans.models import Loan, LoanPaymentHistory
 
         deductions = {}
-        fy_start, fy_end = self._current_financial_year_bounds()
+        if financial_year is None:
+            fy_start, fy_end = self._current_financial_year_bounds()
+        else:
+            policy = get_policy(financial_year=financial_year)
+            start_year = int(policy.financial_year[:4])
+            fy_start, fy_end = date(start_year, 4, 1), date(start_year + 1, 3, 31)
 
         # 80C - Approximate from tagged tax-saving instruments already tracked in portfolio.
         qualifying_tokens = ("elss", "ppf", "nsc", "tax saver", "nps")
@@ -443,9 +359,9 @@ class TaxOptimizerService:
             if any(token in name for token in qualifying_tokens):
                 investments_80c += investment.current_value or investment.invested_amount or 0
 
-        home_loans = Loan.objects.filter(user=user, loan_type='home')
-        home_principal_paid = 0.0
-        home_interest_paid = 0.0
+        home_loans = Loan.objects.filter(user=user, loan_type='home', verification_status='confirmed')
+        home_principal_paid = Decimal("0")
+        home_interest_paid = Decimal("0")
         for payment in LoanPaymentHistory.objects.filter(
             loan__in=home_loans,
             payment_date__gte=fy_start,
@@ -456,13 +372,13 @@ class TaxOptimizerService:
             "interest_paid",
             "interest_component",
         ):
-            home_principal_paid += float(payment.principal_paid or payment.principal_component or 0)
-            home_interest_paid += float(payment.interest_paid or payment.interest_component or 0)
+            home_principal_paid += loan_money(payment.principal_paid or payment.principal_component)
+            home_interest_paid += loan_money(payment.interest_paid or payment.interest_component)
 
-        deductions['80C'] = round(min(investments_80c + home_principal_paid, 150000), 2)
+        deductions['80C'] = loan_money_float(min(Decimal(str(investments_80c)) + home_principal_paid, Decimal("150000")))
 
         if home_interest_paid > 0:
-            deductions['24B'] = round(min(home_interest_paid, 200000), 2)
+            deductions['24B'] = loan_money_float(min(home_interest_paid, Decimal("200000")))
 
         return deductions
 

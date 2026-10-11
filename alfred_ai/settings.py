@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import timedelta
 
 from django.core.exceptions import ImproperlyConfigured
-from .local_config import load_local_environment
+from .local_config import load_local_environment, native_secret_file
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -36,9 +36,14 @@ def _is_local_runtime(argv: list[str] | None = None) -> bool:
 
 
 def _default_secret_key(local_runtime: bool) -> str:
-    if local_runtime:
-        return "alfred-local-development-key"
-    return ""
+    if not local_runtime:
+        return ""
+    configured = os.environ.get("DJANGO_SECRET_KEY")
+    if configured:
+        return configured
+    data = Path(os.environ.get("ALFRED_DATA_DIR") or BASE_DIR)
+    environ.Env.read_env(native_secret_file(data), overwrite=False)
+    return os.environ.get("DJANGO_SECRET_KEY", "")
 
 
 def _default_allowed_hosts(local_runtime: bool) -> list[str]:
@@ -93,6 +98,7 @@ def _require_production(condition: bool, message: str) -> None:
 LOCAL_RUNTIME = env.bool("ALFRED_LOCAL_RUNTIME", default=_is_local_runtime())
 DEBUG = env.bool("DEBUG", default=LOCAL_RUNTIME)
 SECRET_KEY = env("DJANGO_SECRET_KEY", default=_default_secret_key(LOCAL_RUNTIME))
+SECRET_KEY_FALLBACKS = env.json("DJANGO_SECRET_KEY_FALLBACKS", default=[])
 if not SECRET_KEY:
     raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when local runtime mode is disabled.")
 
@@ -132,6 +138,13 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = "users.User"
 
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "/login/"
@@ -153,6 +166,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "alfred_ai.services.upload_limits.UploadProtectionMiddleware",
+    "alfred_ai.services.abuse_protection.AbuseProtectionMiddleware",
     "alfred_ai.middleware.UserDataCacheMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -284,12 +299,44 @@ MEDIA_ROOT = BASE_DIR / "media"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
 }
+
+# Persistent, account-scoped Family invitation abuse protection (not global).
+ALFRED_FAMILY_INVITE_THROTTLE_DIR = env("ALFRED_FAMILY_INVITE_THROTTLE_DIR", default=str(
+    Path(os.environ.get("ALFRED_DATA_DIR") or BASE_DIR) / "artifacts" / "security" / "family-invites"))
+ALFRED_FAMILY_INVITE_CREATE_LIMIT = env.int("ALFRED_FAMILY_INVITE_CREATE_LIMIT", default=5)
+ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS = env.int("ALFRED_FAMILY_INVITE_CREATE_WINDOW_SECONDS", default=3600)
+ALFRED_FAMILY_INVITE_ACCEPT_LIMIT = env.int("ALFRED_FAMILY_INVITE_ACCEPT_LIMIT", default=10)
+ALFRED_FAMILY_INVITE_ACCEPT_WINDOW_SECONDS = env.int("ALFRED_FAMILY_INVITE_ACCEPT_WINDOW_SECONDS", default=600)
+
+ALFRED_ABUSE_THROTTLE_DIR = env('ALFRED_ABUSE_THROTTLE_DIR', default=str(
+    Path(os.environ.get('ALFRED_DATA_DIR') or BASE_DIR) / 'artifacts' / 'security' / 'runtime-limits'))
+for _scope, _count, _window in (
+    ('LOGIN_ACCOUNT', 10, 600), ('LOGIN_IP', 30, 600), ('LOGIN_GLOBAL', 100, 600),
+    ('SIGNUP_IP', 20, 3600), ('SIGNUP_GLOBAL', 50, 3600),
+    ('API_ACCOUNT', 120, 60), ('API_GLOBAL', 600, 60),
+    ('EXPENSIVE_ACCOUNT', 30, 3600), ('EXPENSIVE_GLOBAL', 120, 3600),
+):
+    globals()[f'ALFRED_{_scope}_LIMIT'] = env.int(f'ALFRED_{_scope}_LIMIT', default=_count)
+    globals()[f'ALFRED_{_scope}_WINDOW_SECONDS'] = env.int(f'ALFRED_{_scope}_WINDOW_SECONDS', default=_window)
+
+# Absolute upload limits are independent of Django's memory thresholds.
+from .upload_config import UPLOAD_LIMIT_DEFAULTS
+for _upload_setting, _upload_default in UPLOAD_LIMIT_DEFAULTS.items():
+    globals()[_upload_setting] = env.int(_upload_setting, default=_upload_default)
+DATA_UPLOAD_MAX_NUMBER_FILES = env.int("ALFRED_UPLOAD_FILES", default=4)
+DATA_UPLOAD_MAX_NUMBER_FIELDS = env.int("ALFRED_UPLOAD_FIELDS", default=1000)
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("ALFRED_UPLOAD_FORM_BYTES", default=256 * 1024)
+# Always stream files to disk: no Content-Length-dependent memory allocation.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 0
+FILE_UPLOAD_HANDLERS = [
+    "alfred_ai.services.upload_limits.BoundedUploadHandler",
+    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+]
 
 
 # ---------------------------------------------------------

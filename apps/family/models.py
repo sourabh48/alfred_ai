@@ -39,7 +39,9 @@ class FamilyAccountLink(models.Model):
     invite_code_hint = models.CharField(max_length=16, blank=True)
     share_profile_summary = models.BooleanField(default=True)
     share_dependents = models.BooleanField(default=True)
-    share_financial_summary = models.BooleanField(default=True)
+    # Each participant can grant access only to their own financial summary.
+    share_financial_summary = models.BooleanField(default=False, help_text="Creator shares their own financial summary.")
+    linked_user_share_financial_summary = models.BooleanField(default=False, help_text="Linked user shares their own financial summary.")
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
     expires_at = models.DateTimeField()
     accepted_at = models.DateTimeField(null=True, blank=True)

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import date
+from math import isfinite
 
 from django.utils import timezone
 
 from apps.loans.models import Loan
+from apps.loans.money import loan_money, loan_money_float
 
 
 ACCOUNT_TYPE_TO_LOAN_TYPE = {
@@ -34,6 +36,8 @@ CLOSED_STATUS_TOKENS = (
 
 
 def sync_credit_report_loans(*, user, report_upload) -> dict:
+    if report_upload.user_id != user.pk:
+        raise ValueError("Choose one of your own bureau reports.")
     raw_accounts = list((report_upload.extracted_payload or {}).get("loan_accounts") or [])
     if report_upload.parser_status not in {"parsed", "needs_review"} or report_upload.parse_confidence < 0.65 or not raw_accounts:
         return {
@@ -137,7 +141,7 @@ def sync_credit_report_loans(*, user, report_upload) -> dict:
                 "lender": loan.lender,
                 "loan_account_number": loan.loan_account_number,
                 "status": loan.status,
-                "remaining_balance": round(float(loan.remaining_balance or 0), 2),
+                "remaining_balance": loan_money_float(loan.remaining_balance or 0),
                 "note": "Internal loan not confirmed in the latest uploaded bureau report.",
             }
         )
@@ -167,9 +171,17 @@ def sync_credit_report_loans(*, user, report_upload) -> dict:
 
 
 def _normalize_account(account: dict) -> dict:
+    current_balance = round(float(account.get("current_balance") or 0), 2)
+    # Older parser payloads supplied a default zero even when no balance was
+    # present. Only positive legacy values establish presence; explicit zero
+    # now carries parser provenance rather than being inferred from a key.
+    balance_reported = (
+        account.get("current_balance") is not None and isfinite(current_balance) and current_balance >= 0
+        and (account.get("balance_reported") is True if "balance_reported" in account else current_balance > 0)
+    )
     status_value = _normalize_status(
         status=str(account.get("status", "") or ""),
-        current_balance=float(account.get("current_balance") or 0),
+        current_balance=current_balance,
         closed_on=str(account.get("closed_on", "") or ""),
     )
     account_type = str(account.get("account_type", "") or "").strip()
@@ -184,7 +196,8 @@ def _normalize_account(account: dict) -> dict:
         "opened_on": _coerce_date(str(account.get("opened_on", "") or "").strip()),
         "closed_on": _coerce_date(str(account.get("closed_on", "") or "").strip()),
         "sanctioned_amount": round(float(account.get("sanctioned_amount") or 0), 2),
-        "current_balance": round(float(account.get("current_balance") or 0), 2),
+        "current_balance": current_balance,
+        "balance_reported": balance_reported,
         "emi_amount": round(float(account.get("emi_amount") or 0), 2),
         "overdue_amount": round(float(account.get("overdue_amount") or 0), 2),
         "payment_status": str(account.get("payment_status", "") or "").strip(),
@@ -203,6 +216,7 @@ def _match_account_to_loan(*, account: dict, loans: list[Loan]) -> tuple[Loan | 
     for loan in loans:
         score = 0.0
         reasons = []
+        loan_balance = loan_money_float(loan.remaining_balance or 0)
         loan_last4 = _digits_last4(loan.loan_account_number)
         if account_last4 and loan_last4 and account_last4 == loan_last4:
             score += 0.58
@@ -214,7 +228,7 @@ def _match_account_to_loan(*, account: dict, loans: list[Loan]) -> tuple[Loan | 
         if loan_type and loan_type == loan.loan_type:
             score += 0.1
             reasons.append("loan_type")
-        if current_balance and loan.remaining_balance is not None and abs(current_balance - float(loan.remaining_balance or 0)) <= max(current_balance, float(loan.remaining_balance or 0), 1) * 0.35:
+        if current_balance and loan.remaining_balance is not None and abs(current_balance - loan_balance) <= max(current_balance, loan_balance, 1) * 0.35:
             score += 0.05
             reasons.append("balance")
         if opened_on and loan.start_date and abs((opened_on - loan.start_date).days) <= 120:
@@ -228,6 +242,11 @@ def _match_account_to_loan(*, account: dict, loans: list[Loan]) -> tuple[Loan | 
 
 
 def _apply_account_to_existing_loan(*, loan: Loan, account: dict, report_upload) -> dict:
+    if not account["balance_reported"]:
+        return {
+            "action": "review", "verification_status": "needs_review", "updated": False,
+            "closed": False, "notes": "A reported current balance is required to confirm loan debt.",
+        }
     if account["status"] == "active" and loan.status in {"closed", "foreclosed", "prepaid"}:
         note = "Bureau tradeline shows the account as active, but the internal loan is already closed. Review before reopening."
         _append_sync_note(loan=loan, report_upload=report_upload, note=note)
@@ -241,6 +260,18 @@ def _apply_account_to_existing_loan(*, loan: Loan, account: dict, report_upload)
 
     changed_fields: list[str] = []
     closed = False
+    if not loan.is_confirmed:
+        # Replace the guessed terms with what the tradeline actually supplies.
+        # Missing EMI/rate data must not become a confirmed commitment.
+        loan.principal = loan_money(account["sanctioned_amount"] or account["current_balance"] or 1)
+        loan.emi = loan_money(account["emi_amount"])
+        loan.interest_rate = 0
+        loan.remaining_balance = loan_money(account["current_balance"])
+        changed_fields.extend(["principal", "emi", "interest_rate", "remaining_balance"])
+        loan.verification_status = "confirmed"
+        loan.verification_source = "bureau"
+        loan.verified_at = timezone.now()
+        changed_fields.extend(["verification_status", "verification_source", "verified_at"])
 
     if account["lender_name"] and account["lender_name"] != loan.lender:
         loan.lender = account["lender_name"]
@@ -249,10 +280,10 @@ def _apply_account_to_existing_loan(*, loan: Loan, account: dict, report_upload)
         loan.loan_type = account["loan_type"]
         changed_fields.append("loan_type")
     if account["sanctioned_amount"] > 0 and (loan.auto_detected or loan.principal <= 1):
-        loan.principal = account["sanctioned_amount"]
+        loan.principal = loan_money(account["sanctioned_amount"])
         changed_fields.append("principal")
-    if account["emi_amount"] > 0 and (loan.auto_detected or float(loan.emi or 0) <= 0):
-        loan.emi = account["emi_amount"]
+    if account["emi_amount"] > 0 and (loan.auto_detected or loan_money_float(loan.emi or 0) <= 0):
+        loan.emi = loan_money(account["emi_amount"])
         changed_fields.append("emi")
     if account["opened_on"] and loan.auto_detected and loan.start_date != account["opened_on"]:
         loan.start_date = account["opened_on"]
@@ -265,8 +296,8 @@ def _apply_account_to_existing_loan(*, loan: Loan, account: dict, report_upload)
         if loan.is_active:
             loan.is_active = False
             changed_fields.append("is_active")
-        if float(loan.remaining_balance or 0) != 0:
-            loan.remaining_balance = 0.0
+        if loan_money_float(loan.remaining_balance or 0) != 0:
+            loan.remaining_balance = loan_money(0)
             changed_fields.append("remaining_balance")
         closed_on = account["closed_on"] or report_upload.report_date or timezone.localdate()
         if loan.closed_on != closed_on:
@@ -277,8 +308,8 @@ def _apply_account_to_existing_loan(*, loan: Loan, account: dict, report_upload)
             changed_fields.append("closure_reason")
         closed = True
     else:
-        if loan.status == "active" and account["current_balance"] > 0 and float(loan.remaining_balance or 0) != account["current_balance"]:
-            loan.remaining_balance = account["current_balance"]
+        if loan.status == "active" and loan_money_float(loan.remaining_balance or 0) != account["current_balance"]:
+            loan.remaining_balance = loan_money(account["current_balance"])
             changed_fields.append("remaining_balance")
         if loan.closed_on is not None and loan.status == "active":
             loan.closed_on = None
@@ -297,6 +328,9 @@ def _apply_account_to_existing_loan(*, loan: Loan, account: dict, report_upload)
 
     verification_status = "verified" if changed_fields else "no_change"
     if changed_fields:
+        if "remaining_balance" in changed_fields:
+            loan.verified_at = timezone.now()
+            changed_fields.append("verified_at")
         loan.save(update_fields=sorted(set(changed_fields + ["updated_at"])))
         return {
             "action": "updated",
@@ -331,17 +365,20 @@ def _create_loan_from_account(*, user, account: dict, report_upload) -> Loan:
         loan_type=account["loan_type"],
         lender=account["lender_name"],
         loan_account_number=account["loan_account_number"] or (f"XXXX{account['account_last4']}" if account["account_last4"] else ""),
-        principal=principal,
+        principal=loan_money(principal),
         interest_rate=0.0,
-        emi=emi,
+        emi=loan_money(emi),
         tenure_months=tenure_months,
-        remaining_balance=remaining_balance,
+        remaining_balance=loan_money(remaining_balance),
         start_date=start_date,
         closed_on=closed_on,
         is_active=is_active,
         status="active" if is_active else "closed",
         closure_reason="bureau_report_verified" if not is_active else "",
         auto_detected=True,
+        verification_status="confirmed",
+        verification_source="bureau",
+        verified_at=timezone.now(),
         notes=note,
     )
 
@@ -359,7 +396,7 @@ def _append_sync_note(*, loan: Loan, report_upload, note: str) -> bool:
 def _can_create_loan_from_account(account: dict) -> bool:
     has_identity = bool(account["lender_name"] and (account["account_last4"] or account["loan_account_number"]))
     has_financial_signal = bool(account["sanctioned_amount"] > 0 or account["current_balance"] > 0 or account["emi_amount"] > 0)
-    return has_identity and has_financial_signal
+    return has_identity and has_financial_signal and account["balance_reported"]
 
 
 def _loan_type_from_account_type(value: str) -> str:

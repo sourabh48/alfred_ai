@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from difflib import SequenceMatcher
 from typing import Iterable
 
@@ -10,10 +11,11 @@ from django.utils import timezone
 
 from apps.expenses.models import Expense
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanPaymentHistory
+from apps.loans.money import loan_money
 
 
-FULL_MATCH_TOLERANCE_FLOOR = 600.0
-PARTIAL_MATCH_RATIO = 0.4
+FULL_MATCH_TOLERANCE_FLOOR = Decimal("600.00")
+PARTIAL_MATCH_RATIO = Decimal("0.4")
 RECONCILIATION_WINDOW_DAYS = 45
 SETTLEMENT_COMPONENT_FIELDS = (
     "principal_paid",
@@ -53,9 +55,11 @@ class LoanForeclosureService:
         requested_closure_date: str | None = None,
     ) -> ForeclosureProcessingResult:
         payload = dict(parsed.get("payload") or {})
-        if requested_closure_amount:
-            payload["total_amount_payable"] = float(requested_closure_amount)
-            payload["closure_amount"] = float(requested_closure_amount)
+        if requested_closure_amount is not None:
+            payload["accepted_corrections"] = {
+                **dict(payload.get("accepted_corrections") or {}),
+                "closure_amount": str(requested_closure_amount),
+            }
         if requested_closure_date:
             payload["effective_closure_date"] = requested_closure_date
             payload["closure_date"] = requested_closure_date
@@ -69,7 +73,11 @@ class LoanForeclosureService:
             )
 
         verified, verification_note = self._verify_selected_loan(selected_loan, parsed, link)
-        closure_amount = float(payload.get("total_amount_payable") or payload.get("closure_amount") or selected_loan.remaining_balance or 0)
+        accepted_amount = (payload.get("accepted_corrections") or {}).get("closure_amount")
+        closure_amount = loan_money(
+            accepted_amount if accepted_amount not in (None, "") else
+            payload.get("total_amount_payable") or payload.get("closure_amount") or selected_loan.remaining_balance or 0
+        )
         closure_date = _parse_date(payload.get("effective_closure_date") or payload.get("closure_date"))
 
         with transaction.atomic():
@@ -201,9 +209,15 @@ class LoanForeclosureService:
                 resolved.append(snapshot)
         return resolved
 
+    @transaction.atomic
     def reconcile_snapshot(self, snapshot: LoanForeclosureSnapshot, *, expenses: Iterable[Expense] | None = None) -> bool:
-        loan = snapshot.loan
-        expected = float(snapshot.total_amount_payable or loan.remaining_balance or 0)
+        snapshot = LoanForeclosureSnapshot.objects.select_for_update().get(pk=snapshot.pk)
+        loan = Loan.objects.select_for_update().get(pk=snapshot.loan_id)
+        snapshot.loan = loan
+        if (snapshot.audit_payload or {}).get("settlement_posting", {}).get("finalized_at"):
+            return True
+        accepted_amount = ((snapshot.audit_payload or {}).get("document_payload", {}).get("accepted_corrections") or {}).get("closure_amount")
+        expected = loan_money(accepted_amount if accepted_amount not in (None, "") else snapshot.total_amount_payable or loan.remaining_balance)
         candidate_expenses = list(expenses) if expenses is not None else list(self._expense_queryset_for_snapshot(snapshot))
 
         emi_candidates: list[Expense] = []
@@ -228,9 +242,9 @@ class LoanForeclosureService:
 
         emi_ids = [expense.id for expense in sorted(emi_candidates, key=lambda item: (item.transaction_date, item.id), reverse=True)[:12]]
         best_group, best_score, best_note = (closure_candidates[0] if closure_candidates else ([], 0.0, "No closure payment candidate matched the document total yet."))
-        matched_total = round(sum(item.amount for item in best_group), 2) if best_group else 0.0
-        full_tolerance = max(expected * 0.015, FULL_MATCH_TOLERANCE_FLOOR) if expected else FULL_MATCH_TOLERANCE_FLOOR
-        partial_floor = expected * PARTIAL_MATCH_RATIO if expected else 0.0
+        matched_total = sum((loan_money(item.amount) for item in best_group), Decimal("0.00"))
+        full_tolerance = max(expected * Decimal("0.015"), FULL_MATCH_TOLERANCE_FLOOR)
+        partial_floor = expected * PARTIAL_MATCH_RATIO
 
         if not best_group:
             status = "unmatched"
@@ -251,7 +265,7 @@ class LoanForeclosureService:
 
         snapshot.matched_emi_transaction_ids = emi_ids
         snapshot.matched_closure_transaction_ids = [expense.id for expense in best_group]
-        snapshot.matched_payment_total = matched_total
+        snapshot.matched_payment_total = loan_money(matched_total)
         snapshot.reconciliation_status = status
         snapshot.reconciliation_confidence = round(confidence, 3)
         snapshot.reconciliation_notes = notes
@@ -265,7 +279,7 @@ class LoanForeclosureService:
         snapshot.audit_payload = {
             **dict(snapshot.audit_payload or {}),
             "last_reconciled_at": timezone.now().isoformat(),
-            "expected_total_amount": expected,
+            "expected_total_amount": float(expected),
             "settlement_allocation": settlement_allocation,
         }
         snapshot.save(
@@ -315,6 +329,11 @@ class LoanForeclosureService:
         linkage_confidence: float,
         linkage_notes: str,
     ) -> dict:
+        corrections = payload.get("accepted_corrections") or {}
+        if corrections.get("closure_amount") not in (None, ""):
+            payable = corrections["closure_amount"]
+        else:
+            payable = payload.get("total_amount_payable") or payload.get("closure_amount") or closure_document.closure_amount
         return {
             "loan": loan,
             "closure_document": closure_document,
@@ -325,12 +344,12 @@ class LoanForeclosureService:
             "statement_date": _parse_date(payload.get("statement_date")),
             "effective_closure_date": _parse_date(payload.get("effective_closure_date") or payload.get("closure_date")),
             "due_by_date": _parse_date(payload.get("due_by_date")),
-            "outstanding_principal": float(payload.get("outstanding_principal") or 0),
-            "accrued_interest": float(payload.get("accrued_interest") or 0),
-            "foreclosure_charges": float(payload.get("foreclosure_charges") or 0),
-            "taxes_gst": float(payload.get("taxes_gst") or 0),
-            "overdue_charges": float(payload.get("overdue_charges") or 0),
-            "total_amount_payable": float(payload.get("total_amount_payable") or payload.get("closure_amount") or closure_document.closure_amount or 0),
+            "outstanding_principal": loan_money(payload.get("outstanding_principal")),
+            "accrued_interest": loan_money(payload.get("accrued_interest")),
+            "foreclosure_charges": loan_money(payload.get("foreclosure_charges")),
+            "taxes_gst": loan_money(payload.get("taxes_gst")),
+            "overdue_charges": loan_money(payload.get("overdue_charges")),
+            "total_amount_payable": loan_money(payable),
             "classification_confidence": classification_confidence,
             "linkage_confidence": linkage_confidence,
             "linkage_notes": linkage_notes,
@@ -375,10 +394,11 @@ class LoanForeclosureService:
                 score += 12
                 notes.append("Borrower name aligns with the account holder.")
 
-        payable = float(payload.get("total_amount_payable") or 0)
-        balance = float(loan.remaining_balance or loan.principal or 0)
+        accepted_amount = (payload.get("accepted_corrections") or {}).get("closure_amount")
+        payable = loan_money(accepted_amount if accepted_amount not in (None, "") else payload.get("total_amount_payable") or 0)
+        balance = loan_money(loan.remaining_balance or loan.principal or 0)
         if payable and balance:
-            delta_ratio = abs(payable - balance) / max(balance, 1)
+            delta_ratio = float(abs(payable - balance) / max(balance, 1))
             if delta_ratio <= 0.05:
                 score += 14
                 notes.append("Document payable amount is close to the tracked remaining balance.")
@@ -446,18 +466,19 @@ class LoanForeclosureService:
 
         return score, " ".join(notes) if notes else "Only a weak narrative match was found."
 
-    def _closure_match_for_expense(self, expense: Expense, *, expected: float, relevance_score: float) -> tuple[float, str] | None:
+    def _closure_match_for_expense(self, expense: Expense, *, expected: Decimal, relevance_score: float) -> tuple[float, str] | None:
         if relevance_score < 20 or expected <= 0:
             return None
-        tolerance = max(expected * 0.015, FULL_MATCH_TOLERANCE_FLOOR)
-        delta = abs(float(expense.amount or 0) - expected)
+        tolerance = max(expected * Decimal("0.015"), FULL_MATCH_TOLERANCE_FLOOR)
+        amount = loan_money(expense.amount)
+        delta = abs(amount - expected)
         if delta <= tolerance:
             return relevance_score + 42, "A single debit amount matched the foreclosure payable total closely."
-        if float(expense.amount or 0) >= expected * PARTIAL_MATCH_RATIO:
+        if amount >= expected * PARTIAL_MATCH_RATIO:
             return relevance_score + 18, "A sizable debit aligned with the foreclosure window but did not fully match the payable amount."
         return None
 
-    def _aggregate_same_day_candidates(self, expenses: list[Expense], *, loan: Loan, snapshot: LoanForeclosureSnapshot, expected: float) -> list[tuple[list[Expense], float, str]]:
+    def _aggregate_same_day_candidates(self, expenses: list[Expense], *, loan: Loan, snapshot: LoanForeclosureSnapshot, expected: Decimal) -> list[tuple[list[Expense], float, str]]:
         if expected <= 0:
             return []
         grouped: dict[date, list[Expense]] = {}
@@ -468,11 +489,11 @@ class LoanForeclosureService:
             grouped.setdefault(expense.transaction_date, []).append(expense)
 
         candidates = []
-        tolerance = max(expected * 0.015, FULL_MATCH_TOLERANCE_FLOOR)
+        tolerance = max(expected * Decimal("0.015"), FULL_MATCH_TOLERANCE_FLOOR)
         for _, items in grouped.items():
             if len(items) < 2:
                 continue
-            total = sum(item.amount for item in items)
+            total = sum((loan_money(item.amount) for item in items), Decimal("0.00"))
             if abs(total - expected) <= tolerance:
                 base_score = sum(self._expense_relevance_score(item, loan, snapshot)[0] for item in items) / len(items)
                 candidates.append((items, base_score + 36, "A same-day group of debits matched the document payable total."))
@@ -484,7 +505,7 @@ class LoanForeclosureService:
         *,
         loan: Loan,
         snapshot: LoanForeclosureSnapshot,
-        expected: float,
+        expected: Decimal,
     ) -> list[tuple[list[Expense], float, str]]:
         if expected <= 0:
             return []
@@ -496,7 +517,7 @@ class LoanForeclosureService:
         if len(relevant_expenses) < 2:
             return []
 
-        tolerance = max(expected * 0.015, FULL_MATCH_TOLERANCE_FLOOR)
+        tolerance = max(expected * Decimal("0.015"), FULL_MATCH_TOLERANCE_FLOOR)
         candidates: list[tuple[list[Expense], float, str]] = []
         seen_groups: set[tuple[int, ...]] = set()
         max_group_size = min(3, len(relevant_expenses))
@@ -514,7 +535,7 @@ class LoanForeclosureService:
                 key = tuple(expense.id for expense in grouped_expenses)
                 if key in seen_groups:
                     continue
-                total = round(sum(expense.amount for expense in grouped_expenses), 2)
+                total = sum((loan_money(expense.amount) for expense in grouped_expenses), Decimal("0.00"))
                 if abs(total - expected) > tolerance:
                     continue
                 base_score = sum(score for _, score in window) / len(window)
@@ -531,8 +552,9 @@ class LoanForeclosureService:
     def _looks_like_emi(self, expense: Expense, loan: Loan) -> bool:
         if not loan.emi:
             return False
-        delta = abs(float(expense.amount or 0) - float(loan.emi or 0))
-        return delta <= max(float(loan.emi or 0) * 0.05, 150)
+        emi = loan_money(loan.emi)
+        delta = abs(loan_money(expense.amount) - emi)
+        return delta <= max(emi * Decimal("0.05"), 150)
 
     def _mark_foreclosure_pending(self, loan: Loan, snapshot: LoanForeclosureSnapshot) -> None:
         loan.status = "foreclosure_pending"
@@ -540,14 +562,16 @@ class LoanForeclosureService:
         update_fields = ["status", "is_active", "updated_at"]
 
         pending_balance = loan.remaining_balance
-        if pending_balance is None or float(pending_balance) <= 0:
+        accepted_amount = ((snapshot.audit_payload or {}).get("document_payload", {}).get("accepted_corrections") or {}).get("closure_amount")
+        explicit_zero = accepted_amount not in (None, "") and loan_money(accepted_amount) == 0
+        if (pending_balance is None or loan_money(pending_balance) <= 0) and not explicit_zero:
             pending_balance = (
                 snapshot.total_amount_payable
                 or snapshot.outstanding_principal
                 or loan.principal
                 or 0
             )
-        pending_balance = round(float(pending_balance or 0), 2)
+        pending_balance = loan_money(pending_balance) if pending_balance is not None else None
         if loan.remaining_balance != pending_balance:
             loan.remaining_balance = pending_balance
             update_fields.append("remaining_balance")
@@ -565,15 +589,23 @@ class LoanForeclosureService:
         *,
         settlement_allocation: dict,
     ) -> None:
-        payment_total = round(sum(item.amount for item in matched_expenses), 2)
+        existing_payments = {
+            expense.id: LoanPaymentHistory.objects.filter(loan=loan, expense_reference=expense).first()
+            for expense in matched_expenses
+        }
+        payment_total = sum(
+            (loan_money(expense.amount) for expense in matched_expenses
+             if existing_payments[expense.id] is None or not existing_payments[expense.id].loan_effect_applied),
+            Decimal("0.00"),
+        )
         closure_date = max((item.transaction_date for item in matched_expenses), default=snapshot.effective_closure_date or timezone.localdate())
         loan.status = "foreclosed"
         loan.is_active = False
         loan.closed_on = closure_date
-        loan.remaining_balance = 0
+        loan.remaining_balance = loan_money(0)
         loan.closure_reason = "foreclosed"
         loan.last_payment_date = closure_date
-        loan.total_paid = float(loan.total_paid or 0) + payment_total
+        loan.total_paid = loan_money(loan_money(loan.total_paid) + payment_total)
         loan.save(
             update_fields=[
                 "status",
@@ -594,7 +626,7 @@ class LoanForeclosureService:
         created_payment_ids: list[int] = []
         preserved_history: list[dict] = []
         for expense in matched_expenses:
-            existing = LoanPaymentHistory.objects.filter(loan=loan, expense_reference=expense).first()
+            existing = existing_payments[expense.id]
             if existing is not None:
                 preserved_history.append(
                     {
@@ -608,15 +640,15 @@ class LoanForeclosureService:
             payment = LoanPaymentHistory.objects.create(
                 loan=loan,
                 payment_date=expense.transaction_date,
-                amount=expense.amount,
-                principal_component=float(allocation.get("principal_paid") or 0),
-                interest_component=float(allocation.get("interest_paid") or 0),
-                principal_paid=float(allocation.get("principal_paid") or 0),
-                interest_paid=float(allocation.get("interest_paid") or 0),
-                charges_paid=float(allocation.get("charges_paid") or 0),
-                penalties_paid=float(allocation.get("penalties_paid") or 0),
-                tax_paid=float(allocation.get("tax_paid") or 0),
-                remaining_balance=float(allocation.get("remaining_balance_after_payment") or 0),
+                amount=loan_money(expense.amount),
+                principal_component=loan_money(allocation.get("principal_paid")),
+                interest_component=loan_money(allocation.get("interest_paid")),
+                principal_paid=loan_money(allocation.get("principal_paid")),
+                interest_paid=loan_money(allocation.get("interest_paid")),
+                charges_paid=loan_money(allocation.get("charges_paid")),
+                penalties_paid=loan_money(allocation.get("penalties_paid")),
+                tax_paid=loan_money(allocation.get("tax_paid")),
+                remaining_balance=loan_money(allocation.get("remaining_balance_after_payment")),
                 is_auto_detected=True,
                 detection_confidence=round(snapshot.reconciliation_confidence * 100, 1),
                 detection_reason="Reconciled foreclosure payment from document and statement match.",
@@ -650,23 +682,23 @@ class LoanForeclosureService:
         snapshot: LoanForeclosureSnapshot,
         *,
         matched_expenses: list[Expense],
-        matched_total: float,
+        matched_total: Decimal,
         status: str,
         confidence: float,
     ) -> dict:
         document_basis = self._document_component_basis(snapshot)
-        matched_total = round(float(matched_total or 0), 2)
-        expected_total = round(float(document_basis["expected_total"] or 0), 2)
+        matched_total = Decimal(str(matched_total or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        expected_total = document_basis["expected_total"]
         base_payload = {
             "allocation_status": "pending_unmatched",
             "allocation_method": "unallocated",
             "confidence": round(float(confidence or 0), 3),
-            "expected_total": expected_total,
-            "payment_total": matched_total,
-            "payment_gap": round(expected_total - matched_total, 2),
-            "raw_document_total": round(float(document_basis["raw_document_total"] or 0), 2),
+            "expected_total": float(expected_total),
+            "payment_total": float(matched_total),
+            "payment_gap": float(expected_total - matched_total),
+            "raw_document_total": float(document_basis["raw_document_total"]),
             "document_normalization": document_basis["document_normalization"],
-            "document_components": document_basis["document_components"],
+            "document_components": {key: float(value) for key, value in document_basis["document_components"].items()},
             "allocated_components": self._build_zero_component_map(),
             "expense_allocations": [],
             "notes": document_basis["notes"],
@@ -681,7 +713,7 @@ class LoanForeclosureService:
                 **base_payload,
                 "allocation_status": "finalized",
                 "allocation_method": "document_components",
-                "allocated_components": allocated_components,
+                "allocated_components": {key: float(value) for key, value in allocated_components.items()},
                 "expense_allocations": self._split_components_across_expenses(
                     matched_expenses,
                     allocated_components,
@@ -708,7 +740,7 @@ class LoanForeclosureService:
                 **base_payload,
                 "allocation_status": "provisional_partial",
                 "allocation_method": "proportional_to_matched_payment",
-                "allocated_components": allocated_components,
+                "allocated_components": {key: float(value) for key, value in allocated_components.items()},
                 "expense_allocations": self._split_components_across_expenses(
                     matched_expenses,
                     allocated_components,
@@ -754,31 +786,33 @@ class LoanForeclosureService:
 
     def _document_component_basis(self, snapshot: LoanForeclosureSnapshot) -> dict:
         document_components = {
-            "principal_paid": round(max(float(snapshot.outstanding_principal or 0), 0), 2),
-            "interest_paid": round(max(float(snapshot.accrued_interest or 0), 0), 2),
-            "charges_paid": round(max(float(snapshot.foreclosure_charges or 0), 0), 2),
-            "penalties_paid": round(max(float(snapshot.overdue_charges or 0), 0), 2),
-            "tax_paid": round(max(float(snapshot.taxes_gst or 0), 0), 2),
+            "principal_paid": max(loan_money(snapshot.outstanding_principal), 0),
+            "interest_paid": max(loan_money(snapshot.accrued_interest), 0),
+            "charges_paid": max(loan_money(snapshot.foreclosure_charges), 0),
+            "penalties_paid": max(loan_money(snapshot.overdue_charges), 0),
+            "tax_paid": max(loan_money(snapshot.taxes_gst), 0),
         }
-        raw_total = round(sum(document_components.values()), 2)
-        expected_total = round(float(snapshot.total_amount_payable or raw_total or 0), 2)
+        raw_total = sum(document_components.values(), Decimal("0.00"))
+        accepted_amount = ((getattr(snapshot, "audit_payload", None) or {}).get("document_payload", {}).get("accepted_corrections") or {}).get("closure_amount")
+        has_accepted_amount = accepted_amount not in (None, "")
+        expected_total = loan_money(accepted_amount) if has_accepted_amount else loan_money(snapshot.total_amount_payable) or raw_total
         normalization = "exact"
         notes = ""
-        if expected_total <= 0 and raw_total > 0:
+        if not has_accepted_amount and expected_total <= 0 and raw_total > 0:
             expected_total = raw_total
             notes = "Structured foreclosure components were used because the document payable total was missing."
         elif raw_total <= 0 and expected_total > 0:
             normalization = "principal_only_fallback"
             document_components = {
                 "principal_paid": expected_total,
-                "interest_paid": 0.0,
-                "charges_paid": 0.0,
-                "penalties_paid": 0.0,
-                "tax_paid": 0.0,
+                "interest_paid": Decimal("0.00"),
+                "charges_paid": Decimal("0.00"),
+                "penalties_paid": Decimal("0.00"),
+                "tax_paid": Decimal("0.00"),
             }
             raw_total = expected_total
             notes = "Structured foreclosure components were missing, so the document payable total was treated as principal deterministically."
-        elif raw_total > 0 and abs(raw_total - expected_total) >= 0.01:
+        elif raw_total > 0 and raw_total != expected_total:
             normalization = "scaled_to_payable_total"
             document_components = _proportional_money_split(
                 expected_total,
@@ -805,34 +839,34 @@ class LoanForeclosureService:
         ordered_expenses = sorted(matched_expenses, key=lambda item: (item.transaction_date, item.id))
         if not ordered_expenses:
             return []
-        weights = {expense.id: round(float(expense.amount or 0), 2) for expense in ordered_expenses}
-        component_splits = {
-            field: _proportional_money_split(
-                float(allocated_components.get(field) or 0),
-                weights,
-                fallback_key=ordered_expenses[0].id,
+        capacities = {expense.id: max(loan_money(expense.amount), 0) for expense in ordered_expenses}
+        components = {field: loan_money(allocated_components.get(field)) for field in SETTLEMENT_COMPONENT_FIELDS}
+        if sum(capacities.values()) != sum(components.values()):
+            raise ValueError("Settlement components must equal the matched payment total.")
+        component_splits = {}
+        # Each component spends remaining payment capacity. Independent splits
+        # followed by row corrections can change the global component totals.
+        for field in SETTLEMENT_COMPONENT_FIELDS:
+            component_splits[field] = _proportional_money_split(
+                components[field], capacities, fallback_key=ordered_expenses[0].id,
             )
-            for field in SETTLEMENT_COMPONENT_FIELDS
-        }
-        running_balance = round(max(float(snapshot.outstanding_principal or allocated_components.get("principal_paid") or 0), 0), 2)
+            capacities = {key: value - component_splits[field][key] for key, value in capacities.items()}
+        running_balance = max(loan_money(snapshot.outstanding_principal or allocated_components.get("principal_paid")), 0)
         allocations: list[dict] = []
         for index, expense in enumerate(ordered_expenses):
             allocation = {
-                field: round(float(component_splits[field].get(expense.id, 0) or 0), 2)
+                field: component_splits[field][expense.id]
                 for field in SETTLEMENT_COMPONENT_FIELDS
             }
-            delta = round(float(expense.amount or 0) - sum(allocation.values()), 2)
-            if abs(delta) >= 0.01:
-                allocation = _absorb_rounding_delta(allocation, delta)
-            running_balance = round(max(running_balance - float(allocation.get("principal_paid") or 0), 0), 2)
+            running_balance = max(running_balance - allocation["principal_paid"], 0)
             allocations.append(
                 {
                     "expense_id": expense.id,
                     "payment_date": expense.transaction_date.isoformat(),
-                    "amount": round(float(expense.amount or 0), 2),
+                    "amount": float(loan_money(expense.amount)),
                     "matched_reference": (expense.external_reference or "")[:120],
-                    **allocation,
-                    "remaining_balance_after_payment": 0.0 if finalized and index == len(ordered_expenses) - 1 else running_balance,
+                    **{key: float(value) for key, value in allocation.items()},
+                    "remaining_balance_after_payment": 0.0 if finalized and index == len(ordered_expenses) - 1 else float(running_balance),
                 }
             )
         return allocations
@@ -840,61 +874,35 @@ class LoanForeclosureService:
     def _build_zero_component_map(self) -> dict:
         return {field: 0.0 for field in SETTLEMENT_COMPONENT_FIELDS}
 
-def _proportional_money_split(total: float, weights: dict, *, fallback_key) -> dict:
+def _proportional_money_split(total, weights: dict, *, fallback_key) -> dict:
     keys = list(weights.keys())
     if not keys:
         return {}
-    normalized_weights = {key: max(float(value or 0), 0.0) for key, value in weights.items()}
-    total_cents = int(round(max(float(total or 0), 0.0) * 100))
+    normalized_weights = {
+        key: int((max(Decimal(str(value or 0)), 0) * 100).to_integral_value(rounding=ROUND_HALF_UP))
+        for key, value in weights.items()
+    }
+    total_cents = int((max(Decimal(str(total or 0)), 0) * 100).to_integral_value(rounding=ROUND_HALF_UP))
     if total_cents <= 0:
-        return {key: 0.0 for key in keys}
+        return {key: Decimal("0.00") for key in keys}
     weight_sum = sum(normalized_weights.values())
     if weight_sum <= 0:
         return {
-            key: round(float(total or 0), 2) if key == fallback_key else 0.0
+            key: Decimal(total_cents).scaleb(-2) if key == fallback_key else Decimal("0.00")
             for key in keys
         }
     positions = {key: index for index, key in enumerate(keys)}
-    exact_allocations = {
-        key: (total_cents * normalized_weights[key]) / weight_sum
-        for key in keys
-    }
-    cents_allocations = {key: int(exact_allocations[key]) for key in keys}
+    divisions = {key: divmod(total_cents * normalized_weights[key], weight_sum) for key in keys}
+    cents_allocations = {key: divisions[key][0] for key in keys}
     remaining_cents = total_cents - sum(cents_allocations.values())
     ranked_keys = sorted(
         keys,
-        key=lambda key: (exact_allocations[key] - cents_allocations[key], normalized_weights[key], -positions[key]),
+        key=lambda key: (divisions[key][1], normalized_weights[key], -positions[key]),
         reverse=True,
     )
     for index in range(remaining_cents):
         cents_allocations[ranked_keys[index % len(ranked_keys)]] += 1
-    return {key: round(cents_allocations[key] / 100, 2) for key in keys}
-
-
-def _absorb_rounding_delta(components: dict, delta: float) -> dict:
-    adjusted = {key: round(float(value or 0), 2) for key, value in components.items()}
-    if abs(delta) < 0.01:
-        return adjusted
-    ranked_fields = sorted(
-        SETTLEMENT_COMPONENT_FIELDS,
-        key=lambda field: (adjusted.get(field, 0.0), field == SETTLEMENT_FALLBACK_FIELD),
-        reverse=True,
-    )
-    if delta > 0:
-        target = ranked_fields[0]
-        adjusted[target] = round(adjusted.get(target, 0.0) + delta, 2)
-        return adjusted
-    remaining = round(abs(delta), 2)
-    for field in ranked_fields:
-        available = round(adjusted.get(field, 0.0), 2)
-        if available <= 0:
-            continue
-        reduction = min(available, remaining)
-        adjusted[field] = round(available - reduction, 2)
-        remaining = round(remaining - reduction, 2)
-        if remaining <= 0:
-            break
-    return adjusted
+    return {key: Decimal(cents_allocations[key]).scaleb(-2) for key in keys}
 
 
 def _normalize_reference(value: str | None) -> str:

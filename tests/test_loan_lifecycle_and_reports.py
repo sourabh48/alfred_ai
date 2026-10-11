@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from decimal import Decimal
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
@@ -91,6 +92,7 @@ class LoanLifecycleTests(TestCase):
             lender="Google Play Store Mandateexecute",
             loan_account_number="MANDATEEXECUTE",
             principal=10000,
+            verification_status="estimated",
             interest_rate=10,
             emi=149,
             tenure_months=24,
@@ -135,6 +137,7 @@ class LoanLifecycleTests(TestCase):
             lender="Google Play Store Mandateexecute",
             loan_account_number="MANDATEEXECUTE",
             principal=3576,
+            verification_status="estimated",
             interest_rate=10,
             emi=149,
             tenure_months=24,
@@ -205,6 +208,7 @@ class LoanLifecycleTests(TestCase):
             user=self.user,
             loan_type="car",
             lender="Google Play Playstore Axisbank Mandateexecute",
+            verification_status="estimated",
             loan_account_number="MANDATEEXECUTE",
             principal=3576,
             interest_rate=10,
@@ -358,8 +362,8 @@ class LoanLifecycleTests(TestCase):
         latest_payment.refresh_from_db()
         self.assertEqual(latest_payment.match_status, "matched")
         self.assertEqual(loan.last_payment_date, latest_date)
-        self.assertEqual(loan.remaining_balance, 52642.67)
-        self.assertEqual(loan.total_paid, 55249.0)
+        self.assertEqual(loan.remaining_balance, Decimal("52642.67"))
+        self.assertEqual(loan.total_paid, Decimal("55249.00"))
 
     def test_consolidate_loans_creates_new_loan_and_closes_sources(self):
         loan_one = Loan.objects.create(

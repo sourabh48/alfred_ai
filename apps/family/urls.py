@@ -5,6 +5,7 @@ from .views import (
     FamilyAccountLinkAcceptView,
     FamilyAccountLinkListCreateView,
     FamilyAccountLinkRevokeView,
+    FamilyFinancialSharingView,
     family_growth,
 )
 
@@ -14,5 +15,6 @@ urlpatterns = [
     path("account-links/", FamilyAccountLinkListCreateView.as_view(), name="family_account_links"),
     path("account-links/accept/", FamilyAccountLinkAcceptView.as_view(), name="family_account_link_accept"),
     path("account-links/<int:pk>/revoke/", FamilyAccountLinkRevokeView.as_view(), name="family_account_link_revoke"),
+    path("account-links/<int:pk>/financial-sharing/", FamilyFinancialSharingView.as_view(), name="family_financial_sharing"),
     path("<int:pk>/", DependentDetailView.as_view()),
 ]

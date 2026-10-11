@@ -7,7 +7,8 @@
         <div>
             <div class="alfred-chip mb-3">Regime comparison and deduction strategy</div>
             <h1 class="alfred-hero-title">Compare old versus new tax regime, identify deduction gaps, and convert them into a concrete action plan.</h1>
-            <p class="alfred-hero-copy">The tax optimizer now exposes the backend engine directly, including regime comparison, HRA, home-loan benefits, and tax-saving investment suggestions.</p>
+            <p class="alfred-hero-copy">Compare a salary planning scenario for a resident individual under 60. Review deduction eligibility before using the estimate.</p>
+            <p class="metric-caption" id="taxPolicyCopy">FY 2025-26 · AY 2026-27. Other years and special-rate income are not supported by this calculation.</p>
         </div>
         <div class="surface-card" style="min-width: 280px;">
             <p class="metric-kicker">Recommended Regime</p>
@@ -25,6 +26,12 @@
             <p class="page-section-copy mb-3">Edit assumptions to re-run the optimizer.</p>
             <form id="taxInputForm" class="soft-grid">
                 <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="taxFinancialYear">Financial Year</label>
+                        <select id="taxFinancialYear" name="financial_year" class="form-select">
+                            <option value="2025-26">FY 2025-26 / AY 2026-27</option>
+                        </select>
+                    </div>
                     <div class="col-12">
                         <label class="form-label" for="taxAnnualIncome">Annual Income</label>
                         <input id="taxAnnualIncome" name="annual_income" type="number" step="0.01" class="form-control" required>
@@ -67,14 +74,14 @@
     <div class="col-xl-4">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Action Plan</h2>
-            <p class="page-section-copy mb-3">Priority tax-saving moves produced by the optimizer.</p>
+            <p class="page-section-copy mb-3">Estimated scenarios. Individual action benefits assume a 30% slab and eligible deductions; investment returns are unverified planning assumptions.</p>
             <ul class="insight-list" id="taxActionList"></ul>
         </div>
     </div>
     <div class="col-xl-4">
         <div class="surface-card h-100">
             <h2 class="page-section-title">HRA and Home Loan</h2>
-            <p class="page-section-copy mb-3">Calculated HRA exemption and any detected home-loan tax benefit.</p>
+            <p class="page-section-copy mb-3">Estimated HRA and home-loan scenarios assume a 30% slab. Eligibility, loan conditions and recorded deductions require review.</p>
             <div id="taxBenefitPanel" class="data-stack"></div>
         </div>
     </div>
@@ -89,5 +96,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/tax_optimizer.js?v=2.1"></script>
+<script src="/static/js/tax_optimizer.js?v=3.0"></script>
 {% endblock %}

@@ -6,22 +6,26 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Q
 
+from alfred_ai.services.api_errors import safe_error_response
 from alfred_ai.services.materialized_cache import invalidate_user_materialized_payloads
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 from .models import Dependent, FamilyAccountLink
-from .serializers import DependentSerializer
+from .serializers import DependentSerializer, FamilyFinancialSharingSerializer
+from .throttles import FamilyInvitationAcceptThrottle, FamilyInvitationCreateThrottle
 from .services import (
     accept_family_link_code,
+    accepted_family_links_for_user,
     build_family_link_snapshot,
     create_family_link_invite,
     family_context_user_ids,
     family_financial_user_ids,
     revoke_family_link,
+    set_family_financial_sharing,
 )
 
 class DependentListCreateView(ListCreateAPIView):
@@ -54,28 +58,58 @@ class DependentDetailView(RetrieveUpdateDestroyAPIView):
 
 class FamilyAccountLinkListCreateView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [FamilyInvitationCreateThrottle]
 
     def get(self, request):
         return Response(build_family_link_snapshot(request.user))
 
     def post(self, request):
-        link, code = create_family_link_invite(request.user)
-        invalidate_user_materialized_payloads(request.user.id, reason="family_link_invite_created")
-        payload = build_family_link_snapshot(request.user)
-        payload["invite"] = _serialize_one_time_invite(link, code)
-        return Response(payload, status=status.HTTP_201_CREATED)
+        try:
+            link, code = create_family_link_invite(request.user)
+            invalidate_user_materialized_payloads(request.user.id, reason="family_link_invite_created")
+            payload = build_family_link_snapshot(request.user)
+            payload["invite"] = _serialize_one_time_invite(link, code)
+            return Response(payload, status=status.HTTP_201_CREATED)
+        except Exception as exc:
+            return safe_error_response(exc, "Invitation creation is temporarily unavailable. Please try again.",
+                                       logger_name=__name__, status_code=500)
 
 
 class FamilyAccountLinkAcceptView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [FamilyInvitationAcceptThrottle]
 
     def post(self, request):
+        data = request.data if isinstance(request.data, dict) else {}
+        code = data.get("invite_code") or data.get("code") or ""
+        if not isinstance(code, str) or len(code) > 64:
+            code = ""
         try:
-            link = accept_family_link_code(request.user, request.data.get("invite_code") or request.data.get("code") or "")
+            link = accept_family_link_code(request.user, code)
+            invalidate_user_materialized_payloads(request.user.id, reason="family_link_accepted")
+            invalidate_user_materialized_payloads(link.created_by_id, reason="family_link_accepted")
+            return Response(build_family_link_snapshot(request.user))
         except ValidationError as exc:
-            return Response({"detail": _validation_detail(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        invalidate_user_materialized_payloads(request.user.id, reason="family_link_accepted")
-        invalidate_user_materialized_payloads(link.created_by_id, reason="family_link_accepted")
+            detail = (_validation_detail(exc) if getattr(exc, "code", None) == "invalid_format" else
+                      "This invitation cannot be accepted. Check the code or request a new invitation.")
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return safe_error_response(exc, "Invitation acceptance is temporarily unavailable. Please try again.",
+                                       logger_name=__name__, status_code=500)
+
+
+class FamilyFinancialSharingView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        serializer = FamilyFinancialSharingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            link = set_family_financial_sharing(request.user, pk, serializer.validated_data["share_financial_summary"])
+        except ValidationError as exc:
+            return Response({"detail": _validation_detail(exc)}, status=status.HTTP_404_NOT_FOUND)
+        for user_id in (link.created_by_id, link.linked_user_id):
+            invalidate_user_materialized_payloads(user_id, reason="family_financial_consent_changed")
         return Response(build_family_link_snapshot(request.user))
 
 
@@ -109,8 +143,11 @@ def family_growth(request):
             builder=lambda: _family_growth_payload(request.user, baseline),
         )
         return Response(payload)
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
+    except Exception as exc:
+        return safe_error_response(
+            exc, "Family growth is temporarily unavailable. Please try again.",
+            logger_name=__name__, field="error", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 def _family_growth_revision(user, baseline: dict) -> str:
@@ -123,6 +160,8 @@ def _family_growth_revision(user, baseline: dict) -> str:
     return "|".join(
         str(value or "")
         for value in [
+            "family-growth-safe-errors-v1",
+            "financial-consent-v1",
             ",".join(str(item) for item in context_user_ids),
             ",".join(str(item) for item in financial_user_ids),
             dependent_meta["count"],
@@ -152,7 +191,8 @@ def _family_growth_payload(user, baseline: dict) -> dict:
     savings_capacity = float(family_baseline.get("savings_capacity", 0) or 0)
     evidence = []
     for result in (verified_intelligence.ppf_reference(), verified_intelligence.nps_tax_reference()):
-        evidence.append(result.evidence)
+        # Stored refresh diagnostics can contain internal exception details.
+        evidence.append({key: value for key, value in result.evidence.items() if key not in {"notes", "last_refresh_error"}})
     evidence_freshness = freshness_snapshot(evidence)
 
     projections = []
@@ -268,14 +308,17 @@ def _family_financial_summary(user, *, own_baseline: dict) -> dict:
 
 
 def _family_member_financial_summary(*, requesting_user, member, baseline: dict) -> dict:
+    shares_profile = member.id == requesting_user.id or accepted_family_links_for_user(requesting_user).filter(
+        Q(created_by=member) | Q(linked_user=member), share_profile_summary=True,
+    ).exists()
     full_name = f"{member.first_name} {member.last_name}".strip()
     return {
         "user_id": member.id,
-        "username": member.username,
-        "display_name": full_name or member.username,
+        "username": member.username if shares_profile else None,
+        "display_name": (full_name or member.username) if shares_profile else "Linked member",
         "role": "self" if member.id == requesting_user.id else "linked",
-        "city": member.city,
-        "country": member.country,
+        "city": member.city if shares_profile else None,
+        "country": member.country if shares_profile else None,
         "monthly_income": round(float(baseline.get("monthly_income", 0) or 0), 2),
         "savings_capacity": round(float(baseline.get("savings_capacity", 0) or 0), 2),
         "total_assets": round(float(baseline.get("total_assets", 0) or 0), 2),

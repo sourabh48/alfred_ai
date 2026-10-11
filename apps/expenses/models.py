@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from .money import ExpenseMoneyField
+
 
 class BankAccount(models.Model):
     ACCOUNT_TYPE_CHOICES = [
@@ -19,7 +21,7 @@ class BankAccount(models.Model):
     account_holder = models.CharField(max_length=255, blank=True)
     account_number = models.CharField(max_length=64)
     account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPE_CHOICES, default="savings")
-    current_balance = models.FloatField(null=True, blank=True)
+    current_balance = ExpenseMoneyField(max_digits=14, decimal_places=2, null=True, blank=True)
     is_primary = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     last_synced_at = models.DateTimeField(null=True, blank=True)
@@ -146,7 +148,7 @@ class Expense(models.Model):
         blank=True,
         related_name="expenses",
     )
-    amount = models.FloatField()
+    amount = ExpenseMoneyField(max_digits=14, decimal_places=2)
     classification = models.CharField(max_length=20, choices=CLASSIFICATION_CHOICES, default="expense")
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default="other")
     payment_mode = models.CharField(max_length=50, default="UPI")
@@ -158,7 +160,8 @@ class Expense(models.Model):
     source = models.CharField(max_length=30, choices=SOURCE_CHOICES, default="manual")
     external_reference = models.CharField(max_length=120, blank=True)
     transaction_fingerprint = models.CharField(max_length=64, blank=True, db_index=True)
-    closing_balance = models.FloatField(null=True, blank=True)
+    transaction_identity = models.JSONField(default=dict, blank=True)
+    closing_balance = ExpenseMoneyField(max_digits=14, decimal_places=2, null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     counterparty = models.CharField(max_length=255, blank=True)
     company_name = models.CharField(max_length=255, blank=True)
@@ -178,3 +181,25 @@ class Expense(models.Model):
 
     def __str__(self):
         return f"{self.user.username} | {self.classification} | {self.category} | {self.amount}"
+
+
+class ExpenseMoneySnapshot(models.Model):
+    expense = models.ForeignKey(Expense, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    original_expense_id = models.PositiveBigIntegerField(unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="expense_money_snapshots")
+    source_values = models.JSONField()
+    normalized_values = models.JSONField()
+    policy = models.CharField(max_length=30, default="expense-bank-money-v1")
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class BankAccountMoneySnapshot(models.Model):
+    bank_account = models.ForeignKey(BankAccount, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    original_bank_account_id = models.PositiveBigIntegerField(unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bank_account_money_snapshots")
+    source_values = models.JSONField()
+    normalized_values = models.JSONField()
+    policy = models.CharField(max_length=30, default="expense-bank-money-v1")
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)

@@ -3,6 +3,7 @@ import json
 from django.core.serializers.json import DjangoJSONEncoder
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,9 +17,12 @@ from datetime import date
 from alfred_ai.services.materialized_cache import materialize_payload
 from alfred_ai.services.calculation_risk import calculation_risk_snapshot
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
+from alfred_ai.services.api_errors import safe_error_details, safe_error_response
+from alfred_ai.services.upload_limits import UploadLimitExceeded, UploadFormatError, UploadStorageUnavailable, UploadProtectionUnavailable
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
 from apps.investments.models import Investment
+from apps.mobility.models import BikeProfile
 from alfred_ai.services import record_parser_learning
 from apps.reports.services import operational_logging_service
 from apps.loans.services.loan_pdf_parser import loan_pdf_parser
@@ -27,7 +31,9 @@ from apps.loans.services.payment_review import review_loan_payment_match, serial
 from apps.reports.services import reporting_service
 
 from .models import Loan, LoanClosureDocument, LoanImportDocument, LoanPaymentHistory
+from .money import LOAN_MONEY_FIELDS, loan_money, loan_money_float
 from .serializers import LoanClosureDocumentSerializer, LoanImportDocumentSerializer, LoanSerializer
+from .diagnostics import LOAN_PROCESSING_ERROR, LOAN_ERROR_CODE, import_message, public_retention, public_allocation, reconciliation_message
 
 
 def _json_safe(payload):
@@ -70,6 +76,9 @@ def _loan_dashboard_revision(user) -> str:
         latest_expense=Max("transaction_date"),
         total_amount=Sum("amount"),
     )
+    vehicle_meta = BikeProfile.objects.filter(user=user).aggregate(
+        count=Count("id"), latest_update=Max("updated_at"), total_value=Sum("estimated_market_value"),
+    )
     profile_token = ":".join(
         str(value or "")
         for value in (
@@ -81,7 +90,7 @@ def _loan_dashboard_revision(user) -> str:
     return "|".join(
         str(value or "")
         for value in (
-            "loan-dashboard-v2",
+            "loan-dashboard-v7-safe-diagnostics",
             loan_meta["count"],
             loan_meta["max_id"],
             loan_meta["latest_update"],
@@ -105,6 +114,9 @@ def _loan_dashboard_revision(user) -> str:
             expense_meta["max_id"],
             expense_meta["latest_expense"],
             expense_meta["total_amount"],
+            vehicle_meta["count"],
+            vehicle_meta["latest_update"],
+            vehicle_meta["total_value"],
             profile_token,
         )
     )
@@ -147,8 +159,6 @@ def _create_loan_import_document(*, request, upload_file, parsed: dict, created_
                 "document_type": parsed.get("document_type") or "",
                 "confidence": float(parsed.get("confidence") or 0),
                 "loans": parsed.get("loans") or [],
-                "parser_notes": parsed.get("parser_notes") or "",
-                **(parsed.get("payload") or {}),
             }
         ),
         summary=_loan_import_summary(parsed, created_loans),
@@ -185,13 +195,17 @@ class LoanSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        payload = materialize_payload(
-            namespace="loan-summary",
-            user_id=request.user.id,
-            revision=_loan_dashboard_revision(request.user),
-            ttl_seconds=60,
-            builder=lambda: _build_loan_summary_payload(request),
-        )
+        try:
+            payload = materialize_payload(
+                namespace="loan-summary",
+                user_id=request.user.id,
+                revision=_loan_dashboard_revision(request.user),
+                ttl_seconds=60,
+                builder=lambda: _build_loan_summary_payload(request),
+            )
+        except Exception as exc:
+            return safe_error_response(exc, "Loan summary is temporarily unavailable. Please retry.",
+                                       logger_name=__name__, field="error", status_code=500)
         return Response(payload)
 
 
@@ -248,9 +262,9 @@ class LoanConsolidationView(APIView):
         if len(loan_ids) < 2:
             return Response({"detail": "Select at least two active loans to consolidate."}, status=status.HTTP_400_BAD_REQUEST)
 
-        source_loans = list(Loan.objects.filter(user=request.user, pk__in=loan_ids, is_active=True).order_by("id"))
+        source_loans = list(Loan.objects.filter(user=request.user, pk__in=loan_ids, is_active=True, verification_status="confirmed").order_by("id"))
         if len(source_loans) != len(set(loan_ids)):
-            return Response({"detail": "One or more selected loans are invalid or already inactive."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Choose active, confirmed loans from your own register."}, status=status.HTTP_400_BAD_REQUEST)
 
         start_date_value = request.data.get("start_date") or timezone.localdate().isoformat()
         try:
@@ -258,13 +272,17 @@ class LoanConsolidationView(APIView):
         except ValueError:
             return Response({"detail": "Provide a valid consolidation start date."}, status=status.HTTP_400_BAD_REQUEST)
 
-        total_balance = sum((loan.remaining_balance if loan.remaining_balance is not None else loan.principal) for loan in source_loans)
+        total_balance = sum((loan_money(loan.remaining_balance if loan.remaining_balance is not None else loan.principal)
+                             for loan in source_loans), loan_money(0))
         lender = (request.data.get("lender") or "").strip()
         if not lender:
             return Response({"detail": "Provide the new lender for the consolidated loan."}, status=status.HTTP_400_BAD_REQUEST)
-        principal = float(request.data.get("principal") or total_balance or 0)
+        try:
+            principal = loan_money(request.data.get("principal") or total_balance)
+            emi = loan_money(request.data.get("emi") or 0)
+        except ValueError as exc:
+            return safe_error_response(exc, "Enter valid principal and EMI amounts.", logger_name=__name__)
         interest_rate = float(request.data.get("interest_rate") or 0)
-        emi = float(request.data.get("emi") or 0)
         tenure_months = int(request.data.get("tenure_months") or 0)
         if principal <= 0 or emi <= 0 or tenure_months <= 0:
             return Response({"detail": "Principal, EMI, and tenure must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
@@ -297,6 +315,7 @@ class LoanConsolidationView(APIView):
 @permission_classes([IsAuthenticated])
 def import_loan_pdf(request):
     """Import loans from PDF (loan book or statement)."""
+    processing_stage = "validation"
     try:
         if 'file' not in request.FILES:
             return Response(
@@ -313,12 +332,18 @@ def import_loan_pdf(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        processing_stage = "parser"
         parsed = loan_pdf_parser.parse_document(pdf_file, user=request.user, filename=pdf_file.name)
+        processing_stage = "persistence"
         loans_data = parsed["loans"]
 
         with transaction.atomic():
             created_loans = []
             for loan_data in loans_data:
+                loan_data = {
+                    key: loan_money(value) if key in LOAN_MONEY_FIELDS and value is not None else value
+                    for key, value in loan_data.items()
+                }
                 loan_account_number = (loan_data.get("loan_account_number") or "").strip()
                 lender = (loan_data.get("lender") or "").strip()
                 principal = loan_data.get("principal", 0)
@@ -374,7 +399,7 @@ def import_loan_pdf(request):
                     event_type="loan_document_needs_review",
                     severity="warning",
                     document_id=upload_record.id,
-                    file_name=upload_record.file_name,
+                    file_name="",
                     message="Loan document upload was saved, but Alfred could not populate fully trusted structured loan rows yet.",
                     payload={
                         "parser_status": upload_record.parser_status,
@@ -388,20 +413,27 @@ def import_loan_pdf(request):
                 upload_record,
                 "uploaded_file",
                 reason="loan_document_extraction_complete",
+                metadata_filter=public_retention,
             )
 
         return Response({
             "success": True,
-            "message": upload_record.summary,
+            "message": import_message(upload_record.parser_status),
             "document_type": parsed["document_type"],
             "parse_confidence": parsed["confidence"],
             "loans": LoanSerializer(created_loans, many=True).data,
             "upload": LoanImportDocumentSerializer(upload_record, context={"request": request}).data,
-            "raw_file_retention": raw_file_retention,
+            "raw_file_retention": public_retention(raw_file_retention),
         }, status=status.HTTP_201_CREATED)
 
+    except (UploadLimitExceeded, UploadFormatError, UploadStorageUnavailable, UploadProtectionUnavailable) as exc:
+        return safe_error_response(exc, type(exc).default_detail, logger_name=__name__, status_code=exc.status_code)
+    except APIException as exc:
+        return safe_error_response(exc, LOAN_PROCESSING_ERROR, logger_name=__name__, status_code=exc.status_code)
     except Exception as e:
-        if "pdf_file" in locals() and getattr(pdf_file, "name", "").lower().endswith(".pdf"):
+        diagnostic = safe_error_details(e, LOAN_PROCESSING_ERROR, logger_name=f"{__name__}.{processing_stage}", field="error")
+        diagnostic["error_code"] = LOAN_ERROR_CODE
+        if processing_stage == "parser":
             parsed = {
                 "document_type": "other",
                 "confidence": 0.0,
@@ -417,11 +449,8 @@ def import_loan_pdf(request):
                         created_loans=[],
                     )
                     upload_record.parser_status = "failed"
-                    upload_record.summary = f"The uploaded loan PDF was saved for review after a parser failure: {e}"
-                    upload_record.extracted_payload = {
-                        **(upload_record.extracted_payload or {}),
-                        "error": str(e),
-                    }
+                    upload_record.summary = import_message("failed")
+                    upload_record.extracted_payload = diagnostic
                     upload_record.save(update_fields=["parser_status", "summary", "extracted_payload"])
                     operational_logging_service.log(
                         user=request.user,
@@ -431,31 +460,34 @@ def import_loan_pdf(request):
                         event_type="loan_document_failed",
                         severity="error",
                         document_id=upload_record.id,
-                        file_name=upload_record.file_name,
+                        file_name="",
                         message="Loan document upload hit a parser failure and was kept for review.",
-                        payload={"error": str(e)},
+                        payload=diagnostic,
                     )
                     raw_file_retention = purge_uploaded_file_after_extraction(
                         upload_record,
                         "uploaded_file",
                         reason="loan_document_parser_failure_cleanup",
+                        metadata_filter=public_retention,
                     )
                 return Response(
                     {
                         "success": False,
                         "message": upload_record.summary,
+                        **diagnostic,
                         "document_type": "other",
                         "parse_confidence": 0,
                         "loans": [],
                         "upload": LoanImportDocumentSerializer(upload_record, context={"request": request}).data,
-                        "raw_file_retention": raw_file_retention,
+                        "raw_file_retention": public_retention(raw_file_retention),
                     },
                     status=status.HTTP_201_CREATED,
                 )
-            except Exception:
-                pass
+            except Exception as fallback_error:
+                return safe_error_response(fallback_error, "Loan document could not be saved. Please retry.",
+                                           logger_name=f"{__name__}.review_persistence", field="error", status_code=500)
         return Response(
-            {"error": str(e)},
+            diagnostic,
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -485,11 +517,12 @@ def payoff_loan(request, pk):
                 selected_loan=loan,
                 closure_file=closure_file,
                 parsed=parsed,
-                requested_closure_amount=float(request.data.get("final_payment_amount") or 0) or None,
+                requested_closure_amount=(loan_money(request.data["final_payment_amount"])
+                                          if request.data.get("final_payment_amount") not in (None, "") else None),
                 requested_closure_date=(request.data.get("closure_date") or "").strip() or None,
             )
         except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return safe_error_response(exc, "Check the closure document, payment amount, and selected loan.", logger_name=__name__)
 
         closure_document = result.closure_document
         record_parser_learning(
@@ -506,6 +539,7 @@ def payoff_loan(request, pk):
             closure_document,
             "uploaded_file",
             reason="loan_closure_document_extraction_complete",
+            metadata_filter=public_retention,
         )
 
         if closure_document.verification_status != "verified":
@@ -522,9 +556,9 @@ def payoff_loan(request, pk):
             )
             return Response(
                 {
-                    "detail": closure_document.verification_notes,
+                    "detail": "Closure document could not be verified against the selected loan.",
                     "document": LoanClosureDocumentSerializer(closure_document, context={"request": request}).data,
-                    "raw_file_retention": raw_file_retention,
+                    "raw_file_retention": public_retention(raw_file_retention),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -534,12 +568,12 @@ def payoff_loan(request, pk):
             "message": result.message,
             "loan": LoanSerializer(result.loan).data,
             "document": LoanClosureDocumentSerializer(closure_document, context={"request": request}).data,
-            "raw_file_retention": raw_file_retention,
+            "raw_file_retention": public_retention(raw_file_retention),
             "reconciliation": {
                 "status": getattr(result.snapshot, "reconciliation_status", "unmatched"),
-                "matched_payment_total": getattr(result.snapshot, "matched_payment_total", 0),
-                "notes": getattr(result.snapshot, "reconciliation_notes", ""),
-                "settlement_allocation": dict((getattr(result.snapshot, "audit_payload", {}) or {}).get("settlement_allocation") or {}),
+                "matched_payment_total": loan_money_float(getattr(result.snapshot, "matched_payment_total", 0)),
+                "notes": reconciliation_message(getattr(result.snapshot, "reconciliation_status", "unmatched")),
+                "settlement_allocation": public_allocation((getattr(result.snapshot, "audit_payload", {}) or {}).get("settlement_allocation")),
             },
         }, status=status.HTTP_200_OK if result.confirmed else status.HTTP_202_ACCEPTED)
 
@@ -548,11 +582,13 @@ def payoff_loan(request, pk):
             {"error": "Loan not found"},
             status=status.HTTP_404_NOT_FOUND
         )
+    except (UploadLimitExceeded, UploadFormatError, UploadStorageUnavailable, UploadProtectionUnavailable) as exc:
+        return safe_error_response(exc, type(exc).default_detail, logger_name=__name__, status_code=exc.status_code)
+    except APIException as exc:
+        return safe_error_response(exc, LOAN_PROCESSING_ERROR, logger_name=__name__, status_code=exc.status_code)
     except Exception as e:
-        return Response(
-            {"error": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return safe_error_response(e, "Closure document could not be processed. Please retry.",
+                                   logger_name=__name__, field="error", status_code=500)
 
 
 @api_view(['POST'])
@@ -572,10 +608,8 @@ def detect_loans_from_expenses(request):
         })
 
     except Exception as e:
-        return Response(
-            {"error": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return safe_error_response(e, "Loan payment detection is temporarily unavailable. Please retry.",
+                                   logger_name=__name__, field="error", status_code=500)
 
 
 @api_view(["POST"])
@@ -602,7 +636,7 @@ def review_loan_payment(request, payment_id):
     except LoanPaymentHistory.DoesNotExist:
         return Response({"detail": "Loan payment review row not found."}, status=status.HTTP_404_NOT_FOUND)
     except ValueError as exc:
-        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return safe_error_response(exc, "Choose a valid loan payment review decision.", logger_name=__name__)
 
 
 @api_view(['GET'])
@@ -620,10 +654,8 @@ def loan_metrics(request):
         return Response(payload)
 
     except Exception as e:
-        return Response(
-            {"error": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return safe_error_response(e, "Loan metrics are temporarily unavailable. Please retry.",
+                                   logger_name=__name__, field="error", status_code=500)
 
 
 @api_view(['GET'])
@@ -641,10 +673,8 @@ def calculate_networth(request):
         return Response(payload)
 
     except Exception as e:
-        return Response(
-            {"error": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return safe_error_response(e, "Net worth is temporarily unavailable. Please retry.",
+                                   logger_name=__name__, field="error", status_code=500)
 
 
 def _build_networth_payload(user) -> dict:
@@ -664,7 +694,9 @@ def _build_networth_payload(user) -> dict:
         "cash": asset_lookup.get("Cash and bank balances", 0.0),
         "investments": asset_lookup.get("Investments", 0.0),
         "home_property_acquisition_cost": asset_lookup.get("Home property acquisition-cost base (proxy)", 0.0),
-        "utility_and_income_supporting_vehicles": asset_lookup.get("Utility and income-supporting vehicles", 0.0),
+        "vehicles": asset_lookup.get("Vehicles (estimated current market value)", 0.0),
+        # Compatibility alias; totals use the canonical asset rows only.
+        "utility_and_income_supporting_vehicles": asset_lookup.get("Vehicles (estimated current market value)", 0.0),
         "total": total_assets,
     }
 
@@ -676,7 +708,7 @@ def _build_networth_payload(user) -> dict:
         ),
         "pending_foreclosure_excluded_balance": round(balance_sheet.get("pending_foreclosure_excluded_balance", 0.0), 2),
         "credit_card_liability": liability_lookup.get("Credit card liability", 0.0),
-        "lifestyle_vehicle_burden": liability_lookup.get("Lifestyle vehicle burden", 0.0),
+        "lifestyle_vehicle_burden": 0.0,
         "total": total_debt,
     }
 
@@ -688,7 +720,7 @@ def _build_networth_payload(user) -> dict:
         investment_by_type[asset_type] += inv.current_value
 
     loan_by_type = {}
-    for loan in Loan.objects.filter(user=user).exclude(status__in=["foreclosed", "closed", "prepaid"]):
+    for loan in Loan.objects.filter(user=user, verification_status="confirmed").exclude(status__in=["foreclosed", "closed", "prepaid"]):
         loan_type = loan.get_loan_type_display()
         if loan_type not in loan_by_type:
             loan_by_type[loan_type] = 0
@@ -722,15 +754,15 @@ def _build_networth_payload(user) -> dict:
         "net_worth": net_worth,
         "assets": assets_breakdown,
         "liabilities": liabilities_breakdown,
-        "investment_breakdown": {k: round(v, 2) for k, v in investment_by_type.items()},
-        "loan_breakdown": {k: round(v, 2) for k, v in loan_by_type.items()},
+        "investment_breakdown": {k: float(round(v, 2)) for k, v in investment_by_type.items()},
+        "loan_breakdown": {k: float(round(v, 2)) for k, v in loan_by_type.items()},
         "metrics": {
             "debt_to_asset_ratio": round(debt_to_asset_ratio, 2),
             "asset_allocation": {
                 "cash_percentage": round((assets_breakdown["cash"] / total_assets * 100) if total_assets > 0 else 0, 2),
                 "investment_percentage": round((assets_breakdown["investments"] / total_assets * 100) if total_assets > 0 else 0, 2),
                 "home_property_percentage": round((assets_breakdown["home_property_acquisition_cost"] / total_assets * 100) if total_assets > 0 else 0, 2),
-                "vehicle_asset_percentage": round((assets_breakdown["utility_and_income_supporting_vehicles"] / total_assets * 100) if total_assets > 0 else 0, 2),
+                "vehicle_asset_percentage": round((assets_breakdown["vehicles"] / total_assets * 100) if total_assets > 0 else 0, 2),
             }
         },
         "health": {

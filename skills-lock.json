@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "skills": {
+    "integration-resilience-engineer": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "integration-resilience-engineer/SKILL.md",
+      "computedHash": "93513ce4b0fa5badd85feefe953c18b3420e2835be30a4bd62671a7830fac865"
+    },
+    "observability-integrator": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "observability-integrator/SKILL.md",
+      "computedHash": "3753014c8925a4c2b2458b2f2171b7cc167bfcfadd6e75125de30a1f4b3d6888"
+    },
+    "performance-concurrency-advisor": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "performance-concurrency-advisor/SKILL.md",
+      "computedHash": "29afa5ed3d9951256ca9659fda32ada85e28f94f9dbd9c01bc840e1a9bfc2256"
+    },
+    "playwright": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "playwright/SKILL.md",
+      "computedHash": "f38266e7d37ebbd21ea43b3fc8ad7b1df90370fba01da80155e9efb9e948d32b"
+    },
+    "project-context-ingestion": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "project-context-ingestion/SKILL.md",
+      "computedHash": "75ba32b7c856c301fe461f5f3401b568ff7de5527f31d3f370839fd955ee0170"
+    },
+    "refactoring-code": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "refactoring-code/SKILL.md",
+      "computedHash": "38aa749eef215f34764431e504094fdbeae25e7a9aa9a94911ac32736c36be86"
+    },
+    "schema-migration-planner": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "schema-migration-planner/SKILL.md",
+      "computedHash": "cfef451b9b8664da36cd41752cc1361f908cea1a023bbf836af14f9dc9632e45"
+    },
+    "security-best-practices": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "security-best-practices/SKILL.md",
+      "computedHash": "c1d1a1ce2bb15c46372d7259b717b1ba3b52597710a31d1a5186219b5f8e063b"
+    },
+    "security-threat-model": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "security-threat-model/SKILL.md",
+      "computedHash": "390c6459055a9ee3a4199b2f24abb94452a6fdba2e7908ccf305fc245a306647"
+    },
+    "test-suite-builder": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "test-suite-builder/SKILL.md",
+      "computedHash": "a8e908482cf1b8a380e2aca5c5f06ea685823e844e2c51a3a100424863dab06e"
+    },
+    "transaction-consistency-designer": {
+      "source": "JetBrains/skills",
+      "sourceType": "github",
+      "skillPath": "transaction-consistency-designer/SKILL.md",
+      "computedHash": "faae1d2548c16defd4912bb49e339f18a2831dba5655ee8d2431a1f2451a15de"
+    }
+  }
+}

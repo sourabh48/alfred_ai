@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import date
+from decimal import Decimal
 import logging
 import sys
 
@@ -17,6 +18,7 @@ from alfred_ai.pagination import OptionalPageNumberPagination
 from alfred_ai.services import record_parser_learning
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction, raw_upload_cleanup_enabled
 from .models import BankAccount, Expense, StatementUpload
+from .money import money_float
 from .serializers import BankAccountSerializer, ExpenseSerializer, StatementUploadSerializer
 from .services.cashflow_treatment import (
     add_expense_to_cashflow_bucket,
@@ -102,9 +104,9 @@ def _build_monthly_window(expenses: list[Expense]) -> dict:
 def _build_unwanted_expenses(expenses: list[Expense], monthly_window: dict) -> dict:
     flagged = [expense for expense in expenses if _is_unwanted_expense(expense)]
     category_labels = dict(Expense.CATEGORY_CHOICES)
-    category_totals: dict[str, float] = defaultdict(float)
-    emotional_total = 0.0
-    discretionary_total = 0.0
+    category_totals = defaultdict(lambda: Decimal("0"))
+    emotional_total = Decimal("0")
+    discretionary_total = Decimal("0")
 
     for expense in flagged:
         category_totals[expense.category] += expense.amount
@@ -121,7 +123,7 @@ def _build_unwanted_expenses(expenses: list[Expense], monthly_window: dict) -> d
     top_categories = [
         {
             "label": category_labels.get(key, key.replace("_", " ").title()),
-            "amount": round(amount, 2),
+            "amount": money_float(amount),
         }
         for key, amount in sorted(category_totals.items(), key=lambda item: item[1], reverse=True)[:4]
     ]
@@ -129,9 +131,9 @@ def _build_unwanted_expenses(expenses: list[Expense], monthly_window: dict) -> d
     return {
         "current_month_total": round(current_unwanted, 2),
         "current_month_ratio": ratio,
-        "overall_total": round(total_flagged, 2),
-        "emotional_total": round(emotional_total, 2),
-        "discretionary_total": round(discretionary_total, 2),
+        "overall_total": money_float(total_flagged),
+        "emotional_total": money_float(emotional_total),
+        "discretionary_total": money_float(discretionary_total),
         "count": len(flagged),
         "top_categories": top_categories,
         "items": [
@@ -140,7 +142,7 @@ def _build_unwanted_expenses(expenses: list[Expense], monthly_window: dict) -> d
                 "transaction_date": expense.transaction_date.isoformat(),
                 "merchant": expense.merchant or "Unspecified",
                 "description": expense.description or expense.raw_description or "",
-                "amount": round(expense.amount, 2),
+                "amount": money_float(expense.amount),
                 "category": expense.category,
                 "category_label": category_labels.get(expense.category, expense.category.replace("_", " ").title()),
                 "model_confidence": round(float(expense.model_confidence or 0), 3),
@@ -297,6 +299,7 @@ class ExpenseListCreateView(ListCreateAPIView):
 
         return queryset
 
+    @transaction.atomic
     def perform_create(self, serializer):
         validated = serializer.validated_data
         expense = serializer.save(
@@ -314,6 +317,7 @@ class ExpenseDetailView(RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return Expense.objects.filter(user=self.request.user)
 
+    @transaction.atomic
     def perform_update(self, serializer):
         expense = serializer.save()
         sync_account_balance(expense.bank_account, expense.closing_balance)
@@ -337,8 +341,8 @@ class ExpenseTimelineView(APIView):
         grouped: dict[str, list[dict]] = defaultdict(list)
         summary = {
             **empty_cashflow_bucket(),
-            "emotional_total": 0.0,
-            "unwanted_total": 0.0,
+            "emotional_total": Decimal("0"),
+            "unwanted_total": Decimal("0"),
             "unwanted_count": 0,
             "accounts_tracked": BankAccount.objects.filter(user=request.user, is_active=True).count(),
             "transaction_count": len(expenses),
@@ -363,13 +367,12 @@ class ExpenseTimelineView(APIView):
             {
                 "date": date_value,
                 "items": items,
-                "day_total": round(
+                "day_total": money_float(
                     sum(
-                        item["amount"]
+                        Decimal(str(item["amount"]))
                         for item in items
                         if visible_treatments.get(item["id"]) and visible_treatments[item["id"]].counts_cashflow_outflow
                     ),
-                    2,
                 ),
             }
             for date_value, items in grouped.items()
@@ -381,7 +384,7 @@ class ExpenseTimelineView(APIView):
         return Response(
             {
                 "summary": {
-                    key: round(value, 2) if isinstance(value, float) else value
+                    key: money_float(value) if isinstance(value, (float, Decimal)) else value
                     for key, value in summary.items()
                 },
                 "timeline": timeline,
@@ -481,12 +484,15 @@ class ExpenseStatementImportView(APIView):
         parsed = parse_bank_statement(statement_file, user=request.user)
         statement_kind = (request.data.get("statement_kind") or parsed.statement_kind or "bank_statement").strip() or "bank_statement"
         statement_file.seek(0)
-        result = apply_parsed_statement_upload(
-            user=request.user,
-            parsed=parsed,
-            statement_kind=statement_kind,
-            statement_file=statement_file,
-        )
+        try:
+            result = apply_parsed_statement_upload(
+                user=request.user,
+                parsed=parsed,
+                statement_kind=statement_kind,
+                statement_file=statement_file,
+            )
+        except ValueError:
+            return Response({"detail": "Statement currency is invalid or outside the supported range."}, status=status.HTTP_400_BAD_REQUEST)
         upload = result.upload
         bank_account = result.bank_account
         record_parser_learning(
@@ -588,7 +594,7 @@ class ExpenseStatementImportView(APIView):
                     "upload": StatementUploadSerializer(upload).data,
                     "raw_file_retention": raw_file_retention,
                     "summary": {
-                        key: round(value, 2) if isinstance(value, float) else value
+                        key: money_float(value) if isinstance(value, (float, Decimal)) else value
                         for key, value in result.summary.items()
                     },
                     "parser_notes": parsed.parser_notes,
@@ -611,7 +617,7 @@ class ExpenseStatementImportView(APIView):
                 "upload": StatementUploadSerializer(upload).data,
                 "raw_file_retention": raw_file_retention,
                 "summary": {
-                    key: round(value, 2) if isinstance(value, float) else value
+                    key: money_float(value) if isinstance(value, (float, Decimal)) else value
                     for key, value in result.summary.items()
                 },
             },
@@ -638,7 +644,7 @@ class StatementUploadRetryView(APIView):
                 "skipped_count": result.skipped_count,
                 "upload": StatementUploadSerializer(result.upload).data,
                 "summary": {
-                    key: round(value, 2) if isinstance(value, float) else value
+                    key: money_float(value) if isinstance(value, (float, Decimal)) else value
                     for key, value in result.summary.items()
                 },
             }

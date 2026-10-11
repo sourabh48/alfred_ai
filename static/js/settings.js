@@ -102,13 +102,15 @@ function renderFamilyLinks(snapshot = {}) {
             profile.country || "",
         ].filter(Boolean).join(" | ");
         return `
-            <article class="mini-card family-link-row">
+            <article class="mini-card family-link-row flex-wrap">
                 <div>
                     <div class="fw-semibold">${Alfred.escapeHtml(title)}</div>
                     <div class="metric-caption">${Alfred.escapeHtml(meta)}</div>
+                    <div class="metric-caption">My financial summary: ${link.share_financial_summary ? "Shared" : "Private"}. Member's financial summary: ${link.receives_financial_summary ? "Shared with me" : "Private"}.</div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="status-pill status-stable">Connected</span>
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-family-link-action="financial-sharing" data-family-link-id="${link.id}" data-family-financial-enabled="${Boolean(link.share_financial_summary)}">${link.share_financial_summary ? "Stop sharing my financial summary" : "Share my financial summary"}</button>
                     <button class="btn btn-sm btn-outline-danger" type="button" data-family-link-action="revoke" data-family-link-id="${link.id}">Disconnect</button>
                 </div>
             </article>
@@ -162,11 +164,29 @@ function handleFamilyLinkAction(event) {
     if (!button) {
         return;
     }
-    if (button.dataset.familyLinkAction !== "revoke") {
+    const id = Number(button.dataset.familyLinkId || 0);
+    if (!id) {
         return;
     }
-    const id = Number(button.dataset.familyLinkId || 0);
-    if (!id || !window.confirm("Disconnect this member from your account?")) {
+    if (button.dataset.familyLinkAction === "financial-sharing") {
+        const enabled = button.dataset.familyFinancialEnabled !== "true";
+        if (enabled && !window.confirm("Share your monthly income, savings capacity, assets, liabilities and net worth with this member? This shares only your summary; you can stop sharing at any time.")) {
+            return;
+        }
+        Alfred.fetchJSON(`/api/family/account-links/${id}/financial-sharing/`, {
+            method: "PATCH",
+            body: JSON.stringify({ share_financial_summary: enabled }),
+        })
+            .then(payload => {
+                settingsState.links = payload;
+                renderFamilyLinks(payload);
+                renderFamilyContextSummary(payload);
+                showSettingsFeedback("settingsLinkFeedback", enabled ? "Your financial summary is now shared with this member." : "Your financial summary is now private from this member.", "success");
+            })
+            .catch(error => showSettingsFeedback("settingsLinkFeedback", error.message, "danger"));
+        return;
+    }
+    if (button.dataset.familyLinkAction !== "revoke" || !window.confirm("Disconnect this member from your account?")) {
         return;
     }
     Alfred.fetchJSON(`/api/family/account-links/${id}/revoke/`, {

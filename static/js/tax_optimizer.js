@@ -44,6 +44,8 @@ function renderTaxHero(data) {
     document.getElementById("taxRegimeValue").textContent = String(comparison.recommendation || "either").toUpperCase();
     document.getElementById("taxAnnualValue").textContent = Alfred.formatCurrency(recommendedTax || 0);
     document.getElementById("taxHeroCopy").textContent = comparison.message || "Tax comparison ready.";
+    const policy = data.tax_policy;
+    document.getElementById("taxPolicyCopy").textContent = `FY ${policy.financial_year} · AY ${policy.assessment_year}. Official-source rules verified ${policy.verified_at}; salary planning estimate before return-filing rounding.`;
 }
 
 function renderTaxSummary(data) {
@@ -89,6 +91,7 @@ function renderTaxChart(comparison) {
 
 function renderTaxInputs(inputs) {
     const form = document.getElementById("taxInputForm");
+    form.financial_year.value = inputs.financial_year;
     form.annual_income.value = inputs.annual_income;
     form.basic_salary.value = inputs.basic_salary;
     form.hra_received.value = inputs.hra_received;

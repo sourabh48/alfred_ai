@@ -20,6 +20,8 @@ def run_frozen_worker(arguments):
         from alfred_ai.services.document_extraction import ISOLATED_PDF_OCR_WORKER as source
     elif kind == "statement":
         from apps.expenses.services.statement_import import ISOLATED_OCR_WORKER as source
+    elif kind == "bounded":
+        from alfred_ai.services.bounded_parser import WORKER_SOURCE as source
     else:
         raise ValueError("Unknown OCR worker")
     sys.argv = ["-c", path, pages]

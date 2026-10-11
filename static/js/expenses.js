@@ -17,7 +17,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
-    expenseModal = new bootstrap.Modal(document.getElementById("expenseModal"));
+    const modalElement = document.getElementById("expenseModal");
+    // Keep Bootstrap's dialog above its body-level backdrop, outside the
+    // animated, scrolling workspace's stacking context.
+    document.body.appendChild(modalElement);
+    expenseModal = new bootstrap.Modal(modalElement);
 
     document.getElementById("expenseForm").addEventListener("submit", submitExpenseForm);
     document.getElementById("uploadStatementBtn").addEventListener("click", uploadStatement);
@@ -498,7 +502,7 @@ function renderBalanceSheet(balanceSheet) {
         {
             key: "vehicles",
             label: "Vehicles",
-            value: vehicles.length ? vehicles.map(item => `${Alfred.escapeHtml(item.vehicle)} ${Alfred.escapeHtml(item.bucket)} ${formatCurrency(item.recognized_value)}`).join(" | ") : "No vehicle classification yet",
+            value: vehicles.length ? vehicles.map(item => `${Alfred.escapeHtml(item.vehicle)} | ${item.recognized_value > 0 ? `Estimated asset ${formatCurrency(item.recognized_value)}` : "No positive market value recorded"} | Recorded running costs ${formatCurrency(item.recorded_running_cost_total || 0)} (all history)`).join(" | ") : "No vehicles tracked",
         },
     ];
 

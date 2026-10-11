@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from django.utils import timezone
+from apps.expenses.money import money_float
 
 try:
     import speech_recognition as sr
@@ -297,7 +298,7 @@ class VoiceAssistantService:
         from apps.expenses.models import BankAccount
 
         accounts = BankAccount.objects.filter(user=user, is_active=True)
-        total_balance = sum(acc.current_balance for acc in accounts)
+        total_balance = sum(acc.current_balance or 0 for acc in accounts)
 
         if accounts.count() == 1:
             response = f"Your current balance is {total_balance:,.0f} rupees."
@@ -307,7 +308,7 @@ class VoiceAssistantService:
         return {
             'success': True,
             'intent': 'get_balance',
-            'total_balance': total_balance,
+            'total_balance': money_float(total_balance),
             'account_count': accounts.count(),
             'response': response
         }
@@ -353,7 +354,7 @@ class VoiceAssistantService:
             'success': True,
             'intent': 'get_expenses',
             'period': period_name,
-            'total': total,
+            'total': money_float(total),
             'count': count,
             'response': response
         }
@@ -387,10 +388,11 @@ class VoiceAssistantService:
     def _handle_get_loans(self, user) -> Dict:
         """Get loan summary."""
         from apps.loans.models import Loan
+        from apps.loans.money import loan_money
 
-        active_loans = Loan.objects.filter(user=user, is_active=True)
-        total_outstanding = sum(loan.remaining_balance for loan in active_loans)
-        total_emi = sum(loan.emi for loan in active_loans)
+        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed")
+        total_outstanding = float(sum((loan_money(loan.remaining_balance) for loan in active_loans), loan_money(0)))
+        total_emi = float(sum((loan_money(loan.emi) for loan in active_loans), loan_money(0)))
 
         if active_loans.count() == 0:
             response = "You don't have any active loans. Great job!"
@@ -425,7 +427,7 @@ class VoiceAssistantService:
             'success': True,
             'intent': 'get_investments',
             'investment_count': count,
-            'total_value': total_value,
+            'total_value': float(total_value),
             'response': response
         }
 

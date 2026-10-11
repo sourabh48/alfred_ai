@@ -6,11 +6,13 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from alfred_ai.services import record_parser_learning
+from alfred_ai.services.api_errors import safe_error_response
 from alfred_ai.services.materialized_cache import materialize_payload
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.expenses.models import BankAccount
@@ -21,6 +23,10 @@ from apps.reports.services import operational_logging_service
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 from .serializers import CareerJobAnalysisSerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
+
+
+def _career_error_response(exc, message, *, field="detail", status_code=status.HTTP_400_BAD_REQUEST):
+    return safe_error_response(exc, message, logger_name=__name__, field=field, status_code=status_code)
 
 
 def _get_profile(user):
@@ -423,21 +429,22 @@ class CareerRecruiterMatchView(APIView):
         if not message_text and attachment is None:
             return Response({"detail": "Paste recruiter mail text or upload a JD attachment first."}, status=status.HTTP_400_BAD_REQUEST)
 
-        profile = _get_profile(request.user)
-        latest_resume = CareerResume.objects.filter(user=request.user).order_by("-created_at", "-id").first()
-        resume_payload = latest_resume.extracted_payload if latest_resume else _resume_payload_from_profile(profile)
-        macro = verified_intelligence.macro_context()
-        income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)
-
         try:
             snapshot = job_intelligence.parse_recruiter_message(
                 message_text,
                 attachment=attachment,
                 filename=getattr(attachment, "name", ""),
             )
+        except APIException:
+            raise
         except Exception as exc:
-            return Response({"detail": f"Recruiter intake could not be parsed: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
+            return _career_error_response(exc, "Recruiter intake could not be parsed. Check the text or attachment and try again.")
 
+        profile = _get_profile(request.user)
+        latest_resume = CareerResume.objects.filter(user=request.user).order_by("-created_at", "-id").first()
+        resume_payload = latest_resume.extracted_payload if latest_resume else _resume_payload_from_profile(profile)
+        macro = verified_intelligence.macro_context()
+        income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)
         fit = job_intelligence.compare_resume_to_job(resume_payload, snapshot)
         market = job_intelligence.market_outlook(snapshot.title or profile.role, snapshot.company, macro=macro)
         openings = job_intelligence.suggest_openings(snapshot.title or profile.role, resume_payload.get("skills") or [])
@@ -563,7 +570,7 @@ class CareerJobMatchView(APIView):
         try:
             job_snapshot = job_intelligence.parse_job_page(job_url)
         except Exception as exc:
-            return Response({"detail": f"Job page could not be parsed: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
+            return _career_error_response(exc, "Job page could not be parsed. Check the URL and try again.")
 
         fit = job_intelligence.compare_resume_to_job(resume_payload, job_snapshot)
         market = job_intelligence.market_outlook(job_snapshot.title or profile.role, job_snapshot.company, macro=macro)
@@ -712,8 +719,11 @@ def career_projection(request):
                 "employment_signals": income_signals,
             }
         )
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
+    except Exception as exc:
+        return _career_error_response(
+            exc, "Career projection is temporarily unavailable. Please try again.",
+            field="error", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(["GET"])

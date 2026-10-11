@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Dict, Any, Optional
 from django.utils import timezone
+from apps.expenses.money import money_float
 
 from apps.loans.services import loan_intelligence_service
 from apps.investments.services import portfolio_intelligence_service
@@ -234,10 +235,10 @@ class AlfredFinancialBrain:
             )
 
         return {
-            "total_spending": round(total_spending, 2),
-            "emotional_spending": round(emotional_spending_total, 2),
-            "emotional_percentage": round(emotional_percentage, 2),
-            "emotional_by_category": emotional_by_category,
+            "total_spending": money_float(total_spending),
+            "emotional_spending": money_float(emotional_spending_total),
+            "emotional_percentage": round(float(emotional_percentage), 2),
+            "emotional_by_category": {key: money_float(value) for key, value in emotional_by_category.items()},
             "insights": insights,
         }
 

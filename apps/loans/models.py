@@ -2,9 +2,23 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
+
+from .money import LoanMoneyField, loan_money
 
 
 class Loan(models.Model):
+    VERIFICATION_CHOICES = [
+        ("estimated", "Estimated - needs review"),
+        ("needs_review", "Needs review"),
+        ("confirmed", "Confirmed"),
+    ]
+    VERIFICATION_SOURCE_CHOICES = [
+        ("user", "User recorded"),
+        ("emi_pattern", "Recurring payment estimate"),
+        ("legacy_inference", "Legacy inferred record"),
+        ("bureau", "Bureau report"),
+    ]
     LOAN_TYPE_CHOICES = [
         ("home", "Home Loan"),
         ("personal", "Personal Loan"),
@@ -28,14 +42,14 @@ class Loan(models.Model):
     loan_type = models.CharField(max_length=50, choices=LOAN_TYPE_CHOICES, default="other")
     lender = models.CharField(max_length=120, blank=True)
     loan_account_number = models.CharField(max_length=64, blank=True)
-    principal = models.FloatField()
+    principal = LoanMoneyField(max_digits=14, decimal_places=2)
     interest_rate = models.FloatField()
-    emi = models.FloatField()
+    emi = LoanMoneyField(max_digits=14, decimal_places=2)
     tenure_months = models.PositiveIntegerField(default=12)
-    remaining_balance = models.FloatField(null=True, blank=True)
-    home_purchase_price = models.FloatField(default=0)
-    home_down_payment = models.FloatField(default=0)
-    home_other_upfront_payments = models.FloatField(default=0)
+    remaining_balance = LoanMoneyField(max_digits=14, decimal_places=2, null=True, blank=True)
+    home_purchase_price = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    home_down_payment = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    home_other_upfront_payments = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
     start_date = models.DateField()
     closed_on = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -52,8 +66,11 @@ class Loan(models.Model):
 
     # ML-tracked fields
     auto_detected = models.BooleanField(default=False)
+    verification_status = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default="confirmed")
+    verification_source = models.CharField(max_length=30, choices=VERIFICATION_SOURCE_CHOICES, default="user")
+    verified_at = models.DateTimeField(null=True, blank=True)
     last_payment_date = models.DateField(null=True, blank=True)
-    total_paid = models.FloatField(default=0)
+    total_paid = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
     missed_payments = models.PositiveIntegerField(default=0)
 
     notes = models.TextField(blank=True)
@@ -71,6 +88,10 @@ class Loan(models.Model):
     def __str__(self):
         lender = f" | {self.lender}" if self.lender else ""
         return f"{self.user.username} | {self.loan_type}{lender}"
+
+    @property
+    def is_confirmed(self) -> bool:
+        return self.verification_status == "confirmed"
 
     @property
     def current_status(self) -> str:
@@ -94,45 +115,60 @@ class Loan(models.Model):
     def completion_percentage(self) -> float:
         if self.principal <= 0:
             return 100.0
-        paid = self.principal - (self.remaining_balance or self.principal)
-        return min(100.0, (paid / self.principal) * 100)
+        principal = loan_money(self.principal)
+        remaining = loan_money(self.remaining_balance if self.remaining_balance is not None else self.principal)
+        return float(min(100, (principal - remaining) / principal * 100))
 
     @property
     def resolved_home_purchase_price(self) -> float:
         if self.loan_type != "home":
             return 0.0
-        purchase_price = max(float(self.home_purchase_price or 0), 0.0)
+        purchase_price = max(loan_money(self.home_purchase_price), 0)
         if purchase_price > 0:
-            return round(purchase_price, 2)
-        financed_amount = max(float(self.principal or 0), 0.0)
-        down_payment = max(float(self.home_down_payment or 0), 0.0)
-        return round(financed_amount + down_payment, 2) if (financed_amount or down_payment) else 0.0
+            return float(purchase_price)
+        financed_amount = max(loan_money(self.principal), 0)
+        down_payment = max(loan_money(self.home_down_payment), 0)
+        return float(financed_amount + down_payment)
 
     @property
     def resolved_home_down_payment(self) -> float:
         if self.loan_type != "home":
             return 0.0
-        financed_amount = max(float(self.principal or 0), 0.0)
-        purchase_price = max(float(self.home_purchase_price or 0), 0.0)
+        financed_amount = max(loan_money(self.principal), 0)
+        purchase_price = max(loan_money(self.home_purchase_price), 0)
         if purchase_price > 0:
-            return round(max(purchase_price - financed_amount, 0.0), 2)
-        return round(max(float(self.home_down_payment or 0), 0.0), 2)
+            return float(max(purchase_price - financed_amount, 0))
+        return float(max(loan_money(self.home_down_payment), 0))
 
     @property
     def resolved_home_other_upfront_payments(self) -> float:
         if self.loan_type != "home":
             return 0.0
-        return round(max(float(self.home_other_upfront_payments or 0), 0.0), 2)
+        return float(max(loan_money(self.home_other_upfront_payments), 0))
 
     @property
     def resolved_home_upfront_cash_invested(self) -> float:
-        return round(self.resolved_home_down_payment + self.resolved_home_other_upfront_payments, 2)
+        return float(loan_money(self.resolved_home_down_payment) + loan_money(self.resolved_home_other_upfront_payments))
 
     @property
     def resolved_home_property_acquisition_cost(self) -> float:
         if self.loan_type != "home":
             return 0.0
-        return round(self.resolved_home_purchase_price + self.resolved_home_other_upfront_payments, 2)
+        # A computed property total can exceed the limit of a single stored field.
+        return float(Decimal(str(self.resolved_home_purchase_price)) + loan_money(self.resolved_home_other_upfront_payments))
+
+
+class LoanMoneySnapshot(models.Model):
+    """Retained pre-cutover values; not exposed through the loan API."""
+
+    loan = models.ForeignKey(Loan, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    original_loan_id = models.PositiveBigIntegerField(unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="loan_money_snapshots")
+    source_values = models.JSONField()
+    normalized_values = models.JSONField()
+    policy = models.CharField(max_length=30, default="loan-money-v1")
+    created_at = models.DateTimeField(auto_now_add=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
 
 
 class LoanPaymentHistory(models.Model):
@@ -144,15 +180,15 @@ class LoanPaymentHistory(models.Model):
 
     loan = models.ForeignKey(Loan, on_delete=models.CASCADE, related_name="payment_history")
     payment_date = models.DateField()
-    amount = models.FloatField()
-    principal_component = models.FloatField(default=0)
-    interest_component = models.FloatField(default=0)
-    principal_paid = models.FloatField(default=0)
-    interest_paid = models.FloatField(default=0)
-    charges_paid = models.FloatField(default=0)
-    penalties_paid = models.FloatField(default=0)
-    tax_paid = models.FloatField(default=0)
-    remaining_balance = models.FloatField(null=True, blank=True)
+    amount = LoanMoneyField(max_digits=14, decimal_places=2)
+    principal_component = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    interest_component = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    principal_paid = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    interest_paid = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    charges_paid = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    penalties_paid = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    tax_paid = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    remaining_balance = LoanMoneyField(max_digits=14, decimal_places=2, null=True, blank=True)
     is_auto_detected = models.BooleanField(default=False)
     detection_confidence = models.FloatField(default=0)
     detection_reason = models.CharField(max_length=255, blank=True)
@@ -201,7 +237,7 @@ class LoanClosureDocument(models.Model):
     parse_confidence = models.FloatField(default=0)
     verification_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     verification_notes = models.TextField(blank=True)
-    closure_amount = models.FloatField(default=0)
+    closure_amount = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
     closure_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
@@ -245,12 +281,12 @@ class LoanForeclosureSnapshot(models.Model):
     statement_date = models.DateField(null=True, blank=True)
     effective_closure_date = models.DateField(null=True, blank=True)
     due_by_date = models.DateField(null=True, blank=True)
-    outstanding_principal = models.FloatField(default=0)
-    accrued_interest = models.FloatField(default=0)
-    foreclosure_charges = models.FloatField(default=0)
-    taxes_gst = models.FloatField(default=0)
-    overdue_charges = models.FloatField(default=0)
-    total_amount_payable = models.FloatField(default=0)
+    outstanding_principal = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    accrued_interest = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    foreclosure_charges = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    taxes_gst = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    overdue_charges = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    total_amount_payable = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
     classification_confidence = models.FloatField(default=0)
     linkage_confidence = models.FloatField(default=0)
     linkage_notes = models.TextField(blank=True)
@@ -260,7 +296,7 @@ class LoanForeclosureSnapshot(models.Model):
         default="unmatched",
     )
     reconciliation_confidence = models.FloatField(default=0)
-    matched_payment_total = models.FloatField(default=0)
+    matched_payment_total = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
     matched_emi_transaction_ids = models.JSONField(default=list, blank=True)
     matched_closure_transaction_ids = models.JSONField(default=list, blank=True)
     reconciliation_notes = models.TextField(blank=True)
@@ -277,6 +313,28 @@ class LoanForeclosureSnapshot(models.Model):
 
     def __str__(self):
         return f"{self.loan_id} | {self.document_type} | {self.reconciliation_status}"
+
+
+class LoanRelatedMoneySnapshot(models.Model):
+    """Retained ancillary currency and original linkage; not exposed by APIs."""
+
+    source_model = models.CharField(max_length=40)
+    original_source_id = models.PositiveBigIntegerField()
+    original_loan_id = models.PositiveBigIntegerField()
+    original_parent_ids = models.JSONField(default=dict)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="loan_related_money_snapshots")
+    loan = models.ForeignKey(Loan, null=True, on_delete=models.SET_NULL, related_name="related_money_snapshots")
+    payment_history = models.ForeignKey(LoanPaymentHistory, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    closure_document = models.ForeignKey(LoanClosureDocument, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    foreclosure_snapshot = models.ForeignKey(LoanForeclosureSnapshot, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    source_values = models.JSONField()
+    normalized_values = models.JSONField()
+    policy = models.CharField(max_length=30, default="loan-money-v1")
+    created_at = models.DateTimeField(auto_now_add=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["source_model", "original_source_id"], name="loan_related_money_source_unique")]
 
 
 class LoanImportDocument(models.Model):

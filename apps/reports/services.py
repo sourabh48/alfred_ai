@@ -389,7 +389,7 @@ class OperationalLoggingService:
         return list(queryset.order_by("-created_at", "-id")[:limit])
 
     def serialize(self, entry: OperationalLog) -> dict:
-        return {
+        data = {
             "id": entry.id,
             "module": entry.module,
             "category": entry.category,
@@ -402,6 +402,20 @@ class OperationalLoggingService:
             "payload": entry.payload or {},
             "created_at": entry.created_at.isoformat(),
         }
+        if entry.module == "loans" or entry.scope in {"loan_document", "loan_closure_document"}:
+            from apps.loans.diagnostics import public_payload
+            data.update(message="Loan document processing event recorded.", file_name="",
+                        payload=public_payload(entry.payload), module="loans")
+            if entry.scope not in {"loan_document", "loan_closure_document"}:
+                data["scope"] = "loan_document"
+            if entry.category not in {"document", "api", "system"}:
+                data["category"] = "document"
+            if entry.severity not in {"info", "warning", "error"}:
+                data["severity"] = "error"
+            if entry.event_type not in {"loan_document_failed", "loan_document_needs_review", "document_retry",
+                                        "document_correction", "document_retry_unresolved"}:
+                data["event_type"] = "loan_document_event"
+        return data
 
 
 operational_logging_service = OperationalLoggingService()

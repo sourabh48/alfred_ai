@@ -56,6 +56,9 @@
             </div>
             {% endif %}
 
+            {% if protection_message %}
+            <div class="alert alert-warning" role="alert">{{ protection_message }}</div>
+            {% endif %}
             <form method="post" class="row g-3">
                 {% csrf_token %}
                 <div class="col-12">

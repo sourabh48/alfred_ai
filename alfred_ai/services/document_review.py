@@ -10,6 +10,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from alfred_ai.services import record_parser_correction, record_parser_learning
+from .upload_limits import parser_budget
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services import job_intelligence, resume_intelligence
 from apps.expenses.models import StatementUpload
@@ -18,8 +19,11 @@ from apps.integrations.models import CreditReportUpload, CreditScore
 from apps.integrations.services.credit_report_parser import credit_report_parser
 from apps.integrations.views import _persist_uploaded_credit_score
 from apps.investments.models import Investment, InvestmentImportDocument
+from apps.investments.money import INVESTMENT_MONEY_FIELDS, investment_money, investment_total_float
 from apps.investments.services import portfolio_intelligence_service
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument
+from apps.loans.money import loan_money, loan_money_float
+from apps.loans.diagnostics import import_message, verification_message, public_retry
 from apps.loans.services.loan_pdf_parser import loan_pdf_parser
 from apps.loans.services import loan_foreclosure_service
 from apps.loans.services.loan_closure_parser import loan_closure_parser
@@ -546,6 +550,10 @@ def build_review_queue(user, *, limit: int = 24) -> list[dict]:
 
 
 def apply_correction(user, *, scope: str, document_id: int, corrections: dict) -> dict:
+    if scope == "investment_document":
+        for field in INVESTMENT_MONEY_FIELDS:
+            if field in corrections and corrections[field] in (None, ""):
+                raise ValueError("Investment currency corrections require a finite amount.")
     normalized = {key: value for key, value in (corrections or {}).items() if value not in (None, "", [])}
     if scope == "statement_document":
         item = _apply_statement_correction(user, document_id, normalized)
@@ -816,6 +824,7 @@ def delete_document(user, *, scope: str, document_id: int) -> None:
     raise ValueError("Unsupported delete scope.")
 
 
+@parser_budget
 def retry_review_item(user, *, scope: str, document_id: int) -> dict:
     if scope == "statement_document":
         return _retry_statement_document(user, document_id)
@@ -918,7 +927,6 @@ def _retry_loan_document(user, document_id: int) -> dict:
             "document_type": parsed.get("document_type") or "",
             "confidence": float(parsed.get("confidence") or 0),
             "loans": parsed.get("loans") or [],
-            "extracted_text_excerpt": (parsed.get("extracted_text") or "")[:1500],
         },
     )
     retry_resolution = "loan_rows_updated" if created_loans else "still_needs_review"
@@ -1032,7 +1040,8 @@ def _retry_loan_closure_document(user, document_id: int) -> dict:
     document.parser_status = _best_status(document.parser_status, parsed.get("parser_status") or "needs_review")
     document.verification_status = "verified" if verified else "rejected"
     document.verification_notes = notes
-    document.closure_amount = float(merged_payload.get("closure_amount") or document.closure_amount or 0)
+    amount = merged_payload.get("closure_amount")
+    document.closure_amount = loan_money(document.closure_amount if amount in (None, "") else amount)
     document.closure_date = _parse_date(merged_payload.get("closure_date")) or document.closure_date
     document.save(
         update_fields=[
@@ -1718,7 +1727,7 @@ def _upsert_retry_investments(
             for key in ("invested_amount", "monthly_sip", "current_value", "annual_return_rate"):
                 if item.get(key) in (None, ""):
                     continue
-                value = float(item[key])
+                value = float(item[key]) if key == "annual_return_rate" else investment_money(item[key])
                 # Portfolio extraction uses zero when an amount was not found.
                 # Only an explicit correction should erase a saved amount.
                 if preserve_existing and value == 0 and not (index == 0 and key in (primary_corrections or {})):
@@ -1972,25 +1981,27 @@ def _serialize_statement(upload: StatementUpload) -> dict:
 
 
 def _serialize_loan(document: LoanImportDocument) -> dict:
-    payload = document.extracted_payload or {}
-    first_loan = (payload.get("loans") or [{}])[0] if payload.get("loans") else {}
+    payload = document.extracted_payload if isinstance(document.extracted_payload, dict) else {}
+    rows = payload.get("loans")
+    first_loan = next((row for row in rows if isinstance(row, dict)), {}) if isinstance(rows, list) else {}
     return {
         "scope": "loan_document",
         "id": document.id,
         "file_name": document.file_name,
         "parser_status": document.parser_status,
         "parse_confidence": document.parse_confidence,
-        "summary": document.summary,
-        "notes": (payload.get("parser_notes") or payload.get("error") or ""),
+        "summary": import_message(document.parser_status),
+        "notes": import_message(document.parser_status),
         "fields": {
             "document_type": document.document_type,
             "lender": first_loan.get("lender", ""),
             "loan_type": first_loan.get("loan_type", ""),
             "loan_account_number": first_loan.get("loan_account_number", ""),
         },
-        "background_retry": payload.get("background_retry", {}),
-        "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text, scope="loan_document"),
+        "background_retry": public_retry(payload.get("background_retry")),
+        "accepted_corrections": {key: value for key, value in _accepted_corrections_payload(payload).items()
+                                 if key in {"document_type", "lender", "loan_type", "loan_account_number"}},
+        "review_artifacts": {},
         "review_fields": REVIEW_FIELD_SCHEMAS["loan_document"],
         "created_at": document.created_at.isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -1998,7 +2009,7 @@ def _serialize_loan(document: LoanImportDocument) -> dict:
 
 
 def _serialize_loan_closure(document: LoanClosureDocument) -> dict:
-    payload = document.extracted_payload or {}
+    payload = document.extracted_payload if isinstance(document.extracted_payload, dict) else {}
     snapshot = getattr(document, "foreclosure_snapshot", None)
     return {
         "scope": "loan_closure_document",
@@ -2011,21 +2022,22 @@ def _serialize_loan_closure(document: LoanClosureDocument) -> dict:
             if document.verification_status == "verified"
             else "Closure document retained for review"
         ),
-        "notes": (payload.get("parser_notes") or document.verification_notes or ""),
+        "notes": verification_message(document.verification_status),
         "fields": {
             "document_type": (snapshot.get_document_type_display() if snapshot else "") or payload.get("document_type", ""),
             "lender_name": (snapshot.lender_name if snapshot else "") or payload.get("lender_name", ""),
             "borrower_name": (snapshot.borrower_name if snapshot else "") or payload.get("borrower_name", ""),
             "loan_account_number": payload.get("loan_account_number") or document.loan.loan_account_number,
-            "closure_amount": document.closure_amount or payload.get("closure_amount") or 0,
+            "closure_amount": loan_money_float(document.closure_amount),
             "closure_date": document.closure_date.isoformat() if document.closure_date else payload.get("closure_date") or "",
             "matched_keyword": payload.get("matched_keyword", ""),
             "reconciliation_status": snapshot.get_reconciliation_status_display() if snapshot else "",
-            "matched_payment_total": snapshot.matched_payment_total if snapshot else 0,
+            "matched_payment_total": loan_money_float(snapshot.matched_payment_total) if snapshot else 0.0,
         },
-        "background_retry": payload.get("background_retry", {}),
-        "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=document.extracted_text, scope="loan_closure_document"),
+        "background_retry": public_retry(payload.get("background_retry")),
+        "accepted_corrections": {key: value for key, value in _accepted_corrections_payload(payload).items()
+                                 if key in {"loan_account_number", "closure_amount", "closure_date", "matched_keyword"}},
+        "review_artifacts": {},
         "review_fields": REVIEW_FIELD_SCHEMAS["loan_closure_document"],
         "created_at": (document.updated_at or document.created_at).isoformat(),
         "priority_rank": _priority_rank(document.parser_status, document.parse_confidence),
@@ -2059,8 +2071,8 @@ def _serialize_investment(document: InvestmentImportDocument) -> dict:
                 or first_payload.get("account_number", "")
                 or payload.get("account_number", "")
             ),
-            "invested_amount": (first_linked.invested_amount if first_linked else 0) or first_payload.get("invested_amount", 0),
-            "current_value": (first_linked.current_value if first_linked else 0) or first_payload.get("current_value", 0),
+            "invested_amount": investment_total_float(first_linked.invested_amount) if first_linked else first_payload.get("invested_amount", 0),
+            "current_value": investment_total_float(first_linked.current_value) if first_linked else first_payload.get("current_value", 0),
         },
         "background_retry": payload.get("background_retry", {}),
         "accepted_corrections": _accepted_corrections_payload(payload),
@@ -2192,7 +2204,8 @@ def _serialize_credit(upload: CreditReportUpload) -> dict:
 
 
 def _accepted_corrections_payload(payload: dict | None) -> dict:
-    corrections = dict((payload or {}).get("accepted_corrections") or {})
+    source = (payload or {}).get("accepted_corrections")
+    corrections = source if isinstance(source, dict) else {}
     return {
         key: value
         for key, value in corrections.items()
@@ -2645,6 +2658,7 @@ def _apply_loan_correction(user, document_id: int, corrections: dict) -> dict:
     return _serialize_loan(document)
 
 
+@transaction.atomic
 def _apply_loan_closure_correction(user, document_id: int, corrections: dict) -> dict:
     document = LoanClosureDocument.objects.select_related("loan").get(loan__user=user, pk=document_id)
     payload = dict(document.extracted_payload or {})
@@ -2656,9 +2670,9 @@ def _apply_loan_closure_correction(user, document_id: int, corrections: dict) ->
         payload["loan_account_number"] = str(corrections["loan_account_number"]).strip()
     if corrections.get("matched_keyword"):
         payload["matched_keyword"] = str(corrections["matched_keyword"]).strip()
-    closure_amount = _parse_float(corrections.get("closure_amount"))
-    if closure_amount is not None:
-        payload["closure_amount"] = closure_amount
+    if "closure_amount" in corrections:
+        closure_amount = loan_money(corrections["closure_amount"])
+        payload["closure_amount"] = loan_money_float(closure_amount)
         document.closure_amount = closure_amount
     closure_date = _parse_date(corrections.get("closure_date"))
     if closure_date:
@@ -2709,6 +2723,9 @@ def _apply_loan_closure_correction(user, document_id: int, corrections: dict) ->
 
 @transaction.atomic
 def _apply_investment_correction(user, document_id: int, corrections: dict) -> dict:
+    for field in INVESTMENT_MONEY_FIELDS:
+        if field in corrections and corrections[field] in (None, ""):
+            raise ValueError("Investment currency corrections require a finite amount.")
     document = InvestmentImportDocument.objects.prefetch_related("linked_investments").get(user=user, pk=document_id)
     payload = dict(document.extracted_payload or {})
     accepted = dict(payload.get("accepted_corrections") or {})
@@ -2726,7 +2743,7 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
     )), None) if primary_item else (previous_investments[0] if previous_investments else None)
     if previous_primary:
         primary_item = {
-            **{field: getattr(previous_primary, field) for field in (
+            **{field: (investment_total_float(getattr(previous_primary, field)) if field in INVESTMENT_MONEY_FIELDS else getattr(previous_primary, field)) for field in (
                 "asset_name", "asset_type", "institution", "account_number", "invested_amount",
                 "current_value", "monthly_sip", "annual_return_rate", "risk_level", "notes",
             )},
@@ -2738,12 +2755,14 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
         primary_item["asset_type"] = str(corrections["asset_type"]).strip()
     if corrections.get("account_number"):
         primary_item["account_number"] = str(corrections["account_number"]).strip()
-    invested_amount = _parse_float(corrections.get("invested_amount"))
+    invested_amount = investment_money(corrections["invested_amount"]) if "invested_amount" in corrections else None
     if invested_amount is not None:
-        primary_item["invested_amount"] = invested_amount
-    current_value = _parse_float(corrections.get("current_value"))
+        primary_item["invested_amount"] = investment_total_float(invested_amount)
+    current_value = investment_money(corrections["current_value"]) if "current_value" in corrections else None
     if current_value is not None:
-        primary_item["current_value"] = current_value
+        primary_item["current_value"] = investment_total_float(current_value)
+    if "monthly_sip" in corrections:
+        primary_item["monthly_sip"] = investment_total_float(investment_money(corrections["monthly_sip"]))
     if corrections.get("broker_name"):
         document.broker_name = str(corrections["broker_name"]).strip()
         payload["broker_name"] = document.broker_name

@@ -6,6 +6,8 @@ from typing import Any
 from django.conf import settings
 from django.utils import timezone
 
+from .api_errors import safe_error_details
+
 
 RAW_FILE_RETENTION_KEY = "raw_file_retention"
 
@@ -21,6 +23,7 @@ def purge_uploaded_file_after_extraction(
     reason: str,
     payload_field: str = "extracted_payload",
     update_timestamp: bool = True,
+    metadata_filter=None,
 ) -> dict[str, Any]:
     field_file = getattr(instance, field_name, None)
     storage_name = str(getattr(field_file, "name", "") or "")
@@ -39,7 +42,7 @@ def purge_uploaded_file_after_extraction(
     }
 
     if not raw_upload_cleanup_enabled():
-        return metadata
+        return metadata_filter(metadata) if metadata_filter else metadata
 
     update_fields: set[str] = set()
     if storage_name:
@@ -49,11 +52,15 @@ def purge_uploaded_file_after_extraction(
             metadata["deleted"] = True
             metadata["deleted_at"] = now
             update_fields.add(field_name)
-        except Exception as exc:  # pragma: no cover - depends on storage backend failure.
-            metadata["error"] = f"{type(exc).__name__}: {exc}"
+        except Exception as exc:
+            metadata.update(safe_error_details(exc, "Source upload cleanup failed. Please retry.",
+                                               logger_name=__name__, field="error"))
     else:
         metadata["deleted"] = True
         metadata["deleted_at"] = now
+
+    if metadata_filter:
+        metadata = metadata_filter(metadata)
 
     if payload_field and hasattr(instance, payload_field):
         current_payload = getattr(instance, payload_field, None)

@@ -10,7 +10,6 @@ import json
 import logging
 import os
 from pathlib import Path
-import secrets
 import sqlite3
 import subprocess
 import sys
@@ -102,19 +101,9 @@ def configure(data):
         "ALFRED_REGISTRY_PATH": str(data / "ml_models" / "alfred" / "model_registry"),
     })
     import environ
-    from alfred_ai.local_config import load_local_environment
+    from alfred_ai.local_config import load_local_environment, native_secret_file
     load_local_environment(data)
-    previous_secret = os.environ.get("DJANGO_SECRET_KEY", "alfred-local-development-key")
-    secret_file = config / "native.env"
-    if not secret_file.exists():
-        try:
-            with secret_file.open("x", encoding="utf-8") as output:
-                output.write(f"DJANGO_SECRET_KEY={secrets.token_urlsafe(64)}\n")
-                if (data / "db.sqlite3").exists():
-                    # Preserve existing signed sessions and encrypted email tokens.
-                    output.write(f"DJANGO_SECRET_KEY_FALLBACKS={json.dumps([previous_secret])}\n")
-        except FileExistsError:
-            pass
+    secret_file = native_secret_file(data)
     os.environ.pop("DJANGO_SECRET_KEY_FALLBACKS", None)
     environ.Env.read_env(secret_file, overwrite=True)
     if not os.environ.get("DJANGO_SECRET_KEY"):

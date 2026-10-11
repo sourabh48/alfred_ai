@@ -12,11 +12,11 @@ from alfred_ai.services.materialized_cache import invalidate_user_materialized_p
 from apps.behavioral.models import BehavioralSignal
 from apps.budgets.models import Budget
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, CareerResumeLearningMemory
-from apps.expenses.models import BankAccount, Expense, StatementUpload
+from apps.expenses.models import BankAccount, BankAccountMoneySnapshot, Expense, ExpenseMoneySnapshot, StatementUpload
 from apps.family.models import Dependent, FamilyAccountLink
 from apps.integrations.models import CreditReportUpload, CreditScore, EmailConnection, VerifiedExternalInsight
-from apps.investments.models import Investment, InvestmentImportDocument
-from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument, LoanPaymentHistory
+from apps.investments.models import Investment, InvestmentImportDocument, InvestmentMoneySnapshot
+from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument, LoanMoneySnapshot, LoanPaymentHistory, LoanRelatedMoneySnapshot
 from apps.ml_engine.models.parser_memory import DocumentParserLearningMemory
 from apps.mobility.models import (
     BikeConditionSnapshot,
@@ -104,11 +104,16 @@ def clear_user_fed_data(user) -> dict:
         "bank_accounts": BankAccount.objects.filter(user=user).count(),
         "statement_uploads": statement_upload_qs.count(),
         "expenses": Expense.objects.filter(user=user).count(),
+        "expense_money_snapshots": ExpenseMoneySnapshot.objects.filter(user=user).count(),
+        "bank_account_money_snapshots": BankAccountMoneySnapshot.objects.filter(user=user).count(),
         "loans": Loan.objects.filter(user=user).count(),
         "loan_import_documents": loan_import_qs.count(),
         "loan_closure_documents": loan_closure_qs.count(),
         "loan_foreclosure_snapshots": LoanForeclosureSnapshot.objects.filter(loan__user=user).count(),
+        "loan_money_snapshots": LoanMoneySnapshot.objects.filter(user=user).count(),
+        "loan_related_money_snapshots": LoanRelatedMoneySnapshot.objects.filter(user=user).count(),
         "investments": Investment.objects.filter(user=user).count(),
+        "investment_money_snapshots": InvestmentMoneySnapshot.objects.filter(user=user).count(),
         "investment_import_documents": investment_doc_qs.count(),
         "vehicle_profiles": BikeProfile.objects.filter(user=user).count(),
         "vehicle_documents": bike_document_qs.count(),
@@ -130,6 +135,8 @@ def clear_user_fed_data(user) -> dict:
         CareerResumeLearningMemory.objects.filter(user=user).delete()
         CareerProfile.objects.filter(user=user).delete()
 
+        ExpenseMoneySnapshot.objects.filter(user=user).delete()
+        BankAccountMoneySnapshot.objects.filter(user=user).delete()
         Expense.objects.filter(user=user).delete()
         statement_upload_qs.delete()
         BankAccount.objects.filter(user=user).delete()
@@ -138,8 +145,11 @@ def clear_user_fed_data(user) -> dict:
         LoanForeclosureSnapshot.objects.filter(loan__user=user).delete()
         loan_closure_qs.delete()
         loan_import_qs.delete()
+        LoanMoneySnapshot.objects.filter(user=user).delete()
+        LoanRelatedMoneySnapshot.objects.filter(user=user).delete()
         Loan.objects.filter(user=user).delete()
 
+        InvestmentMoneySnapshot.objects.filter(user=user).delete()
         investment_doc_qs.delete()
         Investment.objects.filter(user=user).delete()
 

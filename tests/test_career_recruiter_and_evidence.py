@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 
+from alfred_ai.services.public_http import PublicResponse
 from apps.career.models import CareerJobAnalysis, CareerResume
 from apps.career.services import job_intelligence
 from apps.ml_engine.models import DocumentParserLearningMemory
@@ -158,9 +159,9 @@ class CareerRecruiterAndEvidenceTests(TestCase):
               </body>
             </html>
         """
-        response.raise_for_status = Mock()
+        response = PublicResponse(response.text.encode("utf-8"), "text/html")
 
-        with patch("apps.career.services.job_intelligence.requests.get", return_value=response):
+        with patch("apps.career.services.job_intelligence.public_http.request", return_value=response):
             snapshot = job_intelligence.parse_job_page(
                 "https://example.wd5.myworkdayjobs.com/en-US/careers/job/Bengaluru/Senior-Data-Analyst_JR-1"
             )
@@ -190,9 +191,9 @@ class CareerRecruiterAndEvidenceTests(TestCase):
               </body>
             </html>
         """
-        response.raise_for_status = Mock()
+        response = PublicResponse(response.text.encode("utf-8"), "text/html")
 
-        with patch("apps.career.services.job_intelligence.requests.get", return_value=response):
+        with patch("apps.career.services.job_intelligence.public_http.request", return_value=response):
             snapshot = job_intelligence.parse_job_page("https://jobs.ashbyhq.com/northwind/abcd-1234")
 
         self.assertEqual(snapshot.source_name, "Ashby")

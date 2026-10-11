@@ -12,7 +12,8 @@ from typing import Any
 from urllib.parse import quote_plus
 
 import feedparser
-import requests
+from alfred_ai.services import public_http
+from alfred_ai.services.api_errors import safe_error_details
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
@@ -547,24 +548,37 @@ class VerifiedIntelligenceService:
         )
 
     def tax_regime_reference(self, stale_days: int = 45, *, force: bool = False) -> InsightResult:
-        return self._static_reference(
+        from apps.ml_engine.services.tax_policy import NEW, OLD, POLICY_VERSION, OFFICIAL_SOURCE
+
+        result = self._static_reference(
             scope="tax",
-            cache_key="india-income-tax-regimes",
+            cache_key=f"india-income-tax-regimes:{POLICY_VERSION}",
             title="India income tax regime reference",
             source_name="Income Tax Department",
-            source_url="https://www.incometax.gov.in/iec/foportal/",
+            source_url=OFFICIAL_SOURCE,
             ttl=timedelta(days=stale_days),
             payload={
-                "assessment_year": "2026-27",
+                "financial_year": NEW.financial_year,
+                "assessment_year": NEW.assessment_year,
+                "policy_version": POLICY_VERSION,
+                "rules_verified_at": NEW.verified_at,
+                "freshness": "STATIC_REFERENCE",
                 "old_regime_basic_exemption": 250000,
-                "new_regime_basic_exemption": 300000,
-                "standard_deduction_old": 50000,
-                "standard_deduction_new": 75000,
+                "new_regime_basic_exemption": 400000,
+                "standard_deduction_old": int(OLD.standard_deduction),
+                "standard_deduction_new": int(NEW.standard_deduction),
             },
-            summary="Official income tax regime reference payload for current slab and standard-deduction comparisons.",
-            notes="This record is source-backed and refreshed on a slower cadence because tax slab references do not change intraday.",
+            summary="Versioned FY 2025-26 / AY 2026-27 ordinary-income tax policy reference.",
+            notes="Static official-source rules verified 2026-10-01. Cache refresh does not re-verify legislation or extend support to another year.",
             force=force,
         )
+        if result.payload.get("policy_version") == POLICY_VERSION and result.evidence.get("status") == "fresh":
+            # Preserve obsolete evidence for history, but stop refreshing or
+            # presenting the unversioned (and incorrect) rule table as active.
+            VerifiedExternalInsight.objects.filter(
+                scope="tax", cache_key="india-income-tax-regimes", is_active=True,
+            ).update(is_active=False)
+        return result
 
     def nps_tax_reference(self, stale_days: int = 45, *, force: bool = False) -> InsightResult:
         return self._static_reference(
@@ -689,7 +703,8 @@ class VerifiedIntelligenceService:
         try:
             payload, summary, notes = fetcher()
         except Exception as exc:
-            breaker_state = self._record_circuit_failure(scope, cache_key, source_url, str(exc))
+            error = safe_error_details(exc, "External source refresh failed.", logger_name=__name__, field="error")
+            breaker_state = self._record_circuit_failure(scope, cache_key, source_url, error["error"])
             breaker_note = self._circuit_state_message(breaker_state)
             if record:
                 if record.status == "fresh":
@@ -697,7 +712,7 @@ class VerifiedIntelligenceService:
                 self._record_refresh_observation(
                     record,
                     "failed",
-                    f"{exc} {breaker_note}".strip(),
+                    f"{error['error']} Reference: {error['error_id']}. {breaker_note}",
                     record_status=record.status,
                 )
                 return InsightResult(record.payload, self._serialize_evidence(record, breaker_note), True)
@@ -708,11 +723,11 @@ class VerifiedIntelligenceService:
                 source_name=source_name,
                 source_url=source_url,
                 query=query,
-                payload={"error": str(exc)},
+                payload=error,
                 summary=f"{title} could not be refreshed.",
                 ttl=ttl,
                 status="failed",
-                notes=f"{exc} {breaker_note}".strip(),
+                notes=f"{error['error']} Reference: {error['error_id']}. {breaker_note}",
             )
             return InsightResult({}, self._serialize_evidence(failed), False)
 
@@ -1053,7 +1068,8 @@ class VerifiedIntelligenceService:
                 elif record.cache_key.startswith("remoteok:"):
                     return self._run_refresh_adapter(record, lambda: self.remoteok_jobs(record.query, force=True))
                 return self._run_refresh_adapter(record, lambda: self.remotive_jobs(record.query, force=True))
-            if record.scope == "tax" and record.cache_key == "india-income-tax-regimes":
+            if record.scope == "tax" and (record.cache_key == "india-income-tax-regimes"
+                                           or record.cache_key.startswith("india-income-tax-regimes:")):
                 return self._run_refresh_adapter(record, lambda: self.tax_regime_reference(force=True))
             if record.scope == "tax" and record.cache_key == "india-nps-tax-benefit":
                 return self._run_refresh_adapter(record, lambda: self.nps_tax_reference(force=True))
@@ -1061,7 +1077,8 @@ class VerifiedIntelligenceService:
                 return self._run_refresh_adapter(record, lambda: self.ppf_reference(force=True))
         except Exception as exc:
             fallback_status = "stale" if record.status == "fresh" else record.status
-            self._record_refresh_observation(record, "failed", str(exc), record_status=fallback_status)
+            error = safe_error_details(exc, "External source refresh failed.", logger_name=__name__)
+            self._record_refresh_observation(record, "failed", f"{error['detail']} Reference: {error['error_id']}.", record_status=fallback_status)
             return "failed"
         self._record_refresh_observation(record, "skipped", "No refresh adapter is registered for this evidence record.")
         return "skipped"
@@ -1071,7 +1088,8 @@ class VerifiedIntelligenceService:
             result = refresh_call()
         except Exception as exc:
             fallback_status = "stale" if record.status == "fresh" else record.status
-            self._record_refresh_observation(record, "failed", str(exc), record_status=fallback_status)
+            error = safe_error_details(exc, "External source refresh failed.", logger_name=__name__)
+            self._record_refresh_observation(record, "failed", f"{error['detail']} Reference: {error['error_id']}.", record_status=fallback_status)
             return "failed"
         outcome, note = self._refresh_outcome_from_result(result)
         if outcome == "refreshed":
@@ -1194,13 +1212,11 @@ class VerifiedIntelligenceService:
         return self._circuit_state_message(state)
 
     def _fetch_world_bank(self, endpoint: str, title: str) -> tuple[dict, str, str]:
-        response = requests.get(
+        response = public_http.request("GET",
             endpoint,
             params={"format": "json", "per_page": 8},
             headers={"User-Agent": self.USER_AGENT},
-            timeout=12,
         )
-        response.raise_for_status()
         payload = response.json()
         series = payload[1] if isinstance(payload, list) and len(payload) > 1 else []
         items = [{"year": row.get("date"), "value": row.get("value")} for row in series if row.get("value") is not None]
@@ -1250,13 +1266,11 @@ class VerifiedIntelligenceService:
         }, summary, "Market data is cached from Yahoo Finance and should be rechecked before high-stakes decisions."
 
     def _fetch_yahoo_chart(self, symbol: str, range_value: str, interval: str) -> dict:
-        response = requests.get(
+        response = public_http.request("GET",
             f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
             params={"range": range_value, "interval": interval},
             headers={"User-Agent": self.USER_AGENT},
-            timeout=12,
         )
-        response.raise_for_status()
         data = response.json()
         result = ((data.get("chart") or {}).get("result") or [{}])[0]
         quote = (((result.get("indicators") or {}).get("quote") or [{}])[0]) or {}
@@ -1265,13 +1279,11 @@ class VerifiedIntelligenceService:
         return {"close": close, "timestamp": timestamps}
 
     def _fetch_geocode(self, destination: str) -> tuple[dict, str, str]:
-        response = requests.get(
+        response = public_http.request("GET",
             "https://nominatim.openstreetmap.org/search",
             params={"q": destination, "format": "jsonv2", "limit": 1},
             headers={"User-Agent": self.USER_AGENT},
-            timeout=10,
         )
-        response.raise_for_status()
         items = response.json()
         if not items:
             raise ValueError("No matching destination was found.")
@@ -1288,13 +1300,11 @@ class VerifiedIntelligenceService:
         suggestions = []
         seen = set()
         for term in ("viewpoint", "waterfall", "lake", "fort", "village", "ghat", "forest"):
-            response = requests.get(
+            response = public_http.request("GET",
                 "https://nominatim.openstreetmap.org/search",
                 params={"q": f"{term} near {destination}", "format": "jsonv2", "limit": 2},
                 headers={"User-Agent": self.USER_AGENT},
-                timeout=10,
             )
-            response.raise_for_status()
             for item in response.json():
                 label = item.get("display_name", "")
                 if not label or label in seen:
@@ -1312,7 +1322,7 @@ class VerifiedIntelligenceService:
         return {"results": suggestions[:6]}, summary, "Suggestions are cached from geocoded place results and old entries are replaced as they refresh."
 
     def _fetch_weather(self, latitude: float, longitude: float, start_date: date, end_date: date) -> tuple[dict, str, str]:
-        response = requests.get(
+        response = public_http.request("GET",
             "https://api.open-meteo.com/v1/forecast",
             params={
                 "latitude": latitude,
@@ -1322,9 +1332,7 @@ class VerifiedIntelligenceService:
                 "start_date": start_date.isoformat(),
                 "end_date": end_date.isoformat(),
             },
-            timeout=10,
         )
-        response.raise_for_status()
         daily = response.json().get("daily", {})
         max_temps = daily.get("temperature_2m_max", [])
         min_temps = daily.get("temperature_2m_min", [])
@@ -1343,8 +1351,9 @@ class VerifiedIntelligenceService:
         return payload, summary, "Weather is cached from Open-Meteo with short freshness windows so stale forecasts can be replaced quickly."
 
     def _fetch_google_news(self, feed_url: str, query: str) -> tuple[dict, str, str]:
-        response = requests.get(feed_url, headers={"User-Agent": self.USER_AGENT}, timeout=10)
-        response.raise_for_status()
+        response = public_http.request("GET", feed_url, headers={"User-Agent": self.USER_AGENT},
+            content_types=("application/rss+xml", "application/atom+xml", "application/xml", "text/xml"),
+            max_bytes=2_000_000)
         parsed = feedparser.parse(response.content)
         items = []
         for entry in parsed.entries[:8]:
@@ -1363,13 +1372,11 @@ class VerifiedIntelligenceService:
         return {"items": items}, summary, "News feed is cached from Google News RSS and should be refreshed frequently for latest developments."
 
     def _fetch_remotive_jobs(self, search_term: str) -> tuple[dict, str, str]:
-        response = requests.get(
+        response = public_http.request("GET",
             "https://remotive.com/api/remote-jobs",
             params={"search": search_term, "limit": 10},
             headers={"User-Agent": self.USER_AGENT},
-            timeout=15,
         )
-        response.raise_for_status()
         data = response.json()
         jobs = []
         for item in data.get("jobs", [])[:10]:
@@ -1390,13 +1397,11 @@ class VerifiedIntelligenceService:
         return {"jobs": jobs}, summary, "Openings are cached from the Remotive Jobs API and refreshed on a short TTL."
 
     def _fetch_arbeitnow_jobs(self, search_term: str) -> tuple[dict, str, str]:
-        response = requests.get(
+        response = public_http.request("GET",
             "https://www.arbeitnow.com/api/job-board-api",
             params={"page": 1},
             headers={"User-Agent": self.USER_AGENT, "Accept": "application/json"},
-            timeout=15,
         )
-        response.raise_for_status()
         data = response.json()
         terms = self._job_search_terms(search_term)
         jobs = []
@@ -1437,12 +1442,10 @@ class VerifiedIntelligenceService:
         return {"jobs": jobs}, summary, "Openings are cached from the Arbeitnow public job-board API and refreshed on a short TTL."
 
     def _fetch_remoteok_jobs(self, search_term: str) -> tuple[dict, str, str]:
-        response = requests.get(
+        response = public_http.request("GET",
             "https://remoteok.com/api",
             headers={"User-Agent": self.USER_AGENT, "Accept": "application/json"},
-            timeout=15,
         )
-        response.raise_for_status()
         data = response.json()
         rows = data if isinstance(data, list) else []
         terms = self._job_search_terms(search_term)

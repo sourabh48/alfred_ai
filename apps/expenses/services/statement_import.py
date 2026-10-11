@@ -22,6 +22,7 @@ from pypdf import PdfReader
 from alfred_ai.services import apply_parser_learning
 from alfred_ai.services.pdf_recovery import rebuild_orphaned_pdf
 from alfred_ai.services.ocr_process import ocr_command, hidden_process_options
+from alfred_ai.services.upload_limits import check_text_budget, document_source, upload_deadline
 
 
 TXN_START_RE = re.compile(r"^\d{2}/\d{2}/\d{2}\s+")
@@ -338,6 +339,7 @@ def parse_bank_statement(file_obj: BinaryIO, user=None, *, ocr_page_limit: int |
         enable_isolated_ocr=enable_isolated_ocr,
     )
     full_text = extraction.text
+    check_text_budget(full_text)
     extraction_notes = list(extraction.notes)
     preview_only = extraction.preview_only
 
@@ -431,37 +433,44 @@ def parse_bank_statement(file_obj: BinaryIO, user=None, *, ocr_page_limit: int |
 
 
 def summarize_transactions(transactions: list[ParsedTransaction]) -> dict[str, float | int]:
+    from apps.expenses.money import expense_money, money_float
+
     summary = {
-        "expense_total": 0.0,
-        "loan_total": 0.0,
-        "other_total": 0.0,
-        "income_total": 0.0,
+        "expense_total": expense_money(0),
+        "loan_total": expense_money(0),
+        "other_total": expense_money(0),
+        "income_total": expense_money(0),
         "transaction_count": len(transactions),
     }
 
     for item in transactions:
+        amount = expense_money(item.amount)
         if item.direction == "credit":
-            summary["income_total"] += item.amount
+            summary["income_total"] += amount
             continue
 
         if item.classification == "expense":
-            summary["expense_total"] += item.amount
+            summary["expense_total"] += amount
         elif item.classification == "loan":
-            summary["loan_total"] += item.amount
+            summary["loan_total"] += amount
         else:
-            summary["other_total"] += item.amount
+            summary["other_total"] += amount
 
-    return summary
+    return {key: value if key == "transaction_count" else money_float(value) for key, value in summary.items()}
 
 
 def _read_file_bytes(file_obj: BinaryIO) -> bytes:
-    raw_bytes = file_obj.read()
+    raw_bytes = document_source(file_obj)
     if hasattr(file_obj, "seek"):
         file_obj.seek(0)
     return raw_bytes
 
 
 def _extract_statement_text(raw_bytes: bytes, *, ocr_page_limit: int, preview_page_limit: int, enable_isolated_ocr: bool) -> StatementTextExtraction:
+    if upload_deadline.get() is not None:
+        from alfred_ai.services.bounded_parser import run_bounded_parser
+        return StatementTextExtraction(**run_bounded_parser("statement", raw_bytes, "statement.pdf",
+            ocr_page_limit=ocr_page_limit, preview_page_limit=preview_page_limit))
     if not raw_bytes:
         return StatementTextExtraction(text="", notes=["Uploaded statement file was empty."], preview_only=False)
 

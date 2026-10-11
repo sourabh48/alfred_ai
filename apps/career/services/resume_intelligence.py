@@ -12,6 +12,7 @@ from xml.etree import ElementTree
 import zipfile
 
 from alfred_ai.services import extract_document_text
+from alfred_ai.services.upload_limits import document_source, upload_deadline
 from pypdf import PdfReader
 
 try:
@@ -91,7 +92,7 @@ class ResumeIntelligenceService:
         raw_bytes = self._read_bytes(upload)
         effective_name = filename or getattr(upload, "name", "resume")
         extraction = extract_document_text(raw_bytes, effective_name)
-        text = extraction.text or self._extract_text(raw_bytes, effective_name)
+        text = extraction.text or ("" if upload_deadline.get() is not None else self._extract_text(raw_bytes, effective_name))
         normalized = " ".join(text.split())
         skills = self._extract_skills(normalized)
         links = self._extract_links(text)
@@ -219,7 +220,7 @@ class ResumeIntelligenceService:
         current = upload.tell() if hasattr(upload, "tell") else None
         if hasattr(upload, "seek"):
             upload.seek(0)
-        content = upload.read()
+        content = document_source(upload)
         if current is not None and hasattr(upload, "seek"):
             upload.seek(current)
         return content

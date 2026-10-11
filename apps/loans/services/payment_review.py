@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.db import transaction
-from django.db.models import Sum
 from django.utils import timezone
 
 from apps.loans.models import Loan, LoanPaymentHistory
+from apps.loans.money import loan_money, loan_money_float
 from apps.reports.services import operational_logging_service
 
 
@@ -32,20 +34,20 @@ def serialize_payment_review(payment: LoanPaymentHistory) -> dict:
             "lender": loan.lender,
             "loan_account_number": loan.loan_account_number,
             "loan_type": loan.loan_type,
-            "remaining_balance": round(float(loan.remaining_balance or 0), 2) if loan.remaining_balance is not None else None,
-            "total_paid": round(float(loan.total_paid or 0), 2),
+            "remaining_balance": loan_money_float(loan.remaining_balance) if loan.remaining_balance is not None else None,
+            "total_paid": loan_money_float(loan.total_paid),
             "last_payment_date": loan.last_payment_date.isoformat() if loan.last_payment_date else "",
         },
         "payment_date": payment.payment_date.isoformat(),
-        "amount": round(float(payment.amount or 0), 2),
-        "principal_component": round(float(payment.principal_component or 0), 2),
-        "interest_component": round(float(payment.interest_component or 0), 2),
-        "principal_paid": round(float(payment.principal_paid or 0), 2),
-        "interest_paid": round(float(payment.interest_paid or 0), 2),
-        "charges_paid": round(float(payment.charges_paid or 0), 2),
-        "penalties_paid": round(float(payment.penalties_paid or 0), 2),
-        "tax_paid": round(float(payment.tax_paid or 0), 2),
-        "remaining_balance": round(float(payment.remaining_balance or 0), 2) if payment.remaining_balance is not None else None,
+        "amount": loan_money_float(payment.amount),
+        "principal_component": loan_money_float(payment.principal_component),
+        "interest_component": loan_money_float(payment.interest_component),
+        "principal_paid": loan_money_float(payment.principal_paid),
+        "interest_paid": loan_money_float(payment.interest_paid),
+        "charges_paid": loan_money_float(payment.charges_paid),
+        "penalties_paid": loan_money_float(payment.penalties_paid),
+        "tax_paid": loan_money_float(payment.tax_paid),
+        "remaining_balance": loan_money_float(payment.remaining_balance) if payment.remaining_balance is not None else None,
         "match_status": payment.match_status,
         "loan_effect_applied": payment.loan_effect_applied,
         "is_auto_detected": payment.is_auto_detected,
@@ -93,9 +95,18 @@ def review_loan_payment_match(
         raise LoanPaymentHistory.DoesNotExist("Loan payment review row not found.")
     if payment.match_status != "review":
         raise ValueError("Only loan payments with match_status=review can be accepted or rejected.")
+    settled_payment_ids = _finalized_settlement_payment_ids(payment.loan)
+    if settled_payment_ids is not None and payment.id in settled_payment_ids:
+        raise ValueError("Payments in a finalized foreclosure settlement cannot be accepted or rejected through payment review.")
 
     if decision == "accept":
-        if not payment.loan_effect_applied:
+        if not payment.loan.is_confirmed:
+            raise ValueError("Confirm the loan terms and current balance before accepting payment matches.")
+        if settled_payment_ids is not None or _predates_verified_balance(payment):
+            # A verified balance or finalized settlement supersedes this allocation.
+            # Retain the evidence row without applying it again to that balance.
+            payment.loan_effect_applied = False
+        elif not payment.loan_effect_applied:
             _apply_payment_to_loan(payment.loan, payment)
             payment.loan_effect_applied = True
         payment.match_status = "matched"
@@ -103,9 +114,9 @@ def review_loan_payment_match(
         event_type = "loan_payment_review_accepted"
         message = "Loan payment review row accepted and eligible for calculation confidence."
     else:
-        if payment.loan_effect_applied:
+        if payment.loan_effect_applied and settled_payment_ids is None and not _predates_verified_balance(payment):
             _reverse_payment_from_loan(payment.loan, payment)
-            payment.loan_effect_applied = False
+        payment.loan_effect_applied = False
         payment.match_status = "rejected"
         _append_review_note(payment, "Rejected", notes)
         event_type = "loan_payment_review_rejected"
@@ -158,8 +169,11 @@ def reject_subscription_false_positive_match(
         return payment
     if not _is_subscription_false_positive(payment):
         raise ValueError("Only auto-detected subscription false-positive loan payments can be rejected here.")
+    settled_payment_ids = _finalized_settlement_payment_ids(payment.loan)
+    if settled_payment_ids is not None and payment.id in settled_payment_ids:
+        raise ValueError("Payments in a finalized foreclosure settlement cannot be accepted or rejected through payment review.")
 
-    if payment.loan_effect_applied:
+    if payment.loan_effect_applied and settled_payment_ids is None and not _predates_verified_balance(payment):
         _reverse_payment_from_loan(payment.loan, payment)
     payment.loan_effect_applied = False
     payment.match_status = "rejected"
@@ -188,6 +202,30 @@ def reject_subscription_false_positive_match(
     return payment
 
 
+def _finalized_settlement_payment_ids(loan: Loan) -> set[int] | None:
+    payment_ids = None
+    for audit in loan.foreclosure_snapshots.values_list("audit_payload", flat=True).iterator():
+        posting = (audit or {}).get("settlement_posting") or {}
+        if not posting.get("finalized_at"):
+            continue
+        if payment_ids is None:
+            payment_ids = set()
+        payment_ids.update(posting.get("created_payment_history_ids") or [])
+        payment_ids.update(
+            item["payment_history_id"]
+            for item in posting.get("preserved_existing_payment_history") or []
+            if item.get("payment_history_id") is not None
+        )
+    return payment_ids
+
+
+def _predates_verified_balance(payment: LoanPaymentHistory) -> bool:
+    verified_at = payment.loan.verified_at
+    return bool(verified_at and (
+        payment.created_at <= verified_at or payment.payment_date <= timezone.localtime(verified_at).date()
+    ))
+
+
 def _append_review_note(payment: LoanPaymentHistory, label: str, notes: str) -> None:
     cleaned = " ".join(str(notes or "").split())
     suffix = f"{label} on {timezone.now().date().isoformat()}"
@@ -204,18 +242,18 @@ def _apply_payment_to_loan(loan: Loan, payment: LoanPaymentHistory) -> None:
         [value for value in [loan.last_payment_date, payment.payment_date] if value],
         default=payment.payment_date,
     )
-    loan.total_paid = round(float(loan.total_paid or 0) + float(payment.amount or 0), 2)
+    loan.total_paid = loan_money(loan.total_paid) + loan_money(payment.amount)
     if payment.remaining_balance is not None:
-        loan.remaining_balance = max(round(float(payment.remaining_balance or 0), 2), 0)
+        loan.remaining_balance = loan_money(max(loan_money(payment.remaining_balance), 0))
     else:
-        current_balance = float(loan.remaining_balance if loan.remaining_balance is not None else loan.principal or 0)
-        loan.remaining_balance = max(round(current_balance - principal_paid, 2), 0)
+        current_balance = loan_money(loan.remaining_balance if loan.remaining_balance is not None else loan.principal)
+        loan.remaining_balance = loan_money(max(current_balance - principal_paid, 0))
 
     if loan.remaining_balance <= 100:
         loan.is_active = False
         loan.status = "closed"
         loan.closed_on = payment.payment_date
-        loan.remaining_balance = 0
+        loan.remaining_balance = loan_money(0)
 
     loan.save(
         update_fields=[
@@ -232,9 +270,9 @@ def _apply_payment_to_loan(loan: Loan, payment: LoanPaymentHistory) -> None:
 
 def _reverse_payment_from_loan(loan: Loan, payment: LoanPaymentHistory) -> None:
     principal_paid = _principal_paid(payment)
-    current_balance = float(loan.remaining_balance if loan.remaining_balance is not None else 0)
-    loan.remaining_balance = round(max(current_balance + principal_paid, 0), 2)
-    loan.total_paid = round(max(float(loan.total_paid or 0) - float(payment.amount or 0), 0), 2)
+    current_balance = loan_money(loan.remaining_balance)
+    loan.remaining_balance = loan_money(max(current_balance + principal_paid, 0))
+    loan.total_paid = loan_money(max(loan_money(loan.total_paid) - loan_money(payment.amount), 0))
     remaining_applied_count = (
         LoanPaymentHistory.objects.filter(loan=loan, loan_effect_applied=True).exclude(id=payment.id).count()
     )
@@ -245,9 +283,9 @@ def _reverse_payment_from_loan(loan: Loan, payment: LoanPaymentHistory) -> None:
         .first()
     )
     loan.last_payment_date = latest_applied.payment_date if latest_applied else None
-    if loan.auto_detected and remaining_applied_count == 0:
-        loan.remaining_balance = 0
-        loan.total_paid = 0
+    if loan.auto_detected and not loan.is_confirmed and remaining_applied_count == 0:
+        loan.remaining_balance = loan_money(0)
+        loan.total_paid = loan_money(0)
         loan.is_active = False
         loan.status = "closed"
         loan.closed_on = payment.payment_date
@@ -271,36 +309,39 @@ def _reverse_payment_from_loan(loan: Loan, payment: LoanPaymentHistory) -> None:
     )
 
 
-def _principal_paid(payment: LoanPaymentHistory) -> float:
-    return round(float(payment.principal_paid or payment.principal_component or 0), 2)
+def _principal_paid(payment: LoanPaymentHistory) -> Decimal:
+    return loan_money(payment.principal_paid or payment.principal_component or 0)
 
 
 def _sync_loan_from_applied_matches(loan: Loan) -> bool:
+    if not loan.is_confirmed or _finalized_settlement_payment_ids(loan) is not None:
+        return False
+    applied = LoanPaymentHistory.objects.filter(loan=loan, loan_effect_applied=True, match_status="matched")
+    if loan.verified_at:
+        applied = applied.filter(created_at__gt=loan.verified_at, payment_date__gt=timezone.localtime(loan.verified_at).date())
     latest_applied = (
-        LoanPaymentHistory.objects.filter(loan=loan, loan_effect_applied=True, match_status="matched")
+        applied
         .order_by("-payment_date", "-id")
         .first()
     )
     if latest_applied is None:
         return False
 
-    total_paid = (
-        LoanPaymentHistory.objects.filter(loan=loan, loan_effect_applied=True, match_status="matched")
-        .aggregate(total=Sum("amount"))
-        .get("total")
-        or 0
-    )
+    paid_amounts = LoanPaymentHistory.objects.filter(
+        loan=loan, loan_effect_applied=True, match_status="matched",
+    ).values_list("amount", flat=True).iterator()
+    total_paid = sum((loan_money(amount) for amount in paid_amounts), loan_money(0))
     loan.last_payment_date = latest_applied.payment_date
-    loan.total_paid = round(float(total_paid or 0), 2)
+    loan.total_paid = loan_money(total_paid)
     if latest_applied.remaining_balance is not None:
-        loan.remaining_balance = max(round(float(latest_applied.remaining_balance or 0), 2), 0)
+        loan.remaining_balance = loan_money(max(loan_money(latest_applied.remaining_balance), 0))
 
-    if float(loan.remaining_balance or 0) <= 100:
+    if loan.remaining_balance is not None and loan.remaining_balance <= 100:
         loan.is_active = False
         loan.status = "closed"
         loan.closed_on = latest_applied.payment_date
-        loan.remaining_balance = 0
-    elif loan.status in {"closed", "prepaid"}:
+        loan.remaining_balance = loan_money(0)
+    elif loan.remaining_balance is not None and loan.status in {"closed", "prepaid"}:
         loan.is_active = True
         loan.status = "active"
         loan.closed_on = None

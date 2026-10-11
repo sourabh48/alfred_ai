@@ -18,9 +18,9 @@ class UserDataCacheMiddleware:
                 and request.path.startswith("/api/")
                 and 200 <= response.status_code < 300
                 and user and user.is_authenticated):
-            from apps.family.services import family_context_user_ids, family_financial_user_ids
+            from apps.family.services import family_context_user_ids, family_financial_viewer_ids
 
-            user_ids = set(family_context_user_ids(user)) | set(family_financial_user_ids(user))
+            user_ids = set(family_context_user_ids(user)) | set(family_financial_viewer_ids(user))
             for user_id in user_ids:
                 invalidate_user_materialized_payloads(user_id, reason="user_api_write")
         return response
