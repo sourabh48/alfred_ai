@@ -1,5 +1,28 @@
 # M15 hybrid intelligence development acceptance
 
+## Latest corrected packaged review - 2026-10-12
+
+Original frozen 03ab0aecdecda72dcb4db7866c46821e7c4264bf remains unchanged.
+Separate corrected build: f6c686ed67362bf3d777271d33bae4388b9b3cbc; subsequent
+eb22c0e changes a browser test only. Actual updated gate: 232 backend PASS,
+6 development Chrome PASS, 30 packaged native checks PASS including four packaged
+browser flows, and launcher/progress/tray/stop PASS. Zero final failures/skips.
+No new migration; system/drift PASS. 10,892 fresh bundle files inspected, no private
+runtime paths, M15 assets match source. Binary/portable hashes and final checkpoint
+SHA are in the external m15-package-final-manifest.json under isolated-tests.
+See M15_PACKAGED_ACCEPTANCE_20261012.md for findings, source/migration/configuration,
+scope/limitations, precise evidence and rollback. Original review candidate needed
+the closure-conflict and Windows status replacement corrections; they were made
+only in a separate hardening branch/worktree and independently tested.
+
+M15 PRODUCTION RELEASE READY remains NO: independent key/archive recovery PENDING
+and real provider/IAM/cost/retention approval/acceptance outstanding. No real OpenAI,
+cloud upload, key export, cancelled passphrase dialog, stable merge or live change.
+Generated narrative remains a hypothesis; independent canonical source fields are
+financial authority. Broader document ingestion and currency/citation improvements
+remain separate. The following original 223-test checkpoint is historical evidence,
+not the current combined count.
+
 2026-10-12. Development worktree F:/ALFRED_DEV/m15 only.
 Tested implementation: 4aac9c91c972c047304726b0219736f61ca1402d.
 Following checkpoint commit changes documentation only; its SHA and source archive

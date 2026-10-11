@@ -1,5 +1,42 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest checkpoint - corrected packaged M15 gate PASS, private release blocked
+
+2026-10-12. Original frozen HEAD/branch/archive 03ab0aecdecda72dcb4db7866c46821e7c4264bf
+untouched. Work ONLY separate F:/ALFRED_DEV/m15-hardening on
+codex/m15-release-hardening-20261012 for review fixes. Corrected packaged source
+f6c686ed67362bf3d777271d33bae4388b9b3cbc; eb22c0e afterwards is browser-test only.
+Final documentation/checkpoint/review SHA and portable hashes are recorded in
+F:/ALFRED_DEV/isolated-tests/m15-package-final-manifest.json after this commit.
+Actual final combined backend: 232 PASS in 143.272s; development Chrome: 6 PASS
+in 66.067s; packaged native: 30 PASS, run 786b0b27ee, including four browser flows
+with actual local Ollama plus bundled OCR, workers/scheduler, restart, corrections,
+deletion/nonresurrection, owner isolation and encrypted-vault restoration. Packaged
+launcher window/tray/guide/no-system-Python/shutdown PASS. Zero final failures/skips.
+No new migration; system/drift PASS. 10,892 bundle files, 1,228,186,906 bytes;
+private path scan and M15 asset digests PASS. Original/interrupted/failure evidence
+preserved. Source-only 29 checks/focused tests overlap; do not add these counts.
+
+Review corrections: 556f180 guards contradictory verified closure evidence;
+b7a819f retries transient Windows metadata replacement with real reader regression;
+f6c686e adds extended native/packaged test tooling; eb22c0e fixes test scroll target.
+835f00e prepares proposed (uninstalled/unapproved) AWS acceptance and manual recovery
+alternative. See M15_PACKAGED_ACCEPTANCE_20261012.md and M15_RELEASE_READINESS.md.
+Document scope stays owned memory/verified closure amount/date; no broad ingestion.
+Observed model currency formatting can be wrong; generated narrative is a hypothesis,
+canonical source values remain authoritative. Improve citations/currency on a separate
+future development branch; do not modify either frozen review candidate.
+
+M15 production release NO: mandatory independent recovery/key/checkpoint remains
+PENDING; real provider selection/IAM/cost/retention approval/acceptance pending.
+Real OpenAI disabled; no paid/real cloud/private uploads. Same-profile synthetic
+restoration is not device-loss recovery. Existing Desktop hashes PASS, no key
+records in verifier; cancelled sealing/passphrase workflow stays cancelled.
+No live source/DB/token/key/backups changes, stable merge or remote push. Preserve
+stable operator changes; M14 remains 30e0b3f. No M15 migration; family.0004 already
+applied in M14 is not repeated. Next action: choose/approve separate archive/key
+recovery destinations and independent restore, then provider-specific acceptance.
+
 ## M15 extended acceptance tooling - source drill PASS, fresh package next
 
 2026-10-12. Corrected runtime commits: 556f180 (closure evidence conflict) and
