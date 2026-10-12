@@ -1,5 +1,24 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15-UI-A complete - isolated UI integration branch
+
+2026-10-12. Work ONLY F:/ALFRED_DEV/m15-ui, codex/m15-ui-integration-20261012,
+based on clean hardened 081e30e. Original 03ab0ae/hardened review remain unchanged.
+Package f6c686e differs from 081e only in tests/docs; portable hash freshly matches
+A862C1AEDFA2A929E2476559C16B317CD6A948A3FC669D6356AC258047C6DE3A.
+UI-A adds offline shared typography/theme/styles/navigation and primary conversation,
+safe source panel, local availability, keyboard/new conversation and draft/retry.
+Existing routes/API GET preserved; no saved-chat model, cloud calls or migrations.
+Focused backend 32 PASS (11.072s); final Chrome 3 PASS (30.647s), zero failures/skips.
+Reviewed actual desktop/dark/outage/390px screenshots; contrast and mobile Escape
+regressions corrected. AST-only update PASS. See M15_UI_IMPLEMENTATION_20261012.md;
+logs/screenshots under F:/ALFRED_DEV/isolated-tests/m15-ui-*. Next UI-B: memory
+review/search/selected deletion/candidates, source links and honest sync/policy state.
+Exact next command: git -C F:/ALFRED_DEV/m15-ui status --short
+Live source/private DB/backups/tokens unchanged. UI-E fresh package still pending.
+Independent archive/key recovery, real provider, separate-PC/installer/real-account
+acceptance remain pending; cancelled sealing stays cancelled; real OpenAI disabled.
+
 ## Latest checkpoint - corrected packaged M15 gate PASS, private release blocked
 
 2026-10-12. Original frozen HEAD/branch/archive 03ab0aecdecda72dcb4db7866c46821e7c4264bf

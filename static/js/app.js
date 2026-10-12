@@ -292,7 +292,11 @@ function fetchJSON(url, options = {}) {
         .then(async response => {
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
-                throw new Error(payload.detail || payload.error || payload.message || "Request failed.");
+                const error = new Error(payload.detail || payload.error || payload.message || (response.status === 413 ? "This file exceeds the upload limit." : "Request failed. Please retry."));
+                error.status = response.status;
+                error.code = payload.code;
+                error.reference = payload.error_id;
+                throw error;
             }
             return payload;
         })

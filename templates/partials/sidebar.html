@@ -1,23 +1,29 @@
-<nav id="sidebarMenu" class="col-12 col-md-3 col-lg-2 d-md-block alfred-sidebar collapse">
+<nav id="sidebarMenu" aria-label="Main navigation" class="col-12 col-md-3 col-lg-2 d-md-block alfred-sidebar collapse">
     <div class="position-sticky pt-3">
         <div class="alfred-sidebar-head px-3 mb-3">
-            <div class="text-uppercase small text-muted fw-semibold">ALFRED Modules</div>
-            <div class="small text-muted">Finance, behavior, career, family, and life decisions in one operating system.</div>
+            <div class="text-uppercase small text-muted fw-semibold">Your workspace</div>
+            <div class="small text-muted">Personal finance & intelligence</div>
         </div>
 
         <div class="alfred-nav-section px-2">
-            <div class="alfred-nav-label px-2">Finance Core</div>
+            <div class="alfred-nav-label px-2">Everyday</div>
             <ul class="nav flex-column alfred-nav-list">
                 <li class="nav-item"><a class="nav-link {% if request.path == '/' or request.path == '/dashboard/' %}active{% endif %}" href="/">Dashboard</a></li>
-                <li class="nav-item"><a class="nav-link {% if request.path == '/documents/' %}active{% endif %}" href="/documents/">Documents</a></li>
-                <li class="nav-item"><a class="nav-link {% if request.path == '/ai/insights/' %}active{% endif %}" href="/ai/insights/">Insights</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.path == '/ai/insights/' %}active{% endif %}" href="/ai/insights/">AI Assistant</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/expenses/' %}active{% endif %}" href="/expenses/">Expenses</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/budgets/' %}active{% endif %}" href="/budgets/">Budgets</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/loans/' %}active{% endif %}" href="/loans/">Loans</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/investments/' %}active{% endif %}" href="/investments/">Investments</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.path == '/family/' %}active{% endif %}" href="/family/">Family</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.path == '/mobility/' %}active{% endif %}" href="/mobility/">Travel</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.path == '/documents/' %}active{% endif %}" href="/documents/">Documents</a></li>
+                <li class="nav-item"><a class="nav-link" href="/settings/#privateMemoryPanel">AI Memory</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.path == '/settings/' %}active{% endif %}" href="/settings/">Settings</a></li>
             </ul>
         </div>
 
+        <details class="workspace-extra-nav" {% if request.path == '/credit-score/' or request.path == '/recommendations/' or request.path == '/tax-optimizer/' or request.path == '/career/' or request.path == '/behavioral/' or request.path == '/relationship/' or request.path == '/risk/' or request.path == '/bike-service/' %}open{% endif %}>
+        <summary>More tools</summary>
         <div class="alfred-nav-section px-2">
             <div class="alfred-nav-label px-2">Advisory</div>
             <ul class="nav flex-column alfred-nav-list">
@@ -30,7 +36,6 @@
         <div class="alfred-nav-section px-2">
             <div class="alfred-nav-label px-2">Life Signals</div>
             <ul class="nav flex-column alfred-nav-list">
-                <li class="nav-item"><a class="nav-link {% if request.path == '/family/' %}active{% endif %}" href="/family/">Family</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/career/' %}active{% endif %}" href="/career/">Career</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/behavioral/' %}active{% endif %}" href="/behavioral/">Behavioral</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/relationship/' %}active{% endif %}" href="/relationship/">Relationship</a></li>
@@ -42,16 +47,10 @@
             <div class="alfred-nav-label px-2">Mobility</div>
             <ul class="nav flex-column alfred-nav-list">
                 <li class="nav-item"><a class="nav-link {% if request.path == '/bike-service/' %}active{% endif %}" href="/bike-service/">Vehicle Service</a></li>
-                <li class="nav-item"><a class="nav-link {% if request.path == '/mobility/' %}active{% endif %}" href="/mobility/">Travel Planner</a></li>
             </ul>
         </div>
 
-        <div class="alfred-nav-section px-2">
-            <div class="alfred-nav-label px-2">Account</div>
-            <ul class="nav flex-column alfred-nav-list">
-                <li class="nav-item"><a class="nav-link {% if request.path == '/settings/' %}active{% endif %}" href="/settings/">Settings</a></li>
-            </ul>
-        </div>
+        </details>
 
         {% if request.user.is_superuser %}
         <div class="alfred-nav-section px-2">

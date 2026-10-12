@@ -31,12 +31,18 @@ class MemoryAPI(APIView):
         return response
 
     def handle_exception(self, exc):
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        if isinstance(exc, EmbeddingUnavailable):
+            response = safe_error_response(exc, 'Local model is unavailable. Your draft is preserved; retry when Ollama is ready.', logger_name=__name__, status_code=503)
+            response.data['code'] = 'local_model_unavailable'
+            return response
         if isinstance(exc,MemoryConflict):
             return safe_error_response(exc,'Memory changed. Refresh memories and review your request before trying again.',logger_name=__name__,status_code=409)
         if isinstance(exc,SyncConflict):
             return safe_error_response(exc,'Memory synchronization conflict. Local data is retained; explicit recovery is required.',logger_name=__name__,status_code=409)
         if isinstance(exc,ReasoningBudgetExceeded):
             response=safe_error_response(exc,'Daily reasoning budget exhausted.',logger_name=__name__,status_code=429)
+            response.data['code'] = 'reasoning_budget_reached'
             from datetime import datetime, timezone
             now=datetime.now(timezone.utc)
             response['Retry-After']=str(86400-now.hour*3600-now.minute*60-now.second)

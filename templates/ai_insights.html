@@ -1,46 +1,46 @@
 {% extends "base.html" %}
-{% block title %}Insights{% endblock %}
+{% block title %}AI Assistant · ALFRED{% endblock %}
 
 {% block content %}
-<section class="alfred-hero fade-in" id="aiInsightsRoot">
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
-        <div>
-            <div class="alfred-chip mb-3">Behavioral finance engine</div>
-            <h1 class="alfred-hero-title">ALFRED is now learning how you earn, spend, service debt, and react under pressure.</h1>
-            <p class="alfred-hero-copy">This page uses your imported transaction history to build a behavioral profile, stress drivers, recurring commitments, anomaly review, and optimization strategy.</p>
-        </div>
-        <div class="surface-card" style="min-width: 260px;">
-            <p class="metric-kicker">Dominant Profile</p>
-            <div class="metric-value" id="aiPersonality">Awaiting data</div>
-            <p class="metric-caption mb-1">Coach tone: <span id="aiCoachTone">energetic</span></p>
-            <p class="metric-caption mb-0" id="aiStrategy">Import richer history so ALFRED can adapt guidance.</p>
-        </div>
-    </div>
-</section>
-
-<section class="soft-grid four-up mb-4" id="aiInsightSummary"></section>
-
+<header class="workspace-heading">
+    <div class="workspace-badge">Private by default</div>
+    <h1>Your ALFRED assistant</h1>
+    <p>Think through your finances and plans, with the records and memories you choose.</p>
+</header>
 <section class="surface-card mb-4" id="intelligencePanel">
-    <h2 class="page-section-title">Ask ALFRED</h2>
-    <p>Ollama answers locally using your verified memories and selected records. AI advice is a hypothesis; financial values below come from ALFRED's verified records. Questions and answers are not saved automatically.</p>
-    <form id="intelligenceForm" data-live-refresh-hold="true">
+    <div class="conversation-header">
+        <div><h2 class="page-section-title mb-2">Ask ALFRED</h2>
+            <div class="workspace-status">
+                <span id="intelligenceLocalStatus" class="workspace-badge" role="status">Checking Ollama</span>
+                <span id="intelligenceCloudStatus" class="workspace-badge">OpenAI disabled</span>
+            </div>
+        </div>
+        <button id="intelligenceNew" class="btn btn-outline-secondary btn-sm" type="button">New conversation</button>
+    </div>
+    <div id="intelligenceEmpty" class="conversation-empty"><h3>What would you like to understand?</h3>
+        <p>Ask about a saved memory, your financial snapshot or your Travel preferences.</p>
+        <p class="small">This conversation stays on this page. Save only facts you have checked.</p></div>
+    <div id="intelligenceAnswers" role="log" aria-live="polite" aria-label="Current conversation" class="conversation-messages"></div>
+    <form id="intelligenceForm" class="conversation-composer" data-live-refresh-hold="true">
         <label for="intelligenceQuery" class="form-label">Your question</label>
-        <textarea id="intelligenceQuery" class="form-control mb-2" rows="2" maxlength="1024" required autocomplete="off"></textarea>
+        <textarea id="intelligenceQuery" class="form-control mb-3" rows="3" maxlength="1024" required autocomplete="off" placeholder="Ask a question…" aria-describedby="intelligencePrivacy"></textarea>
+        <div class="conversation-options mb-3"><div>
         <label for="intelligenceScope" class="form-label">Include local records</label>
         <select id="intelligenceScope" class="form-select mb-2">
             <option value="general">Verified memories</option><option value="finance">My financial snapshot</option>
             <option value="travel">My Travel preferences</option><option value="documents">Verified loan closure evidence</option>
         </select>
-        <div id="intelligenceDocumentField" class="d-none mb-2"><label for="intelligenceDocument" class="form-label">Verified evidence</label>
-            <select id="intelligenceDocument" class="form-select" disabled required></select></div>
+        </div><div id="intelligenceDocumentField" class="d-none mb-2"><label for="intelligenceDocument" class="form-label">Verified evidence</label>
+            <select id="intelligenceDocument" class="form-select" disabled required></select></div></div>
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
             This question is public. Allow approved cloud fallback for this question if Ollama fails.</label>
-        <p class="small">Financial, document and Travel reasoning stays local. Cloud reasoning requires separate provider authorization, an enabled owner policy and spending limits.</p>
-        <button class="btn btn-primary" type="submit">Ask ALFRED</button>
+        <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions are not saved automatically.</p>
+        <div class="conversation-actions"><button class="btn btn-primary" type="submit">Ask ALFRED</button>
+            <span class="small text-muted">Enter for a new line · Ctrl/⌘ + Enter to send</span></div>
     </form>
     <p id="intelligenceFeedback" role="status" aria-live="polite" class="mt-2"></p>
-    <div id="intelligenceAnswers" role="log" aria-live="polite" class="data-stack"></div>
-    <details class="mt-3"><summary>Save a verified memory</summary>
+    <button id="intelligenceRetry" class="btn btn-outline-primary" type="button" hidden>Retry question</button>
+    <details class="mt-3" id="intelligenceMemorySave"><summary>Save a verified memory</summary>
         <p>Only save information you have checked. AI answers may be incorrect. Manage corrections, deletion and retention in <a href="/settings/">Settings</a>.</p>
         <form id="intelligenceMemoryForm" data-live-refresh-hold="true">
             <label for="intelligenceMemoryText" class="form-label">Information I have verified</label>
@@ -53,6 +53,16 @@
         </form>
     </details>
 </section>
+
+<div class="workspace-heading"><h2 class="h4">Financial patterns</h2><p>Insights from your recorded activity. Review the evidence before acting.</p></div>
+<section id="aiInsightsRoot" class="surface-card mb-3">
+    <div class="d-flex justify-content-between flex-wrap gap-3">
+        <div><p class="metric-kicker">Activity profile</p><div class="h4" id="aiPersonality">Awaiting data</div></div>
+        <div><p class="metric-caption mb-1">Coach tone: <span id="aiCoachTone">energetic</span></p>
+            <p class="metric-caption mb-0" id="aiStrategy">Import richer history so ALFRED can adapt guidance.</p></div>
+    </div>
+</section>
+<section class="soft-grid four-up mb-4" id="aiInsightSummary"></section>
 
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
@@ -115,5 +125,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1"></script>
-<script src="/static/js/intelligence.js?v=1"></script>
+<script src="/static/js/intelligence.js?v=2"></script>
 {% endblock %}

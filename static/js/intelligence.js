@@ -8,7 +8,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const answers = document.getElementById("intelligenceAnswers");
     const memoryText = document.getElementById("intelligenceMemoryText");
     const verified = document.getElementById("intelligenceMemoryVerified");
-    let active = true, generation = 0, cloudAvailable = false;
+    const form = document.getElementById("intelligenceForm");
+    const newConversation = document.getElementById("intelligenceNew");
+    const retry = document.getElementById("intelligenceRetry");
+    const empty = document.getElementById("intelligenceEmpty");
+    const localStatus = document.getElementById("intelligenceLocalStatus");
+    let active = true, generation = 0, cloudAvailable = false, pending = false;
+    function setLocalStatus(text, state) {
+        localStatus.textContent = text; localStatus.dataset.state = state;
+    }
     function updateScope() {
         const documents = scope.value === "documents";
         document.getElementById("intelligenceDocumentField").classList.toggle("d-none", !documents);
@@ -18,32 +26,58 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     async function refreshControls() {
         const ticket = generation;
-        const [insights, reasoning] = await Promise.all([Alfred.fetchJSON("/api/ai/personal-insights/"), Alfred.fetchJSON("/api/ai/memories/reason/")]);
+        const [insights, reasoning] = await Promise.all([Alfred.fetchJSON("/api/ai/personal-insights/?assistant_status=1"), Alfred.fetchJSON("/api/ai/memories/reason/")]);
         if (!active || ticket !== generation) return;
         documentChoice.replaceChildren(new Option("Choose verified evidence", ""));
         (insights.assistant_documents || []).forEach(item => documentChoice.append(new Option(item.label, item.id)));
         cloudAvailable = reasoning.provider_available && reasoning.policy.enabled;
+        setLocalStatus(insights.local_model_status === "available" ? "Ollama available" : "Ollama unavailable", insights.local_model_status === "available" ? "ready" : "unavailable");
+        document.getElementById("intelligenceCloudStatus").textContent = !reasoning.real_provider_enabled
+            ? (cloudAvailable ? "Synthetic cloud testing · OpenAI disabled" : "OpenAI disabled")
+            : (cloudAvailable ? "OpenAI · consent required per question" : "OpenAI · owner consent or configuration required");
         updateScope();
     }
     scope.addEventListener("change", updateScope);
-    document.getElementById("intelligenceForm").addEventListener("submit", async event => {
+    query.addEventListener("keydown", event => {
+        if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
+    });
+    retry.addEventListener("click", () => form.requestSubmit());
+    newConversation.addEventListener("click", () => {
+        if (pending) return;
+        generation++; answers.replaceChildren(); empty.hidden = false; query.value = "";
+        consent.checked = false; feedback.textContent = "New conversation. Previous messages cleared from this page."; retry.hidden = true; query.focus();
+    });
+    form.addEventListener("submit", async event => {
         event.preventDefault();
+        if (pending) return;
         const ticket = generation, button = event.target.querySelector("button");
-        button.disabled = true;
+        pending = true; button.disabled = true; newConversation.disabled = true; query.readOnly = true; retry.hidden = true;
+        answers.setAttribute("aria-busy", "true");
+        setLocalStatus("Local model processing", "processing");
         feedback.textContent = "ALFRED is processing locally.";
+        const spinner = document.createElement("span"); spinner.className = "conversation-spinner me-2"; spinner.setAttribute("aria-hidden", "true"); feedback.prepend(spinner);
+        button.textContent = "Thinking…";
         const payload = {query: query.value, scope: scope.value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
         if (scope.value === "documents") payload.document_id = Number(documentChoice.value);
         try {
             const result = await Alfred.fetchJSON("/api/ai/personal-insights/", {method: "POST", body: JSON.stringify(payload)});
             if (!active || ticket !== generation) return;
             const row = document.createElement("article");
-            const question = document.createElement("p"); question.textContent = payload.query;
-            const label = document.createElement("strong"); label.textContent = `AI hypothesis · ${result.provider}`;
-            const answer = document.createElement("p"); answer.textContent = result.answer; answer.style.whiteSpace = "pre-wrap";
-            row.append(question, label, answer);
+            const userMessage = document.createElement("div"); userMessage.className = "conversation-message conversation-message--user";
+            const userLabel = document.createElement("span"); userLabel.className = "conversation-label"; userLabel.textContent = "You";
+            const question = document.createElement("p"); question.textContent = payload.query; userMessage.append(userLabel, question);
+            const assistantMessage = document.createElement("div"); assistantMessage.className = "conversation-message mt-3";
+            const label = document.createElement("span"); label.className = "conversation-label";
+            label.textContent = `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : "Approved cloud"}`;
+            const answer = document.createElement("p"); answer.textContent = result.answer;
+            assistantMessage.append(label, answer); row.append(userMessage, assistantMessage);
+            const evidence = document.createElement("details"); evidence.className = "conversation-evidence";
+            const summary = document.createElement("summary"); summary.textContent = `Sources & evidence (${(result.sources || []).length})`;
+            evidence.append(summary); assistantMessage.append(evidence);
+            if (!result.sources?.length) { const note = document.createElement("p"); note.textContent = "Insufficient evidence for personal facts. This answer has no matching verified source."; evidence.append(note); }
             (result.sources || []).forEach(source => {
                 const reference = document.createElement("p"); reference.textContent = `Source: ${source.ref} · ${source.classification}`;
-                row.append(reference);
+                evidence.append(reference);
                 if (source.data) Object.entries(source.data).forEach(([key, value]) => {
                     if (key === "metric_states") return;
                     const fact = document.createElement("p");
@@ -51,15 +85,24 @@ document.addEventListener("DOMContentLoaded", () => {
                     const display = monetary && typeof value === "number" ? Alfred.formatCurrency(value) : (typeof value === "object" ? JSON.stringify(value) : String(value));
                     const state = source.data.metric_states?.[key]?.status;
                     fact.textContent = `${key.replaceAll("_", " ")}: ${display}${state ? ` (${state})` : ""}`;
-                    row.append(fact);
+                    evidence.append(fact);
                 });
             });
-            answers.append(row);
+            answers.append(row); empty.hidden = true;
             while (answers.children.length > 10) answers.firstElementChild.remove();
             feedback.textContent = result.retrieval_error?.detail || "Answer ready. Review the sources before acting.";
+            setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
             query.value = "";
-        } catch (error) { if (active && ticket === generation) feedback.textContent = error.message; }
-        finally { consent.checked = false; button.disabled = false; }
+            evidence.open = true;
+        } catch (error) {
+            if (active && ticket === generation) {
+                feedback.textContent = `${error.message}${error.reference ? ` Reference: ${error.reference}` : ""}`;
+                retry.hidden = error.status === 409 || error.status === 429 || error.status === 400;
+                setLocalStatus(error.code === "local_model_unavailable" ? "Ollama unavailable" : "Local request did not complete", "unavailable");
+                if (error.code === "reasoning_budget_reached") document.getElementById("intelligenceCloudStatus").textContent = "Cloud budget reached";
+            }
+        }
+        finally { pending = false; consent.checked = false; button.disabled = false; button.textContent = "Ask ALFRED"; newConversation.disabled = false; query.readOnly = false; answers.setAttribute("aria-busy", "false"); }
     });
     document.getElementById("intelligenceMemoryForm").addEventListener("submit", async event => {
         event.preventDefault();
@@ -76,9 +119,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     refreshControls().catch(error => { if (active) feedback.textContent = error.message; });
     window.addEventListener("pagehide", () => {
-        active = false; generation++; answers.replaceChildren(); documentChoice.replaceChildren();
+        active = false; generation++; answers.replaceChildren(); documentChoice.replaceChildren(); empty.hidden = false;
         query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false; feedback.textContent = "";
-        consent.disabled = true;
+        consent.disabled = true; retry.hidden = true;
         document.getElementById("intelligenceMemorySensitivity").value = "sensitive";
     });
     window.addEventListener("pageshow", event => {

@@ -12,7 +12,8 @@ from apps.ml_engine.behavior.anomaly_detector import anomaly_detector
 from apps.ml_engine.behavior.personalizer import personalizer
 from apps.ml_engine.behavior.insight_generator import insight_generator
 from .memory import MemoryAPI, memory_store
-from apps.ml_engine.services.hybrid_intelligence import hybrid_answer
+from apps.ml_engine.services.hybrid_intelligence import hybrid_answer, OllamaReasoner
+from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 
 class EmotionalSpendAPI(APIView):
     permission_classes = [IsAuthenticated]
@@ -58,9 +59,16 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
 
     def get(self, request):
         from apps.loans.models import LoanClosureDocument
-        intelligence = dict(build_financial_intelligence(request.user))
+        intelligence = {} if request.query_params.get('assistant_status') == '1' else dict(build_financial_intelligence(request.user))
         intelligence['assistant_documents']=[{'id':identity,'label':f'Verified loan closure #{identity}'} for identity in
             LoanClosureDocument.objects.filter(loan__user=request.user,verification_status='verified').order_by('-id').values_list('id',flat=True)[:20]]
+        if request.query_params.get('assistant_status') == '1':
+            import time
+            try:
+                OllamaReasoner()._digest(deadline=time.monotonic()+1)
+                intelligence['local_model_status'] = 'available'
+            except EmbeddingUnavailable:
+                intelligence['local_model_status'] = 'unavailable'
         return Response(intelligence)
 
     def post(self,request):

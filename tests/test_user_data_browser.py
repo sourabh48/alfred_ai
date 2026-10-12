@@ -200,6 +200,61 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(sync.status(owner)['revision'],2)
         self.capture('memory-encrypted-mock-sync-session')
 
+    def test_assistant_responsive_keyboard_retry_and_new_conversation(self):
+        from unittest.mock import Mock
+        from selenium.webdriver.common.keys import Keys
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-ui-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_MEMORY_OPENAI_AUTHORIZED=False, ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
+        local = Mock(); local.reason.side_effect = EmbeddingUnavailable('private-file-secret')
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner', return_value=local))
+        self.browser.set_window_size(1440,1200)
+        self.addCleanup(self.browser.set_window_size,1440,1200)
+        self.login()
+        self.browser.execute_script("localStorage.setItem('alfred.appearance','light')")
+        self.browser.get(self.live_server_url+'/ai/insights/')
+        self.wait.until(lambda _: 'Ollama available' in self.text('intelligenceLocalStatus'))
+        self.assertEqual(self.text('intelligenceCloudStatus'), 'OpenAI disabled')
+        question = self.browser.find_element(self.By.ID, 'intelligenceQuery')
+        question.send_keys('Synthetic outage draft', Keys.CONTROL, Keys.ENTER)
+        self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
+        self.assertEqual(question.get_attribute('value'), 'Synthetic outage draft')
+        self.assertNotIn('private-file-secret', self.text('intelligenceFeedback'))
+        self.capture('ui-a-outage-draft-preserved')
+        local.reason.side_effect = None; local.reason.return_value = 'Synthetic hypothesis <img src=x onerror="window.uiLeak=true">'
+        self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.uiLeak)'))
+        self.assertIn('Insufficient evidence', self.text('intelligenceAnswers'))
+        self.browser.execute_script("document.getElementById('alfredMainScroll').scrollTo({top:0,behavior:'instant'}); window.scrollTo({top:0,behavior:'instant'})")
+        self.capture('ui-a-conversation-desktop')
+        self.memory_click('#workspaceTheme')
+        self.assertEqual(self.browser.execute_script('return document.documentElement.dataset.theme'), 'dark')
+        contrast = """function light(rgb) { const v=rgb.match(/\\d+/g).slice(0,3).map(n=>{n=Number(n)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2] }
+            const a=light(getComputedStyle(document.querySelector('#sidebarMenu .nav-link')).color), b=light(getComputedStyle(document.getElementById('sidebarMenu')).backgroundColor);
+            return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)"""
+        self.wait.until(lambda _: self.browser.execute_script(contrast)>4.5)
+        self.capture('ui-a-conversation-dark')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.memory_click('#intelligenceNew')
+        self.assertEqual(self.text('intelligenceAnswers'), '')
+        self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceEmpty').is_displayed())
+        self.assertEqual(self.browser.switch_to.active_element.get_attribute('id'), 'intelligenceQuery')
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.assertEqual(self.browser.execute_script('return innerWidth'), 390)
+        self.memory_click('[aria-controls="sidebarMenu"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'sidebarMenu').is_displayed())
+        self.assertIn('AI Memory', self.text('sidebarMenu'))
+        self.browser.switch_to.active_element.send_keys(Keys.ESCAPE)
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'sidebarMenu').is_displayed())
+        self.browser.execute_script("document.getElementById('alfredMainScroll').scrollTo({top:0,behavior:'instant'}); window.scrollTo({top:0,behavior:'instant'})")
+        self.capture('ui-a-conversation-mobile')
+        self.memory_click('#workspaceTheme'); self.browser.execute_cdp_cmd('Emulation.clearDeviceMetricsOverride', {})
+
     def test_hybrid_insights_local_sources_verified_save_and_fresh_settings(self):
         from unittest.mock import Mock
         from selenium.webdriver.support.ui import Select
@@ -232,7 +287,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#intelligenceForm button')
         self.wait.until(lambda _: 'travel-preferences' in self.text('intelligenceAnswers'))
         self.assertIn('novelty: 0.4',self.text('intelligenceAnswers'))
-        self.memory_click('#intelligencePanel details summary')
+        self.memory_click('#intelligenceMemorySave summary')
         self.browser.find_element(self.By.ID,'intelligenceMemoryText').send_keys('synthetic owner checked hiking fact')
         self.memory_click('#intelligenceMemoryForm button')
         self.assertEqual(len(store.list_memories(owner)),1)
@@ -276,7 +331,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('synthetic public mountain question')
         self.memory_click('#intelligenceCloudConsent'); self.memory_click('#intelligenceForm button')
         self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
-        self.assertIn('mock',self.text('intelligenceAnswers'))
+        self.assertIn('Mock (synthetic)',self.text('intelligenceAnswers'))
         self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_selected())
         self.capture('hybrid-public-consent-sync-policy')
         failed=Mock(); failed.embed.side_effect=EmbeddingUnavailable('synthetic local server offline')
