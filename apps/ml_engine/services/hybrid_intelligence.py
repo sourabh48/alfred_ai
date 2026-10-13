@@ -75,12 +75,13 @@ def source_context(user,scope,document_id=None):
             'closure_date':document.closure_date.isoformat() if document.closure_date else None}}]
 
 
-def present_answer(result,scope):
+def present_answer(result,scope,query=''):
     # Financial models currently have no currency column; never infer it from model prose or OCR.
     claims=result['answer']
     for source in result.get('sources',[]): claims=claims.replace(str(source['ref']),'')
     currency=any(category(char)=='Sc' for char in claims) or re.search(r'\b(?:INR|USD|EUR|GBP|JPY|AUD|CAD|CNY|CHF|dollars?|rupees?|euros?|pounds?|yen)\b',claims,re.I)
-    financial=scope in ('finance','documents') or re.search(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',claims,re.I)
+    intent=claims+' '+(query if scope=='general' else '')
+    financial=scope in ('finance','documents') or re.search(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',intent,re.I)
     numbers=re.search(r'\d',claims)
     withheld=bool((currency and (numbers or financial)) or (financial and numbers))
     if withheld:
@@ -114,7 +115,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,cloud_cons
     except EmbeddingUnavailable:
         if not cloud_consent or query_sensitivity!='public' or scope!='general': raise
         return present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
-            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD),scope)
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD),scope,query)
     with store._transaction() as db:
         store._expire(db,owner)
         live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
@@ -124,4 +125,4 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,cloud_cons
         'memory_retrieval_available':retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
             'url':f"/settings/#memory-{item['id']}",'verified_at':item['verified_at'],
-            'score':item['score']} for item in included]+tools,'context_omitted':len(memories)-len(included)},scope)
+            'score':item['score']} for item in included]+tools,'context_omitted':len(memories)-len(included)},scope,query)

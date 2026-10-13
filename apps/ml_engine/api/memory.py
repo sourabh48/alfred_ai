@@ -164,7 +164,7 @@ class MemoryReasoningAPI(MemoryAPI):
             query_sensitivity=data.get('query_sensitivity'),provider=reasoning_provider(store,request.user),
             daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD)
         from apps.ml_engine.services.hybrid_intelligence import present_answer
-        return Response(present_answer(result,'general'))
+        return Response(present_answer(result,'general',data['query']))
 
 
 class MemoryLearningAPI(MemoryAPI):

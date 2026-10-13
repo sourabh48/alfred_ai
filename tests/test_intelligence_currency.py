@@ -59,6 +59,12 @@ class IntelligenceCurrencyTests(TestCase):
         self.assertTrue(result['narrative_withheld'])
         self.assertNotIn('500',result['answer'])
 
+    def test_financial_question_cannot_get_an_unlabelled_numeric_general_answer(self):
+        self.local.reason.return_value='500.00'
+        result=hybrid_answer(self.store,self.user,'What is my bank balance?',local=self.local)
+        self.assertTrue(result['narrative_withheld'])
+        self.assertNotIn('500.00',result['answer'])
+
     def test_travel_numbers_are_not_formatted_or_suppressed_as_money(self):
         self.local.reason.return_value='Consider 3 quiet walks as a hypothesis.'
         result=self.answer('travel')

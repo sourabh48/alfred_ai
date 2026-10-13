@@ -1,5 +1,14 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Financial-intent follow-up before UI-E
+
+2026-10-14. UI-D interaction follow-up cde37ce19c13c50205df6b21d47e22ff6b85a475
+passes four Chrome workflows (60.632s). An additional currency regression prevents
+a bare numeric reply to a financial question in general-memory mode; query intent
+now participates in the shared response guard, including direct optional reasoning.
+Focused evidence: isolated-tests/m15-ui-c-intent-gate.log. No financial values or
+models change. Fresh build must include this correction; prior packages are stale.
+
 ## M15-UI-D COMPLETE after expanded interaction gate - fresh package next
 
 2026-10-14. Work ONLY F:/ALFRED_DEV/m15-ui / codex/m15-ui-integration-20261012.
