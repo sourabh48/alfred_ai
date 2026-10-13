@@ -286,6 +286,19 @@ def main():
                 assert "ALFRED" in payload["text"] and "275.50" in payload["text"], payload
             passed("bundled_document_and_statement_ocr")
         command("stop")
+        if args.memory:
+            from scripts.verify_memory_acceptance import during_model_outage
+            previous_model = os.environ.get("ALFRED_MEMORY_OLLAMA_MODEL")
+            os.environ["ALFRED_MEMORY_OLLAMA_MODEL"] = "alfred-synthetic-unavailable:latest"
+            try:
+                command("start")
+                during_model_outage(base, session, user, data, passed)
+            finally:
+                command("stop")
+                if previous_model is None:
+                    os.environ.pop("ALFRED_MEMORY_OLLAMA_MODEL", None)
+                else:
+                    os.environ["ALFRED_MEMORY_OLLAMA_MODEL"] = previous_model
         pending = native_runtime_probe(run + "-persist")
         time.sleep(1)
         assert pending.get() is None

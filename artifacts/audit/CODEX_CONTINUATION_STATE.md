@@ -1,5 +1,23 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15 single integrated candidate - new gate IN PROGRESS
+
+2026-10-14. Dedicated F:/ALFRED_DEV/m15-integrated, release/m15-integrated-20261014.
+Created from actual stable M14 30e0b3f, fast-forwarded complete UI 75b6f50 after
+verifying stable/original hybrid/trusted checkpoint/hardening/UI ancestry.
+All completed features already incorporated; no duplicate merge or source conflict.
+Frozen original, hardening and UI worktrees/branches remain unchanged. origin/master
+fresh fetch is 30e0b3f; no push, live source/runtime/private DB or key changes.
+Integration coverage and exact promotion/rollback procedure are in
+M15_INTEGRATED_RELEASE_20261014.md. Actual new combined gate and fresh package
+are required; old 308/14/32 results are historical only. New native acceptance
+checks missing-model outage/draft/retry/zero cloud and waits for loaded Travel UI.
+Independent archive/separate key restore remains PENDING and blocks promotion;
+no cancelled dialogs, key export, weakening or deletion. Real providers disabled.
+Evidence prefix F:/ALFRED_DEV/isolated-tests/m15-integrated-*.
+Next command: powershell.exe -NoProfile -ExecutionPolicy Bypass -File F:/ALFRED_DEV/isolated-tests/m15-integrated-combined.ps1
+
+
 ## M15 UI candidate complete - local gate PASS, private promotion remains blocked
 
 2026-10-14. ONLY F:/ALFRED_DEV/m15-ui / codex/m15-ui-integration-20261012.
@@ -2052,6 +2070,24 @@ database modification; no new migration, cloud/API/UI/reset lifecycle work.
 ## Preserved stable M14 continuation record (30e0b3f)
 
 # ALFRED CODEX CONTINUATION STATE
+
+## M15 single integrated candidate - new gate IN PROGRESS
+
+2026-10-14. Dedicated F:/ALFRED_DEV/m15-integrated, release/m15-integrated-20261014.
+Created from actual stable M14 30e0b3f, fast-forwarded complete UI 75b6f50 after
+verifying stable/original hybrid/trusted checkpoint/hardening/UI ancestry.
+All completed features already incorporated; no duplicate merge or source conflict.
+Frozen original, hardening and UI worktrees/branches remain unchanged. origin/master
+fresh fetch is 30e0b3f; no push, live source/runtime/private DB or key changes.
+Integration coverage and exact promotion/rollback procedure are in
+M15_INTEGRATED_RELEASE_20261014.md. Actual new combined gate and fresh package
+are required; old 308/14/32 results are historical only. New native acceptance
+checks missing-model outage/draft/retry/zero cloud and waits for loaded Travel UI.
+Independent archive/separate key restore remains PENDING and blocks promotion;
+no cancelled dialogs, key export, weakening or deletion. Real providers disabled.
+Evidence prefix F:/ALFRED_DEV/isolated-tests/m15-integrated-*.
+Next command: powershell.exe -NoProfile -ExecutionPolicy Bypass -File F:/ALFRED_DEV/isolated-tests/m15-integrated-combined.ps1
+
 
 ## Latest checkpoint - M14 stable Git integration, awaiting deployment approval
 

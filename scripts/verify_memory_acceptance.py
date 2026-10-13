@@ -99,6 +99,8 @@ def before_restart(base,session,owner,data,passed):
         wait.until(lambda _: browser.find_element(By.ID,'investmentPositionsBodySearch'))
         browser.get(base+'/mobility/')
         wait.until(lambda _: browser.find_element(By.ID,'plannerComposer').is_displayed())
+        wait.until(lambda _: browser.find_element(By.ID,'plannerPlans').text.strip())
+        wait.until(lambda _: browser.execute_script("return [...document.querySelectorAll('.fade-in')].every(el => getComputedStyle(el).opacity === '1')"))
         assert browser.find_elements(By.CSS_SELECTOR,'a[href="/ai/insights/?scope=travel#intelligencePanel"]')
         browser.save_screenshot(str(data/'m15-ui-modules.png'))
         passed('m15_packaged_chrome_banking_financial_filters_and_travel_navigation')
@@ -135,6 +137,56 @@ def before_restart(base,session,owner,data,passed):
     assert post('/api/ai/personal-insights/',{'query':'closure amount','scope':'documents','document_id':document.pk},400)['error_id']
     passed('m15_packaged_conflicting_and_deleted_document_evidence_blocked')
     return {'id':current[0]['id'],'other_session':other_session,'other_id':other_memory.json()['id']}
+
+
+def during_model_outage(base,session,owner,data,passed):
+    """Use a missing model in this disposable runtime; leave the real Ollama service running."""
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys
+    from selenium.webdriver.support.ui import WebDriverWait
+    from tests.user_acceptance_scenario import PASSWORD
+
+    path='/api/ai/memories/reason/'
+    before=session.get(base+path,timeout=15).json()
+    question='Suggest a quiet holiday activity based on my preferences.'
+    response=session.post(base+'/api/ai/personal-insights/',json={'query':question,'scope':'general'},
+        headers={'X-CSRFToken':session.cookies['csrftoken'],'Referer':base+'/ai/insights/'},timeout=45)
+    assert response.status_code==503
+    assert response.json()['code']=='local_model_unavailable' and response.json()['error_id']
+    assert 'alfred-synthetic-unavailable' not in response.text
+    passed('m15_packaged_missing_local_model_returns_safe_503_without_cloud')
+
+    options=webdriver.ChromeOptions()
+    for option in ('--headless=new','--disable-gpu','--no-sandbox','--window-size=1440,1200'): options.add_argument(option)
+    browser=webdriver.Chrome(options=options); wait=WebDriverWait(browser,45)
+    try:
+        browser.get(base+'/login/')
+        browser.find_element(By.NAME,'username').send_keys(owner.username)
+        browser.find_element(By.NAME,'password').send_keys(PASSWORD)
+        browser.find_element(By.CSS_SELECTOR,'button[type=submit]').click()
+        wait.until(lambda _: browser.find_elements(By.ID,'dashboardPeriodNote'))
+        browser.get(base+'/ai/insights/')
+        wait.until(lambda _: browser.find_element(By.ID,'intelligenceLocalStatus').text=='Ollama unavailable')
+        draft=browser.find_element(By.ID,'intelligenceQuery')
+        draft.send_keys(question,Keys.CONTROL,Keys.ENTER)
+        wait.until(lambda _: 'Reference:' in browser.find_element(By.ID,'intelligenceFeedback').text)
+        retry=browser.find_element(By.ID,'intelligenceRetry')
+        assert retry.is_displayed() and draft.get_attribute('value')==question
+        browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});",retry); retry.click()
+        wait.until(lambda _: not draft.get_attribute('readonly') and retry.is_displayed())
+        assert draft.get_attribute('value')==question
+        assert browser.find_element(By.ID,'intelligenceCloudStatus').text=='OpenAI disabled'
+        assert not browser.find_element(By.ID,'intelligenceAnswers').find_elements(By.TAG_NAME,'article')
+        browser.save_screenshot(str(data/'m15-model-outage.png'))
+        after=session.get(base+path,timeout=15).json()
+        assert not after['real_provider_enabled'] and not after['provider_available']
+        assert after['usage']==before['usage']
+        passed('m15_packaged_chrome_model_outage_preserves_draft_retry_and_zero_cloud_usage')
+    except Exception:
+        browser.save_screenshot(str(data/'m15-model-outage-failure.png'))
+        raise
+    finally: browser.quit()
 
 
 def after_restart(base,session,data,state,passed):
