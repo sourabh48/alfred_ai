@@ -39,10 +39,17 @@ def main():
         parser.error("--memory requires --browser")
     if args.load_users < 1 or args.load_writes < 1 or args.load_seconds < 0:
         parser.error("load-users/load-writes must be positive and load-seconds cannot be negative")
+    if args.memory:
+        # This scripted synthetic burst is not a production rate-limit test.
+        os.environ.setdefault("ALFRED_EXPENSIVE_ACCOUNT_LIMIT", "64")
+        os.environ.setdefault("ALFRED_API_ACCOUNT_LIMIT", "512")
     run = uuid.uuid4().hex[:10]
     data = ROOT / "artifacts" / "native-tests" / run
     data.mkdir(parents=True)
     report = {"run": run, "data_dir": str(data), "executable": str(args.executable or sys.executable), "passed": False, "checks": {}}
+    if args.memory:
+        report["synthetic_fixture_limits"] = {name: os.environ[name] for name in
+            ("ALFRED_EXPENSIVE_ACCOUNT_LIMIT", "ALFRED_API_ACCOUNT_LIMIT")}
     prefix = [str(args.executable.resolve())] if args.executable else [sys.executable, str(ROOT / "alfred_native.py")]
     # configure() changes cwd to the isolated data directory; resolve CLI paths first.
     launcher_prefix = [str(args.launcher.resolve())] if args.launcher else prefix

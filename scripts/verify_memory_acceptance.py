@@ -199,6 +199,15 @@ def after_restart(base,session,data,state,passed):
     assert [row['id'] for row in memories]==[state['id']]
     assert post('retrieve/',{'query':'What type of holiday do I enjoy?'})['memories'][0]['id']==state['id']
     passed('m15_packaged_restart_retrieval_and_correction_persistence')
+    status=session.get(base+'/api/ai/personal-insights/?assistant_status=1',timeout=15).json()
+    assert status['local_model_status']=='available'
+    cloud=session.get(base+path+'reason/',timeout=15).json()
+    assert not cloud['real_provider_enabled'] and not cloud['provider_available']
+    response=session.post(base+'/api/ai/personal-insights/',json={'query':'Suggest one quiet mountain activity I would enjoy.','scope':'general'},
+        headers={'X-CSRFToken':session.cookies['csrftoken'],'Referer':base+'/ai/insights/'},timeout=45)
+    assert response.status_code==200 and response.json()['provider']=='ollama'
+    assert any(source['ref']==state['id'] for source in response.json()['sources'])
+    passed('m15_packaged_local_reasoning_recovers_after_model_outage_with_owned_source')
     response=session.delete(base+path+state['id']+'/',headers={'X-CSRFToken':session.cookies['csrftoken'],'Referer':base+path},timeout=15)
     assert response.status_code==204
     assert post('restore/',{})['restored']==0

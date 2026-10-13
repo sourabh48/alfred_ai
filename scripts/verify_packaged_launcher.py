@@ -108,6 +108,7 @@ def main():
             report["tray_removed_after_stop"] = removed != 0
             report["passed"] = report["passed"] and report["tray_removed_after_stop"]
         (data / "proof.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        (root / "artifacts/ops").mkdir(parents=True, exist_ok=True)
         (root / "artifacts/ops/packaged_launcher_verification.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report), flush=True)
     return 0 if report["passed"] else 1

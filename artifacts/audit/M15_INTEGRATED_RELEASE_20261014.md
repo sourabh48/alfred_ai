@@ -65,6 +65,23 @@ configuration/system/migration checks and a new package from this branch's
 committed source. Actual counts, build/review SHAs, hashes and evidence are recorded
 below after the gate and in the external integrated-release manifest.
 
+Corrected source 13ca4b4 final backend: 619 PASS, 470.416s. Development Chrome:
+15 PASS, 173.812s; no failures/skips. System/native configuration/drift PASS.
+Fresh r2 bundle: 10,895 inspected files; changed assets match and no private paths.
+Initial packaged drill reached 13 checks, then its rapid scripted request burst
+correctly hit the production per-account 429 limit during memory correction;
+the visible draft was preserved. Positive --memory fixtures now explicitly use
+bounded account budgets (512 API / 64 expensive), isolated to the synthetic test
+process/data directory. Production settings and the 619-test limiter regressions
+remain unchanged. This is not a rate-limit bypass in application source.
+The launcher completed its own proof and stopped cleanly, but failed to write
+the summary because this fresh worktree lacked artifacts/ops. The house verifier
+now creates the parent directory. A new native/launcher run is required before
+claiming packaged acceptance. The native drill also verifies grounded local
+reasoning after recovery from the deliberately missing model, with cloud disabled.
+These post-build changes affect host acceptance scripts only, not packaged runtime.
+Keep first-run logs/proofs/screenshots; never add partial checks to the final count.
+
 ## Recovery and main-folder promotion boundary
 
 Live master remains 30e0b3f75e785f639897ad36c19090c6a4e8675f. Its operator edits
