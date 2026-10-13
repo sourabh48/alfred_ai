@@ -1,5 +1,16 @@
 # M14 security release readiness - 2026-10-11
 
+Stable integration update: local master merged frozen 6050234 at ffe2b7c and
+added the native source-worker cwd regression correction at d84a5e5. Actual
+updated source gate: 357 backend / 12 Chrome / 19 native checks passed, zero
+failures/skips. A fresh DPAPI-restored private snapshot proves exactly family.0004
+pending, forward/rollback/replay and finance/family hash reconciliation PASS.
+Final integrated HEAD is recorded in the external stable-integration manifest;
+following documentation changes do not change the tested application tree.
+Live promotion remains AWAITING APPROVAL; no installed source/database/config/
+token/service change. Current-user encrypted backup and source restore verified;
+M15 remains isolated. See the updated existing controlled promotion plan.
+
 M14 DEVELOPMENT = COMPLETE
 M14 RELEASE READY = YES
 FINAL M14 INTEGRATION = PASS
