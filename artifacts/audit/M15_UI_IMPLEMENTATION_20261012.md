@@ -69,3 +69,33 @@ m15-ui-chrome/user-data/ui-b-memory-search-review-revocation.png reviewed PASS.
 AST update: 8461 nodes, 22156 edges, no semantic API cost. No new migration.
 Earlier failed test selectors/failure logs are retained; counts are actual runs,
 not overlapping sums. Next: UI-C canonical Decimal display and currency protection.
+
+## UI-C - 2026-10-13 COMPLETE
+
+Currency regressions reproduced unchecked dollar narratives beside canonical loan
+facts. Both local-first and consented/direct cloud-reasoning responses now withhold
+numeric financial/currency claims from prose; safe qualitative interpretation and
+source references remain. No generated figure can alter the independent source card.
+The guard is conservative: numeric financial explanations/examples are withheld,
+not marked verified merely because a model labels them hypothetical.
+
+Canonical baseline exposes additive Decimal strings before its legacy numeric API
+conversion. Loan closure uses the existing bounded HALF_UP money helper. Existing
+numeric fields, calculations, balances and records are unchanged. Missing evidence
+is unavailable rather than a displayed zero. BigInt/string formatting preserves cents
+for large figures and formats explicitly supplied INR/USD/EUR/GBP metadata consistently.
+Important existing limitation: financial models do NOT store per-record currency.
+Assistant source currency is therefore null/NOT RECORDED, never inferred from model
+text or OCR. Legacy dashboard retains its existing INR convention with an explicit
+label. This is not multi-currency accounting or a currency migration.
+
+Dashboard has a compact overview, financial-assistant/transaction/budget links,
+preserved canonical charts/totals and corrected dark-mode metric cards. Generated
+advice remains a hypothesis. Sources remain bounded owner memories/loan closure,
+canonical baseline and owner Travel preferences, not comprehensive document ingestion.
+
+Final related backend: 59 PASS, 46.787s (m15-ui-c-backend-final.log). Final Chrome:
+3 PASS, 28.129s (m15-ui-c-visual-gate.log). Zero final failures/skips. Screenshots
+ui-c-canonical-currency-narrative-protection.png and ui-c-finance-overview.png reviewed
+PASS under m15-ui-chrome/user-data. Earlier reproduction/fixture failure evidence
+preserved. No migration or new dependency. UI-D/E and final combined gate remain.

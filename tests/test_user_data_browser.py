@@ -200,6 +200,46 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(sync.status(owner)['revision'],2)
         self.capture('memory-encrypted-mock-sync-session')
 
+    def test_currency_source_cards_and_exact_decimal_formatting(self):
+        from unittest.mock import Mock
+        from selenium.webdriver.support.ui import Select
+        from decimal import Decimal
+        from datetime import date
+        from apps.loans.models import LoanClosureDocument,Loan
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-currency-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(); local.reason.return_value='Your verified closure cost $99.00 USD.'
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
+        owner=self.scenario['user']; loan=Loan.objects.filter(user=owner).first()
+        document=LoanClosureDocument.objects.create(loan=loan,file_name='synthetic-currency.pdf',closure_amount=Decimal('1000000.01'),closure_date=date(2026,1,2),verification_status='verified')
+        self.login()
+        fmt=lambda amount,currency:self.browser.execute_script('return Alfred.formatRecordedMoney(arguments[0])',{'amount':amount,'currency':currency,'evidence_status':'verified'})
+        self.assertEqual(fmt('1234567.89','INR'),'₹12,34,567.89 INR')
+        self.assertEqual(fmt('999999999999999.99','USD'),'$999,999,999,999,999.99 USD')
+        self.assertEqual(fmt('0.10','EUR'),'€0.10 EUR')
+        self.assertEqual(fmt('-0.50','GBP'),'-£0.50 GBP')
+        self.assertIn('Currency not recorded',fmt('1.00','UNKNOWN'))
+        self.assertEqual(fmt('NaN','INR'),'Amount unavailable')
+        self.assertEqual(self.browser.execute_script("return Alfred.formatRecordedMoney({amount:'0.00',currency:'INR',evidence_status:'unavailable'})"),'Financial evidence unavailable')
+        self.browser.get(self.live_server_url+'/ai/insights/')
+        self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'intelligenceDocument').find_elements(self.By.TAG_NAME,'option'))>1)
+        Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('documents')
+        Select(self.browser.find_element(self.By.ID,'intelligenceDocument')).select_by_value(str(document.pk))
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain my closure evidence')
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'Unsupported model figures' in self.text('intelligenceFeedback'))
+        self.assertNotIn('$99.00',self.text('intelligenceAnswers'))
+        self.assertIn('1,000,000.01 · Currency not recorded',self.text('intelligenceAnswers'))
+        self.assertIn('verified',self.text('intelligenceAnswers'))
+        self.capture('ui-c-canonical-currency-narrative-protection')
+        self.browser.get(self.live_server_url+'/')
+        self.wait.until(lambda _: self.text('dashboardSummaryCards'))
+        self.capture('ui-c-finance-overview')
+        self.memory_click('a[href="/ai/insights/?scope=finance#intelligencePanel"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_attribute('value')=='finance')
+
     def test_memory_search_candidate_review_and_selected_revocation(self):
         from selenium.webdriver.support.ui import Select
         from apps.ml_engine.services.persistent_memory import MemoryStore

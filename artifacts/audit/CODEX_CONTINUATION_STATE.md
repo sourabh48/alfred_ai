@@ -1,5 +1,25 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15-UI-C complete - canonical money presentation and narrative protection
+
+2026-10-13. ONLY F:/ALFRED_DEV/m15-ui / codex/m15-ui-integration-20261012.
+UI-A 0201e2f, UI-B 088a861ef4844ffba24c3cec93913201b5c11540. UI-C reproduces
+and suppresses unsupported model monetary/numeric claims at the response boundary,
+including direct optional reasoning. Additive canonical Decimal/source amounts,
+precision-safe INR/USD/EUR/GBP formatter, honest currency-unrecorded/unavailable
+states and improved dashboard preserve calculations/legacy numeric APIs. Current
+models have no currency code: do not claim multi-currency accounting. Dashboard
+uses its established INR convention explicitly; assistant never infers record currency.
+Related backend 59 PASS (46.787s); final Chrome 3 PASS (28.129s); no final failures/
+skips; actual source/overview screenshots reviewed PASS. AST-only update complete.
+See M15_UI_IMPLEMENTATION_20261012.md / isolated-tests/m15-ui-c-* evidence.
+Next UI-D: reuse Expense filtering, add supported Banking panel, scoped Loan/
+Investment table search and Travel preference/source access. Then UI-E fresh package
+and one actual combined gate. No migrations, live/private writes or real cloud/paid
+calls. Frozen candidates unchanged. Recovery/key/provider/installer/separate-PC/
+real-account acceptance pending; cancelled sealing remains cancelled.
+Exact next command: git -C F:/ALFRED_DEV/m15-ui status --short
+
 ## M15-UI-B complete - memory review, source links and honest provider status
 
 2026-10-13. ONLY F:/ALFRED_DEV/m15-ui / codex/m15-ui-integration-20261012.

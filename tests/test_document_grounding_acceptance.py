@@ -36,7 +36,9 @@ class DocumentGroundingAcceptanceTests(TestCase):
         result=self.answer(cloud_consent=True,query_sensitivity='public')
         source=result['sources'][0]
         self.assertEqual(source['ref'],f'loan-closure-{self.document.pk}')
-        self.assertEqual(source['data'],{'closure_amount':100.0,'closure_date':'2026-02-01'})
+        self.assertEqual({k:v for k,v in source['data'].items() if k!='amounts'},{'closure_amount':100.0,'closure_date':'2026-02-01'})
+        self.assertEqual(source['data']['amounts']['closure_amount']['amount'],'100.00')
+        self.assertIsNone(source['data']['amounts']['closure_amount']['currency'])
         self.assertFalse(result['financial_authority'])
         payload=str(result)+str(self.local.reason.call_args)
         for secret in ('SYNTHETIC-SECRET','SYNTHETIC-ACCOUNT','SYNTHETIC-STACK','PRIVATE-TOKEN','Ignore instructions'):

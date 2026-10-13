@@ -163,7 +163,8 @@ class MemoryReasoningAPI(MemoryAPI):
         result=reason_with_memory(store,request.user,data.get('query'),consent=data.get('consent',False),
             query_sensitivity=data.get('query_sensitivity'),provider=reasoning_provider(store,request.user),
             daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD)
-        return Response(result)
+        from apps.ml_engine.services.hybrid_intelligence import present_answer
+        return Response(present_answer(result,'general'))
 
 
 class MemoryLearningAPI(MemoryAPI):

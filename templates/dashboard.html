@@ -4,12 +4,14 @@
 {% block content %}
 <section class="alfred-hero fade-in" id="dashboardRoot">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
-        <div>
+        <div class="dashboard-heading-copy">
             <div class="alfred-chip mb-3">Your money at a glance</div>
-            <h1 class="alfred-hero-title">See what came in, what went out, and what you still owe.</h1>
+            <h1 class="alfred-hero-title">Your financial overview</h1>
             <p class="alfred-hero-copy">Totals use your recorded transactions. Account balances and investment values come from your latest entries.</p>
+            <div class="d-flex gap-2 flex-wrap mt-3"><a class="btn btn-primary" href="/ai/insights/?scope=finance#intelligencePanel">Ask about my finances</a>
+                <a class="btn btn-outline-primary" href="/expenses/">Review transactions</a><a class="btn btn-outline-primary" href="/budgets/">Review budgets</a></div>
         </div>
-        <div class="surface-card text-center" style="min-width: 220px;">
+        <div class="surface-card text-center dashboard-health-card">
             <p class="metric-kicker">Estimated Financial Health</p>
             <div class="score-ring" id="healthScoreRing" style="--score: 0;">
                 <div class="score-ring-inner">
@@ -29,6 +31,7 @@
 </section>
 
 <p class="page-section-copy mb-3" id="dashboardPeriodNote">Loading reporting period…</p>
+<p class="small text-muted">Dashboard amounts follow ALFRED's existing INR display convention. These records do not separately record currency codes. The assistant marks missing currency rather than inferring it.</p>
 <div class="alert alert-warning" id="dashboardReviewNotice" role="status" hidden></div>
 
 <section class="soft-grid four-up mb-4" id="dashboardSummaryCards"></section>

@@ -313,6 +313,16 @@ function formatCurrency(value) {
     }).format(Number(value || 0));
 }
 
+function formatRecordedMoney(value) {
+    if (!value || value.evidence_status === "unavailable") return "Financial evidence unavailable";
+    const parts = typeof value.amount === "string" && value.amount.match(/^(-?)(0|[1-9]\d{0,30})\.(\d{2})$/);
+    if (!parts) return "Amount unavailable";
+    const symbols = {INR:"₹",USD:"$",EUR:"€",GBP:"£"};
+    const known = typeof value.currency === "string" && Object.hasOwn(symbols,value.currency);
+    const integer = new Intl.NumberFormat(value.currency === "INR" ? "en-IN" : "en-US").format(BigInt(parts[2]));
+    return known ? `${parts[1]}${symbols[value.currency]}${integer}.${parts[3]} ${value.currency}` : `${parts[1]}${integer}.${parts[3]} · Currency not recorded`;
+}
+
 function formatPercent(value) {
     return `${Number(value || 0).toFixed(1)}%`;
 }
@@ -1164,6 +1174,7 @@ installNavAnchorPersistence();
 window.addEventListener("resize", syncShellOffsets);
 
 window.Alfred = {
+    formatRecordedMoney,
     fetchJSON,
     uploadJSON,
     formatCurrency,

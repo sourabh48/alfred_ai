@@ -73,7 +73,7 @@ def build_financial_intelligence(user) -> dict:
 def build_canonical_financial_baseline(user) -> dict:
     revision = _financial_revision(user)
     return materialize_payload(
-        namespace="financial-baseline",
+        namespace="financial-baseline-display-v1",
         user_id=user.id,
         revision=revision,
         ttl_seconds=45,
@@ -801,6 +801,14 @@ def _build_canonical_financial_baseline_uncached(
     }
     return {
         "reference_month": resolved_reference_date.strftime("%B %Y"),
+        "decimal_amounts": {
+            "monthly_income": format(monthly_income_amount, '.2f'),
+            "liquid_cash": format(liquid_cash_amount, '.2f'),
+            "recurring_emi_burden": format(recurring_emi_burden_amount, '.2f'),
+            "total_assets": format(total_assets_amount, '.2f'),
+            "total_liabilities": format(total_liabilities_amount, '.2f'),
+            "net_worth": format(net_worth_amount, '.2f'),
+        },
         "sample_months": len(recent_buckets),
         "monthly_income": _money_float(monthly_income_amount),
         "annual_income": _money_float(annual_income_amount),

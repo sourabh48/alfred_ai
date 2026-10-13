@@ -38,6 +38,8 @@ document.addEventListener("DOMContentLoaded", () => {
         updateScope();
     }
     scope.addEventListener("change", updateScope);
+    const requestedScope = new URLSearchParams(location.search).get("scope");
+    if (["finance","travel"].includes(requestedScope)) scope.value = requestedScope;
     query.addEventListener("keydown", event => {
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
     });
@@ -84,12 +86,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
                 }
                 if (source.data) Object.entries(source.data).forEach(([key, value]) => {
-                    if (key === "metric_states") return;
+                    if (key === "metric_states" || key === "amounts" || Object.hasOwn(source.data.amounts || {},key)) return;
                     const fact = document.createElement("p");
                     const monetary = source.classification === "canonical_financial_baseline" || key === "closure_amount";
                     const display = monetary && typeof value === "number" ? Alfred.formatCurrency(value) : (typeof value === "object" ? JSON.stringify(value) : String(value));
                     const state = source.data.metric_states?.[key]?.status;
                     fact.textContent = `${key.replaceAll("_", " ")}: ${display}${state ? ` (${state})` : ""}`;
+                    evidence.append(fact);
+                });
+                Object.entries(source.data?.amounts || {}).forEach(([key,value]) => {
+                    const fact = document.createElement("p"); fact.className = "recorded-amount";
+                    fact.textContent = `${key.replaceAll('_',' ')}: ${Alfred.formatRecordedMoney(value)} · ${value.evidence_status}`;
                     evidence.append(fact);
                 });
             });
@@ -101,8 +108,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 catch (error) { if (active && ticket===generation) feedback.textContent = error.message; reviewButton.disabled = false; }
             });
             assistantMessage.append(reviewButton);
+            reviewButton.hidden = Boolean(result.narrative_withheld);
             while (answers.children.length > 10) answers.firstElementChild.remove();
             feedback.textContent = result.retrieval_error?.detail || "Answer ready. Review the sources before acting.";
+            if (result.narrative_withheld) feedback.textContent = `Unsupported model figures were withheld. Only source-card amounts are shown. ${result.retrieval_error?.detail || ''}`;
             setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
             query.value = "";
             evidence.open = true;

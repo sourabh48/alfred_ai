@@ -46,6 +46,13 @@ h1, h2, h3, h4, h5, h6, .metric-value, .alfred-brand strong { font-family: inher
 .memory-card details { margin-block: .65rem; }
 .memory-card form label { display: block; }
 .memory-card[hidden] { display: none !important; }
+.dashboard-heading-copy { flex: 1 1 28rem; min-width: 0; }
+.dashboard-health-card { flex: 0 1 17rem; }
+.dashboard-health-card .score-ring { width: 100px; height: 100px; }
+.score-ring-inner { background: var(--alfred-surface-strong); }
+html[data-theme="dark"] .stats-card, html[data-theme="dark"] .glass-card, html[data-theme="dark"] .metric-card,
+html[data-theme="dark"] .dashboard-focus-card { background: #182b44; color: var(--alfred-ink); border-color: var(--alfred-stroke); }
+html[data-theme="dark"] .alfred-chip { color: #c9dfff; background: #294977; }
 @media (max-width: 767.98px) { #memoryRetentionForm { flex-wrap: wrap; } }
 html[data-theme="dark"] { color-scheme: dark; --alfred-ink: #e5edf8; --alfred-muted: #b0bfd3; --alfred-surface-strong: #182b44; --alfred-surface: #182b44; --alfred-stroke: #37506e; --bs-body-color: #e5edf8; --bs-body-bg: #182b44; --bs-secondary-color: #b0bfd3; --bs-border-color: #37506e; }
 html[data-theme="dark"] .alfred-body, html[data-theme="dark"] .alfred-sidebar { background: #0f1e32; }
