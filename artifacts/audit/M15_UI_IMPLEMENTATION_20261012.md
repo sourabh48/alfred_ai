@@ -124,3 +124,14 @@ UI-D COMPLETE after expanded sort/original-order/selected-row regressions. Initi
 4c9586a checkpoint preceded a stale-row test failure; it was not frozen or packaged.
 The follow-up retains live-refresh protection and reacquires refreshed rows, with
 passing evidence above. Prior failed gates remain preserved.
+
+## UI-E - 2026-10-14 COMPLETE
+
+Fresh native package build source 5596635; subsequent M14 ancestry merge changes
+audit docs only and 9a5290c changes a test label only. Runtime/static equality checked.
+Final combined backend 308 PASS (182.769s); development Chrome 14 PASS (151.079s);
+fresh packaged native 32 PASS, run 860fcd4a09, including six real browser flows;
+packaged launcher/progress/tray/no-system-Python/stop PASS. Zero final failures/skips.
+Configuration and drift PASS, no migrations. 10,895 bundle files/private exclusion/
+changed assets PASS. Actual packaged/source screenshots reviewed. No live changes,
+real provider/paid calls or recovery-key export. See M15_UI_RELEASE_CANDIDATE_20261014.md.

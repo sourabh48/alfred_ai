@@ -1,5 +1,24 @@
 # M15 hybrid intelligence development acceptance
 
+## Latest UI-integrated local release candidate - 2026-10-14
+
+M15-UI-A/B/C/D/E COMPLETE. Actual final gate: 308 backend PASS, 14 development
+Chrome PASS, fresh packaged 32 native checks PASS including six packaged browser
+flows, launcher/tray/stop PASS; zero final failures/skips. Configuration/drift PASS,
+no new migrations. Fresh bundle 10,895 files, no private paths, changed assets match.
+Build source 559663546184d1342d052913b5ed1e52bddaa2d1; later b801579 merges stable
+M14 ancestry/audit docs only (parser blobs already equal), and 9a5290c is test-only.
+Final candidate SHA and hashes are in isolated-tests/m15-ui-final-manifest.json.
+See M15_UI_RELEASE_CANDIDATE_20261014.md and M15_UI_IMPLEMENTATION_20261012.md.
+Runtime/source differences were explicitly checked, not assumed identical.
+Unsupported model monetary claims are withheld; canonical Decimal cards preserve
+cents. Record currency is absent and shown NOT RECORDED; no multi-currency accounting.
+M15 UI / PRODUCTION LIVE RELEASE READY remains NO: independent off-device archive/
+key recovery, real provider approval/acceptance, separate-PC, installer lifecycle and
+real-account browser acceptance remain pending. Real OpenAI disabled; no cloud/paid
+calls, live writes, source promotion, key export or restarted passphrase dialogs.
+The following packaged 232-test checkpoint is historical, not the current gate.
+
 ## Latest corrected packaged review - 2026-10-12
 
 Original frozen 03ab0aecdecda72dcb4db7866c46821e7c4264bf remains unchanged.

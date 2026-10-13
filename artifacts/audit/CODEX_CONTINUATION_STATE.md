@@ -1,5 +1,31 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15 UI candidate complete - local gate PASS, private promotion remains blocked
+
+2026-10-14. ONLY F:/ALFRED_DEV/m15-ui / codex/m15-ui-integration-20261012.
+UI-A/B/C/D/E COMPLETE. Build source 559663546184d1342d052913b5ed1e52bddaa2d1.
+Stable 30e0b3f ancestry merged at b801579; parser/test blobs already identical,
+so merge changes audit documents only. 9a5290c changes a native test label only.
+Current final review SHA/archive hashes recorded after this documentation commit
+in F:/ALFRED_DEV/isolated-tests/m15-ui-final-manifest.json; freeze review branch there.
+Actual final combined backend 308 PASS (182.769s); development Chrome 14 PASS
+(151.079s); packaged native 32 PASS, run 860fcd4a09, includes six packaged browser
+flows; launcher/tray/guide/no system Python/stop PASS. No final failures/skips.
+Configuration/drift PASS, no new migrations. Bundle 10,895 files, private exclusion/
+changed assets PASS; actual desktop/dark/390px/source/memory/module screenshots reviewed.
+Native test-label/row-selector failure evidence retained; disposable runtimes stopped.
+Reports: M15_UI_RELEASE_CANDIDATE_20261014.md, M15_UI_IMPLEMENTATION_20261012.md,
+M15_RELEASE_READINESS.md and isolated-tests/m15-ui-* logs/manifests. Do not add
+overlapping focused counts. Current models do not record currency: assistant does
+not infer it; generated figures are withheld, exact canonical amounts stay separate.
+Stable live 30e0b3f, frozen 03ab0ae/hardened 081e30e unchanged. No stable promotion,
+push, live/private writes, key/token changes, real cloud or paid OpenAI calls.
+M15 UI LIVE RELEASE READY NO: independent archive/key restore, provider approval/
+acceptance, separate-PC, installer and real-account acceptance pending. Backups
+preserved; cancelled passphrase workflow stays cancelled. Hold this candidate;
+later feature development must use a separate branch. Exact next safe command:
+git -C F:/ALFRED_DEV/m15-ui status --short
+
 ## Stable M14 ancestry integrated in UI development only
 
 2026-10-14. Merge stable 30e0b3f into the isolated UI branch. Its parser fix
