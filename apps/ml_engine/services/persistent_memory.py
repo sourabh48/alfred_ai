@@ -210,9 +210,16 @@ class MemoryStore:
             exists = db.execute('SELECT 1 FROM memory_keys WHERE id=? AND owner=?', (identity, owner)).fetchone()
             return self._revoke(db, owner, [identity]) if exists else 0
 
-    def reset_owner(self, user):
+    def reset_owner(self, user, *, identities=None):
         owner = _owner(user)
         with self._transaction() as db:
+            if identities is not None:
+                from .memory_sync import valid_id
+                if not isinstance(identities,list) or not 1<=len(identities)<=20 or any(not valid_id(i) for i in identities) or len(set(identities))!=len(identities):
+                    raise ValueError('Select between one and twenty distinct memories.')
+                if any(not db.execute('SELECT 1 FROM memory_keys WHERE id=? AND owner=?',(i,owner)).fetchone() for i in identities):
+                    raise MemoryConflict('Selected memory is no longer available.')
+                return self._revoke(db, owner, identities)
             db.execute('INSERT INTO owner_epochs(owner,epoch) VALUES(?,1) ON CONFLICT(owner) DO UPDATE SET epoch=epoch+1', (owner,))
             self._sync_dirty(db, owner)
             identities = [r[0] for r in db.execute('SELECT id FROM memory_keys WHERE owner=?', (owner,))]

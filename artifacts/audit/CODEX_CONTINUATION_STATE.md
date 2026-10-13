@@ -1,5 +1,23 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15-UI-B complete - memory review, source links and honest provider status
+
+2026-10-13. ONLY F:/ALFRED_DEV/m15-ui / codex/m15-ui-integration-20261012.
+UI-A commit 0201e2f08f991c5e08f0568272037fb9e9243c47. UI-B adds owner memory
+search/categories/provenance, proposal accept/reject, preserved correction drafts,
+atomic selected reset and nonresurrection, safe citations, explicit unverified AI
+proposal save, actual sync transfer/retry/conflict metadata and conservative budget
+reservation display. Real provider/OpenAI remain disabled; mock labels are explicit.
+110 related backend PASS (60.186s); final Chrome 4 PASS (46.985s); zero final
+failures/skips; screenshot review PASS; AST-only update PASS. Evidence in
+M15_UI_IMPLEMENTATION_20261012.md and F:/ALFRED_DEV/isolated-tests/m15-ui-b-*.
+No new migrations, dependencies, financial calculations, live writes or backup/key
+changes. UI-C next: inspect canonical amount boundaries, add Decimal money/source
+presentation and suppress unsupported model currency/numeric claims, then dashboard.
+Exact next command: git -C F:/ALFRED_DEV/m15-ui status --short
+UI-D/E and final combined/fresh-package gates pending. Recovery/key/provider,
+installer/separate-PC/real-account acceptance remain pending; no passphrase dialogs.
+
 ## M15-UI-A complete - isolated UI integration branch
 
 2026-10-12. Work ONLY F:/ALFRED_DEV/m15-ui, codex/m15-ui-integration-20261012,

@@ -42,3 +42,30 @@ fresh packaging remains UI-E, and the old package is not new-UI acceptance.
 All fixtures synthetic. No live source/database/key/backup mutation or real cloud calls.
 Independent off-device recovery/key portability remain PENDING; cancelled dialogs
 stay cancelled. Installer, separate-PC and real-account acceptance remain pending.
+
+## UI-B - 2026-10-13 COMPLETE
+
+Current encrypted memories have searchable/category-filtered cards, owner-confirmed
+labels, provenance/timestamps, immutable-ID corrections and atomic selected deletion
+(1–20 IDs). Any stale/foreign selection rejects the entire request. Other records
+and owners survive; selected memories cannot return through journal recovery.
+Suggestions remain inferred/unverified until explicitly checked; rejection reuses
+the existing owner-scoped revocation endpoint. Search and unrelated review actions
+preserve correction/candidate drafts. Existing stale-edit conflict handling stays intact.
+Source links point only to supported local records; answers can be explicitly saved
+as unverified local proposals. No automatic verified memory or financial mutation.
+
+Sync status shows actual transfer timestamp/retry state, encrypted pending batch and
+conflicts. Synthetic provider labels never imply real cloud success. Conflict merge
+uses the existing explicitly confirmed endpoint. Reasoning preferences keep real
+OpenAI disabled; usage is explicitly conservative reservations, not billing telemetry.
+No keys, raw provider errors or private diagnostic fields are returned.
+
+Focused related backend: 110 PASS, 60.186s, zero failures/skips
+(m15-ui-b-backend.log). Final Chrome: 4 PASS, 46.985s, zero failures/skips
+(m15-ui-b-gate.log), including search/review/selected revocation, verification,
+stale correction drafts and synthetic consent/budget fallback. Actual screenshot
+m15-ui-chrome/user-data/ui-b-memory-search-review-revocation.png reviewed PASS.
+AST update: 8461 nodes, 22156 edges, no semantic API cost. No new migration.
+Earlier failed test selectors/failure logs are retained; counts are actual runs,
+not overlapping sums. Next: UI-C canonical Decimal display and currency protection.

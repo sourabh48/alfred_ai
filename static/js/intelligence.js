@@ -78,6 +78,11 @@ document.addEventListener("DOMContentLoaded", () => {
             (result.sources || []).forEach(source => {
                 const reference = document.createElement("p"); reference.textContent = `Source: ${source.ref} · ${source.classification}`;
                 evidence.append(reference);
+                const types = {owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence"};
+                const description = document.createElement("p"); description.textContent = `${types[source.classification] || 'Source'} · ${source.verified_at ? `Checked ${new Date(source.verified_at).toLocaleString()}` : 'Verification timestamp not recorded'}`; evidence.append(description);
+                if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "")) {
+                    const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
+                }
                 if (source.data) Object.entries(source.data).forEach(([key, value]) => {
                     if (key === "metric_states") return;
                     const fact = document.createElement("p");
@@ -89,6 +94,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             });
             answers.append(row); empty.hidden = true;
+            const reviewButton = document.createElement("button"); reviewButton.type = "button"; reviewButton.className = "btn btn-outline-secondary btn-sm mt-3"; reviewButton.textContent = "Save answer as an unverified suggestion";
+            reviewButton.addEventListener("click", async () => {
+                reviewButton.disabled = true;
+                try { await Alfred.fetchJSON("/api/ai/memories/learning/",{method:"POST",body:JSON.stringify({action:"extract",text:result.answer.replaceAll("\n"," "),provenance:{source:"owner-proposed AI hypothesis",source_refs:(result.sources || []).map(source=>source.ref)},sensitivity:"sensitive"})}); if (active && ticket===generation) feedback.textContent = "Suggestion saved for review in AI Memory. It is not a verified fact."; }
+                catch (error) { if (active && ticket===generation) feedback.textContent = error.message; reviewButton.disabled = false; }
+            });
+            assistantMessage.append(reviewButton);
             while (answers.children.length > 10) answers.firstElementChild.remove();
             feedback.textContent = result.retrieval_error?.detail || "Answer ready. Review the sources before acting.";
             setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");

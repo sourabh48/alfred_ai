@@ -82,9 +82,9 @@ def before_restart(base,session,owner,data,passed):
 
         browser.get(base+'/settings/')
         wait.until(lambda _: 'quiet mountain hiking' in browser.find_element(By.ID,'memoryList').text)
-        click('#memoryList summary')
+        click('#memoryList details[data-memory-correction] summary')
         entry=browser.find_element(By.CSS_SELECTOR,'#memoryList textarea'); entry.clear(); entry.send_keys('I prefer quiet mountain walking in the early morning.')
-        click('#memoryList input[type=checkbox]'); click('#memoryList form button')
+        click('#memoryList details[data-memory-correction] input[type=checkbox]'); click('#memoryList form button')
         wait.until(lambda _: 'Verified correction saved.' in browser.find_element(By.ID,'memoryFeedback').text)
         browser.save_screenshot(str(data/'m15-correction.png'))
         passed('m15_packaged_chrome_verified_correction')

@@ -103,4 +103,5 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,cloud_cons
     return {'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
         'memory_retrieval_available':retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
+            'url':f"/settings/#memory-{item['id']}",'verified_at':item['verified_at'],
             'score':item['score']} for item in included]+tools,'context_omitted':len(memories)-len(included)}

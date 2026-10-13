@@ -159,7 +159,7 @@ class MemorySynchronizer:
     def status(self,user):
         with self.store._transaction() as db:
             state=self.store._sync_state(db,_owner(user))
-            return {k:state[k] for k in ('enabled','pending','revision','conflict','failures')}
+            return {k:state[k] for k in ('enabled','pending','revision','conflict','failures')} | {'retry_at':state['retry_at'],'last_success_at':state.get('last_success_at')}
 
     def export_checkpoint(self,user,*,confirm=False):
         if confirm is not True: raise PermissionError('Explicit recovery checkpoint export confirmation is required.')
@@ -351,7 +351,7 @@ class MemorySynchronizer:
                 with self.store._transaction(timeout=remaining(deadline)) as db:
                     latest=self.store._sync_state(db,owner)
                     if digest(self._snapshot(db,owner))!=fingerprint: raise SyncConflict('Local memory changed during acknowledgement.')
-                    latest.update(revision=revision,identity=head['identity'],ack=fingerprint,pending=False,failures=0,retry_at=0,conflict=False)
+                    latest.update(revision=revision,identity=head['identity'],ack=fingerprint,pending=False,failures=0,retry_at=0,conflict=False,last_success_at=time.time())
                     self.store._write_sync_state(db,owner,latest)
                 return 'current'
             if revision>state['revision'] and dirty and not recover:
@@ -369,7 +369,7 @@ class MemorySynchronizer:
                     if digest(self._snapshot(db,owner))!=fingerprint: raise SyncConflict('Local memory changed during download.')
                     self._apply(db,owner,remote)
                     applied=digest(self._snapshot(db,owner))
-                    latest.update(revision=revision,identity=head['identity'],ack=digest(remote),pending=applied!=digest(remote),failures=0,retry_at=0,conflict=False)
+                    latest.update(revision=revision,identity=head['identity'],ack=digest(remote),pending=applied!=digest(remote),failures=0,retry_at=0,conflict=False,last_success_at=time.time())
                     self.store._write_sync_state(db,owner,latest)
                 return 'downloaded'
             if recover and remote:
@@ -408,7 +408,7 @@ class MemorySynchronizer:
                 if recover and not changed: self._apply(db,owner,local)
                 applied=digest(self._snapshot(db,owner))
                 latest.update(revision=published['revision'],identity=identity,ack=digest(local),
-                    pending=changed or applied!=digest(local),failures=0,retry_at=0,conflict=False)
+                    pending=changed or applied!=digest(local),failures=0,retry_at=0,conflict=False,last_success_at=time.time())
                 self.store._write_sync_state(db,owner,latest)
             return 'uploaded'
         except Exception as exc:

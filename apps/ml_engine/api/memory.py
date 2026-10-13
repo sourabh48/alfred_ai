@@ -91,9 +91,10 @@ class MemoryRetentionAPI(MemoryAPI):
 
 class MemoryResetAPI(MemoryAPI):
     def post(self, request):
-        if self.payload(('confirm',)).get('confirm') is not True:
+        data = self.payload(('confirm','ids'))
+        if data.get('confirm') is not True or ('ids' in data and data['ids'] is None):
             raise ValueError()
-        return Response({'deleted': memory_store().reset_owner(request.user)})
+        return Response({'deleted': memory_store().reset_owner(request.user, identities=data.get('ids'))})
 
 
 class MemoryRestoreAPI(MemoryAPI):
@@ -141,7 +142,14 @@ class MemoryReasoningAPI(MemoryAPI):
         with store._transaction() as db: state=store._sync_state(db,_owner(request.user))
         policy=state.get('reasoning_policy',{'enabled':False,'public_only':True,
             'daily_tokens':settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,'daily_microusd':settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD})
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).date().isoformat()
+        ledger = state.get('reasoning',{})
+        usage = {'day':today,'reserved_tokens':0,'reserved_microusd':0,'basis':'conservative_reservation'}
+        if ledger.get('day') == today:
+            usage.update(reserved_tokens=ledger.get('reserved',0),reserved_microusd=ledger.get('reserved_microusd',0))
         return Response({'policy':policy,'real_provider_enabled':bool(real_reasoning_authorized()),
+            'usage':usage,
             'provider_available':bool(settings.ALFRED_MEMORY_MOCK_REASONING or (real_reasoning_authorized() and state.get('openai_key')))})
 
     def put(self,request):

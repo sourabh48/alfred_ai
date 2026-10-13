@@ -121,12 +121,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(verified['status'],200); identity=verified['data']['id']
         self.browser.refresh(); self.wait.until(lambda _: 'synthetic mountain' in self.text('memoryList'))
         self.assertFalse(self.browser.execute_script('return Boolean(window.memoryLeak)'))
-        self.memory_click('#memoryList summary')
+        self.memory_click('#memoryList details[data-memory-correction] summary')
         correction=self.browser.find_element(self.By.CSS_SELECTOR,'#memoryList textarea')
         correction.clear(); correction.send_keys('synthetic corrected hiking preference')
         self.memory_click('#memoryList form button')
         self.assertEqual(store.list_memories(owner)[0]['id'],identity)
-        self.memory_click('#memoryList input[type="checkbox"]')
+        self.memory_click('#memoryList details[data-memory-correction] input[type="checkbox"]')
         self.memory_click('#memoryList form button')
         self.wait.until(lambda _: self.text('memoryFeedback')=='Verified correction saved.')
         self.wait.until(lambda _: 'synthetic corrected hiking preference' in self.text('memoryList'))
@@ -154,10 +154,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         original=store.save_verified(owner,{'statement':'synthetic original'}, {'source':'synthetic owner review'},verified=True)
         self.login(); self.browser.get(self.live_server_url+'/settings/')
         self.wait.until(lambda _: 'synthetic original' in self.text('memoryList'))
-        self.memory_click('#memoryList summary')
+        self.memory_click('#memoryList details[data-memory-correction] summary')
         correction=self.browser.find_element(self.By.CSS_SELECTOR,'#memoryList textarea')
         correction.clear(); correction.send_keys('synthetic stale draft <img src=x onerror="window.memoryLeak=true">')
-        self.memory_click('#memoryList input[type="checkbox"]')
+        self.memory_click('#memoryList details[data-memory-correction] input[type="checkbox"]')
         winner=MemoryLearning(store).revise(owner,[original],{'statement':'synthetic current winner'},verified=True)
         self.memory_click('#memoryList form button')
         self.wait.until(lambda _: 'Memory changed.' in self.text('memoryFeedback'))
@@ -199,6 +199,54 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         sync=MemorySynchronizer(store,MockCloudProvider(root/'mock'))
         self.assertEqual(sync.status(owner)['revision'],2)
         self.capture('memory-encrypted-mock-sync-session')
+
+    def test_memory_search_candidate_review_and_selected_revocation(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.memory_learning import MemoryLearning
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-ui-review-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        store=MemoryStore(root/'vault'); owner=self.scenario['user']; learning=MemoryLearning(store)
+        first=store.save_verified(owner,{'statement':'synthetic mountain hiking','category':'Travel'},{'source':'synthetic checked itinerary'},verified=True)
+        second=store.save_verified(owner,{'statement':'synthetic quiet evenings','category':'Preferences'},{'source':'synthetic owner'},verified=True)
+        accept=learning.extract(owner,'synthetic preference to review',{'source':'synthetic hypothesis'})[0]
+        reject=learning.extract(owner,'synthetic incorrect suggestion',{'source':'synthetic hypothesis'})[0]
+        foreign=get_user_model().objects.create_user(username='synthetic-ui-review-other')
+        learning.extract(foreign,'FOREIGN-UI-CANDIDATE',{'source':'synthetic other'})
+        self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
+        self.wait.until(lambda _: 'mountain hiking' in self.text('memoryList') and 'NEEDS REVIEW' in self.text('memoryCandidates'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'#sidebarMenu a[href="/settings/#privateMemoryPanel"]').get_attribute('aria-current'),'page')
+        self.assertNotIn('FOREIGN-UI-CANDIDATE',self.text('privateMemoryPanel'))
+        Select(self.browser.find_element(self.By.ID,'memoryCategory')).select_by_value('Travel')
+        self.assertIn('1 of 2',self.text('memoryCount'))
+        self.assertNotIn('quiet evenings',self.text('memoryList'))
+        self.memory_click(f'#memory-{first} details[data-memory-correction] summary')
+        correction=self.browser.find_element(self.By.CSS_SELECTOR,f'#memory-{first} details[data-memory-correction] textarea')
+        correction.clear(); correction.send_keys('synthetic unsaved correction')
+        search=self.browser.find_element(self.By.ID,'memorySearch'); search.send_keys('no such fact')
+        self.assertIn('0 of 2',self.text('memoryCount')); search.clear(); search.send_keys('mountain')
+        self.assertEqual(correction.get_attribute('value'),'synthetic unsaved correction')
+        search.clear(); Select(self.browser.find_element(self.By.ID,'memoryCategory')).select_by_value('')
+        accept_row=f'#memoryCandidates [data-candidate-id="{accept}"]'
+        self.memory_click(accept_row+' input[type=checkbox]'); self.memory_click(accept_row+' button[type=submit]')
+        self.wait.until(lambda _: 'User-confirmed memory saved' in self.text('memoryFeedback'))
+        self.assertEqual(len(store.list_memories(owner)),3)
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,f'#memory-{first} details[data-memory-correction] textarea').get_attribute('value'),'synthetic unsaved correction')
+        self.memory_click(f'#memoryCandidates [data-candidate-id="{reject}"] button[type=button]')
+        self.wait.until(lambda _: 'Suggestion rejected' in self.text('memoryFeedback'))
+        self.assertEqual(learning.candidates(owner),[])
+        self.memory_click(f'#memory-{first} input[data-memory-select]'); self.memory_click('#memorySelectedReset')
+        self.wait.until(lambda driver: driver.switch_to.alert); self.browser.switch_to.alert.accept()
+        self.wait.until(lambda _: '1 selected memories deleted' in self.text('memoryFeedback'))
+        store.restore_owner(owner)
+        self.assertNotIn(first,{r['id'] for r in store.list_memories(owner)})
+        self.assertIn(second,{r['id'] for r in store.list_memories(owner)})
+        self.assertIn('OpenAI disabled',self.text('memoryReasoningStatus'))
+        self.assertIn('Billing measurements are unavailable',self.text('memoryReasoningUsage'))
+        self.browser.execute_script("document.getElementById('privateMemoryPanel').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('ui-b-memory-search-review-revocation')
 
     def test_assistant_responsive_keyboard_retry_and_new_conversation(self):
         from unittest.mock import Mock

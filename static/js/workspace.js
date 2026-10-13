@@ -14,7 +14,14 @@ document.addEventListener("DOMContentLoaded", () => {
         setTheme(dark);
         try { localStorage.setItem("alfred.appearance", dark ? "dark" : "light"); } catch (_) { /* Theme still applies. */ }
     });
-    document.querySelectorAll("#sidebarMenu .nav-link.active").forEach(link => link.setAttribute("aria-current", "page"));
+    function markNavigation() {
+        const memory = location.pathname === "/settings/" && /^#(?:privateMemoryPanel|memoryReviewPanel|memory-[a-f0-9]{32})$/.test(location.hash);
+        document.querySelectorAll("#sidebarMenu .nav-link").forEach(link => {
+            if (location.pathname === "/settings/" && link.getAttribute("href").startsWith("/settings/")) link.classList.toggle("active", memory ? link.hash === "#privateMemoryPanel" : !link.hash);
+            if (link.classList.contains("active")) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
+        });
+    }
+    markNavigation(); window.addEventListener("hashchange", markNavigation);
     const menu = document.getElementById("sidebarMenu");
     document.addEventListener("keydown", event => {
         if (event.key === "Escape" && menu) {

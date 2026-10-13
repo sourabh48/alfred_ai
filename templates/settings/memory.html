@@ -1,6 +1,7 @@
 <section class="surface-card mb-4" id="privateMemoryPanel">
-    <h2 class="page-section-title mb-1">Private Memory</h2>
-    <p class="page-section-copy">Verified memories stay on this computer. Connected family members cannot read them. Deleting a memory also revokes journal recovery of it.</p>
+    <div class="conversation-header mb-3"><div><span class="workspace-badge">Encrypted · owner only</span>
+        <h2 class="page-section-title mt-2 mb-1">AI Memory</h2></div><a href="/ai/insights/" class="btn btn-outline-primary">Ask ALFRED</a></div>
+    <p class="page-section-copy">Memories are encrypted locally. Separately consented encrypted sync can back them up. Connected family members cannot read them. Deleting a memory revokes its current journal recovery.</p>
     <p class="page-section-copy">Retention runs whenever memories are accessed and at local startup. Old recovery backups retain their original data and must be retired separately.</p>
     <form id="memoryRetentionForm" class="d-flex align-items-end gap-3 mb-3" data-live-refresh-hold="true">
         <div><label for="memoryRetentionDays" class="form-label">Keep memories for (days)</label>
@@ -8,7 +9,17 @@
         <button class="btn btn-outline-primary" type="submit">Save Retention</button>
     </form>
     <div id="memoryFeedback" role="status" aria-live="polite"></div>
+    <div class="conversation-options mt-3">
+        <div><label for="memorySearch" class="form-label">Search saved memories</label><input id="memorySearch" class="form-control" type="search" autocomplete="off" placeholder="Find a fact or source"></div>
+        <div><label for="memoryCategory" class="form-label">Category</label><select id="memoryCategory" class="form-select"><option value="">All categories</option></select></div>
+    </div>
+    <p id="memoryCount" role="status" class="small text-muted mt-2"></p>
+    <button id="memorySelectedReset" class="btn btn-outline-danger" type="button" disabled>Delete selected memories</button>
     <div id="memoryList" class="data-stack my-3"></div>
+    <section class="mt-4" id="memoryReviewPanel"><h3 class="h5">Suggested memories · needs review</h3>
+        <p class="small text-muted">Suggestions are inferred and excluded from verified retrieval. Check a suggestion before accepting it. Superseded and expired records are removed from the active list.</p>
+        <div id="memoryCandidates" class="data-stack mb-3"></div>
+    </section>
     <button id="memoryRefreshButton" class="btn btn-outline-secondary mb-3" type="button">Refresh Memories</button>
     <form id="memoryEvaluationForm" class="mb-3" data-live-refresh-hold="true">
         <h3 class="h5">Check Memory Retrieval</h3>
@@ -23,16 +34,20 @@
     <button id="memoryResetButton" class="btn btn-outline-danger" type="button">Reset My Memories</button>
     <h3 class="h5 mt-4">Encrypted Memory Synchronization</h3>
     <p id="memorySyncStatus" role="status" aria-live="polite">Checking local synchronization status.</p>
+    <p id="memorySyncDetails" class="small text-muted"></p>
     <form id="memorySyncForm" data-live-refresh-hold="true">
         <label class="d-block mb-2"><input id="memorySyncEnabled" type="checkbox" disabled> Allow encrypted synchronization with my approved storage provider.</label>
         <button class="btn btn-outline-primary" type="submit" disabled>Save Sync Consent</button>
         <button id="memorySyncNow" class="btn btn-outline-secondary" type="button" disabled>Sync Now</button>
+        <button id="memorySyncRecover" class="btn btn-outline-warning" type="button" hidden>Review & merge conflict</button>
     </form>
     <p>Provider connection requires separate operator authorization and recoverable keys. Old backups can retain deleted memories. Recovery material stays separate from cloud objects.</p>
     <h3 class="h5 mt-4">Optional Public Cloud Reasoning</h3>
     <p id="memoryReasoningStatus" role="status">Checking local reasoning policy.</p>
+    <p id="memoryReasoningUsage" class="small text-muted"></p>
     <form id="memoryReasoningForm" data-live-refresh-hold="true">
-        <label class="d-block mb-2"><input id="memoryReasoningEnabled" type="checkbox"> Allow approved cloud reasoning for public questions. Each request still needs consent.</label>
+        <label class="d-block mb-2"><input id="memoryReasoningEnabled" type="checkbox"> Opt in to approved cloud reasoning for public questions. Leave unchecked for local-only answers.</label>
+        <p class="small text-muted">Saving this preference does not activate OpenAI. Real access needs separate operator authorization and each cloud question needs consent. Personal and sensitive questions stay local.</p>
         <label for="memoryReasoningTokens" class="form-label">Daily token limit</label>
         <input id="memoryReasoningTokens" class="form-control mb-2" type="number" min="1" max="65536" required>
         <label for="memoryReasoningDollars" class="form-label">Daily spending limit (USD)</label>
