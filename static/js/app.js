@@ -273,10 +273,11 @@ function installNavAnchorPersistence() {
 }
 
 function fetchJSON(url, options = {}) {
+    const {onResponse, ...requestOptions} = options;
     const config = {
         credentials: "same-origin",
         headers: { ...(options.headers || {}) },
-        ...options,
+        ...requestOptions,
     };
 
     if (!(config.body instanceof FormData) && !config.headers["Content-Type"] && config.body) {
@@ -298,6 +299,7 @@ function fetchJSON(url, options = {}) {
                 error.reference = payload.error_id;
                 throw error;
             }
+            if (typeof onResponse === "function") onResponse(response);
             return payload;
         })
         .finally(() => {

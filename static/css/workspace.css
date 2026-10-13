@@ -53,6 +53,16 @@ h1, h2, h3, h4, h5, h6, .metric-value, .alfred-brand strong { font-family: inher
 html[data-theme="dark"] .stats-card, html[data-theme="dark"] .glass-card, html[data-theme="dark"] .metric-card,
 html[data-theme="dark"] .dashboard-focus-card { background: #182b44; color: var(--alfred-ink); border-color: var(--alfred-stroke); }
 html[data-theme="dark"] .alfred-chip { color: #c9dfff; background: #294977; }
+html[data-theme="dark"] .table { --bs-table-color: #e5edf8; --bs-table-bg: #182b44; --bs-table-border-color: #37506e; }
+html[data-theme="dark"] .modal-content, html[data-theme="dark"] .travel-session-list > * { background: #182b44; color: var(--alfred-ink); }
+html[data-theme="dark"] .text-dark { color: #e5edf8 !important; }
+html[data-theme="dark"] .text-success { color: #8de2b9 !important; }
+html[data-theme="dark"] .text-danger { color: #ffb8c1 !important; }
+html[data-theme="dark"] .bg-light { background: #203751 !important; color: #e5edf8 !important; }
+html[data-theme="dark"] .form-control::file-selector-button { background: #294977 !important; color: #fff !important; }
+.table-alfred th { font-size: .8rem; color: var(--alfred-muted); }
+.table-alfred td { vertical-align: middle; }
+tr[hidden] { display: none !important; }
 @media (max-width: 767.98px) { #memoryRetentionForm { flex-wrap: wrap; } }
 html[data-theme="dark"] { color-scheme: dark; --alfred-ink: #e5edf8; --alfred-muted: #b0bfd3; --alfred-surface-strong: #182b44; --alfred-surface: #182b44; --alfred-stroke: #37506e; --bs-body-color: #e5edf8; --bs-body-bg: #182b44; --bs-secondary-color: #b0bfd3; --bs-border-color: #37506e; }
 html[data-theme="dark"] .alfred-body, html[data-theme="dark"] .alfred-sidebar { background: #0f1e32; }

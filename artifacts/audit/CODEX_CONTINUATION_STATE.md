@@ -1,5 +1,23 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## M15-UI-D module polish checkpoint - fresh package next
+
+2026-10-14. Work ONLY F:/ALFRED_DEV/m15-ui / codex/m15-ui-integration-20261012.
+UI-A 0201e2f, UI-B 088a861, UI-C ab3476907813b59bfb6b5c3c6033b07a9d027938.
+UI-D adds real owner Banking view/paging/refresh/masking/unknown balance states,
+displayed Loan/Investment search/name sort with original-order/selection protection,
+Travel preference recall and shared dark table/form/chart fixes. Expense imports,
+upload budgets, fingerprints, API contracts and canonical calculations unchanged.
+Related backend 26 PASS (21.970s). Final Chrome log m15-ui-d-verified.log includes
+new banking/filter flow, projection, safe loan diagnostics/reimport and desktop/
+mobile saved Travel plan. Screenshots reviewed under isolated-tests/m15-ui-chrome.
+See M15_UI_IMPLEMENTATION_20261012.md for actual counts and known limitations.
+Next: freeze tested source, fresh UI-E build via isolated-tests/m15-ui-build.ps1,
+one combined backend/development Chrome gate, fresh packaged browser/native/config
+acceptance. No live/private writes, migrations or cloud/paid calls. Recovery/key,
+real provider, installer/separate-PC/real-account acceptance remain pending.
+Exact next command: git -C F:/ALFRED_DEV/m15-ui status --short
+
 ## M15-UI-C complete - canonical money presentation and narrative protection
 
 2026-10-13. ONLY F:/ALFRED_DEV/m15-ui / codex/m15-ui-integration-20261012.

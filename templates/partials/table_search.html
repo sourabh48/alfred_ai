@@ -1,0 +1,7 @@
+<div class="conversation-options mb-3" data-table-controls="{{ table_id }}">
+    <div><label class="form-label" for="{{ table_id }}Search">Search displayed {{ table_label }}</label>
+        <input id="{{ table_id }}Search" class="form-control" type="search" autocomplete="off"></div>
+    <div><label class="form-label" for="{{ table_id }}Sort">Order displayed records</label>
+        <select id="{{ table_id }}Sort" class="form-select"><option value="">Original order</option><option value="asc">Name / label A–Z</option><option value="desc">Name / label Z–A</option></select></div>
+    <p class="small text-muted mb-0" role="status" data-table-count></p>
+</div>

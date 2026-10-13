@@ -75,12 +75,14 @@ def inspect_bundle(bundle):
             raise RuntimeError(f"Private runtime path found in release: {relative}")
         files.append(path)
     for name in ("career/list.html", "integrations/credit_score.html", "mobility/dashboard.html",
-                 "mobility/planner.html", "mobility/preferences.html", "ai_insights.html", "settings/memory.html"):
+                 "mobility/planner.html", "mobility/preferences.html", "ai_insights.html", "settings/memory.html",
+                 "base.html", "partials/navbar.html", "partials/sidebar.html", "partials/table_search.html",
+                 "dashboard.html", "expenses/list.html", "loans/list.html", "investments/list.html"):
         if digest(bundle / "_internal/templates" / name) != digest(ROOT / "templates" / name):
             raise RuntimeError(f"Bundled template is stale: {name}")
     if digest(bundle / "_internal/static/alfred.ico") != digest(ROOT / "static/alfred.ico"):
         raise RuntimeError("Bundled Windows icon is stale")
-    for name in ("js/travel_planner.js", "js/travel_research_panels.js", "js/travel_preferences.js", "js/mobility.js", "js/intelligence.js", "js/memory.js", "js/workspace.js", "css/workspace.css", "css/travel_planner.css", "vendor/leaflet/leaflet.js", "vendor/leaflet/leaflet.css", "vendor/leaflet/LICENSE"):
+    for name in ("js/app.js", "css/style.css", "js/travel_planner.js", "js/travel_research_panels.js", "js/travel_preferences.js", "js/mobility.js", "js/intelligence.js", "js/memory.js", "js/workspace.js", "css/workspace.css", "css/travel_planner.css", "vendor/leaflet/leaflet.js", "vendor/leaflet/leaflet.css", "vendor/leaflet/LICENSE"):
         if digest(bundle / "_internal/static" / name) != digest(ROOT / "static" / name):
             raise RuntimeError(f"Bundled travel asset is stale: {name}")
     return files

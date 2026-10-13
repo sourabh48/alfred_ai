@@ -200,6 +200,56 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(sync.status(owner)['revision'],2)
         self.capture('memory-encrypted-mock-sync-session')
 
+    def test_module_navigation_banking_pagination_and_loaded_record_filters(self):
+        from selenium.webdriver.common.keys import Keys
+        from apps.expenses.models import BankAccount
+        from apps.loans.models import Loan
+        from datetime import date
+        owner=self.scenario['user']; foreign=get_user_model().objects.create_user(username='synthetic-banking-other')
+        BankAccount.objects.create(user=foreign,bank_name='FOREIGN-BANK-NOT-VISIBLE',account_number='987654321000',current_balance=999)
+        for index in range(27):
+            BankAccount.objects.create(user=owner,bank_name=f'Synthetic Bank {index:02d}',account_number=f'10000000{index:04d}',current_balance=None if index==0 else 0)
+        Loan.objects.create(user=owner,loan_type='personal',lender='Zebra Synthetic Loan',principal=1000,remaining_balance=1000,emi=100,
+            interest_rate=5,tenure_months=10,start_date=date(2026,1,1))
+        self.login(); self.browser.get(self.live_server_url+'/expenses/#bankAccountsPanel')
+        self.wait.until(lambda _: 'owned accounts' in self.text('bankAccountsStatus'))
+        self.assertNotIn('FOREIGN-BANK-NOT-VISIBLE',self.text('bankAccountsPanel'))
+        self.assertIn('Balance unavailable',self.text('bankAccountsBody'))
+        self.assertIn('****0000',self.text('bankAccountsBody'))
+        self.assertNotIn('100000000000',self.text('bankAccountsBody'))
+        self.memory_click('#bankAccountsNext')
+        self.wait.until(lambda _: 'page 2' in self.text('bankAccountsStatus'))
+        self.assertTrue(self.browser.find_element(self.By.ID,'bankAccountsPrevious').is_enabled())
+        self.capture('ui-d-banking-owned-pagination')
+        self.browser.get(self.live_server_url+'/loans/')
+        self.wait.until(lambda _: 'Zebra Synthetic Loan' in self.text('loanTableBody'))
+        search=self.browser.find_element(self.By.ID,'loanTableBodySearch'); search.send_keys('Zebra')
+        self.assertIn('1 matching',self.browser.find_element(self.By.CSS_SELECTOR,'[data-table-controls="loanTableBody"] [data-table-count]').text)
+        self.assertIn('Zebra',self.text('loanTableBody'))
+        self.browser.execute_script("document.querySelector('[data-table-controls=loanTableBody]').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('ui-d-loan-filter')
+        search.send_keys(Keys.CONTROL,'a',Keys.BACKSPACE)
+        original=[row.text for row in self.browser.find_elements(self.By.CSS_SELECTOR,'#loanTableBody tr')]
+        from selenium.webdriver.support.ui import Select
+        Select(self.browser.find_element(self.By.ID,'loanTableBodySort')).select_by_value('desc')
+        self.assertIn('Zebra',self.browser.find_elements(self.By.CSS_SELECTOR,'#loanTableBody tr')[0].text)
+        Select(self.browser.find_element(self.By.ID,'loanTableBodySort')).select_by_value('')
+        self.assertEqual([row.text for row in self.browser.find_elements(self.By.CSS_SELECTOR,'#loanTableBody tr')],original)
+        self.memory_click('#loanTableBody input[type=checkbox]')
+        search.send_keys('NO-MATCH-SYNTHETIC')
+        self.assertIn('selected records retained',self.browser.find_element(self.By.CSS_SELECTOR,'[data-table-controls="loanTableBody"] [data-table-count]').text)
+        self.browser.get(self.live_server_url+'/investments/')
+        self.wait.until(lambda _: self.text('investmentPositionsBody'))
+        search=self.browser.find_element(self.By.ID,'investmentPositionsBodySearch'); search.send_keys('NO-MATCH-SYNTHETIC')
+        self.assertEqual(self.text('investmentPositionsBody'),'')
+        self.assertIn('0 matching',self.browser.find_element(self.By.CSS_SELECTOR,'[data-table-controls="investmentPositionsBody"] [data-table-count]').text)
+        self.browser.execute_script("document.querySelector('[data-table-controls=investmentPositionsBody]').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('ui-d-investment-empty-filter')
+        self.browser.get(self.live_server_url+'/mobility/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerComposer').is_displayed())
+        self.memory_click('a[href="/ai/insights/?scope=travel#intelligencePanel"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_attribute('value')=='travel')
+
     def test_currency_source_cards_and_exact_decimal_formatting(self):
         from unittest.mock import Mock
         from selenium.webdriver.support.ui import Select

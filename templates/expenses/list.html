@@ -204,6 +204,13 @@
     </div>
 </div>
 
+<section class="surface-card mb-4" id="bankAccountsPanel">
+    <div class="conversation-header mb-3"><div><h2 class="page-section-title">Banking</h2><p class="small text-muted mb-0">Your recorded accounts and balances. Display uses the existing INR convention; unknown balances remain unavailable.</p></div>
+        <button id="bankAccountsRefresh" class="btn btn-outline-primary" type="button">Refresh accounts</button></div>
+    <p id="bankAccountsStatus" role="status" aria-live="polite">Loading your accounts.</p>
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Owned bank accounts"><table class="table table-alfred"><thead><tr><th>Account</th><th>Reference</th><th>Type</th><th>Recorded balance</th><th>Status</th></tr></thead><tbody id="bankAccountsBody"></tbody></table></div>
+    <div class="d-flex gap-2"><button id="bankAccountsPrevious" class="btn btn-outline-secondary" type="button" disabled>Previous page</button><button id="bankAccountsNext" class="btn btn-outline-secondary" type="button" disabled>Next page</button></div>
+</section>
 {% include "expenses/modal_add.html" %}
 <script src="/static/js/expenses.js?v=3.5"></script>
 </div>

@@ -99,3 +99,24 @@ Final related backend: 59 PASS, 46.787s (m15-ui-c-backend-final.log). Final Chro
 ui-c-canonical-currency-narrative-protection.png and ui-c-finance-overview.png reviewed
 PASS under m15-ui-chrome/user-data. Earlier reproduction/fixture failure evidence
 preserved. No migration or new dependency. UI-D/E and final combined gate remain.
+
+## UI-D - 2026-10-14
+
+Banking is now supported at /expenses/#bankAccountsPanel using existing owner-only
+accounts API and its pagination headers: masked references, null/zero distinction,
+recorded-balance labels, actual paging and refresh. No banking writes or new route.
+Loan/Investment search and name ordering cover displayed records; original order
+is restorable. Selected loans stay visible through filtering, and keyboard focus
+is preserved. Existing Expense search/date filters and upload progress remain;
+safe 413 handling was extended in the shared request helper. Travel preference
+recall links to the existing owner-scoped assistant; planner routes/history and
+provider freshness distinctions remain unchanged. Shared dark tables/forms/charts,
+local fonts and versioned script references cover existing module pages.
+
+Related backend 26 PASS (21.970s), zero failures/skips, m15-ui-d-backend.log.
+Chrome result and final evidence are recorded in m15-ui-d-verified.log. Actual
+banking/loan/investment screenshots reviewed under m15-ui-chrome/user-data/ui-d-*.
+No new migration, dependency, financial calculation or real provider call. Package
+inspection now verifies changed base/partials/module templates and shared scripts.
+UI-E fresh build/combined/backend/native/browser acceptance is next; earlier
+packages do not establish acceptance of this UI source.

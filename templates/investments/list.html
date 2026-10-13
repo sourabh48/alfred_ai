@@ -6,7 +6,7 @@
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
             <div class="alfred-chip mb-3">Portfolio health and allocation control</div>
-            <h1 class="alfred-hero-title">Track each holding, measure diversification, and review a proof-backed short-horizon fund watchlist without leaving the portfolio workspace.</h1>
+            <h1 class="alfred-hero-title">Your investment portfolio</h1>
             <p class="alfred-hero-copy">ALFRED combines your registered positions with allocation, growth projections, and an internet-backed watchlist that explains why a fund is being surfaced instead of asking you to trust a black box.</p>
         </div>
         <div class="surface-card" style="min-width: 260px;">
@@ -165,7 +165,8 @@
             <p class="page-section-copy">Every holding ALFRED is using for valuation, allocation, and risk analysis.</p>
         </div>
     </div>
-    <div class="table-responsive">
+    {% include "partials/table_search.html" with table_id="investmentPositionsBody" table_label="investments" %}
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Recorded investments">
         <table class="table table-alfred align-middle mb-0 metric-table">
             <thead>
                 <tr>
