@@ -88,6 +88,30 @@ def before_restart(base,session,owner,data,passed):
         wait.until(lambda _: 'Verified correction saved.' in browser.find_element(By.ID,'memoryFeedback').text)
         browser.save_screenshot(str(data/'m15-correction.png'))
         passed('m15_packaged_chrome_verified_correction')
+        browser.get(base+'/expenses/#bankAccountsPanel')
+        wait.until(lambda _: 'owned accounts' in browser.find_element(By.ID,'bankAccountsStatus').text)
+        assert 'Banking' in browser.find_element(By.ID,'bankAccountsPanel').text
+        browser.get(base+'/loans/')
+        wait.until(lambda _: browser.find_element(By.ID,'loanTableBody').text)
+        browser.find_element(By.ID,'loanTableBodySearch').send_keys('NO-MATCH-SYNTHETIC')
+        assert not browser.find_element(By.ID,'loanTableBody').text
+        browser.get(base+'/investments/')
+        wait.until(lambda _: browser.find_element(By.ID,'investmentPositionsBodySearch'))
+        browser.get(base+'/mobility/')
+        wait.until(lambda _: browser.find_element(By.ID,'plannerComposer').is_displayed())
+        assert browser.find_elements(By.CSS_SELECTOR,'a[href="/ai/insights/?scope=travel#intelligencePanel"]')
+        browser.save_screenshot(str(data/'m15-ui-modules.png'))
+        passed('m15_packaged_chrome_banking_financial_filters_and_travel_navigation')
+        browser.get(base+'/ai/insights/')
+        wait.until(lambda _: 'Ollama available' in browser.find_element(By.ID,'intelligenceLocalStatus').text)
+        assert browser.find_element(By.ID,'intelligenceCloudStatus').text=='OpenAI disabled'
+        assert browser.execute_script("return Alfred.formatRecordedMoney({amount:'999999999999999.99',currency:'USD',evidence_status:'verified'})")=='$999,999,999,999,999.99 USD'
+        if browser.execute_script('return document.documentElement.dataset.theme')!='dark': click('#workspaceTheme')
+        browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        assert browser.execute_script('return innerWidth==390 && document.documentElement.scrollWidth<=innerWidth')
+        browser.save_screenshot(str(data/'m15-ui-mobile.png'))
+        browser.execute_cdp_cmd('Emulation.clearDeviceMetricsOverride',{})
+        passed('m15_packaged_chrome_mobile_theme_model_policy_and_decimal_display')
     except Exception:
         browser.save_screenshot(str(data/'m15-failure.png'))
         (data/'m15-failure.html').write_text(browser.page_source,encoding='utf-8')

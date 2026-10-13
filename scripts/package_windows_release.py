@@ -76,7 +76,7 @@ def inspect_bundle(bundle):
         files.append(path)
     for name in ("career/list.html", "integrations/credit_score.html", "mobility/dashboard.html",
                  "mobility/planner.html", "mobility/preferences.html", "ai_insights.html", "settings/memory.html",
-                 "base.html", "partials/navbar.html", "partials/sidebar.html", "partials/table_search.html",
+                 "base.html", "settings/account.html", "partials/navbar.html", "partials/sidebar.html", "partials/table_search.html",
                  "dashboard.html", "expenses/list.html", "loans/list.html", "investments/list.html"):
         if digest(bundle / "_internal/templates" / name) != digest(ROOT / "templates" / name):
             raise RuntimeError(f"Bundled template is stale: {name}")
