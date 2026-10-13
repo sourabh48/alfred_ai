@@ -1,26 +1,42 @@
 # ALFRED CODEX CONTINUATION STATE
-## M15 integration correction - final combined gate and fresh build next
+## M15 consolidated candidate frozen - local integration PASS, live blocked
 
-2026-10-14. ONLY F:/ALFRED_DEV/m15-integrated, release/m15-integrated-20261014.
-Complete UI 75b6f50 incorporated by verified fast-forward from stable M14 30e0b3f;
-original 03ab0ae, hardening 081e30e and UI frozen branches remain unchanged.
-Initial source d518c54: 619 backend PASS (509.525s), config/drift PASS, no migration/
-dependency changes; 13/14 Chrome PASS, Travel action timeout reproduced. Preserve
-first package/evidence. Deterministic delayed-list test fails on enabled suggestion
-controls during pending action. Small Travel JS busy-control fix and static-version
-update pass that new regression plus original saved-trip/mobile workflow: 2 Chrome,
-24.241s. No planner/provider/financial calculation changes. Final 15-workflow Chrome,
-619-backend gate and a NEW corrected package must run; earlier counts are not proof.
-Promotion/recovery/rollback plan and coverage: M15_INTEGRATED_RELEASE_20261014.md.
-Staged transfer hashes PASS; independent external archive/separate key restore remains
-PENDING. No passphrase dialogs, key export, rotation, private DB/source writes or push.
-Actual live port 8000 is loopback Django runserver; recorded native PIDs are dead.
-Confirm owning console/CWD/config and writers before approval, do not trust stale
-runtime.json or assume native stop would stop runserver. Do not modify it now.
-Evidence prefix isolated-tests/m15-integrated-*. Real cloud/OpenAI remain disabled.
-Next command: powershell.exe -NoProfile -ExecutionPolicy Bypass -File F:/ALFRED_DEV/isolated-tests/m15-integrated-combined.ps1
-
-
+2026-10-14. Sole release source F:/ALFRED_DEV/m15-integrated, branch
+release/m15-integrated-20261014. Created from actual stable 30e0b3f and fast-forwarded
+complete UI 75b6f50; original hybrid 03ab0ae, trusted checkpoint 14ab9de and hardening
+081e30e already ancestors. No source merge conflicts or duplicate cherry-picks.
+Original/hardening/UI frozen branches and archives preserved with verified hashes.
+Actual corrected gate: 619 backend PASS (470.416s), 15 development Chrome PASS
+(173.812s), fresh packaged 35 native checks PASS, run 90e8311b37 including seven
+packaged Chrome workflows. Launcher/progress/tray/offline guide/no system Python/
+clean missing report directory/stop PASS. Zero final failures/skips. Config/system/
+migration drift PASS, no added migrations/dependencies. Actual screenshot review PASS.
+Fresh build source 13ca4b47d6aa311862aac7e9ee0275f376d31957, r2 bundle inspected:
+10,895 files, private paths zero, changed asset hashes match. Portable ZIP SHA256
+7be25c664b04add24afbc0630dc4b38d82f6ecc161d0069ea622a3fda57ce655.
+6b8bb87 changes host test scripts only (synthetic burst budgets/report mkdir/local
+reasoning recovery); runtime/backend/browser-test trees still equal build source.
+Final freeze changes docs only. Final SHA/source range/archive in external
+isolated-tests/m15-integrated-final-manifest.json and r2 M15_INTEGRATED_REVIEW_MANIFEST.json.
+No repeated M14/M15 development, audits or unrelated feature. Found/reproduced/fixed
+Travel ignored-click race with disabled pending controls; two focused Chrome PASS.
+Initial timeout/429/report-parent evidence preserved, not added to final counts.
+One integrated feature inventory and exact deployment/rollback/backup procedure:
+M15_INTEGRATED_RELEASE_20261014.md. Canonical currency absent stays NOT RECORDED;
+legacy INR preserved, unsupported model figures withheld, no financial/schema change.
+Live master/origin master still 30e0b3f; all six recorded operator files unchanged.
+No live source/DB/service/token/key change, cloud upload, paid call or GitHub M15 push.
+Existing backups preserved; staged material hash verifier PASS, independent external
+archive/separate-key restore PENDING. No cancelled sealing/passphrase workflow resumed.
+M15 RELEASE READY NO: mandatory independent recovery, actual runserver ownership/
+CWD/writers confirmation, separate-PC/installer and normal real-account acceptance.
+Native historical PIDs are dead; actual live 8000 is loopback runserver. Do not use
+stale runtime.json to stop it or claim live native health. Approval remains pending.
+Real provider selection/acceptance and OpenAI access unapproved/disabled; local-only
+features pass. Fresh quiesced SQLite backup/private-copy reconciliation required
+before any approved rollout. All synthetic test ports stopped. No new feature work.
+Exact next safe command:
+Get-Content -LiteralPath F:/ALFRED_DEV/m15-integrated/artifacts/audit/M15_INTEGRATED_RELEASE_20261014.md
 
 ## M15 UI candidate complete - local gate PASS, private promotion remains blocked
 

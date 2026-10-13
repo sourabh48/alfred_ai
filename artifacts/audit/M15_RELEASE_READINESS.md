@@ -1,5 +1,27 @@
 # M15 hybrid intelligence development acceptance
 
+## Current consolidated M15 candidate - 2026-10-14
+
+All completed M15 hybrid, memory, security and UI milestones are incorporated in
+ONE release branch/worktree, release/m15-integrated-20261014 / m15-integrated.
+Current freeze SHA and archives are in isolated-tests/m15-integrated-final-manifest.json.
+Actual final gate: 619 backend PASS, 15 development Chrome PASS, 35 fresh packaged
+native checks PASS including seven packaged Chrome flows; launcher/tray/stop PASS.
+No final failures/skips. System/config/drift PASS, no new migration or dependency.
+Fresh build 13ca4b4, private/asset inspection and actual screenshots PASS. Final
+runtime tree matches the build; later host-acceptance/documentation changes are
+explicitly recorded, not treated as identical full Git trees. Earlier counts below
+are historical evidence. See M15_INTEGRATED_RELEASE_20261014.md for the complete
+coverage matrix, hashes, failure/fix evidence and exact promotion/rollback plan.
+M15 LOCAL CONSOLIDATION COMPLETE; M15 RELEASE READY NO. Independent archive/separate
+key recovery remains unverified and blocks live promotion. Current live 8000 serves
+runserver; historical native PIDs have exited, so writer/launch ownership must be
+confirmed before maintenance. Separate-PC, installer lifecycle and normal real-account
+acceptance remain pending. Real cloud/provider acceptance and OpenAI authorization
+remain absent; both disabled. Fresh quiesced private backup/rehearsal is required.
+No live source, private DB, service, tokens, keys or recovery materials modified;
+no GitHub M15 push. No cancelled passphrase prompts. Frozen candidates preserved.
+
 ## Latest UI-integrated local release candidate - 2026-10-14
 
 M15-UI-A/B/C/D/E COMPLETE. Actual final gate: 308 backend PASS, 14 development

@@ -59,11 +59,40 @@ package is not promotable.
 
 ## Gate and immutable evidence
 
-Initial state: validation IN PROGRESS. Do not reuse 308/14/32 as new proof.
-Run all selected M14/M15/financial suites once, plus development Chrome, native
-configuration/system/migration checks and a new package from this branch's
-committed source. Actual counts, build/review SHAs, hashes and evidence are recorded
-below after the gate and in the external integrated-release manifest.
+M15 LOCAL CONSOLIDATED INTEGRATION GATE = PASS. All completed features are now
+in this one source branch. The final documentation commit freezes the review;
+its full SHA, exact source range/archive and hashes are recorded externally in
+F:/ALFRED_DEV/isolated-tests/m15-integrated-final-manifest.json and the package
+directory's M15_INTEGRATED_REVIEW_MANIFEST.json, avoiding a self-referential SHA.
+
+| Actual final gate | Result | Evidence under isolated-tests/m15-integrated-* |
+| --- | --- | --- |
+| Combined M14/M15/financial backend, 60 selected labels | 619 PASS, 470.416s, zero failures/skips | combined.log / combined.ps1 |
+| Development Chrome | 15 PASS, 173.812s, zero failures/skips | chrome.log; chrome/browser_regression_summary.json |
+| Fresh packaged native, real Ollama, workers, scheduler, restart and encrypted recovery | 35 PASS, run 90e8311b37, zero failures/skips | native.log / native-report.json |
+| Packaged Chrome, included in the 35 checks | 7 PASS: dashboard/settings, conversation, document abstention, correction, modules, mobile/policy, outage | native report and artifacts/native-tests/90e8311b37/*.png |
+| Launcher/progress/tray/offline guide/no Python PATH/graceful stop | PASS from a fresh host with absent report directory | launcher.log / launcher-report.json; launcher-clean-20261014/artifacts/ops |
+| System/native configuration/migration drift | PASS, no new migrations | config-final.log |
+| Fresh bundle files/private paths/changed asset hashes | 10,895 files, 1,228,233,253 bytes; zero private paths, assets match | bundle-inspection.json |
+| Actual screenshot review | PASS: desktop/light/dark/390px, safe currency/source cards, memory, corrected Travel, model outage | chrome/user-data; packaged native screenshots |
+| Source/ancestry/privacy review and graph | PASS; AST-only 8,557 nodes / 22,306 edges; no API cost | source-review.json; graphify-release.log |
+
+Counts are from actual final runs, not sums of overlapping earlier checkpoints.
+The seven packaged browser flows are already included in 35 native checks.
+Source code/templates/static/dependencies and backend/browser tests match the
+tested build commit 13ca4b47d6aa311862aac7e9ee0275f376d31957 exactly. Later
+6b8bb8752d3f93913b57de7a2b9b1d387d3543c8 changes host acceptance scripts and
+documentation only; those scripts are not in the package and were tested by the
+final native/launcher runs. The final freeze changes documentation only. Full
+Git trees differ; this is an explicitly verified runtime equivalence, not an
+assumption that the build and final review commits are identical.
+
+Fresh portable: F:/ALFRED_DEV/release-candidates/m15-integrated-package-20261014-r2/
+ALFRED-M15-INTEGRATED-REVIEW-Windows-x64.zip, 522,195,780 bytes, 10,895 CRC-checked
+entries. SHA-256: 7be25c664b04add24afbc0630dc4b38d82f6ecc161d0069ea622a3fda57ce655.
+ALFRED.exe SHA-256: 0246dac6c29597c9c6d1b9197f391ca91e8485d9c0972d40cee85abd8f679e7a.
+ALFRED Launcher.exe: 9b0569ba618ae5ca0aea92e48760d208609b91484e37153062d382dc6c3b739a.
+No private databases, environment files, media or recovery keys are included.
 
 Corrected source 13ca4b4 final backend: 619 PASS, 470.416s. Development Chrome:
 15 PASS, 173.812s; no failures/skips. System/native configuration/drift PASS.
@@ -81,6 +110,10 @@ claiming packaged acceptance. The native drill also verifies grounded local
 reasoning after recovery from the deliberately missing model, with cloud disabled.
 These post-build changes affect host acceptance scripts only, not packaged runtime.
 Keep first-run logs/proofs/screenshots; never add partial checks to the final count.
+That required rerun is complete: 35 native checks and clean-root launcher PASS.
+Grounded local reasoning returns after the missing-model restart, with the same
+owned corrected memory. Safe outage, draft/retry and zero cloud usage also pass.
+All disposable runtimes stopped gracefully; test ports 8050/8086/8087 are closed.
 
 ## Recovery and main-folder promotion boundary
 
@@ -107,9 +140,35 @@ a specifically approved existing password manager or protected offline key devic
 separate from approved archive storage, followed by an independent disposable
 restore. No destination or export is invented by this preparation.
 
+The staged portable_recovery.py seal/verify modes explicitly open passphrase
+dialogs and must NOT be invoked. The existing noninteractive post-M14 supplement
+builder in isolated-tests/m14-postpromotion-backup.py uses SQLite's backup API
+and the existing ACL-private portable key without regeneration. It is evidence
+for the approved mechanism, not an executable M15 maintenance command: it has
+M14-specific paths/metadata and was not run here. Adapt a reviewed copy for a NEW
+timestamped pre-M15 set only after approval and writer quiescence. Do not run the
+older key-generating builder or export keys. Require independent key recovery first.
+Future private M15 vault/checkpoint/sync keys also require independently recoverable
+protected retention; the older M14 snapshot cannot restore future M15 memories.
+
 This missing recovery proof BLOCKS live promotion. Local source consolidation
 and packaged validation proceed safely; approval will be requested only after
 mandatory recovery/acceptance gates are satisfied. This is not deployment consent.
+
+M15 RELEASE READY = NO. Mandatory independent external archive/key recovery
+remains unverified. Separate-PC, installer lifecycle and real-account acceptance
+remain outstanding; the known Inno compiler path is unavailable and no installer
+or Windows registration/shortcut change was attempted. Real provider selection/
+permission/cost/retention approval and synthetic-only live acceptance remain
+unapproved; real cloud/OpenAI stay disabled. Local-only features passed without
+them. Normal real-account acceptance is part of the controlled approved rollout,
+not replaced by synthetic Chrome. Fresh private backup/rehearsal/reconciliation
+must occur before deployment. No new feature development was started.
+
+Expected privacy impact: only explicit owned context goes to local Ollama. Saved
+memories remain encrypted and owner-only; Family grants and financial data remain
+unchanged. No automatic cloud export or financial mutation is enabled. Historic
+backups can retain deleted memories; no irreversible-erasure claim is made.
 
 Read-only current-runtime observation: port 8000 is a loopback Django runserver
 process, with no native health route. The recorded native supervisor and worker
