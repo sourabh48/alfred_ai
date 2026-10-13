@@ -60,6 +60,7 @@ html[data-theme="dark"] .text-success { color: #8de2b9 !important; }
 html[data-theme="dark"] .text-danger { color: #ffb8c1 !important; }
 html[data-theme="dark"] .bg-light { background: #203751 !important; color: #e5edf8 !important; }
 html[data-theme="dark"] .form-control::file-selector-button { background: #294977 !important; color: #fff !important; }
+html[data-theme="dark"] .detail-item { background: #203751; color: #e5edf8; }
 .table-alfred th { font-size: .8rem; color: var(--alfred-muted); }
 .table-alfred td { vertical-align: middle; }
 tr[hidden] { display: none !important; }

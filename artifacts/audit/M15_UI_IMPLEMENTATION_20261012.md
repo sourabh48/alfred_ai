@@ -114,9 +114,13 @@ provider freshness distinctions remain unchanged. Shared dark tables/forms/chart
 local fonts and versioned script references cover existing module pages.
 
 Related backend 26 PASS (21.970s), zero failures/skips, m15-ui-d-backend.log.
-Chrome result and final evidence are recorded in m15-ui-d-verified.log. Actual
+Final Chrome: 4 PASS, 60.632s, zero failures/skips, m15-ui-d-complete.log. Actual
 banking/loan/investment screenshots reviewed under m15-ui-chrome/user-data/ui-d-*.
 No new migration, dependency, financial calculation or real provider call. Package
 inspection now verifies changed base/partials/module templates and shared scripts.
 UI-E fresh build/combined/backend/native/browser acceptance is next; earlier
 packages do not establish acceptance of this UI source.
+UI-D COMPLETE after expanded sort/original-order/selected-row regressions. Initial
+4c9586a checkpoint preceded a stale-row test failure; it was not frozen or packaged.
+The follow-up retains live-refresh protection and reacquires refreshed rows, with
+passing evidence above. Prior failed gates remain preserved.

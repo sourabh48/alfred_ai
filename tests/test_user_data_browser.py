@@ -235,7 +235,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Zebra',self.browser.find_elements(self.By.CSS_SELECTOR,'#loanTableBody tr')[0].text)
         Select(self.browser.find_element(self.By.ID,'loanTableBodySort')).select_by_value('')
         self.assertEqual([row.text for row in self.browser.find_elements(self.By.CSS_SELECTOR,'#loanTableBody tr')],original)
-        self.memory_click('#loanTableBody input[type=checkbox]')
+        from selenium.common.exceptions import StaleElementReferenceException
+        def select_current_row(_):
+            try:
+                self.memory_click('#loanTableBody input[type=checkbox]')
+                return True
+            except StaleElementReferenceException:
+                return False
+        self.wait.until(select_current_row)
         search.send_keys('NO-MATCH-SYNTHETIC')
         self.assertIn('selected records retained',self.browser.find_element(self.By.CSS_SELECTOR,'[data-table-controls="loanTableBody"] [data-table-count]').text)
         self.browser.get(self.live_server_url+'/investments/')
