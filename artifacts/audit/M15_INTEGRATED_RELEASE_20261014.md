@@ -47,6 +47,16 @@ runtime, without stopping the installed Ollama service or enabling cloud access.
 They verify safe 503, visible outage, unchanged draft/retry and no cloud usage.
 Travel screenshots wait for loaded plans and completed entrance animation.
 
+The first combined backend gate passed 619 tests (509.525s). The first 14-workflow
+Chrome gate passed 13 and timed out at Travel's next itinerary action. Evidence and
+the first d518c54 package are preserved. A deterministic delayed-response regression
+reproduced enabled suggestion buttons while the preceding action was still busy.
+Those controls now stay disabled through response/list rendering, are re-enabled on
+success/failure, and the browser waits for enabled controls. The new regression and
+original saved-trip/mobile workflow both pass (2 tests, 24.241s). The corrected
+source must receive the final combined gate and a second, fresh package; the first
+package is not promotable.
+
 ## Gate and immutable evidence
 
 Initial state: validation IN PROGRESS. Do not reuse 308/14/32 as new proof.
@@ -84,6 +94,13 @@ This missing recovery proof BLOCKS live promotion. Local source consolidation
 and packaged validation proceed safely; approval will be requested only after
 mandatory recovery/acceptance gates are satisfied. This is not deployment consent.
 
+Read-only current-runtime observation: port 8000 is a loopback Django runserver
+process, with no native health route. The recorded native supervisor and worker
+PIDs have exited; runtime.json is historical. The exact owning runserver console,
+working directory/data configuration and any independent writers must be confirmed
+before promotion. Do not infer a healthy current native worker from stale state.
+No live process was stopped, restarted, reconfigured or modified during preparation.
+
 ## Controlled deployment procedure to execute only after explicit approval
 
 1. Pin the final integrated release SHA, verify clean integrated source and current
@@ -94,10 +111,13 @@ mandatory recovery/acceptance gates are satisfied. This is not deployment consen
    to their M14 versions after backup/approval to permit fast-forward; reapply and
    review the operator changes afterward. Never blanket reset, clean or stash private
    untracked files. Do not overwrite config, encryption keys, media, models or jobs.
-3. Establish a closed maintenance window. Using the configured Python SDK, run
-   alfred_native.py stop --data-dir F:/ALFRED/restored-runtime from the stable folder.
-   Verify supervisor/server/worker/scheduler exit and database writers stop; do not
-   blanket-kill processes. Preserve pending work and limiter histories.
+3. Establish a closed maintenance window. Identify the ACTUAL runserver owner and
+   gracefully stop its owning console (Ctrl+C or its operator Stop control), including
+   autoreloader parents and any independent workers/writers. Require port 8000 closed;
+   the native stop command alone cannot stop this current development server. For an
+   actual native instance use the configured SDK and alfred_native.py stop --data-dir
+   F:/ALFRED/restored-runtime from the stable folder. Verify all matching writers exit;
+   do not blanket-kill processes. Preserve pending work and limiter histories.
 4. Create a NEW F:/ALFRED_BACKUPS/m15-prepromotion-<timestamp> recovery set. Capture
    each SQLite database using SQLite's backup API after quiescence (application,
    jobs and durable cache), not copies of active SQLite/WAL/SHM files. Inventory
@@ -145,6 +165,17 @@ mandatory recovery/acceptance gates are satisfied. This is not deployment consen
 GitHub: after separate explicit authorization and a fresh origin/master ancestry
 check, use an ordinary pinned-SHA push to refs/heads/master and independently verify
 the remote SHA. No push occurs during preparation. Preserve legitimate newer commits.
+
+## Separately scoped follow-up: explicit currency persistence
+
+ISSUE: canonical financial models lack explicit currency metadata. OWNER: ALFRED
+maintainer. OUTSIDE THIS RELEASE: design per-record/account currency ownership,
+authoritative code sources and an approved reversible migration/backfill. Unknown
+historical currency must remain unknown; an INR display convention is not proof
+for backfilling records. Preserve all Decimal values, balances and import identity.
+REQUIRED EVIDENCE: forward/rollback rehearsal, unknown/multiple-currency and owner
+isolation fixtures, unchanged financial totals and legacy INR/API compatibility.
+No schema change or live backfill is authorized or performed in this integration.
 
 Regular release rule: Completed -> Tested -> Integrated -> Packaged -> Approved ->
 Promoted. This worktree is the single M15 release source; earlier worktrees remain

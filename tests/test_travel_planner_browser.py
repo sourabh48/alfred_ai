@@ -99,11 +99,40 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
 
     def click(self,selector):
         element=self.browser.find_element(self.By.CSS_SELECTOR,selector)
+        self.wait.until(lambda _: element.is_enabled())
         # WebDriver also scrolls before a native click; its scroll must finish
         # immediately instead of racing the main panel's smooth scrolling.
         self.browser.execute_script("const main=arguments[0].closest('.alfred-main');if(main)main.style.scrollBehavior='auto';arguments[0].scrollIntoView({block:'center',behavior:'instant'});",element)
         self.wait.until(lambda _: self.browser.execute_script("const e=arguments[0],r=e.getBoundingClientRect(),h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return h===e||e.contains(h);",element))
         element.click()
+
+    def test_pending_action_disables_suggestions_until_response_finishes(self):
+        self.browser.get(self.live_server_url+'/mobility/')
+        self.wait.until(lambda _: 'destination is optional' in self.text('plannerMessages'))
+        self.wait.until(lambda _: self.text('plannerPlans').strip() and self.pending==0)
+        entered, release = threading.Event(), threading.Event()
+        original = BaseHandler.get_response
+
+        def delayed_list(handler,request):
+            response=original(handler,request)
+            if request.method=='GET' and request.path=='/api/mobility/planner/sessions/':
+                entered.set(); release.wait(timeout=10)
+            return response
+
+        with patch.object(BaseHandler,'get_response',delayed_list):
+            try:
+                self.browser.find_element(self.By.ID,'plannerInput').send_keys('3-day quiet trip. Budget 15000.')
+                self.click('#plannerSend')
+                self.wait.until(lambda _: entered.is_set())
+                self.assertFalse(self.browser.find_element(self.By.ID,'plannerSend').is_enabled())
+                suggestions=self.browser.find_elements(self.By.CSS_SELECTOR,'[data-planner-message]')
+                self.assertTrue(suggestions)
+                self.assertTrue(all(not button.is_enabled() for button in suggestions))
+                self.assertFalse(self.browser.find_element(self.By.ID,'plannerNew').is_enabled())
+            finally:
+                release.set()
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerSend').is_enabled())
+            self.assertTrue(all(button.is_enabled() for button in self.browser.find_elements(self.By.CSS_SELECTOR,'[data-planner-message]')))
 
     def test_chat_to_saved_plan_desktop_and_mobile(self):
         self.browser.set_window_size(1440,1100)

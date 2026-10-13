@@ -6,6 +6,10 @@ window.TravelPlanner = (() => {
     const money = value => Alfred.formatCurrency(value || 0);
     const state = {session: null, busy: false, timer: null, comparison: false, plans: []};
     const field = key => state.session?.state?.[key]?.value;
+    function syncActionState() {
+        document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button')
+            .forEach(control => { control.disabled = state.busy; });
+    }
     function alert(message) { $("plannerAlert").textContent = message; $("plannerAlert").hidden = !message; }
     function link(url, title) {
         return window.TravelResearchPanels.link(url,title);
@@ -18,6 +22,7 @@ window.TravelPlanner = (() => {
         state.plans = data.plans;
         Alfred.setHTMLIfChanged("plannerPlans", data.plans.map(p=>`<button class="btn btn-sm btn-outline-primary" data-open-plan="${p.id}"><span class="travel-saved-status">${esc(p.status_label)}</span><strong class="d-block">${esc(p.title)}</strong><span class="small">${money(p.budget)} · ${p.duration_days || "Flexible"} days</span></button>`).join("") || '<p class="small">Save a draft whenever you like. No destination required.</p>');
         Alfred.setHTMLIfChanged("plannerSessions", data.sessions.map(s => `<button class="btn btn-sm btn-outline-primary" data-session="${s.id}">${esc(s.title)}<span class="d-block small">${esc(s.status.replaceAll("_", " "))}</span></button>`).join("") || "No conversations yet.");
+        syncActionState();
         return data;
     }
     async function open(id) {
@@ -39,7 +44,7 @@ window.TravelPlanner = (() => {
     async function action(payload) {
         if (state.busy || !state.session) return;
         state.busy = true;
-        $("plannerSend").disabled = true;
+        syncActionState();
         alert("");
         try {
             state.session = await Alfred.fetchJSON(api+`sessions/${state.session.id}/`, {method:"POST", body:JSON.stringify(payload)});
@@ -52,7 +57,7 @@ window.TravelPlanner = (() => {
             }
             return true;
         } catch (err) { alert(err.message); return false; }
-        finally { state.busy = false; $("plannerSend").disabled = false; schedulePoll(); }
+        finally { state.busy = false; syncActionState(); schedulePoll(); }
     }
     async function message(text) {
         const accepted = await action({action:"message", text});
@@ -93,6 +98,7 @@ window.TravelPlanner = (() => {
         if (session.plan_id) populateDetails(session.plan_id);
         else $("planDetails").hidden = true;
         if (field("vehicle_profile")) $("plannerVehicle").value = String(field("vehicle_profile"));
+        syncActionState();
         schedulePoll();
     }
     function candidates() {
