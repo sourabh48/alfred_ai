@@ -64,7 +64,7 @@ def before_restart(base,session,owner,data,passed):
         click('#intelligenceForm button')
         wait.until(lambda _: 'AI hypothesis' in browser.find_element(By.ID,'intelligenceAnswers').text)
         text=browser.find_element(By.ID,'intelligenceAnswers').text
-        assert 'ollama' in text and initial in text
+        assert 'ollama' in text.lower() and initial in text
         browser.save_screenshot(str(data/'m15-conversation.png'))
         passed('m15_packaged_chrome_conversation_grounded_in_owned_memory')
 
