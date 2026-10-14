@@ -1,10 +1,11 @@
-"""Pinned, local ALFRED release checks. This command never deploys or pushes."""
+"""Pinned local release gates; promotion is dry-run unless explicitly authorized. Never pushes."""
 from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -21,6 +22,7 @@ TECHNICAL = ("source", "dependencies", "migrations", "privacy", "configuration",
 OPERATIONAL = ("operators", "local_backup", "off_device_copy", "portable_key",
                "device_loss_restore", "packaged", "real_account", "separate_pc",
                "installer", "remote_git", "remote_ci", "branch_protection")
+WAIVABLE = set(OPERATIONAL) - {"operators", "local_backup", "remote_git"}
 PROTECTED = ("artifacts/audit/CODEX_CONTINUATION_STATE.md",
              "artifacts/audit/M14_CONTROLLED_PROMOTION_PLAN.md", "skills-lock.json",
              "docs/M14_LIVE_DEPLOYMENT_20261011.md",
@@ -43,7 +45,8 @@ def sha256(path):
 
 
 def git(repo, *args):
-    result = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, timeout=60)
+    result = subprocess.run(["git", "--no-optional-locks", "-C", str(repo), *args], capture_output=True, timeout=60,
+                            env=dict(os.environ, GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never"))
     if result.returncode:
         raise GateError("git_operation_failed")
     return result.stdout.decode("utf-8", errors="strict").rstrip("\r\n")
@@ -122,7 +125,7 @@ def decision(manifest, names):
         status = manifest["gates"].get(name, {}).get("status", "NOT_RUN")
         if status == "FAIL":
             failed.append(name)
-        elif status == "WAIVED_BY_USER" and name in OPERATIONAL and valid_waiver(manifest, name):
+        elif status == "WAIVED_BY_USER" and name in WAIVABLE and valid_waiver(manifest, name):
             waived.append(name)
         elif status != "PASS":
             blocked.append(name)
@@ -132,6 +135,11 @@ def decision(manifest, names):
 
 def report(manifest, output):
     output = Path(output)
+    if (output / "release.json").is_file():
+        existing = json.loads((output / "release.json").read_text(encoding="utf-8"))
+        if any(existing.get(key) != manifest.get(key) for key in
+               ("release_id", "candidate_sha", "production_baseline_sha")):
+            raise GateError("release_identity_is_immutable")
     output.mkdir(parents=True, exist_ok=True)
     manifest["technical"] = decision(manifest, TECHNICAL)
     manifest["promotion"] = decision(manifest, TECHNICAL + OPERATIONAL)
@@ -212,7 +220,7 @@ def load(path):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("preflight", "validate", "backup", "recovery", "status", "report"))
+    parser.add_argument("command", choices=("preflight", "validate", "backup", "recovery", "promote", "status", "report"))
     parser.add_argument("--repo", type=Path, default=ROOT)
     parser.add_argument("--release-id")
     parser.add_argument("--candidate")
@@ -229,6 +237,10 @@ def main(argv=None):
     parser.add_argument("--key-file", type=Path)
     parser.add_argument("--restore-directory", type=Path)
     parser.add_argument("--check-remote", action="store_true")
+    parser.add_argument("--execute", action="store_true", help="Requires new exact-release deployment authorization")
+    parser.add_argument("--authorization", type=Path)
+    parser.add_argument("--environment", choices=("rehearsal", "production"), default="rehearsal")
+    parser.add_argument("--port", type=int, default=8150)
     args = parser.parse_args(argv)
     manifest = None
     try:
@@ -264,6 +276,12 @@ def main(argv=None):
             gate(manifest, "financial", "PASS", "authenticated_restore_typed_rows_schema_and_fk_match",
                  archive_sha256=receipt["archive_sha256"])
             manifest["backup"] = {"directory": str(args.backup_directory.resolve()), "archive_sha256": receipt["archive_sha256"]}
+        if args.command == "promote":
+            from scripts.release_promotion import promote
+            if not args.target_repo or not args.runtime:
+                raise GateError("explicit_target_and_runtime_required")
+            promote(args.repo, manifest, args.output, args.target_repo, args.runtime, args.key_file,
+                    args.authorization, args.execute, args.environment, args.port)
         scope = ("source", "dependencies", "migrations", "privacy")
         if args.command == "preflight" and args.target_repo:
             scope += ("operators",)
@@ -280,6 +298,12 @@ def main(argv=None):
         command_decision = decision(manifest, scope if args.command in ("preflight", "validate", "backup", "recovery") else TECHNICAL + OPERATIONAL)
         if args.command == "validate" and args.profile == "targeted" and manifest.get("last_validation", {}).get("status") == "FAIL":
             command_decision["status"] = "FAIL"
+        if args.command == "promote":
+            from scripts.release_promotion import REHEARSAL_REQUIRED, BEFORE_PRODUCTION
+            command_decision = decision(manifest, REHEARSAL_REQUIRED if args.environment == "rehearsal" else BEFORE_PRODUCTION)
+            if args.execute and manifest["deployment"].get("stage") != "COMPLETE":
+                command_decision["status"] = "BLOCKED"
+            command_decision["dry_run"] = not args.execute
         manifest["command_result"] = {"command": args.command, **command_decision}
         report(manifest, args.output)
         print(json.dumps({key: manifest[key] for key in ("release_id", "candidate_sha", "command_result", "technical", "promotion")}))
@@ -287,8 +311,12 @@ def main(argv=None):
     except Exception as exc:
         code = str(exc) if isinstance(exc, GateError) else "release_check_failed"
         if manifest is not None:
-            gate(manifest, "source", "FAIL", code, exception_type=type(exc).__name__)
-            report(manifest, args.output)
+            manifest["command_result"] = {"command": args.command, "status": "FAIL", "code": code,
+                                          "exception_type": type(exc).__name__}
+            try:
+                report(manifest, args.output)
+            except GateError:
+                pass  # Never replace a differently pinned release's existing evidence.
         print(json.dumps({"status": "FAIL", "code": code, "exception_type": type(exc).__name__}))
         return 1
 

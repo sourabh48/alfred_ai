@@ -130,6 +130,15 @@ class ReleaseSourceTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.assertIn("local_backup", result["promotion"]["blocked"])
         self.assertEqual(release.load(self.root / "report/release.json")["candidate_sha"], self.candidate)
 
+    def test_existing_release_output_cannot_silently_change_candidate(self):
+        output = self.root / "report"
+        release.report(self.manifest, output)
+        before = (output / "release.json").read_bytes()
+        other = release.new_manifest("synthetic-1", self.baseline, self.baseline)
+        with self.assertRaisesRegex(release.GateError, "release_identity_is_immutable"):
+            release.report(other, output)
+        self.assertEqual(before, (output / "release.json").read_bytes())
+
     def test_report_failure_is_not_hidden_by_other_passes(self):
         for name in release.TECHNICAL + release.OPERATIONAL:
             release.gate(self.manifest, name, "PASS", "synthetic")

@@ -89,5 +89,32 @@ ACL-private disposable verification tree. Keep the key separately protected.
 The report records LOCAL_BACKUP_VERIFIED independently of OFF_DEVICE_COPY_VERIFIED,
 PORTABLE_KEY_VERIFIED and INDEPENDENT_DEVICE_LOSS_RESTORE_VERIFIED. Raw portable key
 format, matching hashes and current-profile DPAPI success do not prove device-loss
-recovery. The old M15 waiver is not inherited. Promotion remains unimplemented and
-blocked in this unit; no command deploys, migrates or pushes.
+recovery. The old M15 waiver is not inherited.
+
+## Controlled promotion
+
+`promote` defaults to a non-mutating dry run. Supply explicit `--target-repo`,
+`--runtime` and `--environment rehearsal|production`; an existing manifest pins
+the candidate. `--execute` additionally requires an existing key and a new
+`--authorization` JSON bound to the exact release, target, runtime, gate-evidence
+digest and approved archive digest. Approval must expire within 24 hours. It
+does not transfer to another release or environment. The rehearsal runtime must
+carry its exact `.alfred-release-rehearsal.json` binding. An injected test service
+operator is forbidden for production.
+
+The engine checkpoints each stage, stops through the existing native launcher,
+captures a fresh encrypted quiesced backup and independent restore, verifies no
+migrations are pending, then performs only `git merge --ff-only <exact SHA>`.
+It preserves operator hashes, checks native/worker/scheduler health and compares
+canonical data after restart. Schema changes require a separate reviewed migration
+procedure; this command never applies a migration or installs a dependency.
+
+Interruption is recorded and requires review before resumption. Completion is
+idempotent for that same target/runtime only. If explicitly authorized, failure
+recovery preserves a new encrypted diagnostic backup and switches source back to
+the baseline without force. It never overwrites a database. Changed data/schema
+blocks blind rollback and requires manual reconciliation. Failed rollback is
+BLOCKED, never COMPLETE. No release command pushes to GitHub.
+
+Local development tests exercise real Git/SQLite/encryption with simulated service
+actions; they are not actual native or real-account acceptance evidence.

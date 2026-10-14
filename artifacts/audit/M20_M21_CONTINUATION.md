@@ -90,3 +90,32 @@ off-device or portable-key proof. No real recovery key was read or exported.
 M20-H promotion and M21 end-to-end/failure/rollback rehearsal remain NOT_RUN.
 Next safe action: corrected pinned preflight + targeted isolated Django run, then
 implement dry-run/approval/promotion state and M21 disposable acceptance.
+
+## Fourth unit - approval and promotion state
+
+Current branch remains feature/m20-release-gates; parent verified commit is
+0fef33d2d082b01a64dcc09265d0ca7f64dbb23b. Its actual pinned preflight PASS includes
+read-only production operator hashes and remote ancestry. Its isolated Django
+targeted run passed 40 tests, zero skips/failures, with configuration/drift PASS.
+Evidence: artifacts/release-gates/m20-recovery-0fef33d/release.json.
+
+Fourth unit combined focused run: 56 tests PASS, 97.241s, zero failures/skips.
+Modules: test_release_gate, test_release_validation, test_release_recovery,
+test_private_recovery_verifier, test_release_promotion. Earlier runs overlap.
+The first 31-test attempt had one incorrect interruption fixture; its expected
+target binding was added and cross-target rejection is separately covered.
+
+Files: scripts/release_gate.py, scripts/release_validation.py,
+scripts/release_promotion.py, tests/test_release_gate.py,
+tests/test_release_promotion.py, docs/RELEASE_GATES.md and this checkpoint.
+Dry-run default, expiring exact evidence-bound approval, ordinary fast-forward,
+quiesced encrypted backup, operator preservation, typed data reconciliation,
+interruption blocking and authorized source-only rollback are implemented.
+Real Git/crypto/SQLite are exercised; native actions are explicit test doubles.
+Financial writes are preserved and prevent automatic data rollback. Actual native,
+Chrome, M21 end-to-end and packaged acceptance are still NOT_RUN for this unit.
+
+Next: finish operator evidence/waiver interface and actual disposable native
+M21 rehearsal, then run the pinned combined gate. No production changes or push.
+Safe focused resume (configured project SDK, from this worktree):
+python -B -m unittest tests.test_release_gate tests.test_release_validation tests.test_release_recovery tests.test_private_recovery_verifier tests.test_release_promotion

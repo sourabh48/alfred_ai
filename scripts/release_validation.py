@@ -32,7 +32,8 @@ BACKEND = tuple("tests." + name for name in (
     "test_platform_hardening.EmailConnectionTokenSecurityTests", "test_remaining_public_http",
     "test_retention_release_boundary", "test_statement_columns", "test_token_rotation",
     "test_travel_http", "test_upload_limits", "test_upload_privacy_retention", "test_user_data_reset",
-    "test_release_gate", "test_release_validation", "test_release_recovery", "test_private_recovery_verifier"))
+    "test_release_gate", "test_release_validation", "test_release_recovery", "test_private_recovery_verifier",
+    "test_release_promotion"))
 
 SECRET = re.compile(rb"sk-(?:proj-|svcacct-|ant-api[0-9]-)?[A-Za-z0-9_-]{30,}|"
                     rb"github_pat_[A-Za-z0-9_]{35,}|gh[pousr]_[A-Za-z0-9]{30,}|"
