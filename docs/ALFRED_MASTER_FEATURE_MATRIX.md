@@ -808,7 +808,7 @@ because their parent domain has a test suite.
 - Real account: PENDING; no normal existing-account visual acceptance performed by this audit.
 - Real provider: NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Production: Implementation, when present, is in deployed source 3932f391; current service health was not observed.
-- Limitations: Owner deletion/raw cleanup switches exist; native vault retention and historic backups retain data under separate policies.
+- Limitations: Owner deletion/raw cleanup switches exist; native vault retention/backups have separate policies. Non-native DEBUG media served a synthetic file anonymously; native owner media is protected. Actual live exposure not tested.
 - Dependencies: Existing owner/session controls; canonical data availability; acceptance plan.
 - Next action: Unify disclosed retention across raw uploads, metadata, indexes and recovery.
 

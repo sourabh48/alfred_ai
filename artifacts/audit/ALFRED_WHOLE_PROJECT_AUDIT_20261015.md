@@ -50,6 +50,7 @@ Main operator edits were present before the audit: continuation/promotion docume
 | Public AST inventory | All inventoried Python | No syntax errors | Import/runtime correctness is separate |
 | Package requirements | Configured Python 3.12 SDK metadata; pip check | No broken requirements | Not vulnerability or reproducibility certification |
 | UserSerializer synthetic diagnostic | No database writes | monthly_income Infinity accepted; Budget rejects nonfinite input | Serializer-level reproduction, not a private API write |
+| Source/debug media diagnostic | Disposable synthetic text file, DEBUG=true, non-native URL configuration | Anonymous response 200 | Native profile uses protected owner media; no real file or current production DEBUG setting tested |
 | M20 focused evidence | Development HEAD 0052410 | Prior combined 65 PASS; later narrow checks overlap | Interrupted full validation has no final backend/browser/native result |
 | M20 audit reproductions | Generated disposable Git repos only | Two gate failures reproduced | [Safe receipt](master-audit-inventory-20261015/m20-diagnostic-receipt.json); no real credentials |
 | Current HTTP/native service | Read-only localhost checks | Initial unavailable/stored PIDs absent; later /health/live/ 200, /health/native/ 404 with runserver listener | Native DB/worker identity and sustained readiness unconfirmed; no service action |
@@ -140,6 +141,22 @@ an authorized operational acceptance task; don't start a second server blindly.
 Pinned gpt-4.1-mini-2025-04-14 has announced retirement on 2027-01-14. Real access is disabled, so no current paid outage was demonstrated. Independent off-device archive/key restore remains unverified; a DPAPI copy requires its original Windows context.
 
 Fix: explicit model/provider choice with current rates and synthetic adapter contract tests before any approved paid request. Separately choose portable secure recovery without reopening cancelled passphrase dialogs. The historical waiver is not inherited by future releases. [OpenAI deprecations](https://developers.openai.com/api/docs/deprecations).
+
+### AUD-11 — unprotected source/debug media route (HIGH conditional privacy)
+
+[Root URLs](../../alfred_ai/urls.py) use authenticated owner-filtered
+[private_media](../../alfred_ai/native_views.py) when native mode is active, but
+fall back to Django static media serving when non-native DEBUG is true.
+Local source settings default DEBUG to LOCAL_RUNTIME. A disposable synthetic
+file returned 200 to AnonymousUser through that route; [receipt](master-audit-inventory-20261015/source-debug-media-receipt.json).
+No private file or actual live DEBUG/media configuration was queried. This proves
+the source-profile boundary gap, not current private production disclosure.
+
+Fix: reuse protected owner media handling across supported runtime profiles;
+public static assets remain separate. Regression: anonymous/foreign-owner media
+denied, owned supported documents accessible, paths/no-store and source/native
+profile coverage. No schema change or automatic production configuration edit.
+Native M14 ownership controls remain implemented; this is a distinct profile gap.
 
 ## Module conclusions
 

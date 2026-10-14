@@ -38,6 +38,7 @@ or clean-source certificate. The application baseline remains the exact SHA abov
 | All finance values are Decimal or carry INR codes | Core registers Decimal; User/Budget/Career/Mobility tail remains float. Legacy INR convention is not persisted currency; controlled AI source cards label unrecorded currency |
 | AI can reason over every financial document / persisted general conversation history | Current scope is owned memories, six financial metrics, Travel preferences and verified closure projections; broad Q&A/history gaps explicit |
 | Memory encryption makes canonical DB/config unreadable / raw files always deleted | Canonical DB plaintext and broad local grants recorded; raw retention is configured native-vault policy, not universal deletion |
+| Native media privacy is assumed to cover DEBUG source profile | Native owner handling is protected; source/debug synthetic anonymous media returned 200. Conditional profile gap recorded without alleging actual live disclosure |
 | All Travel/provider links imply live availability | Adapter/config/live evidence separated, unavailable rail/bus/permit/hotel/flight and route legality limits documented |
 | Old provider limits/prices remain current | Register has dated official facts and honest unreadable/account-specific limits. Pinned OpenAI model retirement explicitly recorded |
 | Copied DPAPI/hash-verified archive equals portable device-loss protection | Four statuses remain distinct; M15 HDD waiver scoped only to that release, independent restore unverified |

@@ -51,6 +51,9 @@ For migrations: snapshot/rehearse forward, replay/idempotence and supported reve
 - Verify local model/digest, vectors, limits, inference outage, no cloud model metadata and offline startup.
 - Save owner-verified synthetic facts with provenance/sensitivity; retrieve in a fresh session/restart; validate relevance, abstention, dedupe, corrections, conflicts, expiry/reset/tombstones/checkpoints.
 - Prove other owner/family accounts cannot retrieve personal memory or source documents.
+- Verify direct media access in source/debug as well as native profiles. Baseline
+  source DEBUG routing served a synthetic file anonymously; native owner handling
+  must be reused before attaching private files to that profile.
 - Finance tool results remain canonical, with structurally controlled values/currency; contradictory model prose is suppressed.
 - Current document scope is verified closure fields and owned memories. Test stale/deleted/conflicting evidence, citations, injection and missing-evidence abstention. Broader Q&A requires a separate ingestion/evidence acceptance corpus.
 - Persistent chat history is NOT_IMPLEMENTED at baseline; do not infer it from TravelMessage or a screenshot.

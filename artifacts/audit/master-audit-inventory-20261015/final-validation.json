@@ -29,7 +29,7 @@
                                 "real_provider":  "NOT_RUN"
                             },
     "tests":  {
-                  "diagnostic_seconds":  0.064,
+                  "diagnostic_seconds":  0.072,
                   "seconds":  59.061,
                   "system_check":  "PASS",
                   "focused_django_passed":  86,
@@ -61,5 +61,12 @@
                        "graphify":  "AST_ONLY_AUDIT_WORKTREE",
                        "python_syntax_errors":  0,
                        "historical_vendor_immutable_bodies":  "PRESERVED"
-                   }
+                   },
+    "confirmed_findings":  11,
+    "source_debug_media":  {
+                               "synthetic_anonymous_status":  200,
+                               "native_protected":  true,
+                               "actual_live_exposure_tested":  false
+                           },
+    "verified_reconciliation_commit":  "62558c0fa21633a050317adc401ac9ce440639d7"
 }

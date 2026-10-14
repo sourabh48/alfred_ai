@@ -73,6 +73,16 @@ Tests: serializer + authenticated API 400/no mutation, valid zero/large/precisio
 
 ### UNIT 2 — M18 security dependency maintenance
 
+Before UNIT 2, complete **UNIT 1A source/debug media privacy**: AUD-11 proves an
+anonymous synthetic file is served by non-native DEBUG media routing. Reuse the
+authenticated owner-filtered private_media handler from alfred_ai/native_views.py
+in supported source profiles through alfred_ai/urls.py; public static assets are
+separate. Test anonymous/foreign-owner denial, owned module-document access,
+safe paths/no-store, source/native settings and normal UI file access. No schema
+change, real private-file request or production configuration edit is authorized.
+Done: both supported profiles enforce media ownership, with focused regressions.
+The current runserver observation does not prove its actual DEBUG/media path.
+
 Objective: address current official Django 6.0.9 security advisory relative to deployed 6.0.8.
 
 Affected: requirements.txt, constraints/windows-py312.txt, current CI/native/package dependency handling. Reuse existing supported Python 3.12/environment build strategy; create a separate environment, never install into the running production SDK.

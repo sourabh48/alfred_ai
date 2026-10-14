@@ -1,5 +1,11 @@
 # Data Privacy And Storage
 
+Source/debug profile caveat: non-native DEBUG routing currently uses Django's
+unauthenticated media serving. A synthetic anonymous request returned 200;
+native private_media is owner protected. No current private-file exposure was
+tested. Do not attach private media to source/debug until ownership is enforced
+across profiles; see AUD-11 in the [audit](../artifacts/audit/ALFRED_WHOLE_PROJECT_AUDIT_20261015.md).
+
 **Current privacy boundary — 2026-10-15:** Local canonical finance SQLite is plaintext; M15 MemoryStore/index/journal encryption protects AI memory only. Read-only audit found broad local read grants on the private DB and runtime config; no ACL/key change was performed. Raw-upload cleanup is configurable, not a universal native default: native local-vault retention was explicitly deferred under ownership/deletion controls. Owner consent protects family financial summaries; it does not grant memory/document sharing. Real OpenAI/private cloud remain OFF; independent device-loss key recovery is UNVERIFIED. [Acceptance and recovery stages](ALFRED_END_TO_END_ACCEPTANCE.md).
 
 ALFRED handles bank statements, credit reports, loan documents, resumes, and vehicle documents. Treat every production deployment as sensitive financial-data infrastructure.

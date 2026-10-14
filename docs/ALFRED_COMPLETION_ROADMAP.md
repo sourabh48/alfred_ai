@@ -14,6 +14,7 @@ M20 development exists at 0052410 on feature/m20-release-gates; it is not a new 
 | --- | --- | --- | --- | --- |
 | 0 | Operational acceptance: current availability and Windows data ACLs | native health/launcher and current recovery plan | Approved diagnosis; owner/service access, foreign-account denial, service health | P1; live changes require separate authorization |
 | 1 | FIN-SAFE: finite User money inputs | UserSerializer, Budget finite guard | NaN/Infinity/overflow → 400/no mutation; canonical regression | Confirmed correctness defect; isolated engineering first |
+| 1a | PROFILE-PRIVACY: source/debug media ownership | Existing native private_media owner handler | Anonymous/foreign-owner denied in native and source/debug; owned documents usable | Confirmed synthetic 200 in DEBUG source profile; no live exposure asserted |
 | 2 | M18 security dependency patch | requirements/Windows constraints/build scripts | Current official advisory applicability; clean env, focused security gate, fresh package | Django 6.0.9 follow-up; not a replay of completed M01A |
 | 3 | Finish M20 source/privacy safeguards | existing release_gate/validation/recovery/promotion | Ignored operator collisions rejected; JSON credentials detected; no mutations on rejection | Confirmed unfinished-gate defects |
 | 4 | Finish M20 integrated validation and CI | existing house backend/browser/native/backup commands | Exact SHA manifests, actual full gate, privacy, restore, dry-run, approved remote CI | Local PASS ≠ remote; no auto push/deploy |

@@ -2,6 +2,11 @@
 
 ## Latest completed audit checkpoint — 2026-10-15
 
+Final profile diagnostic: non-native DEBUG media route serves a synthetic file
+anonymously (200); native private_media is owner protected. AUD-11 and UNIT 1A
+cover a scoped source-profile fix. No actual private file/current DEBUG queried.
+Reconciliation commit: 62558c0fa21633a050317adc401ac9ce440639d7.
+
 Verified implementation/evidence commits:
 - 1c2e43491ddc2b3f64add7c6102cb56a8004f7c5 — pinned source and public inventory.
 - d2b788c77209d41c84e1ed007aeaa93774410894 — matrix/findings/roadmap/register/
