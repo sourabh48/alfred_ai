@@ -61,7 +61,8 @@ def authorization(path, manifest, target, runtime, environment):
 
 
 def canonical_snapshot(path):
-    return {table: record for table, record in recovery.database_snapshot(path).items()
+    # Signing in changes last_login; income, ownership, consent and all financial columns remain covered.
+    return {table: record for table, record in recovery.database_snapshot(path, {"users_user": ("last_login",)}).items()
             if table.startswith(FINANCIAL_PREFIXES) or table == "django_migrations"}
 
 
@@ -132,6 +133,13 @@ class NativeOperator:
             time.sleep(1)
         raise release.GateError("native_scheduler_or_runtime_not_ready")
 
+    def acceptance(self):
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        for path in ("/login/", "/static/js/intelligence.js", "/static/css/workspace.css"):
+            with opener.open(f"http://127.0.0.1:{self.port}" + path, timeout=15) as response:
+                if response.status != 200:
+                    raise release.GateError("public_runtime_acceptance_failed")
+
 
 def promote(candidate_repo, manifest, output, target, runtime, key_file=None, approval_file=None,
             execute=False, environment="rehearsal", port=8150, operator=None):
@@ -147,6 +155,8 @@ def promote(candidate_repo, manifest, output, target, runtime, key_file=None, ap
             return state  # Idempotent completion never stops or reapplies a release.
         raise release.GateError("interrupted_promotion_requires_review")
     release.source_checks(candidate_repo, manifest, target_repo=target)
+    if environment == "production":
+        release.remote_check(candidate_repo, manifest)
     state.update(stage="PREFLIGHT", environment=environment, plan=list(STAGES), execute=bool(execute),
                  target_repo=str(target), runtime=str(runtime))
     required = REHEARSAL_REQUIRED if environment == "rehearsal" else BEFORE_PRODUCTION
@@ -161,6 +171,8 @@ def promote(candidate_repo, manifest, output, target, runtime, key_file=None, ap
         raise release.GateError("required_promotion_gates_unsatisfied")
     if not key_file or not manifest.get("backup", {}).get("directory"):
         raise release.GateError("verified_local_backup_and_existing_key_required")
+    if manifest["backup"].get("runtime_reference") != recovery.runtime_reference(runtime):
+        raise release.GateError("approved_backup_runtime_mismatch")
     # Bind to evidence AFTER the target's operator-file recheck; no older waiver or YES is inherited.
     approved = authorization(approval_file, manifest, target, runtime, environment)
     operator_hashes = dict(manifest["gates"]["operators"]["evidence"]["sha256"])
@@ -212,6 +224,7 @@ def promote(candidate_repo, manifest, output, target, runtime, key_file=None, ap
             checkpoint("RESTART", "NOT_RUN", "restart_about_to_begin")
             ops.start()
             ops.health()
+            ops.acceptance()
             snapshot = fresh / "after-start.sqlite3"
             recovery.sqlite_copy(runtime / "db.sqlite3", snapshot)
             if canonical_snapshot(snapshot) != expected:

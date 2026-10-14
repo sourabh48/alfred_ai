@@ -21,10 +21,12 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
     def test_private_database_and_memory_payload_paths_are_blocked(self):
         self.commit("artifacts/private-memory-v2/index.sqlite3", "synthetic private memory")
         self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        release.source_checks(self.repo, self.manifest)
         result = validation.privacy(self.repo, self.manifest)
         self.assertEqual(result["status"], "FAIL")
         self.assertNotIn("synthetic private memory", json.dumps(result))
         self.assertNotIn("index.sqlite3", json.dumps(result))
+        self.assertNotIn("index.sqlite3", json.dumps(self.manifest))
 
     def test_secret_removed_in_later_commit_still_blocks_history_push(self):
         secret = "sk-proj-" + "a" * 40
@@ -85,6 +87,15 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.assertEqual(self.manifest["gates"]["backend"]["status"], "NOT_RUN")
         self.assertEqual(self.manifest["targeted_runs"][-1]["tests"], 3)
 
+    def test_failed_gate_can_be_explicitly_rerun_without_losing_prior_result(self):
+        release.gate(self.manifest, "backend", "FAIL", "synthetic_prior_failure")
+        result = {"status": "PASS", "code": "suite_exit", "tests": 3, "skips": 0,
+                  "log": "synthetic.log", "log_sha256": "a" * 64}
+        with patch.object(validation, "run", return_value=result):
+            validation.validate(self.repo, self.manifest, self.root / "retry", "backend")
+        self.assertEqual(self.manifest["gates"]["backend"]["status"], "PASS")
+        self.assertEqual(self.manifest["validation_history"][-1]["previous"]["backend"]["status"], "FAIL")
+
     def test_skipped_or_zero_backend_tests_do_not_pass(self):
         for count, skips in ((0, 0), (3, 1)):
             result = {"status": "PASS", "code": "suite_exit", "tests": count, "skips": skips,
@@ -93,6 +104,20 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
                 validation.validate(self.repo, self.manifest, self.root / ("run-" + str(count)), "backend")
                 self.assertEqual(self.manifest["gates"]["backend"]["status"], "FAIL")
                 self.manifest = release.new_manifest("synthetic-1", self.candidate, self.baseline)
+
+    def test_absent_package_is_not_run_instead_of_pass(self):
+        validation.packaged(self.repo, self.manifest, self.root, {}, None, None)
+        self.assertEqual(self.manifest["gates"]["packaged"]["status"], "NOT_RUN")
+
+    def test_packaged_source_and_executable_identity_are_required_before_execution(self):
+        manifest = self.root / "package.json"
+        manifest.write_text(json.dumps({"source_commit": self.baseline, "source_dirty": False}))
+        with self.assertRaisesRegex(release.GateError, "packaged_source_identity_mismatch"):
+            validation.packaged(self.repo, self.manifest, self.root, {}, self.root, manifest)
+        (self.root / "ALFRED.exe").write_bytes(b"synthetic executable")
+        manifest.write_text(json.dumps({"source_commit": self.candidate, "source_dirty": False, "artifacts": {}}))
+        with self.assertRaisesRegex(release.GateError, "packaged_executable_hash_mismatch"):
+            validation.packaged(self.repo, self.manifest, self.root, {}, self.root, manifest)
 
 
 if __name__ == "__main__":

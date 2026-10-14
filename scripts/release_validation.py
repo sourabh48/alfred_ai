@@ -33,7 +33,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_retention_release_boundary", "test_statement_columns", "test_token_rotation",
     "test_travel_http", "test_upload_limits", "test_upload_privacy_retention", "test_user_data_reset",
     "test_release_gate", "test_release_validation", "test_release_recovery", "test_private_recovery_verifier",
-    "test_release_promotion"))
+    "test_release_promotion", "test_release_acceptance", "test_browser_regression_runner", "test_live_ui_contracts"))
 
 SECRET = re.compile(rb"sk-(?:proj-|svcacct-|ant-api[0-9]-)?[A-Za-z0-9_-]{30,}|"
                     rb"github_pat_[A-Za-z0-9_]{35,}|gh[pousr]_[A-Za-z0-9]{30,}|"
@@ -111,6 +111,9 @@ def privacy(repo, manifest):
                  "source_privacy_findings" if findings else "pinned_source_privacy_verified",
                  paths=len(paths), blobs=len(objects), history_commits=len(commits),
                  reviewed_synthetic_identifiers=reviewed, findings=findings)
+    source = manifest["gates"]["source"].get("evidence", {})
+    source["changed_paths"] = ["redacted-path-" + hashlib.sha256(path.encode()).hexdigest()[:16]
+                               if PRIVATE.search(path) else path for path in source.get("changed_paths", [])]
     return manifest["gates"]["privacy"]
 
 
@@ -170,17 +173,20 @@ def run(repo, command, env, output, name, timeout):
     return result
 
 
-def validate(repo, manifest, output, profile, labels=(), with_ollama=False):
+def validate(repo, manifest, output, profile, labels=(), with_ollama=False, bundle=None, package_manifest=None):
     repo, output = Path(repo).resolve(), Path(output).resolve()
     release.source_checks(repo, manifest)
     privacy(repo, manifest)
     if decision_failed(manifest):
         return
+    run_id = uuid.uuid4().hex[:12]
+    manifest.setdefault("validation_history", []).append({"run": run_id, "profile": profile,
+        "previous": {name: manifest["gates"][name] for name in ("configuration", "backend", "browser", "native", "ollama", "packaged")}})
     env = environment(output / ("synthetic-" + uuid.uuid4().hex))
     configuration = []
     for index, args in enumerate((("check",), ("makemigrations", "--check", "--dry-run"))):
         configuration.append(run(repo, [sys.executable, "manage.py", *args], env, output,
-                                 "configuration-" + str(index), 120))
+                                 "configuration-" + run_id + "-" + str(index), 120))
     release.gate(manifest, "configuration", "PASS" if all(r["status"] == "PASS" for r in configuration) else "FAIL",
                  "isolated_configuration_checks", results=configuration, cloud_enabled=False, paid_openai_enabled=False)
     if manifest["gates"]["configuration"]["status"] != "PASS":
@@ -189,7 +195,7 @@ def validate(repo, manifest, output, profile, labels=(), with_ollama=False):
         selected = tuple(labels) if profile == "targeted" else BACKEND
         if not selected or any(not re.fullmatch(r"(?:tests|apps)\.[A-Za-z0-9_.]+", label) for label in selected):
             raise release.GateError("invalid_targeted_test_labels")
-        result = run(repo, [sys.executable, "manage.py", "test", *selected, "--noinput"], env, output, "backend", 1800)
+        result = run(repo, [sys.executable, "manage.py", "test", *selected, "--noinput"], env, output, "backend-" + run_id, 1800)
         if not result["tests"] or result["skips"]:
             result["status"] = "FAIL"
             result["code"] = "tests_missing_or_skipped"
@@ -201,7 +207,7 @@ def validate(repo, manifest, output, profile, labels=(), with_ollama=False):
     if profile in ("browser", "full"):
         result = run(repo, [sys.executable, "scripts/run_browser_regressions.py", "--browser", "Chrome",
                            "--require-browser", "--artifact-dir", str(output / "browser"),
-                           "--proof-label", "release"], env, output, "browser", 1800)
+                           "--proof-label", "release"], env, output, "browser-" + run_id, 1800)
         if not result["tests"] or result["skips"]:
             result["status"] = "NOT_RUN" if result["skips"] else "FAIL"
         release.gate(manifest, "browser", result["status"], "house_chrome_suite", **result_evidence(result))
@@ -209,19 +215,24 @@ def validate(repo, manifest, output, profile, labels=(), with_ollama=False):
         args = [sys.executable, "scripts/verify_native_runtime.py", "--browser", "--port", "8140"]
         if with_ollama:
             args.append("--memory")
-        result = run(repo, args, env, output, "native", 1800)
-        # The house report provides per-check evidence; a zero exit alone is insufficient.
         native_path = repo / "artifacts/ops/native_huey_verification.json"
+        previous = release.sha256(native_path) if native_path.is_file() else None
+        result = run(repo, args, env, output, "native-" + run_id, 1800)
+        # The house report provides per-check evidence; a zero exit alone is insufficient.
         native = {}
         if native_path.is_file():
             import json
             native = json.loads(native_path.read_text(encoding="utf-8"))
-        passed = result["status"] == "PASS" and native.get("passed") is True and bool(native.get("checks"))
+        passed = (result["status"] == "PASS" and native.get("passed") is True and bool(native.get("checks"))
+                  and release.sha256(native_path) != previous)
         release.gate(manifest, "native", "PASS" if passed else "FAIL", "house_native_suite",
-                     **result_evidence(result), checks=len(native.get("checks", {})))
+                     **result_evidence(result), checks=len(native.get("checks", {})),
+                     report_sha256=release.sha256(native_path) if native_path.is_file() else None)
         manifest["native_run"] = native.get("run")
         if with_ollama:
             release.gate(manifest, "ollama", "PASS" if passed else "FAIL", "local_model_native_acceptance")
+    if profile == "packaged":
+        packaged(repo, manifest, output, env, bundle, package_manifest, with_ollama)
     # Tests must not silently change tracked source or advance the selected SHA.
     release.source_checks(repo, manifest)
 
@@ -231,4 +242,33 @@ def result_evidence(result):
 
 
 def decision_failed(manifest):
-    return any(result["status"] == "FAIL" for result in manifest["gates"].values())
+    return any(manifest["gates"][name]["status"] == "FAIL" for name in ("source", "dependencies", "migrations", "privacy"))
+
+
+def packaged(repo, manifest, output, env, bundle, package_manifest, with_ollama=False):
+    import json
+    if not bundle or not package_manifest:
+        release.gate(manifest, "packaged", "NOT_RUN", "fresh_bundle_and_source_manifest_required")
+        return
+    from scripts.package_windows_release import inspect_bundle
+    bundle, package_manifest = Path(bundle).resolve(), Path(package_manifest).resolve()
+    receipt = json.loads(package_manifest.read_text(encoding="utf-8"))
+    if receipt.get("source_commit") != manifest["candidate_sha"] or receipt.get("source_dirty") is not False:
+        raise release.GateError("packaged_source_identity_mismatch")
+    for name in ("ALFRED.exe", "ALFRED Launcher.exe"):
+        if receipt.get("artifacts", {}).get(name, {}).get("sha256") != release.sha256(bundle / name):
+            raise release.GateError("packaged_executable_hash_mismatch")
+    files = inspect_bundle(bundle)
+    report = Path(repo) / "artifacts/ops/native_exe_verification.json"
+    previous = release.sha256(report) if report.is_file() else None
+    args = [sys.executable, "scripts/verify_native_runtime.py", "--executable", str(bundle / "ALFRED.exe"),
+            "--launcher", str(bundle / "ALFRED Launcher.exe"), "--browser", "--port", "8160"]
+    if with_ollama:
+        args.append("--memory")
+    result = run(repo, args, env, output, "packaged-" + uuid.uuid4().hex[:12], 1800)
+    record = json.loads(report.read_text()) if report.is_file() else {}
+    passed = (result["status"] == "PASS" and record.get("passed") is True and bool(record.get("checks"))
+              and release.sha256(report) != previous)
+    release.gate(manifest, "packaged", "PASS" if passed else "FAIL", "house_packaged_native_and_chrome",
+        **result_evidence(result), checks=len(record.get("checks", {})), inspected_files=len(files),
+        source_manifest_sha256=release.sha256(package_manifest), scope="same_host_portable_package_only")

@@ -143,6 +143,9 @@ def report(manifest, output):
     output.mkdir(parents=True, exist_ok=True)
     manifest["technical"] = decision(manifest, TECHNICAL)
     manifest["promotion"] = decision(manifest, TECHNICAL + OPERATIONAL)
+    if manifest.get("deployment", {}).get("status") == "FAIL":
+        manifest["promotion"]["status"] = "FAIL"
+        manifest["promotion"]["failed"].append("deployment")
     manifest["promotion"]["authorized"] = manifest.get("approval", {}).get("status") == "PASS"
     manifest["promotion"]["ready"] = (manifest["promotion"]["status"] == "PASS"
                                         and manifest["promotion"]["authorized"])
@@ -159,6 +162,13 @@ def report(manifest, output):
         lines.append(f"| {name} | {result['status']} | {result['code']} |")
     lines += ["", "Waivers are release-specific exceptions, never PASS or recovery proof.",
               "No deployment or GitHub push is performed by validation/report commands."]
+    state = manifest.get("deployment", {})
+    lines += ["", f"Deployment: {state.get('stage', 'PREFLIGHT')} / {state.get('status', 'NOT_RUN')}",
+              f"Rollback: {state.get('rollback', 'NOT_RUN')}",
+              f"Command: {manifest.get('command_result', {}).get('status', 'NOT_RUN')}",
+              f"M21 disposable rehearsal: {manifest.get('rehearsal', {}).get('status', 'NOT_RUN')}",
+              "", "Recovery checks remain separate: local restore, copied archive, portable key, device-loss restore.",
+              "Real-account, separate-PC and installer evidence is never inferred from synthetic tests."]
     for run in manifest.get("targeted_runs", []):
         lines.append(f"Targeted validation: {run['status']}; tests={run['tests']}; skips={run['skips']}; log={run['log']}")
     (output / "release.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -218,9 +228,44 @@ def load(path):
     return manifest
 
 
+def record_evidence(manifest, path):
+    """Human/device observations are explicit attestations, never inferred from tests."""
+    record = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    name, status = record.get("gate"), record.get("status")
+    if (name not in WAIVABLE or status not in STATUSES
+            or any(record.get(key) != manifest[key] for key in ("release_id", "candidate_sha"))
+            or not all(isinstance(record.get(key), str) and record[key].strip()
+                       for key in ("authorized_by", "authorization_evidence", "reason"))):
+        raise GateError("invalid_scoped_operational_evidence")
+    observed = datetime.fromisoformat(record["observed_utc"])
+    if observed.tzinfo is None or observed > datetime.now(timezone.utc):
+        raise GateError("invalid_evidence_timestamp")
+    reference = sha256(path)
+    if status == "WAIVED_BY_USER":
+        if record.get("decision") != "YES" or record.get("scope") != "this_release_only":
+            raise GateError("explicit_release_waiver_required")
+        manifest["waivers"] = [item for item in manifest["waivers"] if item.get("gate") != name]
+        manifest["waivers"].append({key: record[key] for key in (
+            "release_id", "candidate_sha", "gate", "scope", "reason", "authorized_by", "authorization_evidence")})
+    if status == "PASS":
+        if not record.get("evidence_files"):
+            raise GateError("attestation_requires_verifiable_evidence_files")
+        files = [sha256(Path(path).parent / filename) for filename in record["evidence_files"]]
+        if name == "device_loss_restore" and not all(record.get(key) is True for key in
+                ("decryption_verified", "sqlite_integrity_verified", "inventory_reconciled", "original_profile_not_required")):
+            raise GateError("hashes_alone_are_not_device_loss_recovery")
+    else:
+        files = []
+    manifest.setdefault("evidence_history", []).append({"gate": name, "previous": manifest["gates"][name],
+        "record_sha256": reference, "observed_utc": observed.isoformat()})
+    gate(manifest, name, status, "explicit_operator_attestation", record_sha256=reference,
+         evidence_sha256=files, observed_utc=observed.isoformat(), scope="operator_attested_not_automatically_verified")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("preflight", "validate", "backup", "recovery", "promote", "status", "report"))
+    parser.add_argument("command", choices=("preflight", "validate", "backup", "recovery", "promote", "record",
+                                           "approval-request", "rehearse", "complete", "status", "report"))
     parser.add_argument("--repo", type=Path, default=ROOT)
     parser.add_argument("--release-id")
     parser.add_argument("--candidate")
@@ -229,7 +274,7 @@ def main(argv=None):
     parser.add_argument("--target-repo", type=Path)
     parser.add_argument("--expected-dependency", action="append", default=[])
     parser.add_argument("--expected-migration", action="append", default=[])
-    parser.add_argument("--profile", choices=("targeted", "backend", "browser", "native", "full"), default="targeted")
+    parser.add_argument("--profile", choices=("targeted", "backend", "browser", "native", "packaged", "full"), default="targeted")
     parser.add_argument("--test-label", action="append", default=[])
     parser.add_argument("--with-ollama", action="store_true")
     parser.add_argument("--runtime", type=Path)
@@ -241,6 +286,10 @@ def main(argv=None):
     parser.add_argument("--authorization", type=Path)
     parser.add_argument("--environment", choices=("rehearsal", "production"), default="rehearsal")
     parser.add_argument("--port", type=int, default=8150)
+    parser.add_argument("--evidence", type=Path)
+    parser.add_argument("--rehearsal-directory", type=Path)
+    parser.add_argument("--bundle", type=Path)
+    parser.add_argument("--package-manifest", type=Path)
     args = parser.parse_args(argv)
     manifest = None
     try:
@@ -253,9 +302,41 @@ def main(argv=None):
                 remote_check(args.repo, manifest)
         else:
             manifest = load(args.output / "release.json")
+        if args.command == "record":
+            if not args.evidence:
+                raise GateError("explicit_evidence_file_required")
+            record_evidence(manifest, args.evidence)
+        if args.command == "approval-request":
+            from scripts.release_promotion import binding
+            if not args.target_repo or not args.runtime:
+                raise GateError("explicit_target_and_runtime_required")
+            source_checks(args.repo, manifest, target_repo=args.target_repo)
+            request = {"decision": "PENDING", "binding": binding(manifest, args.target_repo, args.runtime, args.environment),
+                       "authorized_by": "", "authorization_evidence": "", "expires_utc": "",
+                       "actions": ["stop_writers", "backup", "promote", "restart", "rollback_source", "restart_previous"]}
+            destination = args.output / "approval-request.json"
+            if destination.exists():
+                raise GateError("approval_request_already_exists")
+            write_json(destination, request)
+        if args.command == "rehearse":
+            from scripts.release_acceptance import rehearse
+            if not args.rehearsal_directory:
+                raise GateError("new_disposable_rehearsal_directory_required")
+            rehearse(args.repo, manifest, args.output, args.rehearsal_directory, args.port)
+        if args.command == "complete":
+            state = manifest["deployment"]
+            if (state.get("environment") != "production" or state.get("stage") != "ACCEPTANCE"
+                    or not args.target_repo or not args.runtime
+                    or str(args.target_repo.resolve()) != state.get("target_repo")
+                    or str(args.runtime.resolve()) != state.get("runtime")
+                    or git(args.target_repo, "rev-parse", "HEAD") != manifest["candidate_sha"]
+                    or decision(manifest, TECHNICAL + OPERATIONAL)["status"] != "PASS"):
+                raise GateError("deployment_acceptance_incomplete")
+            state.update(stage="COMPLETE", status="PASS", code="all_release_and_human_acceptance_recorded")
         if args.command == "validate":
             from scripts.release_validation import validate
-            validate(args.repo, manifest, args.output, args.profile, args.test_label, args.with_ollama)
+            validate(args.repo, manifest, args.output, args.profile, args.test_label, args.with_ollama,
+                     args.bundle, args.package_manifest)
         if args.command in ("backup", "recovery"):
             from scripts import release_recovery
             source_checks(args.repo, manifest)
@@ -275,7 +356,8 @@ def main(argv=None):
             gate(manifest, "local_backup", "PASS", "independent_local_restore_verified", **receipt)
             gate(manifest, "financial", "PASS", "authenticated_restore_typed_rows_schema_and_fk_match",
                  archive_sha256=receipt["archive_sha256"])
-            manifest["backup"] = {"directory": str(args.backup_directory.resolve()), "archive_sha256": receipt["archive_sha256"]}
+            manifest["backup"] = {"directory": str(args.backup_directory.resolve()), "archive_sha256": receipt["archive_sha256"],
+                                  "runtime_reference": receipt["runtime_reference"]}
         if args.command == "promote":
             from scripts.release_promotion import promote
             if not args.target_repo or not args.runtime:
@@ -289,13 +371,18 @@ def main(argv=None):
             scope += ("remote_git",)
         if args.command == "validate":
             scope += ("configuration",)
-            if args.profile in ("backend", "browser", "native"):
+            if args.profile in ("backend", "browser", "native", "packaged"):
                 scope += (args.profile,)
             elif args.profile == "full":
                 scope = TECHNICAL
         if args.command in ("backup", "recovery"):
             scope += ("local_backup", "financial")
-        command_decision = decision(manifest, scope if args.command in ("preflight", "validate", "backup", "recovery") else TECHNICAL + OPERATIONAL)
+        if args.command == "rehearse":
+            scope = TECHNICAL
+        if args.command in ("record", "approval-request"):
+            scope = ()  # Recording a scoped observation does not certify the release.
+        command_decision = decision(manifest, scope if args.command in
+            ("preflight", "validate", "backup", "recovery", "record", "approval-request", "rehearse") else TECHNICAL + OPERATIONAL)
         if args.command == "validate" and args.profile == "targeted" and manifest.get("last_validation", {}).get("status") == "FAIL":
             command_decision["status"] = "FAIL"
         if args.command == "promote":
@@ -313,6 +400,12 @@ def main(argv=None):
         if manifest is not None:
             manifest["command_result"] = {"command": args.command, "status": "FAIL", "code": code,
                                           "exception_type": type(exc).__name__}
+            if args.command in ("preflight", "validate"):
+                gate(manifest, "source", "FAIL", code, exception_type=type(exc).__name__)
+            elif args.command in ("backup", "recovery"):
+                gate(manifest, "local_backup", "FAIL", code, exception_type=type(exc).__name__)
+            elif args.command == "promote":
+                manifest["deployment"].update(status="FAIL", code=code)
             try:
                 report(manifest, args.output)
             except GateError:

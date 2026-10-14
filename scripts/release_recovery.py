@@ -33,6 +33,10 @@ CHUNK = 1024 * 1024
 GROUPS = ("config", "media", "ml_models", "artifacts/native/jobs.sqlite3", "artifacts/private-memory-v2")
 
 
+def runtime_reference(runtime):
+    return hashlib.sha256(str(no_links(runtime)).casefold().encode()).hexdigest()
+
+
 def no_links(path):
     path = Path(os.path.abspath(path))
     if any(p.is_symlink() or p.is_junction() for p in (path, *path.parents)):
@@ -58,7 +62,7 @@ def cipher_from_file(path):
     return Fernet(key), "WINDOWS_PROFILE_BOUND" if profile_bound else "PORTABLE_FORMAT_UNVERIFIED"
 
 
-def database_snapshot(path):
+def database_snapshot(path, ignored_columns=None):
     """Typed row fingerprints preserve money/identity/ownership without publishing values."""
     with closing(sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)) as db:
         if db.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
@@ -69,7 +73,11 @@ def database_snapshot(path):
         result = {}
         for table, schema in tables:
             hashes = []
-            for row in db.execute('SELECT * FROM "' + table.replace('"', '""') + '"'):
+            quoted = '"' + table.replace('"', '""') + '"'
+            ignored = set((ignored_columns or {}).get(table, ()))
+            columns = [item[1] for item in db.execute("PRAGMA table_info(" + quoted + ")") if item[1] not in ignored]
+            selected = ",".join('"' + item.replace('"', '""') + '"' for item in columns)
+            for row in db.execute('SELECT ' + selected + ' FROM ' + quoted):
                 values = [(type(value).__name__, value.hex() if isinstance(value, bytes) else repr(value)) for value in row]
                 hashes.append(hashlib.sha256(json.dumps(values).encode()).digest())
                 if len(hashes) > 1000000:
@@ -141,7 +149,8 @@ def create(runtime, destination, key_file, release_id, candidate, baseline, sour
     records, snapshots = [], {}
     metadata = {"schema": 1, "release_id": release_id, "candidate_sha": candidate,
                 "production_baseline_sha": baseline, "complete": False, "files": records,
-                "coverage": coverage, "database_snapshots": snapshots, "key_kind": key_kind}
+                "coverage": coverage, "database_snapshots": snapshots, "key_kind": key_kind,
+                "runtime_reference": runtime_reference(runtime)}
     with writer_barriers(runtime, databases):
         for name, source in files.items():
             target = scratch / name
@@ -196,7 +205,7 @@ def create(runtime, destination, key_file, release_id, candidate, baseline, sour
                         chunks.append({"entry": entry, "sha256": hashlib.sha256(token).hexdigest(), "bytes": len(content)})
                 record["chunks"] = chunks
             zipped.writestr("manifest.fernet", cipher.encrypt(json.dumps(metadata, sort_keys=True).encode()))
-    public = {key: metadata[key] for key in ("schema", "release_id", "candidate_sha", "production_baseline_sha", "file_count", "total_bytes", "key_kind")}
+    public = {key: metadata[key] for key in ("schema", "release_id", "candidate_sha", "production_baseline_sha", "file_count", "total_bytes", "key_kind", "runtime_reference")}
     public.update(archive="recovery.zip", archive_bytes=archive.stat().st_size, archive_sha256=release.sha256(archive), complete=True)
     write_json(destination / "backup.json", public)
     # Independent process: decrypt and restore with the supplied existing key, not capture's in-memory cipher.
@@ -233,7 +242,7 @@ def restore(backup, key_file, destination):
         if zipped.getinfo("manifest.fernet").file_size > 16 * 1024 * 1024:
             raise release.GateError("encrypted_manifest_budget")
         metadata = json.loads(cipher.decrypt(zipped.read("manifest.fernet")))
-        for key in ("schema", "release_id", "candidate_sha", "production_baseline_sha", "file_count", "total_bytes"):
+        for key in ("schema", "release_id", "candidate_sha", "production_baseline_sha", "file_count", "total_bytes", "runtime_reference"):
             if metadata.get(key) != public.get(key):
                 raise release.GateError("authenticated_manifest_identity_failed")
         records = metadata["files"]
@@ -281,6 +290,7 @@ def restore(backup, key_file, destination):
             "file_count": metadata["file_count"], "database_count": len(metadata["database_snapshots"]),
             "sqlite_integrity": "PASS", "foreign_keys": "PASS", "financial_reconciliation": "PASS",
             "archive_sha256": public["archive_sha256"], "key_kind": key_kind,
+            "runtime_reference": metadata["runtime_reference"],
             "restore_scope": "fresh_process_same_device_only"}
 
 

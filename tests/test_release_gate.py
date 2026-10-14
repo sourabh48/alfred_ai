@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from datetime import datetime, timezone
 
 from scripts import release_gate as release
 
@@ -179,6 +180,53 @@ class ReleaseSourceTests(ReleaseRepositoryFixture, unittest.TestCase):
                              "--output", str(self.root / "cli")])
         self.assertEqual(code, 0)
         self.assertFalse(json.loads((self.root / "cli/release.json").read_text())["promotion"]["ready"])
+
+    def evidence(self, name="device_loss_restore", status="WAIVED_BY_USER"):
+        payload = {"release_id": "synthetic-1", "candidate_sha": self.candidate, "gate": name, "status": status,
+                   "authorized_by": "synthetic operator", "authorization_evidence": "synthetic current explicit YES",
+                   "reason": "synthetic test only", "observed_utc": datetime.now(timezone.utc).isoformat(),
+                   "decision": "YES", "scope": "this_release_only"}
+        path = self.root / "evidence.json"
+        path.write_text(json.dumps(payload))
+        return path, payload
+
+    def test_explicit_waiver_keeps_distinct_status_and_release_scope(self):
+        path, payload = self.evidence()
+        release.record_evidence(self.manifest, path)
+        self.assertEqual(self.manifest["gates"]["device_loss_restore"]["status"], "WAIVED_BY_USER")
+        self.assertEqual(release.decision(self.manifest, ["device_loss_restore"])["waived"], ["device_loss_restore"])
+        other = release.new_manifest("next-release", self.candidate, self.baseline)
+        with self.assertRaisesRegex(release.GateError, "invalid_scoped_operational_evidence"):
+            release.record_evidence(other, path)
+
+    def test_financial_privacy_local_backup_and_remote_git_cannot_be_attested_or_waived(self):
+        for name in ("financial", "privacy", "local_backup", "operators", "remote_git"):
+            path, payload = self.evidence(name)
+            with self.subTest(gate=name), self.assertRaisesRegex(release.GateError, "invalid_scoped_operational_evidence"):
+                release.record_evidence(self.manifest, path)
+
+    def test_waiver_requires_explicit_yes(self):
+        path, payload = self.evidence()
+        payload["decision"] = "PENDING"
+        path.write_text(json.dumps(payload))
+        with self.assertRaisesRegex(release.GateError, "explicit_release_waiver_required"):
+            release.record_evidence(self.manifest, path)
+
+    def test_hashes_cannot_be_attested_as_decryption_or_device_loss_restore(self):
+        path, payload = self.evidence(status="PASS")
+        proof = self.root / "hashes.json"
+        proof.write_text('{"synthetic_hashes_only": true}')
+        payload["evidence_files"] = [proof.name]
+        path.write_text(json.dumps(payload))
+        with self.assertRaisesRegex(release.GateError, "hashes_alone_are_not_device_loss_recovery"):
+            release.record_evidence(self.manifest, path)
+        for key in ("decryption_verified", "sqlite_integrity_verified", "inventory_reconciled", "original_profile_not_required"):
+            payload[key] = True
+        path.write_text(json.dumps(payload))
+        release.record_evidence(self.manifest, path)
+        evidence = self.manifest["gates"]["device_loss_restore"]["evidence"]
+        self.assertEqual(evidence["scope"], "operator_attested_not_automatically_verified")
+        self.assertEqual(evidence["evidence_sha256"], [release.sha256(proof)])
 
 
 if __name__ == "__main__":

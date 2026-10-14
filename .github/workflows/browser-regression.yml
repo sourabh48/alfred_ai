@@ -84,7 +84,7 @@ jobs:
             artifacts/native-tests/*/*.png
             artifacts/release-ci/release.json
             artifacts/release-ci/release.md
-            artifacts/release-ci/backend.log
+            artifacts/release-ci/*.log
           if-no-files-found: warn
 
   selenium:

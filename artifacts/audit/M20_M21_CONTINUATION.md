@@ -26,8 +26,8 @@ prerequisites; they remain open. No dependency pruning or Travel changes here.
 | Financial snapshot/reconciliation | Old rehearsal patterns | Typed BLOB/Decimal/ownership-preserving wrapper | release_recovery.py, full SQLite integrity/FK and typed row/schema digests | Included in 40 PASS | Synthetic PASS; production NOT_RUN |
 | Local backup/file/SQLite verification | backup_before_windows_reinstall, verify_private_recovery | Explicit single-runtime encrypted wrapper | release_recovery.py; native locks/API and private scratch verifier | WAL, busy writer, missing/corrupt/key/path/restore failures | Included in 40 PASS |
 | Privacy/source scan | Manual Git history review, package inspector | Reusable redacted scan | Pinned source/history checks, redacted logs, stripped child env | History secrets/private paths/unsafe log tests | Included in 20 PASS |
-| Controlled promotion | native start/stop, manual FF and rollback | Pinned approval/resumable rehearsal | Thin wrapper; dry run default | Pending | NOT_RUN |
-| M21 failure/rollback acceptance | Native synthetic/recovery house drill | Release engine rehearsal | Disposable Git/runtime only | Pending | NOT_RUN |
+| Controlled promotion | native start/stop, manual FF and rollback | Pinned approval/resumable rehearsal | release_promotion.py; dry run default | Included in 65 focused PASS | Implemented; actual rehearsal pending |
+| M21 failure/rollback acceptance | Native synthetic/recovery house drill | Release engine rehearsal | release_acceptance.py; new disposable Git/runtime only | Proof boundaries covered in 65 PASS | Actual native rehearsal NOT_RUN |
 | Remote CI / branch protection | One PR/manual workflow | Actual remote evidence/protection | Master trigger and engine backend integration proposed locally | Local review; publication NOT authorized | NOT_RUN remotely |
 | Real-account / separate-PC / installer | Existing acceptance docs/kit | Actual human/device evidence | Keep human checklist | Not inferable locally | PENDING |
 
@@ -119,3 +119,43 @@ Next: finish operator evidence/waiver interface and actual disposable native
 M21 rehearsal, then run the pinned combined gate. No production changes or push.
 Safe focused resume (configured project SDK, from this worktree):
 python -B -m unittest tests.test_release_gate tests.test_release_validation tests.test_release_recovery tests.test_private_recovery_verifier tests.test_release_promotion
+
+## Fifth unit - M21 orchestration and operator evidence
+
+Combined focused run: 65 tests PASS, 148.265s, zero failures/skips, adding
+test_release_acceptance to the previous five modules. Package/source guard suite:
+11 tests PASS, 20.015s; follow-up retry/evidence-identity tests: 2 PASS, 3.512s.
+These runs overlap and are not added. Local workflow YAML/master/read-only/job
+contract PASS; this is not remote CI. Parent source is de9ba15debc7869143bb3e6835e1c4514fa79b8b.
+
+Added release-scoped operational attestations and explicit waivers, PENDING-only
+approval requests, post-deployment human completion, immutable run logs/history,
+same-runtime backup binding, and the existing package inspector/runner adapter.
+Login timestamp changes are expected; user income, ownership, consent, Decimal
+values, financial fingerprints and schema remain covered in reconciliation.
+Private tracked-path findings are redacted even in the source inventory.
+
+M21 orchestration creates a private new source clone/runtime and synthetic protected
+key, reuses only the engine's matching successful native fixture, and performs
+actual startup, Chrome navigation, encrypted restore, ordinary fast-forward,
+restart/retrieval, own-worker crash and source rollback. This code is implemented;
+its actual end-to-end run has not happened at this checkpoint. No production
+authorization is generated or inherited. The baseline fixture and all backups
+are preserved. Local restore never proves device-loss recovery.
+
+Changed files: release_gate.py, release_validation.py, release_recovery.py,
+release_promotion.py, new release_acceptance.py and test_release_acceptance.py,
+test_release_gate.py, test_release_promotion.py, test_release_validation.py,
+browser-regression.yml, RELEASE_GATES.md, RELEASE_HUMAN_ACCEPTANCE.md, this file.
+No Django migration, dependency, application model/view/UI or production file changed.
+
+Configured project SDK has no PyInstaller; documented F:/ALFRED-tools/InnoSetup
+is absent. Fresh package/installer acceptance is NOT_RUN, not reused from M15.
+Read-only production HTTP health was not observed on port 8000 during development;
+no production process was stopped/restarted and no runtime was modified to fix it.
+
+Next safe commands after committing this unit (use the configured SDK): pinned
+preflight, then validate --profile full --with-ollama, then rehearse using a new
+private disposable directory outside this checkout. Actual receipts go under
+artifacts/release-gates/<unique-release-id>; never repin an existing output.
+External latest-verified-commit.json records exact HEAD after each commit.

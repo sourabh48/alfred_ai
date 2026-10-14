@@ -43,6 +43,9 @@ class FakeNative:
     def health(self):
         self.call("health")
 
+    def acceptance(self):
+        self.call("acceptance")
+
 
 class ReleasePromotionTests(ReleaseRepositoryFixture, unittest.TestCase):
     def setUp(self):
@@ -71,7 +74,8 @@ class ReleasePromotionTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.receipt = recovery.create(self.runtime, self.backup, self.key,
             self.manifest["release_id"], self.candidate, self.baseline, self.target)
         release.gate(self.manifest, "local_backup", "PASS", "synthetic_local_restore")
-        self.manifest["backup"] = {"directory": str(self.backup), "archive_sha256": self.receipt["archive_sha256"]}
+        self.manifest["backup"] = {"directory": str(self.backup), "archive_sha256": self.receipt["archive_sha256"],
+                                   "runtime_reference": self.receipt["runtime_reference"]}
         marker = promotion.core_binding(self.manifest, self.target, self.runtime, "rehearsal")
         (self.runtime / ".alfred-release-rehearsal.json").write_text(json.dumps(marker))
         self.approval = self.root / "synthetic-approval.json"
@@ -141,6 +145,13 @@ class ReleasePromotionTests(ReleaseRepositoryFixture, unittest.TestCase):
             self.execute()
         self.assertFalse(self.ops.calls)
 
+    def test_a_different_runtimes_backup_cannot_authorize_shutdown(self):
+        self.manifest["backup"]["runtime_reference"] = "a" * 64
+        self.approve()
+        with self.assertRaisesRegex(release.GateError, "approved_backup_runtime_mismatch"):
+            self.execute()
+        self.assertFalse(self.ops.calls)
+
     def test_browser_ollama_privacy_and_backend_failures_block_promotion(self):
         for name in ("browser", "ollama", "privacy", "backend", "configuration", "local_backup"):
             with self.subTest(gate=name):
@@ -168,6 +179,25 @@ class ReleasePromotionTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.assertEqual(self.manifest["deployment"]["rollback"], "PASS")
         self.assertEqual(before, recovery.database_snapshot(self.runtime / "db.sqlite3"))
         self.assertTrue(Path(self.manifest["deployment"]["failure_backup"]).is_dir())
+
+    def test_browser_acceptance_failure_rolls_source_back(self):
+        self.ops.fail = "acceptance"
+        with self.assertRaisesRegex(release.GateError, "synthetic_acceptance_failure"):
+            self.execute()
+        self.assertEqual(self.manifest["deployment"]["rollback"], "PASS")
+        self.assertEqual(release.git(self.target, "rev-parse", "HEAD"), self.baseline)
+
+    def test_login_timestamp_is_expected_but_income_changes_are_not(self):
+        with closing(sqlite3.connect(self.runtime / "db.sqlite3")) as db, db:
+            db.execute("CREATE TABLE users_user (id INTEGER, monthly_income NUMERIC, last_login TEXT)")
+            db.execute("INSERT INTO users_user VALUES (1,80000,NULL)")
+        before = promotion.canonical_snapshot(self.runtime / "db.sqlite3")
+        with closing(sqlite3.connect(self.runtime / "db.sqlite3")) as db, db:
+            db.execute("UPDATE users_user SET last_login='2026-10-15'")
+        self.assertEqual(before, promotion.canonical_snapshot(self.runtime / "db.sqlite3"))
+        with closing(sqlite3.connect(self.runtime / "db.sqlite3")) as db, db:
+            db.execute("UPDATE users_user SET monthly_income=999")
+        self.assertNotEqual(before, promotion.canonical_snapshot(self.runtime / "db.sqlite3"))
 
     def test_unexplained_financial_writes_are_preserved_and_block_blind_data_rollback(self):
         self.ops.change_data = True

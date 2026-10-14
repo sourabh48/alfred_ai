@@ -13,6 +13,7 @@ $baseline = '3932f391aa4eed7b3200ad3b034f7991435e01e4'
 & $python scripts/release_gate.py validate --output artifacts/release-gates/m20-local --profile backend
 & $python scripts/release_gate.py validate --output artifacts/release-gates/m20-local --profile browser
 & $python scripts/release_gate.py validate --output artifacts/release-gates/m20-local --profile native --with-ollama
+& $python scripts/release_gate.py validate --output artifacts/release-gates/m20-local --profile packaged --bundle $freshBundle --package-manifest $freshPackageManifest --with-ollama
 & $python scripts/release_gate.py status --output artifacts/release-gates/m20-local
 ```
 
@@ -38,6 +39,11 @@ the complete backend gate. Zero/skipped tests cannot pass a release suite.
 Child environments remove operator secrets, force disposable SQLite and disable
 real OpenAI and cloud sync. Diagnostic logs keep test names/counts and omit raw
 tracebacks, exception messages, OCR text, paths and model/user payloads.
+Every run has a new log identity and retains previous results. Explicit retries
+can replace a failed gate only with new passing evidence. Package validation
+requires the exact clean source receipt, both executable hashes and the existing
+bundle inspector before invoking native/Chrome acceptance. No supplied package
+means NOT_RUN; this command never installs a build tool or reuses old proof.
 
 Pinned privacy scanning covers all candidate files and intermediate unpublished
 commits. It does not read the live database or working-copy private configuration.
@@ -118,3 +124,49 @@ BLOCKED, never COMPLETE. No release command pushes to GitHub.
 
 Local development tests exercise real Git/SQLite/encryption with simulated service
 actions; they are not actual native or real-account acceptance evidence.
+
+## M21 disposable rehearsal
+
+After the pinned backend, Chrome and native/Ollama gates pass:
+
+```powershell
+& $python scripts/release_gate.py rehearse --output $releaseEvidence --rehearsal-directory $newPrivateSandbox --port 8150
+```
+
+The sandbox must be new and outside the candidate checkout. The command accepts
+only the engine's current hashed, successful house-native fixture. It creates a
+local source clone at the baseline, a separately encrypted synthetic backup and
+restored runtime, then exercises actual native startup, Chrome navigation, exact
+promotion, restart/memory persistence, worker crash injection and source rollback.
+Only a new synthetic fixture key is generated, profile-protected on Windows; it
+cannot decrypt existing backups. No live path is a test target. Failed evidence
+and backups remain. Rehearsal authorization is bound to the sandbox and never
+authorizes production. Same-host recovery does not fill off-device/key gates.
+
+## Evidence, waivers and approval
+
+`record --evidence <JSON>` accepts operational observations only, bound to this
+release ID and candidate SHA. Include `gate`, `status`, `observed_utc`,
+`authorized_by`, `authorization_evidence` and `reason`. A PASS requires
+`evidence_files` whose hashes are retained. Device-loss restore additionally
+requires explicit observations of decryption, SQLite integrity, reconciled
+inventory and independence from the original profile. These are labeled operator
+attestations; never use synthetic evidence for an actual account/device.
+
+A waiver also requires `decision: YES` and `scope: this_release_only`; it stays
+WAIVED_BY_USER. Financial/privacy/source/local-backup/operator/remote-Git gates
+cannot be attested or waived. Evidence history is retained. Do not place secrets
+in notes or attachments.
+
+`approval-request` with explicit target/runtime/environment writes a bound
+`approval-request.json` with PENDING decision and empty author/evidence/expiry.
+It never generates authorization. The operator must review the gate report and
+provide a separate explicit YES before supplying that file to `promote --execute`.
+The production preflight rechecks remote ancestry. A backup from another runtime
+cannot authorize shutdown. After promotion, actual human acceptance may remain
+BLOCKED; `complete` only records completion after all required observations pass.
+
+Read [the human acceptance checklist](RELEASE_HUMAN_ACCEPTANCE.md). Proposed GitHub
+required checks are `native-windows` and `selenium` from Browser Regression.
+Enforce them on master only after separately authorized publication, actual remote
+CI PASS and explicit repository-settings approval. No command changes protections.
