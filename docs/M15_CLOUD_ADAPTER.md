@@ -1,5 +1,7 @@
 # M15 encrypted cloud adapter pre-connection record
 
+**Current pre-connection status — 2026-10-15:** Adapter source is deployed within 3932f391; no real AWS account/region/bucket acceptance is recorded and cloud stays OFF. Endpoint validation is AWS-specific, not arbitrary S3-compatible/Drive/Azure support. Initial synthetic results below are dated evidence. Portable key/checkpoint recovery remains pending; the historical M15 HDD waiver does not authorize private cloud use. [Provider register](ALFRED_EXTERNAL_INTEGRATIONS.md).
+
 2026-10-11. Initial development provider: Amazon S3, configurable through the
 existing provider-neutral synchronization protocol. No real account is connected,
 no credentials have been supplied and no private/paid request has been made.

@@ -1,5 +1,7 @@
 # Native runtime and recovery proof
 
+**Evidence interpretation — 2026-10-15:** Earlier native/recovery results below are dated proof, not present service health or independent device-loss recovery. M15 has since deployed at 3932f391 with local restore/reconciliation evidence. Normal-account/clean-PC/key portability remain open; the audit made no backup/service/data changes. [Current acceptance](ALFRED_END_TO_END_ACCEPTANCE.md).
+
 This is the historical 16 September development-server proof. The subsequently
 implemented Waitress/Huey runtime, installer and verification commands are in
 [Native Windows](NATIVE_WINDOWS.md). Docker is optional for that runtime.

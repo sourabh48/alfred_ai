@@ -1,5 +1,7 @@
 # Local hosting
 
+**Selected runtime — 2026-10-15:** Local Windows-native remains the deployed path; Compose is optional. Keep loopback/private LAN and do not add public cloud hosting from these guides. Current service health was not observed during audit. Real provider settings remain disabled; see [configuration](CONFIGURATION.md).
+
 For the selected native Windows setup, use [Native Windows](NATIVE_WINDOWS.md):
 Waitress, Huey and SQLite start together from a double-click launcher or the
 standalone installer. The rest of this document describes the optional Docker

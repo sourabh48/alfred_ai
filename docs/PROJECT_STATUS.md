@@ -1,5 +1,13 @@
 # Project Status
 
+**Current status — 2026-10-15:** M14/M15 consolidated source is deployed and GitHub master matches 3932f391aa4eed7b3200ad3b034f7991435e01e4. Dated release results are 619 backend/15 Chrome/35 native (overlapping packaged scope); this audit independently ran 86 focused tests, zero skips, plus isolated system/drift checks. Normal-account, real-provider, clean-PC and device-loss acceptance remain incomplete. Port 8000 did not respond during the audit; no service action was taken. M20 is unfinished separate development; M16–M19/M21 are not declared complete.
+
+Use the [authoritative feature matrix](ALFRED_MASTER_FEATURE_MATRIX.md), [completion roadmap](ALFRED_COMPLETION_ROADMAP.md) and [acceptance plan](ALFRED_END_TO_END_ACCEPTANCE.md). The earlier progress narrative below is historical module detail, not proof of current production availability or comprehensive AI accuracy.
+
+Final read-only observation: /health/live/ returned 200 on a runserver listener;
+/health/native/ returned 404. No audit restart occurred. Actual DB/worker/native
+readiness remains unconfirmed; the initial unavailable observation is historical.
+
 The [completion audit](COMPLETION_AUDIT.md) records the current verification
 results and remaining local/LAN runtime work. The sections below describe
 implemented capabilities, not a guarantee of complete real-data coverage.

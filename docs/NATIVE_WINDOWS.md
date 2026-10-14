@@ -1,5 +1,11 @@
 # ALFRED on Windows
 
+Final audit poll: /health/live/ 200, /health/native/ 404 on a runserver listener;
+no audit runtime action. Verify actual data/worker/native identity before assuming
+the documented native launcher currently owns port 8000.
+
+**Current runtime baseline — 2026-10-15:** Source 3932f391 is deployed in F:/ALFRED/alfred_ai; selected private runtime is F:/ALFRED/restored-runtime/db.sqlite3. Preserve operator config/keys/media/queues. Historical native/package gates passed, but this audit did not observe service health on 8000 and did not restart it. Real-account, sign-in, separate-PC and installer acceptance remain open. [Acceptance plan](ALFRED_END_TO_END_ACCEPTANCE.md).
+
 See the [standalone package guide](WINDOWS_PACKAGE.md),
 [acceptance continuation](ACCEPTANCE_20260925.md) and
 [18 September verification report](NATIVE_HARDENING_VERIFICATION.md)

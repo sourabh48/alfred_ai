@@ -1,5 +1,9 @@
 # M15 recovery acceptance: existing material and manual alternative
 
+**Current recovery status — 2026-10-15:** Local independent pre-M15 restoration was verified; HDD copying is user reported and independently recoverable off-device archive/key restore remains UNVERIFIED under an explicit M15-only deployment waiver. Cancelled sealing dialogs stay cancelled; no plaintext key workaround or new export is authorized. Hash verification/current-profile DPAPI does not prove device-loss recovery. Use [four-stage acceptance](ALFRED_END_TO_END_ACCEPTANCE.md).
+
+## Historical preparation record — 2026-10-12
+
 2026-10-12. Preparation only; no key export, new seal/passphrase dialog, rotation,
 restore of live data, backup overwrite or deletion. Off-device recovery PENDING.
 

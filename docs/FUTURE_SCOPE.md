@@ -1,5 +1,7 @@
 # Future Scope
 
+**Execution order — 2026-10-15:** Use the [completion roadmap](ALFRED_COMPLETION_ROADMAP.md) and [feature matrix](ALFRED_MASTER_FEATURE_MATRIX.md). Prioritize confirmed finite-income/Windows privacy/dependency issues, complete existing M20 gates and M21 acceptance, then T09/M16, M17 and scoped financial/AI/Travel gaps. M14/M15 development must not be restarted. Items below are proposals unless original approval is independently recorded; they do not authorize providers, currency migrations, cloud hosting or autonomous actions.
+
 ## Highest-Value Next Steps
 
 1. Validate the implemented OCR overlays and field corrections against more real document layouts and additional browser workflows.

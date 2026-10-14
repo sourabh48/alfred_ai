@@ -1,5 +1,7 @@
 # M15 encrypted synchronization: synthetic provider slice
 
+**Integrated status — 2026-10-15:** The synthetic protocol and later AWS wire adapter are incorporated in deployed M15, not proof of real provider activation. Lifecycle/retry/tombstone/checkpoint behavior remains locally/synthetically accepted. Owner key/checkpoint/device-loss acceptance is separate and unverified. Memory sync is not full financial database backup. [Current register](ALFRED_EXTERNAL_INTEGRATIONS.md).
+
 Worktree F:/ALFRED_DEV/m15, branch codex/m15-persistent-memory-20261011.
 M14 remains installed at 30e0b3f75e785f639897ad36c19090c6a4e8675f.
 This implementation never synchronizes the live SQLite database, WAL or SHM.

@@ -1,8 +1,10 @@
 # M15 optional public-context cloud reasoning
 
+**Current adapter/lifecycle — 2026-10-15:** Public-query-only adapter source is deployed, but real paid access remains OFF and has no live acceptance. Official docs list pinned gpt-4.1-mini-2025-04-14 as deprecated with 2027-01-14 removal; pricing currently still matches code ($0.40/$1.60 per million). A model/rate decision and explicit bounded approval are required before enabling. store:false is not zero retention. Dated slice tests below are historical. [Current provider register](ALFRED_EXTERNAL_INTEGRATIONS.md).
+
 2026-10-11, isolated source/synthetic HTTP fixtures only. Real paid OpenAI calls:
 ZERO. Default `ALFRED_MEMORY_OPENAI_AUTHORIZED=false`. Ollama embeddings and
-private-data processing remain local. No M15 deployment or live credential change.
+private-data processing remain local. That dated slice made no deployment or credential change; the adapter was later incorporated in the deployed M15 release without enabling paid access.
 
 The adapter uses only `https://api.openai.com/v1/responses` through the existing
 safe HTTPS transport. A restricted owner project key is encrypted in the private

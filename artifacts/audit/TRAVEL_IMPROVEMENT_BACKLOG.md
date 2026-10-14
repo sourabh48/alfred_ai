@@ -1,4 +1,12 @@
-﻿# Travel improvement backlog
+# Travel improvement backlog
+
+## Current disposition — 2026-10-15
+
+T01–T08 implemented scopes are preserved in deployed M15 3932f391. T09 retention/selective invalidation remains open. T10's older rebuild requirement was met by the integrated M15 package/native/browser gate; normal-account, keyed providers, clean-PC and installer acceptance remain separate. T11 requires authoritative contracts/evidence. T12 Investment/Verified Intelligence HTTP migration was resolved at 7bb5086 through the shared bounded transport; do not repeat.
+
+Larger pools, real alternative/scenic routes, motorcycle restrictions, road-detour corridors, broader multi-stop/video/social scope remain in the [matrix](../../docs/ALFRED_MASTER_FEATURE_MATRIX.md) and [roadmap](../../docs/ALFRED_COMPLETION_ROADMAP.md). Historical pending-migration/rebuild claims below describe their date, not the current installation.
+
+## Historical Travel release backlog
 
 Updated 2026-10-01 after final backend validation. No confirmed P0; this is not a completed security certification.
 

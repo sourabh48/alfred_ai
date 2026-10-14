@@ -1,5 +1,7 @@
 # Chat-first Travel Planner
 
+**Current integrated scope — 2026-10-15:** Structured Travel conversation/preferences, saved plans, source freshness, estimates, day edits and map geometry are in deployed M15 source. General LLM trip reasoning, broad candidate/show-more pools, true alternate/scenic routes, verified bike legality and road-network detours remain partial. Photos are not video/social publication. Hotels/flights are disabled without approved provider access; rail/bus/permit links are not live inventory. T09/M16 retention remains open. [Feature matrix](ALFRED_MASTER_FEATURE_MATRIX.md), [provider register](ALFRED_EXTERNAL_INTEGRATIONS.md).
+
 Alfred now starts travel planning from dates, a budget, duration or a craving.
 Open **Travel Planner** and try:
 

@@ -1,5 +1,7 @@
 # Local/LAN completion audit
 
+**Superseded current-state assessment — 2026-10-15:** The [whole-project audit](../artifacts/audit/ALFRED_WHOLE_PROJECT_AUDIT_20261015.md) and [master matrix](ALFRED_MASTER_FEATURE_MATRIX.md) replace the old current-status interpretation below. M15 was deployed and source-synchronized at 3932f391. Full product acceptance remains incomplete: normal real-account, current service health, clean-PC/installer, model quality and device-loss recovery are distinct. The dated September evidence below is preserved and must not be treated as fresh runtime proof.
+
 Audit started: 15 September 2026. Continued: 18 September 2026 (Asia/Kolkata).
 Initial baseline commit: `c31de65`. Sample-user continuation baseline: `a20435e`;
 results cover the local working tree.

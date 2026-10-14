@@ -1,5 +1,7 @@
 # M15 first local memory slice
 
+**Integrated status — 2026-10-15:** This guide's original slice below is historical scope. Its encrypted local engine/index/journal, APIs and UI are incorporated in deployed 3932f391 alongside later learning/hybrid/sync adapters. The original statements that no background learning/sync/reasoning was added apply only to that first slice. Real providers stay disabled; current-profile DPAPI is not portable recovery. [Current feature matrix](ALFRED_MASTER_FEATURE_MATRIX.md).
+
 This document records the local baseline. The subsequent opt-in synthetic
 encrypted synchronization milestone is documented in
 [M15_ENCRYPTED_MEMORY_SYNC.md](M15_ENCRYPTED_MEMORY_SYNC.md).

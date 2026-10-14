@@ -1,5 +1,7 @@
 # Standalone Windows package
 
+**Latest integrated package scope — 2026-10-15:** The frozen M15 integrated report records 35 native checks including seven packaged Chrome flows at 3932f391. Earlier package results below are historical versions and must not be substituted for a changed candidate. Separate-PC/installer lifecycle is not accepted merely by portable startup. M18–19 build constraints/reproducibility and M21 actual lifecycle remain open. [Roadmap](ALFRED_COMPLETION_ROADMAP.md).
+
 The Windows x64 release contains its own Python 3.12 runtime and application
 dependencies. No Python, pip, virtual environment, Docker, PostgreSQL or Redis
 installation is required on the destination PC.

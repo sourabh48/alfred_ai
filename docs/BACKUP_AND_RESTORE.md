@@ -1,5 +1,7 @@
 # Backup and restore
 
+**Select the actual runtime — 2026-10-15:** Production is currently the native restored-runtime SQLite installation; the Compose procedures below are optional profile instructions, not commands to run on it. Preserve existing local encrypted pre-M15 backups, configuration/keys/media/queues and later writes. Independent local restore passed historically; off-device/key/device-loss recovery is unverified under a M15-only waiver. No cancelled key dialogs or backup deletion. [Distinct recovery gates](ALFRED_END_TO_END_ACCEPTANCE.md).
+
 Keep application data and its related files in one dated recovery set. The
 Docker Compose runtime uses PostgreSQL and named volumes; native development
 may use SQLite and directories in the checkout. Select the procedure for the

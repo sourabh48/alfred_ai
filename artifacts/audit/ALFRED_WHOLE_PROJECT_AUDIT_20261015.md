@@ -46,7 +46,7 @@ Main operator edits were present before the audit: continuation/promotion docume
 | Actual M15 deployment, 2026-10-15 | Local operator deployment report, inspected read-only | 21 HTTP/queue; 26 private-copy compatibility; 34 main-source native including seven Chrome | Separate overlapping checks; real-account visual acceptance pending |
 | Fresh audit focused gate | Seven named test modules in [receipt](master-audit-inventory-20261015/focused-checks.json) | **86 PASS**, zero skips, 59.061s | Synthetic disposable DB; finance/family/hybrid/evidence/currency/session/tax scope |
 | Fresh Django checks | Isolated audit runtime | system PASS; makemigrations --check --dry-run PASS | Not a current private DB schema query |
-| Audit helper tests | tests/test_audit_project.py | Four diagnostic-helper tests; see final validation receipt | Not product/browser/model acceptance |
+| Audit helper tests | tests/test_audit_project.py | Five PASS, 0.064s, including matrix/source/prompt coverage | Not product/browser/model acceptance |
 | Public AST inventory | All inventoried Python | No syntax errors | Import/runtime correctness is separate |
 | Package requirements | Configured Python 3.12 SDK metadata; pip check | No broken requirements | Not vulnerability or reproducibility certification |
 | UserSerializer synthetic diagnostic | No database writes | monthly_income Infinity accepted; Budget rejects nonfinite input | Serializer-level reproduction, not a private API write |

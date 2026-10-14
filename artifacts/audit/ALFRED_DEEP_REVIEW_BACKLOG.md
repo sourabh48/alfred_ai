@@ -1,5 +1,29 @@
 # ALFRED deep review backlog
 
+## Current audited disposition — 2026-10-15
+
+The [whole-project audit](ALFRED_WHOLE_PROJECT_AUDIT_20261015.md), [matrix](../../docs/ALFRED_MASTER_FEATURE_MATRIX.md) and [roadmap](../../docs/ALFRED_COMPLETION_ROADMAP.md) supersede the historical table. Main and fresh remote master are 3932f391; no live operation was performed.
+
+| Existing ID | Current disposition |
+| --- | --- |
+| M00 / M01A-B / M12A-C / M13A-D | Implemented historical scope incorporated/deployed; no repeat migration. New Django 6.0.9 advisory is separate maintenance; M01C eligibility remains partial |
+| M02 / M04 / M08-M10 | Current structured origin/mode/map/freshness source must govern; old reported issues are not blanket open vulnerabilities. Real routing/provider/manual acceptance remains bounded |
+| M03 / M05-M07 | Larger pools/show-more, true alternative/scenic routes and road-detour corridors remain partial |
+| M11 / T07-T08 | Decimal Travel edits and typed preference/pillion/scoped edits preserved; broader language remains partial |
+| M12D | Family 8% and several projection modes already label heuristics. Remaining eligibility/calibration needs review; do not duplicate existing labels |
+| M13 remainder | User/Budget/Career/Mobility money floats remain. User nonfinite input accepted in synthetic serializer diagnostic; explicit currency separately scoped |
+| M14A-H | HTTP/auth/CSRF/invitation/upload/loan diagnostics/historical filtering/consent controls are deployed in M15. family.0004 applied historically, financial grants OFF. Old development-only notes superseded |
+| M14I | Re-encryption tooling complete; no live token mutation/fallback removal, separate approval required |
+| T09 / M16 | Retention/selective invalidation open; preserve quotas/active work |
+| M17 | Experimental missing patch_generator and unrouted self-improve confirmed; no working AI Council |
+| M18-19 | Dependency/package reproducibility open; scoped security patch follow-up |
+| M20 | Partial development at 0052410, full gate interrupted. Ignored operator overwrite and quoted JSON credential miss reproduced; not release ready |
+| M21 | Orchestration/helpers exist; complete actual rehearsal/clean-PC/installer/normal-account acceptance not performed |
+
+New operational findings: 8000 health not observed and broad Windows read grants on private DB/config. These require authorized diagnosis/remediation, not automatic live changes.
+
+## Historical remediation table
+
 Updated 2026-10-01 from the user-supplied master remediation note. This is an implementation backlog, not a new whole-repository audit. Reported gaps remain open until targeted code/tests establish their state. Priority: P0 security/material financial correctness; P1 high-impact correctness/release; P2 improvement; P3 cleanup.
 
 | ID | Priority | Domain | Problem | Impact | Affected files | Proposed fix | Tests required | Status |

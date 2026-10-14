@@ -1,5 +1,7 @@
 # Windows source application setup
 
+**Existing installation safety — 2026-10-15:** Setup/init examples apply to new synthetic/fresh installs. Never replace keys or initialize a new DB for the existing F:/ALFRED/restored-runtime installation. Deployed source is 3932f391; current service health requires authorized operational diagnosis. Obtain current SDK/toolchain and use [acceptance plan](ALFRED_END_TO_END_ACCEPTANCE.md) before a real upgrade.
+
 Prepared on 2026-10-05 for the pre-reinstall checkpoint. These are recovery
 instructions to retain now; Windows has not been reinstalled and private data
 has not been restored by this preparation. Read the

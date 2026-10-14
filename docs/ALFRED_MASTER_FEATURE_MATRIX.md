@@ -169,6 +169,11 @@ Full explicit fields are in the [machine-readable matrix](../artifacts/audit/alf
 
 Common real-account status is PENDING: no normal existing-account visual acceptance was performed. Local-only features have no external-provider requirement. Provider-dependent rows explicitly override that status. Source and test links below are public; no private runtime record is included.
 
+Linked test files identify associated coverage; their presence does not claim every
+test was rerun. The audit's execution ledger lists the exact seven fresh modules
+and historical gate scopes. Missing capabilities do not become tested merely
+because their parent domain has a test suite.
+
 ### Personal finance
 
 #### FIN-01 — Dashboard, income, expenses and fixed obligations

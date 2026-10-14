@@ -1,5 +1,7 @@
 # Configuration
 
+**Current native configuration — 2026-10-15:** Preserve operator files/keys; this audit did not load or overwrite their values. The selected live data directory is F:/ALFRED/restored-runtime, with explicit db.sqlite3 there. Do not initialize a new checkout database when resuming. ALFRED_MEMORY_OPENAI_AUTHORIZED and ALFRED_MEMORY_CLOUD_AUTHORIZED remain false, and no real sync provider is selected. Config/native.env/local.env must be untracked and owner-protected; current broad read grants are an audit finding requiring separately approved maintenance. See [provider activation boundaries](ALFRED_EXTERNAL_INTEGRATIONS.md).
+
 ALFRED now supports a config-backed UI copy layer so the shared brand, auth, error-page, expense, and ML-runtime guidance text does not need to stay hardcoded in templates.
 
 ## Files

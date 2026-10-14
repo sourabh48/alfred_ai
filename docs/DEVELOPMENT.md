@@ -1,5 +1,7 @@
 # Development and verification
 
+**Current source workflow — 2026-10-15:** Start isolated work from actual verified 3932f391 baseline or the intended development checkpoint. Never run tests against F:/ALFRED/restored-runtime/db.sqlite3. Use disposable ALFRED_DATA_DIR, DATABASE_URL, registry/cache/media/queues and an absent local env file; disable startup training and real OpenAI/cloud. Obtain the configured SDK before Python commands. Existing M20 work is at feature/m20-release-gates (0052410 reviewed), not blank scope. See [roadmap](ALFRED_COMPLETION_ROADMAP.md) and [master prompt](../artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md).
+
 Use Python 3.12 for the currently tested development environment. Packaged
 Windows users can follow [Native Windows](NATIVE_WINDOWS.md) directly.
 Run these commands from the repository root in PowerShell.

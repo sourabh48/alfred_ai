@@ -1,5 +1,7 @@
 # Clean-PC and reboot acceptance
 
+**Current acceptance boundary — 2026-10-15:** M15 exact-source portable/native/synthetic browser results passed historically. A separate clean PC, actual installer install/upgrade/uninstall, real sign-in/reboot and normal-account acceptance remain PENDING. Do not reuse a process restart or an HTTP 200 as those results. [Authoritative acceptance plan](ALFRED_END_TO_END_ACCEPTANCE.md).
+
 Use a separate Windows x64 computer with no project checkout, Python or Docker.
 Extract `ALFRED-Windows-x64.zip` or install `ALFRED-Setup.exe` from the
 release folder first.

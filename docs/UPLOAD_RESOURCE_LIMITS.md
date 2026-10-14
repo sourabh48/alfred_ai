@@ -1,5 +1,7 @@
 # Shared upload and parser limits (M14E)
 
+**Integrated status — 2026-10-15:** M14E streamed-byte and parser CPU/time/memory/document limits are in deployed M15 3932f391 and covered by the frozen regression gate. Preserve actual stream enforcement/fingerprints; safe 413/parser responses remain mandatory. Current runtime availability and individual OCR prerequisites are separate acceptance items. [Matrix](ALFRED_MASTER_FEATURE_MATRIX.md).
+
 Development source only. These limits have not been promoted to the live app.
 Use untracked local environment configuration to adjust them for supported
 documents; never commit documents or runtime secrets with configuration changes.

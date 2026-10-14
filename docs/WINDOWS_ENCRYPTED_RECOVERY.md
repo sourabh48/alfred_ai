@@ -1,5 +1,15 @@
 # Windows recovery from the encrypted ALFRED backup
 
+## Current recovery boundary — 2026-10-15
+
+Main source is 3932f391; latest verified pre-M15 local set: F:/ALFRED_BACKUPS/m15-prepromotion-20261015-000251. Independent local restore/reconciliation passed historically. HDD copy is user reported; portable key/device-loss restore remains UNVERIFIED. The OneDrive procedure below is an archive-specific historical method, not a current selected/verified destination.
+
+Preserve every backup and key. No cancelled dialogs, plaintext key workaround, key rotation, deletion, live restore or invented destination is authorized. Current-profile DPAPI is not portable. The M15-only waiver does not certify a Windows wipe. Use [four distinct recovery gates](ALFRED_END_TO_END_ACCEPTANCE.md).
+
+Any new approved recovery uses the actual retained manifest/source/key method and disposable destination, authentic decryption, complete inventory, SQLite/FK integrity and canonical reconciliation. Never test restore into live data. Do not execute the historical commands as today's operating procedure without a new explicit plan.
+
+## Historical 2026-10-06 archive-specific procedure
+
 Prepared before the PC wipe. These are later recovery instructions; no Windows
 reinstall, private-data restore or backup deletion was performed by writing this
 document. A command example is not evidence of a completed backup. Use the final

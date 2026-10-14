@@ -1,5 +1,7 @@
 # Travel provider policy and architecture
 
+**Provider status — 2026-10-15:** Code/fixture success is separate from configured and real-live-tested. No new provider credentials/calls were used in this audit. Open-Meteo current published free limits and Brave/Duffel/OpenAI pricing/retention are in the [current register](ALFRED_EXTERNAL_INTEGRATIONS.md); ORS account quotas and all contract-specific limits remain unverified. Keep old dated limits below as historical guidance. Never treat wiki/POIs/link-outs as booking or road-legality evidence.
+
 Policy review: 29 September 2026. ALFRED remains a local/LAN application. The
 planner sends public place/date/route search parameters, not conversations,
 vehicle registrations, private history or photographs, to providers. Put secrets
