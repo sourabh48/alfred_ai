@@ -1,0 +1,15 @@
+{
+  "source_commit": "3932f391aa4eed7b3200ad3b034f7991435e01e4",
+  "tracked_and_owned_files": 803,
+  "markdown_files": 133,
+  "python_files": 529,
+  "documentation_classes": {
+    "CURRENT": 93,
+    "VENDOR": 10,
+    "HISTORICAL": 30
+  },
+  "syntax_errors": 0,
+  "missing_link_count": 2,
+  "matrix_issues": [],
+  "scope": "public_source_and_documentation_only_no_runtime_or_database_access"
+}
