@@ -1,9 +1,9 @@
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from django.contrib.auth.views import LoginView, LogoutView
 from django.views.generic import RedirectView
+from .native_views import private_media
 from .views import (
     index_view,
     dashboard_view, insights_view,
@@ -31,6 +31,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("media/<path:path>", private_media, name="private_media"),
     path("admin/", admin.site.urls),
     path("health/", health_api_view, name="health"),
     path("health/live/", health_live_api_view, name="health_live"),
@@ -102,13 +103,10 @@ urlpatterns = [
 ]
 
 if getattr(settings, "ALFRED_NATIVE_RUNTIME", False):
-    from .native_views import native_health, private_media
+    from .native_views import native_health
     urlpatterns += [
         path("health/native/", native_health, name="native_health"),
-        path("media/<path:path>", private_media, name="private_media"),
     ]
-elif settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 handler404 = "alfred_ai.views.not_found_view"
 handler500 = "alfred_ai.views.server_error_view"

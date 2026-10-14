@@ -1,5 +1,24 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Latest task — post-audit implementation, 2026-10-15
+
+Audit is complete/frozen at bced10480512bed460b4aac1481a20753c4e1dce. Active worktree
+F:/ALFRED_DEV/post-audit, branch fix/post-audit-critical-20261015; read actual HEAD.
+Production remains 3932f391 and is unchanged. User superseded AWS activation:
+decommission all active AWS paths; preserve neutral crypto/sync/history. No live
+ACL repair, database/service operation, cloud/paid request or push is authorized.
+
+P0-B and P0-C implemented. Numeric API/schema compatibility retained; no migration.
+47 focused tests PASS / zero skips; migration drift PASS. Exact synthetic receipt
+artifacts/post-audit/money-media-3570b592/receipt.json. Files listed in authoritative
+docs/PROJECT_STATUS.md. Earlier failed test attempt was a fixture savepoint issue,
+fixed and retained. Next: P0-A private storage, AWS dispatch removal and existing
+M20 gate repairs. Do not restart audit, regenerate matrix or start a UI redesign.
+
+Safe resume: Get-Content -LiteralPath F:/ALFRED_DEV/post-audit/docs/PROJECT_STATUS.md.
+Use configured SDK read-only for current isolated tests; dependency patch must use
+a separate environment and never modify the production venv.
+
 ## Latest authoritative task — whole-project audit, 2026-10-15
 
 Final AUD-11: source/non-native DEBUG media anonymously served a disposable

@@ -1,10 +1,11 @@
 from rest_framework import serializers
 from .models import User
+from .money import ProfileMoneySerializerField
 
 class UserSerializer(serializers.ModelSerializer):
-    monthly_income = serializers.FloatField(min_value=0, required=False)
-    variable_income = serializers.FloatField(min_value=0, required=False)
-    rent_or_emi = serializers.FloatField(min_value=0, required=False)
+    monthly_income = ProfileMoneySerializerField(required=False)
+    variable_income = ProfileMoneySerializerField(required=False)
+    rent_or_emi = ProfileMoneySerializerField(required=False)
     email = serializers.EmailField(required=False, allow_blank=True)
     first_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
     last_name = serializers.CharField(required=False, allow_blank=True, max_length=150)

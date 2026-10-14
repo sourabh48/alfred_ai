@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from apps.users.money import ProfileMoneySerializerField
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 
 class CareerProfileSerializer(serializers.ModelSerializer):
@@ -108,9 +109,9 @@ class CareerJobAnalysisSerializer(serializers.ModelSerializer):
 
 
 class CareerProjectionScenarioSerializer(serializers.Serializer):
-    monthly_income = serializers.FloatField(required=False, min_value=0)
-    variable_income = serializers.FloatField(required=False, min_value=0)
-    rent_or_emi = serializers.FloatField(required=False, min_value=0)
+    monthly_income = ProfileMoneySerializerField(required=False)
+    variable_income = ProfileMoneySerializerField(required=False)
+    rent_or_emi = ProfileMoneySerializerField(required=False)
     city = serializers.CharField(required=False, allow_blank=True, max_length=100)
     experience_years = serializers.FloatField(required=False, min_value=0)
     skills = serializers.ListField(

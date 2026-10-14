@@ -1,13 +1,14 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from .money import ProfileMoneyField
 
 
 class User(AbstractUser):
     class Meta:
         app_label = "users"
-    monthly_income = models.FloatField(default=0)
-    variable_income = models.FloatField(default=0)
-    rent_or_emi = models.FloatField(default=0)
+    monthly_income = ProfileMoneyField(default=0)
+    variable_income = ProfileMoneyField(default=0)
+    rent_or_emi = ProfileMoneyField(default=0)
 
     city = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True)
