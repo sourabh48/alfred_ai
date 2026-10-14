@@ -32,7 +32,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_platform_hardening.EmailConnectionTokenSecurityTests", "test_remaining_public_http",
     "test_retention_release_boundary", "test_statement_columns", "test_token_rotation",
     "test_travel_http", "test_upload_limits", "test_upload_privacy_retention", "test_user_data_reset",
-    "test_release_gate", "test_release_validation"))
+    "test_release_gate", "test_release_validation", "test_release_recovery", "test_private_recovery_verifier"))
 
 SECRET = re.compile(rb"sk-(?:proj-|svcacct-|ant-api[0-9]-)?[A-Za-z0-9_-]{30,}|"
                     rb"github_pat_[A-Za-z0-9_]{35,}|gh[pousr]_[A-Za-z0-9]{30,}|"
@@ -44,6 +44,11 @@ PRIVATE = re.compile(r"(?i)(^|/)(?:\.env(?:\..+)?|native\.env|local\.env|"
                      r"[^/]+\.(?:sqlite3?|db|key|pem|p12|pfx|wal|shm|zip|7z|enc)|"
                      r"media|uploads|statement_uploads|career_resumes|credit_reports|"
                      r"backups|restored-runtime|embeddings_store|private-memory-v2)(?:/|$)")
+PUBLIC_TEST_IDENTIFIERS = {
+    # AWS documentation example and a mocked OpenAI key, reviewed at the M15 baseline.
+    ("tests/memory_s3_fixture.py", "1a5d44a2dca19669d72edf4c4f1c27c4c1ca4b4408fbb17f6ce4ad452d78ddb3"),
+    ("tests/test_memory_reasoning.py", "3de18efc58026cb49080132b1b2c2a55776401162062b9d6c060951ddb93e626"),
+}
 
 
 def privacy(repo, manifest):
@@ -92,12 +97,12 @@ def privacy(repo, manifest):
         position = end + 1 + size + 1
         for match in SECRET.finditer(content):
             value = match.group()
-            known_s3 = (names == {"tests/memory_s3_fixture.py"} and value.startswith(b"AKIA")
-                        and (b"ALFREDTEST" in value or value == b"AKIA" + b"0" * 16))
+            known_fixture = (len(names) == 1 and (next(iter(names)), hashlib.sha256(value).hexdigest())
+                             in PUBLIC_TEST_IDENTIFIERS)
             known_rehearsal = (names == {"scripts/rehearse_money_migrations.py"}
                                and b"disposable-rehearsal-key-only" in value
                                and b"Django DB is not disposable" in content)
-            if known_s3 or known_rehearsal:
+            if known_fixture or known_rehearsal:
                 reviewed += 1
             else:
                 findings.append({"code": "credential_pattern", "blob_reference": oid[:16]})
@@ -121,8 +126,8 @@ def environment(sandbox):
     env.update(ALFRED_LOCAL_RUNTIME="true", ALFRED_AUTO_TRAIN_ON_STARTUP="false",
                ALFRED_DATA_DIR=str(sandbox), ALFRED_LOCAL_ENV_FILE=str(sandbox / "absent.env"),
                ALFRED_REGISTRY_PATH=str(sandbox / "registry"),
-               ALFRED_MEMORY_CLOUD_AUTHORIZED="false", ALFRED_MEMORY_CLOUD_PROVIDER="",
-               ALFRED_MEMORY_OPENAI_AUTHORIZED="false", ALFRED_MEMORY_CLOUD_MOCK="false",
+               ALFRED_MEMORY_CLOUD_AUTHORIZED="false", ALFRED_MEMORY_SYNC_PROVIDER="",
+               ALFRED_MEMORY_OPENAI_AUTHORIZED="false", ALFRED_MEMORY_SYNC_MOCK_DIR="",
                ALFRED_RUN_BROWSER_TESTS="false", DJANGO_SECRET_KEY=uuid.uuid4().hex,
                DATABASE_URL="sqlite:///" + (sandbox / "db.sqlite3").as_posix(),
                CACHE_BACKEND="django.core.cache.backends.locmem.LocMemCache", CACHE_LOCATION="release-synthetic",

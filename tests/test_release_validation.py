@@ -40,6 +40,14 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
         self.assertEqual(validation.privacy(self.repo, self.manifest)["status"], "FAIL")
 
+    def test_exact_public_examples_are_classified_without_a_blanket_test_exemption(self):
+        for name in ("memory_s3_fixture.py", "test_memory_reasoning.py"):
+            self.commit("tests/" + name, (Path(__file__).parent / name).read_text(encoding="utf-8"))
+        self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        result = validation.privacy(self.repo, self.manifest)
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["evidence"]["reviewed_synthetic_identifiers"], 2)
+
     def test_profile_environment_and_logs_never_include_operator_secrets(self):
         with patch.dict(os.environ, {"OPENAI_API_KEY": "synthetic-secret", "AWS_SECRET_ACCESS_KEY": "synthetic-secret",
                     "ALFRED_DATA_DIR": "synthetic-production", "ALFRED_MEMORY_CLOUD_AUTHORIZED": "true"}):
@@ -48,6 +56,8 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.assertNotIn("AWS_SECRET_ACCESS_KEY", env)
         self.assertEqual(env["ALFRED_MEMORY_CLOUD_AUTHORIZED"], "false")
         self.assertEqual(env["ALFRED_MEMORY_OPENAI_AUTHORIZED"], "false")
+        self.assertEqual(env["ALFRED_MEMORY_SYNC_PROVIDER"], "")
+        self.assertEqual(env["ALFRED_MEMORY_SYNC_MOCK_DIR"], "")
         self.assertNotIn("synthetic-production", json.dumps(env))
         raw = "FAIL: test_example (tests.synthetic.Case)\nC:\\private\\account.pdf amount=123456\nOCR synthetic-secret\nRan 2 tests in 1.2s\nFAILED (failures=1)"
         safe = validation.safe_log(raw)

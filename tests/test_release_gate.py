@@ -35,6 +35,44 @@ class ReleaseRepositoryFixture:
 
 
 class ReleaseSourceTests(ReleaseRepositoryFixture, unittest.TestCase):
+    def target(self, baseline=True):
+        target = self.root / "target"
+        release.git(self.root, "clone", "--quiet", str(self.repo), str(target))
+        if baseline:
+            release.git(target, "checkout", "--detach", self.baseline)
+        return target
+
+    def test_target_operator_edits_are_hashed_and_preserved(self):
+        target = self.target()
+        path = target / "docs/M15_LIVE_DEPLOYMENT_20261015.md"
+        path.parent.mkdir()
+        path.write_text("synthetic operator note")
+        release.source_checks(self.repo, self.manifest, target_repo=target)
+        self.assertEqual(self.manifest["gates"]["operators"]["status"], "PASS")
+        self.assertEqual(path.read_text(), "synthetic operator note")
+
+    def test_unknown_target_edits_are_not_overwritten(self):
+        target = self.target()
+        (target / "baseline.txt").write_text("synthetic operator edit")
+        with self.assertRaisesRegex(release.GateError, "unprotected_or_overlapping_operator_changes"):
+            release.source_checks(self.repo, self.manifest, target_repo=target)
+        self.assertEqual((target / "baseline.txt").read_text(), "synthetic operator edit")
+
+    def test_changed_target_head_blocks(self):
+        with self.assertRaisesRegex(release.GateError, "target_baseline_changed"):
+            release.source_checks(self.repo, self.manifest, target_repo=self.target(baseline=False))
+
+    def test_remote_divergence_blocks_without_push(self):
+        remote = self.target()
+        self.git("remote", "add", "origin", str(remote))
+        release.git(remote, "switch", "-c", "remote-diverged")
+        (remote / "diverged.txt").write_text("synthetic divergence")
+        release.git(remote, "add", "diverged.txt")
+        release.git(remote, "-c", "user.name=Synthetic", "-c", "user.email=release@example.test", "commit", "-qm", "synthetic divergence")
+        release.remote_check(self.repo, self.manifest, branch="remote-diverged")
+        self.assertEqual(self.manifest["gates"]["remote_git"]["status"], "FAIL")
+        self.assertFalse(self.manifest["gates"]["remote_git"]["evidence"]["push_performed"])
+
 
     def test_exact_clean_candidate_and_changed_file_inventory(self):
         release.source_checks(self.repo, self.manifest)

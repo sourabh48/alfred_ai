@@ -20,7 +20,7 @@ TECHNICAL = ("source", "dependencies", "migrations", "privacy", "configuration",
              "backend", "browser", "native", "ollama", "financial", "rollback")
 OPERATIONAL = ("operators", "local_backup", "off_device_copy", "portable_key",
                "device_loss_restore", "packaged", "real_account", "separate_pc",
-               "installer", "remote_ci", "branch_protection")
+               "installer", "remote_git", "remote_ci", "branch_protection")
 PROTECTED = ("artifacts/audit/CODEX_CONTINUATION_STATE.md",
              "artifacts/audit/M14_CONTROLLED_PROMOTION_PLAN.md", "skills-lock.json",
              "docs/M14_LIVE_DEPLOYMENT_20261011.md",
@@ -63,6 +63,25 @@ def ancestor(repo, older, newer):
     if result.returncode not in (0, 1):
         raise GateError("ancestry_check_failed")
     return result.returncode == 0
+
+
+def remote_check(repo, manifest, remote="origin", branch="master"):
+    if not all(re.fullmatch(r"[A-Za-z0-9_.-]+", value) for value in (remote, branch)):
+        raise GateError("invalid_remote_reference")
+    rows = git(repo, "ls-remote", "--heads", remote, "refs/heads/" + branch).splitlines()
+    if len(rows) != 1:
+        raise GateError("remote_branch_missing")
+    head = rows[0].split()[0]
+    if not re.fullmatch(r"[a-f0-9]{40}", head):
+        raise GateError("remote_head_invalid")
+    try:
+        exact_commit(repo, head)
+    except GateError:
+        compatible = False
+    else:
+        compatible = ancestor(repo, head, manifest["candidate_sha"])
+    gate(manifest, "remote_git", "PASS" if compatible else "FAIL",
+         "remote_fast_forward_verified" if compatible else "remote_diverged", head=head, push_performed=False)
 
 
 def gate(manifest, name, status, code, **evidence):
@@ -193,7 +212,7 @@ def load(path):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("preflight", "validate", "status", "report"))
+    parser.add_argument("command", choices=("preflight", "validate", "backup", "recovery", "status", "report"))
     parser.add_argument("--repo", type=Path, default=ROOT)
     parser.add_argument("--release-id")
     parser.add_argument("--candidate")
@@ -205,6 +224,11 @@ def main(argv=None):
     parser.add_argument("--profile", choices=("targeted", "backend", "browser", "native", "full"), default="targeted")
     parser.add_argument("--test-label", action="append", default=[])
     parser.add_argument("--with-ollama", action="store_true")
+    parser.add_argument("--runtime", type=Path)
+    parser.add_argument("--backup-directory", type=Path)
+    parser.add_argument("--key-file", type=Path)
+    parser.add_argument("--restore-directory", type=Path)
+    parser.add_argument("--check-remote", action="store_true")
     args = parser.parse_args(argv)
     manifest = None
     try:
@@ -213,21 +237,47 @@ def main(argv=None):
             source_checks(args.repo, manifest, args.expected_dependency, args.expected_migration, args.target_repo)
             from scripts.release_validation import privacy
             privacy(args.repo, manifest)
+            if args.check_remote:
+                remote_check(args.repo, manifest)
         else:
             manifest = load(args.output / "release.json")
         if args.command == "validate":
             from scripts.release_validation import validate
             validate(args.repo, manifest, args.output, args.profile, args.test_label, args.with_ollama)
+        if args.command in ("backup", "recovery"):
+            from scripts import release_recovery
+            source_checks(args.repo, manifest)
+            if not args.backup_directory or not args.key_file:
+                raise GateError("backup_and_existing_key_paths_required")
+            if args.command == "backup":
+                if not args.runtime:
+                    raise GateError("explicit_runtime_required")
+                receipt = release_recovery.create(args.runtime, args.backup_directory, args.key_file,
+                    manifest["release_id"], manifest["candidate_sha"], manifest["production_baseline_sha"], args.target_repo)
+            else:
+                if not args.restore_directory:
+                    raise GateError("explicit_new_restore_directory_required")
+                receipt = release_recovery.restore(args.backup_directory, args.key_file, args.restore_directory)
+            if any(receipt.get(key) != manifest[key] for key in ("release_id", "candidate_sha", "production_baseline_sha")):
+                raise GateError("recovery_receipt_release_mismatch")
+            gate(manifest, "local_backup", "PASS", "independent_local_restore_verified", **receipt)
+            gate(manifest, "financial", "PASS", "authenticated_restore_typed_rows_schema_and_fk_match",
+                 archive_sha256=receipt["archive_sha256"])
+            manifest["backup"] = {"directory": str(args.backup_directory.resolve()), "archive_sha256": receipt["archive_sha256"]}
         scope = ("source", "dependencies", "migrations", "privacy")
         if args.command == "preflight" and args.target_repo:
             scope += ("operators",)
+        if args.command == "preflight" and args.check_remote:
+            scope += ("remote_git",)
         if args.command == "validate":
             scope += ("configuration",)
             if args.profile in ("backend", "browser", "native"):
                 scope += (args.profile,)
             elif args.profile == "full":
                 scope = TECHNICAL
-        command_decision = decision(manifest, scope if args.command in ("preflight", "validate") else TECHNICAL + OPERATIONAL)
+        if args.command in ("backup", "recovery"):
+            scope += ("local_backup", "financial")
+        command_decision = decision(manifest, scope if args.command in ("preflight", "validate", "backup", "recovery") else TECHNICAL + OPERATIONAL)
         if args.command == "validate" and args.profile == "targeted" and manifest.get("last_validation", {}).get("status") == "FAIL":
             command_decision["status"] = "FAIL"
         manifest["command_result"] = {"command": args.command, **command_decision}
