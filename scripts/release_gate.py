@@ -17,7 +17,7 @@ from alfred_native import write_json
 
 STATUSES = {"PASS", "FAIL", "BLOCKED", "NOT_RUN", "WAIVED_BY_USER"}
 TECHNICAL = ("source", "dependencies", "migrations", "privacy", "configuration",
-             "backend", "browser", "native", "financial", "rollback")
+             "backend", "browser", "native", "ollama", "financial", "rollback")
 OPERATIONAL = ("operators", "local_backup", "off_device_copy", "portable_key",
                "device_loss_restore", "packaged", "real_account", "separate_pc",
                "installer", "remote_ci", "branch_protection")
@@ -132,11 +132,13 @@ def report(manifest, output):
         lines.append(f"| {name} | {result['status']} | {result['code']} |")
     lines += ["", "Waivers are release-specific exceptions, never PASS or recovery proof.",
               "No deployment or GitHub push is performed by validation/report commands."]
+    for run in manifest.get("targeted_runs", []):
+        lines.append(f"Targeted validation: {run['status']}; tests={run['tests']}; skips={run['skips']}; log={run['log']}")
     (output / "release.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return manifest
 
 
-def source_checks(repo, manifest, expected_dependencies=(), expected_migrations=(), target_repo=None):
+def source_checks(repo, manifest, expected_dependencies=None, expected_migrations=None, target_repo=None):
     repo = Path(repo).resolve()
     candidate = exact_commit(repo, manifest["candidate_sha"])
     baseline = exact_commit(repo, manifest["production_baseline_sha"])
@@ -147,6 +149,12 @@ def source_checks(repo, manifest, expected_dependencies=(), expected_migrations=
     if not ancestor(repo, baseline, candidate):
         raise GateError("baseline_diverged")
     paths = git(repo, "diff", "--name-only", baseline, candidate).splitlines()
+    policy = manifest.setdefault("change_policy", {"dependencies": [], "migrations": []})
+    if expected_dependencies is not None:
+        policy["dependencies"] = list(expected_dependencies)
+    if expected_migrations is not None:
+        policy["migrations"] = list(expected_migrations)
+    expected_dependencies, expected_migrations = policy["dependencies"], policy["migrations"]
     dependencies = [p for p in paths if re.search(r"(^|/)(requirements[^/]*\.txt|constraints/|"
                                                  r"pyproject\.toml|.*lock(?:\.json)?$)", p)]
     migrations = [p for p in paths if "/migrations/" in p and p.endswith(".py")]
@@ -185,7 +193,7 @@ def load(path):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("preflight", "status", "report"))
+    parser.add_argument("command", choices=("preflight", "validate", "status", "report"))
     parser.add_argument("--repo", type=Path, default=ROOT)
     parser.add_argument("--release-id")
     parser.add_argument("--candidate")
@@ -194,17 +202,38 @@ def main(argv=None):
     parser.add_argument("--target-repo", type=Path)
     parser.add_argument("--expected-dependency", action="append", default=[])
     parser.add_argument("--expected-migration", action="append", default=[])
+    parser.add_argument("--profile", choices=("targeted", "backend", "browser", "native", "full"), default="targeted")
+    parser.add_argument("--test-label", action="append", default=[])
+    parser.add_argument("--with-ollama", action="store_true")
     args = parser.parse_args(argv)
     manifest = None
     try:
         if args.command == "preflight":
             manifest = new_manifest(args.release_id or "", args.candidate, args.baseline)
             source_checks(args.repo, manifest, args.expected_dependency, args.expected_migration, args.target_repo)
+            from scripts.release_validation import privacy
+            privacy(args.repo, manifest)
         else:
             manifest = load(args.output / "release.json")
+        if args.command == "validate":
+            from scripts.release_validation import validate
+            validate(args.repo, manifest, args.output, args.profile, args.test_label, args.with_ollama)
+        scope = ("source", "dependencies", "migrations", "privacy")
+        if args.command == "preflight" and args.target_repo:
+            scope += ("operators",)
+        if args.command == "validate":
+            scope += ("configuration",)
+            if args.profile in ("backend", "browser", "native"):
+                scope += (args.profile,)
+            elif args.profile == "full":
+                scope = TECHNICAL
+        command_decision = decision(manifest, scope if args.command in ("preflight", "validate") else TECHNICAL + OPERATIONAL)
+        if args.command == "validate" and args.profile == "targeted" and manifest.get("last_validation", {}).get("status") == "FAIL":
+            command_decision["status"] = "FAIL"
+        manifest["command_result"] = {"command": args.command, **command_decision}
         report(manifest, args.output)
-        print(json.dumps({key: manifest[key] for key in ("release_id", "candidate_sha", "technical", "promotion")}))
-        return 1 if manifest["promotion"]["status"] == "FAIL" else 2 if manifest["promotion"]["status"] == "BLOCKED" else 0
+        print(json.dumps({key: manifest[key] for key in ("release_id", "candidate_sha", "command_result", "technical", "promotion")}))
+        return 1 if command_decision["status"] == "FAIL" else 2 if command_decision["status"] == "BLOCKED" else 0
     except Exception as exc:
         code = str(exc) if isinstance(exc, GateError) else "release_check_failed"
         if manifest is not None:

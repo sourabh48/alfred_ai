@@ -7,7 +7,7 @@ import unittest
 from scripts import release_gate as release
 
 
-class ReleaseSourceTests(unittest.TestCase):
+class ReleaseRepositoryFixture:
     def setUp(self):
         self.temporary = TemporaryDirectory(prefix="alfred-release-synthetic-")
         self.addCleanup(self.temporary.cleanup)
@@ -32,6 +32,9 @@ class ReleaseSourceTests(unittest.TestCase):
         target.write_text(text, encoding="utf-8")
         self.git("add", "--", path)
         self.git("commit", "-qm", "synthetic fixture")
+
+
+class ReleaseSourceTests(ReleaseRepositoryFixture, unittest.TestCase):
 
     def test_exact_clean_candidate_and_changed_file_inventory(self):
         release.source_checks(self.repo, self.manifest)
@@ -123,11 +126,11 @@ class ReleaseSourceTests(unittest.TestCase):
         self.assertEqual(self.manifest["promotion"]["status"], "PASS")
         self.assertFalse(self.manifest["promotion"]["ready"])
 
-    def test_cli_returns_nonzero_for_incomplete_release(self):
+    def test_cli_preflight_scope_pass_does_not_claim_release_readiness(self):
         code = release.main(["preflight", "--repo", str(self.repo), "--release-id", "synthetic-1",
                              "--candidate", self.candidate, "--baseline", self.baseline,
                              "--output", str(self.root / "cli")])
-        self.assertEqual(code, 2)
+        self.assertEqual(code, 0)
         self.assertFalse(json.loads((self.root / "cli/release.json").read_text())["promotion"]["ready"])
 
 

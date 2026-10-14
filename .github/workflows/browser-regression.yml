@@ -2,6 +2,8 @@ name: Browser Regression
 
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
   pull_request:
     paths:
       - ".github/workflows/browser-regression.yml"
@@ -20,6 +22,16 @@ on:
       - "tests/test_durable_queue.py"
       - "tests/test_native_runtime.py"
       - "requirements.txt"
+      - "scripts/release*.py"
+      - "tests/test_release*.py"
+      - "constraints/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alfred-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   native-windows:
@@ -29,8 +41,13 @@ jobs:
       ALFRED_LOCAL_RUNTIME: "true"
       ALFRED_AUTO_TRAIN_ON_STARTUP: "false"
       ALFRED_REGISTRY_PATH: artifacts/ci-model-registry
+      ALFRED_MEMORY_OPENAI_AUTHORIZED: "false"
+      ALFRED_MEMORY_CLOUD_AUTHORIZED: "false"
+      BASELINE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -46,7 +63,14 @@ jobs:
           tar -xzf artifacts/tools/axe-core.tgz -C artifacts/tools package/axe.min.js package/LICENSE
           if ((Get-FileHash artifacts/tools/package/axe.min.js -Algorithm SHA256).Hash -ne 'C24F097BD2F451D4F933E8BC7D8D539F8672A2EBCB5CC9F9F3EEC8CA9470A0C1') { throw 'Unexpected axe-core hash' }
       - name: Backend and recovery regression suite
-        run: python manage.py test --noinput
+        shell: pwsh
+        run: |
+          $baseline = $env:BASELINE_SHA
+          if ($baseline -match '^0+$') { $baseline = $env:GITHUB_SHA }
+          python scripts/release_gate.py preflight --release-id "ci-$env:GITHUB_RUN_ID" --candidate $env:GITHUB_SHA --baseline $baseline --output artifacts/release-ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/release_gate.py validate --output artifacts/release-ci --profile backend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Native HTTP, recovery, backup, concurrency and accessibility
         run: python scripts/verify_native_runtime.py --browser --extended
       - name: Upload native proof (synthetic data only)
@@ -58,7 +82,9 @@ jobs:
             artifacts/ops/native_huey_extended_verification.json
             artifacts/native-tests/*/mobile-accessibility.json
             artifacts/native-tests/*/*.png
-            artifacts/native-tests/*/artifacts/native/*.log
+            artifacts/release-ci/release.json
+            artifacts/release-ci/release.md
+            artifacts/release-ci/backend.log
           if-no-files-found: warn
 
   selenium:
@@ -144,7 +170,7 @@ jobs:
           assert github.get("workflow"), payload
           assert github.get("repository"), payload
           assert github.get("sha"), payload
-          assert github.get("event_name") in {"pull_request", "workflow_dispatch"}, payload
+          assert github.get("event_name") in {"pull_request", "workflow_dispatch", "push"}, payload
           assert github.get("head_ref") or github.get("ref_name") or github.get("ref"), payload
           PY
 
