@@ -1,0 +1,39 @@
+{
+  "baseline": "3932f391aa4eed7b3200ad3b034f7991435e01e4",
+  "labels": [
+    "tests.test_financial_baseline_alignment",
+    "tests.test_family_account_links",
+    "tests.test_hybrid_intelligence",
+    "tests.test_document_grounding_acceptance",
+    "tests.test_intelligence_currency",
+    "tests.test_api_session_security",
+    "tests.test_tax_policy"
+  ],
+  "results": [
+    {
+      "gate": "system",
+      "status": "PASS",
+      "exit": 0,
+      "tests": 0,
+      "seconds": null,
+      "skips": 0
+    },
+    {
+      "gate": "migration",
+      "status": "PASS",
+      "exit": 0,
+      "tests": 0,
+      "seconds": null,
+      "skips": 0
+    },
+    {
+      "gate": "focused",
+      "status": "PASS",
+      "exit": 0,
+      "tests": 86,
+      "seconds": 59.061,
+      "skips": 0
+    }
+  ],
+  "scope": "synthetic_disposable_database_no_real_provider_calls"
+}

@@ -1,0 +1,50 @@
+{
+    "scope":  "public_tracked_and_owned_source_only_no_operator_env",
+    "files":  815,
+    "findings":  [
+                     {
+                         "path":  "scripts/benchmark_local_cache.py",
+                         "code":  "credential_pattern",
+                         "line":  96,
+                         "match_sha256":  "5dbfc784c7dd91de820790aecc08e0a09248acf4aceb858175544c73b6e270b7",
+                         "disposition":  "Reviewed unchanged public synthetic fixture or disposable rehearsal key; not an operator credential"
+                     },
+                     {
+                         "path":  "scripts/rehearse_money_migrations.py",
+                         "code":  "credential_pattern",
+                         "line":  146,
+                         "match_sha256":  "8c55aea836191192e8d863229227c32585de62f669d245e5383490ed6d125431",
+                         "disposition":  "Reviewed unchanged public synthetic fixture or disposable rehearsal key; not an operator credential"
+                     },
+                     {
+                         "path":  "tests/memory_s3_fixture.py",
+                         "code":  "credential_pattern",
+                         "line":  16,
+                         "match_sha256":  "1a5d44a2dca19669d72edf4c4f1c27c4c1ca4b4408fbb17f6ce4ad452d78ddb3",
+                         "disposition":  "Reviewed unchanged public synthetic fixture or disposable rehearsal key; not an operator credential"
+                     },
+                     {
+                         "path":  "tests/memory_s3_fixture.py",
+                         "code":  "credential_pattern",
+                         "line":  16,
+                         "match_sha256":  "099ffd0e4ccd9ca5a43a7ff4255d0ce24231fa1776f934dd60361dfa0499c431",
+                         "disposition":  "Reviewed unchanged public synthetic fixture or disposable rehearsal key; not an operator credential"
+                     },
+                     {
+                         "path":  "tests/test_global_abuse_limits.py",
+                         "code":  "credential_pattern",
+                         "line":  121,
+                         "match_sha256":  "c3e1e29fc822d0b9a3e12bb120c19b9aeccdc5ea47169a4f4ff6b123e3a6ec22",
+                         "disposition":  "Reviewed unchanged public synthetic fixture or disposable rehearsal key; not an operator credential"
+                     },
+                     {
+                         "path":  "tests/test_memory_reasoning.py",
+                         "code":  "credential_pattern",
+                         "line":  18,
+                         "match_sha256":  "3de18efc58026cb49080132b1b2c2a55776401162062b9d6c060951ddb93e626",
+                         "disposition":  "Reviewed unchanged public synthetic fixture or disposable rehearsal key; not an operator credential"
+                     }
+                 ],
+    "status":  "PASS_PUBLIC_SOURCE_SCOPE",
+    "limitation":  "Pattern/path scan is not proof of absence of all personal data or unrecognized secret formats"
+}

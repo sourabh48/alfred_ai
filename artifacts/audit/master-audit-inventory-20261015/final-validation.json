@@ -1,0 +1,65 @@
+{
+    "matrix":  {
+                   "implemented_not_accepted":  29,
+                   "blocked_external":  3,
+                   "not_implemented":  11,
+                   "blocked_approval":  5,
+                   "partial":  34,
+                   "features":  143,
+                   "complete_bounded_verified":  61,
+                   "remaining_prompt_coverage":  "PASS",
+                   "invalid_source_references":  0
+               },
+    "production":  {
+                       "remote_modified":  false,
+                       "service_actions":  false,
+                       "keys_or_backups_changed":  false,
+                       "source_modified":  false,
+                       "database_modified_by_audit":  false,
+                       "health_native_http":  404,
+                       "runtime_identity":  "UNCONFIRMED",
+                       "health_live_http":  200
+                   },
+    "application_baseline":  "3932f391aa4eed7b3200ad3b034f7991435e01e4",
+    "external_acceptance":  {
+                                "real_account":  "PENDING",
+                                "device_loss":  "UNVERIFIED_M15_RELEASE_ONLY_WAIVER",
+                                "real_cloud":  "DISABLED",
+                                "paid_openai":  "DISABLED",
+                                "real_provider":  "NOT_RUN"
+                            },
+    "tests":  {
+                  "diagnostic_seconds":  0.064,
+                  "seconds":  59.061,
+                  "system_check":  "PASS",
+                  "focused_django_passed":  86,
+                  "fresh_browser":  "NOT_RUN",
+                  "skipped":  0,
+                  "migration_drift":  "PASS",
+                  "fresh_package":  "NOT_RUN",
+                  "failed":  0,
+                  "diagnostic_passed":  5,
+                  "fresh_native":  "NOT_RUN"
+              },
+    "markdown":  {
+                     "historical_generated_artifact_exceptions":  2,
+                     "active_missing_file_links":  0,
+                     "vendor":  44,
+                     "reviewed":  141,
+                     "historical":  38,
+                     "baseline":  133,
+                     "existing_updated":  43,
+                     "created":  8,
+                     "current":  59
+                 },
+    "audit_inventory_commit":  "1c2e43491ddc2b3f64add7c6102cb56a8004f7c5",
+    "source_status":  "documentation_and_diagnostic_only",
+    "validation":  {
+                       "commit_references":  5,
+                       "git_diff_check":  "PASS",
+                       "privacy":  "PASS_PUBLIC_SOURCE_SCOPE_WITH_REVIEWED_SYNTHETIC_FIXTURES",
+                       "graphify":  "AST_ONLY_AUDIT_WORKTREE",
+                       "python_syntax_errors":  0,
+                       "historical_vendor_immutable_bodies":  "PRESERVED"
+                   }
+}

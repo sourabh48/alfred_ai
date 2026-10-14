@@ -1,0 +1,47 @@
+{
+    "checks":  [
+                   {
+                       "code":  "USER_NONFINITE_INPUT",
+                       "no_database_rows_written":  true,
+                       "synthetic_infinity_accepted":  true,
+                       "budget_nonfinite_rejected":  true
+                   },
+                   {
+                       "sqlite_format_plain":  true,
+                       "code":  "PRIVATE_STORAGE_ACL",
+                       "no_records_or_secret_values_read":  true,
+                       "broad_deny_found":  false,
+                       "broad_read_sids":  [
+                                               "S-1-5-11",
+                                               "S-1-5-32-545"
+                                           ],
+                       "inheritance_enabled":  true,
+                       "files_checked":  [
+                                             "private_database",
+                                             "native_configuration",
+                                             "local_configuration"
+                                         ]
+                   },
+                   {
+                       "http_8000_responded":  false,
+                       "code":  "CURRENT_SERVICE_NOT_OBSERVED",
+                       "historical_server_worker_pids_present":  false,
+                       "no_service_action":  true
+                   }
+               ],
+    "scope":  "read_only_metadata_and_disposable_serializer_diagnostic",
+    "helper_tests":  {
+                         "seconds":  0.064,
+                         "skipped":  0,
+                         "failed":  0,
+                         "passed":  5
+                     },
+    "baseline":  "3932f391aa4eed7b3200ad3b034f7991435e01e4",
+    "later_service_observation":  {
+                                      "health_live_status":  200,
+                                      "runserver_listener":  true,
+                                      "health_native_status":  404,
+                                      "native_data_worker_identity_verified":  false,
+                                      "no_audit_start_restart":  true
+                                  }
+}

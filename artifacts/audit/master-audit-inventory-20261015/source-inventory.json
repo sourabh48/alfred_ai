@@ -5261,6 +5261,14 @@
     "model_fields": [
       {
         "model": "BehavioralSignal",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 5,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "BehavioralSignal",
         "field": "stress_score",
         "type": "FloatField",
         "line": 6,
@@ -5699,6 +5707,14 @@
       }
     ],
     "model_fields": [
+      {
+        "model": "Budget",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 5,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
       {
         "model": "Budget",
         "field": "month",
@@ -6530,6 +6546,14 @@
       },
       {
         "model": "CareerResume",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 24,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "CareerResume",
         "field": "uploaded_file",
         "type": "FileField",
         "line": 25,
@@ -6618,6 +6642,14 @@
       },
       {
         "model": "CareerResumeLearningMemory",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 48,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "CareerResumeLearningMemory",
         "field": "file_extension",
         "type": "CharField",
         "line": 49,
@@ -6687,6 +6719,14 @@
         "line": 57,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "CareerJobAnalysis",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 84,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "CareerJobAnalysis",
@@ -8885,6 +8925,14 @@
     "model_fields": [
       {
         "model": "BankAccount",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 18,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "BankAccount",
         "field": "bank_name",
         "type": "CharField",
         "line": 19,
@@ -8954,6 +9002,22 @@
         "line": 28,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "StatementUpload",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 68,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "StatementUpload",
+        "field": "bank_account",
+        "type": "ForeignKey",
+        "line": 69,
+        "monetary_candidate": false,
+        "relationships": "BankAccount"
       },
       {
         "model": "StatementUpload",
@@ -9066,6 +9130,30 @@
         "line": 89,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "Expense",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 136,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "Expense",
+        "field": "bank_account",
+        "type": "ForeignKey",
+        "line": 137,
+        "monetary_candidate": false,
+        "relationships": "BankAccount"
+      },
+      {
+        "model": "Expense",
+        "field": "statement_upload",
+        "type": "ForeignKey",
+        "line": 144,
+        "monetary_candidate": false,
+        "relationships": "StatementUpload"
       },
       {
         "model": "Expense",
@@ -9213,11 +9301,27 @@
       },
       {
         "model": "ExpenseMoneySnapshot",
+        "field": "expense",
+        "type": "ForeignKey",
+        "line": 187,
+        "monetary_candidate": true,
+        "relationships": "Expense"
+      },
+      {
+        "model": "ExpenseMoneySnapshot",
         "field": "original_expense_id",
         "type": "PositiveBigIntegerField",
         "line": 188,
         "monetary_candidate": true,
         "relationships": null
+      },
+      {
+        "model": "ExpenseMoneySnapshot",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 189,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "ExpenseMoneySnapshot",
@@ -9261,11 +9365,27 @@
       },
       {
         "model": "BankAccountMoneySnapshot",
+        "field": "bank_account",
+        "type": "ForeignKey",
+        "line": 198,
+        "monetary_candidate": false,
+        "relationships": "BankAccount"
+      },
+      {
+        "model": "BankAccountMoneySnapshot",
         "field": "original_bank_account_id",
         "type": "PositiveBigIntegerField",
         "line": 199,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "BankAccountMoneySnapshot",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 200,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "BankAccountMoneySnapshot",
@@ -12047,6 +12167,14 @@
     "model_fields": [
       {
         "model": "Dependent",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 5,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "Dependent",
         "field": "name",
         "type": "CharField",
         "line": 6,
@@ -12068,6 +12196,22 @@
         "line": 8,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "FamilyAccountLink",
+        "field": "created_by",
+        "type": "ForeignKey",
+        "line": 26,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "FamilyAccountLink",
+        "field": "linked_user",
+        "type": "ForeignKey",
+        "line": 31,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "FamilyAccountLink",
@@ -13192,6 +13336,14 @@
     "model_fields": [
       {
         "model": "CreditScore",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 61,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "CreditScore",
         "field": "bureau",
         "type": "CharField",
         "line": 62,
@@ -13312,6 +13464,14 @@
       },
       {
         "model": "CreditScoreFactor",
+        "field": "credit_score",
+        "type": "ForeignKey",
+        "line": 112,
+        "monetary_candidate": false,
+        "relationships": "CreditScore"
+      },
+      {
+        "model": "CreditScoreFactor",
         "field": "factor_name",
         "type": "CharField",
         "line": 114,
@@ -13341,6 +13501,14 @@
         "line": 117,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "CreditReportUpload",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 136,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "CreditReportUpload",
@@ -13464,6 +13632,14 @@
       },
       {
         "model": "EmailConnection",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 180,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "EmailConnection",
         "field": "provider",
         "type": "CharField",
         "line": 181,
@@ -13549,6 +13725,14 @@
         "line": 198,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "VerifiedExternalInsight",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 239,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "VerifiedExternalInsight",
@@ -15958,6 +16142,14 @@
     "model_fields": [
       {
         "model": "Investment",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 17,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "Investment",
         "field": "asset_type",
         "type": "CharField",
         "line": 18,
@@ -16027,6 +16219,14 @@
         "line": 29,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "InvestmentImportDocument",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 50,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "InvestmentImportDocument",
@@ -16123,6 +16323,22 @@
         "line": 76,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "InvestmentMoneySnapshot",
+        "field": "investment",
+        "type": "ForeignKey",
+        "line": 77,
+        "monetary_candidate": false,
+        "relationships": "Investment"
+      },
+      {
+        "model": "InvestmentMoneySnapshot",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 78,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "InvestmentMoneySnapshot",
@@ -17967,6 +18183,14 @@
     "model_fields": [
       {
         "model": "Loan",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 41,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "Loan",
         "field": "loan_type",
         "type": "CharField",
         "line": 42,
@@ -18036,6 +18260,14 @@
         "line": 56,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "Loan",
+        "field": "consolidated_into",
+        "type": "ForeignKey",
+        "line": 57,
+        "monetary_candidate": false,
+        "relationships": "'self'"
       },
       {
         "model": "Loan",
@@ -18127,11 +18359,27 @@
       },
       {
         "model": "LoanMoneySnapshot",
+        "field": "loan",
+        "type": "ForeignKey",
+        "line": 164,
+        "monetary_candidate": false,
+        "relationships": "Loan"
+      },
+      {
+        "model": "LoanMoneySnapshot",
         "field": "original_loan_id",
         "type": "PositiveBigIntegerField",
         "line": 165,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "LoanMoneySnapshot",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 166,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "LoanMoneySnapshot",
@@ -18172,6 +18420,14 @@
         "line": 171,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "LoanPaymentHistory",
+        "field": "loan",
+        "type": "ForeignKey",
+        "line": 181,
+        "monetary_candidate": false,
+        "relationships": "Loan"
       },
       {
         "model": "LoanPaymentHistory",
@@ -18231,11 +18487,27 @@
       },
       {
         "model": "LoanPaymentHistory",
+        "field": "expense_reference",
+        "type": "ForeignKey",
+        "line": 198,
+        "monetary_candidate": true,
+        "relationships": "'expenses.Expense'"
+      },
+      {
+        "model": "LoanPaymentHistory",
         "field": "created_at",
         "type": "DateTimeField",
         "line": 205,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "LoanClosureDocument",
+        "field": "loan",
+        "type": "ForeignKey",
+        "line": 231,
+        "monetary_candidate": false,
+        "relationships": "Loan"
       },
       {
         "model": "LoanClosureDocument",
@@ -18324,6 +18596,14 @@
         "line": 243,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "LoanForeclosureSnapshot",
+        "field": "loan",
+        "type": "ForeignKey",
+        "line": 271,
+        "monetary_candidate": false,
+        "relationships": "Loan"
       },
       {
         "model": "LoanForeclosureSnapshot",
@@ -18511,6 +18791,46 @@
       },
       {
         "model": "LoanRelatedMoneySnapshot",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 325,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "LoanRelatedMoneySnapshot",
+        "field": "loan",
+        "type": "ForeignKey",
+        "line": 326,
+        "monetary_candidate": false,
+        "relationships": "Loan"
+      },
+      {
+        "model": "LoanRelatedMoneySnapshot",
+        "field": "payment_history",
+        "type": "ForeignKey",
+        "line": 327,
+        "monetary_candidate": false,
+        "relationships": "LoanPaymentHistory"
+      },
+      {
+        "model": "LoanRelatedMoneySnapshot",
+        "field": "closure_document",
+        "type": "ForeignKey",
+        "line": 328,
+        "monetary_candidate": false,
+        "relationships": "LoanClosureDocument"
+      },
+      {
+        "model": "LoanRelatedMoneySnapshot",
+        "field": "foreclosure_snapshot",
+        "type": "ForeignKey",
+        "line": 329,
+        "monetary_candidate": false,
+        "relationships": "LoanForeclosureSnapshot"
+      },
+      {
+        "model": "LoanRelatedMoneySnapshot",
         "field": "source_values",
         "type": "JSONField",
         "line": 330,
@@ -18548,6 +18868,14 @@
         "line": 334,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "LoanImportDocument",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 348,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "LoanImportDocument",
@@ -23181,6 +23509,14 @@
     "model_fields": [
       {
         "model": "DocumentParserLearningMemory",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 6,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "DocumentParserLearningMemory",
         "field": "scope",
         "type": "CharField",
         "line": 7,
@@ -27144,6 +27480,14 @@
     "model_fields": [
       {
         "model": "BikeProfile",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 42,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "BikeProfile",
         "field": "vehicle_type",
         "type": "CharField",
         "line": 43,
@@ -27360,6 +27704,22 @@
       },
       {
         "model": "BikeServiceRecord",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 98,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "BikeServiceRecord",
+        "field": "bike_profile",
+        "type": "ForeignKey",
+        "line": 99,
+        "monetary_candidate": false,
+        "relationships": "'BikeProfile'"
+      },
+      {
+        "model": "BikeServiceRecord",
         "field": "bike_name",
         "type": "CharField",
         "line": 100,
@@ -27448,6 +27808,14 @@
       },
       {
         "model": "BikeServiceRecord",
+        "field": "source_document",
+        "type": "ForeignKey",
+        "line": 111,
+        "monetary_candidate": false,
+        "relationships": "'BikeDocument'"
+      },
+      {
+        "model": "BikeServiceRecord",
         "field": "source_document_name",
         "type": "CharField",
         "line": 112,
@@ -27477,6 +27845,22 @@
         "line": 115,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "FuelRefillLog",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 129,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "FuelRefillLog",
+        "field": "bike_profile",
+        "type": "ForeignKey",
+        "line": 130,
+        "monetary_candidate": false,
+        "relationships": "'BikeProfile'"
       },
       {
         "model": "FuelRefillLog",
@@ -27565,6 +27949,22 @@
         "line": 141,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "TravelPlan",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 176,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "TravelPlan",
+        "field": "vehicle_profile",
+        "type": "ForeignKey",
+        "line": 177,
+        "monetary_candidate": false,
+        "relationships": "'BikeProfile'"
       },
       {
         "model": "TravelPlan",
@@ -27672,6 +28072,14 @@
       },
       {
         "model": "TravelPlanningSession",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 220,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "TravelPlanningSession",
         "field": "plan",
         "type": "OneToOneField",
         "line": 221,
@@ -27744,6 +28152,14 @@
       },
       {
         "model": "TravelMessage",
+        "field": "session",
+        "type": "ForeignKey",
+        "line": 236,
+        "monetary_candidate": false,
+        "relationships": "TravelPlanningSession"
+      },
+      {
+        "model": "TravelMessage",
         "field": "role",
         "type": "CharField",
         "line": 237,
@@ -27773,6 +28189,14 @@
         "line": 240,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "TravelResearchSession",
+        "field": "session",
+        "type": "ForeignKey",
+        "line": 247,
+        "monetary_candidate": false,
+        "relationships": "TravelPlanningSession"
       },
       {
         "model": "TravelResearchSession",
@@ -27917,6 +28341,14 @@
         "line": 265,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "TravelResearchEvidence",
+        "field": "research",
+        "type": "ForeignKey",
+        "line": 272,
+        "monetary_candidate": false,
+        "relationships": "TravelResearchSession"
       },
       {
         "model": "TravelResearchEvidence",
@@ -28152,6 +28584,14 @@
       },
       {
         "model": "UserDestinationHistory",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 317,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "UserDestinationHistory",
         "field": "place_key",
         "type": "CharField",
         "line": 318,
@@ -28288,6 +28728,22 @@
       },
       {
         "model": "TripLog",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 348,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "TripLog",
+        "field": "travel_plan",
+        "type": "ForeignKey",
+        "line": 349,
+        "monetary_candidate": false,
+        "relationships": "TravelPlan"
+      },
+      {
+        "model": "TripLog",
         "field": "log_date",
         "type": "DateField",
         "line": 350,
@@ -28368,6 +28824,30 @@
       },
       {
         "model": "TripPhoto",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 372,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "TripPhoto",
+        "field": "travel_plan",
+        "type": "ForeignKey",
+        "line": 373,
+        "monetary_candidate": false,
+        "relationships": "TravelPlan"
+      },
+      {
+        "model": "TripPhoto",
+        "field": "trip_log",
+        "type": "ForeignKey",
+        "line": 374,
+        "monetary_candidate": false,
+        "relationships": "TripLog"
+      },
+      {
+        "model": "TripPhoto",
         "field": "image",
         "type": "FileField",
         "line": 375,
@@ -28445,6 +28925,38 @@
         "line": 384,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "BikeIssueReport",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 423,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "BikeIssueReport",
+        "field": "bike_profile",
+        "type": "ForeignKey",
+        "line": 424,
+        "monetary_candidate": false,
+        "relationships": "'BikeProfile'"
+      },
+      {
+        "model": "BikeIssueReport",
+        "field": "bike_service",
+        "type": "ForeignKey",
+        "line": 425,
+        "monetary_candidate": false,
+        "relationships": "BikeServiceRecord"
+      },
+      {
+        "model": "BikeIssueReport",
+        "field": "travel_plan",
+        "type": "ForeignKey",
+        "line": 426,
+        "monetary_candidate": false,
+        "relationships": "TravelPlan"
       },
       {
         "model": "BikeIssueReport",
@@ -28581,6 +29093,22 @@
         "line": 443,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "BikeDocument",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 480,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "BikeDocument",
+        "field": "bike_profile",
+        "type": "ForeignKey",
+        "line": 481,
+        "monetary_candidate": false,
+        "relationships": "'BikeProfile'"
       },
       {
         "model": "BikeDocument",
@@ -28741,6 +29269,22 @@
         "line": 501,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "BikeConditionSnapshot",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 522,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "BikeConditionSnapshot",
+        "field": "bike_profile",
+        "type": "ForeignKey",
+        "line": 523,
+        "monetary_candidate": false,
+        "relationships": "'BikeProfile'"
       },
       {
         "model": "BikeConditionSnapshot",
@@ -33908,6 +34452,14 @@
     "model_fields": [
       {
         "model": "RelationshipProfile",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 5,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "RelationshipProfile",
         "field": "partner_name",
         "type": "CharField",
         "line": 6,
@@ -34435,6 +34987,14 @@
     "model_fields": [
       {
         "model": "GeneratedReport",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 6,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
+      {
+        "model": "GeneratedReport",
         "field": "file_path",
         "type": "CharField",
         "line": 7,
@@ -34448,6 +35008,14 @@
         "line": 8,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "ChatGPTImport",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 24,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "ChatGPTImport",
@@ -34520,6 +35088,14 @@
         "line": 33,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "SystemTicket",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 76,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "SystemTicket",
@@ -34616,6 +35192,14 @@
         "line": 88,
         "monetary_candidate": false,
         "relationships": null
+      },
+      {
+        "model": "OperationalLog",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 117,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
       },
       {
         "model": "OperationalLog",
@@ -35374,6 +35958,14 @@
       }
     ],
     "model_fields": [
+      {
+        "model": "RiskSignal",
+        "field": "user",
+        "type": "ForeignKey",
+        "line": 5,
+        "monetary_candidate": false,
+        "relationships": "settings.AUTH_USER_MODEL"
+      },
       {
         "model": "RiskSignal",
         "field": "layoff_risk",
@@ -36506,7 +37098,7 @@
   },
   {
     "path": "scripts/audit_project.py",
-    "sha256": "f9d3e58f5beb0eef2f68c31064a24a7ae789683734df5b490d041ec8f6b820b0",
+    "sha256": "62875cbcd09603e348baf8486c3ef7cf59ae7d0859bd2ac7c22142de9f9eb8d5",
     "symbols": [
       {
         "name": "tracked",
@@ -36521,27 +37113,27 @@
       {
         "name": "link_target",
         "kind": "FunctionDef",
-        "line": 38
+        "line": 48
       },
       {
         "name": "markdown_inventory",
         "kind": "FunctionDef",
-        "line": 49
+        "line": 59
       },
       {
         "name": "source_inventory",
         "kind": "FunctionDef",
-        "line": 68
+        "line": 78
       },
       {
         "name": "validate_matrix",
         "kind": "FunctionDef",
-        "line": 103
+        "line": 114
       },
       {
         "name": "main",
         "kind": "FunctionDef",
-        "line": 121
+        "line": 132
       }
     ],
     "model_fields": [],
@@ -37988,6 +38580,65 @@
       "tests_run_count",
       "time.monotonic",
       "write_summary"
+    ]
+  },
+  {
+    "path": "scripts/run_master_audit_checks.py",
+    "sha256": "67a02a4e0bfe15089b06cd531992cbb352c8ea8e8c12f53650f77f3217fc9031",
+    "symbols": [
+      {
+        "name": "isolated_environment",
+        "kind": "FunctionDef",
+        "line": 21
+      },
+      {
+        "name": "main",
+        "kind": "FunctionDef",
+        "line": 39
+      }
+    ],
+    "model_fields": [],
+    "imports": [
+      "__future__",
+      "json",
+      "os",
+      "pathlib",
+      "re",
+      "subprocess",
+      "sys",
+      "tempfile",
+      "uuid"
+    ],
+    "routes": [],
+    "calls": [
+      "'\\n'.join",
+      "(directory / 'db.sqlite3').as_posix",
+      "(output / 'focused-checks.json').write_text",
+      "(output / (name + '-safe.log')).write_text",
+      "Path",
+      "Path(__file__).resolve",
+      "Path(directory).resolve",
+      "SystemExit",
+      "TemporaryDirectory",
+      "any",
+      "combined.splitlines",
+      "float",
+      "int",
+      "isolated_environment",
+      "json.dumps",
+      "key.upper",
+      "line.strip",
+      "main",
+      "os.environ.items",
+      "output.mkdir",
+      "print",
+      "re.findall",
+      "re.fullmatch",
+      "result.update",
+      "results.append",
+      "str",
+      "subprocess.run",
+      "uuid.uuid4"
     ]
   },
   {
@@ -39490,48 +40141,73 @@
   },
   {
     "path": "tests/test_audit_project.py",
-    "sha256": "fe1717082217790605bb6be22d7e726555ffd92eab08062dad7c072c37256308",
+    "sha256": "cfad8e204656d6d5f8643d395474eb605e93fe4b0a4ea65a610ccc120c1be727",
     "symbols": [
       {
         "name": "AuditProjectTests",
         "kind": "ClassDef",
-        "line": 8
+        "line": 9
       },
       {
         "name": "test_links_resolve_relative_and_root_but_skip_external_and_anchors",
         "kind": "FunctionDef",
-        "line": 9
+        "line": 10
       },
       {
         "name": "test_monetary_candidates_exclude_measurements_and_records_have_lines",
         "kind": "FunctionDef",
-        "line": 16
+        "line": 17
       },
       {
         "name": "test_historical_records_and_vendor_docs_are_not_current_guides",
         "kind": "FunctionDef",
-        "line": 24
+        "line": 25
+      },
+      {
+        "name": "test_diagnostic_environment_cannot_inherit_provider_or_database_settings",
+        "kind": "FunctionDef",
+        "line": 32
+      },
+      {
+        "name": "test_authoritative_matrix_and_prompt_cover_every_remaining_feature",
+        "kind": "FunctionDef",
+        "line": 44
       }
     ],
     "model_fields": [],
     "imports": [
+      "json",
       "pathlib",
       "scripts",
+      "scripts.run_master_audit_checks",
       "tempfile",
-      "unittest"
+      "unittest",
+      "unittest.mock"
     ],
     "routes": [],
     "calls": [
+      "(root / 'artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md').read_text",
+      "(root / 'docs/ALFRED_MASTER_FEATURE_MATRIX.md').read_text",
       "(root / 'models.py').write_text",
       "Path",
       "Path('F:/synthetic-source').resolve",
+      "Path(__file__).resolve",
+      "Path(directory).resolve",
       "TemporaryDirectory",
       "all",
       "audit.classification",
       "audit.link_target",
       "audit.source_inventory",
+      "audit.validate_matrix",
+      "env['DATABASE_URL'].startswith",
+      "isolated_environment",
+      "json.loads",
+      "matrix_path.read_text",
+      "patch.dict",
       "self.assertEqual",
+      "self.assertIn",
       "self.assertIsNone",
+      "self.assertNotIn",
       "self.assertTrue",
       "unittest.main"
     ]

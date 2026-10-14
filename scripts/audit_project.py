@@ -24,12 +24,22 @@ def tracked(repo=ROOT):
 
 
 def classification(path):
-    if path.startswith((".codex/skills/graphify/", ".claude/skills/graphify/", "static/vendor/")):
+    if (path.startswith((".codex/skills/graphify/", ".claude/skills/graphify/", "static/vendor/"))
+            or path.startswith(".agents/skills/") and not path.startswith(".agents/skills/alfred-")):
         return "VENDOR"
+    if path.startswith(("docs/releases/", "artifacts/reinstall/")):
+        return "HISTORICAL"
+    if path.startswith(("docs/ALFRED_", "artifacts/audit/ALFRED_WHOLE_PROJECT_AUDIT_",
+                        "artifacts/audit/ALFRED_DOCUMENTATION_RECONCILIATION_",
+                        "artifacts/audit/ALFRED_MASTER_COMPLETION_")):
+        return "CURRENT"
     if (re.search(r"(?:VERIFICATION|ACCEPTANCE|REPORT|RESEARCH|_20\d{6}|_2026-\d\d-\d\d)", path)
             and path not in ("docs/MANUAL_ACCEPTANCE.md", "docs/USER_DATA_ACCEPTANCE.md",
-                             "docs/WINDOWS_ACCEPTANCE.md", "docs/COMPLETION_AUDIT.md")):
+                             "docs/WINDOWS_ACCEPTANCE.md", "docs/COMPLETION_AUDIT.md",
+                             "docs/M15_RECOVERY_ACCEPTANCE.md")):
         return "HISTORICAL"
+    if path == "artifacts/audit/M15_RELEASE_READINESS.md":
+        return "CURRENT"
     if path.startswith("artifacts/audit/") and "BACKLOG" not in path and "CONTINUATION" not in path:
         return "HISTORICAL"
     return "CURRENT"
@@ -136,11 +146,14 @@ def main():
         "tracked_and_owned_files": len(paths), "markdown_files": len(docs), "python_files": len(source),
         "documentation_classes": dict(Counter(row["classification"] for row in docs)),
         "syntax_errors": sum("syntax_error_line" in row for row in source),
-        "missing_link_count": sum(len(row["missing_links"]) for row in docs), "matrix_issues": issues,
+        "missing_link_count": sum(len(row["missing_links"]) for row in docs),
+        "active_missing_links": [{"path": row["path"], "targets": row["missing_links"]}
+                                 for row in docs if row["classification"] == "CURRENT" and row["missing_links"]],
+        "matrix_issues": issues,
         "scope": "public_source_and_documentation_only_no_runtime_or_database_access"}
     (args.output / "inventory-summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary))
-    return 1 if issues or summary["syntax_errors"] else 0
+    return 1 if issues or summary["syntax_errors"] or summary["active_missing_links"] else 0
 
 
 if __name__ == "__main__":

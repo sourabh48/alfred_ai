@@ -1,15 +1,16 @@
 {
-  "source_commit": "3932f391aa4eed7b3200ad3b034f7991435e01e4",
-  "tracked_and_owned_files": 803,
-  "markdown_files": 133,
-  "python_files": 529,
+  "source_commit": "1c2e43491ddc2b3f64add7c6102cb56a8004f7c5",
+  "tracked_and_owned_files": 824,
+  "markdown_files": 141,
+  "python_files": 530,
   "documentation_classes": {
-    "CURRENT": 93,
-    "VENDOR": 10,
-    "HISTORICAL": 30
+    "CURRENT": 59,
+    "VENDOR": 44,
+    "HISTORICAL": 38
   },
   "syntax_errors": 0,
   "missing_link_count": 2,
+  "active_missing_links": [],
   "matrix_issues": [],
   "scope": "public_source_and_documentation_only_no_runtime_or_database_access"
 }

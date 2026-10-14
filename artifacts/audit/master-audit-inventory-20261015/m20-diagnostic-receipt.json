@@ -1,0 +1,16 @@
+{
+  "candidate": "0052410bcc6726c6881713002902fd9c1ae7bc59",
+  "cases": [
+    {
+      "finding": "M20_IGNORED_OPERATOR_COLLISION",
+      "operator_gate_status": "PASS",
+      "synthetic_operator_overwritten": true
+    },
+    {
+      "finding": "M20_QUOTED_JSON_CREDENTIAL_CLASSIFIER",
+      "privacy_gate_status": "PASS",
+      "synthetic_credential_detected": false
+    }
+  ],
+  "scope": "generated_public_test_repositories_only_no_production_changes"
+}
