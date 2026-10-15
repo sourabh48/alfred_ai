@@ -69,6 +69,7 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.assertEqual(env["ALFRED_MEMORY_OPENAI_AUTHORIZED"], "false")
         self.assertEqual(env["ALFRED_MEMORY_SYNC_PROVIDER"], "")
         self.assertEqual(env["ALFRED_MEMORY_SYNC_MOCK_DIR"], "")
+        self.assertEqual(env["ALFRED_MEDIA_ROOT"], str(self.root / "sandbox/media"))
         self.assertNotIn("synthetic-production", json.dumps(env))
         raw = "FAIL: test_example (tests.synthetic.Case)\nC:\\private\\account.pdf amount=123456\nOCR synthetic-secret\nRan 2 tests in 1.2s\nFAILED (failures=1)"
         safe = validation.safe_log(raw)
@@ -114,6 +115,17 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
                 self.assertEqual(self.manifest["gates"]["backend"]["status"], "NOT_RUN")
                 self.assertEqual(release.decision(self.manifest, ["backend"])["status"], "BLOCKED")
                 self.manifest = release.new_manifest("synthetic-1", self.candidate, self.baseline)
+
+    def test_failed_backend_stops_full_gate_before_expensive_browser_or_native_runs(self):
+        passed={"status":"PASS","code":"suite_exit","tests":0,"skips":0,
+                "log":"synthetic.log","log_sha256":"a"*64}
+        failed=passed|{"status":"FAIL","tests":1}
+        with patch.object(validation,"run",side_effect=[passed,passed,failed]) as run:
+            validation.validate(self.repo,self.manifest,self.root/'fail-fast','full',with_ollama=True)
+        self.assertEqual(run.call_count,3)
+        self.assertEqual(self.manifest['gates']['backend']['status'],'FAIL')
+        self.assertEqual(self.manifest['gates']['browser']['status'],'NOT_RUN')
+        self.assertEqual(self.manifest['gates']['native']['status'],'NOT_RUN')
 
     def test_absent_package_is_not_run_instead_of_pass(self):
         validation.packaged(self.repo, self.manifest, self.root, {}, None, None)

@@ -1,15 +1,38 @@
 import json
+from contextlib import redirect_stdout
+from io import StringIO
 import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+from types import SimpleNamespace
 
 from scripts import run_browser_regressions
 
 
 class BrowserRegressionRunnerTests(TestCase):
+    def test_child_runtime_and_media_cannot_inherit_operator_or_cloud_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args=SimpleNamespace(artifact_dir=directory,browser='Chrome',require_browser=True,
+                                 proof_label='synthetic',test_labels=('tests.synthetic',))
+            process=Mock(stdout=['Found 1 test(s).\n','Ran 1 test in 0.1s\n','OK\n'])
+            process.wait.return_value=0
+            with patch.object(run_browser_regressions,'parse_args',return_value=args), \
+                 patch.object(run_browser_regressions.subprocess,'Popen',return_value=process) as spawn, \
+                 patch.dict(os.environ,{'ALFRED_DATA_DIR':'C:/synthetic-production',
+                     'ALFRED_MEDIA_ROOT':'C:/synthetic-production/media','OPENAI_API_KEY':'synthetic-secret',
+                     'ALFRED_MEMORY_CLOUD_AUTHORIZED':'true'}),redirect_stdout(StringIO()):
+                self.assertEqual(run_browser_regressions.main(),0)
+            env=spawn.call_args.kwargs['env']
+            self.assertNotIn('OPENAI_API_KEY',env)
+            self.assertNotIn('synthetic-production',json.dumps(env))
+            self.assertEqual(env['ALFRED_MEMORY_CLOUD_AUTHORIZED'],'false')
+            self.assertEqual(env['ALFRED_MEMORY_OPENAI_AUTHORIZED'],'false')
+            self.assertTrue(Path(env['ALFRED_DATA_DIR']).is_relative_to(directory))
+            self.assertEqual(Path(env['ALFRED_MEDIA_ROOT']).parent,Path(env['ALFRED_DATA_DIR']))
+
     def test_summary_records_driver_backed_success_when_required_suite_runs_without_skips(self):
         summary = run_browser_regressions.build_run_summary(
             command=["python", "manage.py", "test", "tests.test_document_review_browser"],

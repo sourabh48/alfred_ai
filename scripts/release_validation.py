@@ -136,6 +136,7 @@ def environment(sandbox):
     env = {key: value for key, value in os.environ.items() if key.upper() in allowed}
     env.update(ALFRED_LOCAL_RUNTIME="true", ALFRED_AUTO_TRAIN_ON_STARTUP="false",
                ALFRED_DATA_DIR=str(sandbox), ALFRED_LOCAL_ENV_FILE=str(sandbox / "absent.env"),
+               ALFRED_MEDIA_ROOT=str(sandbox / "media"),
                ALFRED_REGISTRY_PATH=str(sandbox / "registry"),
                ALFRED_MEMORY_CLOUD_AUTHORIZED="false", ALFRED_MEMORY_SYNC_PROVIDER="",
                ALFRED_MEMORY_OPENAI_AUTHORIZED="false", ALFRED_MEMORY_SYNC_MOCK_DIR="",
@@ -211,6 +212,8 @@ def validate(repo, manifest, output, profile, labels=(), with_ollama=False, bund
             manifest["last_validation"] = {"profile": profile, "status": result["status"]}
         else:
             release.gate(manifest, "backend", result["status"], "combined_backend", **result_evidence(result), labels=list(selected))
+        if result["status"] != "PASS":
+            return
     if profile in ("browser", "full"):
         result = run(repo, [sys.executable, "scripts/run_browser_regressions.py", "--browser", "Chrome",
                            "--require-browser", "--artifact-dir", str(output / "browser"),
@@ -218,6 +221,8 @@ def validate(repo, manifest, output, profile, labels=(), with_ollama=False, bund
         if result["status"] == "PASS" and (not result["tests"] or result["skips"]):
             result["status"] = "NOT_RUN"
         release.gate(manifest, "browser", result["status"], "house_chrome_suite", **result_evidence(result))
+        if result["status"] != "PASS":
+            return
     if profile in ("native", "full"):
         args = [sys.executable, "scripts/verify_native_runtime.py", "--browser", "--port", "8140"]
         if with_ollama:

@@ -15,6 +15,7 @@ class UsersConfig(AppConfig):
         try:
             guard_sqlite_storage(settings.DATABASES)
             if os.name == "nt":
+                private_directory(Path(settings.MEDIA_ROOT).absolute())
                 for config in settings.CACHES.values():
                     if config["BACKEND"] in {"diskcache.DjangoCache", "django.core.cache.backends.filebased.FileBasedCache"}:
                         private_directory(Path(config["LOCATION"]).absolute())

@@ -20,6 +20,15 @@ from alfred_private_storage import (PrivateStorageUnavailable, acl_snapshot, cur
 
 @skipUnless(os.name == "nt", "Windows source storage acceptance requires Windows")
 class SourceStorageTests(TestCase):
+    def test_source_startup_protects_media_before_preview_or_document_creation(self):
+        from django.apps import apps
+        with TemporaryDirectory() as directory,override_settings(MEDIA_ROOT=Path(directory)/'media'):
+            apps.get_app_config('users').ready()
+            self.assertTrue(verify_private(Path(settings.MEDIA_ROOT)))
+            preview=Path(settings.MEDIA_ROOT)/'synthetic-preview.bin'
+            preview.write_bytes(b'synthetic preview')
+            self.assertTrue(verify_private(preview))
+
     def test_sqlite_and_test_directories_are_private_before_first_connection(self):
         with TemporaryDirectory() as directory:
             root=Path(directory)

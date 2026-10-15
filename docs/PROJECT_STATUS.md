@@ -100,8 +100,20 @@ The first upload fixture run failed because its intentionally shared media/temp
 directory was broad; the disposable fixture is now protected before seeding.
 No money, schema, provider, key or production change is included.
 
-Next action: pin the completed source-storage commit and run the final combined
-gate, then actual disposable M21 rehearsal. Specialized audit/runbooks and
+8978fe1 combined attempt retained: 744 backend executed, 26 failures/28 errors
+from pre-existing broad shared media fixtures; 37 Chrome executed with one different
+intermittent navigation error; 34 native/Ollama checks PASS. Overall FAIL remains.
+The guard was not weakened. Corrected release environments now select a fresh
+ALFRED_MEDIA_ROOT; source startup protects it before preview/document generation.
+The shared M14F temp/media fixture is private before seeding. Standalone browser
+runs use the same stripped, disposable environment instead of inheriting operator
+DB/media/cloud settings. 150 focused document/loan/upload/financial tests PASS
+(artifacts/post-audit/media-isolation-fixed-20c05611/receipt.json); 22 overlapping
+runner/isolation/fail-fast tests PASS (runner-final-67f8460e). Backend/browser
+failure stops subsequent expensive gates and leaves unexecuted gates NOT_RUN.
+
+Next action: pin the media-isolation correction and run the final combined gate,
+then actual disposable M21 rehearsal. Specialized audit/runbooks and
 historical results below remain reference material, not fresh acceptance.
 
 **Current status — 2026-10-15:** M14/M15 consolidated source is deployed and GitHub master matches 3932f391aa4eed7b3200ad3b034f7991435e01e4. Dated release results are 619 backend/15 Chrome/35 native (overlapping packaged scope); this audit independently ran 86 focused tests, zero skips, plus isolated system/drift checks. Normal-account, real-provider, clean-PC and device-loss acceptance remain incomplete. Port 8000 did not respond during the audit; no service action was taken. M20 is unfinished separate development; M16–M19/M21 are not declared complete.

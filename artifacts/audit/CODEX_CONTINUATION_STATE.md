@@ -43,7 +43,14 @@ Source/debug P0-A creation gaps reproduced and fixed: before-use SQLite/config/
 cache checks; private retained and streamed temporary uploads. 89 focused tests
 PASS, system/drift PASS; exact evidence and fixture correction in PROJECT_STATUS.
 No migration or production repair. Source/SDK main HEAD remains 3932f391.
-Next: final pinned combined gate on the committed extension using local .venv;
+Source storage commit: 8978fe1d9bba453704a106d7e310ed3fc66cbc3e. Full attempt
+retained: 744 backend with 26 failures/28 errors from broad old shared media
+fixtures; 37 Chrome with one intermittent navigation error; 34 native PASS.
+Correction: fresh ALFRED_MEDIA_ROOT in release environments, media protection at
+startup, private M14F fixture and stripped standalone browser environments. 150
+focused tests PASS, 22 overlapping runner tests PASS, receipts in PROJECT_STATUS.
+M20 now stops after failed backend/browser; unexecuted gates remain NOT_RUN.
+Next: final pinned combined gate on this committed correction using local .venv;
 declare only requirements.txt and constraints/windows-py312.txt dependency changes,
 then actual disposable M21 rehearsal if backend/browser/native/Ollama PASS.
 Do not restart audit, regenerate matrix or start a UI redesign.

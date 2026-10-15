@@ -289,7 +289,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(env("ALFRED_MEDIA_ROOT", default=str(BASE_DIR / "media")))
 STORAGES = {
     "default": {"BACKEND": "alfred_ai.storage.PrivateFileSystemStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},

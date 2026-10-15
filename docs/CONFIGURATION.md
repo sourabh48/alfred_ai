@@ -11,6 +11,8 @@ before use and protects retained/temporary uploads before writing data. A fresh
 source installation should select an empty private data directory and explicit
 SQLite path outside the code checkout. Use `ALFRED_DATA_DIR` for local config/key
 selection and `DATABASE_URL=sqlite:///...` for the matching absolute database path;
+`ALFRED_MEDIA_ROOT` selects a separate private source/debug upload directory
+(native continues to use its selected data directory's media subdirectory).
 verify the selected path before any initialization. Existing native data, keys or
 operator edits must be preserved, not moved or replaced by these examples.
 Broad existing file/directory ACLs fail safely and need the separately authorized

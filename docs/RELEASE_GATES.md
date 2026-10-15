@@ -33,6 +33,9 @@ Credential scanning includes quoted JSON access/refresh tokens and client secret
 Only exact reviewed public fixture path/value hashes are exempted. Successful
 runners with zero/skipped required tests report NOT_RUN, never PASS; failed
 runners remain FAIL.
+Release and standalone browser runs select fresh runtime/media roots and strip
+operator/cloud credentials. A failing backend or browser suite stops the full
+pipeline before later expensive gates; those gates remain NOT_RUN.
 
 Exit codes: 0 requested command scope passed, 1 failed, 2 blocked/incomplete.
 Preflight/targeted PASS is **not** full release readiness. Both the JSON and
