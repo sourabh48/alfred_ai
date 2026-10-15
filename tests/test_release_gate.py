@@ -85,6 +85,31 @@ class ReleaseSourceTests(ReleaseRepositoryFixture, unittest.TestCase):
         with self.assertRaisesRegex(release.GateError, "target_baseline_changed"):
             release.source_checks(self.repo, self.manifest, target_repo=self.target(baseline=False))
 
+    def test_clean_tracked_checkpoint_changes_are_source_not_operator_overlays(self):
+        path=release.PROTECTED[0]
+        self.commit(path,'synthetic baseline checkpoint')
+        self.baseline=self.git('rev-parse','HEAD')
+        self.commit(path,'synthetic candidate checkpoint')
+        self.candidate=self.git('rev-parse','HEAD')
+        self.manifest=release.new_manifest('synthetic-1',self.candidate,self.baseline)
+        target=self.target()
+        release.source_checks(self.repo,self.manifest,target_repo=target)
+        self.assertNotIn(path,self.manifest['gates']['operators']['evidence']['sha256'])
+        release.git(target,'merge','--ff-only',self.candidate)
+        self.assertEqual((target/path).read_text(),'synthetic candidate checkpoint')
+
+    def test_real_operator_checkpoint_edit_overlapping_candidate_is_still_blocked(self):
+        path=release.PROTECTED[0]
+        self.commit(path,'synthetic baseline checkpoint')
+        self.baseline=self.git('rev-parse','HEAD')
+        self.commit(path,'synthetic candidate checkpoint')
+        self.candidate=self.git('rev-parse','HEAD')
+        self.manifest=release.new_manifest('synthetic-1',self.candidate,self.baseline)
+        target=self.target();(target/path).write_text('synthetic operator overlay')
+        with self.assertRaisesRegex(release.GateError,'unprotected_or_overlapping_operator_changes'):
+            release.source_checks(self.repo,self.manifest,target_repo=target)
+        self.assertEqual((target/path).read_text(),'synthetic operator overlay')
+
     def test_remote_divergence_blocks_without_push(self):
         remote = self.target()
         self.git("remote", "add", "origin", str(remote))

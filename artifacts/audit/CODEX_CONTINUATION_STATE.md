@@ -50,9 +50,19 @@ Correction: fresh ALFRED_MEDIA_ROOT in release environments, media protection at
 startup, private M14F fixture and stripped standalone browser environments. 150
 focused tests PASS, 22 overlapping runner tests PASS, receipts in PROJECT_STATUS.
 M20 now stops after failed backend/browser; unexecuted gates remain NOT_RUN.
-Next: final pinned combined gate on this committed correction using local .venv;
-declare only requirements.txt and constraints/windows-py312.txt dependency changes,
-then actual disposable M21 rehearsal if backend/browser/native/Ollama PASS.
+Media-isolation commit e4c66471e34a4eae14eb90a1bae3ce13577a5925: pinned combined
+747 backend / 37 Chrome / 34 native-Ollama PASS, zero skips/failures. Exact receipt
+artifacts/release-gates/post-audit-isolated-e4c6647/release.json.
+Actual M21 ran in F:/ALFRED_DEV/post-audit-rehearsal-e4c6647. Backup/restore and
+baseline startup passed; post-FF clean tracked checkpoint hashes caused a false
+operator_file_changed_after_promotion. Actual source rollback PASS; data/config
+and evidence preserved. Rehearsal overall FAIL, no live action.
+Fix distinguishes clean tracked source from genuine operator overlays; still
+blocks dirty overlap/ignored collisions. CLI GateError identity unified. 58
+focused tests PASS, three overlapping CLI tests PASS; receipts in PROJECT_STATUS.
+Next: pin this correction, fresh combined gate, then new disposable rehearsal.
+Use local .venv; expected dependency paths only requirements.txt and
+constraints/windows-py312.txt. Source/production private data remain untouched.
 Do not restart audit, regenerate matrix or start a UI redesign.
 
 Safe resume: Get-Content -LiteralPath F:/ALFRED_DEV/post-audit/docs/PROJECT_STATUS.md.

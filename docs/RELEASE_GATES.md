@@ -36,6 +36,9 @@ runners remain FAIL.
 Release and standalone browser runs select fresh runtime/media roots and strip
 operator/cloud credentials. A failing backend or browser suite stops the full
 pipeline before later expensive gates; those gates remain NOT_RUN.
+Clean tracked checkpoint files changed by the candidate are source changes, not
+operator overlays. Their actual local edits still block when they overlap the
+candidate; unchanged protected operator files remain hashed across promotion.
 
 Exit codes: 0 requested command scope passed, 1 failed, 2 blocked/incomplete.
 Preflight/targeted PASS is **not** full release readiness. Both the JSON and

@@ -14,6 +14,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+if __name__ == "__main__":
+    sys.modules["scripts.release_gate"] = sys.modules[__name__]
 from alfred_native import write_json
 
 STATUSES = {"PASS", "FAIL", "BLOCKED", "NOT_RUN", "WAIVED_BY_USER"}
@@ -225,7 +227,7 @@ def source_checks(repo, manifest, expected_dependencies=None, expected_migration
                 gate(manifest, "operators", "FAIL", "candidate_collides_with_operator_file",
                      path_reference=hashlib.sha256(path.encode()).hexdigest()[:16])
                 raise GateError("candidate_collides_with_operator_file")
-        hashes = {p: sha256(target / p) for p in PROTECTED if (target / p).is_file()}
+        hashes = {p: sha256(target / p) for p in PROTECTED if p not in paths and (target / p).is_file()}
         gate(manifest, "operators", "PASS", "operator_files_recorded", sha256=hashes)
     return manifest
 

@@ -112,8 +112,26 @@ DB/media/cloud settings. 150 focused document/loan/upload/financial tests PASS
 runner/isolation/fail-fast tests PASS (runner-final-67f8460e). Backend/browser
 failure stops subsequent expensive gates and leaves unexecuted gates NOT_RUN.
 
-Next action: pin the media-isolation correction and run the final combined gate,
-then actual disposable M21 rehearsal. Specialized audit/runbooks and
+Pinned e4c66471e34a4eae14eb90a1bae3ce13577a5925 passed **747 backend / 37 Chrome /
+34 native-Ollama checks**, zero failures/skips. Source/privacy/configuration/drift
+PASS. Receipt: artifacts/release-gates/post-audit-isolated-e4c6647/release.json.
+Actual M21 sandbox F:/ALFRED_DEV/post-audit-rehearsal-e4c6647 independently backed
+up/restored synthetic data, booted the baseline and exercised fast-forward. It
+then failed operator_file_changed_after_promotion because clean tracked checkpoint
+source changes were incorrectly hashed as operator overlays. Authorized synthetic
+source rollback PASS; data/configuration and all evidence/backups preserved.
+This is a real M21 failure, not COMPLETE or real-account acceptance.
+
+Correction: hash protected operator files only when the candidate does not change
+them; clean tracked source advances normally, while dirty overlapping operator
+edits and ignored-file collisions still block. CLI main/imports share GateError
+identity so fixed errors stay actionable. 58 focused M20/promotion tests PASS
+(artifacts/post-audit/m21-operator-fix-d24c0908/receipt.json); three overlapping
+actual CLI boundary tests PASS (m21-cli-final-18f0f3fd). New candidate requires
+fresh combined validation and a new disposable M21 rehearsal.
+
+Next action: pin the M21 operator/CLI correction and validate it, then rehearse.
+Specialized audit/runbooks and
 historical results below remain reference material, not fresh acceptance.
 
 **Current status — 2026-10-15:** M14/M15 consolidated source is deployed and GitHub master matches 3932f391aa4eed7b3200ad3b034f7991435e01e4. Dated release results are 619 backend/15 Chrome/35 native (overlapping packaged scope); this audit independently ran 86 focused tests, zero skips, plus isolated system/drift checks. Normal-account, real-provider, clean-PC and device-loss acceptance remain incomplete. Port 8000 did not respond during the audit; no service action was taken. M20 is unfinished separate development; M16–M19/M21 are not declared complete.
