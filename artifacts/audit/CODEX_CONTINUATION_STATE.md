@@ -16,11 +16,22 @@ M15 unnecessarily. M16 retention implementation d66ce9904e560ade110ccf41be210eed
 passed 156 focused tests/system/drift and pinned source/privacy preflight plus nine
 targeted tests. Latest scope: artifacts/release-gates/post-audit-m16-d66ce99/release.json.
 Full gates remain NOT_RUN for newer M16 source; do not inherit the b162c8f PASS.
-Next: M16 dependency-aware selective refresh/invalidation. Reuse cache keys,
-travel/research.py, travel_research.py, travel_conversation.py and existing source
-freshness/revision rules; preserve user choices, stale labels and quota limits.
+M16 retention + selective refresh implementation is now COMPLETE in development:
+196 focused backend / 5 Chrome PASS, zero failures/skips; system/drift PASS.
+Receipts: artifacts/post-audit/m16-verified-d421da86/receipt.json and
+artifacts/post-audit/m16-final-chrome-56feb12f/receipt.json. Reviewed desktop/mobile
+screenshots include changed-dates-no-old-forecast.png. Source pin/limited gates:
+artifacts/release-gates/post-audit-m16-selective/release.json; read actual HEAD.
+New tests test_travel_refresh exercise caches/call avoidance, dates/offers/prices,
+quotas/leases, superseded jobs, location choice, preserved edits, old-banner
+filtering and atomic plan/session rollback. No migration/dependency added.
+Full release/native/package acceptance remains NOT_RUN for this newer source.
+Failed reproductions/fixture attempts remain in PROJECT_STATUS.md; do not delete.
+Next: M17 unsupported advanced_engine/SelfImproveAPI and legacy email OAuth/token
+paths. Trace only those callers; preserve supported inference/training and IMAP
+portfolio imports. No new autonomous coding agent, provider or production repair.
 Safe status command from this worktree:
-`.\.venv\Scripts\python.exe -B scripts/release_gate.py status --output artifacts/release-gates/post-audit-m16-d66ce99`
+`.\.venv\Scripts\python.exe -B scripts/release_gate.py status --output artifacts/release-gates/post-audit-m16-selective`
 Production, private DB, real providers and GitHub stay unchanged/unauthorized.
 
 ### Earlier post-audit development checkpoints

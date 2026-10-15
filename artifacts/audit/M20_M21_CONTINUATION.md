@@ -16,7 +16,10 @@ The older implementation matrix below is historical. PROJECT_STATUS.md remains
 the authoritative active overview. Newer M16 retention source d66ce99 passed 156
 focused tests/system/drift and pinned source/privacy plus nine targeted tests.
 Its full combined gates remain NOT_RUN; b162c8f is still the exact full critical
-candidate. M16 selective invalidation is next; no acceptance transfers implicitly.
+candidate. M16 selective refresh/date invalidation now passed 196 targeted backend
+and five Chrome checks/system/drift; exact current source pin and NOT_RUN full-gate
+scope are in artifacts/release-gates/post-audit-m16-selective/release.json.
+M17 unsupported-path cleanup is next; no acceptance transfers implicitly.
 
 Active work is now F:/ALFRED_DEV/post-audit on fix/post-audit-critical-20261015.
 The original 0052410 history is retained. P0-D ignored-file collision and JSON

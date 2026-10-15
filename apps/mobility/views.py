@@ -1,6 +1,7 @@
 from datetime import timedelta
 from datetime import date as date_cls
 
+from django.db import transaction
 from django.db.models import Count, Max
 from django.utils import timezone
 from rest_framework import status
@@ -614,12 +615,15 @@ class TravelPlanDetailView(RetrieveUpdateDestroyAPIView):
         ).select_related("vehicle_profile")
 
 
+    @transaction.atomic
     def perform_update(self, serializer):
         from .services.travel_discovery import fact
         from .models import TravelPlanningSession
         original = serializer.instance
         core = ("destination", "start_date", "end_date", "budget", "transport_mode", "vehicle_profile")
         changed = any(key in serializer.validated_data and getattr(original,key) != serializer.validated_data[key] for key in core)
+        timing_changed = any(key in serializer.validated_data and getattr(original,key) != serializer.validated_data[key]
+                             for key in ("start_date", "end_date"))
         plan = serializer.save()
         session = TravelPlanningSession.objects.filter(plan=plan, user=self.request.user).first()
         if session:
@@ -631,6 +635,14 @@ class TravelPlanDetailView(RetrieveUpdateDestroyAPIView):
                         session.state.pop(key,None)
                     else:
                         session.state[key] = fact(val,"plan_details",True)
+                if timing_changed:
+                    from .services.travel.presentation import invalidate_trip_dates
+                    from .services.travel_discovery import budget_for
+                    from .services.travel.links import external_links
+                    session.candidates = [invalidate_trip_dates(c) for c in session.candidates]
+                    for candidate in session.candidates:
+                        candidate["budget"] = budget_for(session.state, candidate)
+                        candidate["external_links"] = external_links(session.state, candidate)
                 session.revision += 1
                 session.itinerary = {}
                 session.status = "destination_selected" if plan.destination else "discovery"

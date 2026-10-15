@@ -203,6 +203,24 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.assertIn("wikivoyage · destinations",self.text("plannerQuotaBody"))
         self.assertIn("duffel · flights",self.text("plannerQuotaBody"))
 
+    def test_date_change_keeps_edited_days_and_does_not_resurrect_old_forecast(self):
+        self.browser.get(self.live_server_url + "/mobility/")
+        self.wait.until(lambda _: "destination is optional" in self.text("plannerMessages"))
+        self.send("Plan a 3-day bike trip from Bengaluru to Coorg. Budget 15000.")
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, ".travel-day")) == 3)
+        self.send("Make day 2 relaxed")
+        start = timezone.localdate() + timedelta(days=5)
+        self.send(f"{start} to {start + timedelta(days=2)}")
+        self.assertIn("Dates changed. Recheck weather", self.text("plannerItinerary"))
+        self.assertIn(str(start), self.browser.find_element(self.By.CSS_SELECTOR, '[data-day="1"]').text)
+        self.assertIn("relaxed", self.browser.find_element(self.By.CSS_SELECTOR, '[data-day="2"]').text)
+        self.send("Build itinerary")
+        self.assertIn("Dates changed. Recheck weather", self.text("plannerItinerary"))
+        self.assertIn("Recheck needed", self.text("plannerResearch"))
+        self.assertNotIn("current weather forecast(s) available", self.text("plannerResearch"))
+        self.browser.execute_script("document.getElementById('plannerItinerary').scrollIntoView({block:'start',behavior:'instant'})")
+        self.browser.save_screenshot(str(self.artifacts / "changed-dates-no-old-forecast.png"))
+
     def test_quick_ideas_draft_and_preferences(self):
         self.browser.set_window_size(390,1000)
         self.browser.execute_cdp_cmd("Emulation.setDeviceMetricsOverride",{"width":390,"height":1000,"deviceScaleFactor":1,"mobile":True})

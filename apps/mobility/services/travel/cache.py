@@ -28,7 +28,7 @@ def _cache_result(record, error=""):
     return ProviderResult(**data)
 
 
-def query(provider, parameters, *, force=False):
+def query(provider, parameters, *, force=False, cache_only=False):
     try:
         parameters = provider.parameters(parameters)
     except (ValueError, TypeError, ProviderError):
@@ -52,6 +52,12 @@ def query(provider, parameters, *, force=False):
             return _cache_result(record, code)
         return ProviderResult(provider.name, provider.category, request_parameters=parameters,
             source_url=provider.source_url, attribution=provider.attribution, error=code)
+
+    if cache_only:
+        if record:
+            log("cache_hit")
+            return _cache_result(record)
+        return unavailable("refresh_not_requested")
 
     reason = provider.unavailable_reason()
     if reason:
@@ -125,10 +131,10 @@ def query(provider, parameters, *, force=False):
         source_url=provider.source_url, request_parameters=parameters)
 
 
-def query_with_fallback(providers, parameters, *, force=False):
+def query_with_fallback(providers, parameters, *, force=False, cache_only=False):
     attempts, stale = [], None
     for provider in providers:
-        result = query(provider, parameters, force=force)
+        result = query(provider, parameters, force=force, cache_only=cache_only)
         if result.success and not result.stale:
             result.fallback = attempts
             return result

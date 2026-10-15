@@ -32,6 +32,8 @@ class PlannerWriteThrottle(UserRateThrottle):
 def session_payload(session):
     session.refresh_from_db()
     run = session.research_runs.first()
+    outdated = bool(run and any(value(run.request, key) != value(session.state, key)
+                    for key in ("available_start_date", "available_end_date", "trip_duration")))
     candidates = deepcopy(session.candidates)
     now = timezone.now().isoformat()
     for candidate in candidates:
@@ -54,11 +56,14 @@ def session_payload(session):
             "map_config":map_configuration(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),
-            "research": ({"id": run.id, "status": run.status, "stage": STAGES.get(run.status, run.status),
-                          "deep": run.deep, "summary": run.summary, "error": run.error, "changes": run.changes,
-                          "sources_checked": run.sources_checked, "candidate_count": run.candidate_count,
-                          "created_at": run.created_at, "completed_at": run.completed_at,
-                          "evidence": [evidence_payload(e) for e in run.evidence.all()]} if run else None)})
+            "research": ({"id": run.id, "status": run.status, "outdated": outdated,
+                          "stage": "Recheck needed" if outdated else STAGES.get(run.status, run.status),
+                          "deep": run.deep,
+                          "summary": "Trip dates changed. Previous research applies to the earlier window; recheck weather and offers." if outdated else run.summary,
+                          "error": "" if outdated else run.error, "changes": [] if outdated else run.changes,
+                          "sources_checked": 0 if outdated else run.sources_checked, "candidate_count": run.candidate_count,
+                          "created_at": run.created_at, "completed_at": None if outdated else run.completed_at,
+                          "evidence": [] if outdated else [evidence_payload(e) for e in run.evidence.all()]} if run else None)})
 
 
 class TravelSessionList(APIView):

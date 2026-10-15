@@ -14,7 +14,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.mobility.models import BikeProfile, TravelMessage, TravelPlan, TravelPlanningSession
 from .travel_catalog import ALIASES, CITIES, DESTINATIONS, lookup
-from .travel_discovery import candidates_for, fact, learn, profile_for, value
+from .travel_discovery import budget_for, candidates_for, fact, learn, profile_for, value
 from .travel_itinerary import build_itinerary, edit_itinerary
 from .travel_research import queue_research
 
@@ -266,6 +266,28 @@ def send_message(session_id, user, text):
             session.itinerary = {}
             session.state.pop("selected_destination",None)
             session.state.pop("selected_location",None)
+    timing_changed = any(value(session.state,k) != value(old_state,k) for k in ("available_start_date", "available_end_date", "trip_duration"))
+    if timing_changed:
+        from .travel.presentation import invalidate_trip_dates
+        from .travel.links import external_links
+        session.candidates = [invalidate_trip_dates(c) for c in session.candidates]
+        for candidate in session.candidates:
+            candidate["budget"] = budget_for(session.state, candidate)
+            candidate["external_links"] = external_links(session.state, candidate)
+        if session.itinerary:
+            old_itinerary = invalidate_trip_dates(session.itinerary)
+            selected = next((c for c in session.candidates if c["name"] == value(session.state, "selected_destination")), None)
+            session.itinerary = build_itinerary(session.state, selected) if selected else old_itinerary
+            if len(old_itinerary["days"]) == len(session.itinerary["days"]):
+                start = value(session.state, "available_start_date")
+                for index, day in enumerate(old_itinerary["days"]):
+                    day["date"] = str(date.fromisoformat(start) + timedelta(days=index)) if start else None
+                session.itinerary["days"] = old_itinerary["days"]
+                session.itinerary["budget"] = old_itinerary["budget"]
+                session.itinerary["edits"] = old_itinerary["edits"]
+            if not selected:
+                session.itinerary.setdefault("checks", []).append("Dates changed; rebuild and review the duration and budget before saving.")
+                session.itinerary["external_links"] = external_links(session.state, {"name": session.itinerary.get("destination")})
     TravelMessage.objects.create(session=session, role="user", text=text)
     lower = text.lower()
     if session.state != old_state:
@@ -276,7 +298,7 @@ def send_message(session_id, user, text):
     for key in value(session.state, "must_avoid", []):
         if key not in value(old_state, "must_avoid", []):
             learn(user, key, False, "Explicit avoidance: "+text[:160], 1, True)
-    from .travel.intent import PROFILE_KEYS
+    from .travel.intent import PROFILE_KEYS, research_categories
     for key in PROFILE_KEYS:
         if key in session.state and session.state[key] != old_state.get(key) and session.state[key].get("confirmed_by_user"):
             learn(user,key,value(session.state,key),"Explicit travel preference",1,True)
@@ -319,10 +341,11 @@ def send_message(session_id, user, text):
             session.save()
         say(session,"Applied the proposed indoor/rest alternatives; existing budget allowances are retained." if proposals else "No current weather alternatives are available. Recheck the trip first.")
         return session
-    research_followup = bool(re.search(r"\b(?:check|find|show|compare|re-plan|replan|refresh|is|need)\b",lower) and re.search(r"\b(?:weather|rain|forecast|hotels?|availability|trains?|flights?|buses?|permit|permission|open|unexplored|hidden|camping)\b",lower))
+    research_followup = bool(re.search(r"\b(?:check|find|show|compare|re-plan|replan|refresh|is|need)\b",lower) and re.search(r"\b(?:weather|rain|forecast|hotels?|availability|trains?|flights?|bus(?:es)?|permit|permission|open|unexplored|hidden|camping)\b",lower))
     route_change = any(value(session.state,k) != value(old_state,k) for k in ("avoid_expressways","avoid_tolls","scenic_preference"))
     if (research_followup or route_change) and session.candidates:
-        queue_research(session,recheck=True,force=bool(re.search(r"\b(?:refresh|live refresh)\b",lower)))
+        queue_research(session,recheck=True,force=bool(re.search(r"\b(?:refresh|live refresh)\b",lower)),
+                       categories=research_categories(text) | ({"routing"} if route_change else set()))
         reply = "I'll update research using your saved trip details and fresh cached results where available."
         if "flight" in lower and not (value(session.state,"origin_airport") and value(session.state,"destination_airport")):
             reply += " For flight search, give the airport codes, for example BLR to CCJ; I won't guess the nearest airports."
@@ -389,28 +412,8 @@ def send_message(session_id, user, text):
         else:
             say(session, "I can adapt this trip for a pillion. Vehicle load limits and current road suitability need checking; I won't invent them. Shall I include a second traveller and recalculate?", ["Include pillion"])
     elif session.itinerary:
-        timing_changed = any(value(session.state,k) != value(old_state,k) for k in ("available_start_date", "available_end_date", "trip_duration"))
         if timing_changed:
-            selected = next((c for c in session.candidates if c["name"] == value(session.state, "selected_destination")), None)
-            if selected:
-                old_itinerary = deepcopy(session.itinerary)
-                session.itinerary = build_itinerary(session.state, selected)
-                if len(old_itinerary["days"]) == len(session.itinerary["days"]):
-                    for old_day, day in zip(old_itinerary["days"], session.itinerary["days"]):
-                        old_day["date"] = day["date"]
-                    session.itinerary["days"] = old_itinerary["days"]
-                    session.itinerary["budget"] = old_itinerary["budget"]
-                    session.itinerary["edits"] = old_itinerary["edits"]
-                session.itinerary["weather"] = {"summary":"Dates changed. Recheck weather for the revised window.","confidence":"UNKNOWN"}
-                session.itinerary["sources"] = []
-                for key in ("weather_result","hotels_result","flights_result","trains_result","buses_result","permit_result"):
-                    session.itinerary[key] = {"freshness":"UNKNOWN","status":"needs_refresh","error":"trip_dates_changed","payload":{}}
-                session.itinerary["weather_proposals"] = []
-                session.itinerary["web_research"] = []
-                from .travel.links import external_links
-                session.itinerary["external_links"] = external_links(session.state,selected)
-                session.itinerary["quality"] = {"verified":[],"estimated":["budget"],"recheck":["Dates changed; refresh volatile research"]}
-                say(session, "Updated the dates and duration. Review the revised plan and recheck weather before saving.", ["Recheck trip"])
+            say(session, "Updated the dates and duration. Review the revised plan and recheck weather before saving.", ["Recheck trip"])
         else:
             edited, reply = edit_itinerary(session.itinerary, text, session.state)
             if edited:

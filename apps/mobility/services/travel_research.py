@@ -19,8 +19,20 @@ STAGES = {"queued": "Queued", "destinations": "Researching Destinations", "weath
           "recommendations": "Building Recommendations", "ready": "Ready", "failed": "Failed", "superseded": "Request updated"}
 
 
-def queue_research(session, deep=False, recheck=False, force=False):
+def queue_research(session, deep=False, recheck=False, force=False, categories=None):
+    request = deepcopy(session.state)
+    # Refresh scope belongs to this job, never to the user's persistent preferences.
+    for key in ("force_refresh", "refresh_categories"):
+        request.pop(key, None)
+    if categories:
+        request["refresh_categories"] = fact(sorted(categories), "requested_research")
+    if force:
+        request["force_refresh"] = fact(True, "explicit_refresh")
     active = session.research_runs.exclude(status__in=TERMINAL).filter(revision=session.revision).first()
+    if active and any(active.request.get(key) != request.get(key) for key in ("force_refresh", "refresh_categories")):
+        session.revision += 1
+        session.save(update_fields=["revision"])
+        active = None
     if active:
         if deep and not active.deep:
             if active.status == "queued":
@@ -31,9 +43,6 @@ def queue_research(session, deep=False, recheck=False, force=False):
             session.save(update_fields=["revision"])
         else:
             return active
-    request = deepcopy(session.state)
-    if force:
-        request["force_refresh"] = fact(True, "explicit_refresh")
     run = TravelResearchSession.objects.create(session=session, request=request, revision=session.revision,
                                               deep=deep, recheck=recheck)
     session.status = "researching"
@@ -115,10 +124,16 @@ def run_research(run_id):
     try:
         from .travel.research import enrich_candidate, research_candidates
         from .travel.discovery import remember
-        preliminary = candidates_for(run.session.user, run.request, limit=50)
-        options = research_candidates(run.session.user, run.request, preliminary)[:3]
-        if run.recheck and run.session.candidates and not value(run.request, "requested_destination"):
-            options = run.session.candidates
+        requested = value(run.request, "requested_destination") or value(run.request, "selected_destination")
+        saved = [d for d in run.session.candidates if not requested or d["name"].casefold() == requested.casefold()]
+        selected = value(run.request, "selected_location", {})
+        if selected.get("lat") is not None and selected.get("lon") is not None:
+            saved = [d for d in saved if all(d.get(key) == selected[key] for key in ("lat", "lon"))]
+        if run.recheck and saved:
+            options = saved
+        else:
+            preliminary = candidates_for(run.session.user, run.request, limit=50)
+            options = research_candidates(run.session.user, run.request, preliminary)[:3]
         previous = {d["name"]: d for d in run.session.candidates}
         verified, changes, researched = 0, [], []
         for destination in options:

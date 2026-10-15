@@ -37,7 +37,29 @@ post-start canonical reconciliation excludes only the expiring request table.
 migration drift PASS** (artifacts/post-audit/m16-integration-a065eaeb/receipt.json).
 These overlap prior tests and are not added to 753. This extension is after the
 frozen critical candidate; its full combined/package gate has not run.
-M16 remains IN PROGRESS: dependency-aware selective refresh/invalidation is next.
+M16 retention and selective-refresh implementation is now COMPLETE in isolated
+development. Category-scoped jobs reuse unrelated fresh/expired caches without
+network calls, preserve provenance and quota/lease guards, prioritize the latest
+web topic and selected location, and supersede older incompatible jobs. Date
+edits invalidate candidate/itinerary forecasts, offers, quote snapshots and old
+research banners while retaining independent route/place evidence and edited
+days/allowances. Plan/session changes are atomic on invalidation failure.
+**196 targeted backend tests / 5 Chrome workflows PASS, zero failures/skips;
+system and migration drift PASS.** Receipts:
+artifacts/post-audit/m16-verified-d421da86/receipt.json and
+artifacts/post-audit/m16-final-chrome-56feb12f/receipt.json.
+Desktop/mobile screenshots were reviewed; changed-dates-no-old-forecast.png
+shows the corrected date warning. No migration or dependency was added.
+Initial reproduced failures and two corrected synthetic fixture failures are
+retained in selective-refresh-repro-072cd2a5, date-invalidation-repro-28a7f490,
+m16-selective-integration-8ecbf0b8 and m16-final-contract-3f61f4cd. The latter
+rollback assertion needed a DB reload after save_plan's confirmed-state write;
+safe class/frame diagnosis is in m16-rollback-diagnostic-865c4715. The initial
+Chrome pass also exposed an old banner claim, corrected before final acceptance.
+Counts overlap earlier checks and are never added together. Exact source pin and
+limited gate scope: artifacts/release-gates/post-audit-m16-selective/release.json.
+Full combined/native/package release gates are NOT_RUN for this newer source.
+Next scoped unit: M17 unsupported self-improve and legacy email-token paths.
 Implementation commit d66ce9904e560ade110ccf41be210eedc6f7b7e8 also passed exact
 source/privacy/dependency/migration preflight and nine targeted retention tests
 (artifacts/release-gates/post-audit-m16-d66ce99/release.json). Its full backend,
