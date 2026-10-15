@@ -140,6 +140,10 @@ Tests: clock-boundary/month quotas, restart, interrupted cleanup, per-user event
 
 ### UNIT 6 — M17 unsupported experiments / legacy token paths
 
+Post-audit execution retires these unused prototypes and legacy setup paths in
+development. Read PROJECT_STATUS.md and the actual HEAD before resuming; do not
+rebuild retired experiments. The affected-file list below records the audit baseline.
+
 Affected: apps/ml_engine/self_improve/advanced_engine.py (missing patch_generator), api/views.py unrouted SelfImproveAPI, package module collection; integrations/services/email_integration.py legacy CWD token writer; voice_assistant.py orphan optional external processors.
 
 Trace all callers/import/package inclusion. Remove/quarantine truly unsupported paths safely, or document explicit unsupported state. Preserve supported registry/training gates. Do not silently add new agent or external speech/mail functionality.

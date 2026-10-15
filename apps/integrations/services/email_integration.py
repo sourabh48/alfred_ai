@@ -1,6 +1,6 @@
 """
 Email Integration Service
-Complete IMAP/OAuth2 setup for automatic statement imports from Gmail, Outlook, etc.
+IMAP scanning for the supported portfolio import workflow. Interactive OAuth is not supported.
 """
 import imaplib
 import email
@@ -8,38 +8,15 @@ from email.header import decode_header
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, BinaryIO
-import io
-import base64
-from django.conf import settings
-from django.utils import timezone
+from typing import Dict, Optional, BinaryIO
 
-# Google OAuth2
-try:
-    from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    from google.auth.transport.requests import Request
-    from googleapiclient.discovery import build
-    GOOGLE_AUTH_AVAILABLE = True
-except ImportError:
-    GOOGLE_AUTH_AVAILABLE = False
-
-# Microsoft OAuth2
-try:
-    import msal
-    MSAL_AVAILABLE = True
-except ImportError:
-    MSAL_AVAILABLE = False
-
+from alfred_ai.services.api_errors import safe_error_details
 
 class EmailIntegrationService:
     """
     Automatic email scanning for financial statements and transaction alerts.
-    Supports Gmail (OAuth2), Outlook (OAuth2), and generic IMAP.
+    Supports generic IMAP with attachments returned by each scan.
     """
-
-    # Gmail OAuth2 scopes
-    GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
     # Email patterns for financial institutions
     BANK_EMAIL_PATTERNS = {
@@ -94,127 +71,9 @@ class EmailIntegrationService:
     }
 
     def __init__(self):
-        self.gmail_service = None
-        self.outlook_client = None
         self.imap_connection = None
         self.logger = logging.getLogger(__name__)
 
-    # ==================== Gmail OAuth2 Integration ====================
-
-    def setup_gmail_oauth(self, credentials_json_path: str, user) -> Dict:
-        """
-        Set up Gmail OAuth2 authentication.
-
-        Args:
-            credentials_json_path: Path to Google OAuth2 credentials JSON
-            user: Django user object
-
-        Returns:
-            Dict with setup status and instructions
-        """
-        if not GOOGLE_AUTH_AVAILABLE:
-            return {
-                'success': False,
-                'error': 'Google OAuth2 libraries not installed. Run: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client'
-            }
-
-        try:
-            creds = None
-            token_path = f'gmail_token_{user.id}.json'
-
-            # Check for existing token
-            try:
-                creds = Credentials.from_authorized_user_file(token_path, self.GMAIL_SCOPES)
-            except FileNotFoundError:
-                pass
-
-            # If no valid credentials, get new ones
-            if not creds or not creds.valid:
-                if creds and creds.expired and creds.refresh_token:
-                    creds.refresh(Request())
-                else:
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        credentials_json_path, self.GMAIL_SCOPES
-                    )
-                    creds = flow.run_local_server(port=0)
-
-                # Save credentials
-                with open(token_path, 'w') as token:
-                    token.write(creds.to_json())
-
-            # Build Gmail service
-            self.gmail_service = build('gmail', 'v1', credentials=creds)
-
-            return {
-                'success': True,
-                'message': 'Gmail OAuth2 setup complete',
-                'email': self._get_gmail_email()
-            }
-
-        except Exception as e:
-            return {
-                'success': False,
-                'error': f'Gmail OAuth2 setup failed: {str(e)}'
-            }
-
-    def _get_gmail_email(self) -> str:
-        """Get authenticated Gmail email address."""
-        try:
-            profile = self.gmail_service.users().getProfile(userId='me').execute()
-            return profile.get('emailAddress', 'Unknown')
-        except Exception:
-            self.logger.warning("Failed to read the authenticated Gmail profile.", exc_info=True)
-            return 'Unknown'
-
-    # ==================== Outlook OAuth2 Integration ====================
-
-    def setup_outlook_oauth(self, client_id: str, client_secret: str, user) -> Dict:
-        """
-        Set up Outlook/Microsoft 365 OAuth2 authentication.
-
-        Args:
-            client_id: Azure App client ID
-            client_secret: Azure App client secret
-            user: Django user object
-
-        Returns:
-            Dict with setup status
-        """
-        if not MSAL_AVAILABLE:
-            return {
-                'success': False,
-                'error': 'MSAL library not installed. Run: pip install msal'
-            }
-
-        try:
-            authority = 'https://login.microsoftonline.com/common'
-            scopes = ['https://graph.microsoft.com/Mail.Read']
-
-            app = msal.PublicClientApplication(
-                client_id,
-                authority=authority
-            )
-
-            # Interactive login
-            result = app.acquire_token_interactive(scopes)
-
-            if 'access_token' in result:
-                self.outlook_client = result
-                return {
-                    'success': True,
-                    'message': 'Outlook OAuth2 setup complete'
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f"Authentication failed: {result.get('error_description')}"
-                }
-
-        except Exception as e:
-            return {
-                'success': False,
-                'error': f'Outlook OAuth2 setup failed: {str(e)}'
-            }
 
     # ==================== Generic IMAP Integration ====================
 
@@ -243,9 +102,11 @@ class EmailIntegrationService:
             }
 
         except Exception as e:
+            self.disconnect()
             return {
                 'success': False,
-                'error': f'IMAP connection failed: {str(e)}'
+                **safe_error_details(e, 'Email connection failed. Check the configured account and retry.',
+                                     logger_name=__name__, field='error'),
             }
 
     # ==================== Email Scanning & Parsing ====================
@@ -271,14 +132,7 @@ class EmailIntegrationService:
             'total_found': 0
         }
 
-        # Use Gmail if available
-        if self.gmail_service:
-            results = self._scan_gmail(user, days_back)
-        # Use Outlook if available
-        elif self.outlook_client:
-            results = self._scan_outlook(user, days_back)
-        # Use IMAP if connected
-        elif self.imap_connection:
+        if self.imap_connection:
             results = self._scan_imap(user, days_back)
         else:
             return {
@@ -297,56 +151,6 @@ class EmailIntegrationService:
 
         return results
 
-    def _scan_gmail(self, user, days_back: int) -> Dict:
-        """Scan Gmail for financial statements."""
-        results = {
-            'bank_statements': [],
-            'credit_card_statements': [],
-            'investment_statements': [],
-            'loan_statements': [],
-            'mutual_fund_statements': [],
-            'transaction_alerts': []
-        }
-
-        try:
-            # Calculate date range
-            after_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y/%m/%d')
-
-            # Search query for financial emails
-            query = f'after:{after_date} (statement OR alert OR transaction OR payment) has:attachment'
-
-            # Get messages
-            response = self.gmail_service.users().messages().list(
-                userId='me',
-                q=query,
-                maxResults=100
-            ).execute()
-
-            messages = response.get('messages', [])
-
-            for msg in messages:
-                # Get full message
-                full_msg = self.gmail_service.users().messages().get(
-                    userId='me',
-                    id=msg['id'],
-                    format='full'
-                ).execute()
-
-                # Parse message
-                parsed = self._parse_gmail_message(full_msg)
-
-                # Categorize
-                category = self._categorize_email(parsed['subject'], parsed['from'])
-                if category:
-                    results[category].append(parsed)
-
-            return results
-
-        except Exception as e:
-            return {
-                'error': f'Gmail scan failed: {str(e)}',
-                **results
-            }
 
     def _scan_imap(self, user, days_back: int) -> Dict:
         """Scan IMAP inbox for financial statements."""
@@ -399,39 +203,10 @@ class EmailIntegrationService:
 
         except Exception as e:
             return {
-                'error': f'IMAP scan failed: {str(e)}',
+                **safe_error_details(e, 'Email scan failed. Please retry.', logger_name=__name__, field='error'),
                 **results
             }
 
-    def _parse_gmail_message(self, message: Dict) -> Dict:
-        """Parse Gmail message to extract key info."""
-        headers = message['payload']['headers']
-
-        subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), '')
-        from_email = next((h['value'] for h in headers if h['name'].lower() == 'from'), '')
-        date = next((h['value'] for h in headers if h['name'].lower() == 'date'), '')
-
-        attachments = []
-
-        # Check for attachments
-        if 'parts' in message['payload']:
-            for part in message['payload']['parts']:
-                if part.get('filename'):
-                    attachment_id = part['body'].get('attachmentId')
-                    attachments.append({
-                        'filename': part['filename'],
-                        'attachment_id': attachment_id,
-                        'mime_type': part.get('mimeType'),
-                        'size': part['body'].get('size', 0)
-                    })
-
-        return {
-            'id': message['id'],
-            'subject': subject,
-            'from': from_email,
-            'date': date,
-            'attachments': attachments
-        }
 
     def _parse_imap_message(self, message) -> Dict:
         """Parse IMAP email message."""
@@ -492,125 +267,20 @@ class EmailIntegrationService:
         return None
 
     def download_statement(self, message_id: str, attachment_index: int = 0) -> Optional[BinaryIO]:
-        """
-        Download statement attachment from email.
-
-        Args:
-            message_id: Email message ID
-            attachment_index: Index of attachment to download
-
-        Returns:
-            Binary file object of the attachment
-        """
-        try:
-            if self.gmail_service:
-                return self._download_gmail_attachment(message_id, attachment_index)
-            elif self.imap_connection:
-                return self._download_imap_attachment(message_id, attachment_index)
-            else:
-                return None
-        except Exception as e:
-            self.logger.warning("Email attachment download failed: %s", str(e), exc_info=True)
-            return None
-
-    def _download_gmail_attachment(self, message_id: str, attachment_index: int) -> BinaryIO:
-        """Download attachment from Gmail."""
-        message = self.gmail_service.users().messages().get(
-            userId='me',
-            id=message_id
-        ).execute()
-
-        parts = message['payload'].get('parts', [])
-        if attachment_index >= len(parts):
-            return None
-
-        part = parts[attachment_index]
-        attachment_id = part['body'].get('attachmentId')
-
-        if attachment_id:
-            attachment = self.gmail_service.users().messages().attachments().get(
-                userId='me',
-                messageId=message_id,
-                id=attachment_id
-            ).execute()
-
-            file_data = base64.urlsafe_b64decode(attachment['data'])
-            return io.BytesIO(file_data)
-
+        """IMAP scans include attachment bytes; standalone refetch is unsupported."""
         return None
 
-    def auto_import_statements(self, user, days_back: int = 7) -> Dict:
-        """
-        Automatically scan and import all financial statements.
-
-        Args:
-            user: Django user object
-            days_back: Days to scan backwards (default 7)
-
-        Returns:
-            Dict with import results
-        """
-        results = {
-            'scanned_emails': 0,
-            'statements_found': 0,
-            'imported': {
-                'bank_statements': 0,
-                'investments': 0,
-                'loans': 0,
-                'credit_cards': 0
-            },
-            'errors': []
-        }
-
-        # Scan emails
-        scan_results = self.scan_financial_emails(user, days_back)
-
-        if 'error' in scan_results:
-            results['errors'].append(scan_results['error'])
-            return results
-
-        results['statements_found'] = scan_results['total_found']
-
-        # Import each type
-        # Bank statements
-        for stmt in scan_results.get('bank_statements', []):
-            try:
-                # Download and import
-                # This would integrate with existing import services
-                results['imported']['bank_statements'] += 1
-            except Exception as e:
-                results['errors'].append(f"Bank statement import error: {str(e)}")
-
-        # Investment statements
-        for stmt in scan_results.get('investment_statements', []):
-            try:
-                # Import via portfolio_intelligence service
-                results['imported']['investments'] += 1
-            except Exception as e:
-                results['errors'].append(f"Investment import error: {str(e)}")
-
-        # Loan statements
-        for stmt in scan_results.get('loan_statements', []):
-            try:
-                # Import via loan_pdf_parser
-                results['imported']['loans'] += 1
-            except Exception as e:
-                results['errors'].append(f"Loan import error: {str(e)}")
-
-        return results
 
     def disconnect(self):
         """Close all email connections."""
-        if self.imap_connection:
-            try:
-                self.imap_connection.close()
-                self.imap_connection.logout()
-            except Exception:
-                self.logger.warning("Failed to close the IMAP connection cleanly.", exc_info=True)
-
-        self.gmail_service = None
-        self.outlook_client = None
+        connection = self.imap_connection
         self.imap_connection = None
+        if connection:
+            for action in ('close', 'logout'):
+                try:
+                    getattr(connection, action)()
+                except Exception as e:
+                    safe_error_details(e, 'Email connection cleanup failed.', logger_name=__name__)
 
 
 # Singleton instance

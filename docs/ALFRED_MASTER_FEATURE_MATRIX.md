@@ -4,6 +4,9 @@ Post-audit progress and requirement overrides are recorded in
 [PROJECT_STATUS.md](PROJECT_STATUS.md). AWS activation is withdrawn by the user;
 R2 is the non-AWS implementation candidate, still unimplemented/unapproved.
 The 143-row audit snapshot below is preserved; do not regenerate it to report fixes.
+M17 post-audit development retires the unrouted self-improve/voice prototypes and
+legacy plaintext OAuth setup. Their source links below refer to the historical
+M15 commit; retirement is not delivery of AI Council or voice functionality.
 
 Audit date: 2026-10-15. Public/production source: `3932f391aa4eed7b3200ad3b034f7991435e01e4`.
 
@@ -1078,7 +1081,7 @@ because their parent domain has a test suite.
 
 - Status: **PARTIALLY_IMPLEMENTED**; priority P2.
 - Requirement provenance: Current user audit scope A–M, 2026-10-15. Historic original conversation unavailable unless linked implementation/backlog supplies provenance; implementation authorization is separate.
-- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/services/voice_assistant.py](../apps/ml_engine/services/voice_assistant.py).
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/services/voice_assistant.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/services/voice_assistant.py).
 - API/UI: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py.
 - Models/storage: User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
 - Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -2037,7 +2040,7 @@ because their parent domain has a test suite.
 
 - Status: **IMPLEMENTED_NOT_ACCEPTED**; priority P2.
 - Requirement provenance: Current user audit scope A–M, 2026-10-15. Historic original conversation unavailable unless linked implementation/backlog supplies provenance; implementation authorization is separate.
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
 - API/UI: ML runtime status; no routed self-improvement/coding-council API.
 - Models/storage: AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
 - Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -2052,7 +2055,7 @@ because their parent domain has a test suite.
 
 - Status: **NOT_IMPLEMENTED**; priority P2.
 - Requirement provenance: Current user audit scope A–M, 2026-10-15. Historic original conversation unavailable unless linked implementation/backlog supplies provenance; implementation authorization is separate.
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
 - API/UI: ML runtime status; no routed self-improvement/coding-council API.
 - Models/storage: AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
 - Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -2067,7 +2070,7 @@ because their parent domain has a test suite.
 
 - Status: **PARTIALLY_IMPLEMENTED**; priority P1.
 - Requirement provenance: Current user audit scope A–M, 2026-10-15. Historic original conversation unavailable unless linked implementation/backlog supplies provenance; implementation authorization is separate.
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
 - API/UI: ML runtime status; no routed self-improvement/coding-council API.
 - Models/storage: AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
 - Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -2082,7 +2085,7 @@ because their parent domain has a test suite.
 
 - Status: **PARTIALLY_IMPLEMENTED**; priority P2.
 - Requirement provenance: Current user audit scope A–M, 2026-10-15. Historic original conversation unavailable unless linked implementation/backlog supplies provenance; implementation authorization is separate.
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
 - API/UI: ML runtime status; no routed self-improvement/coding-council API.
 - Models/storage: AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
 - Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -2097,7 +2100,7 @@ because their parent domain has a test suite.
 
 - Status: **NOT_IMPLEMENTED**; priority P2.
 - Requirement provenance: Current user audit scope A–M, 2026-10-15. Historic original conversation unavailable unless linked implementation/backlog supplies provenance; implementation authorization is separate.
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
 - API/UI: ML runtime status; no routed self-improvement/coding-council API.
 - Models/storage: AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
 - Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.

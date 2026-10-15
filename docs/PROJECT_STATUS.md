@@ -59,12 +59,38 @@ Chrome pass also exposed an old banner claim, corrected before final acceptance.
 Counts overlap earlier checks and are never added together. Exact source pin and
 limited gate scope: artifacts/release-gates/post-audit-m16-selective/release.json.
 Full combined/native/package release gates are NOT_RUN for this newer source.
-Next scoped unit: M17 unsupported self-improve and legacy email-token paths.
+Next scoped unit after M16 was M17; its completed implementation is recorded below.
 Implementation commit d66ce9904e560ade110ccf41be210eedc6f7b7e8 also passed exact
 source/privacy/dependency/migration preflight and nine targeted retention tests
 (artifacts/release-gates/post-audit-m16-d66ce99/release.json). Its full backend,
 browser and native gates correctly remain NOT_RUN; the targeted success is not
 transferred into a release PASS.
+
+M17 cleanup is COMPLETE in development. The unrouted self-improve package
+(missing patch generator, eager GPT-2 pipelines and production-root scanner),
+SelfImproveAPI and orphan Google speech/gTTS voice prototype were retired from
+source/package module inventory. Their preserved M15 history is linked from the
+audit/matrix; no working AI Council or voice feature is claimed. Supported hybrid
+reasoning, encrypted memory, registry and consented training remain.
+Legacy interactive Gmail/Outlook setup, plaintext CWD token writer, unreachable
+Gmail transport and counter-only fake auto-import method were removed. Existing
+encrypted EmailConnection models and historical token/recovery files are untouched.
+The IMAP portfolio service retains inline attachment parsing; standalone refetch
+is explicitly unsupported. Each import gets its own connection, with a deterministic
+two-owner concurrency regression. Connection/scan/cleanup failures use existing
+safe diagnostic references/classification, never raw server/credential contents;
+logout is attempted even after close fails.
+**114 focused backend tests PASS, zero skips/failures; system/drift PASS**:
+artifacts/post-audit/m17-integration-2bf509e2/receipt.json. This includes seven new
+retirement/privacy/isolation checks, supported mail/ML/training/reasoning, finance,
+auth and source-native boundary checks. Six original failures are retained in
+m17-repro-d0730c23; the intermediate six-test pass is m17-fixed-240a62d7.
+Pinned source/privacy/targeted scope:
+artifacts/release-gates/post-audit-m17-cleanup/release.json.
+No migration/dependency/provider activation; new full/native/package gates NOT_RUN.
+Real mail/account/provider acceptance is still pending. No production remediation
+or deployment is inferred. Next: M18 clean dependency reproducibility, then M19
+fresh native package; reuse constraints/package tooling and do not repeat P0/M15.
 
 ### Earlier development evidence (preserved; current result above supersedes pending actions)
 

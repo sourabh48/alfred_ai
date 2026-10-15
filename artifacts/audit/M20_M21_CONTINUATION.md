@@ -19,7 +19,10 @@ Its full combined gates remain NOT_RUN; b162c8f is still the exact full critical
 candidate. M16 selective refresh/date invalidation now passed 196 targeted backend
 and five Chrome checks/system/drift; exact current source pin and NOT_RUN full-gate
 scope are in artifacts/release-gates/post-audit-m16-selective/release.json.
-M17 unsupported-path cleanup is next; no acceptance transfers implicitly.
+M17 unsupported-path cleanup also passed 114 focused backend tests/system/drift;
+scope is artifacts/release-gates/post-audit-m17-cleanup/release.json. M18 clean
+dependency reproducibility/M19 package are next. Full release results do not
+transfer to newer source and source-native tests are not frozen executable proof.
 
 Active work is now F:/ALFRED_DEV/post-audit on fix/post-audit-critical-20261015.
 The original 0052410 history is retained. P0-D ignored-file collision and JSON

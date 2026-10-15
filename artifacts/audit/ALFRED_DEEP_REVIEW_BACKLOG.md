@@ -14,8 +14,8 @@ The [whole-project audit](ALFRED_WHOLE_PROJECT_AUDIT_20261015.md), [matrix](../.
 | M13 remainder | User/Budget/Career/Mobility money floats remain. User nonfinite input accepted in synthetic serializer diagnostic; explicit currency separately scoped |
 | M14A-H | HTTP/auth/CSRF/invitation/upload/loan diagnostics/historical filtering/consent controls are deployed in M15. family.0004 applied historically, financial grants OFF. Old development-only notes superseded |
 | M14I | Re-encryption tooling complete; no live token mutation/fallback removal, separate approval required |
-| T09 / M16 | Retention/selective invalidation open; preserve quotas/active work |
-| M17 | Experimental missing patch_generator and unrouted self-improve confirmed; no working AI Council |
+| T09 / M16 | Post-audit development implementation complete: retention/selective refresh; 196 targeted backend / 5 Chrome, system/drift PASS. New full/package/deployment pending; see PROJECT_STATUS.md |
+| M17 | Post-audit cleanup complete: retired unrouted self-improve/voice and legacy token writer; 114 focused backend/system/drift PASS. No working AI Council/voice delivery or production remediation claimed |
 | M18-19 | Dependency/package reproducibility open; scoped security patch follow-up |
 | M20 | Partial development at 0052410, full gate interrupted. Ignored operator overwrite and quoted JSON credential miss reproduced; not release ready |
 | M21 | Orchestration/helpers exist; complete actual rehearsal/clean-PC/installer/normal-account acceptance not performed |

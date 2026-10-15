@@ -123,7 +123,11 @@ Fix: established T09/M16 configurable deterministic retention, aggregated quota 
 
 ### AUD-08 — experimental self-improve and legacy mail dead ends (MEDIUM latent/maintenance)
 
-[advanced_engine.py](../../apps/ml_engine/self_improve/advanced_engine.py) imports nonexistent patch_generator. SelfImproveAPI is not routed. No working coding/review AI Council exists. [email_integration.py](../../apps/integrations/services/email_integration.py) has an unrouted legacy OAuth helper writing plaintext token JSON in CWD; no live token was found or helper executed.
+Post-audit disposition: M17 retires these unsupported paths in development;
+[PROJECT_STATUS.md](../../docs/PROJECT_STATUS.md) records verification and remaining
+acceptance. The finding below preserves the original M15 source evidence.
+
+[advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py) imports nonexistent patch_generator. SelfImproveAPI is not routed. No working coding/review AI Council exists. [email_integration.py](../../apps/integrations/services/email_integration.py) has an unrouted legacy OAuth helper writing plaintext token JSON in CWD; no live token was found or helper executed.
 
 Fix: M17 classify callers/package inclusion, quarantine/retire unneeded experiments or complete a separately approved workflow. Reuse encrypted EmailConnection/token rotation rather than the legacy writer. Do not infer current remote exposure from unreachable code.
 

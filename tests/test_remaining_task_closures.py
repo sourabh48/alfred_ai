@@ -144,8 +144,8 @@ class InvestmentEmailImportTests(TestCase):
 
         fake_email = FakeEmailService()
         with patch(
-            "apps.integrations.services.email_integration.email_integration_service",
-            fake_email,
+            "apps.integrations.services.email_integration.EmailIntegrationService",
+            return_value=fake_email,
         ), patch.object(
             portfolio_intelligence_service,
             "parse_portfolio_pdf",

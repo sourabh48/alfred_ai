@@ -6,7 +6,14 @@ Authoritative audit: [whole-project findings](../artifacts/audit/ALFRED_WHOLE_PR
 
 The existing deep-review backlog and inspected post-release roadmap define M16 as Travel retention/selective refresh, M17 as experimental self-improve cleanup, M18–M19 as dependency/build reproducibility and packaging follow-ups, M20 as CI/release governance and M21 as real-environment acceptance. None is silently renumbered here.
 
-M20 development exists at 0052410 on feature/m20-release-gates; it is not a new blank project. M21 helper orchestration exists there, but full acceptance is not executed. The older roadmap contains no demonstrated M16–M19 prerequisite edge requiring all those features before release-gate engineering. Specific security/dependency fixes can precede an accepted candidate without redefining milestones.
+The audit initially found M20 development at 0052410 on feature/m20-release-gates.
+It is now integrated in the post-audit worktree; its local full gate and same-host
+M21 rehearsal passed at the frozen b162c8f critical candidate. Newer M16/M17
+implementation and exact validation scopes are tracked in
+[PROJECT_STATUS.md](PROJECT_STATUS.md). External/real-environment acceptance is
+still incomplete. The older roadmap contains no demonstrated M16–M19 prerequisite
+edge requiring all those features before release-gate engineering. Specific
+security/dependency fixes can precede an accepted candidate without redefining milestones.
 
 ## Priority/dependency sequence
 

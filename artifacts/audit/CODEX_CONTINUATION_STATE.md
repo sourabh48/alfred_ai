@@ -27,11 +27,25 @@ quotas/leases, superseded jobs, location choice, preserved edits, old-banner
 filtering and atomic plan/session rollback. No migration/dependency added.
 Full release/native/package acceptance remains NOT_RUN for this newer source.
 Failed reproductions/fixture attempts remain in PROJECT_STATUS.md; do not delete.
-Next: M17 unsupported advanced_engine/SelfImproveAPI and legacy email OAuth/token
-paths. Trace only those callers; preserve supported inference/training and IMAP
-portfolio imports. No new autonomous coding agent, provider or production repair.
+M17 cleanup is now COMPLETE in development: 114 focused backend tests, system/drift
+PASS with zero failures/skips (artifacts/post-audit/m17-integration-2bf509e2/receipt.json).
+Unrouted self-improve/GPT-2/source-scanner and voice/cloud-speech prototypes removed;
+supported hybrid/memory/registry/training retained. Legacy OAuth/token writer and
+fake import counters removed; historical tokens/recovery/model rows untouched.
+IMAP portfolio service uses one connection per import; a two-owner interleaving
+test proves isolation. Inline attachments preserved; refetch unavailable. Failures
+retain safe error IDs/classes; no raw credentials, text or cleanup exception logs.
+Seven retirement regressions are in test_experimental_retirement; the initial six
+failures and intermediate focused pass remain in m17-repro-d0730c23/m17-fixed-240a62d7.
+Pinned source/privacy/targeted proof: artifacts/release-gates/post-audit-m17-cleanup/release.json.
+No migration/dependency change. New full/native/package gates NOT_RUN. Original
+audit/matrix counts remain dated evidence; deleted-source links pin preserved M15.
+Next: M18 clean dependency reproducibility, then M19 fresh package. Current dev
+.venv uses read-only baseline library fallback; it is not a clean-install proof.
+Review actual requirements/constraints and existing package tooling; remove/update
+only proven obsolete dependencies, without major upgrades or new paid providers.
 Safe status command from this worktree:
-`.\.venv\Scripts\python.exe -B scripts/release_gate.py status --output artifacts/release-gates/post-audit-m16-selective`
+`.\.venv\Scripts\python.exe -B scripts/release_gate.py status --output artifacts/release-gates/post-audit-m17-cleanup`
 Production, private DB, real providers and GitHub stay unchanged/unauthorized.
 
 ### Earlier post-audit development checkpoints

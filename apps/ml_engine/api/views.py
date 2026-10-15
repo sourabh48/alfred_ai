@@ -78,13 +78,6 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
             query_sensitivity=data.get('query_sensitivity','sensitive')))
 
 
-class SelfImproveAPI(APIView):
-    def get(self, request):
-        from apps.ml_engine.self_improve.advanced_engine import self_improve_engine
-        result = self_improve_engine.run_full_analysis()
-        return Response(result)
-
-
 class MLRuntimeStatusAPI(APIView):
     permission_classes = [IsAuthenticated]
 
