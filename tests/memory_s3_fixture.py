@@ -208,5 +208,3 @@ class LegacyS3FixtureProvider:
         self._scope(owner,deadline)
         if not valid_id(identity,64): raise PermissionError('Invalid snapshot removal scope.')
         self._send('DELETE',self.prefix+'snapshots/'+identity,deadline=deadline,maximum=16384,statuses=(204,))
-
-

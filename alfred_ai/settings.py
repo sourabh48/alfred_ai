@@ -290,6 +290,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+STORAGES = {
+    "default": {"BACKEND": "alfred_ai.storage.PrivateFileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 
 
 # ---------------------------------------------------------
@@ -335,7 +339,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("ALFRED_UPLOAD_FORM_BYTES", default=256 * 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 0
 FILE_UPLOAD_HANDLERS = [
     "alfred_ai.services.upload_limits.BoundedUploadHandler",
-    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+    "alfred_ai.services.upload_limits.PrivateTemporaryUploadHandler",
 ]
 
 

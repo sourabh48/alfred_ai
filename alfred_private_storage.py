@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import stat
 import time
+from urllib.parse import parse_qs, urlsplit
 
 
 class PrivateStorageUnavailable(RuntimeError):
@@ -186,6 +187,26 @@ def permission_plan(root):
             "bytes": info.st_size if path.is_file() else None,
             "mtime": info.st_mtime_ns if path.is_file() else None, "acl": acl_snapshot(path)})
     return {"version": 1, "root": str(root), "owner": current_sid(), "records": records}
+
+
+def guard_sqlite_storage(databases):
+    """Verify source/native paths before Django opens a private SQLite database."""
+    if os.name != "nt":
+        return
+    for config in databases.values():
+        if not config.get("ENGINE", "").endswith(".sqlite3"):
+            continue
+        for name in (config.get("NAME"), (config.get("TEST") or {}).get("NAME")):
+            if not name or str(name) == ":memory:":
+                continue
+            if str(name).startswith("file:"):
+                if parse_qs(urlsplit(str(name)).query).get("mode") == ["memory"]:
+                    continue
+                raise PrivateStorageUnavailable("Use a local path for private SQLite storage.")
+            path = safe_path(Path(name).absolute())
+            private_directory(path.parent)
+            if path.exists() and not verify_private(path):
+                raise PrivateStorageUnavailable("Existing SQLite permissions need explicitly authorized repair.")
 
 
 def apply_plan(plan, *, authorization_reference, quiesced=False):

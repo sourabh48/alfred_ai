@@ -3,6 +3,7 @@ from contextvars import ContextVar
 from contextlib import ExitStack
 from io import BytesIO
 from functools import wraps
+from pathlib import Path
 import os
 import shutil
 import tempfile
@@ -11,7 +12,7 @@ import zipfile
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, RequestDataTooBig, TooManyFieldsSent, TooManyFilesSent
-from django.core.files.uploadhandler import FileUploadHandler
+from django.core.files.uploadhandler import FileUploadHandler, TemporaryFileUploadHandler
 from django.http import JsonResponse
 from django.http.multipartparser import MultiPartParser, MultiPartParserError
 from django.db import transaction
@@ -19,6 +20,7 @@ from rest_framework.exceptions import APIException
 
 from .api_errors import safe_error_details
 from alfred_ai.upload_config import UPLOAD_LIMIT_DEFAULTS as DEFAULTS
+from alfred_private_storage import protect, PrivateStorageUnavailable
 
 
 upload_deadline = ContextVar("upload_deadline", default=None)
@@ -123,6 +125,17 @@ class BoundedUploadHandler(FileUploadHandler):
 
     def file_complete(self, file_size):
         return None
+
+
+class PrivateTemporaryUploadHandler(TemporaryFileUploadHandler):
+    def new_file(self, *args, **kwargs):
+        super().new_file(*args, **kwargs)
+        try:
+            protect(Path(self.file.temporary_file_path()))
+        except (OSError, ValueError, PrivateStorageUnavailable) as exc:
+            safe_error_details(exc, UploadStorageUnavailable.default_detail, logger_name=__name__)
+            self.file.close()
+            raise UploadStorageUnavailable() from None
 
 
 def read_upload_bytes(upload):

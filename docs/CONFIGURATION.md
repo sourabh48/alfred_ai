@@ -6,6 +6,17 @@ ALFRED now supports a config-backed UI copy layer so the shared brand, auth, err
 
 ## Files
 
+Post-audit Windows development checks private SQLite/config/cache permissions
+before use and protects retained/temporary uploads before writing data. A fresh
+source installation should select an empty private data directory and explicit
+SQLite path outside the code checkout. Use `ALFRED_DATA_DIR` for local config/key
+selection and `DATABASE_URL=sqlite:///...` for the matching absolute database path;
+verify the selected path before any initialization. Existing native data, keys or
+operator edits must be preserved, not moved or replaced by these examples.
+Broad existing file/directory ACLs fail safely and need the separately authorized
+[permission repair](NATIVE_WINDOWS.md#private-storage-permission-repair). No startup
+silently repairs production. No new migration is introduced by this protection.
+
 - `config/alfred_ui.example.json`
   Tracked example config committed to the repo.
 - `config/alfred_ui.json`

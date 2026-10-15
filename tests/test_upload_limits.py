@@ -27,6 +27,8 @@ class UploadHTTPTests(TestCase):
         self.client.force_login(self.user)
         directory = self.enterContext(TemporaryDirectory(prefix="alfred-upload-tests-"))
         self.directory = Path(directory)
+        from alfred_private_storage import private_directory
+        private_directory(self.directory)
         self.enterContext(override_settings(MEDIA_ROOT=directory, FILE_UPLOAD_TEMP_DIR=directory))
 
     def upload(self, size, **extra):

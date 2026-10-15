@@ -58,6 +58,11 @@ directories receive a protected owner/SYSTEM DACL. Parser/OCR files and disposab
 recovery copies receive private permissions before sensitive bytes are written.
 Inherited owner/SYSTEM access is accepted only below a verified private parent.
 An existing unsafe directory is refused; existing keys/data are not replaced.
+Source/debug startup also checks SQLite and file-backed caches before use, and
+configuration files before reads. Retained media and Django streamed upload files
+are protected before payload writes; this applies without the native launcher.
+Existing unsafe storage requires the same explicit repair. Static assets remain
+publicly serveable. Canonical SQLite is still plaintext, protected by access controls.
 See the [explicit Windows repair procedure](NATIVE_WINDOWS.md#private-storage-permission-repair).
 These are development protections, not evidence that production ACLs were repaired.
 Filesystem permissions protect against other ordinary Windows identities; they

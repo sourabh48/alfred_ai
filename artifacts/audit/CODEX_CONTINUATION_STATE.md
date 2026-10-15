@@ -35,7 +35,17 @@ decommission tests PASS, strict syntax compile PASS (known regex warning fixed).
 R2 selected as unimplemented candidate from official contracts; private-bucket
 verification/least-privilege/recovery acceptance remain prerequisites. No cloud
 account/provider is activated. See PROJECT_STATUS.md/provider register.
-Next: pinned combined validation and actual M21 rehearsal using local .venv.
+AWS decommission commit: 3b73d78916b4c5f545e8148ec0abcaee143855cd. Its pinned
+combined gate ran 736 backend PASS, 34 native/Ollama PASS, 37 Chrome with one
+Travel quick-ideas timeout (isolated retry PASS); overall correctly FAIL. Preserve
+that gate receipt/history. No actual M21 rehearsal yet.
+Source/debug P0-A creation gaps reproduced and fixed: before-use SQLite/config/
+cache checks; private retained and streamed temporary uploads. 89 focused tests
+PASS, system/drift PASS; exact evidence and fixture correction in PROJECT_STATUS.
+No migration or production repair. Source/SDK main HEAD remains 3932f391.
+Next: final pinned combined gate on the committed extension using local .venv;
+declare only requirements.txt and constraints/windows-py312.txt dependency changes,
+then actual disposable M21 rehearsal if backend/browser/native/Ollama PASS.
 Do not restart audit, regenerate matrix or start a UI redesign.
 
 Safe resume: Get-Content -LiteralPath F:/ALFRED_DEV/post-audit/docs/PROJECT_STATUS.md.

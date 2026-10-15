@@ -12,7 +12,7 @@ service, paid provider or GitHub operation is authorized here.
 | --- | --- | --- |
 | P0-B profile money | Implemented: finite, bounded cent validation at API/form/model/ORM and Career scenario inputs; existing Float SQL schema/API numeric contract preserved | 47 combined focused tests PASS, zero skips; migration drift PASS; production not remediated |
 | P0-C private media | Implemented: source/debug and native use the same owner-filtered handler; safe missing/permission response, public static assets separate | Same 47-test gate includes anonymous/invalid session/foreign owner/traversal/deletion/source/native tests; packaged/live acceptance pending |
-| P0-A Windows storage | Implemented: owner/SYSTEM creation and verification in native runtime/config, memory, parser/OCR scratch and recovery copies; explicit pinned, quiesced repair/rollback | 117 focused backend PASS; 11 repair CLI tests PASS (overlapping); 18 fresh native checks PASS; production ACL repair requires separate approval |
+| P0-A Windows storage | Implemented: native and source/debug SQLite/config/cache checks, private retained/streamed uploads, memory/parser/recovery protection; pinned quiesced repair/rollback | Native unit: 117 focused PASS, 11 overlapping CLI PASS, 18 native PASS. Source extension: 89 focused PASS, system/drift PASS. Production ACL repair remains approval-gated |
 | P0-D M20 gates | Reused/merged existing 0052410 engine: ignored target file collisions fail before mutation; quoted JSON credentials fail with redacted findings | Both original failures reproduced; 70 focused gate/recovery/promotion/acceptance tests PASS; 13 overlapping incomplete-run/privacy tests PASS |
 | AWS / replacement | AWS runtime provider removed; provisioning rejects before prompts/writes; historical flags report disabled. Old protocol is network-free test quarantine only | 86 focused memory/sync/UI tests PASS; 2 final decommission tests and SyntaxWarning-as-error compile PASS; neutral encryption/sync unchanged; R2 is an unimplemented candidate |
 | M18 Django security patch | Development requirements and Windows constraints pinned to 6.0.9 | Separate development venv: 227 focused security/finance/upload/document tests PASS, zero skips; system/drift PASS; fresh browser/native/package gates pending |
@@ -79,8 +79,29 @@ implementation can claim readiness; no checkbox replaces that proof. Alternative
 and exact constraints are in the [provider register](ALFRED_EXTERNAL_INTEGRATIONS.md#non-aws-intelligence-storage-decision).
 Real cloud, real OpenAI and device-loss recovery remain unaccepted/OFF.
 
-Next action: run the pinned integrated release gate with the patched development
-environment, then actual disposable M21 rehearsal. Specialized audit/runbooks and
+Pinned 3b73d78916b4c5f545e8148ec0abcaee143855cd combined attempt:
+**736 backend PASS / zero skips; 34 native/Ollama checks PASS; 36 of 37 Chrome
+tests PASS, one Travel quick-ideas timeout.** Overall gate correctly FAIL, not
+release-ready. The isolated failing browser test reran PASS without source changes
+(travel-browser-debug-7812ac83); a whole browser retry is required, not a claimed
+fix. Evidence: artifacts/release-gates/post-audit-integrated-3b73d78/release.json.
+Loan/investment monetary screenshots reviewed; their captures were intentional
+successful evidence, not additional browser failures.
+
+Source storage extension closes a reproduced part of P0-A: ordinary source/debug
+SQLite, retained media and streamed temporary uploads inherited broad fixture
+permissions. Synthetic receipt: source-storage-repro-final-84402574. New checks
+run before source SQLite/cache use or configuration reads; PrivateFileSystemStorage
+and PrivateTemporaryUploadHandler protect data before payload writes. Static
+assets stay separate. Existing unsafe directories/files fail for approved repair;
+none are automatically changed. Receipt: artifacts/post-audit/source-storage-final-62f32718/receipt.json
+(89 PASS / zero skips); system/drift PASS in source-storage-fixed-12c75b59.
+The first upload fixture run failed because its intentionally shared media/temp
+directory was broad; the disposable fixture is now protected before seeding.
+No money, schema, provider, key or production change is included.
+
+Next action: pin the completed source-storage commit and run the final combined
+gate, then actual disposable M21 rehearsal. Specialized audit/runbooks and
 historical results below remain reference material, not fresh acceptance.
 
 **Current status — 2026-10-15:** M14/M15 consolidated source is deployed and GitHub master matches 3932f391aa4eed7b3200ad3b034f7991435e01e4. Dated release results are 619 backend/15 Chrome/35 native (overlapping packaged scope); this audit independently ran 86 focused tests, zero skips, plus isolated system/drift checks. Normal-account, real-provider, clean-PC and device-loss acceptance remain incomplete. Port 8000 did not respond during the audit; no service action was taken. M20 is unfinished separate development; M16–M19/M21 are not declared complete.
