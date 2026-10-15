@@ -4,7 +4,8 @@
 
 Active `F:/ALFRED_DEV/post-audit`, `feature/fin-money-tail-20261016`, based on
 08f39a88. Banking correction committed as `0e7e1df35c5afe279050253b97e92ad0ecfc04fc`.
-This checkpoint accompanies the verified Budget unit; verify actual HEAD.
+Verified Budget source: `cd696572f0a3ce69260fb1cf212ce700836fb453`.
+This documentation-only checkpoint follows that source; verify actual Git HEAD.
 Frozen `release/post-audit-runtime-20261016` remains exactly 4aa7ac70; do not
 move/rebuild it or reuse its 797/40/native evidence as proof of this new schema.
 
@@ -27,6 +28,8 @@ receipts. System/drift/one-migration plan PASS. File-backed synthetic backup,
 independent restore, integrity/FKs, alias forward, all unrelated typed table
 hashes and exact reverse/source preservation PASS. No production DB was opened.
 No full release/native/package gate rerun; Graphify AST graph updated.
+Changed-file privacy/link scan PASS: 12 staged paths, no credential/private-path
+findings, added local link resolves. No package or frozen report was rewritten.
 
 Production diagnosis is recorded below: service/listener/worker/scheduler absent,
 stale running/PIDs predate reboot. No repair/start/stop. Production/source/operator

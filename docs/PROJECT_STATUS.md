@@ -38,6 +38,9 @@ Zero skips in successful runs. No full gate or package rebuild. Correction commi
 
 ### FIN-MONEY — Budget register complete locally, 2026-10-16
 
+Verified implementation: `cd696572f0a3ce69260fb1cf212ce700836fb453`; later
+documentation-only checkpoints do not change that tested runtime source.
+
 Scope: `Budget.base_budget`, `inflation_adjusted`, `spent`, their model/form/API
 boundaries, dashboard amounts and owner reset. Reuses Expense money helpers and
 the existing M13 original-snapshot/guarded-reverse pattern. Money is Decimal cents
