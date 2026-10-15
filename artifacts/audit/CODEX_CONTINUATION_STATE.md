@@ -44,6 +44,16 @@ Next: M18 clean dependency reproducibility, then M19 fresh package. Current dev
 .venv uses read-only baseline library fallback; it is not a clean-install proof.
 Review actual requirements/constraints and existing package tooling; remove/update
 only proven obsolete dependencies, without major upgrades or new paid providers.
+Implementation pins: M16 3344ce21588dcaf41eb7655579cd978142c5fee2 and
+M17 86947a62e78359a5a62a51dacbcbbe2d3a3f484e; exact CLI preflight/targeted PASS.
+M18 has removed nine retired direct SDK requirements. Clean resolver PASS for 151
+packages (artifacts/post-audit/m18-clean-resolver-be31990d/receipt.json); startup
+with those SDK imports blocked PASS (m18-no-retired-sdks-eaa4689f). A standalone
+venv exists at m18-clean-resolver-be31990d/venv. Check installation-receipt.json
+before doing anything else: installation/checks are in progress. No installed-
+runtime/backend/browser/native/package PASS is inferred from resolution alone.
+Keep its public package cache and receipts; do not recreate or repeat completed
+M16/M17 work. The clean environment sets local/offline-only model/provider flags.
 Safe status command from this worktree:
 `.\.venv\Scripts\python.exe -B scripts/release_gate.py status --output artifacts/release-gates/post-audit-m17-cleanup`
 Production, private DB, real providers and GitHub stay unchanged/unauthorized.

@@ -92,6 +92,24 @@ Real mail/account/provider acceptance is still pending. No production remediatio
 or deployment is inferred. Next: M18 clean dependency reproducibility, then M19
 fresh native package; reuse constraints/package tooling and do not repeat P0/M15.
 
+Exact implementation pins: M16 3344ce21588dcaf41eb7655579cd978142c5fee2;
+M17 86947a62e78359a5a62a51dacbcbbe2d3a3f484e. Both source/privacy/dependency/
+migration preflights and targeted CLI runs passed; full newer-source release
+gates remain NOT_RUN. M16/M17 documentation checks passed for 12 changed documents,
+986 local links and seven archived-source links verified against preserved Git
+blobs (artifacts/post-audit/m16-m17-doc-links-8971b1d4/receipt.json).
+
+M18 is IN PROGRESS. Nine unused direct OAuth/voice SDK requirements were removed
+after caller/import verification; supported ML/OCR/financial packages and the
+historical Windows constraint snapshot remain. A fresh disposable resolver passed
+with 151 packages/no conflicts/no retired direct requirements:
+artifacts/post-audit/m18-clean-resolver-be31990d/receipt.json. Django startup and
+URL checks also passed with retired SDK imports blocked
+(artifacts/post-audit/m18-no-retired-sdks-eaa4689f/receipt.json). Resolution is not
+an installed-runtime proof. Clean installation/checks are being recorded in
+m18-clean-resolver-be31990d/installation-receipt.json; focused clean-environment
+regressions and a fresh package remain required. No production SDK changed.
+
 ### Earlier development evidence (preserved; current result above supersedes pending actions)
 
 Latest pinned integration: **3a46e1cb24234c586a40be446501a83c48cce2ea — 751 backend,

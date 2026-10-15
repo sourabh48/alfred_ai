@@ -1,6 +1,19 @@
 # Development and verification
 
-**Current source workflow — 2026-10-15:** Start isolated work from actual verified 3932f391 baseline or the intended development checkpoint. Never run tests against F:/ALFRED/restored-runtime/db.sqlite3. Use disposable ALFRED_DATA_DIR, DATABASE_URL, registry/cache/media/queues and an absent local env file; disable startup training and real OpenAI/cloud. Obtain the configured SDK before Python commands. Existing M20 work is at feature/m20-release-gates (0052410 reviewed), not blank scope. See [roadmap](ALFRED_COMPLETION_ROADMAP.md) and [master prompt](../artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md).
+**Current source workflow — 2026-10-15:** Start isolated work from the intended
+committed development checkpoint. Never run tests against
+F:/ALFRED/restored-runtime/db.sqlite3. Use disposable ALFRED_DATA_DIR, DATABASE_URL,
+registry/cache/media/queues and an absent local env file; disable startup training
+and real OpenAI/cloud. Obtain the configured SDK before Python commands. Existing
+M20 history is integrated in the post-audit branch. Exact source pins, M16/M17
+evidence and M18 clean-environment progress are in [Project Status](PROJECT_STATUS.md).
+See the [roadmap](ALFRED_COMPLETION_ROADMAP.md) and
+[master prompt](../artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md).
+
+M18 removes the retired interactive OAuth/voice SDKs from direct requirements.
+Historical constraint entries do not install those packages themselves. The older
+development venv's shared-library fallback is not clean-install evidence; use the
+recorded disposable venv and its receipts to resume validation.
 
 Use Python 3.12 for the currently tested development environment. Packaged
 Windows users can follow [Native Windows](NATIVE_WINDOWS.md) directly.
@@ -11,12 +24,19 @@ Run these commands from the repository root in PowerShell.
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:ALFRED_DATA_DIR = Join-Path $env:LOCALAPPDATA 'ALFRED-Development'
+$env:DATABASE_URL = 'sqlite:///' + (Join-Path $env:ALFRED_DATA_DIR 'db.sqlite3').Replace('\', '/')
+$env:ALFRED_AUTO_TRAIN_ON_STARTUP = 'false'
+$env:ALFRED_MEMORY_OPENAI_AUTHORIZED = 'false'
+$env:ALFRED_MEMORY_CLOUD_AUTHORIZED = 'false'
 .\.venv\Scripts\python.exe alfred_native.py start
 ```
 
 The native launcher creates local configuration, applies migrations, prepares
-static assets and starts the server, worker and scheduler. It uses the checkout
-as its data folder by default. Keep an existing `.venv` if it is already set up.
+static assets and starts the server, worker and scheduler in the explicit
+development data folder above. Keep it separate from production and source.
+Existing unsafe storage is refused; do not bypass the ACL guard to start it.
+Keep an existing `.venv` if it is already set up.
 
 For Django's development server, set `ALFRED_LOCAL_RUNTIME=true` and use
 `python manage.py runserver` with the selected environment. `runserver` is one
