@@ -15,6 +15,7 @@ service, paid provider or GitHub operation is authorized here.
 | P0-A Windows storage | Implemented: owner/SYSTEM creation and verification in native runtime/config, memory, parser/OCR scratch and recovery copies; explicit pinned, quiesced repair/rollback | 117 focused backend PASS; 11 repair CLI tests PASS (overlapping); 18 fresh native checks PASS; production ACL repair requires separate approval |
 | P0-D M20 gates | Reused/merged existing 0052410 engine: ignored target file collisions fail before mutation; quoted JSON credentials fail with redacted findings | Both original failures reproduced; 70 focused gate/recovery/promotion/acceptance tests PASS; 13 overlapping incomplete-run/privacy tests PASS |
 | AWS / replacement | User decision: no AWS runtime/provider activation | Decommission active path, evaluate non-AWS official contracts; real cloud remains OFF |
+| M18 Django security patch | Development requirements and Windows constraints pinned to 6.0.9 | Separate development venv: 227 focused security/finance/upload/document tests PASS, zero skips; system/drift PASS; fresh browser/native/package gates pending |
 
 Changed money/media files: apps/users/money.py, models.py, serializers.py, forms.py;
 apps/career/serializers.py; alfred_ai/urls.py, native_views.py; new boundary/profile
@@ -47,8 +48,23 @@ regressions are included in the standard release backend gate. M20 full pinned
 integration and actual M21 native rehearsal are still pending; production approval,
 off-device/key recovery, real-account and external CI gates are not filled by tests.
 
-Next action: decommission AWS dispatch and apply the supported dependency patch;
-then run a pinned integrated release gate. Specialized audit/runbooks and
+M20 integration commit: 6045904824a86413396eac16d5b16d9464dcd2fa. Its actual
+pinned preflight source/privacy/dependency/migration scope PASS is saved at
+artifacts/release-gates/post-audit-m20-6045904/release.json. Overall readiness is
+correctly BLOCKED on unexecuted technical/operational gates and approval.
+
+Django 6.0.9 is the compatible 6.0 security patch dated 2026-10-06; it addresses
+language/header parsing denial of service and additional scoped security fixes.
+No framework major upgrade or schema change is included.
+[Official release notes](https://docs.djangoproject.com/en/6.0/releases/6.0.9/).
+Receipt: artifacts/post-audit/django609-focused-4084887b/receipt.json. The isolated
+.venv supplies its own Django while sharing other baseline libraries read-only;
+this is not a clean full dependency installation or reproducible package proof.
+Production's interpreter and requirements remain unchanged. Broader dependency
+maintenance and M19/clean-PC acceptance remain open.
+
+Next action: finish AWS decommission regressions, then a pinned integrated release
+gate using the patched development environment. Specialized audit/runbooks and
 historical results below remain reference material, not fresh acceptance.
 
 **Current status — 2026-10-15:** M14/M15 consolidated source is deployed and GitHub master matches 3932f391aa4eed7b3200ad3b034f7991435e01e4. Dated release results are 619 backend/15 Chrome/35 native (overlapping packaged scope); this audit independently ran 86 focused tests, zero skips, plus isolated system/drift checks. Normal-account, real-provider, clean-PC and device-loss acceptance remain incomplete. Port 8000 did not respond during the audit; no service action was taken. M20 is unfinished separate development; M16–M19/M21 are not declared complete.

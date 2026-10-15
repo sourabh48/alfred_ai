@@ -22,9 +22,13 @@ M20 0052410 has been merged with a single verifier conflict resolved by preservi
 private scratch protection AND optional scratch_root. Both P0-D failures reproduced
 before their fixes; 70 focused tests PASS, 13 overlapping privacy/NOT_RUN tests
 PASS. Updated release BACKEND includes P0 regressions. Prior ACL commit fd507ab5ec4c0715c1854eda796df9ab7c799977.
-Next: remove AWS runtime activation, patch supported Django pins using isolated
-.venv (6.0.9 installed there, baseline dependencies shared read-only), then pinned
-combined release validation and actual M21 rehearsal. SDK/production env unchanged.
+M20 integration commit: 6045904824a86413396eac16d5b16d9464dcd2fa. Its pinned
+preflight source/privacy scope PASS; overall readiness correctly BLOCKED.
+Django requirements/Windows pins now 6.0.9. Separate development .venv: 227 tests
+PASS, system/drift PASS; baseline libraries shared read-only (not clean packaging
+proof). Evidence in PROJECT_STATUS.md. SDK/production env unchanged.
+Next: finish AWS runtime decommission unit/regressions, then pinned combined
+validation and actual M21 rehearsal with the local patched interpreter.
 Do not restart audit, regenerate matrix or start a UI redesign.
 
 Safe resume: Get-Content -LiteralPath F:/ALFRED_DEV/post-audit/docs/PROJECT_STATUS.md.
