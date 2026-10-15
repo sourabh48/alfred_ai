@@ -25,7 +25,7 @@ Off-device copy/key/device-loss restore, fresh package, normal account, separate
 PC, installer, remote Git/CI and branch protection are NOT_RUN. Source-native
 checks are not a frozen executable proof. The M15 HDD waiver is not inherited.
 P0 fixes and Django 6.0.9 are development-only; live ACL repair/deployment need
-separate authorization. Next independent source unit: M16/T09 request retention.
+separate authorization. Newer M16 source progress is recorded below.
 
 M16/T09 request retention is now implemented in development: configurable 7-day
 non-network/90-day network history, current UTC quota windows preserved, active
@@ -38,6 +38,11 @@ migration drift PASS** (artifacts/post-audit/m16-integration-a065eaeb/receipt.js
 These overlap prior tests and are not added to 753. This extension is after the
 frozen critical candidate; its full combined/package gate has not run.
 M16 remains IN PROGRESS: dependency-aware selective refresh/invalidation is next.
+Implementation commit d66ce9904e560ade110ccf41be210eedc6f7b7e8 also passed exact
+source/privacy/dependency/migration preflight and nine targeted retention tests
+(artifacts/release-gates/post-audit-m16-d66ce99/release.json). Its full backend,
+browser and native gates correctly remain NOT_RUN; the targeted success is not
+transferred into a release PASS.
 
 ### Earlier development evidence (preserved; current result above supersedes pending actions)
 

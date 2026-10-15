@@ -12,9 +12,16 @@ Technical decision PASS; promotion BLOCKED/unauthorized on external recovery,
 fresh package, real-account/device/installer and remote Git/CI/protection gates.
 No production/source/database/ACL/provider/GitHub mutation. All backups preserved.
 Existing status/evidence docs contain earlier failed attempts; do not rerun P0 or
-M15 unnecessarily. Next: M16/T09 configurable request retention, preserve quota
-windows/active leases/canonical records; cache.py, mobility tasks, source/native
-schedules and focused tests. Selective invalidation remains a subsequent unit.
+M15 unnecessarily. M16 retention implementation d66ce9904e560ade110ccf41be210eedc6f7b7e8
+passed 156 focused tests/system/drift and pinned source/privacy preflight plus nine
+targeted tests. Latest scope: artifacts/release-gates/post-audit-m16-d66ce99/release.json.
+Full gates remain NOT_RUN for newer M16 source; do not inherit the b162c8f PASS.
+Next: M16 dependency-aware selective refresh/invalidation. Reuse cache keys,
+travel/research.py, travel_research.py, travel_conversation.py and existing source
+freshness/revision rules; preserve user choices, stale labels and quota limits.
+Safe status command from this worktree:
+`.\.venv\Scripts\python.exe -B scripts/release_gate.py status --output artifacts/release-gates/post-audit-m16-d66ce99`
+Production, private DB, real providers and GitHub stay unchanged/unauthorized.
 
 ### Earlier post-audit development checkpoints
 

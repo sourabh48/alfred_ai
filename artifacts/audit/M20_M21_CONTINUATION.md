@@ -13,7 +13,10 @@ retains a FAIL child receipt and PASS rollback; do not flatten or erase it.
 Technical readiness PASS, operational promotion BLOCKED/unauthorized. No new
 package/installer/separate-PC/account/device-loss/remote CI acceptance is inferred.
 The older implementation matrix below is historical. PROJECT_STATUS.md remains
-the authoritative active overview; subsequent safe source work is M16/T09.
+the authoritative active overview. Newer M16 retention source d66ce99 passed 156
+focused tests/system/drift and pinned source/privacy plus nine targeted tests.
+Its full combined gates remain NOT_RUN; b162c8f is still the exact full critical
+candidate. M16 selective invalidation is next; no acceptance transfers implicitly.
 
 Active work is now F:/ALFRED_DEV/post-audit on fix/post-audit-critical-20261015.
 The original 0052410 history is retained. P0-D ignored-file collision and JSON
