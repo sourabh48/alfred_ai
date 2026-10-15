@@ -63,7 +63,8 @@ def authorization(path, manifest, target, runtime, environment):
 def canonical_snapshot(path):
     # Signing in changes last_login; income, ownership, consent and all financial columns remain covered.
     return {table: record for table, record in recovery.database_snapshot(path, {"users_user": ("last_login",)}).items()
-            if table.startswith(FINANCIAL_PREFIXES) or table == "django_migrations"}
+            if (table.startswith(FINANCIAL_PREFIXES) or table == "django_migrations")
+            and table != 'mobility_travelproviderrequest'}  # Expiring telemetry stays in full recovery snapshots.
 
 
 class NativeOperator:

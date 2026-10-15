@@ -27,6 +27,18 @@ checks are not a frozen executable proof. The M15 HDD waiver is not inherited.
 P0 fixes and Django 6.0.9 are development-only; live ACL repair/deployment need
 separate authorization. Next independent source unit: M16/T09 request retention.
 
+M16/T09 request retention is now implemented in development: configurable 7-day
+non-network/90-day network history, current UTC quota windows preserved, active
+attempts deferred, bounded oldest-first batches, dry-run CLI and shared 15-minute
+source/native scheduling. Saved plans/evidence, owners, expenses, balances, cache
+results and provider state are not cleanup targets. Full backups retain telemetry;
+post-start canonical reconciliation excludes only the expiring request table.
+**156 focused Travel/worker/recovery/promotion tests PASS, zero skips; system and
+migration drift PASS** (artifacts/post-audit/m16-integration-a065eaeb/receipt.json).
+These overlap prior tests and are not added to 753. This extension is after the
+frozen critical candidate; its full combined/package gate has not run.
+M16 remains IN PROGRESS: dependency-aware selective refresh/invalidation is next.
+
 ### Earlier development evidence (preserved; current result above supersedes pending actions)
 
 Latest pinned integration: **3a46e1cb24234c586a40be446501a83c48cce2ea — 751 backend,

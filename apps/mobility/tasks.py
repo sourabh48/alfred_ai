@@ -7,6 +7,12 @@ from alfred_ai.background import shared_task
 
 
 @shared_task
+def cleanup_travel_request_history():
+    from .services.travel.cache import cleanup_request_history
+    return cleanup_request_history(apply=True)
+
+
+@shared_task
 def research_travel(run_id):
     from .services.travel_research import run_research
     return run_research(run_id)

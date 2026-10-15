@@ -12,7 +12,12 @@ from apps.integrations.tasks import (
     cleanup_verified_external_intelligence, refresh_verified_external_intelligence,
 )
 from apps.ml_engine.continual.tasks import run_global_training_cycle
-from apps.mobility.tasks import research_travel, resume_travel_research
+from apps.mobility.tasks import research_travel, resume_travel_research, cleanup_travel_request_history
+
+
+@db_periodic_task(crontab(minute="*/15"))
+def native_travel_request_cleanup():
+    return cleanup_travel_request_history()
 
 
 @db_periodic_task(crontab(minute="*/2"))

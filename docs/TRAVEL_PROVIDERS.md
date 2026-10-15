@@ -1,5 +1,39 @@
 # Travel provider policy and architecture
 
+## Request telemetry retention
+
+Post-audit development only; this policy has not been deployed. It deletes only
+expired `TravelProviderRequest` telemetry. Saved plans, research evidence, cached
+provider results, financial records, owners and provider lease/backoff state remain.
+
+| Setting | Default | Allowed |
+| --- | --- | --- |
+| `TRAVEL_PROVIDER_REQUEST_RETENTION_DAYS` | 7 | 1–3650 days, non-network logs |
+| `TRAVEL_PROVIDER_NETWORK_RETENTION_DAYS` | 90 | 1–3650 days, network attempts |
+| `TRAVEL_PROVIDER_CLEANUP_BATCH_SIZE` | 1000 | 1–10000 rows per run |
+
+The current UTC billing month and at least the previous day of network attempts
+remain even with shorter retention, preserving existing minute/hour/day/month
+quotas. Active in-progress attempts are deferred while their provider lease is
+valid; expired abandoned attempts can age out. Old completed attempts can expire
+while a provider is busy. Cleanup is deterministic and restart-safe, oldest first.
+The result reports remaining/deferred counts; a partial batch does not claim that
+all expired rows have gone. Both source Celery beat and native Huey run it every
+15 minutes. Configuration errors fail before deletion.
+
+In an explicitly configured disposable runtime:
+
+```powershell
+& $python manage.py cleanup_travel_requests
+& $python manage.py cleanup_travel_requests --apply
+```
+
+The first command only previews safe counts. `--apply` deletes one bounded batch;
+repeat as needed. Production maintenance remains separately authorized. No command
+deletes or rewrites backups. Historical backups may retain expired telemetry.
+Full SQLite recovery checks include that table; post-start financial comparison
+excludes only this operational table. Selective research invalidation remains open.
+
 **Provider status — 2026-10-15:** Code/fixture success is separate from configured and real-live-tested. No new provider credentials/calls were used in this audit. Open-Meteo current published free limits and Brave/Duffel/OpenAI pricing/retention are in the [current register](ALFRED_EXTERNAL_INTEGRATIONS.md); ORS account quotas and all contract-specific limits remain unverified. Keep old dated limits below as historical guidance. Never treat wiki/POIs/link-outs as booking or road-legality evidence.
 
 Policy review: 29 September 2026. ALFRED remains a local/LAN application. The

@@ -32,7 +32,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_private_storage", "test_source_storage", "test_private_media_profiles", "test_local_config",
     "test_platform_hardening.EmailConnectionTokenSecurityTests", "test_remaining_public_http",
     "test_retention_release_boundary", "test_statement_columns", "test_token_rotation",
-    "test_travel_http", "test_upload_limits", "test_upload_privacy_retention", "test_user_data_reset",
+    "test_travel_http", "test_travel_retention", "test_upload_limits", "test_upload_privacy_retention", "test_user_data_reset",
     "test_release_gate", "test_release_validation", "test_release_recovery", "test_private_recovery_verifier",
     "test_release_promotion", "test_release_acceptance", "test_browser_regression_runner", "test_live_ui_contracts"))
 

@@ -18,6 +18,18 @@ schedules and focused tests. Selective invalidation remains a subsequent unit.
 
 ### Earlier post-audit development checkpoints
 
+Current follow-on source unit M16 retention: 156 focused Travel/provider/source-
+native scheduling/recovery/promotion tests PASS, zero skips; system/drift PASS.
+Receipt artifacts/post-audit/m16-integration-a065eaeb/receipt.json. Nine initial
+tests overlap. New command cleanup_travel_requests is dry-run by default; --apply
+prunes one bounded batch. Config is 7/90 days and 1000 rows, runs every 15 minutes
+in source/native. Current UTC month/hour/day quotas and active attempts survive;
+abandoned old attempts expire. Only request telemetry is excluded from post-start
+canonical comparison; complete backup verification still includes every table.
+Freeze release/post-audit-critical-20261015 remains at b162c8f; do not transfer its
+full gate PASS to newer source. Next M16 unit: selective refresh/invalidation using
+existing cache keys/research revisions. No live operations or provider activation.
+
 Latest full source gate 3a46e1cb24234c586a40be446501a83c48cce2ea: 751 backend /
 37 Chrome / 34 source-native-Ollama PASS, zero failures/skips. Exact evidence and
 scopes in PROJECT_STATUS.md. Actual M21 exact promotion/nine browser checks and

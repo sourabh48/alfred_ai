@@ -408,7 +408,15 @@ _require_production(
     "Production mode cannot enable CELERY_TASK_ALWAYS_EAGER.",
 )
 
+TRAVEL_PROVIDER_REQUEST_RETENTION_DAYS = env.int('TRAVEL_PROVIDER_REQUEST_RETENTION_DAYS', default=7)
+TRAVEL_PROVIDER_NETWORK_RETENTION_DAYS = env.int('TRAVEL_PROVIDER_NETWORK_RETENTION_DAYS', default=90)
+TRAVEL_PROVIDER_CLEANUP_BATCH_SIZE = env.int('TRAVEL_PROVIDER_CLEANUP_BATCH_SIZE', default=1000)
+
 CELERY_BEAT_SCHEDULE = {
+    "travel-request-cleanup": {
+        "task": "apps.mobility.tasks.cleanup_travel_request_history",
+        "schedule": timedelta(minutes=15),
+    },
     "travel-research-recovery": {
         "task": "apps.mobility.tasks.resume_travel_research",
         "schedule": timedelta(minutes=2),
