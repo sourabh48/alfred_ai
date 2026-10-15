@@ -8,6 +8,27 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
+**Current verified critical-fix source: b162c8fb2c43b357e840c3a298d06ffa4bed3251.**
+753 backend tests, 37 Chrome tests and 34 source-native/Ollama checks PASS,
+zero failures/skips. Actual M21 exact promotion, nine browser checks, restart/
+encrypted memory persistence, independent local restore, typed financial/family
+reconciliation, injected worker crash and source rollback PASS. Evidence:
+artifacts/release-gates/post-audit-critical-b162c8f/release.json and
+F:/ALFRED_DEV/post-audit-rehearsal-b162c8f/rehearsal.json. The failure-injection
+child report deliberately records FAIL with rollback PASS; the parent rehearsal
+is PASS. No database was overwritten by source rollback. All recovery assets
+and failed earlier evidence remain. Screenshots reviewed at the preceding
+3a46e1c equivalent UI gate; current Chrome gate also PASS.
+
+M20 technical decision is PASS; production promotion is BLOCKED and unauthorized.
+Off-device copy/key/device-loss restore, fresh package, normal account, separate
+PC, installer, remote Git/CI and branch protection are NOT_RUN. Source-native
+checks are not a frozen executable proof. The M15 HDD waiver is not inherited.
+P0 fixes and Django 6.0.9 are development-only; live ACL repair/deployment need
+separate authorization. Next independent source unit: M16/T09 request retention.
+
+### Earlier development evidence (preserved; current result above supersedes pending actions)
+
 Latest pinned integration: **3a46e1cb24234c586a40be446501a83c48cce2ea — 751 backend,
 37 Chrome and 34 source-native/Ollama checks PASS; zero failures/skips**. Isolated
 pip check PASS (shared baseline libraries, not clean-install/package proof).

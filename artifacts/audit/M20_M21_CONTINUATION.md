@@ -2,6 +2,19 @@
 
 ## Post-audit integration — 2026-10-15
 
+Latest local source proof is b162c8fb2c43b357e840c3a298d06ffa4bed3251 in
+F:/ALFRED_DEV/post-audit. 753 backend / 37 Chrome / 34 source-native/Ollama PASS,
+zero skips/failures. Full actual M21 PASS: independent encrypted local restore,
+typed finance/family reconciliation, exact FF, nine Chrome checks, restart/memory,
+worker crash and source rollback. Parent proof is
+artifacts/release-gates/post-audit-critical-b162c8f/release.json; disposable proof
+F:/ALFRED_DEV/post-audit-rehearsal-b162c8f/rehearsal.json. Deliberate worker failure
+retains a FAIL child receipt and PASS rollback; do not flatten or erase it.
+Technical readiness PASS, operational promotion BLOCKED/unauthorized. No new
+package/installer/separate-PC/account/device-loss/remote CI acceptance is inferred.
+The older implementation matrix below is historical. PROJECT_STATUS.md remains
+the authoritative active overview; subsequent safe source work is M16/T09.
+
 Active work is now F:/ALFRED_DEV/post-audit on fix/post-audit-critical-20261015.
 The original 0052410 history is retained. P0-D ignored-file collision and JSON
 credential failures were reproduced and fixed. 70 focused tests PASS, zero skips;

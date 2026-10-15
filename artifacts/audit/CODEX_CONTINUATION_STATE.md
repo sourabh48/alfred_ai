@@ -2,6 +2,22 @@
 
 ## Latest task — post-audit implementation, 2026-10-15
 
+Critical source b162c8fb2c43b357e840c3a298d06ffa4bed3251 is fully locally verified:
+753 backend / 37 Chrome / 34 source-native-Ollama PASS, zero skips/failures.
+Actual M21 PASS in F:/ALFRED_DEV/post-audit-rehearsal-b162c8f: exact promotion,
+nine browser checks, restart/memory persistence, encrypted independent local
+restore, typed reconciliation, worker crash and actual source rollback. Child
+failure-injection FAIL is deliberate and its rollback PASS; parent is PASS.
+Technical decision PASS; promotion BLOCKED/unauthorized on external recovery,
+fresh package, real-account/device/installer and remote Git/CI/protection gates.
+No production/source/database/ACL/provider/GitHub mutation. All backups preserved.
+Existing status/evidence docs contain earlier failed attempts; do not rerun P0 or
+M15 unnecessarily. Next: M16/T09 configurable request retention, preserve quota
+windows/active leases/canonical records; cache.py, mobility tasks, source/native
+schedules and focused tests. Selective invalidation remains a subsequent unit.
+
+### Earlier post-audit development checkpoints
+
 Latest full source gate 3a46e1cb24234c586a40be446501a83c48cce2ea: 751 backend /
 37 Chrome / 34 source-native-Ollama PASS, zero failures/skips. Exact evidence and
 scopes in PROJECT_STATUS.md. Actual M21 exact promotion/nine browser checks and
