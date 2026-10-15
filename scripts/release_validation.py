@@ -151,9 +151,13 @@ def safe_log(text):
     """Retain test identifiers/counts, never raw tracebacks, payloads or exception messages."""
     lines = []
     for line in text.splitlines():
-        if re.fullmatch(r"(?:Ran \d+ tests? in [\d.]+s|OK(?: \(skipped=\d+\))?|"
-                        r"FAILED \([\w=, ]+\)|[.sEFx!]+|Found \d+ test\(s\)\.|"
-                        r"(?:FAIL|ERROR): test_[\w]+ \([\w.]+\))", line.strip()):
+        failure = re.fullmatch(r"(FAIL|ERROR): ([A-Za-z_][A-Za-z0-9_.]*) "
+                               r"\(([A-Za-z_][A-Za-z0-9_.]*)\)(?: .*)?", line.strip())
+        if failure:
+            # Subtest parameters can contain document text; retain identifiers only.
+            lines.append(f"{failure[1]}: {failure[2]} ({failure[3]})")
+        elif re.fullmatch(r"(?:Ran \d+ tests? in [\d.]+s|OK(?: \(skipped=\d+\))?|"
+                        r"FAILED \([\w=, ]+\)|[.sEFx!]+|Found \d+ test\(s\)\.)", line.strip()):
             lines.append(line.strip())
         elif re.match(r"PASS [a-zA-Z0-9_]+:", line):
             lines.append(line.split(":", 1)[0])

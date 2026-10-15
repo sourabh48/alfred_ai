@@ -130,7 +130,18 @@ identity so fixed errors stay actionable. 58 focused M20/promotion tests PASS
 actual CLI boundary tests PASS (m21-cli-final-18f0f3fd). New candidate requires
 fresh combined validation and a new disposable M21 rehearsal.
 
-Next action: pin the M21 operator/CLI correction and validate it, then rehearse.
+Pinned f79690a8c42eab6b2ae3182445af5002a87da6a8 retry executed 750 backend tests,
+zero skips, with one error; browser/native correctly remained NOT_RUN. Evidence:
+artifacts/release-gates/post-audit-m21-resume-f79690a/release.json. The earlier
+post-audit-m21-f79690a attempt was interrupted before a final receipt, not PASS.
+The redactor omitted setup/subtest failure headers; its reproduced regression
+now retains test/class identifiers without parameter values or exception content.
+15 runner tests PASS (failure-log-fix-49532b0a); 27 overlapping source/acceptance
+tests PASS (m21-three-debug-296f6a15). These targeted results do not clear the
+combined failure. Preserve all receipts; repeat the pinned combined gate, identify
+any repeated error, then perform the new disposable M21 rehearsal.
+
+Next action: commit the safe failure-header correction, validate, then rehearse.
 Specialized audit/runbooks and
 historical results below remain reference material, not fresh acceptance.
 

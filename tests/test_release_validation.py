@@ -89,6 +89,17 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
             result = validation.run(self.repo, ["unused"], {}, self.root, "timeout", 1)
         self.assertEqual(result["code"], "suite_timeout")
 
+    def test_failure_headers_retain_setup_and_subtest_ids_without_parameter_values(self):
+        raw = ("ERROR: setUpClass (tests.synthetic.Case)\n"
+               "FAIL: test_owner (tests.synthetic.Case.test_owner) (document='private-account.pdf')\n"
+               "Traceback secret-value /private/statement.pdf\n")
+        safe = validation.safe_log(raw)
+        self.assertIn("ERROR: setUpClass (tests.synthetic.Case)", safe)
+        self.assertIn("FAIL: test_owner (tests.synthetic.Case.test_owner)", safe)
+        self.assertNotIn("private-account", safe)
+        self.assertNotIn("secret-value", safe)
+        self.assertNotIn("statement.pdf", safe)
+
     def test_targeted_tests_do_not_satisfy_full_backend_gate(self):
         result = {"status": "PASS", "code": "suite_exit", "tests": 3, "skips": 0,
                   "log": "synthetic.log", "log_sha256": "a" * 64}
