@@ -49,11 +49,23 @@ M17 86947a62e78359a5a62a51dacbcbbe2d3a3f484e; exact CLI preflight/targeted PASS.
 M18 has removed nine retired direct SDK requirements. Clean resolver PASS for 151
 packages (artifacts/post-audit/m18-clean-resolver-be31990d/receipt.json); startup
 with those SDK imports blocked PASS (m18-no-retired-sdks-eaa4689f). A standalone
-venv exists at m18-clean-resolver-be31990d/venv. Check installation-receipt.json
-before doing anything else: installation/checks are in progress. No installed-
-runtime/backend/browser/native/package PASS is inferred from resolution alone.
-Keep its public package cache and receipts; do not recreate or repeat completed
-M16/M17 work. The clean environment sets local/offline-only model/provider flags.
+venv exists at m18-clean-resolver-be31990d/venv. Installation-receipt.json now
+records PASS: all 151 packages match, pip check/system/drift PASS, Django 6.0.9
+inside that venv without baseline fallback. Preserve it and its package cache.
+Pinned clean-SDK full gate 5f6bb76 passed 792 backend tests, then Chrome failed
+(38 tests/one quick-ideas-preferences error). Native/Ollama correctly NOT_RUN.
+Retain artifacts/release-gates/post-audit-clean-5f6bb76/release.json as FAIL.
+A delayed initial preference GET reproduced UI loss after a successful save;
+the DB retained the choice (preferences-read-stages-cf247671). Disabled initial
+fieldset, loading/save guard, safe unavailable state and v2 scripts correct it.
+Seven clean-SDK Chrome workflows PASS, zero skips, screenshots/JS syntax reviewed:
+artifacts/post-audit/preferences-loading-fixed-45eabf1a/receipt.json. New candidate
+needs a fresh pinned full gate; no earlier PASS is inherited. Use the clean venv:
+`.\artifacts\post-audit\m18-clean-resolver-be31990d\venv\Scripts\python.exe`.
+Next: preflight/full --with-ollama at the corrected HEAD, then M19 fresh portable
+package. Build-tool wheels/hash receipt m19-build-tools-3b6aacd1 are staged only.
+Inno Setup is unavailable in checked locations; installer acceptance is pending.
+Do not repeat M16/M17/P0/audit, overwrite old evidence or modify live/provider state.
 Safe status command from this worktree:
 `.\.venv\Scripts\python.exe -B scripts/release_gate.py status --output artifacts/release-gates/post-audit-m17-cleanup`
 Production, private DB, real providers and GitHub stay unchanged/unauthorized.

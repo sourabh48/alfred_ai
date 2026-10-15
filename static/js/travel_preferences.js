@@ -4,6 +4,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const $ = id=>document.getElementById(id);
     const esc = x=>Alfred.escapeHtml(String(x ?? ""));
     const url = "/api/mobility/planner/preferences/";
+    let pending = true;
+    function setPending(value) {
+        pending = value;
+        $("travelPreferenceFields").disabled = value;
+        root.setAttribute("aria-busy", String(value));
+    }
     function render(p) {
         $("travelNovelty").value=p.novelty;
         $("travelLearning").checked=p.learning_enabled;
@@ -11,8 +17,11 @@ document.addEventListener("DOMContentLoaded", () => {
         $("travelPreferenceList").innerHTML=Object.entries(p.preferences).map(([k,v])=>`<div class="travel-preference"><div><strong>${esc(k)}: ${esc(v.value)}</strong><small>${v.confirmed_by_user ? "Set by you" : "Tentative inference"} · confidence ${esc(v.confidence)}</small><small>${esc((v.reasons || [v.source]).join(" · "))}</small></div><div><button class="btn btn-sm btn-outline-primary" data-preference="${esc(k)}" data-preference-action="accept">Accept</button> <button class="btn btn-sm btn-outline-secondary" data-preference="${esc(k)}" data-preference-action="remove">Remove</button></div></div>`).join("") || "No travel preferences learned yet.";
     }
     async function update(data) {
+        if (pending) return;
+        setPending(true);
         try {render(await Alfred.fetchJSON(url,{method:"PATCH",body:JSON.stringify(data)}));$("travelPreferencesAlert").textContent="Travel preferences saved.";}
         catch(e){$("travelPreferencesAlert").textContent=e.message;}
+        finally {setPending(false);}
     }
     $("travelNovelty").addEventListener("change", e=>update({novelty:e.target.value}));
     $("travelLearning").addEventListener("change", e=>update({learning_enabled:e.target.checked}));
@@ -20,5 +29,12 @@ document.addEventListener("DOMContentLoaded", () => {
     $("travelResetPreferences").addEventListener("click", ()=>update({action:"reset"}));
     $("travelPreferenceForm").addEventListener("submit", e=>{e.preventDefault();update({key:$("travelPreferenceKey").value,value:true});});
     root.addEventListener("click", e=>{const b=e.target.closest("button[data-preference]");if(b)update({key:b.dataset.preference,action:b.dataset.preferenceAction,value:true});});
-    Alfred.fetchJSON(url).then(render).catch(e=>{$("travelPreferencesAlert").textContent=e.message;});
+    Alfred.fetchJSON(url).then(p=>{
+        render(p);
+        $("travelPreferencesAlert").textContent="";
+        setPending(false);
+    }).catch(e=>{
+        root.setAttribute("aria-busy", "false");
+        $("travelPreferencesAlert").textContent=e.message+" Reload settings to try again.";
+    });
 });

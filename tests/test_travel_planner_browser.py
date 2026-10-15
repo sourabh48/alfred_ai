@@ -236,3 +236,50 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.click('#travelPreferenceForm button[type="submit"]')
         self.wait.until(lambda _: "mountains: true" in self.text("travelPreferenceList"))
         self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth+1"))
+
+    def test_preferences_wait_for_initial_load_and_save(self):
+        reading, release_read, writing, release_write = (threading.Event() for _ in range(4))
+        original = BaseHandler.get_response
+        def delayed(handler, request):
+            response = original(handler, request)
+            if request.path == '/api/mobility/planner/preferences/':
+                entered, release = (reading, release_read) if request.method == 'GET' else (writing, release_write)
+                entered.set()
+                release.wait(timeout=10)
+            return response
+        with patch.object(BaseHandler, 'get_response', delayed):
+            try:
+                self.browser.get(self.live_server_url + '/settings/#travelPreferences')
+                self.wait.until(lambda _: reading.is_set())
+                button = self.browser.find_element(self.By.CSS_SELECTOR, '#travelPreferenceForm button[type="submit"]')
+                self.assertFalse(button.is_enabled())
+                self.assertEqual(self.browser.find_element(self.By.ID, 'travelPreferences').get_attribute('aria-busy'), 'true')
+                release_read.set()
+                self.wait.until(lambda _: button.is_enabled())
+                self.click('#travelPreferenceForm button[type="submit"]')
+                self.wait.until(lambda _: writing.is_set())
+                self.assertFalse(button.is_enabled())
+                self.assertFalse(self.browser.find_element(self.By.ID, 'travelLearning').is_enabled())
+                self.assertFalse(self.browser.find_element(self.By.ID, 'travelResetPreferences').is_enabled())
+                release_write.set()
+                self.wait.until(lambda _: 'mountains: true' in self.text('travelPreferenceList'))
+                self.wait.until(lambda _: button.is_enabled())
+                self.assertEqual(self.browser.find_element(self.By.ID, 'travelPreferences').get_attribute('aria-busy'), 'false')
+            finally:
+                release_read.set()
+                release_write.set()
+
+    def test_preferences_load_failure_does_not_enable_unknown_privacy_controls(self):
+        from django.http import JsonResponse
+        original = BaseHandler.get_response
+        def unavailable(handler, request):
+            if request.method == 'GET' and request.path == '/api/mobility/planner/preferences/':
+                return JsonResponse({'detail': 'Preference service unavailable.'}, status=503)
+            return original(handler, request)
+        with patch.object(BaseHandler, 'get_response', unavailable):
+            self.browser.get(self.live_server_url + '/settings/#travelPreferences')
+            self.wait.until(lambda _: 'Preference service unavailable.' in self.text('travelPreferencesAlert'))
+            self.assertFalse(self.browser.find_element(self.By.ID, 'travelLearning').is_enabled())
+            self.assertFalse(self.browser.find_element(self.By.ID, 'travelMediaLearning').is_enabled())
+            self.assertFalse(self.browser.find_element(self.By.ID, 'travelResetPreferences').is_enabled())
+            self.assertEqual(self.browser.find_element(self.By.ID, 'travelPreferences').get_attribute('aria-busy'), 'false')

@@ -42,8 +42,9 @@ development. Category-scoped jobs reuse unrelated fresh/expired caches without
 network calls, preserve provenance and quota/lease guards, prioritize the latest
 web topic and selected location, and supersede older incompatible jobs. Date
 edits invalidate candidate/itinerary forecasts, offers, quote snapshots and old
-research banners while retaining independent route/place evidence and edited
-days/allowances. Plan/session changes are atomic on invalidation failure.
+research banners while retaining independent route/place evidence. Same-length
+date shifts retain edited days/allowances; changed duration requires schedule and
+budget review. Plan/session changes are atomic on invalidation failure.
 **196 targeted backend tests / 5 Chrome workflows PASS, zero failures/skips;
 system and migration drift PASS.** Receipts:
 artifacts/post-audit/m16-verified-d421da86/receipt.json and
@@ -106,9 +107,31 @@ with 151 packages/no conflicts/no retired direct requirements:
 artifacts/post-audit/m18-clean-resolver-be31990d/receipt.json. Django startup and
 URL checks also passed with retired SDK imports blocked
 (artifacts/post-audit/m18-no-retired-sdks-eaa4689f/receipt.json). Resolution is not
-an installed-runtime proof. Clean installation/checks are being recorded in
-m18-clean-resolver-be31990d/installation-receipt.json; focused clean-environment
-regressions and a fresh package remain required. No production SDK changed.
+an installed-runtime proof. The subsequent clean installation PASS exactly matched
+all 151 planned packages; pip check, isolated Django 6.0.9, system/drift PASS with
+no baseline fallback (m18-clean-resolver-be31990d/installation-receipt.json).
+No production SDK changed.
+
+The pinned 5f6bb76 clean-SDK full gate passed **792 backend tests/zero skips**,
+then failed Chrome (38 executed, one error in quick-ideas/preferences). Correct
+fail-fast left native/Ollama NOT_RUN; it is not a release PASS:
+artifacts/release-gates/post-audit-clean-5f6bb76/release.json. The isolated original
+test passed, but a deterministic delayed-read reproduction proved that an old
+initial GET could erase a successful preference save from the UI while the DB
+retained it (preferences-read-stages-cf247671/diagnostic.json). Both new loading/
+outage regressions failed before correction (preferences-loading-repro-1010ed2d).
+Travel preferences now use a disabled fieldset until loading completes, serialize
+saves, expose aria-busy/status and retain disabled privacy controls after a failed
+initial read. Both script callers use v2 assets. APIs/auth/CSRF are unchanged.
+**Seven clean-SDK Chrome workflows PASS, zero skips/failures**, including delayed
+GET/PATCH and load failure; mobile/error screenshots reviewed; JS syntax PASS:
+artifacts/post-audit/preferences-loading-fixed-45eabf1a/receipt.json.
+The corrected exact candidate needs its own combined gate; no 5f6bb76 counts are
+silently transferred. M19 PyInstaller 6.22.3 and declared tool wheels are staged
+with hashes at artifacts/post-audit/m19-build-tools-3b6aacd1/receipt.json; not
+installed during validation. Inno Setup is unavailable in checked PATH/standard/
+registered locations, as already documented historically. Fresh portable package,
+installer lifecycle and external/real-account recovery acceptance remain pending.
 
 ### Earlier development evidence (preserved; current result above supersedes pending actions)
 
