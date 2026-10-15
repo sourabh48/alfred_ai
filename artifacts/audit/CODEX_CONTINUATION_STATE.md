@@ -12,6 +12,15 @@ M21 rollback still pending. Preserve the failed sandbox and all backups.
 Next: finish private temporary-parent P0 follow-up, commit tested units, then pin
 and validate the corrected source before a new disposable M21 rehearsal.
 
+M21 output-directory correction committed 84b506a27343ed04909bb0ef8410a9ecb4fda812.
+P0 upload/OCR parent-creation gap then reproduced at file-open time and corrected:
+private parent before file creation; Django's Windows-safe temporary wrapper and
+scoped OCR cleanup retained. 115 focused storage/upload/document/loan/finance
+tests PASS, zero skips (private-temp-fixed-900cdd22). First wrapper attempt failed
+Windows reopening checks and is retained. See PROJECT_STATUS.md for exact paths.
+No production repair. Next pin the combined source, run system/drift/full isolated
+gate, then new actual M21 rehearsal; do not reuse or delete prior sandboxes.
+
 Earlier source f79690a8c42eab6b2ae3182445af5002a87da6a8: combined retry
 executed 750 backend tests / zero skips / one error. Correct fail-fast left
 browser/native NOT_RUN. Earlier attempt interrupted without final evidence.

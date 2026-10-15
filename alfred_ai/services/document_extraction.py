@@ -14,7 +14,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import textwrap
 from typing import BinaryIO
 from xml.etree import ElementTree
@@ -24,7 +23,8 @@ from pypdf import PdfReader
 from .upload_limits import upload_deadline
 
 from alfred_ai.services.pdf_recovery import rebuild_orphaned_pdf
-from alfred_ai.services.ocr_process import ocr_command, hidden_process_options
+from alfred_ai.services.ocr_process import ocr_command, hidden_process_options, private_ocr_input
+from alfred_ai.services.api_errors import safe_error_details
 
 try:
     import pdfplumber
@@ -640,24 +640,18 @@ def _extract_image_with_rapidocr(
 def _extract_pdf_with_isolated_ocr(raw_bytes: bytes, *, page_limit: int) -> dict:
     if len(raw_bytes) < 2048:
         return {"text": "", "review_payload": {}}
-    temp_path = ""
     try:
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as handle:
-            from alfred_private_storage import protect
-            protect(Path(handle.name))
-            handle.write(raw_bytes)
-            temp_path = handle.name
-
-        completed = subprocess.run(
-            ocr_command("document", ISOLATED_PDF_OCR_WORKER, temp_path, page_limit),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="ignore",
-            timeout=ISOLATED_OCR_TIMEOUT_SECONDS,
-            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-            **hidden_process_options(),
-        )
+        with private_ocr_input(raw_bytes) as temp_path:
+            completed = subprocess.run(
+                ocr_command("document", ISOLATED_PDF_OCR_WORKER, temp_path, page_limit),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                timeout=ISOLATED_OCR_TIMEOUT_SECONDS,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                **hidden_process_options(),
+            )
         if completed.returncode != 0:
             return {"text": "", "review_payload": {}}
         lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
@@ -672,15 +666,9 @@ def _extract_pdf_with_isolated_ocr(raw_bytes: bytes, *, page_limit: int) -> dict
                 "recovery_steps": [{"step": "isolated_ocr_worker", "status": "completed"}],
             },
         }
-    except Exception:
-        logger.warning("Isolated OCR extraction failed for document upload.", exc_info=True)
+    except Exception as exc:
+        safe_error_details(exc, "Isolated document OCR is unavailable.", logger_name=__name__)
         return {"text": "", "review_payload": {"recovery_steps": [{"step": "isolated_ocr_worker", "status": "failed"}]}}
-    finally:
-        if temp_path:
-            try:
-                os.unlink(temp_path)
-            except OSError:
-                logger.warning("Temporary OCR cleanup failed for %s.", temp_path, exc_info=True)
 
 
 def _flatten_tables(tables: list) -> list[str]:

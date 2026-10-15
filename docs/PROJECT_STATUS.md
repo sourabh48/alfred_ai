@@ -21,6 +21,17 @@ that private directory before writing. 33 focused acceptance/promotion/recovery
 tests PASS (artifacts/post-audit/m21-output-directory-2f27f838/receipt.json).
 All failed evidence/backups remain; complete actual rollback acceptance is pending.
 
+P0 temporary-file follow-up: uploads and both isolated OCR paths now create
+private parent directories before opening document files. Tightening a file ACL
+after creation alone cannot revoke an already-open read handle. The creation-time
+regression reproduced all three gaps (temp-parent-repro-ee45ea20). Streamed files
+retain Django's Windows-safe temporary wrapper; the first attempt using Python's
+different sharing mode failed and is preserved (private-temp-parent-efce6af0).
+Corrected **115 focused storage/upload/document/loan/finance tests PASS**, zero
+skips (artifacts/post-audit/private-temp-fixed-900cdd22/receipt.json). Temporary
+directories close with their files; OCR uses private scoped input and safe
+classified errors, without raw cleanup paths. No production ACL/file change.
+
 | Unit | Development status | Evidence / remaining acceptance |
 | --- | --- | --- |
 | P0-B profile money | Implemented: finite, bounded cent validation at API/form/model/ORM and Career scenario inputs; existing Float SQL schema/API numeric contract preserved | 47 combined focused tests PASS, zero skips; migration drift PASS; production not remediated |

@@ -1,11 +1,14 @@
 """Source/debug storage protection with synthetic files and no live records."""
 from contextlib import closing
+import io
+import json
 import os
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 from unittest import TestCase, skipUnless
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -20,6 +23,48 @@ from alfred_private_storage import (PrivateStorageUnavailable, acl_snapshot, cur
 
 @skipUnless(os.name == "nt", "Windows source storage acceptance requires Windows")
 class SourceStorageTests(TestCase):
+    def test_upload_and_ocr_parents_are_private_at_the_instant_files_are_created(self):
+        from alfred_ai.services import document_extraction
+        from apps.expenses.services import statement_import
+        for kind in ('upload', 'document', 'statement'):
+            with self.subTest(kind=kind), TemporaryDirectory() as directory, \
+                    override_settings(FILE_UPLOAD_TEMP_DIR=directory), patch('tempfile.tempdir', directory):
+                root = Path(directory)
+                replace_acl(root, f'D:P(A;;FA;;;{current_sid()})(A;;FA;;;SY)(A;;FR;;;AU)')
+                observed = []
+                original_open = io.open
+                original_os_open = os.open
+                def observe(path):
+                    if isinstance(path, (str, os.PathLike)):
+                        path = Path(path)
+                        if path.is_relative_to(root):
+                            observed.append(verify_private(path if path.is_dir() else path.parent))
+                def opening(path, mode='r', *args, **kwargs):
+                    if 'w' in mode:
+                        observe(path)
+                    return original_open(path, mode, *args, **kwargs)
+                def creating(path, flags, *args, **kwargs):
+                    if flags & os.O_CREAT:
+                        observe(path)
+                    return original_os_open(path, flags, *args, **kwargs)
+                with patch('io.open', side_effect=opening), patch('os.open', side_effect=creating):
+                    if kind == 'upload':
+                        handler = PrivateTemporaryUploadHandler()
+                        handler.new_file('upload', 'synthetic.txt', 'text/plain', 9)
+                        try:
+                            handler.receive_data_chunk(b'synthetic', 0)
+                        finally:
+                            handler.file.close()
+                    else:
+                        module = document_extraction if kind == 'document' else statement_import
+                        function = module._extract_pdf_with_isolated_ocr if kind == 'document' else module._extract_with_isolated_ocr
+                        with patch.object(module.subprocess, 'run', return_value=SimpleNamespace(
+                                returncode=0, stdout=json.dumps({'text': 'synthetic'}))):
+                            self.assertIn('synthetic', str(function(b'synthetic'*1024, page_limit=1)))
+                self.assertTrue(observed)
+                self.assertTrue(all(observed), 'A temporary document was created in a readable directory')
+                self.assertEqual(list(root.iterdir()), [])
+
     def test_source_startup_protects_media_before_preview_or_document_creation(self):
         from django.apps import apps
         with TemporaryDirectory() as directory,override_settings(MEDIA_ROOT=Path(directory)/'media'):

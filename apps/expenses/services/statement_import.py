@@ -14,7 +14,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import textwrap
 from typing import BinaryIO
 
@@ -22,7 +21,8 @@ from pypdf import PdfReader
 
 from alfred_ai.services import apply_parser_learning
 from alfred_ai.services.pdf_recovery import rebuild_orphaned_pdf
-from alfred_ai.services.ocr_process import ocr_command, hidden_process_options
+from alfred_ai.services.ocr_process import ocr_command, hidden_process_options, private_ocr_input
+from alfred_ai.services.api_errors import safe_error_details
 from alfred_ai.services.upload_limits import check_text_budget, document_source, upload_deadline
 
 
@@ -703,24 +703,18 @@ def _load_ocr_dependencies():
 def _extract_with_isolated_ocr(raw_bytes: bytes, page_limit: int) -> str:
     if len(raw_bytes) < 4096:
         return ""
-    temp_path = ""
     try:
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as handle:
-            from alfred_private_storage import protect
-            protect(Path(handle.name))
-            handle.write(raw_bytes)
-            temp_path = handle.name
-
-        completed = subprocess.run(
-            ocr_command("statement", ISOLATED_OCR_WORKER, temp_path, page_limit),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="ignore",
-            timeout=ISOLATED_OCR_TIMEOUT_SECONDS,
-            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-            **hidden_process_options(),
-        )
+        with private_ocr_input(raw_bytes) as temp_path:
+            completed = subprocess.run(
+                ocr_command("statement", ISOLATED_OCR_WORKER, temp_path, page_limit),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                timeout=ISOLATED_OCR_TIMEOUT_SECONDS,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                **hidden_process_options(),
+            )
         if completed.returncode != 0:
             return ""
         lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
@@ -728,15 +722,9 @@ def _extract_with_isolated_ocr(raw_bytes: bytes, page_limit: int) -> str:
             return ""
         payload = json.loads(lines[-1])
         return str(payload.get("text") or "").strip()
-    except Exception:
-        logger.warning("Isolated OCR worker failed for statement extraction.", exc_info=True)
+    except Exception as exc:
+        safe_error_details(exc, "Isolated statement OCR is unavailable.", logger_name=__name__)
         return ""
-    finally:
-        if temp_path:
-            try:
-                os.unlink(temp_path)
-            except OSError:
-                logger.warning("Temporary statement OCR cleanup failed for %s.", temp_path, exc_info=True)
 
 
 def _collect_transaction_groups(lines: list[str]) -> list[str]:

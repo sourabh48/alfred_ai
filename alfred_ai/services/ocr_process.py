@@ -1,8 +1,21 @@
 """Run the existing isolated OCR routines from Python or the frozen launcher."""
 import os
+from contextlib import contextmanager
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+
+from alfred_private_storage import private_directory
+
+
+@contextmanager
+def private_ocr_input(raw_bytes):
+    with tempfile.TemporaryDirectory(prefix='alfred-ocr-') as directory:
+        root = private_directory(Path(directory))
+        path = root / 'input.pdf'
+        path.write_bytes(raw_bytes)
+        yield str(path)
 
 
 def ocr_command(kind, source, path, pages):
