@@ -1,5 +1,12 @@
 # ALFRED on Windows
 
+Latest development acceptance, 2026-10-16: source/package candidate 4aa7ac7 passed
+local native, browser, repeat-build and M21 rollback checks; it is not deployed.
+See [package evidence](WINDOWS_PACKAGE.md) and [current status](PROJECT_STATUS.md).
+Production source remains 3932f391. A current read-only check could not reach
+port 8000; no service action or private DB access was attempted. The audit poll
+below is historical and does not establish present availability.
+
 Final audit poll: /health/live/ 200, /health/native/ 404 on a runserver listener;
 no audit runtime action. Verify actual data/worker/native identity before assuming
 the documented native launcher currently owns port 8000.

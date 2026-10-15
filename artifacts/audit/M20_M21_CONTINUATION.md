@@ -1,6 +1,31 @@
 # M20/M21 implementation checkpoint
 
-## Current local correction — 2026-10-16
+## Verified local candidate — 2026-10-16
+
+Frozen branch `release/post-audit-runtime-20261016` pins
+`4aa7ac70fa27c1410e695470af5c3987235244b1`. Exact-source 797 backend / 40 Chrome /
+34 source-native-Ollama PASS, zero failures/skips; fresh portable package 35 native
+checks including seven Chrome PASS. Actual M21 in
+`F:/ALFRED_DEV/post-audit-rehearsal-4aa7ac7/rehearsal.json` PASS: local restore,
+reconciliation, exact promotion, restart, worker crash and source rollback with
+nine browser checks before and after rollback. Child failure FAIL is deliberate,
+its rollback PASS; parent PASS. Earlier failed 874639f evidence is retained.
+
+Technical decision PASS, production promotion BLOCKED and unauthorized:
+`artifacts/release-gates/post-audit-quiescence-20261016/release.json`.
+All fixture backup/operator evidence is scoped to its disposable target. No live
+backup, custom external-path coverage, production ACL repair, real-account,
+device-loss/key, clean-PC/installer or remote CI/protection acceptance is inferred.
+No new waiver, provider access, key rotation, production mutation or GitHub push.
+
+M19 second assembly matched all 10,322 file paths/bytes, using the same SDK with
+no installation. Portable ZIP entry hashes/sizes passed. Full paths, executable
+hashes and safe resume commands are in CODEX_CONTINUATION_STATE.md and
+docs/WINDOWS_PACKAGE.md. Documentation-only successors do not replace frozen4aa
+for package/source identity checks. PROJECT_STATUS.md is the active overview;
+following sections preserve earlier checkpoints.
+
+## Earlier local correction — 2026-10-16
 
 See PROJECT_STATUS.md for the active overview. Newer exact 874639f clean-SDK gates
 passed 792 backend / 40 Chrome / 34 source-native/Ollama checks, zero final skips

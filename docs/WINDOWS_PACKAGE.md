@@ -1,15 +1,56 @@
 # Standalone Windows package
 
-**Latest integrated package scope — 2026-10-15:** The frozen M15 integrated report records 35 native checks including seven packaged Chrome flows at 3932f391. Earlier package results below are historical versions and must not be substituted for a changed candidate. Separate-PC/installer lifecycle is not accepted merely by portable startup. M18–19 build constraints/reproducibility and M21 actual lifecycle remain open. [Roadmap](ALFRED_COMPLETION_ROADMAP.md).
+**Latest local review candidate — 2026-10-16:** Frozen source
+`4aa7ac70fa27c1410e695470af5c3987235244b1`, branch
+`release/post-audit-runtime-20261016`, is not deployed or published. A fresh
+Python 3.12.10 / Django 6.0.9 bundle passed 35 native checks including seven
+packaged Chrome flows. Exact-source gates passed 797 backend / 40 Chrome /
+34 source-native/Ollama and actual M21 restore/promotion/restart/worker-crash/
+source-rollback acceptance. The completed backend/Chrome/native suites have zero
+failures/skips; M21's intentional worker failure is recorded separately.
+[Current status](PROJECT_STATUS.md) records pending operational gates.
+
+Local ignored evidence is under
+`artifacts/releases/post-audit-4aa7ac7-28624710`: build/source manifest, complete
+bundle inventory, copied native proof, hash-pinned dependency inputs and portable
+verification. A second assembly in `post-audit-4aa7ac7-repeat-fa68edd5` matched
+all 10,322 file paths and bytes, including these SHA-256 values:
+
+| Accepted artifact | SHA-256 |
+| --- | --- |
+| `ALFRED.exe` | `39ef797c876cbbb434a467ef0697709524ff9a41c8f12c8adc05ac768673b5dc` |
+| `ALFRED Launcher.exe` | `024ceab3c78756f2ad5e3e3f15abad4c130ab2c3debfbac068f28c19fc33dcae` |
+| `portable/ALFRED-Windows-x64.zip` | `6db90bd1c03cb4689c7719030369efc3ba28c0cb1c393d2e92e4967e7465a90a` |
+
+The 468,439,826-byte ZIP's 10,322 entries were independently decompressed and
+matched to the accepted inventory by size and SHA-256. The acceptance kit is
+prepared beside it. This is an application archive, not an encrypted user-data
+backup. No private runtime was packaged, deployed or exported.
+
+The SDK matched 151 application packages; those packages and bootstrap pip kept
+their versions when five declared build tools were added. All 156 application/
+build distributions have recorded public input hashes (154 wheels / two source
+archives). Bootstrap pip is 25.0.1. Source-archive backend provenance and an
+independent clean environment remain distinct from same-SDK repeatability.
+Builds used fixed `PYTHONHASHSEED=1` and commit-time `SOURCE_DATE_EPOCH`, as in
+[PyInstaller's reproducible-build guidance](https://www.pyinstaller.org/en/stable/advanced-topics.html#creating-a-reproducible-build).
+These are build-process inputs; do not set them globally for application runtime.
+Use a disposable data/configuration root and the house
+`scripts.release_validation.environment` to strip operator credentials and disable
+cloud, paid reasoning and startup training before analysis. Preserve its receipts
+and use a fresh output directory. No installer compiler was available here;
+installer lifecycle, separate-PC/reboot, normal-account and device-loss recovery
+acceptance remain NOT_RUN. No live update or GitHub publication is authorized.
 
 The Windows x64 release contains its own Python 3.12 runtime and application
 dependencies. No Python, pip, virtual environment, Docker, PostgreSQL or Redis
 installation is required on the destination PC.
 
-The [1.1.0 travel preview verification](TRAVEL_RELEASE_VERIFICATION_20260929.md)
-records the current package fingerprints, travel checks and local upgrade.
+The historical [1.1.0 travel preview verification](TRAVEL_RELEASE_VERIFICATION_20260929.md)
+records that preview's package fingerprints, travel checks and local upgrade.
 
-Download the [Windows preview from GitHub Releases](https://github.com/sourabh48/alfred_ai/releases/tag/v1.1.0-preview.1):
+Previously published [Windows preview downloads](https://github.com/sourabh48/alfred_ai/releases/tag/v1.1.0-preview.1)
+(these are not the local post-audit candidate):
 
 - [Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Setup.exe)
 - [Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Windows-x64.zip)

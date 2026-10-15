@@ -1,5 +1,11 @@
 # Production Readiness
 
+**Local development update — 2026-10-16:** Frozen 4aa7ac7 has local technical,
+same-host packaged/repeat-build and synthetic M21 PASS. It has not replaced
+production 3932f391. Real-account, installer/clean-PC, independently recoverable
+off-device materials and remote CI/protection remain unverified; production
+promotion/ACL repair require new approval. See [authoritative status](PROJECT_STATUS.md).
+
 **Scope correction — 2026-10-15:** ALFRED's selected production installation is local Windows-native Waitress/Huey/SQLite, with deployed source 3932f391. The PostgreSQL/Redis/HTTPS/Celery proof contract below applies to an optional public/server profile; it is not a mandatory replacement for the approved loopback runtime. No public/cloud deployment decision has been made. M15 deployment passed dated gates, while normal-account/clean-PC/device-loss acceptance and present service health remain open. Use [current acceptance](ALFRED_END_TO_END_ACCEPTANCE.md); never invoke live probes or data writes merely to satisfy a documentation checkbox.
 
 ALFRED is now being treated as a local or LAN-hosted application by default. For that path, follow [Local Hosting](LOCAL_HOSTING.md).

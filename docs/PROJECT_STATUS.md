@@ -8,7 +8,67 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
-### Latest bounded correction — 2026-10-16
+### Verified local runtime candidate — 2026-10-16
+
+Frozen branch `release/post-audit-runtime-20261016` points exactly to
+`4aa7ac70fa27c1410e695470af5c3987235244b1`. It integrates 28 commits / 156 changed
+tracked paths since M15 `3932f391`; the source manifest is authoritative for that
+inventory. Production and GitHub master remain at `3932f391`; their source and
+operator files were not changed. Documentation checkpoints after the frozen
+commit do not change the tested source or substitute their HEAD for this SHA.
+
+**Local technical decision PASS; production promotion BLOCKED and unauthorized.**
+Exact-source combined results: **797 backend / 40 Chrome / 34 source-native/Ollama
+checks PASS, zero failures/skips**. Source/privacy, system and migration-drift
+checks passed; no new migration. Earlier dependency changes remain explicitly
+declared: Django 6.0.9 and removal of nine retired direct SDK requirements.
+Evidence: `artifacts/release-gates/post-audit-quiescence-20261016/release.json`.
+
+Actual M21 at `F:/ALFRED_DEV/post-audit-rehearsal-4aa7ac7/rehearsal.json` PASS:
+authenticated encrypted local restore, typed financial/family reconciliation,
+exact fast-forward, nine Chrome checks, restart/memory persistence, injected
+worker crash, source rollback and nine after-rollback browser checks. The failure
+child deliberately records FAIL with rollback PASS; the parent is PASS. The
+older failed 874639f sandbox and all recovery evidence remain preserved. Test
+servers on 8140/8150/8160 were closed. These are synthetic fixture-bound results,
+not live-backup, real-account or device-loss acceptance.
+
+Fresh portable package at `artifacts/releases/post-audit-4aa7ac7-28624710` PASS:
+**35 packaged native checks including seven Chrome flows**, actual local Ollama,
+encrypted memory, owner/deletion isolation, launcher, worker/scheduler, outage and
+restart checks. Desktop Travel and mobile assistant screenshots were reviewed.
+No ignored files existed under the packaged project-data directories; the bundle
+inspector passed all 10,322 files. A second clean assembly in
+`post-audit-4aa7ac7-repeat-fa68edd5` produced **identical paths and bytes for all
+10,322 files**, including both executable hashes. This is same-host/same-SDK
+repeatability; independent clean-PC installation is NOT_RUN.
+
+The clean Python 3.12.10 SDK matched all 151 planned application packages; pip
+and those packages were unchanged when five declared build-tool dependencies
+were added. Pip check passed. The package directory contains hash-pinned inputs
+for 156 distributions (154 wheels / two source archives), plus the bootstrap pip
+version. Source-archive build-backend provenance is an additional independent
+replay consideration. The 468,439,826-byte portable ZIP passed every entry's size
+and SHA-256 comparison. It is an application archive, not a financial-data backup.
+See [Windows package evidence](WINDOWS_PACKAGE.md).
+
+M16 and M17 implementation are complete locally. M18 clean dependency/security
+validation and M19 same-host portable/repeat-build acceptance PASS. M20 local
+engine and M21 same-host rehearsal PASS; installer/clean-PC, normal-account,
+independent archive/key/device-loss recovery, remote CI and branch protection
+remain NOT_RUN. No new waiver or production authorization exists. The backup
+adapter's default native-layout proof does not establish coverage of custom
+external media/configuration paths; review coverage before any live operation.
+Production ACL repair and dependency/runtime promotion remain separately gated.
+The latest read-only check still could not reach `127.0.0.1:8000`; no startup,
+shutdown, private DB access or repair was attempted.
+
+Next: obtain the required installer/clean-PC environment and scoped CI/human
+acceptance approvals, or continue the next independent confirmed roadmap item on
+the development branch. Preserve the frozen source, all backups and the cancelled
+key-dialog decision. Do not repeat completed P0/M16/M17/full local gates.
+
+### Implementation checkpoint before the full gate — 2026-10-16
 
 The clean SDK at `artifacts/post-audit/m18-clean-resolver-be31990d/venv`
 passed **792 backend / 40 Chrome / 34 source-native/Ollama checks**, zero final
@@ -38,7 +98,8 @@ are not summed. Changed implementation is in `alfred_native.py` and
 `scripts/release_recovery.py`, with native/recovery regressions. No migration,
 dependency, financial-value or production change. AST graph updated locally.
 
-**Current release readiness remains BLOCKED.** This correction needs a new pinned
+**Readiness at that checkpoint was BLOCKED.** The following work was pending then
+and the verified local candidate above supersedes that pending state: a new pinned
 full gate and actual M21 rehearsal before fresh packaging. M19 tools are staged;
 Inno Setup is unavailable. Separate-PC/installer, normal-account, independent
 device-loss recovery and remote CI acceptance remain unverified; no waiver is

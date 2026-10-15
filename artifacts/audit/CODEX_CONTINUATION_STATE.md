@@ -1,6 +1,66 @@
 # ALFRED CODEX CONTINUATION STATE
 
-## Current checkpoint — M20 quiescence correction, 2026-10-16
+## Latest verified checkpoint — runtime candidate, 2026-10-16
+
+Development: `F:/ALFRED_DEV/post-audit`, `fix/post-audit-critical-20261015`.
+Frozen tested source: `4aa7ac70fa27c1410e695470af5c3987235244b1`, local branch
+`release/post-audit-runtime-20261016`. This documentation checkpoint follows that
+source commit; verify actual Git HEAD, but do not substitute a newer docs HEAD for
+the frozen package/gate SHA. All audit/frozen history remains preserved.
+
+Exact source PASS: 797 backend / 40 Chrome / 34 source-native-Ollama, zero skips
+or failures. Fresh package PASS: 35 native checks including seven Chrome flows.
+Actual M21 PASS in `F:/ALFRED_DEV/post-audit-rehearsal-4aa7ac7`: local encrypted
+restore, typed financial/family reconciliation, exact promotion, nine Chrome,
+restart/memory persistence, worker crash, source rollback, nine after-rollback
+Chrome checks. Deliberate failure child FAIL + rollback PASS is expected; parent
+PASS. Earlier 874639f rollback FAIL and Banking browser failure remain preserved.
+No failure was waived or erased. Current technical PASS, production BLOCKED/
+unauthorized; fixture backup/operator evidence does not authorize a live target.
+
+Evidence:
+- `artifacts/release-gates/post-audit-quiescence-20261016/release.json` and `.md`.
+- `artifacts/releases/post-audit-4aa7ac7-28624710/build-receipt.json`,
+  `release-manifest.json`, `bundle-files.json`,
+  `native-exe-proof-2a2d0386a5.json`, `environment-lock-receipt.json`.
+- `artifacts/releases/post-audit-4aa7ac7-repeat-fa68edd5/repeat-receipt.json`:
+  all 10,322 file paths/bytes match, zero differences; no SDK installs during replay.
+- `artifacts/releases/post-audit-4aa7ac7-28624710/portable/portable-verification.json`:
+  468,439,826-byte application ZIP, all 10,322 entry sizes/hashes match. It is not a
+  private-data recovery archive. Separate-PC acceptance kit is prepared beside it.
+
+SDK: `artifacts/post-audit/m18-clean-resolver-be31990d/venv/Scripts/python.exe`,
+Python 3.12.10 / Django 6.0.9, no baseline fallback. 151 application packages + pip
+were unchanged when five verified build packages were installed. The package has
+156 hash-pinned build/validation inputs; two are source archives. Repeat build is
+same-host/same-SDK proof, not independent clean-PC/backend reproducibility.
+Actual SDK/query and safe resume details also remain in
+`artifacts/post-audit/session-state.json`.
+
+Production/GitHub master still 3932f391. No live source, private DB, ACL, token,
+key, provider setting, backup or service mutation; no push. Port 8000 was
+unreachable on the latest read-only check. Do not start/stop it under this task.
+Keep real OpenAI/cloud OFF. Never reopen cancelled key dialogs. M15 external
+recovery waiver does not transfer. Installer/second-PC, normal account, independent
+device-loss/key restore, remote CI and branch protection remain unverified.
+Default-layout backup rehearsal is not proof of custom external storage coverage.
+
+Next safe work: preserve frozen4aa and complete installer/clean-PC and scoped CI/
+human acceptance prerequisites; independent remaining product units follow
+PROJECT_STATUS.md / the existing roadmap. Do not rerun completed audit/P0/M16/M17.
+For status (BLOCKED is expected until operational gates and new approval exist):
+
+```powershell
+Set-Location F:\ALFRED_DEV\post-audit
+git status --short
+& '.\artifacts\post-audit\m18-clean-resolver-be31990d\venv\Scripts\python.exe' -B scripts/release_gate.py status --output artifacts/release-gates/post-audit-quiescence-20261016
+```
+
+Consult the configured SDK before invoking Python. Validation/rehearsal against
+this frozen report requires the exact frozen source; docs-only successor commits
+do not automatically inherit or replace its candidate identity.
+
+## Implementation checkpoint before the full gate — M20 quiescence, 2026-10-16
 
 Worktree `F:/ALFRED_DEV/post-audit`, branch `fix/post-audit-critical-20261015`.
 Audit bced104 and production 3932f391 remain preserved. This checkpoint commit

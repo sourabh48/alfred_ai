@@ -5,6 +5,15 @@ Existing engine from `feature/m20-release-gates` / 0052410 is integrated into
 fresh evidence. Select the isolated development Python 3.12 interpreter; do not
 install updates into the running production environment.
 
+Latest local proof: frozen `release/post-audit-runtime-20261016` /
+`4aa7ac70fa27c1410e695470af5c3987235244b1` has technical PASS, fresh same-host
+package PASS and actual M21 PASS. Production remains BLOCKED/unauthorized.
+See [current status](PROJECT_STATUS.md) for exact counts and limitations. The
+manifest at `artifacts/release-gates/post-audit-quiescence-20261016/release.json`
+pins that source; documentation-only successor commits do not substitute their
+HEAD or automatically inherit its evidence. Fixture operator/backup results are
+bound to their synthetic paths, not the live installation.
+
 ```powershell
 $python = '.\.venv\Scripts\python.exe'
 $candidate = git rev-parse HEAD
