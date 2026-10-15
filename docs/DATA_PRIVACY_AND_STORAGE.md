@@ -40,6 +40,14 @@ Trip photos are user media, not extraction-only documents, and are not automatic
 
 ## What The App Keeps
 
+The development FIN-MONEY Budget migration retains owner-scoped original float
+representations and normalized cents in `BudgetMoneySnapshot` for recovery.
+This evidence is not exposed by Budget APIs. Deleting a Budget does not destroy
+its recovery evidence; owner reset/account deletion removes that owner's
+snapshots, including orphan rows. It lives in the canonical financial database
+and shares that database's storage protections, not M15 memory encryption.
+Historical backups may retain deleted evidence. This migration is not deployed.
+
 ALFRED keeps only the database records needed for product behavior:
 
 - parsed transaction rows and statement metadata

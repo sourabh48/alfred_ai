@@ -33,8 +33,59 @@ banking-baseline-1/diagnostic.json (original failure); loan-race-before and
 loan-race-fixed (preserved deterministic failures); loan-race-scope-fixed
 (13 PASS: two Chrome workflows + eleven HTTP/UI contract tests); banking-fixed-0
 through -2 (three additional independent runs of the original workflow PASS).
-Zero skips in successful runs. No full gate or package rebuild. FIN-MONEY next
-scoped unit: Budget's three money fields; historical currency stays unrecorded.
+Zero skips in successful runs. No full gate or package rebuild. Correction commit:
+`0e7e1df35c5afe279050253b97e92ad0ecfc04fc`. Historical currency stays unrecorded.
+
+### FIN-MONEY — Budget register complete locally, 2026-10-16
+
+Scope: `Budget.base_budget`, `inflation_adjusted`, `spent`, their model/form/API
+boundaries, dashboard amounts and owner reset. Reuses Expense money helpers and
+the existing M13 original-snapshot/guarded-reverse pattern. Money is Decimal cents
+with HALF_UP normalization, finite/non-negative validation and maximum stored
+amount `999999999999.99`; numeric API fields remain compatible. Dashboard stored
+amounts and actual Expense accumulation stay Decimal until numeric output;
+statistical suggestions/forecasts remain estimates. No balance, loan, investment,
+transfer identity or ownership algorithm was replaced.
+
+Pending development migration: [budgets.0002_budget_money_decimal](../apps/budgets/migrations/0002_budget_money_decimal.py),
+depending only on budgets.0001 and the existing swappable User dependency.
+It validates the complete register, retains exact original float representations
+and independent normalized values in owned snapshots, then applies cents with
+markers atomically. Invalid historical amounts block conversion without partial
+evidence or financial writes. Reverse restores original precision only for
+unchanged, applied, still-owned fields; corrections/new rows remain, deleted rows
+are not recreated. Owner reset removes owned snapshots, including orphan evidence.
+Snapshots are private canonical-DB recovery evidence, not encrypted AI memories.
+No currency column/backfill or FX assumption is introduced; legacy screen INR
+conventions remain unchanged. User/Career/Mobility Decimal storage and explicit
+currency design are still separate unfinished FIN-MONEY/FIN-CURRENCY work.
+
+Validation evidence under `artifacts/post-audit/fin-money-20261016/`:
+- `budget-focused/receipt.json`: 14 focused tests PASS (included in the combined run).
+- `budget-integration/receipt.json`: **74 backend PASS**, zero failures/skips:
+  Budget runtime/migrations, canonical baseline, user-data acceptance/reset,
+  abuse limits, family boundaries and Expense identity.
+- `finance-browser-final/receipt.json`: **three Chrome workflows PASS**, zero
+  failures/skips (delayed Loan response, Banking/filter navigation, sample finance).
+- `configuration/receipt.json`: system/drift checks PASS; synthetic baseline plan
+  contains exactly the one Budget migration. New tests are in the existing M20
+  backend selection; no completed M20/M21 gate was rerun.
+
+The file-backed synthetic rehearsal uses SQLite backup and an independent restore,
+checks integrity/FKs, forwards on a separate alias, compares all unrelated tables
+with typed row hashes (accounts, transfer fingerprints/legs, loans, investments,
+family and owners), reverses to exact original row hashes, and proves source bytes
+unchanged. No real private records or backup material were used. Screenshots of
+the corrected Loan table and final finance workflow were reviewed.
+
+**Local unit PASS; FIN-MONEY overall PARTIAL; no deployment authorization.**
+Production still 3932f391; new migration is not applied there. Frozen 4aa7ac70
+and package evidence remain their own immutable scope. No native rebuild/full
+release gate for this new unit yet. Existing clean-PC/installer, normal-account,
+independent device-loss/key recovery and remote CI/protection acceptance remain
+pending. Next safe unit: scoped User income/rent Decimal conversion, reusing its
+completed finite-input guards and preserving original values with independent
+baseline/reverse/recovery evidence. Never infer historical currency.
 
 ### Verified local runtime candidate — 2026-10-16
 

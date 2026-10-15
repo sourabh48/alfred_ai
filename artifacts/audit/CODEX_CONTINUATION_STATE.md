@@ -1,5 +1,54 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## FIN-MONEY Budget completion — 2026-10-16
+
+Active `F:/ALFRED_DEV/post-audit`, `feature/fin-money-tail-20261016`, based on
+08f39a88. Banking correction committed as `0e7e1df35c5afe279050253b97e92ad0ecfc04fc`.
+This checkpoint accompanies the verified Budget unit; verify actual HEAD.
+Frozen `release/post-audit-runtime-20261016` remains exactly 4aa7ac70; do not
+move/rebuild it or reuse its 797/40/native evidence as proof of this new schema.
+
+Budget base_budget/inflation_adjusted/spent now Decimal cents, finite/non-negative,
+bounded, HALF_UP. Numeric API preserved; dashboard actual spending uses Decimal
+until output. Existing forecast/model estimates remain estimates. New owned
+BudgetMoneySnapshot retains original precision; owner reset clears own orphans.
+Only new migration: budgets.0002_budget_money_decimal, atomic capture/normalize
+with applied markers and guarded reverse preserving corrections/new rows/owners.
+Invalid history blocks before partial evidence. No currency field or inference.
+Files: apps/budgets/{money,models,serializers,views}.py, its new migration,
+apps/users/services.py, scripts/release_validation.py (new test labels),
+tests/test_budget_money.py and tests/test_budget_money_migration.py.
+
+Evidence: `artifacts/post-audit/fin-money-20261016/`. 14 focused PASS, then
+74 combined backend PASS including those 14, zero skips/failures. Three final
+Chrome PASS; prior eleven HTTP/UI contract checks and three separate original
+Banking repetitions also PASS. Keep original Banking and deterministic failing
+receipts. System/drift/one-migration plan PASS. File-backed synthetic backup,
+independent restore, integrity/FKs, alias forward, all unrelated typed table
+hashes and exact reverse/source preservation PASS. No production DB was opened.
+No full release/native/package gate rerun; Graphify AST graph updated.
+
+Production diagnosis is recorded below: service/listener/worker/scheduler absent,
+stale running/PIDs predate reboot. No repair/start/stop. Production/source/operator
+files, all private data/ACL/keys/backups, GitHub and real providers unchanged.
+AWS retired; real OpenAI/cloud OFF. All operational acceptance remains separate.
+
+Next: User monthly_income/variable_income/rent_or_emi Decimal unit, using the
+existing ProfileMoneyField finite guards, canonical baseline and snapshot pattern;
+trace callers and reverse/ownership first. Do not repeat Budget or core M13A-D.
+Use the existing clean SDK after IDE SDK consultation, never default/live env:
+artifacts/post-audit/m18-clean-resolver-be31990d/venv/Scripts/python.exe.
+Safe resume:
+```powershell
+Set-Location F:\ALFRED_DEV\post-audit
+git status --short
+git log -3 --oneline
+Get-Content -LiteralPath docs/PROJECT_STATUS.md -TotalCount 120
+```
+Read the audited UNIT 8 and scoped User models/forms/serializers/services/tests
+before editing. Deployment, live service repair and any production ACL/schema
+change need separate authorization. Do not reopen key dialogs or extend M15's waiver.
+
 ## Active FIN-MONEY branch — Banking fix and read-only health, 2026-10-16
 
 Worktree `F:/ALFRED_DEV/post-audit`, branch `feature/fin-money-tail-20261016`,

@@ -10,7 +10,7 @@ from django.db.models import Q
 
 from alfred_ai.services.materialized_cache import invalidate_user_materialized_payloads
 from apps.behavioral.models import BehavioralSignal
-from apps.budgets.models import Budget
+from apps.budgets.models import Budget, BudgetMoneySnapshot
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, CareerResumeLearningMemory
 from apps.expenses.models import BankAccount, BankAccountMoneySnapshot, Expense, ExpenseMoneySnapshot, StatementUpload
 from apps.family.models import Dependent, FamilyAccountLink
@@ -177,6 +177,7 @@ def clear_user_fed_data(user) -> dict:
         VerifiedExternalInsight.objects.filter(user=user).delete()
 
         BehavioralSignal.objects.filter(user=user).delete()
+        BudgetMoneySnapshot.objects.filter(user=user).delete()
         Budget.objects.filter(user=user).delete()
         Dependent.objects.filter(user=user).delete()
         family_link_qs.delete()
