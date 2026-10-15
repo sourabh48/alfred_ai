@@ -7,6 +7,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from alfred_ai.local_config import is_public_default_secret, load_local_environment, native_secret_file
+from alfred_private_storage import private_directory
 
 
 class LocalEnvironmentTests(TestCase):
@@ -36,8 +37,8 @@ class LocalEnvironmentTests(TestCase):
     def test_native_secret_file_retains_precedence(self):
         from alfred_native import configure
         with TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
-            root = Path(directory)
-            (root / "config").mkdir()
+            root = private_directory(Path(directory))
+            private_directory(root / "config")
             (root / "config" / "local.env").write_text(
                 "DJANGO_SECRET_KEY=local-fixture\nTRAVEL_ORS_API_KEY=local-provider-fixture\n", encoding="utf-8")
             native = root / "config" / "native.env"

@@ -12,7 +12,7 @@ service, paid provider or GitHub operation is authorized here.
 | --- | --- | --- |
 | P0-B profile money | Implemented: finite, bounded cent validation at API/form/model/ORM and Career scenario inputs; existing Float SQL schema/API numeric contract preserved | 47 combined focused tests PASS, zero skips; migration drift PASS; production not remediated |
 | P0-C private media | Implemented: source/debug and native use the same owner-filtered handler; safe missing/permission response, public static assets separate | Same 47-test gate includes anonymous/invalid session/foreign owner/traversal/deletion/source/native tests; packaged/live acceptance pending |
-| P0-A Windows storage | Next: protected creation/verification and explicit repair path with synthetic ACL tests | Existing production permissions must not be changed automatically |
+| P0-A Windows storage | Implemented: owner/SYSTEM creation and verification in native runtime/config, memory, parser/OCR scratch and recovery copies; explicit pinned, quiesced repair/rollback | 117 focused backend PASS; 11 repair CLI tests PASS (overlapping); 18 fresh native checks PASS; production ACL repair requires separate approval |
 | P0-D M20 gates | Existing 0052410 implementation will be reused and integrated after focused fixes | Ignored-file collision and JSON credential regressions pending |
 | AWS / replacement | User decision: no AWS runtime/provider activation | Decommission active path, evaluate non-AWS official contracts; real cloud remains OFF |
 
@@ -23,8 +23,19 @@ synthetic). First money test attempt exposed a test transaction/savepoint issue;
 the fixture was corrected without weakening validation. Historical failed receipt
 is preserved. No migration, financial record conversion or balance change.
 
-Next action: implement private storage creation and verified, authorization-bound
-repair; then repair/reuse M20 source/privacy gates. Specialized audit/runbooks and
+Storage files: alfred_private_storage.py; alfred_native.py; local_config.py;
+memory_key.py; bounded_parser.py; document_extraction.py; statement_import.py;
+backup/verification/recovery scripts and synthetic permission fixtures.
+Evidence: artifacts/post-audit/storage-final-f320dc9c/receipt.json (117 tests and
+WAL/config/media backup fixture); storage-cli-0dc1fcd2/receipt.json (11 tests);
+storage-native-final-7e6dbb9c/receipt.json (18 actual native checks). Earlier native
+attempt reached 16 checks then refused inherited restored-directory permissions;
+the guard now accepts exact owner/SYSTEM inheritance only from a verified private
+ancestor. Its failed receipt is preserved. No source/debug database encryption,
+portable-key verification or production ACL remediation is claimed.
+
+Next action: integrate and repair existing M20 source/privacy gates, decommission
+AWS dispatch and apply the supported dependency patch. Specialized audit/runbooks and
 historical results below remain reference material, not fresh acceptance.
 
 **Current status — 2026-10-15:** M14/M15 consolidated source is deployed and GitHub master matches 3932f391aa4eed7b3200ad3b034f7991435e01e4. Dated release results are 619 backend/15 Chrome/35 native (overlapping packaged scope); this audit independently ran 86 focused tests, zero skips, plus isolated system/drift checks. Normal-account, real-provider, clean-PC and device-loss acceptance remain incomplete. Port 8000 did not respond during the audit; no service action was taken. M20 is unfinished separate development; M16–M19/M21 are not declared complete.

@@ -7,6 +7,7 @@ from functools import lru_cache
 from importlib import import_module
 from io import BytesIO
 from io import StringIO
+from pathlib import Path
 import json
 import logging
 import os
@@ -705,6 +706,8 @@ def _extract_with_isolated_ocr(raw_bytes: bytes, page_limit: int) -> str:
     temp_path = ""
     try:
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as handle:
+            from alfred_private_storage import protect
+            protect(Path(handle.name))
             handle.write(raw_bytes)
             temp_path = handle.name
 

@@ -5,8 +5,12 @@ import json
 from pathlib import Path
 import shutil
 import sqlite3
+import sys
 from contextlib import closing
 from tempfile import TemporaryDirectory
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from alfred_private_storage import private_directory
 
 
 def checksum(path):
@@ -22,7 +26,7 @@ def check_sqlite(path, verified_paths):
     # SQLite may rewrite shared-memory state even on a read-only connection.
     # Rebuild it in a disposable directory, preserving every retained byte.
     with TemporaryDirectory(prefix='alfred-sqlite-check-') as temporary:
-        shadow = Path(temporary) / 'database.sqlite3'
+        shadow = private_directory(Path(temporary)) / 'database.sqlite3'
         shutil.copyfile(path, shadow)
         if nonempty_wal:
             shutil.copyfile(wal, Path(str(shadow) + '-wal'))

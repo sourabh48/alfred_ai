@@ -96,6 +96,45 @@ The installer contains code, libraries, OCR engine assets and static files.
 It excludes your database, uploads, learned models, local settings and secrets.
 Uninstalling the application retains the separate data folder.
 
+## Private storage permission repair
+
+Post-audit development refuses an existing data/configuration directory that
+grants access beyond its owner and SYSTEM. It creates new private directories
+before writing keys, databases, queues, caches or recovery payloads. Existing
+installations need a separately approved repair; no runtime startup silently
+changes their ACLs. Use an explicit writable data directory outside the source
+checkout for a fresh installation.
+
+From the reviewed development checkout, first select the actual runtime and a
+new retained plan path outside it. The plan contains original permissions and
+private filenames, so its directory is protected and must remain private:
+
+```powershell
+& $python alfred_private_storage.py $dataDirectory --plan $retainedPermissionPlan
+$planHash = (Get-FileHash -LiteralPath $retainedPermissionPlan -Algorithm SHA256).Hash.ToLowerInvariant()
+```
+
+This command is a dry run: it inspects the target and records a rollback plan.
+Obtain explicit repair authorization, verify a current backup, stop all writers
+using the documented launcher, and review the selected Windows owner. Only then:
+
+```powershell
+& $python alfred_private_storage.py $dataDirectory --plan $retainedPermissionPlan --expected-sha256 $planHash --apply --authorization-reference $approvalReference --quiesced
+```
+
+Every target and original ACL must still match the retained plan before repair.
+Only the Windows owner and SYSTEM retain access; the owner-run launcher, server,
+worker and scheduler use that same identity. A distinct service identity requires
+a separately reviewed permission policy, not a broad Users grant. No file
+contents, encryption keys or financial records are changed. On interruption,
+retain the plan and inspect the partially protected tree before retrying.
+
+An authorized permission rollback uses the same pinned plan with `--rollback`
+instead of `--apply`, after writers stop. It refuses a changed file inventory,
+size or modification time; it never blindly restores ACLs over new writes.
+Restoring the old broad ACL may reintroduce the original privacy issue. This is
+local permission repair, not a portable-key or device-loss recovery test.
+
 ## Background processing
 
 On Windows, the running supervisor owns an ALFRED notification-area icon.

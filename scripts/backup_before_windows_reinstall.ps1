@@ -256,7 +256,9 @@ try:
         raise RuntimeError('No valuable private data was detected; review the actual data directory.')
     destination.mkdir(parents=True, exist_ok=True)
     backup = destination / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
-    backup.mkdir(exist_ok=False)
+    sys.path.insert(0, os.environ['ALFRED_REINSTALL_BACKUP_REPO'])
+    from alfred_private_storage import private_directory
+    private_directory(backup)
     for source, relative, is_database in selected:
         target = backup / relative
         target.parent.mkdir(parents=True, exist_ok=True)

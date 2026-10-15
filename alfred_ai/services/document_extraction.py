@@ -6,6 +6,7 @@ from functools import lru_cache
 from html.parser import HTMLParser
 from importlib import import_module
 from io import BytesIO, StringIO
+from pathlib import Path
 import html
 import json
 import logging
@@ -642,6 +643,8 @@ def _extract_pdf_with_isolated_ocr(raw_bytes: bytes, *, page_limit: int) -> dict
     temp_path = ""
     try:
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as handle:
+            from alfred_private_storage import protect
+            protect(Path(handle.name))
             handle.write(raw_bytes)
             temp_path = handle.name
 

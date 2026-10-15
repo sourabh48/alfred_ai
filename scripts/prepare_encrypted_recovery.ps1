@@ -31,6 +31,10 @@ foreach ($executable in @($SevenZipExecutable,$PythonExecutable)) {
     if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw 'Required verifier or archiver is missing.' }
 }
 $verifier = Join-Path $PSScriptRoot 'verify_private_recovery.py'
+function Initialize-PrivateExtraction {
+    & $PythonExecutable -B -c 'import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); from alfred_private_storage import private_directory; private_directory(Path(sys.argv[2]))' $sourceRoot $ExtractionDirectory
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot protect disposable recovery storage; extraction blocked.' }
+}
 if (-not $ExtractionDirectory -or -not [IO.Path]::IsPathRooted($ExtractionDirectory)) { throw 'Use an explicit absolute disposable extraction directory.' }
 $extraction = [IO.Path]::GetFullPath($ExtractionDirectory)
 if (Test-Path -LiteralPath $extraction) { throw 'Extraction directory must be new; nothing will be overwritten.' }
@@ -86,6 +90,7 @@ if ($Mode -eq 'Encrypt') {
     if ($LASTEXITCODE -ne 0) { throw 'Encrypted archive integrity test failed.' }
     Test-EncryptedHeaders $parts[0].FullName
     if (-not $ExtractionDirectory -or (Test-Path -LiteralPath $ExtractionDirectory)) { throw 'Use a new disposable extraction directory.' }
+    Initialize-PrivateExtraction
     & $SevenZipExecutable x -bsp0 -bb0 $parts[0].FullName "-o$ExtractionDirectory"
     if ($LASTEXITCODE -ne 0) { throw 'Local encrypted archive extraction failed.' }
     $extracted = Get-PrivateVerification -Directory $ExtractionDirectory -ExpectedHead $head
@@ -159,6 +164,7 @@ recovery until protected data is re-encrypted and verified, then retire it safel
     if ($LASTEXITCODE -ne 0) { throw 'Downloaded archive test failed.' }
     Test-EncryptedHeaders (Join-Path $repository $records[0].name)
     if (-not $ExtractionDirectory -or (Test-Path -LiteralPath $ExtractionDirectory)) { throw 'Use a new disposable extraction directory.' }
+    Initialize-PrivateExtraction
     & $SevenZipExecutable x -bsp0 -bb0 (Join-Path $repository $records[0].name) "-o$ExtractionDirectory"
     if ($LASTEXITCODE -ne 0) { throw 'Downloaded archive extraction failed.' }
     $verification = Get-PrivateVerification -Directory $ExtractionDirectory -ExpectedHead $public.source_git_head

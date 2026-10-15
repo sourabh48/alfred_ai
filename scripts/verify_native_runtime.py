@@ -46,6 +46,8 @@ def main():
     run = uuid.uuid4().hex[:10]
     data = ROOT / "artifacts" / "native-tests" / run
     data.mkdir(parents=True)
+    from alfred_private_storage import private_directory
+    private_directory(data)
     report = {"run": run, "data_dir": str(data), "executable": str(args.executable or sys.executable), "passed": False, "checks": {}}
     if args.memory:
         report["synthetic_fixture_limits"] = {name: os.environ[name] for name in
@@ -326,7 +328,7 @@ def main():
         backup_probe = native_runtime_probe(run + "-backup-queue")
         backup = data.parent / f"{run}-backup"
         restored = data.parent / f"{run}-restored"
-        backup.mkdir()
+        private_directory(backup)
         with sqlite3.connect(data / "db.sqlite3") as source, sqlite3.connect(backup / "db.sqlite3") as target:
             source.backup(target)
         queue_copy = backup / "artifacts" / "native" / "jobs.sqlite3"
@@ -337,7 +339,8 @@ def main():
         shutil.copytree(data / "config", backup / "config")
         if args.memory:
             shutil.copytree(data / "artifacts/private-memory-v2", backup / "artifacts/private-memory-v2")
-        shutil.copytree(backup, restored)
+        private_directory(restored)
+        shutil.copytree(backup, restored, dirs_exist_ok=True)
         assert hashlib.sha256((data / "media" / upload.original_file.name).read_bytes()).digest() == hashlib.sha256((restored / "media" / upload.original_file.name).read_bytes()).digest()
         result = subprocess.run([*prefix, "start", "--data-dir", str(restored), "--port", str(args.port + 1), "--no-browser"],
                                 capture_output=True, text=True, timeout=240)

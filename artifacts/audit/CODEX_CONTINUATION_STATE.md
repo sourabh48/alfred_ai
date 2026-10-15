@@ -12,8 +12,15 @@ P0-B and P0-C implemented. Numeric API/schema compatibility retained; no migrati
 47 focused tests PASS / zero skips; migration drift PASS. Exact synthetic receipt
 artifacts/post-audit/money-media-3570b592/receipt.json. Files listed in authoritative
 docs/PROJECT_STATUS.md. Earlier failed test attempt was a fixture savepoint issue,
-fixed and retained. Next: P0-A private storage, AWS dispatch removal and existing
-M20 gate repairs. Do not restart audit, regenerate matrix or start a UI redesign.
+fixed and retained. P0-A development now verifies owner/SYSTEM access, protects
+fresh runtime/config/memory/parser/recovery paths and refuses unsafe existing data.
+Pinned repair/rollback CLI requires authorization and quiesced writers. 117 focused
+backend PASS, 11 overlapping CLI PASS, 18 actual native PASS; evidence and changed
+files in PROJECT_STATUS.md. Production ACL repair is still approval-gated.
+Preceding verified money/media commit: bfabba99ef23d4c4cb4738307891717a6faf8087.
+Next: merge/reuse M20 0052410, repair ignored operator collision and JSON token
+classifier, remove AWS runtime activation, then isolate the dependency patch.
+Do not restart audit, regenerate matrix or start a UI redesign.
 
 Safe resume: Get-Content -LiteralPath F:/ALFRED_DEV/post-audit/docs/PROJECT_STATUS.md.
 Use configured SDK read-only for current isolated tests; dependency patch must use

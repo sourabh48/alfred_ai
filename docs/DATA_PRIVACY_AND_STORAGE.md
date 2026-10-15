@@ -1,10 +1,10 @@
 # Data Privacy And Storage
 
-Source/debug profile caveat: non-native DEBUG routing currently uses Django's
-unauthenticated media serving. A synthetic anonymous request returned 200;
-native private_media is owner protected. No current private-file exposure was
-tested. Do not attach private media to source/debug until ownership is enforced
-across profiles; see AUD-11 in the [audit](../artifacts/audit/ALFRED_WHOLE_PROJECT_AUDIT_20261015.md).
+Post-audit development now routes source/debug and native media through the same
+authenticated, owner-filtered handler. Anonymous, invalid-session, foreign-owner,
+traversal and deleted-file regressions pass. This fix is not yet deployed; the
+original AUD-11 reproduction remains historical evidence in the
+[audit](../artifacts/audit/ALFRED_WHOLE_PROJECT_AUDIT_20261015.md).
 
 **Current privacy boundary — 2026-10-15:** Local canonical finance SQLite is plaintext; M15 MemoryStore/index/journal encryption protects AI memory only. Read-only audit found broad local read grants on the private DB and runtime config; no ACL/key change was performed. Raw-upload cleanup is configurable, not a universal native default: native local-vault retention was explicitly deferred under ownership/deletion controls. Owner consent protects family financial summaries; it does not grant memory/document sharing. Real OpenAI/private cloud remain OFF; independent device-loss key recovery is UNVERIFIED. [Acceptance and recovery stages](ALFRED_END_TO_END_ACCEPTANCE.md).
 
@@ -51,6 +51,17 @@ ALFRED keeps only the database records needed for product behavior:
 - parser status, confidence, and `raw_file_retention` audit metadata
 
 ## Local Storage Controls
+
+The post-audit native launcher verifies its selected data directory before reading
+configuration or starting writers. Fresh data/configuration, memory and backup
+directories receive a protected owner/SYSTEM DACL. Parser/OCR files and disposable
+recovery copies receive private permissions before sensitive bytes are written.
+Inherited owner/SYSTEM access is accepted only below a verified private parent.
+An existing unsafe directory is refused; existing keys/data are not replaced.
+See the [explicit Windows repair procedure](NATIVE_WINDOWS.md#private-storage-permission-repair).
+These are development protections, not evidence that production ACLs were repaired.
+Filesystem permissions protect against other ordinary Windows identities; they
+do not make data inaccessible to an authorized system administrator or the owner.
 
 Use these controls before entering real financial documents:
 
