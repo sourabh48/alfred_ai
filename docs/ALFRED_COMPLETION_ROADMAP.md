@@ -28,7 +28,7 @@ M20 development exists at 0052410 on feature/m20-release-gates; it is not a new 
 | 12 | AI-GROUND richer read-only tools and document evidence | hybrid source_context, document hub/review | Owned canonical expense/budget/portfolio tools; source citations, stale/conflict/injection abstention | Depends on money/currency and reviewed ingestion; no silent writes |
 | 13 | AI-QUALITY genuine model evaluation | registry/training/readiness and MemoryLearning.evaluate | Chronological holdouts, sufficient consenting labels, calibrated uncertainty/drift | No fabricated training/accuracy claims |
 | 14 | TRAVEL-GAPS route/discovery/multi-stop | typed state, safe provider/cache, geometry | Pools/batches, true alternates, corridor road detours, uncertainty and edit persistence | Approved routing provider/key acceptance as applicable |
-| 15 | APPROVED-PROVIDERS OpenAI/S3/Travel | completed adapters/consent/caps | Provider/account selection, least privilege, current pricing/terms, synthetic live acceptance | Separate approvals; remains OFF until then |
+| 15 | APPROVED-PROVIDERS OpenAI/non-AWS/Travel | neutral encrypted sync, consent/caps, existing Travel adapters | R2 candidate adapter and private permissions/recovery proof; approved accounts, pricing/terms and synthetic live acceptance | AWS decommissioned; separate approvals; remains OFF |
 | 16 | Product follow-ups goals/export/alerts/career/bike/media | existing canonical/report/domain services | Each defined feature's owner/API/UI/tests and actual acceptance | Confirm original scope; avoid parallel registers |
 | 17 | AI-COUNCIL if explicitly confirmed | skills/checkpoints/registry, not broken self-improve | Sandboxed roles/task state, budgets, exact Git human approvals, recovery | Design decision; not implied by current inference adapters |
 
@@ -63,7 +63,7 @@ Savings goals, structured export, portfolio alerts, richer career coaching and v
 ## Provider activation boundaries
 
 - OpenAI: public queries only, local-first; current pinned model retirement requires a model/pricing decision. No private finances/memory upload and no paid request without explicit capped approval.
-- AWS S3: dedicated private owner namespaces, key/checkpoint recoverability, IAM/account checks, synthetic events only for initial live acceptance. No raw SQLite/WAL/SHM.
+- AWS: decommissioned by user; historical activation instructions must not run. R2 is an implementation candidate only. Require private owner buckets, least-privilege permissions, atomic conflicts and independent key/checkpoint recovery before approved synthetic live acceptance. No raw SQLite/WAL/SHM.
 - Travel: actual enabled/contract rights and account quotas, freshness expiry and unavailable states. No unauthorized rail/bus/provider scraping. Maps/POI data are not live booking inventory.
 - Email/bureau: encrypted token/account consent, source contract and attachment limits; legacy helpers cannot be used as production onboarding.
 - Device-loss recovery: no cancelled dialogs, no plaintext key export and no waiver inheritance.

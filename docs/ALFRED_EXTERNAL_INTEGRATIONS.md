@@ -10,7 +10,8 @@ Reviewed 2026-10-15 against source 3932f391aa4eed7b3200ad3b034f7991435e01e4. Thi
 | --- | --- | --- | --- | --- | --- |
 | Ollama, loopback only | Inference/embeddings; local_embeddings.py, hybrid_intelligence.py | IMPLEMENTED | Historical actual local restart/retrieval plus synthetic contracts; current live app unavailable | Installed local models; no paid API; device compute/storage cost | Fixed loopback, no remote/cloud model; context/response/digest validation. Accept model availability on each target PC |
 | OpenAI Responses | memory_reasoning.py | IMPLEMENTED, synthetic-only provider acceptance | Real access DISABLED; operator + owner + per-request public consent required | Restricted encrypted owner key; current pinned rates below; no free use assumed | Public-query-only; fixed endpoint, deadlines/output/usage/budgets, no private finance. Model retirement decision and separately approved paid acceptance |
-| AWS S3 | memory_cloud.py | IMPLEMENTED; signed synthetic S3 accepted | No selected real bucket/account/region; real sync DISABLED | Restricted IAM/session credentials in encrypted owner vault; storage/request/egress region costs, no free-tier entitlement assumed | AWS virtual-host endpoint restrictions, expected owner, private bucket/account checks, conditional writes, client-authenticated ciphertext + SSE. Not a generic arbitrary endpoint adapter |
+| AWS (all services) | Removed from runtime memory_cloud.py; historical fixture in tests only | DECOMMISSIONED by user, 2026-10-15 | No activation or provisioning permitted; old flags cannot reactivate it in development | Existing encrypted profiles retained without mutation; no credential prompts | Legacy wire fixture has no network transport. M15 production remains unchanged with cloud OFF |
+| Cloudflare R2 | Provider-neutral memory_sync.py to reuse; adapter not yet implemented | Selected implementation candidate | BLOCKED_APPROVAL for any account/private upload; mock development only | Bucket-scoped object token; distinct private bucket per owner recommended; published costs below | Atomic conditional writes verified in official contract; private-bucket proof, permission/recovery acceptance still required |
 | Mock cloud / local S3 wire fixture | memory_sync.py, tests/memory_s3_fixture.py | IMPLEMENTED / SYNTHETIC | Synthetic only; not off-device protection | No real credential/billing | Exercises corruption, conflicts, delete/retry/restart. Do not display as real sync |
 | Azure / Google Drive / OneDrive memory sync | No adapter demonstrated | NOT AVAILABLE | Not approved/selected | Unknown; requires product/provider choice | Existing manual recovery staging is not a sync adapter; do not add cloud wiring implicitly |
 | Open-Meteo weather/geocoding | travel/providers/weather.py, geocoding.py; verified_intelligence.py | IMPLEMENTED | Public source historical/fixture evidence; new real requests NOT_RUN | Free noncommercial API; paid commercial plans; no key on basic free endpoint | Current published free limits below. Forecast horizon, cache and UNKNOWN guards; query locations leave device |
@@ -51,7 +52,56 @@ Brave advertises Search at $5 per 1,000 requests with $5 monthly credits and 50 
 
 Duffel's documented excess-search allowance is one booking per 1,500 searches, with $0.005 per excess search. Specific Stays/Flights services, fees and account eligibility need approved contract review; the application should not assume its requests are free. [Official excess-search policy](https://help.duffel.com/hc/en-gb/articles/4412912264466-What-is-Excess-Search), [pricing](https://duffel.com/pricing).
 
-AWS documents If-None-Match for creation and If-Match for ETag-conditioned updates with SigV4 and required object permissions. Application synthetic CAS tests are compatible in design; real bucket policies/races/owner permissions remain unaccepted. Storage/requests/egress are region/account-specific; no fixed price was verified for an unselected destination. [Official conditional writes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html).
+The AWS implementation and acceptance proposal are superseded by the user's
+decommission decision. Historical test evidence is retained, not activation advice.
+
+## Non-AWS intelligence storage decision
+
+Reviewed official public contracts on 2026-10-15; no credentials or provider
+connections were tested. **Cloudflare R2 is the implementation candidate only.**
+Reuse MemorySynchronizer/encrypted packets/queues/checkpoints, not AWS runtime
+provisioning, IAM, bucket-owner checks or unsupported server-encryption headers.
+
+R2 documents atomic `If-Match`/`If-None-Match` object writes, suitable for the
+existing conditional head update. Its compatibility table explicitly does not
+support AWS bucket-owner and ordinary SSE request headers. Use the account-bound
+Cloudflare HTTPS endpoint, client-side authenticated encryption and bounded reads.
+[API contract](https://developers.cloudflare.com/r2/api/s3/api/),
+[storage security](https://developers.cloudflare.com/r2/reference/data-security/).
+
+R2 object tokens can be limited to selected buckets. Plan one private bucket per
+owner; a client prefix alone is not a remote authorization boundary. Public
+`r2.dev` access and custom domains must be disabled and independently checked.
+Object credentials do not authorize Cloudflare's configuration REST API: determine
+the least-privilege configuration verification method before coding activation.
+Do not replace this check with an unverified checkbox or reuse AWS ACL APIs.
+[Authentication/permissions](https://developers.cloudflare.com/r2/api/tokens/),
+[public access controls](https://developers.cloudflare.com/r2/buckets/public-buckets/).
+
+Published Standard pricing: $0.015/GB-month, $4.50/million Class A operations and
+$0.36/million Class B; direct R2 egress is free. The monthly Standard free tier is
+10 GB-month, one million Class A and ten million Class B operations. Other
+services/account use may still cost money; no user entitlement or hard billing cap
+is established. Single-key concurrent writes are limited to one/second and can
+return 429. Retain local retry/backoff, CAS conflicts and bounded shutdown behavior.
+ALFRED's encrypted-object limits stay far below provider object limits.
+[Pricing](https://developers.cloudflare.com/r2/pricing/),
+[limits](https://developers.cloudflare.com/r2/platform/limits/).
+An approved account must accept the applicable
+[service-specific terms](https://www.cloudflare.com/service-specific-terms-application-services/)
+and jurisdiction/privacy/billing requirements before any live acceptance.
+
+| Alternative | Current disposition | Required proof before reconsideration |
+| --- | --- | --- |
+| Google Drive | Not implemented; retain as an alternative | OAuth least privilege, private app files, immutable revision handling and a proven atomic concurrent-head contract; revisions alone do not establish the current protocol's CAS guarantee. [Revisions](https://developers.google.com/workspace/drive/api/guides/manage-revisions), [usage/cost limits](https://developers.google.com/workspace/drive/api/guides/limits) |
+| Backblaze B2 | Not implemented; retain as an alternative | Restricted application keys, exact conditional-write semantics, deletion/version retention and approved request/egress budget. Compatibility is not acceptance. [API](https://www.backblaze.com/docs/cloud-storage-s3-compatible-api), [pricing](https://www.backblaze.com/cloud-storage/pricing) |
+| User-managed encrypted folder | Limited fallback, not cloud synchronization | Approved destination, private ACLs, single-writer discipline and independent key/restore proof; do not promise multi-device CAS from file copying |
+
+R2 implementation remains pending. Mock-first tests must cover two owners/devices,
+private-configuration rejection, interrupted publication, 429/412, tamper/replay,
+deletions, startup/periodic/shutdown retries and recovery checkpoints. Real account,
+billing, credentials, portable key recovery and private uploads remain approval
+gated. No database/document/media/key upload is part of intelligence sync.
 
 Current ORS plan numbers were not readable from the fetched interactive [official plans page](https://account.heigit.org/info/plans); keep them UNVERIFIED rather than recycling old limits.
 

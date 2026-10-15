@@ -27,8 +27,15 @@ preflight source/privacy scope PASS; overall readiness correctly BLOCKED.
 Django requirements/Windows pins now 6.0.9. Separate development .venv: 227 tests
 PASS, system/drift PASS; baseline libraries shared read-only (not clean packaging
 proof). Evidence in PROJECT_STATUS.md. SDK/production env unchanged.
-Next: finish AWS runtime decommission unit/regressions, then pinned combined
-validation and actual M21 rehearsal with the local patched interpreter.
+Dependency patch commit: d65d86be235847bf23e3e9993b6e9f2f8546d335.
+AWS runtime provider removed; configure command refuses without prompting or
+mutating profiles. Historical S3 protocol moved to tests with no real transport;
+neutral memory/sync unchanged. 86 focused tests PASS, two final overlapping
+decommission tests PASS, strict syntax compile PASS (known regex warning fixed).
+R2 selected as unimplemented candidate from official contracts; private-bucket
+verification/least-privilege/recovery acceptance remain prerequisites. No cloud
+account/provider is activated. See PROJECT_STATUS.md/provider register.
+Next: pinned combined validation and actual M21 rehearsal using local .venv.
 Do not restart audit, regenerate matrix or start a UI redesign.
 
 Safe resume: Get-Content -LiteralPath F:/ALFRED_DEV/post-audit/docs/PROJECT_STATUS.md.

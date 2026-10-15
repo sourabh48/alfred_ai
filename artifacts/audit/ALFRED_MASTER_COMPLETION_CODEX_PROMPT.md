@@ -1,5 +1,12 @@
 # Executable Codex master completion prompt for ALFRED
 
+**Execution override, 2026-10-15:** The audit is complete. Resume committed
+post-audit implementation from docs/PROJECT_STATUS.md; do not re-audit/regenerate
+the matrix. AWS is completely decommissioned by the user and may not be activated.
+Preserve neutral crypto/sync; R2 is a candidate only, subject to the provider
+register's unresolved private-permission/recovery contract and separate account
+approval. This override supersedes all AWS/S3 activation proposals below.
+
 Use the prompt below as the next implementation session's instruction. It is derived from the code-verified 2026-10-15 audit, not a generic wishlist. It authorizes isolated engineering/diagnostics within confirmed scope only; it does not authorize production operations, account changes, providers or publication.
 
 ---

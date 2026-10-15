@@ -1,5 +1,10 @@
 # ALFRED authoritative feature matrix
 
+Post-audit progress and requirement overrides are recorded in
+[PROJECT_STATUS.md](PROJECT_STATUS.md). AWS activation is withdrawn by the user;
+R2 is the non-AWS implementation candidate, still unimplemented/unapproved.
+The 143-row audit snapshot below is preserved; do not regenerate it to report fixes.
+
 Audit date: 2026-10-15. Public/production source: `3932f391aa4eed7b3200ad3b034f7991435e01e4`.
 
 This matrix inventories the scope restated by the user, not automatic authorization to implement every proposed feature. Original chats outside this session are unavailable; their exact wording remains UNKNOWN. Historical plans and source establish implementation history, not invented user approval. No percentages certify completion.

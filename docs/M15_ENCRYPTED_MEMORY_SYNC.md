@@ -1,5 +1,11 @@
 # M15 encrypted synchronization: synthetic provider slice
 
+**Post-audit override, 2026-10-15:** AWS is decommissioned. Its adapter is removed
+from development runtime and quarantined in network-free tests; historical
+activation flags cannot enable it. Neutral encrypted synchronization remains.
+R2 is an unimplemented candidate; no account/contact is approved. Results below
+are historical synthetic evidence. See [current status](PROJECT_STATUS.md).
+
 **Integrated status — 2026-10-15:** The synthetic protocol and later AWS wire adapter are incorporated in deployed M15, not proof of real provider activation. Lifecycle/retry/tombstone/checkpoint behavior remains locally/synthetically accepted. Owner key/checkpoint/device-loss acceptance is separate and unverified. Memory sync is not full financial database backup. [Current register](ALFRED_EXTERNAL_INTEGRATIONS.md).
 
 Worktree F:/ALFRED_DEV/m15, branch codex/m15-persistent-memory-20261011.

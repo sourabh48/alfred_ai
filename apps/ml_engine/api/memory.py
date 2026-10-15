@@ -115,9 +115,7 @@ class MemoryRetrieveAPI(MemoryAPI):
 class MemorySyncAPI(MemoryAPI):
     def get(self,request):
         store=memory_store(); kind=configured_provider()
-        from apps.ml_engine.services.persistent_memory import _owner
-        with store._transaction() as db: state=store._sync_state(db,_owner(request.user))
-        available=(kind=='mock' and bool(settings.ALFRED_MEMORY_SYNC_MOCK_DIR)) or (kind=='s3' and settings.ALFRED_MEMORY_CLOUD_AUTHORIZED and bool(state.get('cloud')))
+        available=kind=='mock' and bool(settings.ALFRED_MEMORY_SYNC_MOCK_DIR)
         return Response({'provider':kind or 'disabled','available':bool(available),
             'status':MemorySynchronizer(store,None).status(request.user)})
 

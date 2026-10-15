@@ -14,7 +14,7 @@ service, paid provider or GitHub operation is authorized here.
 | P0-C private media | Implemented: source/debug and native use the same owner-filtered handler; safe missing/permission response, public static assets separate | Same 47-test gate includes anonymous/invalid session/foreign owner/traversal/deletion/source/native tests; packaged/live acceptance pending |
 | P0-A Windows storage | Implemented: owner/SYSTEM creation and verification in native runtime/config, memory, parser/OCR scratch and recovery copies; explicit pinned, quiesced repair/rollback | 117 focused backend PASS; 11 repair CLI tests PASS (overlapping); 18 fresh native checks PASS; production ACL repair requires separate approval |
 | P0-D M20 gates | Reused/merged existing 0052410 engine: ignored target file collisions fail before mutation; quoted JSON credentials fail with redacted findings | Both original failures reproduced; 70 focused gate/recovery/promotion/acceptance tests PASS; 13 overlapping incomplete-run/privacy tests PASS |
-| AWS / replacement | User decision: no AWS runtime/provider activation | Decommission active path, evaluate non-AWS official contracts; real cloud remains OFF |
+| AWS / replacement | AWS runtime provider removed; provisioning rejects before prompts/writes; historical flags report disabled. Old protocol is network-free test quarantine only | 86 focused memory/sync/UI tests PASS; 2 final decommission tests and SyntaxWarning-as-error compile PASS; neutral encryption/sync unchanged; R2 is an unimplemented candidate |
 | M18 Django security patch | Development requirements and Windows constraints pinned to 6.0.9 | Separate development venv: 227 focused security/finance/upload/document tests PASS, zero skips; system/drift PASS; fresh browser/native/package gates pending |
 
 Changed money/media files: apps/users/money.py, models.py, serializers.py, forms.py;
@@ -63,8 +63,24 @@ this is not a clean full dependency installation or reproducible package proof.
 Production's interpreter and requirements remain unchanged. Broader dependency
 maintenance and M19/clean-PC acceptance remain open.
 
-Next action: finish AWS decommission regressions, then a pinned integrated release
-gate using the patched development environment. Specialized audit/runbooks and
+AWS decommission changes: memory_cloud.py, memory API/status and sync command,
+configure_memory_cloud.py, synthetic-only proof script and test fixture. No stored
+profile/key is removed or rotated. Active provider documentation and the existing
+master prompt/roadmap carry the explicit override; the 143 audit rows/history are
+preserved. Receipts: artifacts/post-audit/aws-off-9cadde31/receipt.json (86 tests)
+and aws-final-582984f8/receipt.json (two overlapping tests plus strict syntax check).
+The documented regex warning was fixed in the quarantined fixture using raw
+patterns; no AWS transport is imported by application runtime.
+
+Non-AWS choice: R2 implementation candidate after official atomic CAS, token,
+security/pricing/limits review. No adapter/account is activated. Private bucket
+configuration proof and least-privilege verification must be resolved before an
+implementation can claim readiness; no checkbox replaces that proof. Alternatives
+and exact constraints are in the [provider register](ALFRED_EXTERNAL_INTEGRATIONS.md#non-aws-intelligence-storage-decision).
+Real cloud, real OpenAI and device-loss recovery remain unaccepted/OFF.
+
+Next action: run the pinned integrated release gate with the patched development
+environment, then actual disposable M21 rehearsal. Specialized audit/runbooks and
 historical results below remain reference material, not fresh acceptance.
 
 **Current status — 2026-10-15:** M14/M15 consolidated source is deployed and GitHub master matches 3932f391aa4eed7b3200ad3b034f7991435e01e4. Dated release results are 619 backend/15 Chrome/35 native (overlapping packaged scope); this audit independently ran 86 focused tests, zero skips, plus isolated system/drift checks. Normal-account, real-provider, clean-PC and device-loss acceptance remain incomplete. Port 8000 did not respond during the audit; no service action was taken. M20 is unfinished separate development; M16–M19/M21 are not declared complete.
