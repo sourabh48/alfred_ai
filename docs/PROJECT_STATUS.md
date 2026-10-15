@@ -3,10 +3,38 @@
 ## Active post-audit implementation — 2026-10-15
 
 Production remains 3932f391; audit baseline bced104 is preserved. Isolated work:
-F:/ALFRED_DEV/post-audit, fix/post-audit-critical-20261015. Audit is complete;
+F:/ALFRED_DEV/post-audit, feature/fin-money-tail-20261016. Audit is complete;
 the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
+
+### Banking regression and production diagnosis — 2026-10-16
+
+Development starts at `08f39a88`; frozen runtime candidate `4aa7ac70` and its
+package remain unchanged. Read-only production diagnosis: no port-8000 listener,
+HTTP connection fails, no production server/worker process or matching Windows
+service. Native scheduler belongs to that absent worker. Recorded supervisor
+11376/worker 7740 are absent; `runtime.json` says running but predates the latest
+Windows boot (2026-10-15 13:40 UTC), as do both runtime logs. Current-user ALFRED
+autostart is not registered. Consistent with no restart after reboot; a crash
+cause is not established. No live database was opened or service action taken.
+Operator action is required to restore service using the documented explicit
+`F:/ALFRED/restored-runtime` data directory, not an implicit launcher default.
+
+The intermittent Banking workflow was reproduced in isolation: it actually
+fails on Loan sorting with `StaleElementReferenceException`. The refresh root
+covered only the hero, excluding form/table controls; an in-flight refresh could
+also replace rows after interaction began. The root now encloses the workspace
+and late background responses recheck the existing interaction guard. Foreground
+actions remain immediate; the next idle refresh fetches fresh data.
+
+Evidence under `artifacts/post-audit/fin-money-20261016`: production-health.json;
+banking-baseline-1/diagnostic.json (original failure); loan-race-before and
+loan-race-fixed (preserved deterministic failures); loan-race-scope-fixed
+(13 PASS: two Chrome workflows + eleven HTTP/UI contract tests); banking-fixed-0
+through -2 (three additional independent runs of the original workflow PASS).
+Zero skips in successful runs. No full gate or package rebuild. FIN-MONEY next
+scoped unit: Budget's three money fields; historical currency stays unrecorded.
 
 ### Verified local runtime candidate — 2026-10-16
 

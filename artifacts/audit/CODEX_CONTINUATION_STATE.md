@@ -1,5 +1,38 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Active FIN-MONEY branch — Banking fix and read-only health, 2026-10-16
+
+Worktree `F:/ALFRED_DEV/post-audit`, branch `feature/fin-money-tail-20261016`,
+from `08f39a88e93ddd3a0e7995165c346c093e760cf0`. Verify actual HEAD; this
+checkpoint accompanies the Banking/Loan refresh correction. Frozen source
+`4aa7ac70fa27c1410e695470af5c3987235244b1` and all accepted packages unchanged.
+
+Production remains 3932f391 with existing operator changes. Read-only diagnosis:
+port 8000 has no listener; HTTP connection fails; no production runtime processes
+or matching Windows service. Runtime recorded running/PIDs 11376/7740 are stale
+and absent; logs/state predate Windows boot 2026-10-15 13:40 UTC. Native worker
+and its scheduler are inactive. Current-user autostart is absent. No crash cause
+proved. No live DB open, service/ACL/config/backup/provider/GitHub action taken.
+Operator must separately restore service with explicit restored-runtime data dir.
+
+Banking original workflow reproduced FAIL on Loan sort row.text, stale element.
+Root covered hero only, not controls; late responses also ignored interaction.
+Workspace root and response-time guard fixed; deterministic delayed-response
+test proves blocked row replacement during editing and normal idle refresh.
+13 PASS (two Chrome + eleven HTTP/UI contract checks), plus three separate
+original-workflow Chrome runs PASS, zero skips. Historical failed receipts kept.
+Safe redacted evidence: `artifacts/post-audit/fin-money-20261016/`.
+
+Next bounded unit already being implemented: Budget base_budget,
+inflation_adjusted, spent Decimal storage, owned original snapshots, guarded
+reverse, numeric API and deterministic dashboard cents. No currency inference;
+User/Career/Mobility and FIN-CURRENCY remain separate. Commit that unit only
+after focused boundary/ownership/migration/backup/reconciliation checks pass.
+Use existing clean SDK in artifacts/post-audit/m18-clean-resolver-be31990d/venv,
+consult configured SDK first, run only sanitized synthetic environments. Do not
+deploy, rebuild frozen RC, repeat full audit/gates or start production. Cloud and
+OpenAI remain OFF; AWS retired. Preserve all backups and cancelled key dialogs.
+
 ## Latest verified checkpoint — runtime candidate, 2026-10-16
 
 Development: `F:/ALFRED_DEV/post-audit`, `fix/post-audit-critical-20261015`.

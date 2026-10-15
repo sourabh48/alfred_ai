@@ -257,6 +257,38 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('a[href="/ai/insights/?scope=travel#intelligencePanel"]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_attribute('value')=='travel')
 
+    def test_loan_refresh_response_does_not_replace_rows_during_table_interaction(self):
+        self.login()
+        self.browser.get(self.live_server_url + '/loans/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#loanTableBody input[type=checkbox]'))
+        self.browser.execute_script('''
+            Alfred.disableLiveRefresh('loans-live');
+            const original = Alfred.fetchJSON;
+            Alfred.fetchJSON = (url, options) => url !== '/api/loans/summary/' ? original(url, options) :
+                original(url, options).then(payload => new Promise(resolve => {
+                    window.releaseLoanResponse = () => { Alfred.fetchJSON = original; resolve(payload); };
+                }));
+            window.loanRefreshFinished = false;
+            loadLoanPage({live:true}).finally(() => { window.loanRefreshFinished = true; });
+        ''')
+        self.wait.until(lambda _: self.browser.execute_script('return typeof window.releaseLoanResponse === "function"'))
+        checkbox = self.browser.find_element(self.By.CSS_SELECTOR, '#loanTableBody input[type=checkbox]')
+        self.browser.execute_script('window.loanRowBeforeRefresh = arguments[0]', checkbox)
+        search = self.browser.find_element(self.By.ID, 'loanTableBodySearch')
+        search.send_keys('NO-MATCH-SYNTHETIC')
+        self.browser.execute_script('window.releaseLoanResponse()')
+        self.wait.until(lambda _: self.browser.execute_script('return window.loanRefreshFinished'))
+        self.assertTrue(checkbox.get_property('isConnected'))
+        self.assertEqual(search.get_attribute('value'), 'NO-MATCH-SYNTHETIC')
+        self.assertIn('0 matching', self.browser.find_element(self.By.CSS_SELECTOR,
+            '[data-table-controls="loanTableBody"] [data-table-count]').text)
+        self.assertFalse(self.browser.execute_async_script('''
+            const done = arguments[0];
+            document.activeElement.blur();
+            document.getElementById('loanPlannerRoot').dataset.liveRefreshLockedUntil = '0';
+            loadLoanPage({live:true}).then(() => done(window.loanRowBeforeRefresh.isConnected));
+        '''))
+
     def test_currency_source_cards_and_exact_decimal_formatting(self):
         from unittest.mock import Mock
         from selenium.webdriver.support.ui import Select
