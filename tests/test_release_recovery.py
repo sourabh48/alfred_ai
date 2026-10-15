@@ -73,10 +73,32 @@ class ReleaseRecoveryTests(unittest.TestCase):
             self.assertFalse(any(r["backup_path"].endswith(("-wal", "-shm")) for r in metadata["files"]))
 
     def test_active_native_writer_blocks_without_stopping_any_process(self):
-        (self.runtime / "artifacts/native/runtime.json").write_text(json.dumps({"pid": os.getpid()}))
-        with self.assertRaisesRegex(release.GateError, "native_writer_running"):
-            self.create()
+        with recovery.InstanceLock(self.runtime):
+            with self.assertRaisesRegex(release.GateError, "native_writer_running"):
+                self.create()
         self.assertFalse((self.backup / "recovery.zip").exists())
+
+    def test_active_worker_blocks_even_without_a_supervisor_or_state_file(self):
+        with recovery.InstanceLock(self.runtime, "worker.lock"):
+            with self.assertRaisesRegex(release.GateError, "native_writer_running"):
+                self.create()
+        self.assertFalse((self.backup / "recovery.zip").exists())
+
+    def test_stopped_runtime_with_live_reused_pids_does_not_block_local_recovery(self):
+        (self.runtime / "artifacts/native/runtime.json").write_text(json.dumps({
+            "status": "stopped", "pid": os.getpid(), "worker_pid": os.getpid(),
+        }))
+        receipt = self.create()
+        self.assertEqual(receipt["LOCAL_BACKUP_VERIFIED"], "PASS")
+        restored = self.backup / "independent-local-restore/db.sqlite3"
+        self.assertEqual(recovery.database_snapshot(self.runtime / "db.sqlite3"), recovery.database_snapshot(restored))
+
+    def test_backup_barriers_block_new_native_processes_throughout_capture(self):
+        with recovery.writer_barriers(self.runtime, [self.runtime / "db.sqlite3"]):
+            for name in ("instance.lock", "worker.lock"):
+                with self.subTest(lock=name), self.assertRaises(OSError):
+                    with recovery.InstanceLock(self.runtime, name):
+                        self.fail("A native process entered during backup capture")
 
     def test_active_sqlite_writer_blocks(self):
         with closing(sqlite3.connect(self.runtime / "db.sqlite3")) as db:

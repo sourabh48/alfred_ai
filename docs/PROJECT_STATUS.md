@@ -8,7 +8,46 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
-**Current verified critical-fix source: b162c8fb2c43b357e840c3a298d06ffa4bed3251.**
+### Latest bounded correction — 2026-10-16
+
+The clean SDK at `artifacts/post-audit/m18-clean-resolver-be31990d/venv`
+passed **792 backend / 40 Chrome / 34 source-native/Ollama checks**, zero final
+failures/skips, at exact source `874639f142f224255c6704d9c32409f79bb0bb73`.
+The initial full browser failure, interrupted retry and later successful retry
+remain recorded; the intermittent Banking error was not reproduced in the
+40-test diagnostic run or completed normal retry. Its cause is unconfirmed.
+The Travel preference loading/save race was independently reproduced and fixed.
+Source/privacy, dependency policy and migration checks passed. Evidence:
+`artifacts/release-gates/post-audit-clean-874639f/release.json`.
+
+That source's actual M21 promotion, nine browser checks, local restore and restart
+persistence passed, but worker-crash rollback was **BLOCKED/native_writer_running**.
+Preserve `F:/ALFRED_DEV/post-audit-rehearsal-874639f/rehearsal.json` and its archives.
+Recorded PIDs can remain alive briefly after clean shutdown or be reused; the
+backup guard incorrectly treated them as proof of a writer. The correction uses
+the existing supervisor/worker OS locks and SQLite write reservations throughout
+capture. Active writers still block. Native shutdown now waits for both locks
+after the stopped status is published and keeps its bounded failure result.
+
+Reproductions: `writer-barrier-repro-4e872736` (14 tests, three errors) and
+`shutdown-lock-repro-65f45f6e` (two tests, three failed subtest/assertion results),
+under `artifacts/post-audit`. The backup-only correction passed 100 focused tests;
+the complete shutdown/recovery correction passed **66 focused tests, zero skips
+or failures** (`shutdown-recovery-fixed-4daa6f27/receipt.json`). These overlap and
+are not summed. Changed implementation is in `alfred_native.py` and
+`scripts/release_recovery.py`, with native/recovery regressions. No migration,
+dependency, financial-value or production change. AST graph updated locally.
+
+**Current release readiness remains BLOCKED.** This correction needs a new pinned
+full gate and actual M21 rehearsal before fresh packaging. M19 tools are staged;
+Inno Setup is unavailable. Separate-PC/installer, normal-account, independent
+device-loss recovery and remote CI acceptance remain unverified; no waiver is
+inherited. A read-only check on 2026-10-15 found port 8000 unreachable; no service
+action was taken. Production source/operator files remained unchanged.
+
+### Earlier frozen critical-fix evidence
+
+**Frozen source: b162c8fb2c43b357e840c3a298d06ffa4bed3251.**
 753 backend tests, 37 Chrome tests and 34 source-native/Ollama checks PASS,
 zero failures/skips. Actual M21 exact promotion, nine browser checks, restart/
 encrypted memory persistence, independent local restore, typed financial/family
@@ -20,7 +59,8 @@ is PASS. No database was overwritten by source rollback. All recovery assets
 and failed earlier evidence remain. Screenshots reviewed at the preceding
 3a46e1c equivalent UI gate; current Chrome gate also PASS.
 
-M20 technical decision is PASS; production promotion is BLOCKED and unauthorized.
+At that frozen source M20 technical decision was PASS; production promotion
+remained BLOCKED and unauthorized. The latest correction above needs its own gate.
 Off-device copy/key/device-loss restore, fresh package, normal account, separate
 PC, installer, remote Git/CI and branch protection are NOT_RUN. Source-native
 checks are not a frozen executable proof. The M15 HDD waiver is not inherited.
@@ -126,8 +166,9 @@ initial read. Both script callers use v2 assets. APIs/auth/CSRF are unchanged.
 **Seven clean-SDK Chrome workflows PASS, zero skips/failures**, including delayed
 GET/PATCH and load failure; mobile/error screenshots reviewed; JS syntax PASS:
 artifacts/post-audit/preferences-loading-fixed-45eabf1a/receipt.json.
-The corrected exact candidate needs its own combined gate; no 5f6bb76 counts are
-silently transferred. M19 PyInstaller 6.22.3 and declared tool wheels are staged
+The corrected 874639f candidate received the combined and failed rollback results
+recorded above; its later shutdown/recovery correction needs a new gate.
+M19 PyInstaller 6.22.3 and declared tool wheels are staged
 with hashes at artifacts/post-audit/m19-build-tools-3b6aacd1/receipt.json; not
 installed during validation. Inno Setup is unavailable in checked PATH/standard/
 registered locations, as already documented historically. Fresh portable package,

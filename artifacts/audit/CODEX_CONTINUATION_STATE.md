@@ -1,5 +1,56 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## Current checkpoint — M20 quiescence correction, 2026-10-16
+
+Worktree `F:/ALFRED_DEV/post-audit`, branch `fix/post-audit-critical-20261015`.
+Audit bced104 and production 3932f391 remain preserved. This checkpoint commit
+contains the native stop/recovery lock correction; verify its actual Git HEAD.
+No live source/DB/config/ACL/service/GitHub/provider operation was performed.
+
+Clean SDK: `artifacts/post-audit/m18-clean-resolver-be31990d/venv/Scripts/python.exe`.
+151 resolved/installed runtime packages match; no baseline fallback. At source
+874639f142f224255c6704d9c32409f79bb0bb73: 792 backend, 40 Chrome, 34 source-native/
+Ollama PASS, zero final skips/failures. Retain the original Banking browser FAIL
+and interrupted retry. The 40-test diagnostic and normal retry passed; original
+Banking cause is unconfirmed. Source-native screenshots were reviewed.
+
+Actual M21 at `F:/ALFRED_DEV/post-audit-rehearsal-874639f/rehearsal.json` FAILED:
+promotion/nine Chrome/local restore/restart persistence passed, worker-crash
+rollback blocked with `native_writer_running`. Source/data/evidence are retained,
+and port 8150 was closed at inspection. Do not reuse or delete that sandbox.
+PID-only writer detection was reproduced; native stop also reported success
+before its OS locks were released. Recovery now holds both native OS locks and
+SQLite reservations; stop waits for both locks, with its existing timeout.
+No process is killed or financial data corrected by the fix.
+
+Proof: `artifacts/post-audit/writer-barrier-repro-4e872736/receipt.json` (14/three
+errors), `shutdown-lock-repro-65f45f6e/receipt.json` (two/three failed results),
+`writer-barrier-fixed-d0fc8bd7/receipt.json` (100 PASS, intermediate), and
+`shutdown-recovery-fixed-4daa6f27/receipt.json` (66 PASS, zero skips/failures).
+Do not add overlapping counts or transfer old full gates to this correction.
+
+Next: pin this committed HEAD, run the clean-SDK full gate and a new actual M21
+rehearsal, then build a fresh portable package. Local build preparation is at
+`artifacts/post-audit/m19-build-tools-3b6aacd1/build_verified_candidate.py`; it checks
+tool-wheel hashes, source identity/cleanliness, runtime package preservation and
+bundle inventory. Fixed build hash seed/timestamp do not prove bit-identical output
+until repeat builds are compared. Do not install tools while validation is active.
+Inno Setup/clean-PC lifecycle, real account/provider, independent device-loss/key
+recovery and remote CI remain NOT_RUN; no passphrase dialogs or inherited waiver.
+
+```powershell
+Set-Location F:\ALFRED_DEV\post-audit
+$candidate = (git rev-parse HEAD).Trim()
+$python = '.\artifacts\post-audit\m18-clean-resolver-be31990d\venv\Scripts\python.exe'
+& $python -B scripts/release_gate.py preflight --release-id post-audit-quiescence-20261016 --candidate $candidate --baseline 3932f391aa4eed7b3200ad3b034f7991435e01e4 --expected-dependency requirements.txt --expected-dependency constraints/windows-py312.txt --output artifacts/release-gates/post-audit-quiescence-20261016
+& $python -B scripts/release_gate.py validate --profile full --with-ollama --output artifacts/release-gates/post-audit-quiescence-20261016
+```
+
+Consult the configured SDK before invoking Python; use the explicit isolated SDK
+above, not production. Inspect completed receipts before retrying interrupted work.
+`artifacts/post-audit/session-state.json` retains current process/evidence state.
+Do not edit tracked source during a pinned run. Do not start another audit.
+
 ## Latest task — post-audit implementation, 2026-10-15
 
 Critical source b162c8fb2c43b357e840c3a298d06ffa4bed3251 is fully locally verified:

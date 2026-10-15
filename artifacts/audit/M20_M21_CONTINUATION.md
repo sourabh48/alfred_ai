@@ -1,5 +1,23 @@
 # M20/M21 implementation checkpoint
 
+## Current local correction — 2026-10-16
+
+See PROJECT_STATUS.md for the active overview. Newer exact 874639f clean-SDK gates
+passed 792 backend / 40 Chrome / 34 source-native/Ollama checks, zero final skips
+or failures. Its actual M21 promotion, nine browser checks and restart passed,
+but worker-crash source rollback blocked on PID-only `native_writer_running`.
+The failed sandbox and all archives remain at
+`F:/ALFRED_DEV/post-audit-rehearsal-874639f`; this is not a rollback PASS.
+
+This checkpoint corrects recovery exclusion to use authoritative native OS locks
+plus SQLite reservations, and makes stop wait for lock release after stopped
+status. Live/reused unrelated PIDs do not authorize or block backup. Real native
+and SQLite writers still block; no writer is forcibly stopped. Reproductions and
+66 focused PASS results are recorded in CODEX_CONTINUATION_STATE.md. The
+intermediate 100-test result overlaps and must not be summed. The new committed
+candidate requires fresh full/M21/package gates; earlier b162c8f PASS is historical.
+No production, provider, database, ACL or GitHub mutation is authorized.
+
 ## Post-audit integration — 2026-10-15
 
 Latest local source proof is b162c8fb2c43b357e840c3a298d06ffa4bed3251 in

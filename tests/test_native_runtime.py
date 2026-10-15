@@ -10,7 +10,7 @@ from unittest.mock import patch
 from django.test import SimpleTestCase, override_settings
 from alfred_ai.services.ocr_process import ocr_command
 from apps.integrations.models import _encrypt_token, _decrypt_token
-from alfred_native import InstanceLock, data_directory, parent_is_running, write_json
+from alfred_native import InstanceLock, data_directory, parent_is_running, stop, write_json
 from alfred_ai.services.native_web import create_native_server
 
 
@@ -60,6 +60,43 @@ class NativeRuntimeBoundaryTests(SimpleTestCase):
                         self.fail("A second supervisor acquired the same data folder")
             with InstanceLock(data):
                 pass
+
+    def test_stop_waits_for_both_locks_after_stopped_status_is_published(self):
+        for finishing_worker in (False, True):
+            with self.subTest(worker=finishing_worker), TemporaryDirectory() as directory:
+                data = Path(directory)
+                supervisor = InstanceLock(data); supervisor.__enter__()
+                worker = InstanceLock(data, "worker.lock") if finishing_worker else None
+                if worker:
+                    worker.__enter__()
+                releases = []
+                def finish(_):
+                    releases.append(True)
+                    if len(releases) == 1:
+                        supervisor.__exit__()
+                    elif worker:
+                        worker.__exit__()
+                states = [{"status": "running", "instance": "synthetic"}] + [{"status": "stopped"}] * 3
+                try:
+                    with patch("alfred_native.read_state", side_effect=states), \
+                         patch("alfred_native.time.monotonic", side_effect=[0, 0, 1, 2, 121]), \
+                         patch("alfred_native.time.sleep", side_effect=finish) as pause:
+                        self.assertEqual(stop(data), 0)
+                        self.assertEqual(pause.call_count, 2 if worker else 1)
+                finally:
+                    supervisor.__exit__()
+                    if worker:
+                        worker.__exit__()
+
+    def test_stop_does_not_claim_success_when_stopped_state_still_has_a_writer(self):
+        with TemporaryDirectory() as directory:
+            data = Path(directory)
+            with InstanceLock(data), \
+                 patch("alfred_native.read_state", side_effect=[
+                     {"status": "running", "instance": "synthetic"}, {"status": "stopped"}]), \
+                 patch("alfred_native.time.monotonic", side_effect=[0, 0, 121]), \
+                 patch("alfred_native.time.sleep"):
+                self.assertEqual(stop(data), 1)
 
     def test_explicit_data_folder_wins_over_environment(self):
         with patch.dict(os.environ, {"ALFRED_DATA_DIR": "wrong-folder"}):

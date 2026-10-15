@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from cryptography.fernet import Fernet
-from alfred_native import InstanceLock, parent_is_running, write_json
+from alfred_native import InstanceLock, write_json
 from apps.ml_engine.services.memory_key import private_directory, protect_key
 from scripts import release_gate as release
 from scripts.verify_private_recovery import verify
@@ -100,14 +100,13 @@ def sqlite_copy(source, target, seconds=60):
 @contextmanager
 def writer_barriers(runtime, databases):
     """House native locks plus SQLite write reservations prevent cross-file drift."""
-    state_path = runtime / "artifacts/native/runtime.json"
-    if state_path.exists():
-        state = json.loads(state_path.read_text(encoding="utf-8-sig"))
-        if any(parent_is_running(state.get(key, 0)) for key in ("pid", "worker_pid") if isinstance(state.get(key), int)):
-            raise release.GateError("native_writer_running")
     with ExitStack() as stack:
-        stack.enter_context(InstanceLock(runtime))
-        stack.enter_context(InstanceLock(runtime, "worker.lock"))
+        # Recorded PIDs can outlive shutdown or be reused; OS locks identify writers.
+        try:
+            stack.enter_context(InstanceLock(runtime))
+            stack.enter_context(InstanceLock(runtime, "worker.lock"))
+        except OSError:
+            raise release.GateError("native_writer_running") from None
         for path in databases:
             connection = stack.enter_context(closing(sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, timeout=0.2)))
             try:

@@ -87,6 +87,9 @@ All paths are explicit operator selections; variables above are not guessed real
 destinations. The destination must be new, outside runtime/source, without links,
 and separate from the existing key. Native/worker locks and SQLite write barriers
 must be available. This command will not stop a running service; it rejects writers.
+The locks identify native writers; recorded PIDs can be stale or reused. The stop
+command waits for both locks after stopped status, and backup retains them until
+capture ends. SQLite reservations independently reject database writers.
 It captures the default native database, queue, configuration, media and existing
 encrypted-memory directory, preserving committed WAL rows through SQLite's API.
 Custom external storage is not silently assumed covered; review/extend the coverage
