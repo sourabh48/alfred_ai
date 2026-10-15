@@ -18,8 +18,13 @@ Pinned repair/rollback CLI requires authorization and quiesced writers. 117 focu
 backend PASS, 11 overlapping CLI PASS, 18 actual native PASS; evidence and changed
 files in PROJECT_STATUS.md. Production ACL repair is still approval-gated.
 Preceding verified money/media commit: bfabba99ef23d4c4cb4738307891717a6faf8087.
-Next: merge/reuse M20 0052410, repair ignored operator collision and JSON token
-classifier, remove AWS runtime activation, then isolate the dependency patch.
+M20 0052410 has been merged with a single verifier conflict resolved by preserving
+private scratch protection AND optional scratch_root. Both P0-D failures reproduced
+before their fixes; 70 focused tests PASS, 13 overlapping privacy/NOT_RUN tests
+PASS. Updated release BACKEND includes P0 regressions. Prior ACL commit fd507ab5ec4c0715c1854eda796df9ab7c799977.
+Next: remove AWS runtime activation, patch supported Django pins using isolated
+.venv (6.0.9 installed there, baseline dependencies shared read-only), then pinned
+combined release validation and actual M21 rehearsal. SDK/production env unchanged.
 Do not restart audit, regenerate matrix or start a UI redesign.
 
 Safe resume: Get-Content -LiteralPath F:/ALFRED_DEV/post-audit/docs/PROJECT_STATUS.md.

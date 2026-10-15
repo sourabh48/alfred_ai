@@ -13,7 +13,7 @@ service, paid provider or GitHub operation is authorized here.
 | P0-B profile money | Implemented: finite, bounded cent validation at API/form/model/ORM and Career scenario inputs; existing Float SQL schema/API numeric contract preserved | 47 combined focused tests PASS, zero skips; migration drift PASS; production not remediated |
 | P0-C private media | Implemented: source/debug and native use the same owner-filtered handler; safe missing/permission response, public static assets separate | Same 47-test gate includes anonymous/invalid session/foreign owner/traversal/deletion/source/native tests; packaged/live acceptance pending |
 | P0-A Windows storage | Implemented: owner/SYSTEM creation and verification in native runtime/config, memory, parser/OCR scratch and recovery copies; explicit pinned, quiesced repair/rollback | 117 focused backend PASS; 11 repair CLI tests PASS (overlapping); 18 fresh native checks PASS; production ACL repair requires separate approval |
-| P0-D M20 gates | Existing 0052410 implementation will be reused and integrated after focused fixes | Ignored-file collision and JSON credential regressions pending |
+| P0-D M20 gates | Reused/merged existing 0052410 engine: ignored target file collisions fail before mutation; quoted JSON credentials fail with redacted findings | Both original failures reproduced; 70 focused gate/recovery/promotion/acceptance tests PASS; 13 overlapping incomplete-run/privacy tests PASS |
 | AWS / replacement | User decision: no AWS runtime/provider activation | Decommission active path, evaluate non-AWS official contracts; real cloud remains OFF |
 
 Changed money/media files: apps/users/money.py, models.py, serializers.py, forms.py;
@@ -34,8 +34,21 @@ the guard now accepts exact owner/SYSTEM inheritance only from a verified privat
 ancestor. Its failed receipt is preserved. No source/debug database encryption,
 portable-key verification or production ACL remediation is claimed.
 
-Next action: integrate and repair existing M20 source/privacy gates, decommission
-AWS dispatch and apply the supported dependency patch. Specialized audit/runbooks and
+M20 integration preserves its prior history and both recovery-verifier changes:
+private scratch protection plus caller-selected scratch roots. Recovery fixtures
+now create private directories before seeding synthetic data; the initial mixed
+branch failure is retained under m20-focused-7e820d51. Fixed receipts:
+artifacts/post-audit/m20-corrected-67461836/receipt.json and
+m20-incomplete-d8fd4607/receipt.json. Zero/skipped successful runner output now
+reports NOT_RUN and blocks readiness; an actual failing runner remains FAIL.
+The source scanner retains exact path/value-hash exemptions for six reviewed
+public synthetic identifiers, never a blanket test-file exception. New P0
+regressions are included in the standard release backend gate. M20 full pinned
+integration and actual M21 native rehearsal are still pending; production approval,
+off-device/key recovery, real-account and external CI gates are not filled by tests.
+
+Next action: decommission AWS dispatch and apply the supported dependency patch;
+then run a pinned integrated release gate. Specialized audit/runbooks and
 historical results below remain reference material, not fresh acceptance.
 
 **Current status — 2026-10-15:** M14/M15 consolidated source is deployed and GitHub master matches 3932f391aa4eed7b3200ad3b034f7991435e01e4. Dated release results are 619 backend/15 Chrome/35 native (overlapping packaged scope); this audit independently ran 86 focused tests, zero skips, plus isolated system/drift checks. Normal-account, real-provider, clean-PC and device-loss acceptance remain incomplete. Port 8000 did not respond during the audit; no service action was taken. M20 is unfinished separate development; M16–M19/M21 are not declared complete.
