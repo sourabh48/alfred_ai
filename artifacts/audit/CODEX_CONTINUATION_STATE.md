@@ -2,7 +2,17 @@
 
 ## Latest task — post-audit implementation, 2026-10-15
 
-Latest verified source f79690a8c42eab6b2ae3182445af5002a87da6a8: combined retry
+Latest full source gate 3a46e1cb24234c586a40be446501a83c48cce2ea: 751 backend /
+37 Chrome / 34 source-native-Ollama PASS, zero failures/skips. Exact evidence and
+scopes in PROJECT_STATUS.md. Actual M21 exact promotion/nine browser checks and
+restart persistence PASS; worker-crash phase hit a missing nested evidence dir.
+Reproduced and corrected private directory creation; 33 focused acceptance/
+promotion/recovery tests PASS (m21-output-directory-2f27f838). Complete actual
+M21 rollback still pending. Preserve the failed sandbox and all backups.
+Next: finish private temporary-parent P0 follow-up, commit tested units, then pin
+and validate the corrected source before a new disposable M21 rehearsal.
+
+Earlier source f79690a8c42eab6b2ae3182445af5002a87da6a8: combined retry
 executed 750 backend tests / zero skips / one error. Correct fail-fast left
 browser/native NOT_RUN. Earlier attempt interrupted without final evidence.
 Safe logging omitted setup/subtest headers; reproduced and corrected to retain

@@ -7,9 +7,19 @@ import unittest
 from scripts import release_acceptance as acceptance
 from scripts import release_gate as release
 from tests.test_release_gate import ReleaseRepositoryFixture
+from alfred_private_storage import private_directory, verify_private
 
 
 class ReleaseAcceptanceTests(ReleaseRepositoryFixture, unittest.TestCase):
+    def test_worker_crash_approval_creates_a_private_nested_evidence_directory(self):
+        runtime = private_directory(self.root / 'runtime')
+        output = self.root / 'failure-injection'
+        authorization = acceptance.sandbox_approval(self.manifest, self.repo, runtime, output)
+        self.assertTrue(verify_private(output))
+        approved = acceptance.promotion.authorization(authorization, self.manifest, self.repo, runtime, 'rehearsal')
+        self.assertIn('rollback_source', approved['actions'])
+        self.assertEqual(approved['binding']['environment'], 'rehearsal')
+
     def test_cli_preserves_imported_fixed_gate_error_code(self):
         output=self.root/'cli-report'
         release.report(self.manifest,output)

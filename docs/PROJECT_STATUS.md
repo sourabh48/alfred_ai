@@ -8,6 +8,19 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
+Latest pinned integration: **3a46e1cb24234c586a40be446501a83c48cce2ea — 751 backend,
+37 Chrome and 34 source-native/Ollama checks PASS; zero failures/skips**. Isolated
+pip check PASS (shared baseline libraries, not clean-install/package proof).
+Evidence: artifacts/release-gates/post-audit-final-3a46e1c/release.json. Synthetic
+dashboard/mobile Travel screenshots reviewed. Overall promotion remains BLOCKED.
+Actual M21 in F:/ALFRED_DEV/post-audit-rehearsal-3a46e1c passed exact promotion,
+nine browser checks, financial preservation and memory restart persistence, then
+failed before worker-crash injection because its nested evidence directory did
+not exist. Reproduced FileNotFoundError; sandbox approval now creates/verifies
+that private directory before writing. 33 focused acceptance/promotion/recovery
+tests PASS (artifacts/post-audit/m21-output-directory-2f27f838/receipt.json).
+All failed evidence/backups remain; complete actual rollback acceptance is pending.
+
 | Unit | Development status | Evidence / remaining acceptance |
 | --- | --- | --- |
 | P0-B profile money | Implemented: finite, bounded cent validation at API/form/model/ORM and Career scenario inputs; existing Float SQL schema/API numeric contract preserved | 47 combined focused tests PASS, zero skips; migration drift PASS; production not remediated |
@@ -141,7 +154,10 @@ tests PASS (m21-three-debug-296f6a15). These targeted results do not clear the
 combined failure. Preserve all receipts; repeat the pinned combined gate, identify
 any repeated error, then perform the new disposable M21 rehearsal.
 
-Next action: commit the safe failure-header correction, validate, then rehearse.
+The safe failure-header correction is committed at 3a46e1c. Its full rerun passed
+as recorded above; the earlier one-error run did not reproduce, and is retained.
+Next action: finish the private temporary-parent P0 follow-up under focused tests,
+pin the corrected candidate and repeat actual M21 acceptance. No production action.
 Specialized audit/runbooks and
 historical results below remain reference material, not fresh acceptance.
 

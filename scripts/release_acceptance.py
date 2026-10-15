@@ -10,6 +10,7 @@ import re
 import signal
 
 from cryptography.fernet import Fernet
+from alfred_private_storage import private_directory
 from alfred_native import write_json
 from scripts import release_gate as release
 from scripts import release_recovery as recovery
@@ -145,6 +146,7 @@ def attach_backup(manifest, receipt, directory):
 
 
 def sandbox_approval(manifest, target, runtime, output):
+    output = private_directory(recovery.no_links(output))
     write_json(runtime / ".alfred-release-rehearsal.json", promotion.core_binding(manifest, target, runtime, "rehearsal"))
     approval = output / "synthetic-authorization.json"
     write_json(approval, {"decision": "YES", "binding": promotion.binding(manifest, target, runtime, "rehearsal"),
