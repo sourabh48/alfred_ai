@@ -23,6 +23,10 @@ Duplicate imports retain their original source link; no duplicate alternate
 provenance is invented. Raw PDF/OCR text is not copied into new diagnostic or memory
 fields. Existing owner-only private-media downloads are reused.
 
+Assistant integration/last fully validated runtime source:
+`0778a2f8e0261bd775c05504b5f5ca4326b37ecf`. This closing checkpoint is
+documentation-only; verify actual HEAD before continuing on this branch.
+
 Explicit record confirmation is separate from parser success and from trusted
 long-term memory. File bytes, source/owner/account linkage, date bounds, parser
 state, canonical edits, duplicate/conflicting records and revocation invalidate

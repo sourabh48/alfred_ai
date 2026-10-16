@@ -5,7 +5,9 @@
 Current isolated branch feature/ai-ground-bank-20261016, worktree
 F:/ALFRED_DEV/post-audit, based exactly on 20b916ee00867b0f0cdcb5c758c697762fda897b.
 Provenance unit 35bf1a9e7377f7fa8ecd23f09b753dcddef09033 is committed. This next
-implementation/checkpoint follows it; verify actual HEAD. Read
+assistant unit/last fully validated runtime source is
+0778a2f8e0261bd775c05504b5f5ca4326b37ecf. This closing documentation-only checkpoint
+records those commits; verify actual HEAD. Read
 docs/PROJECT_STATUS.md for the active contract. No duplicate MD.
 
 Unit 1 implemented: additive expenses.0006 receipt model; immutable structured
