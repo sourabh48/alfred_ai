@@ -53,7 +53,8 @@ def baseline_source(user):
             'Reported income and housing are not independently verified.'],amounts={},metric_states={})
     for key in (*BASELINE_KEYS,'rent_burden'):
         state=baseline['metric_states'][key]
-        supported=(key=='rent_burden' or (key=='monthly_income' and baseline['income_source']=='reported_monthly_income'))
+        supported=(key=='rent_burden' or (key=='monthly_income' and baseline['income_source']=='reported_monthly_income'
+            and owner.monthly_income>0 and baseline['decimal_amounts']['monthly_income']==format(profile_money(owner.monthly_income),'.2f')))
         value=owner.rent_or_emi if key=='rent_burden' else baseline['decimal_amounts'].get(key)
         available=supported and state['status']!='unavailable'
         data['amounts'][key]=_amount(value if available else None,profile_money,state['status'],state['source'])

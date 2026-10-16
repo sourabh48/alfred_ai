@@ -161,6 +161,18 @@ class CanonicalEvidenceTests(TestCase):
         baseline=resolve_canonical_financial_baseline(current,fresh=True)
         self.assertEqual(source['data']['amounts']['monthly_income']['amount'],baseline['decimal_amounts']['monthly_income'])
 
+    def test_career_fallback_does_not_become_an_explicitly_reported_user_income_fact(self):
+        from apps.career.models import CareerProfile
+        get_user_model().objects.filter(pk=self.owner.pk).update(monthly_income='0.00')
+        CareerProfile.objects.create(user=self.owner,role='Synthetic role',experience_years=1,skills='Synthetic',last_salary='10000.00')
+        current=get_user_model().objects.get(pk=self.owner.pk)
+        baseline=resolve_canonical_financial_baseline(current,fresh=True)
+        self.assertEqual(baseline['income_source'],'reported_monthly_income')
+        self.assertEqual(baseline['decimal_amounts']['monthly_income'],'10000.00')
+        source=baseline_source(self.owner)
+        self.assertIsNone(source['data']['amounts']['monthly_income']['amount'])
+        self.assertEqual(source['data']['amounts']['monthly_income']['evidence_status'],'unavailable')
+
     def test_bank_record_selector_cannot_bypass_receipt_review(self):
         upload=StatementUpload.objects.create(user=self.owner,bank_account=self.account,account_number=self.account.account_number,
             original_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-synthetic-canonical-only'),file_name='synthetic.pdf',parser_status='parsed')

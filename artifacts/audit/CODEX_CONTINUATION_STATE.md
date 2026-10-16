@@ -1,12 +1,13 @@
 # ALFRED CODEX CONTINUATION STATE
 
-## AI-GROUND Phase 2 canonical financial records — 2026-10-16
+## AI-GROUND Phase 2 canonical financial records — 2026-10-16–17
 
 Isolated F:/ALFRED_DEV/post-audit, feature/ai-ground-bank-20261016, based exactly on
 1b80138d470150de8f9fc1d1be831af1cecc8941. Source unit
 df386be6938e533cff5b9e20af11ba015672ee9a is committed; this assistant unit follows
 it as b49c14125af6b60c51b8965e8c221cf7ecc8f35e. The next verified-document unit
-is implemented below; verify actual HEAD. Read docs/PROJECT_STATUS.md.
+is committed as 9a02f168ea1394282ec77e4afc7ca5da2e002fbe; verify actual HEAD.
+Read docs/PROJECT_STATUS.md. Final source-boundary correction follows below.
 
 Unit 1 implemented: canonical_evidence.py and read-only financial-evidence API;
 owned citation template/view; exact typed money/source/date/revision; expense,
@@ -63,6 +64,17 @@ Screenshots reviewed; three distinct flows in addition to canonical four, no
 overlapping backend counts summed. Final system/drift PASS, zero schema changes.
 grounding-final-backend: 154 backend PASS, zero failures/skips across combined
 canonical/bank/closure/history/finance/session source after closure integration.
+
+2026-10-17 final income boundary: allow reported monthly baseline income only if
+it equals the positive stored User.monthly_income. Legacy canonical resolver may
+label Career fallback reported_monthly_income even with User income empty; keep
+that service unchanged and withhold it from this stricter grounding contract.
+baseline-source-boundary-corrected: 32 backend PASS, zero skips/failures, source/
+hybrid/currency plus reproduction proving legacy 10000.00 remains unchanged.
+First fixture failed for missing required Career experience, safely retained and
+corrected. Do not add these overlapping checks to 154. No unresolved final failure.
+Final source privacy/link/identity PASS: 25 files, 74 local references, zero findings,
+preserved C1–C10/frozen/master identities. AST-only graph and Node/diff checks PASS.
 
 Next independent safe verified-document task: investment extraction field-level
 owner-confirmed receipt/provenance using existing import/review/correction, original

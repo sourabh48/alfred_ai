@@ -8,7 +8,7 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
-### AI-GROUND Phase 2 — individual canonical financial records, 2026-10-16
+### AI-GROUND Phase 2 — individual canonical financial records, 2026-10-16–17
 
 Based exactly on `1b80138d470150de8f9fc1d1be831af1cecc8941`, on the same isolated
 feature/ai-ground-bank-20261016 branch. Source unit
@@ -43,6 +43,19 @@ available; totals/derived income requiring currency/source compatibility are
 withheld. The existing canonical baseline itself is not changed. Currency C1–C10
 remains unapproved: no FX, aggregation of unknown denominations, backfill or INR
 inference. Exact stored values/identities/fingerprints are preserved.
+
+Final source-boundary correction (2026-10-17): reported monthly income additionally
+requires an exact match to a positive stored User.monthly_income. The existing
+canonical resolver can label a Career salary fallback reported_monthly_income
+when the User field is empty; that fallback remains unchanged for legacy financial
+services but is not promoted into an explicitly reported User fact. A synthetic
+regression proves the original fallback remains 10000.00 while grounding withholds
+it. `baseline-source-boundary-corrected`: **32 backend PASS**, zero failures/skips
+(source/hybrid/currency). The initial regression fixture omitted required Career
+experience; its safe failure receipt is retained and the fixture corrected.
+Final changed-source privacy/link/identity validation PASS: 25 files, 74 local
+references, zero findings; FIN-CURRENCY contract and frozen/master SHAs unchanged.
+Final AST-only graph update and JavaScript/diff checks PASS. No new schema/dependency.
 
 `artifacts/post-audit/ai-ground-canonical-20261016/canonical-source-verified`:
 **46 backend PASS**, zero failures/skips (new sources, financial baseline, existing
@@ -112,6 +125,7 @@ closure scope now cites `/documents/loan-closures/<id>/`, with an owner-only
 `/api/ai/closure-evidence/<id>/` API and the shared private record view. Citation
 links reopen the existing document selector, including older owned records. No new
 parser, financial write, money calculation, model, migration or dependency.
+Implementation source: `9a02f168ea1394282ec77e4afc7ca5da2e002fbe`.
 
 Reuses the bank private-file helper as `file_reference`: same media-root boundary,
 bounded byte reads, private-media authorization and no raw text. Closure revision
