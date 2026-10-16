@@ -264,7 +264,6 @@ def _investment_import_summary(parsed: dict, linked_investments: list[Investment
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
-@transaction.atomic
 def import_investment_pdf(request):
     upload = request.FILES.get("file")
     if not upload:

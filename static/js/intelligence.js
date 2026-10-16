@@ -238,7 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
             }
             if (!historical && source.data) Object.entries(source.data).forEach(([key, value]) => {
-                if (key === "metric_states" || key === "amounts" || Object.hasOwn(source.data.amounts || {},key)) return;
+                if (key === "metric_states" || key === "amounts" || key === "document_sources" || Object.hasOwn(source.data.amounts || {},key)) return;
                 const fact = document.createElement("p");
                 const monetary = source.classification === "canonical_financial_baseline" || key === "closure_amount";
                 const display = value === null ? "Not recorded" : monetary && typeof value === "number" ? Alfred.formatCurrency(value) : (typeof value === "object" ? JSON.stringify(value) : String(value));

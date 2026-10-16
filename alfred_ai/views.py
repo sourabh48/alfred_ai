@@ -267,8 +267,11 @@ def loan_closure_evidence_view(request, document_id):
 def canonical_evidence_view(request, kind, identity):
     from apps.ml_engine.services.canonical_evidence import record_source
     from alfred_ai.services.api_errors import safe_error_details
+    from alfred_ai.services.upload_limits import UploadLimitExceeded
     try:
         source = record_source(request.user, kind, identity)
+    except UploadLimitExceeded as exc:
+        response = JsonResponse(safe_error_details(exc, 'Financial source exceeds supported processing limits.', logger_name=__name__), status=413)
     except ValueError as exc:
         response = JsonResponse(safe_error_details(exc, 'Financial evidence is unavailable. Existing records are preserved.', logger_name=__name__), status=503)
     else:
@@ -284,7 +287,19 @@ def canonical_evidence_view(request, kind, identity):
 @require_http_methods(["GET"])
 def investment_evidence_view(request, document_id, identity):
     from apps.investments.services.document_evidence import evidence
-    response = render(request, 'investment_evidence.html', {'evidence':evidence(request.user,document_id,identity)})
+    from alfred_ai.services.api_errors import safe_error_details
+    from alfred_ai.services.upload_limits import UploadLimitExceeded
+    from django.http import Http404
+    try:
+        detail=evidence(request.user,document_id,identity)
+    except Http404:
+        raise
+    except UploadLimitExceeded as exc:
+        response=JsonResponse(safe_error_details(exc, 'Investment source exceeds supported processing limits.', logger_name=__name__), status=413)
+    except Exception as exc:
+        response=JsonResponse(safe_error_details(exc, 'Investment evidence is unavailable. Existing records are preserved.', logger_name=__name__), status=503)
+    else:
+        response = render(request, 'investment_evidence.html', {'evidence':detail})
     response['Cache-Control'] = 'no-store, private'
     return response
 

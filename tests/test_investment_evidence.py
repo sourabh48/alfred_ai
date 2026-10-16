@@ -7,8 +7,9 @@ from unittest.mock import patch
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import F
+from django.db import connection
 from django.http import Http404
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 
 from apps.expenses.models import Expense, BankAccount
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
@@ -63,7 +64,8 @@ class InvestmentEvidenceTests(TestCase):
     def test_owner_only_api_citation_download_and_csrf(self):
         detail=self.current()
         self.assertEqual(self.client.get(detail['citation_url']).status_code,200)
-        self.assertEqual(self.client.get(detail['source_download_url']).status_code,200)
+        download=self.client.get(detail['source_download_url']); self.addCleanup(download.close)
+        self.assertEqual(download.status_code,200)
         for actor in (None,self.other):
             client=Client()
             if actor: client.force_login(actor)
@@ -188,11 +190,14 @@ class InvestmentEvidenceTests(TestCase):
         self.assertTrue(InvestmentDocumentEvidence.objects.filter(source_values__current_value='2345.6700').exists())
 
     def test_failed_receipt_capture_rolls_back_new_imported_financial_records(self):
+        from alfred_ai.services.upload_limits import begin_upload_writes
+        baseline=len(connection.atomic_blocks)
         def parsed(*args,**kwargs):
-            row=Investment.objects.create(user=self.owner,asset_type='equity',asset_name='SYNTHETIC-ATOMIC-IMPORT')
-            return dict(investments=[row],payload={'investments':[]})
+            self.assertEqual(len(connection.atomic_blocks),baseline)
+            begin_upload_writes()  # Existing parser opens the write scope only after heavy extraction.
+            return dict(investments=[{'asset_name':'SYNTHETIC-ATOMIC-IMPORT','asset_type':'equity'}],payload={'investments':[]})
         before=list(Investment.objects.values())
-        with patch('apps.investments.views.portfolio_intelligence_service.parse_portfolio_pdf',side_effect=parsed), \
+        with patch('apps.investments.views.portfolio_intelligence_service.parse_portfolio_document',side_effect=parsed), \
                 patch.object(service,'capture_import',side_effect=RuntimeError('synthetic-metadata-failure')):
             response=self.client.post('/api/investments/import-pdf/',{'file':SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC',content_type='application/pdf')})
         self.assertEqual(response.status_code,500); self.assertTrue(response.json()['error_id'])
@@ -201,17 +206,32 @@ class InvestmentEvidenceTests(TestCase):
         self.assertEqual(InvestmentImportDocument.objects.count(),1)
 
     def test_new_upload_captures_exact_parser_value_without_automatic_confirmation(self):
+        from alfred_ai.services.upload_limits import begin_upload_writes
         raw=dict(asset_name='SYNTHETIC-NEW-IMPORT',institution='',current_value='2.675')
+        baseline=len(connection.atomic_blocks)
         def parsed(*args,**kwargs):
-            row=Investment.objects.create(user=self.owner,asset_type='equity',asset_name=raw['asset_name'],current_value=raw['current_value'])
-            return dict(investments=[row],payload={'investments':[raw]})
-        with patch('apps.investments.views.portfolio_intelligence_service.parse_portfolio_pdf',side_effect=parsed):
+            self.assertEqual(len(connection.atomic_blocks),baseline)
+            begin_upload_writes()
+            return dict(investments=[raw],payload={'investments':[raw]})
+        with patch('apps.investments.views.portfolio_intelligence_service.parse_portfolio_document',side_effect=parsed):
             response=self.client.post('/api/investments/import-pdf/',{'file':SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC',content_type='application/pdf')})
         self.assertEqual(response.status_code,201)
         row=Investment.objects.get(asset_name=raw['asset_name'])
         proof=InvestmentDocumentEvidence.objects.get(investment=row)
         self.assertEqual(str(row.current_value),'2.68'); self.assertEqual(proof.source_values['current_value'],'2.675')
         self.assertEqual(proof.reviewed_fields,{})
+
+    def test_oversized_or_failed_source_has_safe_html_and_api_errors(self):
+        with override_settings(ALFRED_UPLOAD_FILE_BYTES=8):
+            for url in (self.endpoint(),self.current_citation(),f'/ai/financial-records/investment/{self.investment.pk}/'):
+                response=self.client.get(url); self.assertEqual(response.status_code,413)
+                self.assertNotIn('SYNTHETIC-DO-NOT-DISCLOSE',response.content.decode())
+        with patch.object(service,'evidence',side_effect=RuntimeError('SYNTHETIC-PRIVATE-ERROR C:/private/ocr.pdf')):
+            response=self.client.get(self.current_citation())
+        self.assertEqual(response.status_code,503); self.assertTrue(response.json()['error_id'])
+        self.assertNotIn('SYNTHETIC-PRIVATE-ERROR',response.content.decode())
+
+    def current_citation(self): return f'/documents/investments/{self.document.pk}/records/{self.investment.pk}/'
 
     def test_snapshot_capture_rejects_foreign_rows_atomically(self):
         other=Investment.objects.create(user=self.other,asset_type='equity',asset_name='SYNTHETIC-FOREIGN')

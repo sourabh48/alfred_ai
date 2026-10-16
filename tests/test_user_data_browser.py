@@ -1068,6 +1068,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#intelligenceForm button')
         self.wait.until(lambda _: f'canonical-investment-{row.pk}' in self.text('intelligenceAnswers'))
         self.assertIn('2,345.67 · Currency not recorded',self.text('intelligenceAnswers'))
+        self.assertNotIn('document sources: [',self.text('intelligenceAnswers'))
         self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
         self.capture('investment-grounded-field-citation')
         self.memory_click(f'#intelligenceAnswers a[href="{detail["citation_url"]}"]')
