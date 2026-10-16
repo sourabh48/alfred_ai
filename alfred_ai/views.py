@@ -282,6 +282,15 @@ def canonical_evidence_view(request, kind, identity):
 
 @login_required
 @require_http_methods(["GET"])
+def investment_evidence_view(request, document_id, identity):
+    from apps.investments.services.document_evidence import evidence
+    response = render(request, 'investment_evidence.html', {'evidence':evidence(request.user,document_id,identity)})
+    response['Cache-Control'] = 'no-store, private'
+    return response
+
+
+@login_required
+@require_http_methods(["GET"])
 def statement_evidence_view(request, document_id, transaction_id):
     from apps.expenses.services.statement_evidence import evidence
     detail = evidence(request.user, transaction_id, document_id=document_id)

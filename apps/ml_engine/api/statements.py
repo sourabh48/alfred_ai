@@ -7,9 +7,10 @@ from .memory import MemoryAPI
 
 
 class StatementEvidenceAPI(MemoryAPI):
+    conflict_message = 'Statement evidence changed or requires source review. Reload before confirming.'
     def handle_exception(self, exc):
         if isinstance(exc, EvidenceConflict):
-            return safe_error_response(exc, 'Statement evidence changed or requires source review. Reload before confirming.',
+            return safe_error_response(exc, self.conflict_message,
                 logger_name=__name__, status_code=409)
         return super().handle_exception(exc)
 

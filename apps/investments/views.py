@@ -264,6 +264,7 @@ def _investment_import_summary(parsed: dict, linked_investments: list[Investment
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
+@transaction.atomic
 def import_investment_pdf(request):
     upload = request.FILES.get("file")
     if not upload:
@@ -290,6 +291,8 @@ def import_investment_pdf(request):
         )
         if linked_investments:
             document.linked_investments.set(linked_investments)
+            from .services.document_evidence import capture_import
+            capture_import(document, linked_investments, extraction=(parsed.get('payload') or {}).get('investments') or [])
         record_parser_learning(
             user=request.user,
             scope="investment_document",

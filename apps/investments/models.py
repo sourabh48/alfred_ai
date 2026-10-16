@@ -81,3 +81,16 @@ class InvestmentMoneySnapshot(models.Model):
     policy = models.CharField(max_length=30, default="investment-money-v1")
     applied_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class InvestmentDocumentEvidence(models.Model):
+    document = models.ForeignKey(InvestmentImportDocument, on_delete=models.CASCADE, related_name="field_evidence")
+    investment = models.ForeignKey(Investment, null=True, on_delete=models.SET_NULL, related_name="document_evidence")
+    original_investment_id = models.PositiveBigIntegerField()
+    source_values = models.JSONField(default=dict)
+    reviewed_fields = models.JSONField(default=dict)
+    review_generation = models.PositiveBigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("document", "original_investment_id"), name="investment_source_record_once")]

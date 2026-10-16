@@ -1113,6 +1113,9 @@ def _retry_loan_closure_document(user, document_id: int) -> dict:
 
 def _retry_investment_document(user, document_id: int) -> dict:
     document = InvestmentImportDocument.objects.prefetch_related("linked_investments").get(user=user, pk=document_id)
+    from apps.investments.services.document_evidence import capture_import
+    from copy import deepcopy
+    capture_import(document, list(document.linked_investments.all()))
     unavailable = _retry_source_unavailable(document, "uploaded_file", _serialize_investment)
     if unavailable is not None:
         return unavailable
@@ -1126,6 +1129,7 @@ def _retry_investment_document(user, document_id: int) -> dict:
     finally:
         document.uploaded_file.close()
 
+    original_extraction = deepcopy(parsed.get('investments') or [])
     accepted = _saved_corrections(payload, ("broker_name", "asset_name", "asset_type", "account_number", "invested_amount", "current_value"))
     if accepted.get("broker_name"):
         parsed["broker"] = accepted["broker_name"]
@@ -1162,6 +1166,7 @@ def _retry_investment_document(user, document_id: int) -> dict:
     document.save(update_fields=["broker_name", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary", "updated_at"])
     if created_investments:
         document.linked_investments.add(*created_investments)
+        capture_import(document, created_investments, extraction=original_extraction)
     record_parser_learning(
         user=user,
         scope="investment_document",
@@ -2728,6 +2733,9 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
         if field in corrections and corrections[field] in (None, ""):
             raise ValueError("Investment currency corrections require a finite amount.")
     document = InvestmentImportDocument.objects.prefetch_related("linked_investments").get(user=user, pk=document_id)
+    from apps.investments.services.document_evidence import capture_import
+    from apps.investments.models import InvestmentDocumentEvidence
+    capture_import(document, list(document.linked_investments.all()))
     payload = dict(document.extracted_payload or {})
     accepted = dict(payload.get("accepted_corrections") or {})
     accepted.update(corrections)
@@ -2776,6 +2784,8 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
 
     updated_primary = _upsert_retry_investments(user, [primary_item] if primary_item.get("asset_name") else [])
     linked = [*updated_primary, *[item for item in previous_investments if item != previous_primary and item not in updated_primary]]
+    original_values = InvestmentDocumentEvidence.objects.filter(document=document, investment=previous_primary).first() if previous_primary else None
+    capture_import(document, updated_primary, originals={item.pk:original_values.source_values for item in updated_primary} if original_values else None)
     document.extracted_payload = payload
     document.parse_confidence = max(document.parse_confidence, 0.8 if linked else 0.63)
     document.parser_status = "parsed" if linked else "needs_review"

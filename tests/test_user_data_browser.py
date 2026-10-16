@@ -1009,6 +1009,46 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 invested_amount='1234.56',current_value='2345.67'), 'baseline':owner}
         return rows,local
 
+    def test_investment_field_review_correction_revocation_and_stale_source(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.investments.models import InvestmentImportDocument, Investment
+        from apps.investments.services.document_evidence import capture_import
+        rows,_=self.canonical_grounding_fixture(); row=rows['investment']
+        media=Path(self.enterContext(TemporaryDirectory(prefix='alfred-investment-field-browser-')))
+        self.enterContext(override_settings(MEDIA_ROOT=media))
+        raw=dict(asset_name=row.asset_name,institution=row.institution,current_value='2345.6700',
+            invested_amount=str(row.invested_amount),monthly_sip=str(row.monthly_sip))
+        document=InvestmentImportDocument.objects.create(user=self.scenario['user'],file_name='synthetic-portfolio.pdf',
+            uploaded_file=SimpleUploadedFile('synthetic-portfolio.pdf',b'%PDF-SYNTHETIC-FIELDS'),parser_status='parsed',
+            extracted_payload={'investments':[raw],'text':'SYNTHETIC-DO-NOT-DISPLAY'})
+        document.linked_investments.add(row); capture_import(document,[row],extraction=[raw])
+        self.login(); self.browser.get(self.live_server_url+f'/documents/investments/{document.pk}/records/{row.pk}/')
+        self.wait.until(lambda _: '2345.6700' in self.text('statementEvidence'))
+        self.assertNotIn('SYNTHETIC-DO-NOT-DISPLAY',self.browser.page_source)
+        self.memory_click('#statementEvidenceForm [value="current_value"]')
+        self.memory_click('#statementEvidenceConfirm'); self.memory_click('#statementEvidenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'owner_confirmed' in self.text('statementEvidence'))
+        self.capture('investment-single-field-confirmed')
+        self.memory_click('#statementEvidenceForm [value="current_value"]')
+        self.memory_click('#statementEvidenceRevoke'); self.browser.switch_to.alert.accept()
+        self.wait.until(lambda _: 'needs_owner_review' in self.text('statementEvidence') and 'owner_confirmed' not in self.text('statementEvidence'))
+        Investment.objects.filter(pk=row.pk).update(current_value='3456.78')
+        self.browser.refresh(); self.wait.until(lambda _: '3456.78' in self.text('statementEvidence'))
+        self.assertIn('2345.6700',self.text('statementEvidence'))
+        self.memory_click('#statementEvidenceForm [value="current_value"]'); self.memory_click('#statementEvidenceConfirm')
+        Path(document.uploaded_file.path).write_bytes(b'%PDF-SYNTHETIC-REPLACED-SOURCE')
+        self.memory_click('#statementEvidenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'Reference:' in self.text('statementEvidenceFeedback'))
+        self.assertTrue(self.browser.find_element(self.By.ID,'statementEvidenceConfirm').is_selected())
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,'[name="fields"][value="current_value"]').is_selected())
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.querySelector('#statementEvidence').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('investment-field-stale-mobile')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('statementEvidence'),'')
+
     def test_canonical_financial_sources_corrections_citations_and_mobile(self):
         from selenium.webdriver.support.ui import Select
         from apps.expenses.models import BankAccount

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Investment field evidence · ALFRED{% endblock %}
+{% block content %}
+<section class="surface-card" id="statementEvidence" data-record="{{ evidence.investment_id }}" data-api="/api/ai/investment-evidence/{{ evidence.document_id }}/{{ evidence.investment_id }}/">
+<header class="workspace-heading"><div class="workspace-badge">Private field evidence</div>
+    <h1>{{ evidence.document_name }}</h1><p>Document #{{ evidence.document_id }} · Investment #{{ evidence.investment_id }}</p></header>
+    <h2 class="page-section-title">Review individual recorded fields</h2>
+    <p role="status">Source: {{ evidence.source_status }}. Current record date: {{ evidence.applicable_date }}.</p>
+    {% if evidence.source_download_url %}<a href="{{ evidence.source_download_url }}" class="btn btn-outline-secondary mb-3">Open private source file</a>{% endif %}
+    <a href="/ai/financial-records/investment/{{ evidence.investment_id }}/" class="btn btn-outline-primary mb-3">Open canonical record</a>
+    <form id="statementEvidenceForm" data-live-refresh-hold="true">{% csrf_token %}
+        <div class="table-responsive"><table class="table"><caption>Parser values are original extraction evidence, not authenticated financial facts. Currency was not recorded.</caption>
+        <thead><tr><th scope="col">Field to review</th><th scope="col">Current record</th><th scope="col">Original parser value</th><th scope="col">Evidence status</th></tr></thead>
+        <tbody>{% for name, value in evidence.fields.items %}<tr>
+            <th scope="row"><label><input type="checkbox" name="fields" value="{{ name }}"> {{ name }}</label></th>
+            <td>{{ value.current }}</td><td>{{ value.original|default_if_none:"Not retained" }}</td><td>{{ value.verification }}</td>
+        </tr>{% endfor %}</tbody></table></div>
+        <ul>{% for note in evidence.limitations %}<li>{{ note }}</li>{% endfor %}</ul>
+        <p>Correct the holding in <a href="/investments/">Investments</a> or the extracted document fields in <a href="/documents/">Documents</a>, then review again. Confirmation changes evidence metadata only. Source deletion, edits and revocation invalidate it. Source documents can retain original extraction after a holding is deleted. Historical backups may retain older data.</p>
+        <label class="d-block mb-3"><input id="statementEvidenceConfirm" type="checkbox" required {% if not evidence.review_allowed %}disabled{% endif %}> I checked each selected current value against this source document.</label>
+        <button class="btn btn-primary" type="submit" {% if not evidence.review_allowed %}disabled{% endif %}>Confirm selected fields</button>
+        <button class="btn btn-outline-secondary" type="button" id="statementEvidenceRevoke">Withdraw selected confirmations</button>
+    </form>
+    <p id="statementEvidenceFeedback" role="status" aria-live="polite"></p>
+</section>
+{{ evidence.revision|json_script:"statementEvidenceRevision" }}
+{% endblock %}
+{% block extra_js %}<script src="/static/js/statement_evidence.js?v=3"></script>{% endblock %}

@@ -16,11 +16,13 @@ document.addEventListener('DOMContentLoaded', () => {
         pending = true;
         form.querySelectorAll('button').forEach(button => { button.disabled = true; });
         try {
-            await Alfred.fetchJSON(`/api/ai/statement-evidence/${root.dataset.record}/`, {method,
-                body:JSON.stringify({revision:JSON.parse(document.getElementById('statementEvidenceRevision').textContent), confirm:method === 'DELETE' || check.checked})});
+            const payload = {revision:JSON.parse(document.getElementById('statementEvidenceRevision').textContent), confirm:method === 'DELETE' || check.checked};
+            if (form.querySelector('[name="fields"]')) payload.fields = [...form.querySelectorAll('[name="fields"]:checked')].map(field => field.value);
+            await Alfred.fetchJSON(root.dataset.api || `/api/ai/statement-evidence/${root.dataset.record}/`, {method, body:JSON.stringify(payload)});
             if (active) location.reload();
         } catch (error) {
-            if (active) feedback.textContent = `${error.message} Your choice is preserved. Reload and review before retrying.`;
+            const reference = /^[a-f0-9]{32}$/.test(error.reference || '') ? ` Reference: ${error.reference}.` : '';
+            if (active) feedback.textContent = `${error.message}${reference} Your choice is preserved. Reload and review before retrying.`;
         }
     }
     form.addEventListener('submit', event => { event.preventDefault(); submit('POST'); });

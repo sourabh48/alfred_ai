@@ -5,6 +5,7 @@ from django.contrib.auth.views import LoginView, LogoutView
 from django.views.generic import RedirectView
 from .native_views import private_media
 from .views import statement_evidence_view
+from .views import investment_evidence_view
 from .views import canonical_evidence_view
 from .views import loan_closure_evidence_view
 from .views import (
@@ -60,6 +61,7 @@ urlpatterns = [
     path("documents/", documents_view, name="documents"),
     path('documents/statements/<int:document_id>/transactions/<int:transaction_id>/', statement_evidence_view, name='statement_evidence'),
     path('documents/loan-closures/<int:document_id>/', loan_closure_evidence_view, name='loan_closure_evidence'),
+    path('documents/investments/<int:document_id>/records/<int:identity>/', investment_evidence_view, name='investment_evidence'),
     path('ai/financial-records/<str:kind>/<int:identity>/', canonical_evidence_view, name='canonical_evidence'),
     path("api/documents/review-queue/", document_review_queue_api_view, name="document_review_queue_api"),
     path("api/documents/review-queue/resolve/", document_review_correction_api_view, name="document_review_correction_api"),
