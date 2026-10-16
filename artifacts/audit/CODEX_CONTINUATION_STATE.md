@@ -8,6 +8,8 @@ df386be6938e533cff5b9e20af11ba015672ee9a is committed; this assistant unit follo
 it as b49c14125af6b60c51b8965e8c221cf7ecc8f35e. The next verified-document unit
 is committed as 9a02f168ea1394282ec77e4afc7ca5da2e002fbe; verify actual HEAD.
 Read docs/PROJECT_STATUS.md. Final source-boundary correction follows below.
+Last fully validated runtime source is 179db89625e4d77ef2f90bd221707397f2c4f2b1;
+this closing documentation-only checkpoint records it. Verify actual current HEAD.
 
 Unit 1 implemented: canonical_evidence.py and read-only financial-evidence API;
 owned citation template/view; exact typed money/source/date/revision; expense,

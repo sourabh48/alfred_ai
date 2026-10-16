@@ -22,6 +22,9 @@ currency null/not_recorded, record identity, source field, applicable date,
 evidence status and content revision. No new model, migration, dependency or money
 calculation. Existing FIN-MONEY conversions and bank provenance remain intact.
 Assistant unit: `b49c14125af6b60c51b8965e8c221cf7ecc8f35e`.
+Final source-boundary unit/last validated runtime source:
+`179db89625e4d77ef2f90bd221707397f2c4f2b1`. This closing checkpoint changes
+documentation only; verify actual HEAD before the next implementation unit.
 
 Canonical means the currently stored record, **not independent third-party proof**.
 Manual expenses are user recorded; bank imports still require the existing receipt
