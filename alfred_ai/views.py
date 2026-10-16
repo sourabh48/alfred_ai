@@ -236,6 +236,24 @@ def documents_view(request):
 
 @login_required
 @require_http_methods(["GET"])
+def canonical_evidence_view(request, kind, identity):
+    from apps.ml_engine.services.canonical_evidence import record_source
+    from alfred_ai.services.api_errors import safe_error_details
+    try:
+        source = record_source(request.user, kind, identity)
+    except ValueError as exc:
+        response = JsonResponse(safe_error_details(exc, 'Financial evidence is unavailable. Existing records are preserved.', logger_name=__name__), status=503)
+    else:
+        if kind == 'expense' and source['url'].startswith('/documents/statements/'):
+            response = redirect(source['url'])
+        else:
+            response = render(request, 'canonical_evidence.html', {'source':source})
+    response['Cache-Control'] = 'no-store, private'
+    return response
+
+
+@login_required
+@require_http_methods(["GET"])
 def statement_evidence_view(request, document_id, transaction_id):
     from apps.expenses.services.statement_evidence import evidence
     detail = evidence(request.user, transaction_id, document_id=document_id)

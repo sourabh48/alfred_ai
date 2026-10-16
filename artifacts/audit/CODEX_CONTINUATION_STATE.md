@@ -1,5 +1,44 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## AI-GROUND Phase 2 canonical financial records — 2026-10-16
+
+Isolated F:/ALFRED_DEV/post-audit, feature/ai-ground-bank-20261016, based exactly on
+1b80138d470150de8f9fc1d1be831af1cecc8941. This first implementation/checkpoint
+follows it; verify actual HEAD. Read docs/PROJECT_STATUS.md, not a new report.
+
+Unit 1 implemented: canonical_evidence.py and read-only financial-evidence API;
+owned citation template/view; exact typed money/source/date/revision; expense,
+budget, loan, investment and reported baseline fields. Reuses domain money helpers,
+Loan.current_status/persisted EMI/payment records and canonical baseline resolver
+(new optional fresh=True). No competing calculations or schema/migration changes.
+Bank expenses delegate unchanged receipt confirmation/revocation and owner citation.
+Budget approval metadata does not exist: expose owner-saved records honestly, not
+approved budgets. Same-period contradictions abstain. Loans require confirmed
+records; missing balances remain unknown and closure contradictions abstain.
+Investment positions are recorded values, not live quotes or verified extraction.
+Unknown-currency/derived baseline totals are withheld; C1–C10 remain gated.
+
+Evidence artifacts/post-audit/ai-ground-canonical-20261016:
+canonical-source-verified 46 backend PASS, zero skips/failures; includes existing
+bank source/hybrid and financial baseline. Exact canonical Decimal and financial
+rows have zero mismatches. System/migration drift PASS. No schema change; do not
+repeat old FIN-MONEY or release suites. Citation privacy reuses shared pagehide/
+cached-page cleanup; browser acceptance is pending the assistant unit.
+
+Next: add financial_records scope/record_type/record_id to existing hybrid/API/UI;
+no arbitrary model tools. Unsupported record questions/FX/totals abstain locally;
+typed current source values and source revisions, safe citations, no raw labels or
+documents in prompts; revalidate before answers and refuse cloud fallback. Keep
+legacy finance source shape but withhold unknown-currency totals from assistant
+output. Test history/bank compatibility, browser, actual bounded synthetic Ollama
+when local models are available. Then next independent verified-document unit.
+
+History activation remains OFF; AWS retired, OpenAI/cloud OFF, frozen 4aa7ac70 and
+all FIN-MONEY history preserved. Production DOWN is prior evidence only; no service,
+DB/config/ACL/key/backup/remote operations. No deployment approval requested.
+Resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
+git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 90.
+
 ## AI-GROUND bank provenance/local assistant — 2026-10-16
 
 Current isolated branch feature/ai-ground-bank-20261016, worktree

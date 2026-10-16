@@ -8,6 +8,56 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
+### AI-GROUND Phase 2 — individual canonical financial records, 2026-10-16
+
+Based exactly on `1b80138d470150de8f9fc1d1be831af1cecc8941`, on the same isolated
+feature/ai-ground-bank-20261016 branch. First bounded unit adds
+[canonical evidence](../apps/ml_engine/services/canonical_evidence.py),
+[read-only owner APIs](../apps/ml_engine/api/financial_evidence.py),
+`/api/ai/financial-evidence/` and owner-only
+`/ai/financial-records/<kind>/<id>/` citation views. Supported kinds: expense,
+budget, loan, investment and baseline. Each amount has exact decimal text, explicit
+currency null/not_recorded, record identity, source field, applicable date,
+evidence status and content revision. No new model, migration, dependency or money
+calculation. Existing FIN-MONEY conversions and bank provenance remain intact.
+
+Canonical means the currently stored record, **not independent third-party proof**.
+Manual expenses are user recorded; bank imports still require the existing receipt
+confirmation/revocation/file checks and redirect to their original citation.
+Budget has no approval state: saved records are labeled approval_not_recorded;
+conflicting same-period aliases abstain. No approval is invented. Loans expose
+confirmed contract fields, persisted EMI/outstanding/paid values and the latest
+applied-payment reference. Missing balance is unavailable, never principal or zero.
+Estimated or contradictory closure/status records require review. No new EMI,
+amortization or repayment forecast calculator is introduced. Portfolio positions
+use current corrected register values, never old extraction text or assumed live
+market prices; source imports are explicitly not field-verified. Foreign parent,
+payment or import-document links fail closed, including Family-sharing accounts.
+
+Baseline reuse adds optional `fresh=True` to the existing resolver, preserving its
+default behavior/calculations. Grounding reloads the owner and bypasses cached
+financial results. Only supported single reported-income/housing fields are
+available; totals/derived income requiring currency/source compatibility are
+withheld. The existing canonical baseline itself is not changed. Currency C1–C10
+remains unapproved: no FX, aggregation of unknown denominations, backfill or INR
+inference. Exact stored values/identities/fingerprints are preserved.
+
+`artifacts/post-audit/ai-ground-canonical-20261016/canonical-source-verified`:
+**46 backend PASS**, zero failures/skips (new sources, financial baseline, existing
+bank provenance/hybrid). Synthetic financial-row and canonical Decimal baseline
+comparisons show zero mismatches. Owner/Family/citation/session denial, corrected
+precedence, budget/loan conflicts, null balance, original evidence, bank revocation
+and read-only API semantics are covered. `canonical-system`: system and migration
+drift PASS; no schema change or old money migration rehearsal needed.
+
+Next bounded unit wires these sources into existing assistant selection, local-only
+reasoning, unsupported-question abstention and post-inference revision checks,
+then validates browser flows and bounded actual local Ollama if available. This
+first unit does not yet claim assistant canonical-record inference acceptance.
+History activation, OpenAI and cloud sync OFF; AWS retired. Production DOWN remains
+the prior finding, without new operational checks or repair. Production source/data,
+backups, frozen `4aa7ac70` and GitHub master are unchanged.
+
 ### AI-GROUND — bank-statement provenance and local assistant, 2026-10-16
 
 Based exactly on AI-HISTORY `20b916ee00867b0f0cdcb5c758c697762fda897b`; its

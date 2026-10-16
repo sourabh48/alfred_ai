@@ -81,8 +81,8 @@ def build_canonical_financial_baseline(user) -> dict:
     )
 
 
-def resolve_canonical_financial_baseline(user) -> dict:
-    payload = build_canonical_financial_baseline(user)
+def resolve_canonical_financial_baseline(user, *, fresh=False) -> dict:
+    payload = _build_canonical_financial_baseline_uncached(user) if fresh else build_canonical_financial_baseline(user)
     return {key: value for key, value in payload.items() if key != "_materialized"}
 
 

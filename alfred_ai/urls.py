@@ -5,6 +5,7 @@ from django.contrib.auth.views import LoginView, LogoutView
 from django.views.generic import RedirectView
 from .native_views import private_media
 from .views import statement_evidence_view
+from .views import canonical_evidence_view
 from .views import (
     index_view,
     dashboard_view, insights_view,
@@ -57,6 +58,7 @@ urlpatterns = [
     path("dashboard/", dashboard_view, name="dashboard"),
     path("documents/", documents_view, name="documents"),
     path('documents/statements/<int:document_id>/transactions/<int:transaction_id>/', statement_evidence_view, name='statement_evidence'),
+    path('ai/financial-records/<str:kind>/<int:identity>/', canonical_evidence_view, name='canonical_evidence'),
     path("api/documents/review-queue/", document_review_queue_api_view, name="document_review_queue_api"),
     path("api/documents/review-queue/resolve/", document_review_correction_api_view, name="document_review_correction_api"),
     path("api/documents/review-queue/retry/", document_review_retry_api_view, name="document_review_retry_api"),

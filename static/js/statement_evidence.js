@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const canonical = document.getElementById('canonicalEvidence');
+    if (canonical) {
+        window.addEventListener('pagehide', () => canonical.replaceChildren());
+        window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
+    }
     const root = document.getElementById('statementEvidence');
     if (!root) return;
     const form = document.getElementById('statementEvidenceForm');

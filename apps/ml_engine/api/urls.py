@@ -1,10 +1,13 @@
 from django.urls import path
 from .statements import StatementEvidenceAPI
+from .financial_evidence import FinancialEvidenceAPI
 from .views import AlfredExplainAPI, AlfredPersonalInsightsAPI, EmotionalSpendAPI, MLRuntimeControlAPI, MLRuntimeStatusAPI
 from .memory import MemoryCollectionAPI, MemoryDetailAPI, MemoryRetentionAPI, MemoryResetAPI, MemoryRestoreAPI, MemoryRetrieveAPI, MemorySyncAPI, MemoryReasoningAPI, MemoryLearningAPI
 from .conversations import ConversationPolicyAPI, ConversationCollectionAPI, ConversationDetailAPI, ConversationClearAPI
 
 urlpatterns = [
+    path('financial-evidence/', FinancialEvidenceAPI.as_view()),
+    path('financial-evidence/<str:kind>/<int:identity>/', FinancialEvidenceAPI.as_view()),
     path('statement-evidence/', StatementEvidenceAPI.as_view()),
     path('statement-evidence/<int:identity>/', StatementEvidenceAPI.as_view()),
     path("conversations/policy/", ConversationPolicyAPI.as_view()),
