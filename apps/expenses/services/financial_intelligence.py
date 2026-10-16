@@ -1287,20 +1287,20 @@ def _build_vehicle_positions(
     vehicle_services: list[BikeServiceRecord],
     trip_logs: list[TripLog],
 ) -> list[dict]:
-    service_by_profile: dict[int | None, float] = defaultdict(float)
+    service_by_profile: dict[int | None, Decimal] = defaultdict(Decimal)
     for item in vehicle_services:
-        service_by_profile[item.bike_profile_id] += item.cost or 0
+        service_by_profile[item.bike_profile_id] += _decimal_amount(item.cost)
 
-    trip_by_profile: dict[int | None, float] = defaultdict(float)
+    trip_by_profile: dict[int | None, Decimal] = defaultdict(Decimal)
     for item in trip_logs:
         profile_id = getattr(item.travel_plan, "vehicle_profile_id", None)
-        trip_by_profile[profile_id] += item.spend_amount or 0
+        trip_by_profile[profile_id] += _decimal_amount(item.spend_amount)
 
     positions = []
     for profile in vehicle_profiles:
-        recorded_cost = service_by_profile.get(profile.id, 0.0) + trip_by_profile.get(profile.id, 0.0)
+        recorded_cost = service_by_profile.get(profile.id, Decimal("0")) + trip_by_profile.get(profile.id, Decimal("0"))
         market_value = _money_float(max(_decimal_amount(profile.estimated_market_value), Decimal("0")))
-        monthly_income_support = profile.monthly_income_support or 0.0
+        monthly_income_support = _decimal_amount(profile.monthly_income_support)
 
         positions.append(
             {
@@ -1310,8 +1310,8 @@ def _build_vehicle_positions(
                 "recognized_value": market_value,
                 "estimated_market_value": round(market_value, 2),
                 "valuation_status": "user_estimate" if market_value > 0 else "no_positive_value_recorded",
-                "monthly_income_support": round(monthly_income_support, 2),
-                "recorded_running_cost_total": round(recorded_cost, 2),
+                "monthly_income_support": _money_float(monthly_income_support),
+                "recorded_running_cost_total": _money_float(recorded_cost),
                 "running_cost_period": "all_recorded_history",
                 "monthly_running_cost": None,
                 "rationale": (

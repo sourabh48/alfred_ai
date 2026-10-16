@@ -25,6 +25,7 @@ from apps.mobility.models import (
     BikeProfile,
     BikeServiceRecord,
     FuelRefillLog,
+    MobilityMoneySnapshot,
     TravelPlan,
     TravelPlanningSession,
     TravelPreferenceProfile,
@@ -161,6 +162,7 @@ def clear_user_fed_data(user) -> dict:
         investment_doc_qs.delete()
         Investment.objects.filter(user=user).delete()
 
+        MobilityMoneySnapshot.objects.filter(user=user).delete()
         BikeIssueReport.objects.filter(user=user).delete()
         BikeServiceRecord.objects.filter(user=user).delete()
         FuelRefillLog.objects.filter(user=user).delete()

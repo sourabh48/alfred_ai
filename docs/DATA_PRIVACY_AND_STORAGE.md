@@ -48,6 +48,12 @@ deletion cascades it. Neither snapshot type adds historical currency metadata.
 CareerProfileMoneySnapshot retains original salary under the same owner boundary;
 profile deletion keeps its unlinked recovery evidence, while owner reset/account
 deletion removes it. It is not exposed by Career APIs and does not encrypt the DB.
+MobilityMoneySnapshot similarly retains the original nine money fields and typed
+source/parent links for the development Mobility migration. Source deletion
+unlinks its evidence without recreating deleted records; owner reset/account
+deletion removes owned snapshots, including orphans. Mobility APIs exclude these
+snapshots. They share canonical database storage protections, not memory-journal
+encryption, and do not establish historical currency.
 This evidence is not exposed by Budget APIs. Deleting a Budget does not destroy
 its recovery evidence; owner reset/account deletion removes that owner's
 snapshots, including orphan rows. It lives in the canonical financial database

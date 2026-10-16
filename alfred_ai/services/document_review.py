@@ -14,6 +14,7 @@ from .upload_limits import parser_budget
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services import job_intelligence, resume_intelligence
 from apps.expenses.models import StatementUpload
+from apps.expenses.money import money_float
 from apps.expenses.services.statement_lifecycle import delete_statement_upload, queue_statement_retry, retry_statement_upload
 from apps.integrations.models import CreditReportUpload, CreditScore
 from apps.integrations.services.credit_report_parser import credit_report_parser
@@ -2555,7 +2556,7 @@ def _vehicle_document_parse_fields(document: BikeDocument, payload: dict | None,
             "service_advisor_name": service_data.get("service_advisor_name") or service_data.get("advisor_name", ""),
             "service_advisor_contact": service_data.get("service_advisor_contact") or service_data.get("advisor_contact", ""),
             "service_center_name": service_data.get("service_center", "") or source.get("service_center_name", ""),
-            "total_customer_amount": service_data.get("total_customer_amount") or service_data.get("cost") or document.premium_amount or 0,
+            "total_customer_amount": service_data.get("total_customer_amount") or service_data.get("cost") or money_float(document.premium_amount),
         }.items()
         if value not in ("", None, [], {})
     }

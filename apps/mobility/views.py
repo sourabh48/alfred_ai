@@ -14,6 +14,8 @@ from rest_framework.views import APIView
 from alfred_ai.pagination import OptionalPageNumberPagination
 from alfred_ai.services import record_parser_learning
 from alfred_ai.services.materialized_cache import materialize_payload
+from apps.expenses.money import money_float
+from apps.expenses.services.financial_intelligence import _numeric_currency_payload
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.reports.services import operational_logging_service
 from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto
@@ -630,7 +632,7 @@ class TravelPlanDetailView(RetrieveUpdateDestroyAPIView):
             if changed:
                 for key, val in {"selected_destination":plan.destination, "available_start_date":str(plan.start_date) if plan.start_date else None,
                                  "available_end_date":str(plan.end_date) if plan.end_date else None, "trip_duration":plan.duration_days or None,
-                                 "budget":plan.budget, "transport_mode":plan.transport_mode, "vehicle_profile":plan.vehicle_profile_id}.items():
+                                 "budget":money_float(plan.budget), "transport_mode":plan.transport_mode, "vehicle_profile":plan.vehicle_profile_id}.items():
                     if val is None:
                         session.state.pop(key,None)
                     else:
@@ -744,7 +746,7 @@ class MobilityDashboardView(APIView):
             user_id=request.user.id,
             revision=revision,
             ttl_seconds=45,
-            builder=lambda: self._build_payload(request),
+            builder=lambda: _numeric_currency_payload(self._build_payload(request)),
         )
         return Response(payload)
 
@@ -876,7 +878,7 @@ class BikeServiceDashboardView(APIView):
             user_id=request.user.id,
             revision=revision,
             ttl_seconds=45,
-            builder=lambda: self._build_payload(request),
+            builder=lambda: _numeric_currency_payload(self._build_payload(request)),
         )
         return Response(payload)
 

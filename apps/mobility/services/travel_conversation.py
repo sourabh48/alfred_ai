@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from apps.expenses.money import money_float
 from apps.mobility.models import BikeProfile, TravelMessage, TravelPlan, TravelPlanningSession
 from .travel_catalog import ALIASES, CITIES, DESTINATIONS, lookup
 from .travel_discovery import budget_for, candidates_for, fact, learn, profile_for, value
@@ -41,7 +42,7 @@ def new_session(user, plan=None):
         session.state = deepcopy(plan.planning_state)
         for key, val in {"selected_destination": plan.destination, "available_start_date": plan.start_date.isoformat() if plan.start_date else None,
                          "available_end_date": plan.end_date.isoformat() if plan.end_date else None,
-                         "budget": plan.budget, "transport_mode": plan.transport_mode, "trip_duration": plan.duration_days or None}.items():
+                         "budget": money_float(plan.budget), "transport_mode": plan.transport_mode, "trip_duration": plan.duration_days or None}.items():
             if val is not None:
                 session.state[key] = fact(val, "saved_plan", True)
         session.itinerary = plan.itinerary
@@ -463,7 +464,7 @@ def save_plan(session, draft=False):
     session.status = "draft" if draft else "planned"
     session.save()
     if not draft:
-        for key, val in {"typical_duration":plan.duration_days, "typical_spend":plan.budget, "preferred_transport":plan.transport_mode}.items():
+        for key, val in {"typical_duration":plan.duration_days, "typical_spend":money_float(plan.budget), "preferred_transport":plan.transport_mode}.items():
             learn(session.user,key,val,f"Saved trip: {plan.title}",.5)
     say(session, "Draft saved. You can return to this conversation later." if draft else "Travel Plan saved with your itinerary, research and conversation. No retyping needed.")
     return plan

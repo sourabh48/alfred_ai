@@ -1,12 +1,16 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.utils import timezone
 from rest_framework import serializers
+from apps.expenses.money import NumericMoneySerializerField, money_float
 
 from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto
 
 
 class BikeProfileSerializer(serializers.ModelSerializer):
+    estimated_market_value = NumericMoneySerializerField(required=False)
+    monthly_income_support = NumericMoneySerializerField(required=False)
     verification_status_label = serializers.CharField(source="get_verification_status_display", read_only=True)
     vehicle_type_label = serializers.CharField(source="get_vehicle_type_display", read_only=True)
     usage_pattern_label = serializers.CharField(source="get_usage_pattern_display", read_only=True)
@@ -63,6 +67,7 @@ class BikeProfileSerializer(serializers.ModelSerializer):
 
 
 class BikeServiceRecordSerializer(serializers.ModelSerializer):
+    cost = NumericMoneySerializerField(required=False)
     service_type_label = serializers.CharField(source="get_service_type_display", read_only=True)
     source_mode_label = serializers.CharField(source="get_source_mode_display", read_only=True)
     bike_profile_name = serializers.CharField(source="bike_profile.display_name", read_only=True)
@@ -114,6 +119,7 @@ class BikeServiceRecordSerializer(serializers.ModelSerializer):
 
 
 class FuelRefillLogSerializer(serializers.ModelSerializer):
+    total_cost = NumericMoneySerializerField(required=False)
     bike_profile_name = serializers.CharField(source="bike_profile.display_name", read_only=True)
     bike_profile = serializers.PrimaryKeyRelatedField(queryset=BikeProfile.objects.all(), allow_null=True, required=False)
     actual_mileage_kmpl = serializers.SerializerMethodField()
@@ -154,7 +160,7 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
     def get_fuel_price_per_liter(self, obj):
         if not obj.fuel_liters:
             return 0
-        return round((obj.total_cost or 0) / max(obj.fuel_liters, 0.01), 2)
+        return money_float(Decimal(str(obj.total_cost or 0)) / max(Decimal(str(obj.fuel_liters)), Decimal('0.01')))
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -185,6 +191,7 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
 
 
 class TravelPlanSerializer(serializers.ModelSerializer):
+    budget = NumericMoneySerializerField(required=False)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     transport_mode_label = serializers.CharField(source="get_transport_mode_display", read_only=True)
     duration_days = serializers.IntegerField(read_only=True)
@@ -248,6 +255,7 @@ class TravelPlanSerializer(serializers.ModelSerializer):
 
 
 class TripLogSerializer(serializers.ModelSerializer):
+    spend_amount = NumericMoneySerializerField(required=False)
     travel_plan_title = serializers.CharField(source="travel_plan.title", read_only=True)
 
     class Meta:
@@ -347,6 +355,7 @@ class TripPhotoSerializer(serializers.ModelSerializer):
 
 
 class BikeIssueReportSerializer(serializers.ModelSerializer):
+    projected_cost = NumericMoneySerializerField(read_only=True)
     system_label = serializers.CharField(source="get_system_display", read_only=True)
     severity_label = serializers.CharField(source="get_severity_display", read_only=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
@@ -358,7 +367,7 @@ class BikeIssueReportSerializer(serializers.ModelSerializer):
     travel_plan = serializers.PrimaryKeyRelatedField(queryset=TravelPlan.objects.all(), allow_null=True, required=False)
     odometer_km = serializers.IntegerField(allow_null=True, required=False)
     next_action_at = serializers.DateTimeField(allow_null=True, required=False)
-    actual_cost = serializers.FloatField(allow_null=True, required=False)
+    actual_cost = NumericMoneySerializerField(allow_null=True, required=False)
 
     class Meta:
         model = BikeIssueReport
@@ -436,6 +445,7 @@ class BikeIssueReportSerializer(serializers.ModelSerializer):
 
 
 class BikeDocumentSerializer(serializers.ModelSerializer):
+    premium_amount = NumericMoneySerializerField(required=False)
     document_type_label = serializers.CharField(source="get_document_type_display", read_only=True)
     verification_status_label = serializers.CharField(source="get_verification_status_display", read_only=True)
     parser_status_label = serializers.CharField(source="get_parser_status_display", read_only=True)

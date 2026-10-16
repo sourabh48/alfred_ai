@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 from .models import BikeProfile, TravelFeedback, TravelPlan, TravelPlanningSession, TripPhoto
 from .serializers import TravelPlanSerializer
 from .services.travel_conversation import STYLE_WORDS, new_session, save_plan, send_message
+from apps.expenses.money import money_float
 from .services.travel_discovery import fact, learn, profile_for, value
 from .services.travel_research import STAGES, TERMINAL, evidence_payload, queue_research
 from .services.travel.presentation import age_saved_facts
@@ -237,7 +238,7 @@ class TravelFeedbackView(APIView):
         for tag in disliked:
             learn(request.user, tag, False, f"Trip feedback: {plan.title}", .9)
         learn(request.user, "typical_duration", plan.duration_days, f"Completed trip: {plan.title}", .65)
-        learn(request.user, "typical_spend", plan.budget, f"Completed trip budget: {plan.title}", .55)
+        learn(request.user, "typical_spend", money_float(plan.budget), f"Completed trip budget: {plan.title}", .55)
         return Response({"saved": True})
 
 

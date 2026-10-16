@@ -1,5 +1,66 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## FIN-MONEY User/Career/Mobility validation — 2026-10-16
+
+Worktree F:/ALFRED_DEV/post-audit; branch feature/fin-money-tail-20261016, based on
+814d4dad. User implementation 2f48d3edf50555299e4072dfd2f9441a3b435af9 and Career
+f8c7ebb2400113713ba640e43e76d8340e4607b5 are committed. This checkpoint accompanies
+the separate Mobility unit; verify actual HEAD. Frozen release/post-audit-runtime-
+20261016 remains exactly 4aa7ac70fa27c1410e695470af5c3987235244b1; do not move,
+rebuild or reuse its old release counts as proof of these new schema changes.
+
+New migrations in this task: users.0003_user_money_decimal,
+career.0005_career_salary_decimal, mobility.0013_mobility_money_decimal. All are
+separate domain conversions with retained original values, applied markers and
+guarded rollback. The prior Budget unit is untouched. Mobility covers nine money
+fields/7 models with typed source and original parent/owner guards, preserving
+null versus zero. Decimal API/storage/caller boundaries, owner reset and private
+snapshot retention are complete; quantities/rates/model statistics remain separate.
+No currency inferred. PROJECT_STATUS is authoritative and now contains the scoped
+FIN-CURRENCY proposal; schema/FX/multi-currency implementation remains unapproved.
+
+Evidence root artifacts/post-audit/fin-money-profiles-20261016. Final combined
+money-integration-final: 156 backend PASS, no skips/failures. mobility-browser-final:
+3 Chrome PASS (vehicle accounting, invoice exact-cent correction, Travel saved
+plan/reload +390/768 viewports); screenshots reviewed, Travel console empty.
+User browser two and Career browser one previously PASS in their own units.
+money-system-final: system/drift and exact one Mobility migration from 0012 PASS.
+Earlier User/Career plans are exactly one respective migration. Independent alias
+SQLite backup/restore, integrity/FKs, typed unrelated rows and source bytes,
+guarded forward/reverse, and zero cent-valued baseline mismatches PASS.
+Enhanced three-domain-rehearsal-verified: one PASS after the combined run. It
+starts at users.0002/career.0004/mobility.0012, asserts precisely the three new
+migrations, checks converted monetary equality and strict typed hashes for every
+unconverted column/table, then exact reverse/source bytes. SQLite zero affinity
+changes in converted columns are expected, not a financial mismatch; an initial
+overstrict whole-table assertion was corrected without changing runtime code.
+mobility-outputs-final: one strengthened exact numeric dashboard/fuel/per-km
+output regression PASS. Only test assertions changed after the combined run;
+do not inflate its 156 count with these two overlapping enhanced tests.
+
+Failures retained: mobility-focused found a Decimal/float accumulator in shared
+vehicle positions; fixed with Decimal accumulation. mobility-focused-fixed then
+found only a test expectation after a successful edit; corrected. mobility-browser
+and travel-decimal-before exposed saved budget Decimal in JSON state/preferences;
+fixed explicit numeric JSON boundaries in new_session/save/feedback, new regression
+PASS. First broad money-final-integration also used the wrong projection test
+module name; final invocation uses test_career_projection_simulation and passes.
+Do not count these diagnostic runs as successful or add overlapping suite counts.
+
+Production remains DOWN: read-only production-health-final.json at 09:06 UTC has
+zero listeners/runtime processes; main HEAD 3932f391. No production DB opened,
+service restarted, configuration/ACL/key/backup/remote/provider action. The earlier
+stale runtime marker predates reboot; crash cause is not proven. Operator action
+requires separate authorization. AWS remains retired; real OpenAI/cloud OFF.
+
+Safe resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
+git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 125.
+Do not rerun audit, Banking fix, Budget migration or M16-M21 full gates. No new
+implementation until current committed evidence is read. Currency is a separate
+decision: unknown historical currency stays unknown, no display-INR backfill.
+Future release integration/package/real-account/production rollout remain gated;
+this work does not alter frozen 4aa7ac70 or authorize a new deployment.
+
 ## FIN-MONEY Career completion — 2026-10-16
 
 User source committed `2f48d3edf50555299e4072dfd2f9441a3b435af9`; same isolated

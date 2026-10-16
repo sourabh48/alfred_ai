@@ -8,6 +8,92 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
+### FIN-MONEY — User, Career and Mobility tail complete locally, 2026-10-16
+
+User source: `2f48d3edf50555299e4072dfd2f9441a3b435af9`; Career source:
+`f8c7ebb2400113713ba640e43e76d8340e4607b5`. This checkpoint accompanies the
+separate Mobility implementation, based on Career. All audited tail register
+fields are now Decimal cents in development; the earlier Budget unit is retained
+without repeating its migration tests. No production remediation/deployment is
+claimed. Frozen release `4aa7ac70` remains unchanged and is not this new source.
+
+Mobility scope: BikeProfile estimated_market_value/monthly_income_support,
+BikeServiceRecord.cost, FuelRefillLog.total_cost, TravelPlan.budget,
+TripLog.spend_amount, BikeIssueReport projected_cost/nullable actual_cost,
+BikeDocument.premium_amount. Reuses M13 finite bounded 14/2 HALF_UP storage and
+numeric API fields. Existing signed-value rules and Travel API negative-budget
+rejection remain; null actual cost differs from zero. Measurements, rates,
+confidence, raw parsed evidence and fingerprints remain unchanged.
+
+`mobility.0013_mobility_money_decimal` is the sole Mobility schema unit, depending
+on mobility.0012, the existing expenses.0005 policy and swappable User. It validates
+all source amounts/parent owners before capture, retains owned originals and
+typed source/parent links, and applies normalized cents with markers. Reverse
+restores only unchanged applied values with matching source/owner/parents; edits,
+new rows and deleted records survive safely. Reset removes owned orphan evidence.
+No currency column, inference, dependency upgrade or unrelated migration.
+
+Derived boundaries were updated where Decimal money met float quantities or JSON:
+canonical vehicle cost accumulation, fuel/cost-per-km output, service model
+features, dashboards/cache, saved-plan state/preferences/feedback and document
+review fallback. Money remains Decimal through canonical accumulation; existing
+numeric API/JSON and statistical model contracts are preserved. Initial tests
+reproduced mixed-type and Travel JSON failures; regression evidence is retained.
+
+Final `money-integration-final`: **156 backend PASS**, zero failures/skips in one
+actual combined run covering User/Career/Mobility, profile boundaries, canonical
+finance, projections, reset, vehicle accounting, APIs, extraction/review and Travel.
+Final `mobility-browser-final`: **3 Chrome PASS**, vehicle accounting, invoice-cent
+correction and saved-plan desktop/mobile reload; screenshots reviewed and Travel
+console empty. Earlier User two/Career one focused Chrome flows also passed.
+Final system/drift/exact Mobility migration-plan checks PASS. New migration tests
+cover originals, nullable zero, finite/boundary inputs, owner/parent guards,
+idempotence, edits/deletion and zero cent-history canonical baseline mismatches.
+`three-domain-rehearsal-verified`: one enhanced rehearsal PASS after the combined
+run, starting with all three preceding schemas and asserting exactly the three
+User/Career/Mobility migrations. Independent SQLite backup/restore, integrity/FKs,
+converted monetary equality, unrelated typed rows, family permissions, account/
+transfer fingerprints, exact reverse and source bytes reconcile with zero
+unexpected mismatches. Converted SQLite numeric affinity can change a zero's
+storage type; compare its exact value while keeping strict type hashes for all
+unconverted columns. This is not a financial discrepancy or a waived check.
+`mobility-outputs-final`: one strengthened output regression PASS, exact numeric
+dashboard totals and HALF_UP fuel-price/cost-per-km formatting. These two
+post-combined test enhancements changed assertions only, not runtime source;
+their counts are reported separately, not added to 156.
+Evidence: `artifacts/post-audit/fin-money-profiles-20261016/`; failed initial runs
+remain diagnostic evidence, not accepted outcomes. No full release/package gate.
+
+Production read-only check at 2026-10-16 09:06 UTC: no port-8000 listener or
+production runtime process; HEAD remains 3932f391. Prior stale pre-reboot state is
+preserved. No restart, repair, live DB access, backup/ACL/key/remote action. AWS
+retired; real OpenAI/cloud OFF. Next is the separate currency design below and a
+future authorized candidate integration/release gate, not a production migration.
+
+### FIN-CURRENCY — separate design disposition, 2026-10-16
+
+No currency migration or historical backfill is part of FIN-MONEY. Source review:
+User, Career and the nine Mobility money fields do not persist a currency code;
+neither do the existing Expense/Bank/Loan/Investment monetary registers. The
+legacy `static/js/app.js::formatCurrency` INR convention is presentation only.
+`hybrid_intelligence.source_context` deliberately emits `currency: null` and
+`currency_status: not_recorded`; its deterministic presentation suppresses
+unsupported model numeric/currency claims. `formatRecordedMoney` labels missing
+currency rather than inferring it. These contracts remain unchanged.
+
+Next scoped design must establish an authoritative per-record currency code or
+explicit unknown, with source/owner attestation and correction provenance. Never
+derive historical currency from country, locale, INR labels or an AI narrative.
+Keep unknown history unknown unless independent record evidence is explicitly
+reviewed. Plan per-currency totals and a separate unknown bucket; mixed-currency
+sums require an explicit, dated FX source, rate provenance and Decimal rounding
+policy. Existing aggregate behavior is a legacy convention, not verified
+multi-currency accounting. Decide which record owns currency, account/transfer
+compatibility, precision for non-cent currencies, API transitions and reversible
+migrations before implementation. This is an unapproved design proposal, not an
+implemented schema or permission for provider calls/backfill. Currency/FX tests,
+approval and release acceptance remain open; no historical value is relabeled.
+
 ### FIN-MONEY — Career salary complete locally, 2026-10-16
 
 User implementation committed as `2f48d3edf50555299e4072dfd2f9441a3b435af9`.
@@ -30,9 +116,8 @@ exact one-Career-migration plan PASS. Synthetic alias backup/restore, integrity/
 forward/reverse, raw evidence/parent/owner preservation and unrelated financial/
 family row hashes reconcile. Cent-valued salary fallback baseline unchanged.
 
-Next: Mobility's nine monetary fields across seven models, including nullable
-actual cost; preserve parent links and derived output contracts. No new full
-release/package gate and no change to frozen 4aa7ac70 or production 3932f391.
+At this Career checkpoint, Mobility was next; it is now completed above. No new
+full release/package gate and no change to frozen 4aa7ac70 or production 3932f391.
 
 ### FIN-MONEY — User income/rent complete locally, 2026-10-16
 
@@ -63,7 +148,7 @@ exactly the one User migration from the preceding schema. No production DB acces
 
 Read-only operational recheck: production port 8000 has no listener or runtime
 process; the prior stale pre-reboot runtime finding remains. No start/stop/repair.
-Next: independently scoped Career and Mobility register conversions. Currency
+The subsequent Career and Mobility conversions are completed above. Currency
 metadata/FX policy stays separate; no deployment or provider activation authorized.
 
 ### Banking regression and production diagnosis — 2026-10-16

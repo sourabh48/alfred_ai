@@ -166,7 +166,7 @@ Affected money fields: User income/rent; Budget base_budget/inflation_adjusted/s
 
 Classify money versus rates/measurements; use existing snapshot/money migration/rehearsal patterns. Preserve original values/recovery, identifiers/fingerprints/ref/transfer/loan posting and numeric API compatibility. Finance row updates only through authorized workflow.
 
-Currency is a separate scoped design: authoritative record code or UNKNOWN, approved legacy INR backfill provenance, per-currency totals, explicit dated FX sources/rounding. Never infer currency from model narratives. Keep Decimal strings and controlled cards; unknown currency remains explicit.
+Currency is a separate scoped design: authoritative record code or UNKNOWN, per-currency totals, explicit dated FX sources/rounding. Historical unknown currency stays unknown; never backfill from legacy INR display conventions, country or model narratives. Any later correction requires independent record evidence and explicit review. Keep Decimal strings and controlled cards; unknown currency remains explicit. See the current FIN-CURRENCY disposition in docs/PROJECT_STATUS.md before proposing schema changes.
 
 Tests: finite/large/cent precision, conversions, forward/reverse/idempotence, independent balance/loan/transfer comparisons, multi-currency/unknown/FX provenance and no LLM numeric override. Done: reviewed migration package, no production application until separately authorized.
 
