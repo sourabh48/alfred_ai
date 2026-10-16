@@ -7,6 +7,7 @@ import unittest
 import threading
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import cache
@@ -883,6 +884,107 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
         self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
         self.capture('bank-evidence-correction-mobile')
+
+    def test_bank_grounding_review_to_answer_correction_and_private_citation(self):
+        from datetime import date
+        from unittest.mock import Mock
+        from apps.expenses.models import BankAccount
+        from apps.expenses.services.statement_evidence import evidence, review
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        row,upload,item=self.bank_statement_evidence_fixture(); owner=self.scenario['user']
+        # An older citation must reopen even when it is outside the bounded recent-record menu.
+        Expense.objects.bulk_create([Expense(user=owner,bank_account=row.bank_account,statement_upload=upload,
+            source='bank_statement',amount='1.23',transaction_date=date(2026,9,day)) for day in range(2,22)])
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(); local.reason.return_value='Synthetic hypothesis: review this selected record and its source.'
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner',return_value=Mock()))
+        cloud=self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.reason_with_memory',side_effect=AssertionError('No bank cloud')))
+        self.login(); self.browser.get(self.live_server_url+f'/ai/insights/?scope=bank_statements&transaction={row.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
+        question='Explain this synthetic statement record'
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys(question)
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
+        self.assertIn('Local evidence check',self.text('intelligenceAnswers'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),question)
+        local.reason.assert_not_called()
+        self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_enabled())
+        self.capture('bank-grounding-unreviewed')
+        self.memory_click('#intelligenceAnswers a[href^="/documents/statements/"]')
+        self.wait.until(lambda _: self.text('statementEvidenceStatus')=='needs_owner_review')
+        self.memory_click('#statementEvidenceConfirm'); self.memory_click('#statementEvidenceForm button[type=submit]')
+        self.wait.until(lambda _: self.text('statementEvidenceStatus')=='owner_confirmed')
+        self.memory_click('a[href^="/ai/insights/?scope=bank_statements"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys(question)
+        before=[list(model.objects.values()) for model in (Expense,BankAccount)]
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'owner_confirmed_statement_record' in self.text('intelligenceAnswers'))
+        self.assertIn(upload.file_name,self.text('intelligenceAnswers'))
+        self.assertIn('2.68 · Currency not recorded',self.text('intelligenceAnswers'))
+        self.assertIn('2026-09-01',self.text('intelligenceAnswers'))
+        self.assertEqual([list(model.objects.values()) for model in (Expense,BankAccount)],before)
+        self.assertEqual(MemoryStore(settings.ALFRED_MEMORY_DIR,embedder=SyntheticEmbeddings()).list_memories(owner),[])
+        self.capture('bank-grounding-confirmed-source-card')
+        status=self.browser.execute_async_script('''
+            const [id,done]=arguments;
+            Alfred.fetchJSON(`/api/expenses/${id}/`,{method:'PATCH',body:JSON.stringify({amount:'7.77'})})
+                .then(()=>done(200)).catch(error=>done(error.status));
+        ''',row.pk)
+        self.assertEqual(status,200)
+        self.memory_click('#intelligenceNew')
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys(question)
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
+        self.assertNotIn('2.68',self.text('intelligenceAnswers'))
+        self.assertNotIn('7.77',self.text('intelligenceAnswers'))
+        self.assertEqual(evidence(owner,row.pk)['original']['amount'],'2.68')
+        current=evidence(owner,row.pk); review(owner,row.pk,revision=current['revision'],confirm=True)
+        self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: '7.77 · Currency not recorded' in self.text('intelligenceAnswers'))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.querySelector('#intelligenceAnswers article:last-child').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('bank-grounding-corrected-mobile')
+        self.browser.execute_script("document.querySelector('#intelligenceAnswers article:last-child .recorded-amount').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('bank-grounding-corrected-amount-mobile')
+        cloud.assert_not_called()
+
+    def test_bank_grounding_outage_and_source_revocation_preserve_draft(self):
+        from unittest.mock import Mock
+        from apps.expenses.services.statement_evidence import evidence, review
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        row,upload,item=self.bank_statement_evidence_fixture(); owner=self.scenario['user']
+        review(owner,row.pk,revision=item['revision'],confirm=True)
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(); local.reason.side_effect=EmbeddingUnavailable('SYNTHETIC-PRIVATE-DETAIL')
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner',return_value=Mock()))
+        cloud=self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.reasoning_provider',side_effect=AssertionError('No fallback')))
+        self.login(); self.browser.get(self.live_server_url+f'/ai/insights/?scope=bank_statements&transaction={row.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
+        question='Keep this synthetic question through outage'
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys(question)
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),question)
+        self.assertNotIn('SYNTHETIC-PRIVATE-DETAIL',self.text('intelligenceFeedback'))
+        current=evidence(owner,row.pk); review(owner,row.pk,revision=current['revision'],confirm=True,revoke=True)
+        local.reason.side_effect=None; local.reason.return_value='Synthetic local answer'
+        local.reason.reset_mock()
+        self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
+        local.reason.assert_not_called(); cloud.assert_not_called()
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),question)
+        self.assertEqual(self.text('conversationHistoryStatus'),'Unavailable · operator retention/recovery approval required')
+        self.capture('bank-grounding-outage-revocation-draft')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('intelligenceAnswers'),'')
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceStatement').find_elements(self.By.TAG_NAME,'option'),[])
 
     def click_upload_button(self, form_id):
         button = self.browser.find_element(self.By.CSS_SELECTOR, f"#{form_id} button[type=submit]")

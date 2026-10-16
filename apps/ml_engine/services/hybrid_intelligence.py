@@ -44,8 +44,21 @@ class OllamaReasoner(OllamaEmbeddings):
         return message['content']
 
 
-def source_context(user,scope,document_id=None):
+def source_context(user,scope,document_id=None,transaction_id=None):
     if scope=='general': return []
+    if scope=='bank_statements':
+        from apps.expenses.services.statement_evidence import evidence
+        record=evidence(user,transaction_id)
+        data={**record['statement'], 'transaction_date':record['current']['transaction_date'],
+            'verification':record['verification'], 'original_status':record['original_status'],
+            'limitations':record['limitations'], 'amounts':{}}
+        if record['verification']=='owner_confirmed':
+            data.update({key:record['current'][key] for key in ('direction','category','classification')})
+            data['amounts']={key:{'amount':record['current'][key], 'currency':None,
+                'currency_status':'not_recorded', 'evidence_status':'unavailable' if record['current'][key] is None else 'owner_confirmed'} for key in ('amount','closing_balance')}
+        return [{'ref':f"bank-statement-{record['statement']['document_id']}-transaction-{record['transaction_id']}",
+            'classification':'owner_confirmed_statement_record' if record['verification']=='owner_confirmed' else 'unverified_statement_record',
+            'url':record['citation_url'], 'verified_at':record['verified_at'], 'revision':record['revision'], 'data':data}]
     if scope=='finance':
         from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
         baseline=resolve_canonical_financial_baseline(user)
@@ -81,7 +94,7 @@ def present_answer(result,scope,query=''):
     for source in result.get('sources',[]): claims=claims.replace(str(source['ref']),'')
     currency=any(category(char)=='Sc' for char in claims) or re.search(r'\b(?:INR|USD|EUR|GBP|JPY|AUD|CAD|CNY|CHF|dollars?|rupees?|euros?|pounds?|yen)\b',claims,re.I)
     intent=claims+' '+(query if scope=='general' else '')
-    financial=scope in ('finance','documents') or re.search(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',intent,re.I)
+    financial=scope in ('finance','documents','bank_statements') or re.search(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',intent,re.I)
     numbers=re.search(r'\d',claims)
     withheld=bool((currency and (numbers or financial)) or (financial and numbers))
     if withheld:
@@ -90,20 +103,34 @@ def present_answer(result,scope,query=''):
     return result
 
 
-def hybrid_answer(store,user,query,*,scope='general',document_id=None,cloud_consent=False,query_sensitivity='sensitive',local=None):
+def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,cloud_consent=False,query_sensitivity='sensitive',local=None):
     owner=_owner(user)
-    if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents')
+    if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents','bank_statements')
             or type(cloud_consent) is not bool or query_sensitivity not in ('public','personal','sensitive')
             or (scope=='documents' and (type(document_id) is not int or document_id<1))
-            or (scope!='documents' and document_id is not None)):
+            or (scope!='documents' and document_id is not None)
+            or (scope=='bank_statements' and (type(transaction_id) is not int or transaction_id<1))
+            or (scope!='bank_statements' and transaction_id is not None)):
         raise ValueError('Choose a bounded question and an owned supported source.')
-    tools=source_context(user,scope,document_id)
+    if scope=='bank_statements' and cloud_consent:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied('Bank-statement evidence is local only.')
+    tools=source_context(user,scope,document_id,transaction_id)
+    if scope=='bank_statements' and tools[0]['data']['verification']!='owner_confirmed':
+        return {'answer':'This record is not currently supported by owner-confirmed source evidence. The source may be unreviewed, missing, incomplete or conflicting. Open the private citation and review it before asking again.',
+            'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
+            'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}
     retrieval_error=None
     try: memories=store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
     except EmbeddingUnavailable as exc:
         memories=[]
         retrieval_error=safe_error_details(exc,'Saved-memory retrieval is unavailable; this answer has no saved-memory grounding.',logger_name=__name__)
-    payload={'query':query,'sources':tools.copy()}; included=[]
+    # Filenames and private citation URLs are UI metadata, never model instructions.
+    model_tools=tools if scope!='bank_statements' else [{
+        'ref':source['ref'],'classification':source['classification'],
+        'data':{key:value for key,value in source['data'].items() if key in
+            ('transaction_date','statement_start','statement_end','verification','direction','category','classification','amounts')}} for source in tools]
+    payload={'query':query,'sources':model_tools.copy()}; included=[]
     if len(json.dumps(payload,ensure_ascii=False,allow_nan=False).encode())>4096: raise ValueError('Select smaller local source context.')
     for item in memories:
         source={'ref':item['id'],'classification':'owner_verified_statement','data':item['content']}
@@ -120,7 +147,10 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,cloud_cons
         store._expire(db,owner)
         live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
         if any(item['id'] not in live for item in included): raise MemoryConflict('Answer context changed during inference.')
-    if source_context(user,scope,document_id)!=tools: raise MemoryConflict('Canonical source changed during inference.')
+    from django.http import Http404
+    try: fresh=source_context(user,scope,document_id,transaction_id)
+    except Http404 as exc: raise MemoryConflict('Canonical source became inaccessible during inference.') from exc
+    if fresh!=tools: raise MemoryConflict('Canonical source changed during inference.')
     return present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
         'memory_retrieval_available':retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],

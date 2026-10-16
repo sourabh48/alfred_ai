@@ -8,11 +8,12 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
-### AI-GROUND — bank-statement provenance and owner review, 2026-10-16
+### AI-GROUND — bank-statement provenance and local assistant, 2026-10-16
 
 Based exactly on AI-HISTORY `20b916ee00867b0f0cdcb5c758c697762fda897b`; its
-encryption, retention and default-OFF operator gate are preserved. The first unit
-adds [statement evidence](../apps/expenses/services/statement_evidence.py),
+encryption, retention and default-OFF operator gate are preserved. Provenance unit
+`35bf1a9e7377f7fa8ecd23f09b753dcddef09033` adds
+[statement evidence](../apps/expenses/services/statement_evidence.py),
 [owner APIs](../apps/ml_engine/api/statements.py) and an authorized
 `/documents/statements/<document>/transactions/<record>/` review page. Import
 snapshots preserve original structured values, parser monetary identity, dates,
@@ -52,9 +53,61 @@ System, drift, disposable migration and pending-migration checks PASS.
 correction, withdrawal and mobile layout; desktop/mobile screenshots reviewed.
 Earlier browser timing/helper failures are preserved and corrected, not counted.
 
-Next unit connects this reviewed source to the existing Ollama/hybrid assistant,
-with explicit uncertainty, typed amounts, fresh-source checks and local-only
-citations. The review page does not yet claim assistant bank-document grounding.
+The next bounded unit connects reviewed records to the existing
+[hybrid assistant](../apps/ml_engine/services/hybrid_intelligence.py), API and UI
+with `scope=bank_statements` plus one owned `transaction_id`. The recent menu is
+bounded; a citation can reopen an older record through the same owner API. Source
+cards show document name, statement period, transaction date/reference, verification,
+limitations and **current** exact-decimal amounts. Corrected amounts require fresh
+confirmation; original extraction remains on the review page. Missing balances
+remain unavailable. No totals, FX, new money arithmetic or financial write tools.
+
+Unreviewed/partial/conflicting/missing sources return `insufficient_evidence` before
+memory retrieval or inference; the UI preserves the question and offers source
+review/retry. Deleted, reparented or changed sources and confirmation revocation/
+reconfirmation during inference reject the answer. Missing accounts fail closed.
+Names, original OCR/PDF text, account numbers, transaction descriptions and private
+citation URLs do not enter the bank tool prompt. Only bounded structured canonical
+fields are supplied locally. Explicit cloud consent is refused for this scope;
+local model failure cannot fall back to OpenAI. The existing numeric/currency
+narrative suppression applies, so only source cards display financial values.
+Suggestions remain unverified and require explicit review; no automatic learning.
+
+History remains operator-disabled. Synthetic-only compatibility checks prove a
+local model turn can retain encrypted reference-only history, while an evidence
+warning is never saved as a model turn. Existing question digests stay unchanged
+unless a transaction selection is supplied. Pagehide clears private selection and
+answers; CSRF/session authorization and owner-only citation/download checks remain.
+
+`bank-grounding-integration`: **202 backend PASS**, zero failures/skips, covering
+bank provenance/import/review, existing loan grounding, history, privacy, upload
+limits, session security and reset. This run includes the nine source-mutation
+cases during inference. A final added null-balance/new-conflict case passes
+separately (`bank-null-conflict-final`, **1 PASS**); runs are not added to earlier
+overlapping totals. Final `bank-final-source`: **34 backend PASS**, zero failures/
+skips, rechecks all 11 bank-grounding cases plus history/UI on the final source.
+`bank-browser-final`: **4 Chrome PASS**, zero failures/skips:
+bank review→answer→correction, outage/revocation/draft/pagehide, and existing
+memory/finance/Travel/source and currency-card compatibility. The bank flow also
+reopens a record outside the recent menu. Desktop/mobile screenshots reviewed;
+synthetic example: “Synthetic September statement.pdf”, period 2026-09-01 to
+2026-09-30, `bank-statement-1-transaction-21`, current amount **7.77**, original
+**2.68**, **currency not recorded**, owner-only
+`/documents/statements/1/transactions/21/`. IDs are synthetic examples, not live IDs.
+An initial browser expectation used different punctuation from the established
+money formatter; the test now checks the existing formatter. No runtime financial
+format or currency convention was changed to satisfy the test.
+
+Remaining grounding scope: reviewed linked bank transactions, verified loan closure
+evidence and owner-verified memories, **not arbitrary PDF Q&A or whole-statement
+completeness**. No automatic historical evidence backfill or inferred alternate
+source link for duplicates. Real-account/private-document, actual model narrative
+quality and packaged acceptance remain unperformed for this source. Next safe
+AI-GROUND unit is bounded owner-scoped canonical expense/budget/portfolio evidence
+selection with provenance/uncertainty; keep aggregate/currency work gated by C1–C10.
+Changed-source privacy/link/identity validation PASS: 21 files, 71 local references,
+zero findings; currency contract text and frozen/master identities unchanged.
+JavaScript syntax, diff checks and AST-only graph update PASS. No new dependency.
 Currency remains unrecorded; C1–C10 below remain unapproved. History activation,
 OpenAI and real cloud sync remain OFF; AWS stays retired. Frozen `4aa7ac70`,
 production, its database, backups and GitHub are unchanged. Production DOWN is the

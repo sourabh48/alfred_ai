@@ -49,9 +49,13 @@
         <select id="intelligenceScope" class="form-select mb-2">
             <option value="general">Verified memories</option><option value="finance">My financial snapshot</option>
             <option value="travel">My Travel preferences</option><option value="documents">Verified loan closure evidence</option>
+            <option value="bank_statements">My bank-statement records</option>
         </select>
         </div><div id="intelligenceDocumentField" class="d-none mb-2"><label for="intelligenceDocument" class="form-label">Verified evidence</label>
-            <select id="intelligenceDocument" class="form-select" disabled required></select></div></div>
+            <select id="intelligenceDocument" class="form-select" disabled required></select></div>
+        <div id="intelligenceStatementField" class="d-none mb-2"><label for="intelligenceStatement" class="form-label">Source transaction</label>
+            <select id="intelligenceStatement" class="form-select" disabled required></select>
+            <p class="small">Choose a record, then open its citation to check and confirm it. Parser success alone is not verification. No currency is inferred.</p></div></div>
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
             This question is public. Allow approved cloud fallback for this question if Ollama fails.</label>
         <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
@@ -145,5 +149,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1"></script>
-<script src="/static/js/intelligence.js?v=3"></script>
+<script src="/static/js/intelligence.js?v=4"></script>
 {% endblock %}

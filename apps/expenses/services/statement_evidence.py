@@ -93,7 +93,7 @@ def _state(row, proof):
             (payload.get('ocr_progress') or {}).get('is_partial'))))
     if status == 'available':
         normalize = lambda value: ''.join(char.casefold() for char in value if char.isalnum())
-        if (row.bank_account_id != upload.bank_account_id or
+        if (row.bank_account_id is None or upload.bank_account_id is None or row.bank_account_id != upload.bank_account_id or
                 (row.bank_account and upload.account_number and normalize(row.bank_account.account_number) != normalize(upload.account_number)) or
                 (proof and proof.statement_upload_id != upload.pk) or
                 (upload.statement_start and upload.statement_end and upload.statement_start > upload.statement_end) or

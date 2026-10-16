@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const query = document.getElementById("intelligenceQuery");
     const scope = document.getElementById("intelligenceScope");
     const documentChoice = document.getElementById("intelligenceDocument");
+    const statementChoice = document.getElementById("intelligenceStatement");
     const consent = document.getElementById("intelligenceCloudConsent");
     const feedback = document.getElementById("intelligenceFeedback");
     const answers = document.getElementById("intelligenceAnswers");
@@ -45,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function forgetPrivatePage() {
         active = false; generation++; conversation = null; historyPolicy = null; requestToken = null; historyBlocked = false;
-        answers.replaceChildren(); documentChoice.replaceChildren(); empty.hidden = false;
+        answers.replaceChildren(); documentChoice.replaceChildren(); statementChoice.replaceChildren(); empty.hidden = false;
         historyList.replaceChildren(); historyTitle.value = ""; historyConsent.checked = false; historyDays.value = "7";
         query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false;
         feedback.textContent = ""; historyFeedback.textContent = ""; retry.hidden = true;
@@ -144,6 +145,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const documents = scope.value === "documents";
         document.getElementById("intelligenceDocumentField").classList.toggle("d-none", !documents);
         documentChoice.disabled = !documents;
+        const statements = scope.value === "bank_statements";
+        document.getElementById("intelligenceStatementField").classList.toggle("d-none", !statements);
+        statementChoice.disabled = !statements;
         if (resetConsent || scope.value !== "general" || !cloudAvailable || historyEnabled()) consent.checked = false;
         consent.disabled = scope.value !== "general" || !cloudAvailable || historyEnabled();
     }
@@ -154,6 +158,15 @@ document.addEventListener("DOMContentLoaded", () => {
         applyHistory(history);
         documentChoice.replaceChildren(new Option("Choose verified evidence", ""));
         (insights.assistant_documents || []).forEach(item => documentChoice.append(new Option(item.label, item.id)));
+        const selectedStatement = statementChoice.value || requestedTransaction;
+        statementChoice.replaceChildren(new Option("Choose a source transaction", ""));
+        (insights.assistant_statement_records || []).forEach(item => statementChoice.append(new Option(item.label, item.id)));
+        if (/^[1-9]\d{0,15}$/.test(selectedStatement || "") && ![...statementChoice.options].some(option => option.value === selectedStatement)) {
+            const record = await Alfred.fetchJSON(`/api/ai/statement-evidence/${selectedStatement}/`);
+            if (!active || ticket !== generation) return;
+            statementChoice.append(new Option(`${record.statement.document_name} · ${record.current.transaction_date} · record #${record.transaction_id}`, record.transaction_id));
+        }
+        if ([...statementChoice.options].some(option => option.value === selectedStatement)) statementChoice.value = selectedStatement;
         cloudAvailable = reasoning.provider_available && reasoning.policy.enabled;
         setLocalStatus(insights.local_model_status === "available" ? "Ollama available" : "Ollama unavailable", insights.local_model_status === "available" ? "ready" : "unavailable");
         document.getElementById("intelligenceCloudStatus").textContent = !reasoning.real_provider_enabled
@@ -163,7 +176,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     scope.addEventListener("change", updateScope);
     const requestedScope = new URLSearchParams(location.search).get("scope");
-    if (["finance","travel"].includes(requestedScope)) scope.value = requestedScope;
+    const requestedTransaction = new URLSearchParams(location.search).get("transaction");
+    if (["finance","travel","bank_statements"].includes(requestedScope)) scope.value = requestedScope;
     query.addEventListener("keydown", event => {
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
     });
@@ -180,7 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const question = document.createElement("p"); question.textContent = payload.query; userMessage.append(userLabel, question);
         const assistantMessage = document.createElement("div"); assistantMessage.className = "conversation-message mt-3";
         const label = document.createElement("span"); label.className = "conversation-label";
-        label.textContent = `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : "Approved cloud"}`;
+        label.textContent = result.provider === "local_evidence" ? "Local evidence check · no model used" : `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : "Approved cloud"}`;
         const answer = document.createElement("p"); answer.textContent = result.answer;
         if (historical) label.textContent = `Historical AI hypothesis · Ollama (local) · saved ${new Date(result.saved_at).toLocaleString()}`;
         assistantMessage.append(label, answer); row.append(userMessage, assistantMessage);
@@ -191,17 +205,17 @@ document.addEventListener("DOMContentLoaded", () => {
         (result.sources || []).forEach(source => {
             const reference = document.createElement("p"); reference.textContent = `Source: ${source.ref} · ${source.classification}`;
             evidence.append(reference);
-            const types = {owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence"};
+            const types = {owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence", owner_confirmed_statement_record:"Owner-confirmed bank-statement record (not independently bank-authenticated)", unverified_statement_record:"Bank-statement record · source review required"};
             const description = document.createElement("p"); description.textContent = `${types[source.classification] || 'Source'} · ${source.verified_at ? `Checked ${new Date(source.verified_at).toLocaleString()}` : 'Verification timestamp not recorded'}`; evidence.append(description);
             if (historical) description.textContent = "Saved reference only; current existence and verification have not been checked.";
-            if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "")) {
+            if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(source.url || "")) {
                 const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
             }
             if (!historical && source.data) Object.entries(source.data).forEach(([key, value]) => {
                 if (key === "metric_states" || key === "amounts" || Object.hasOwn(source.data.amounts || {},key)) return;
                 const fact = document.createElement("p");
                 const monetary = source.classification === "canonical_financial_baseline" || key === "closure_amount";
-                const display = monetary && typeof value === "number" ? Alfred.formatCurrency(value) : (typeof value === "object" ? JSON.stringify(value) : String(value));
+                const display = value === null ? "Not recorded" : monetary && typeof value === "number" ? Alfred.formatCurrency(value) : (typeof value === "object" ? JSON.stringify(value) : String(value));
                 const state = source.data.metric_states?.[key]?.status;
                 fact.textContent = `${key.replaceAll("_", " ")}: ${display}${state ? ` (${state})` : ""}`;
                 evidence.append(fact);
@@ -220,7 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
             catch (error) { if (active && ticket===generation) feedback.textContent = error.message; reviewButton.disabled = false; }
         });
         assistantMessage.append(reviewButton);
-        reviewButton.hidden = historical || Boolean(result.narrative_withheld);
+        reviewButton.hidden = historical || Boolean(result.narrative_withheld) || result.provider === "local_evidence";
         while (answers.children.length > 20) answers.firstElementChild.remove();
         evidence.open = true;
     }
@@ -238,6 +252,7 @@ document.addEventListener("DOMContentLoaded", () => {
         button.textContent = "Thinking…";
         const payload = {query: query.value, scope: scope.value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
         if (scope.value === "documents") payload.document_id = Number(documentChoice.value);
+        if (scope.value === "bank_statements") payload.transaction_id = Number(statementChoice.value);
         try {
             if (historyEnabled()) {
                 if (!conversation) conversation = await Alfred.fetchJSON("/api/ai/conversations/", {method:"POST", body:JSON.stringify({title:historyTitle.value.trim() || "Private conversation"})});
@@ -252,8 +267,14 @@ document.addEventListener("DOMContentLoaded", () => {
             renderTurn(payload, result, ticket, Boolean(result.historical));
             feedback.textContent = result.retrieval_error?.detail || "Answer ready. Review the sources before acting.";
             if (result.narrative_withheld) feedback.textContent = `Unsupported model figures were withheld. Only source-card amounts are shown. ${result.retrieval_error?.detail || ''}`;
-            setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
-            query.value = ""; requestToken = null;
+            if (result.provider === "local_evidence") {
+                feedback.textContent = "Insufficient evidence. Review the source citation, then retry. Your draft is preserved; no model or cloud was used and no turn was saved.";
+                setLocalStatus("Evidence review required · no model used", "review");
+                retry.hidden = false;
+            } else {
+                setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
+                query.value = ""; requestToken = null;
+            }
             if (historyEnabled()) await refreshHistory().catch(() => { historyPolicy = null; historyFeedback.textContent = "Answer saved, but history status could not refresh. Reload before another question."; });
         } catch (error) {
             if (active && ticket === generation) {

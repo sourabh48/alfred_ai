@@ -10,6 +10,7 @@
     <p id="statementEvidenceStatus" role="status">{{ evidence.verification }}</p>
     <p>Statement period: {{ evidence.statement.statement_start|default:"Not recorded" }} to {{ evidence.statement.statement_end|default:"Not recorded" }}.</p>
     {% if evidence.source_download_url %}<a href="{{ evidence.source_download_url }}" class="btn btn-outline-secondary mb-3">Open private source file</a>{% endif %}
+    <a href="/ai/insights/?scope=bank_statements&amp;transaction={{ evidence.transaction_id }}" class="btn btn-outline-primary mb-3">Ask ALFRED about this record</a>
     <div class="table-responsive"><table class="table"><caption>Current records take precedence over the original parser snapshot. Currency was not recorded.</caption>
         <thead><tr><th scope="col">Field</th><th scope="col">Current record</th><th scope="col">Original extraction</th></tr></thead>
         <tbody>

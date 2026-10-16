@@ -1,11 +1,12 @@
 # ALFRED CODEX CONTINUATION STATE
 
-## AI-GROUND bank provenance/owner review — 2026-10-16
+## AI-GROUND bank provenance/local assistant — 2026-10-16
 
 Current isolated branch feature/ai-ground-bank-20261016, worktree
 F:/ALFRED_DEV/post-audit, based exactly on 20b916ee00867b0f0cdcb5c758c697762fda897b.
-This implementation/checkpoint commit follows that AI-HISTORY baseline; verify
-actual HEAD. Read docs/PROJECT_STATUS.md for the active contract. No duplicate MD.
+Provenance unit 35bf1a9e7377f7fa8ecd23f09b753dcddef09033 is committed. This next
+implementation/checkpoint follows it; verify actual HEAD. Read
+docs/PROJECT_STATUS.md for the active contract. No duplicate MD.
 
 Unit 1 implemented: additive expenses.0006 receipt model; immutable structured
 import snapshots; owner-only evidence API/review page/private-media citations;
@@ -26,13 +27,39 @@ confirmation/correction/withdrawal/mobile. Desktop/mobile screenshots reviewed.
 Earlier failed timing/helper browser attempts are retained, not final acceptance.
 No native package rebuild or full prior release/M16–M21 suite rerun.
 
-Next independently safe unit: add bank_statements scope/transaction selection to
-existing hybrid_intelligence.py and personal-insights API/UI. Verified records use
-current exact-decimal typed source cards with unknown currency; no raw documents,
-account numbers or filename instructions in model prompts. Unreviewed/conflicting/
-missing sources abstain before inference. Recheck source revision after inference;
-reject stale answers. Refuse cloud consent/fallback for this scope. Add focused
-hybrid/privacy/browser regressions, then commit/update this checkpoint.
+Unit 2 implemented: bank_statements scope/transaction selection in existing
+hybrid_intelligence.py/personal-insights API/UI, linked owner citation review and
+older-record reopening. Current typed exact amounts with unknown currency are
+separate from narrative. Unreviewed/partial/conflicting/missing evidence abstains
+before retrieval/inference. Source recheck rejects in-flight correction, metadata,
+file replacement/removal, owner reassignment, account/record deletion and withdrawal/
+reconfirmation. No raw documents/account numbers/filename instructions/private URLs
+in bank model context; no financial writes. Cloud consent/fallback refused. No
+automatic memory promotion/sync. Null closing balance explicitly unavailable.
+History warning not appended; validated local-model history stores references only.
+Default-OFF operator/privacy/retention contract unchanged.
+
+bank-grounding-integration 202 backend PASS, zero failures/skips; includes import,
+correction, owner/CSRF, loan grounding compatibility, history, upload budgets/reset.
+bank-null-conflict-final 1 additional targeted PASS after unavailable-balance
+presentation refinement. Do not sum overlapping runs. bank-browser-final 4 Chrome
+PASS, zero failures/skips: bank review/correction/older citation, outage/revocation/
+draft/pagehide, existing source/memory/finance/Travel and currency UI. Screenshots
+reviewed, including corrected 7.77 versus original 2.68 with currency unrecorded.
+First bank browser failure was a test punctuation assumption; established formatter
+unchanged. No package, production, prior full M16–M21/release gate rerun.
+bank-final-source 34 backend PASS, zero failures/skips on final source: all 11
+bank-grounding cases plus existing history/UI compatibility. No remaining failures.
+Changed-source privacy/link/identity check PASS: 21 files, 71 local references,
+zero findings; C1–C10 byte content and frozen/master identities unchanged. Node
+syntax/diff checks and AST-only graph update PASS. One additive migration only.
+
+Remaining: broader owner-scoped canonical expense/budget/portfolio tool selection,
+reviewed extraction beyond linked bank records; no arbitrary PDF Q&A/completeness
+claim. Real-account, actual model quality and packaged source acceptance pending.
+Next safe unit: inspect audited AI-GROUND canonical record evidence selectors and
+tests, implement one bounded read-only source without aggregation/currency inference.
+Do not repeat completed bank provenance, history or old audit/release phases.
 
 History operator activation remains OFF pending retention/recovery approval.
 FIN-CURRENCY C1–C10 unapproved. AWS decommissioned; OpenAI/cloud OFF. Frozen
