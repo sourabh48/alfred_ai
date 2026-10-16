@@ -2,7 +2,7 @@
 
 Baseline: 3932f391aa4eed7b3200ad3b034f7991435e01e4, audited 2026-10-15. Current normal-account acceptance is PENDING. This plan does not authorize production actions, password changes, provider calls, data corrections or deployment.
 
-Use the [feature matrix](ALFRED_MASTER_FEATURE_MATRIX.md), [provider register](ALFRED_EXTERNAL_INTEGRATIONS.md) and [roadmap](ALFRED_COMPLETION_ROADMAP.md). Record PASS/FAIL/PENDING/NOT_RUN with date, exact source/package SHA, environment and observed evidence for each line. Synthetic and real results remain separate.
+Use the [feature matrix](PROJECT_STATUS.md), [provider register](ALFRED_EXTERNAL_INTEGRATIONS.md) and [roadmap](PROJECT_STATUS.md). Record PASS/FAIL/PENDING/NOT_RUN with date, exact source/package SHA, environment and observed evidence for each line. Synthetic and real results remain separate.
 
 ## Environments and approvals
 

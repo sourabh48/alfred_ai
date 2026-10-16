@@ -1,4 +1,4 @@
-> **Current status (2026-10-15):** M15 AI/UI source is deployed and GitHub master matches `3932f391`. Full product acceptance remains incomplete; normal-account, real-provider, clean-PC and independently portable recovery evidence are separate. Current service health was not observed by the audit. Start with the [feature matrix](docs/ALFRED_MASTER_FEATURE_MATRIX.md), [roadmap](docs/ALFRED_COMPLETION_ROADMAP.md), [acceptance plan](docs/ALFRED_END_TO_END_ACCEPTANCE.md) and [executable completion prompt](artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md).
+> **Current status (2026-10-15):** M15 AI/UI source is deployed and GitHub master matches `3932f391`. Full product acceptance remains incomplete; normal-account, real-provider, clean-PC and independently portable recovery evidence are separate. Current service health was not observed by the audit. Start with the [feature matrix](docs/PROJECT_STATUS.md), [roadmap](docs/PROJECT_STATUS.md), [acceptance plan](docs/ALFRED_END_TO_END_ACCEPTANCE.md) and [executable completion prompt](artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md).
 
 <p align="center">
   <strong>Alfred - Finance Assistant</strong><br>

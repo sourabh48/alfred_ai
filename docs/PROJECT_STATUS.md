@@ -1,4 +1,1653 @@
-# Project Status
+# ALFRED Project Status
+
+**Only active overview, feature matrix, roadmap and continuation checkpoint. Updated 2026-10-17.**
+
+## Resume here
+
+- Development: `F:/ALFRED_DEV/post-audit`, branch `development/alfred-integrated`.
+- Integrated source checkpoint: `fb28846552122da2d0014f802eaf7c5dc5267179`; discover the exact current HEAD with `git rev-parse HEAD`. Later documentation commits do not substitute for tested runtime source.
+- All 22 local branch tips were verified ancestors of this checkpoint; no merge/cherry-pick is needed. Completed M15, security, Banking, FIN-MONEY, FIN-CURRENCY design, AI-HISTORY, bank provenance, canonical financial and exact closure citations are retained.
+- Production/master remains `3932f391aa4eed7b3200ad3b034f7991435e01e4`; production DOWN is the last read-only finding, not a fresh health assertion. No production restart, source/data/config/ACL mutation or GitHub push authorized.
+- Frozen tested candidate `release/post-audit-runtime-20261016` = `4aa7ac70fa27c1410e695470af5c3987235244b1` remains unchanged. The integrated branch is newer development, not a replacement frozen package or deployment approval.
+- AWS retired permanently; paid OpenAI, real cloud synchronization and private conversation-history activation OFF. No cancelled key dialogs or key export. M15's device-loss waiver is not inherited.
+- FIN-CURRENCY C1–C10 below remain the unapproved design contract; no schema/backfill/FX/inferred INR. Preserve exact Decimal values, raw import evidence, fingerprints, owner/parent linkage and guarded rollback.
+
+Safe resume:
+
+```powershell
+Set-Location F:\ALFRED_DEV\post-audit
+git status --short
+git branch --show-current
+git rev-parse HEAD
+Get-Content docs/PROJECT_STATUS.md -TotalCount 145
+```
+
+## Current execution and validation
+
+1. Consolidate documentation and preserve ignored/unique worktree payloads with per-file SHA-256 verification before ordinary `git worktree remove`; never force. Keep Git refs/frozen releases and uncertain work.
+2. Execute one integrated house backend/browser/privacy/configuration/native/Ollama gate using synthetic isolated data. New counts are PENDING until actual receipts exist; old results below are historical, not current-source certification.
+3. Next implementation: owner-confirmed investment-document **field** provenance using existing document review/correction, source receipts and owner citations. No new calculation or independent broker-authenticity claim.
+4. Commit each verified unit and update this file. No new status/audit/roadmap/checkpoint/prompt Markdown files. Historical continuation/audit/release reports remain evidence, not alternate active instructions.
+
+Current consolidation evidence: `artifacts/consolidation-20261017/` (ignored local machine-readable receipts, not source or private-provider uploads).
+
+## Counts and interpretation
+
+The denominator remains the original 143 audited capabilities, not new commit/subfeature counts. COMPLETE_VERIFIED is bounded technical evidence, **not** real-account/provider/clean-PC/device-loss acceptance. Partial capabilities are not fractionally counted. The JSON audit inventory remains a dated immutable snapshot; the live rows below supersede its statuses.
+
+- BLOCKED_APPROVAL: **5**
+- BLOCKED_EXTERNAL: **3**
+- COMPLETE_VERIFIED: **64**
+- IMPLEMENTED_NOT_ACCEPTED: **32**
+- NOT_IMPLEMENTED: **13**
+- PARTIALLY_IMPLEMENTED: **26**
+
+Technical completion: **64/143 = 44.8%**. Remaining: **79**, including implemented but unaccepted and approval/external blockers. This is not a product acceptance percentage.
+
+## Prioritized remaining roadmap and approval boundaries
+
+| Order | Existing unit | Current scope / next action | Gate |
+| --- | --- | --- | --- |
+| 1 | AI-GROUND | Investment-document field originals, corrected precedence, owner review/revocation, immutable revision, safe exact citations and stale/conflict rejection; then broader verified sources only | Synthetic local tests and financial invariance; no financial writes by AI |
+| 2 | FIN-CURRENCY | C1–C10 explicit ownership, unknown history, incompatible totals, ISO scale, FX policy and reversible migration contract below | Explicit contract approval before schema work |
+| 3 | AI-HISTORY | Implemented private encrypted conversations; owner opt-in/retention/recovery acceptance | Operator activation remains OFF |
+| 4 | Non-AWS sync | Reuse encrypted journal/checkpoint/queue; evaluate/implement approved compatible R2 or other non-AWS adapter | No live provider contact/private uploads; independent key recovery and provider approval first |
+| 5 | AI-QUALITY / OpenAI | Broader owned document tools; genuine retrieval/drift/chronological evaluation; public-query-only optional provider model/pricing contract | Local Ollama first; no paid calls/private export; no hypotheses promoted to facts |
+| 6 | Travel | Larger novel destination pools, true scenic/alternate/bike-legal routes, detours, permits/freshness, authorized inventory, galleries | Reuse providers/cache; contracts/credentials/terms before real availability claims |
+| 7 | Finance/product | Savings goals/export, investment alerts/planning, tax policy years, career/vehicle/relationship inference and safe AI Council | Canonical models/Decimal; no invented eligibility/accuracy or autonomous financial/code writes |
+| 8 | Operational acceptance | Production availability/ACL repair, normal-account UI, clean-PC installer lifecycle, portable independent recovery, remote CI/branch governance | Separate authorization; synthetic and real acceptance remain distinct |
+
+M16 retention/invalidation and M17 experimental retirement are implemented locally; M18 dependency security and M19 same-host packaging evidence exist. M20 local gate engine and M21 disposable same-host rehearsal passed at frozen 4aa7ac70. Their remote/real-environment acceptance remains open. Do not repeat completed development or redefine milestone numbers.
+
+Release workflow: **Develop → Test → Integrate → Package → Backup → Approve → Promote → Verify → Push**. One active dev checkout; archive unique ignored artifacts before removing redundant worktrees, retain all branch/frozen refs. Never delete recovery backups or overwrite uncertain/operator work.
+
+Known release blockers: fresh exact-source integrated gate/package; normal real-account/separate-PC/installer acceptance; independent portable-key/device-loss restore; production repair/promotion authorization; remote CI/branch protections. Provider activation, currency schema and private history have their own approvals. Checksum verification does not establish decryptability.
+
+## All 143 capabilities — current implementation inventory
+
+For unchanged rows the dated code/test scope is retained from the completed audit; no new acceptance is invented. Cross-cutting global gates and explicit updates above supersede obsolete per-feature baseline advice. References below point to code/tests, not live private data.
+
+### FIN-01 — Dashboard, income, expenses and fixed obligations
+
+**COMPLETE_VERIFIED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Canonical baseline distinguishes measured, entered, inferred and unavailable values; complete transaction history is not assumed. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Retain reconciliation and complete real-account visual acceptance.
+
+### FIN-02 — Disposable cash flow and savings capacity
+
+**COMPLETE_VERIFIED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Capacity is an estimate based on recorded history/obligations, not an automatic future income guarantee. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep canonical baseline as the single calculation path.
+
+### FIN-03 — Net worth, liquid cash and account snapshots
+
+**COMPLETE_VERIFIED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Entered account values are snapshots; partial imports do not establish an audited ledger. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept with the owner's actual account and snapshots.
+
+### FIN-04 — Financial health and historical spending indicators
+
+**IMPLEMENTED_NOT_ACCEPTED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Indicators are bounded heuristic summaries; predictive accuracy is not established. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Label heuristics and evaluate against reviewed outcomes.
+
+### FIN-05 — Budget management, utilization and affordability
+
+**PARTIALLY_IMPLEMENTED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/budgets/models.py](../apps/budgets/models.py), [apps/budgets/serializers.py](../apps/budgets/serializers.py), [apps/budgets/services/budget_intelligence.py](../apps/budgets/services/budget_intelligence.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Budget money remains FloatField; serializer rejects nonfinite amounts. City/category assumptions are not universal facts. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Convert remaining money under a rehearsed migration and preserve affordability assumptions.
+
+### FIN-06 — Persisted savings goals and progress workflow
+
+**NOT_IMPLEMENTED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: No dedicated goal model or end-to-end goal management route found; savings capacity is not goal persistence. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Confirm goal requirements; add owner goals only after currency/money decisions.
+
+### FIN-07 — Cash-flow forecasting
+
+**PARTIALLY_IMPLEMENTED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/budgets/services/budget_intelligence.py](../apps/budgets/services/budget_intelligence.py), [apps/ml_engine/models/expense_forecaster.py](../apps/ml_engine/models/expense_forecaster.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py), [tests/test_ml_training_orchestrator.py](../tests/test_ml_training_orchestrator.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Forecast and expense-LSTM fallback exist; sufficient genuine outcomes and calibrated forecast quality are unverified. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Evaluate chronological holdouts and label forecast uncertainty.
+
+### FIN-08 — Expense categorization and merchant correction learning
+
+**COMPLETE_VERIFIED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/expenses/services/transaction_intelligence.py](../apps/expenses/services/transaction_intelligence.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py), [tests/test_parser_adaptive_learning.py](../tests/test_parser_adaptive_learning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Parser/history heuristics require review on new layouts; corrections do not prove classifier accuracy. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Continue reviewed synthetic and authorized document-family acceptance.
+
+### FIN-09 — Bank accounts and statement imports
+
+**COMPLETE_VERIFIED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/expenses/services/statement_import.py](../apps/expenses/services/statement_import.py), [apps/expenses/services/statement_lifecycle.py](../apps/expenses/services/statement_lifecycle.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py), [tests/test_statement_columns.py](../tests/test_statement_columns.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Actual balances must be reconciled against full bank evidence; OCR availability can require review. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Complete real-document and real-account acceptance.
+
+### FIN-10 — Account-scoped duplicate detection and fingerprints
+
+**COMPLETE_VERIFIED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/expenses/services/transaction_intelligence.py](../apps/expenses/services/transaction_intelligence.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py), [tests/test_expense_money_identity.py](../tests/test_expense_money_identity.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Fingerprint schema and cross-account distinctions are preserved by money migrations. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Reject any unexplained fingerprint changes.
+
+### FIN-11 — Transfer legs and cross-account financial relationships
+
+**COMPLETE_VERIFIED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/expenses/services/financial_relationships.py](../apps/expenses/services/financial_relationships.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py), [tests/test_financial_relationships.py](../tests/test_financial_relationships.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Detected relationships are evidence/confidence driven; unresolved transfers need owner review. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep transfers separate from income/living spend.
+
+### FIN-12 — Financial reconciliation
+
+**COMPLETE_VERIFIED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Historical synthetic/deployment reconciliation passed; current private rows were not reread in this audit. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Use approved private-copy reconciliation during the next release.
+
+### FIN-13 — Financial export and correction
+
+**PARTIALLY_IMPLEMENTED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/reports/services.py](../apps/reports/services.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py), [tests/test_user_data_acceptance.py](../tests/test_user_data_acceptance.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Statement/expense correction and report paths exist; one comprehensive portable structured financial export is not demonstrated. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Define formats and owner redaction; reuse existing reports rather than duplicate registers.
+
+### FIN-14 — Money storage across every domain
+
+**COMPLETE_VERIFIED** · Personal finance · P1.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/users/models.py](../apps/users/models.py), [apps/users/serializers.py](../apps/users/serializers.py), [apps/budgets/models.py](../apps/budgets/models.py), [apps/career/models.py](../apps/career/models.py), [apps/mobility/models.py](../apps/mobility/models.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Core Expense/BankAccount/Investment/Loan amounts are Decimal; User, Budget, Career and Mobility money tail remains float. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Budget/User/Career/Mobility Decimal tail, original snapshots and guarded rollback complete; tests/test_budget_money_migration.py, tests/test_user_money.py, tests/test_career_money.py, tests/test_mobility_money.py. No currency inferred.
+
+### FIN-15 — Canonical currency persistence and multi-currency aggregation
+
+**NOT_IMPLEMENTED** · Personal finance · P1.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Legacy INR convention exists; finance models generally lack currency codes. AI correctly labels currency unrecorded; no proven FX ledger. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Decide currency ownership, migration/backfill and historical rate policy separately.
+
+### FIN-16 — Tax calculations and source-backed eligibility
+
+**PARTIALLY_IMPLEMENTED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/ml_engine/services/tax_policy.py](../apps/ml_engine/services/tax_policy.py), [apps/ml_engine/services/tax_optimizer.py](../apps/ml_engine/services/tax_optimizer.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py), [tests/test_tax_policy.py](../tests/test_tax_policy.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Dated tax policy supports deterministic arithmetic; effective dates, deduction eligibility and reviewed actual tax cases remain acceptance dependencies. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Confirm current-year authoritative policy and conditional eligibility; do not infer deductions.
+
+### FIN-17 — Credit bureau reports and official score access
+
+**PARTIALLY_IMPLEMENTED** · Personal finance · P2.
+
+- Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/integrations/services/credit_report_parser.py](../apps/integrations/services/credit_report_parser.py), [apps/integrations/services/credit_score_tracker.py](../apps/integrations/services/credit_score_tracker.py).
+- APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
+- Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py), [tests/test_credit_report_upload.py](../tests/test_credit_report_upload.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Official bureau integration BLOCKED_EXTERNAL; uploaded reports synthetic/dated acceptance only.
+- Limitations/dependencies: Uploaded bureau evidence and clearly labelled estimates exist; authenticated bureau pulls/contracts are not accepted. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep estimates distinct; obtain approved bureau access before live pulls.
+
+### LOAN-01 — EMI, schedules, outstanding and repayment metrics
+
+**COMPLETE_VERIFIED** · Loans and liabilities · P2.
+
+- Source: [apps/loans/services/loan_intelligence.py](../apps/loans/services/loan_intelligence.py), [apps/loans/models.py](../apps/loans/models.py), [apps/loans/urls.py](../apps/loans/urls.py).
+- APIs/UI/models: /loans/; /api/loans/ (see urls.py); Loan, LoanPaymentHistory, LoanImportDocument, LoanClosureDocument, LoanForeclosureSnapshot.
+- Tests: [tests/test_loan_money_runtime.py](../tests/test_loan_money_runtime.py), [tests/test_loan_lifecycle_and_reports.py](../tests/test_loan_lifecycle_and_reports.py), [tests/test_loan_foreclosure_money.py](../tests/test_loan_foreclosure_money.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Rates/tenure assumptions and missing history remain explicit; monetary persistence uses Decimal. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep lender reconciliation and real-statement acceptance.
+
+### LOAN-02 — Loan PDF import and repayment statement parsing
+
+**COMPLETE_VERIFIED** · Loans and liabilities · P2.
+
+- Source: [apps/loans/services/loan_intelligence.py](../apps/loans/services/loan_intelligence.py), [apps/loans/models.py](../apps/loans/models.py), [apps/loans/urls.py](../apps/loans/urls.py), [apps/loans/services/loan_pdf_parser.py](../apps/loans/services/loan_pdf_parser.py).
+- APIs/UI/models: /loans/; /api/loans/ (see urls.py); Loan, LoanPaymentHistory, LoanImportDocument, LoanClosureDocument, LoanForeclosureSnapshot.
+- Tests: [tests/test_loan_money_runtime.py](../tests/test_loan_money_runtime.py), [tests/test_loan_lifecycle_and_reports.py](../tests/test_loan_lifecycle_and_reports.py), [tests/test_loan_diagnostics.py](../tests/test_loan_diagnostics.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Layout-specific parsing can require review; safe diagnostics hide historical/current parser internals. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Expand authorized real layouts without weakening M14 resource budgets.
+
+### LOAN-03 — Loan payment detection and review
+
+**COMPLETE_VERIFIED** · Loans and liabilities · P2.
+
+- Source: [apps/loans/services/loan_intelligence.py](../apps/loans/services/loan_intelligence.py), [apps/loans/models.py](../apps/loans/models.py), [apps/loans/urls.py](../apps/loans/urls.py), [apps/loans/services/payment_review.py](../apps/loans/services/payment_review.py).
+- APIs/UI/models: /loans/; /api/loans/ (see urls.py); Loan, LoanPaymentHistory, LoanImportDocument, LoanClosureDocument, LoanForeclosureSnapshot.
+- Tests: [tests/test_loan_money_runtime.py](../tests/test_loan_money_runtime.py), [tests/test_loan_lifecycle_and_reports.py](../tests/test_loan_lifecycle_and_reports.py), [tests/test_loan_related_money_runtime.py](../tests/test_loan_related_money_runtime.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Heuristic matching is reviewable; subscription false positives can be reversed. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Preserve settlement allocations and no-double-post tests.
+
+### LOAN-04 — Foreclosure and prepayment scenarios
+
+**COMPLETE_VERIFIED** · Loans and liabilities · P2.
+
+- Source: [apps/loans/services/loan_intelligence.py](../apps/loans/services/loan_intelligence.py), [apps/loans/models.py](../apps/loans/models.py), [apps/loans/urls.py](../apps/loans/urls.py), [apps/loans/services/loan_foreclosure_service.py](../apps/loans/services/loan_foreclosure_service.py).
+- APIs/UI/models: /loans/; /api/loans/ (see urls.py); Loan, LoanPaymentHistory, LoanImportDocument, LoanClosureDocument, LoanForeclosureSnapshot.
+- Tests: [tests/test_loan_money_runtime.py](../tests/test_loan_money_runtime.py), [tests/test_loan_lifecycle_and_reports.py](../tests/test_loan_lifecycle_and_reports.py), [tests/test_loan_foreclosure_money.py](../tests/test_loan_foreclosure_money.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Fees and payoff must come from reviewed lender evidence, not guessed quotes. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep hypothetical scenarios separate from posting.
+
+### LOAN-05 — Closure extraction, verification and evidence status
+
+**COMPLETE_VERIFIED** · Loans and liabilities · P2.
+
+- Source: [apps/loans/services/loan_intelligence.py](../apps/loans/services/loan_intelligence.py), [apps/loans/models.py](../apps/loans/models.py), [apps/loans/urls.py](../apps/loans/urls.py), [apps/loans/services/loan_closure_parser.py](../apps/loans/services/loan_closure_parser.py).
+- APIs/UI/models: /loans/; /api/loans/ (see urls.py); Loan, LoanPaymentHistory, LoanImportDocument, LoanClosureDocument, LoanForeclosureSnapshot.
+- Tests: [tests/test_loan_money_runtime.py](../tests/test_loan_money_runtime.py), [tests/test_loan_lifecycle_and_reports.py](../tests/test_loan_lifecycle_and_reports.py), [tests/test_loan_verification.py](../tests/test_loan_verification.py), [tests/test_loan_verification_api.py](../tests/test_loan_verification_api.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Uploaded closure evidence is not automatically verified solely because parsing succeeded. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept actual lender evidence under owner review.
+
+### LOAN-06 — Multi-loan aggregation and consolidation
+
+**COMPLETE_VERIFIED** · Loans and liabilities · P2.
+
+- Source: [apps/loans/services/loan_intelligence.py](../apps/loans/services/loan_intelligence.py), [apps/loans/models.py](../apps/loans/models.py), [apps/loans/urls.py](../apps/loans/urls.py).
+- APIs/UI/models: /loans/; /api/loans/ (see urls.py); Loan, LoanPaymentHistory, LoanImportDocument, LoanClosureDocument, LoanForeclosureSnapshot.
+- Tests: [tests/test_loan_money_runtime.py](../tests/test_loan_money_runtime.py), [tests/test_loan_lifecycle_and_reports.py](../tests/test_loan_lifecycle_and_reports.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Consolidation is an authorized application workflow; assistant cannot silently execute it. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Retain original loan lineage and cash-flow tests.
+
+### LOAN-07 — Loan forecasting and cross-module liabilities
+
+**IMPLEMENTED_NOT_ACCEPTED** · Loans and liabilities · P2.
+
+- Source: [apps/loans/services/loan_intelligence.py](../apps/loans/services/loan_intelligence.py), [apps/loans/models.py](../apps/loans/models.py), [apps/loans/urls.py](../apps/loans/urls.py).
+- APIs/UI/models: /loans/; /api/loans/ (see urls.py); Loan, LoanPaymentHistory, LoanImportDocument, LoanClosureDocument, LoanForeclosureSnapshot.
+- Tests: [tests/test_loan_money_runtime.py](../tests/test_loan_money_runtime.py), [tests/test_loan_lifecycle_and_reports.py](../tests/test_loan_lifecycle_and_reports.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Projection is amortization/assumption based, not a calibrated personal prediction. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Verify real payment histories and forecast uncertainty.
+
+### LOAN-08 — Broad real-document/lender acceptance
+
+**IMPLEMENTED_NOT_ACCEPTED** · Loans and liabilities · P2.
+
+- Source: [apps/loans/services/loan_intelligence.py](../apps/loans/services/loan_intelligence.py), [apps/loans/models.py](../apps/loans/models.py), [apps/loans/urls.py](../apps/loans/urls.py).
+- APIs/UI/models: /loans/; /api/loans/ (see urls.py); Loan, LoanPaymentHistory, LoanImportDocument, LoanClosureDocument, LoanForeclosureSnapshot.
+- Tests: [tests/test_loan_money_runtime.py](../tests/test_loan_money_runtime.py), [tests/test_loan_lifecycle_and_reports.py](../tests/test_loan_lifecycle_and_reports.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Synthetic parser/closure tests and older reviewed documents do not cover every lender/layout. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Run an approved redacted/private-copy lender acceptance corpus.
+
+### INV-01 — Portfolio register, valuation and allocation
+
+**COMPLETE_VERIFIED** · Investments · P2.
+
+- Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
+- APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
+- Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Values can be entered snapshots; cached external quotes have freshness metadata. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept owner portfolio and reconcile to broker evidence.
+
+### INV-02 — Investment PDF imports and corrections
+
+**IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
+
+- Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
+- APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
+- Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py), [tests/test_document_center_and_statement_import.py](../tests/test_document_center_and_statement_import.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Parser/import/review exists; generalized broker layout accuracy is not established. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Existing imports/corrections remain available; original per-field extraction provenance and explicit owner confirmation not yet implemented. No independent market/broker authenticity is claimed.
+
+### INV-03 — Returns and planning projections
+
+**IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
+
+- Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
+- APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
+- Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Projection assumptions and inflation influence estimates; not guaranteed investment returns. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Use disclosed assumptions and actual outcome evaluation.
+
+### INV-04 — Risk classification and recommendations
+
+**PARTIALLY_IMPLEMENTED** · Investments · P2.
+
+- Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
+- APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
+- Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Allocation/watchlist logic is heuristic, supported by available sources; suitability accuracy is unverified. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Define risk evidence and acceptance; never present as certified advice.
+
+### INV-05 — AMFI/Yahoo market evidence and historical performance
+
+**IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
+
+- Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
+- APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
+- Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Source implemented; current real-live acceptance NOT_RUN.
+- Limitations/dependencies: Adapters/cache/provenance exist; no fresh authorized provider request was made in this audit. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Validate provider terms, quote age and account limits.
+
+### INV-06 — Long-term investment planning
+
+**PARTIALLY_IMPLEMENTED** · Investments · P2.
+
+- Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
+- APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
+- Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Growth scenarios exist; owner-specific goals, full portfolio risk calibration and currency policy are incomplete. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Reuse projection engine when implementing approved goals.
+
+### INV-07 — Persistent portfolio alerts
+
+**PARTIALLY_IMPLEMENTED** · Investments · P2.
+
+- Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
+- APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
+- Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Dashboard observations/watchlists exist; verified alert thresholds, delivery and lifecycle are not demonstrated. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Define owner opt-in alert workflow and freshness rejection.
+
+### INV-08 — Investment contribution to net worth
+
+**COMPLETE_VERIFIED** · Investments · P2.
+
+- Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
+- APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
+- Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Canonical investment totals feed the baseline; unknown currency is not silently converted. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Preserve source amounts and reconciliation.
+
+### DOC-01 — Bounded PDF/image upload and OCR
+
+**COMPLETE_VERIFIED** · Document intelligence · P2.
+
+- Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js), [alfred_ai/services/upload_limits.py](../alfred_ai/services/upload_limits.py).
+- APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
+- Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py), [tests/test_upload_limits.py](../tests/test_upload_limits.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: OCR requires supported binaries; missing OCR degrades to review. Raw payloads are not safe log content. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept more layouts and native OCR availability.
+
+### DOC-02 — Bank/loan/investment extraction and classification
+
+**IMPLEMENTED_NOT_ACCEPTED** · Document intelligence · P2.
+
+- Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js).
+- APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
+- Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Dedicated parsers and source-kind classification exist; comprehensive accuracy across arbitrary documents is unproven. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Maintain field-level reviewed fixtures and provenance.
+
+### DOC-03 — Confidence, metadata and provenance
+
+**COMPLETE_VERIFIED** · Document intelligence · P2.
+
+- Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js).
+- APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
+- Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Parser confidence is not proof that an extracted fact is true; verification remains separate. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Preserve source/version/field review distinction.
+
+### DOC-04 — Field corrections, visual review and retry
+
+**COMPLETE_VERIFIED** · Document intelligence · P2.
+
+- Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js).
+- APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
+- Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py), [tests/test_document_retry_integrity.py](../tests/test_document_retry_integrity.py), [tests/test_document_review_browser.py](../tests/test_document_review_browser.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Corrections update supported module records; stale retries cannot overwrite newer accepted edits. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Retain browser and integrity regressions.
+
+### DOC-05 — Document deduplication and source lineage
+
+**COMPLETE_VERIFIED** · Document intelligence · P2.
+
+- Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js).
+- APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
+- Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Module identities differ; not a universal semantic document deduplication service. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Preserve account/source fingerprints.
+
+### DOC-06 — General searchable document knowledge
+
+**PARTIALLY_IMPLEMENTED** · Document intelligence · P2.
+
+- Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js).
+- APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
+- Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Document hub can inspect module records; no unified searchable encrypted full-document knowledge index is demonstrated. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Reviewed bank transaction citations and exact verified closure citations implemented; investment per-field source review is next. Arbitrary document search/Q&A not claimed.
+
+### DOC-07 — AI Q&A over arbitrary financial documents
+
+**NOT_IMPLEMENTED** · Document intelligence · P2.
+
+- Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js), [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py).
+- APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
+- Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py), [tests/test_document_grounding_acceptance.py](../tests/test_document_grounding_acceptance.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Hybrid grounding currently accepts owned memories and verified loan closure projections, not arbitrary PDF/OCR corpora. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Implement bounded reviewed ingestion/citations in a separate milestone.
+
+### DOC-08 — Loan closure document Q&A and abstention
+
+**COMPLETE_VERIFIED** · Document intelligence · P2.
+
+- Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js), [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py).
+- APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
+- Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py), [tests/test_document_grounding_acceptance.py](../tests/test_document_grounding_acceptance.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Structured verified closure fields only; deleted/stale/conflicting evidence is rejected or abstained. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Exact owner-only closure citation/file digest/revision checks implemented at 9a02f16; tests/test_closure_citations.py. No-file legacy metadata explicitly limited.
+
+### DOC-09 — Document deletion and retention
+
+**PARTIALLY_IMPLEMENTED** · Document intelligence · P2.
+
+- Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js), [alfred_ai/services/upload_privacy.py](../alfred_ai/services/upload_privacy.py).
+- APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
+- Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py), [tests/test_upload_privacy_retention.py](../tests/test_upload_privacy_retention.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Owner deletion/raw cleanup switches exist; native vault retention and historic backups retain data under separate policies. Source/non-native DEBUG media route served a synthetic file anonymously; native owner media is protected. No current live exposure asserted. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Unify disclosed retention across raw uploads, metadata, indexes and recovery. Reuse media ownership across source/native profiles (AUD-11).
+
+### AI-01 — Ollama local inference
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Installed local model/digest and bounded response validation; actual availability can change. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Recheck local model as operational acceptance, not paid fallback.
+
+### AI-02 — Ollama embeddings and similarity retrieval
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/services/local_embeddings.py](../apps/ml_engine/services/local_embeddings.py).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Local embed vector validation and relevant retrieval exist; real personalized quality still needs outcomes. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Maintain semantic benchmark and abstention fixtures.
+
+### AI-03 — Persistent encrypted memory/index/journal
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py), [tests/test_memory_privacy.py](../tests/test_memory_privacy.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Application-layer memory encryption is not encryption of every financial SQLite file; Windows recovery key portability remains separate. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Preserve at-rest/index protection and independently recoverable keys.
+
+### AI-04 — Owner isolation and memory access
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Memories are owner scoped; family finance consent does not grant memory sharing. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Test revoked permissions independently.
+
+### AI-05 — Verification, confidence and provenance separation
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/services/memory_learning.py](../apps/ml_engine/services/memory_learning.py).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py), [tests/test_memory_learning.py](../tests/test_memory_learning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: AI hypotheses never become canonical financial authority; reviewed/user-confirmed states have schema mapping. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep human confirmation distinct from source verification.
+
+### AI-06 — Deduplication, relevance and insufficient-evidence abstention
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py), [tests/test_memory_learning.py](../tests/test_memory_learning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Quality assertions cover synthetic memory queries, not broad real-world model accuracy. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Grow reviewed relevance evaluation without private uploads.
+
+### AI-07 — Memory corrections, feedback and conflict safety
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/services/memory_learning.py](../apps/ml_engine/services/memory_learning.py).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Stale edits conflict rather than overwrite; accept/reject review actions exist. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Preserve drafts, provenance and supersession.
+
+### AI-08 — Delete/reset/retention and resurrection protection
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py), [tests/test_memory_privacy.py](../tests/test_memory_privacy.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Tombstones/key revocation/trusted checkpoints protect current restore; historical recoverable backups may retain prior data. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Never promise irreversible historic erasure.
+
+### AI-09 — Conversation UI, provider status and evidence cards
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py), [tests/test_intelligence_ui.py](../tests/test_intelligence_ui.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Session-local conversation display; status does not imply real OpenAI access. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Perform normal real-account UI acceptance.
+
+### AI-10 — Persistent general conversation history
+
+**IMPLEMENTED_NOT_ACCEPTED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: New-conversation action clears current UI; no dedicated persisted general chat model/event history demonstrated. Travel messages are separate. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Encrypted consent/owner/restart/retention/history APIs and UI implemented (20b916e); tests/test_conversation_history.py. Operator activation OFF pending retention and recovery approval.
+
+### AI-11 — Financial grounding and numeric/currency suppression
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py), [tests/test_intelligence_currency.py](../tests/test_intelligence_currency.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Six canonical finance metrics use controlled Decimal source cards, currency=None when unrecorded; prose financial numbers are suppressed. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Typed canonical source facts and post-inference revalidation at df386be/b49c141/179db89; tests/test_canonical_evidence.py and tests/test_canonical_grounding.py. Unknown currency and unsupported totals withheld.
+
+### AI-12 — Cross-module personal reasoning
+
+**PARTIALLY_IMPLEMENTED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Finance baseline, Travel preferences, verified closure evidence and general owned memories are supported; not all module histories. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Bounded owner-scoped expense/budget/loan/investment/baseline records and reviewed bank/closure sources now implemented; arbitrary cross-module Q&A remains partial.
+
+### AI-13 — Offline/model-outage behavior and consent fallback
+
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Ollama outage yields safe local state; cloud does not silently activate. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Recheck drafts/retry and public-consent paths.
+
+### AI-14 — Background learning pipeline
+
+**IMPLEMENTED_NOT_ACCEPTED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/training/orchestrator.py](../apps/ml_engine/training/orchestrator.py), [apps/ml_engine/services/memory_learning.py](../apps/ml_engine/services/memory_learning.py).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py), [tests/test_ml_training_orchestrator.py](../tests/test_ml_training_orchestrator.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Candidate extraction/evaluation and scheduled training paths exist; genuine outcome sufficiency is model dependent. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Run sustained eligible training with consent and reviewed outcomes.
+
+### AI-15 — Model registry and serving readiness
+
+**IMPLEMENTED_NOT_ACCEPTED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/training/quality.py](../apps/ml_engine/training/quality.py).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py), [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Registry/sample/quality/freshness gating exists; fallback/heuristic models are not calibrated trained intelligence. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Validate each model against genuine held-out outcomes.
+
+### AI-16 — Retrieval/model quality and drift monitoring
+
+**PARTIALLY_IMPLEMENTED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Synthetic retrieval evaluation/readiness exists; sustained drift, calibrated errors and chronological production quality are not established. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Define evaluation cohorts and model-specific drift criteria.
+
+### AI-17 — Autonomous user task execution
+
+**NOT_IMPLEMENTED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Current assistant is read-only; no approved general autonomous mutations, planner/executor or financial action agent. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Confirm scope and human approval policy before implementation.
+
+### AI-18 — Voice assistant
+
+**NOT_IMPLEMENTED** · ALFRED intelligence · P2.
+
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/services/voice_assistant.py](../apps/ml_engine/services/voice_assistant.py).
+- APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
+- Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Legacy service imports optional external speech libraries and has no demonstrated routed UI/caller. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Unrouted voice prototype retired by M17; no working accepted voice assistant. Future scope requires confirmation.
+
+### OPENAI-01 — Responses API request/response adapter
+
+**COMPLETE_VERIFIED** · Optional OpenAI · P2.
+
+- Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
+- APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
+- Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. DISABLED; paid acceptance NOT_RUN.
+- Limitations/dependencies: Pinned endpoint, schema/model/usage validation and bounded public-query adapter are synthetic tested; no paid acceptance. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep real access OFF until separately approved.
+
+### OPENAI-02 — Model compatibility and current price review
+
+**PARTIALLY_IMPLEMENTED** · Optional OpenAI · P1.
+
+- Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
+- APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
+- Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Official documentation reviewed 2026-10-15; no account availability call.
+- Limitations/dependencies: Pinned gpt-4.1-mini-2025-04-14 is deprecated; documented retirement 2027-01-14. Verified $0.40/$1.60 per million still matches code. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Select/test replacement with current official rates before enabling; no silent model switch.
+
+### OPENAI-03 — Encrypted key provisioning and owner consent
+
+**COMPLETE_VERIFIED** · Optional OpenAI · P2.
+
+- Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
+- APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
+- Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Masked operator provisioning plus owner policy and per-request public consent; no browser key leakage. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Use account-scoped approved keys; never expand to private financial content.
+
+### OPENAI-04 — Privacy classification and sensitive-data filtering
+
+**COMPLETE_VERIFIED** · Optional OpenAI · P2.
+
+- Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
+- APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
+- Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Public-only boundary rejects sensitive context; store:false is not a zero-retention promise. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Explain provider monitoring retention and keep private queries local.
+
+### OPENAI-05 — Daily token and monetary spending caps
+
+**COMPLETE_VERIFIED** · Optional OpenAI · P2.
+
+- Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
+- APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
+- Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Atomic upper-bound reservations include failure costs; current-day price-review gate and strict usage validation. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Reverify pricing/model caps before approved paid tests.
+
+### OPENAI-06 — Fallback, timeout, redacted diagnostics and UI
+
+**COMPLETE_VERIFIED** · Optional OpenAI · P2.
+
+- Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
+- APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
+- Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Ollama-first, no uncontrolled automatic paid retries; UI availability is not billing authorization. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept actual configured provider only under approval.
+
+### OPENAI-07 — Real paid-provider acceptance
+
+**BLOCKED_APPROVAL** · Optional OpenAI · P2.
+
+- Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
+- APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
+- Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. BLOCKED_APPROVAL
+- Limitations/dependencies: Not authorized; no real request made. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Obtain model/provider consent and bounded synthetic-only spending authorization.
+
+### SYNC-01 — Provider-neutral mock sync protocol
+
+**COMPLETE_VERIFIED** · Encrypted intelligence synchronization · P2.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Mock transport proves encrypted protocol behavior, not real remote service acceptance. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep mock receipts explicitly synthetic.
+
+### SYNC-02 — Non-AWS encrypted object adapter (AWS withdrawn)
+
+**NOT_IMPLEMENTED** · Encrypted intelligence synchronization · P2.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Synthetic S3 server only; no real account acceptance.
+- Limitations/dependencies: AWS endpoint/account ownership restrictions; not arbitrary Azure/Drive/S3-compatible endpoint support. IAM/account unselected. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: AWS is permanently withdrawn, not a deliverable. Non-AWS replacement adapter remains unimplemented; R2 is a candidate, not approved/configured/live-tested.
+
+### SYNC-03 — Startup/periodic/bounded shutdown sync
+
+**COMPLETE_VERIFIED** · Encrypted intelligence synchronization · P2.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py), [tests/test_memory_sync_runtime.py](../tests/test_memory_sync_runtime.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Native lifecycle and local retry state are tested; no real remote upload occurred. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept lifecycle under authorized provider faults.
+
+### SYNC-04 — Offline durable retry and interrupted upload recovery
+
+**COMPLETE_VERIFIED** · Encrypted intelligence synchronization · P2.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Local-first changes and bounded retries preserve dirty state. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Exercise real provider disconnects only after approval.
+
+### SYNC-05 — Authenticated versioned encrypted snapshots
+
+**COMPLETE_VERIFIED** · Encrypted intelligence synchronization · P2.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Client-authenticated ciphertext; immutable application snapshots differ from bucket object versioning. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep crypto/schema/version/size checks.
+
+### SYNC-06 — Concurrent conflict detection and ownership
+
+**COMPLETE_VERIFIED** · Encrypted intelligence synchronization · P2.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Conditional writes, owner prefixes and validated events; real multi-device race acceptance pending. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Run two synthetic devices under approved provider.
+
+### SYNC-07 — Tombstones, revocation and remote pruning
+
+**COMPLETE_VERIFIED** · Encrypted intelligence synchronization · P2.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Deletion propagation/checkpoint prevents resurrection; historical backups may retain revoked data. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Disclose retained snapshots/keys and test approved pruning.
+
+### SYNC-08 — Trusted high-water checkpoint
+
+**COMPLETE_VERIFIED** · Encrypted intelligence synchronization · P2.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Separately protected checkpoint required for remote rollback detection; a copied DPAPI blob is not a portable key. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept new-profile key/checkpoint recovery separately.
+
+### SYNC-09 — Portable keys and independent multi-device/device-loss recovery
+
+**BLOCKED_APPROVAL** · Encrypted intelligence synchronization · P1.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Profile-independent key/archive restore is unverified; cancelled passphrase flow and release-specific M15 waiver stay scoped. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: User selects a genuinely portable secure recovery method; do not restart cancelled dialogs.
+
+### SYNC-10 — Real provider activation, costs and IAM acceptance
+
+**BLOCKED_APPROVAL** · Encrypted intelligence synchronization · P2.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. BLOCKED_APPROVAL
+- Limitations/dependencies: Real sync remains disabled; region/bucket/account and spending/least-privilege acceptance not selected. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Obtain provider selection and separate synthetic-only authorization.
+
+### SYNC-11 — Full application/cloud backup
+
+**NOT_IMPLEMENTED** · Encrypted intelligence synchronization · P2.
+
+- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
+- Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Memory sync does not synchronize canonical Django databases/media/config or raw SQLite/WAL. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep approved application backup tooling separate from memory protocol.
+
+### TRAVEL-01 — Conversational discovery and saved preferences
+
+**COMPLETE_VERIFIED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Structured intent/state and correction rules, not unconstrained generative Travel reasoning. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Preserve state history and explicit confirmed preferences.
+
+### TRAVEL-02 — Source-backed new destinations and novelty
+
+**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Dynamic Wikivoyage/provider discovery and saved history exist; absent visits are not proof of never visiting. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept actual intended destinations/sources under current terms.
+
+### TRAVEL-03 — Large candidate pools, show-more batches and comparison
+
+**PARTIALLY_IMPLEMENTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Current ranked output is typically limit=3; broader 20â€“30 candidate/show-more flow not demonstrated. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Implement bounded persisted pools/batches and exclude repeated rejected destinations.
+
+### TRAVEL-04 — Multiple destinations and day-wise itineraries
+
+**PARTIALLY_IMPLEMENTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Structured selected destination/day edits exist; general ordered multi-stop routing and itinerary optimization is incomplete. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Reuse Travel state and route evidence for approved multi-stop scope.
+
+### TRAVEL-05 — Budget summaries and estimates
+
+**COMPLETE_VERIFIED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/costs.py](../apps/mobility/services/travel/costs.py), [apps/mobility/services/travel/money.py](../apps/mobility/services/travel/money.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Live quote, estimate, unknown and cached data remain distinct; legacy INR convention and scenario assumptions. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep canonical recorded spend separate from quoted planning costs.
+
+### TRAVEL-06 — Motorbike/pillion and vehicle-aware planning
+
+**COMPLETE_VERIFIED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Profile and trip constraints affect planning; safety/road legality cannot be guaranteed by a car route. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept normal rider/pillion scenarios and honest limits.
+
+### TRAVEL-07 — Scenic and truly alternative routes
+
+**PARTIALLY_IMPLEMENTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/providers/routing.py](../apps/mobility/services/travel/providers/routing.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: ORS normalizes possible features but request does not generate alternative_routes; scenic ranking is incomplete. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Implement bounded alternatives/selection with route provenance.
+
+### TRAVEL-08 — Expressway avoidance and motorcycle road restrictions
+
+**PARTIALLY_IMPLEMENTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Highway avoidance is broader than expressways; motorcycle_legal/closures remain UNKNOWN. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Use verified restrictions or abstain; do not label car routing bike-legal.
+
+### TRAVEL-09 — Route corridor stops and real detour distance
+
+**PARTIALLY_IMPLEMENTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/discovery.py](../apps/mobility/services/travel/discovery.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Current sampled crow-flight corridor ranking is not verified road-detour distance. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Add bounded road-network detours and uncertain labels.
+
+### TRAVEL-10 — Camping and attraction discovery
+
+**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/providers/places.py](../apps/mobility/services/travel/providers/places.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: OSM/wiki POIs are not bookable camping availability or verified opening hours. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept freshness/provenance; leave booking claims unavailable.
+
+### TRAVEL-11 — Hotel live availability
+
+**BLOCKED_EXTERNAL** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/providers/accommodation.py](../apps/mobility/services/travel/providers/accommodation.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. REQUIRES_CREDENTIALS/CONTRACT; NOT_REAL_LIVE_TESTED.
+- Limitations/dependencies: Duffel Stays adapter exists but account/service rights and live authorization are missing. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Select provider/contract and approve limited synthetic traveler queries.
+
+### TRAVEL-12 — Flight live availability
+
+**BLOCKED_EXTERNAL** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/providers/transport.py](../apps/mobility/services/travel/providers/transport.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. REQUIRES_CREDENTIALS/CONTRACT; NOT_REAL_LIVE_TESTED.
+- Limitations/dependencies: Duffel Flights adapter exists, intentionally disabled without approved access; research links are not offers. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Authorize provider and capped synthetic availability acceptance.
+
+### TRAVEL-13 — Train live seat/fare/waitlist inventory
+
+**BLOCKED_EXTERNAL** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/providers/transport.py](../apps/mobility/services/travel/providers/transport.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: IndianRailProvider returns unavailable; pasted timetables are USER_PROVIDED, seat inventory UNKNOWN. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Obtain authorized contract/API; no scraping.
+
+### TRAVEL-14 — Bus live inventory
+
+**NOT_IMPLEMENTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/links.py](../apps/mobility/services/travel/links.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Link-outs exist; no live bus booking/inventory adapter is demonstrated. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Confirm approved provider before building live integration.
+
+### TRAVEL-15 — Live permits and road closure confirmation
+
+**PARTIALLY_IMPLEMENTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/providers/permits.py](../apps/mobility/services/travel/providers/permits.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Dated official references exist; no verified live permit availability or closure service. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Maintain reviewed effective-date references and unknown state.
+
+### TRAVEL-16 — Weather, horizons and replanning
+
+**COMPLETE_VERIFIED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/providers/weather.py](../apps/mobility/services/travel/providers/weather.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Forecast horizon and stale/unknown guards are implemented; free service limits/terms apply. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Validate permitted service and current dates.
+
+### TRAVEL-17 — GeoJSON mapping and optional tiles
+
+**COMPLETE_VERIFIED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/mapping.py](../apps/mobility/services/travel/mapping.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Local route geometry works without tiles; public tile use requires policy/attribution. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep tile requests explicit and no offline bulk download.
+
+### TRAVEL-18 — Google Maps API integration and offline map packages
+
+**NOT_IMPLEMENTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Map link-outs/Leaflet are not authenticated Google Maps integration or offline tile bundles. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Confirm product/provider choice and storage rights before implementation.
+
+### TRAVEL-19 — Photos, GPS/date inference and trip galleries
+
+**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel_media.py](../apps/mobility/services/travel_media.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: TripPhoto and EXIF review exist; inferred locations need user confirmation. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept authorized media layouts without publishing location.
+
+### TRAVEL-20 — Video management and social Travel profile
+
+**NOT_IMPLEMENTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Image/gallery paths do not establish video ingestion or an Instagram-style publish/privacy lifecycle. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Confirm local/private versus public scope before adding models.
+
+### TRAVEL-21 — Freshness, cache, quotas and safe external HTTP
+
+**COMPLETE_VERIFIED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/cache.py](../apps/mobility/services/travel/cache.py), [alfred_ai/services/public_http.py](../alfred_ai/services/public_http.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py), [tests/test_travel_http.py](../tests/test_travel_http.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Existing provider states/source labels and bounded transport reject unsafe destinations; live provider status remains independent. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Maintain T02/T12 and M14 protections.
+
+### TRAVEL-22 — Provider telemetry retention and selective invalidation
+
+**COMPLETE_VERIFIED** · Travel · P1.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/cache.py](../apps/mobility/services/travel/cache.py).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: TravelProviderRequest persists without production cleanup; current quotas and active work constrain deletion. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: M16 bounded telemetry retention and selective invalidation implemented; tests/test_travel_retention.py and tests/test_travel_refresh.py; local frozen 4aa7ac70 gate.
+
+### TRAVEL-23 — API budgets and provider terms compliance
+
+**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+
+- Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
+- APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Application quotas/paid opt-ins/storage flags exist; provider-specific plan rights and current account limits need acceptance. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Use current register and contract-specific approval.
+
+### CAREER-01 — Resume upload, extraction and review
+
+**COMPLETE_VERIFIED** · Career · P2.
+
+- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
+- APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
+- Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: OCR/layout diversity still needs acceptance; protected diagnostics/resource budgets are implemented. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Expand authorized reviewed CV corpus.
+
+### CAREER-02 — Skill-gap and recruiter/JD matching
+
+**IMPLEMENTED_NOT_ACCEPTED** · Career · P2.
+
+- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
+- APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
+- Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Parsed skills and bounded fit rules exist; not calibrated universal recruitment prediction. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Validate reviewed outcomes and source references.
+
+### CAREER-03 — Job discovery and recommendations
+
+**IMPLEMENTED_NOT_ACCEPTED** · Career · P2.
+
+- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
+- APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
+- Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Remotive/Arbeitnow/RemoteOK feeds and JSON-LD/Greenhouse/Lever/Workday/Ashby parsers exist; geography/coverage is limited. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Validate actual permitted sources and location coverage.
+
+### CAREER-04 — Recruiter email/attachment processing
+
+**PARTIALLY_IMPLEMENTED** · Career · P2.
+
+- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js), [apps/integrations/services/email_integration.py](../apps/integrations/services/email_integration.py).
+- APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
+- Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Manual recruiter/JD intake works; automatic mail access is not an accepted integrated workflow. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Reuse encrypted token model; retire plaintext legacy OAuth writer.
+
+### CAREER-05 — Application and opportunity outcome tracking
+
+**IMPLEMENTED_NOT_ACCEPTED** · Career · P2.
+
+- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
+- APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
+- Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: CareerJobAnalysis/outcome contract tracks opportunities; no universal applicant-tracking/automatic apply service. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept owner corrections and genuine outcome lineage.
+
+### CAREER-06 — Salary/location evidence and progression
+
+**IMPLEMENTED_NOT_ACCEPTED** · Career · P2.
+
+- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js), [apps/career/services/projection_engine.py](../apps/career/services/projection_engine.py).
+- APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
+- Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py), [tests/test_career_projection_confidence.py](../tests/test_career_projection_confidence.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Salary-bearing evidence/geo scope exists; sparse evidence must be labelled. Career salary storage remains float. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Review currency/unit normalization and expand approved evidence.
+
+### CAREER-07 — Interview preparation
+
+**PARTIALLY_IMPLEMENTED** · Career · P2.
+
+- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
+- APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
+- Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Study recommendations exist; no demonstrated interactive verified interview-coach workflow. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Confirm desired local coaching scope and reuse skill gaps.
+
+### CAREER-08 — Predictive career forecasting and timing
+
+**PARTIALLY_IMPLEMENTED** · Career · P2.
+
+- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
+- APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
+- Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Heuristic/model-backed modes and confidence exist; calibrated genuine future outcome accuracy is unverified. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Collect consenting outcomes and evaluate chronological holdout.
+
+### FAMILY-01 — Family relationships and invitation lifecycle
+
+**COMPLETE_VERIFIED** · Family, relationships and risk · P2.
+
+- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py).
+- APIs/UI/models: /family/; family relationship/financial-sharing APIs; Dependent, FamilyAccountLink; owner-scoped financial baseline.
+- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Accepted relationships alone do not authorize financial sharing. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Complete normal user invite/revoke acceptance.
+
+### FAMILY-02 — Explicit financial opt-in and revocation
+
+**COMPLETE_VERIFIED** · Family, relationships and risk · P2.
+
+- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py), [apps/family/migrations/0004_financial_sharing_opt_in.py](../apps/family/migrations/0004_financial_sharing_opt_in.py).
+- APIs/UI/models: /family/; family relationship/financial-sharing APIs; Dependent, FamilyAccountLink; owner-scoped financial baseline.
+- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py), [tests/test_family_consent_migration.py](../tests/test_family_consent_migration.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: family.0004 reset historical grants OFF at M14 deployment; owner consent governs shared summaries. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Never equate relationship membership with consent.
+
+### FAMILY-03 — Invitation throttling and concurrent acceptance
+
+**COMPLETE_VERIFIED** · Family, relationships and risk · P2.
+
+- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py).
+- APIs/UI/models: /family/; family relationship/financial-sharing APIs; Dependent, FamilyAccountLink; owner-scoped financial baseline.
+- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py), [tests/test_family_invitation_atomic.py](../tests/test_family_invitation_atomic.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Existing account-isolated atomic throttles apply independently of authorization. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Preserve 429/no-mutation/expiry regressions.
+
+### FAMILY-04 — Cross-account isolation
+
+**COMPLETE_VERIFIED** · Family, relationships and risk · P2.
+
+- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py).
+- APIs/UI/models: /family/; family relationship/financial-sharing APIs; Dependent, FamilyAccountLink; owner-scoped financial baseline.
+- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Family financial summaries require consent; personal memories/documents remain owner scoped. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Retain revoked/foreign-ID negative tests.
+
+### FAMILY-05 — Relationship alignment and family growth
+
+**IMPLEMENTED_NOT_ACCEPTED** · Family, relationships and risk · P2.
+
+- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py), [apps/family/views.py](../apps/family/views.py), [apps/relationship/services/relationship_intelligence.py](../apps/relationship/services/relationship_intelligence.py).
+- APIs/UI/models: /family/; family relationship/financial-sharing APIs; Dependent, FamilyAccountLink; owner-scoped financial baseline.
+- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py), [tests/test_investment_and_relationship_advisory.py](../tests/test_investment_and_relationship_advisory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Grounded inputs plus bounded model blend; 8% family projection is already labelled heuristic, not guaranteed. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Evaluate outcomes rather than reopen an already-labelled assumption.
+
+### FAMILY-06 — Behavioral signals and personalization
+
+**IMPLEMENTED_NOT_ACCEPTED** · Family, relationships and risk · P2.
+
+- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py), [apps/behavioral/services.py](../apps/behavioral/services.py).
+- APIs/UI/models: /family/; family relationship/financial-sharing APIs; Dependent, FamilyAccountLink; owner-scoped financial baseline.
+- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py), [tests/test_behavioral_linkage.py](../tests/test_behavioral_linkage.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Manual signals and derived pressure maps exist; clinical/personal prediction accuracy not established. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Obtain consent and labelled outcomes; avoid medical certainty.
+
+### FAMILY-07 — Financial/health/relocation risk intelligence
+
+**IMPLEMENTED_NOT_ACCEPTED** · Family, relationships and risk · P2.
+
+- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py), [apps/risk/services/risk_intelligence.py](../apps/risk/services/risk_intelligence.py).
+- APIs/UI/models: /family/; family relationship/financial-sharing APIs; Dependent, FamilyAccountLink; owner-scoped financial baseline.
+- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Risk scores mix history, heuristic weights and external context; not calibrated diagnosis/prediction. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Document confidence and evaluate actual outcomes.
+
+### BIKE-01 — Vehicle profiles and Hunter 350 catalog support
+
+**IMPLEMENTED_NOT_ACCEPTED** · Bike and mobility · P2.
+
+- Source: [apps/mobility/services/bike_service_intelligence.py](../apps/mobility/services/bike_service_intelligence.py), [apps/mobility/services/bike_catalog.py](../apps/mobility/services/bike_catalog.py), [apps/mobility/urls.py](../apps/mobility/urls.py).
+- APIs/UI/models: /bike-service/ and /api/mobility/; supported routes in root URLs; BikeProfile, BikeServiceRecord, FuelRefillLog, BikeIssueReport, BikeDocument, BikeConditionSnapshot.
+- Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Catalog and profile defaults exist; official current model/service variants need acceptance. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Verify manufacturer/model data and owner's actual vehicle.
+
+### BIKE-02 — Service records, fuel and costs
+
+**IMPLEMENTED_NOT_ACCEPTED** · Bike and mobility · P2.
+
+- Source: [apps/mobility/services/bike_service_intelligence.py](../apps/mobility/services/bike_service_intelligence.py), [apps/mobility/services/bike_catalog.py](../apps/mobility/services/bike_catalog.py), [apps/mobility/urls.py](../apps/mobility/urls.py).
+- APIs/UI/models: /bike-service/ and /api/mobility/; supported routes in root URLs; BikeProfile, BikeServiceRecord, FuelRefillLog, BikeIssueReport, BikeDocument, BikeConditionSnapshot.
+- Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: CRUD/mileage/history exist; monetary amounts remain float in Mobility models. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Complete financial-tail migration and reviewed actual logs.
+
+### BIKE-03 — Maintenance prediction and condition tracking
+
+**PARTIALLY_IMPLEMENTED** · Bike and mobility · P2.
+
+- Source: [apps/mobility/services/bike_service_intelligence.py](../apps/mobility/services/bike_service_intelligence.py), [apps/mobility/services/bike_catalog.py](../apps/mobility/services/bike_catalog.py), [apps/mobility/urls.py](../apps/mobility/urls.py).
+- APIs/UI/models: /bike-service/ and /api/mobility/; supported routes in root URLs; BikeProfile, BikeServiceRecord, FuelRefillLog, BikeIssueReport, BikeDocument, BikeConditionSnapshot.
+- Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Rules, condition snapshots and optional service model exist; prediction quality is unverified. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Evaluate real service outcomes; label intervals/part-life assumptions.
+
+### BIKE-04 — Insurance/service documents and invoice review
+
+**IMPLEMENTED_NOT_ACCEPTED** · Bike and mobility · P2.
+
+- Source: [apps/mobility/services/bike_service_intelligence.py](../apps/mobility/services/bike_service_intelligence.py), [apps/mobility/services/bike_catalog.py](../apps/mobility/services/bike_catalog.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [apps/mobility/services/bike_document_ai.py](../apps/mobility/services/bike_document_ai.py).
+- APIs/UI/models: /bike-service/ and /api/mobility/; supported routes in root URLs; BikeProfile, BikeServiceRecord, FuelRefillLog, BikeIssueReport, BikeDocument, BikeConditionSnapshot.
+- Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py), [tests/test_bike_document_parser.py](../tests/test_bike_document_parser.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Extraction, relevance checks and linked service updates exist; layout/identity review is essential. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept approved real documents and no-duplicate service posting.
+
+### BIKE-05 — Spare parts and service recommendations
+
+**PARTIALLY_IMPLEMENTED** · Bike and mobility · P2.
+
+- Source: [apps/mobility/services/bike_service_intelligence.py](../apps/mobility/services/bike_service_intelligence.py), [apps/mobility/services/bike_catalog.py](../apps/mobility/services/bike_catalog.py), [apps/mobility/urls.py](../apps/mobility/urls.py).
+- APIs/UI/models: /bike-service/ and /api/mobility/; supported routes in root URLs; BikeProfile, BikeServiceRecord, FuelRefillLog, BikeIssueReport, BikeDocument, BikeConditionSnapshot.
+- Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Model/class heuristics and suggestions exist; no verified live price/parts-inventory service. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Use authoritative compatibility and mark estimates.
+
+### BIKE-06 — Travel integration and vehicle net-worth relationship
+
+**COMPLETE_VERIFIED** · Bike and mobility · P2.
+
+- Source: [apps/mobility/services/bike_service_intelligence.py](../apps/mobility/services/bike_service_intelligence.py), [apps/mobility/services/bike_catalog.py](../apps/mobility/services/bike_catalog.py), [apps/mobility/urls.py](../apps/mobility/urls.py).
+- APIs/UI/models: /bike-service/ and /api/mobility/; supported routes in root URLs; BikeProfile, BikeServiceRecord, FuelRefillLog, BikeIssueReport, BikeDocument, BikeConditionSnapshot.
+- Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Vehicle utility/valuation assumptions and route wear affect existing baseline/planner; no guaranteed road legality. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep confirmed profile inputs and canonical reconciliation.
+
+### COUNCIL-01 — Multiple ML inference roles and registry routing
+
+**IMPLEMENTED_NOT_ACCEPTED** · AI Council and developer intelligence · P2.
+
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
+- Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Inference adapters are specialized predictions, not development planning/coding/review agents. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Describe current registry accurately.
+
+### COUNCIL-02 — Planning/coding/review/security multi-agent application
+
+**NOT_IMPLEMENTED** · AI Council and developer intelligence · P2.
+
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
+- Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Codex skills/hooks and inference routing do not form a working product AI Council. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Confirm original role/approval scope; build separately only after core completion.
+
+### COUNCIL-03 — Experimental self-improvement engine
+
+**NOT_IMPLEMENTED** · AI Council and developer intelligence · P1.
+
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
+- Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: advanced_engine imports absent patch_generator; SelfImproveAPI is not routed. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Unsafe experimental self-editing prototype retired by M17. Retirement is not delivery of a safe human-approved AI Council; no autonomous production code writes.
+
+### COUNCIL-04 — Persistent tasks, conflicts and usage-limit recovery
+
+**PARTIALLY_IMPLEMENTED** · AI Council and developer intelligence · P2.
+
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
+- Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Development Markdown checkpoints and runtime queues exist; persistent multi-agent task ownership/conflict resolution is absent. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Reuse checkpoint conventions, not a second hidden autonomous Git system.
+
+### COUNCIL-05 — AI development budget and human Git approval
+
+**NOT_IMPLEMENTED** · AI Council and developer intelligence · P2.
+
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
+- Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Product-level council has no demonstrated policy engine; operator release approvals are distinct. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Require exact-SHA approvals, sandbox tests and no force pushes if council approved.
+
+### RUNTIME-01 — Native launcher, tray, worker and scheduler
+
+**COMPLETE_VERIFIED** · Windows, deployment and release · P1.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Historical native acceptance passed; initial health failed, later /health/live/ 200 and native 404 on runserver. Actual data/worker identity remains unconfirmed. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Diagnose current availability under a separately authorized operational task.
+
+### RUNTIME-02 — Restart persistence and local data isolation
+
+**COMPLETE_VERIFIED** · Windows, deployment and release · P2.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Native data-directory and durable queue survive tested process restarts; not proof of a fresh Windows profile restore. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep explicit restored-runtime selection.
+
+### RUNTIME-03 — Windows sign-in and sustained scheduled observation
+
+**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P2.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Startup registration and process tests exist; real sign-in and full sustained eligible cleanup/training still need evidence. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Run operator acceptance separately without automatic production restart.
+
+### RUNTIME-04 — Portable package and static assets
+
+**COMPLETE_VERIFIED** · Windows, deployment and release · P2.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Fresh exact M15 package source/assets/screenshots had dated acceptance; installer/fresh-PC remain distinct. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Use pinned source/package manifest, not old build reuse.
+
+### RUNTIME-05 — Install/upgrade/uninstall on separate PC
+
+**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P2.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [scripts/verify_windows_installer.py](../scripts/verify_windows_installer.py).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py), [tests/test_windows_setup.py](../tests/test_windows_setup.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Installer scripts/verifier exist; clean-PC lifecycle and preserved-data upgrade are unaccepted. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: M21 synthetic clean-PC lifecycle evidence.
+
+### RUNTIME-06 — Offline startup and local model prerequisites
+
+**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P2.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Local-first app works without paid/cloud providers; installed Ollama/models and OCR dependencies vary by host. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Accept a new host without network and disclose unavailable model/OCR states.
+
+### RUNTIME-07 — Local backup, encrypted restore and rollback
+
+**COMPLETE_VERIFIED** · Windows, deployment and release · P2.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [scripts/verify_private_recovery.py](../scripts/verify_private_recovery.py), [scripts/prepare_encrypted_recovery.ps1](../scripts/prepare_encrypted_recovery.ps1).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py), [tests/test_private_recovery_verifier.py](../tests/test_private_recovery_verifier.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Dated independent local pre-M15 restore/rehearsal passed; no new backup or live DB read in this audit. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Require fresh approved consistent backup before future promotion.
+
+### RUNTIME-08 — Off-device/device-loss disaster recovery
+
+**BLOCKED_APPROVAL** · Windows, deployment and release · P1.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: HDD copy user reported; portable independent key/restore unverified. Historical M15 waiver does not extend to future releases. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Wait for explicit recoverable method/acceptance without repeated cancelled dialogs.
+
+### RUNTIME-09 — Filesystem protection of private DB/config
+
+**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P1.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Read-only ACL review found Authenticated Users/local Users read grants; DB has plaintext SQLite header. No exploitation or secret values observed. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Least-privilege creation/repair implementation tested in disposable Windows paths; tests/test_private_storage.py. Production ACL remediation requires authorization.
+
+### RUNTIME-10 — Session/CSRF/auth/upload/HTTP/diagnostic safeguards
+
+**COMPLETE_VERIFIED** · Windows, deployment and release · P2.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [alfred_ai/services/public_http.py](../alfred_ai/services/public_http.py), [alfred_ai/services/upload_limits.py](../alfred_ai/services/upload_limits.py), [apps/loans/diagnostics.py](../apps/loans/diagnostics.py).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py), [tests/test_api_session_security.py](../tests/test_api_session_security.py), [tests/test_upload_limits.py](../tests/test_upload_limits.py), [tests/test_loan_diagnostics.py](../tests/test_loan_diagnostics.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: M14 completed controls remain in exact M15 source; do not restart resolved endpoint audits. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep relevant security regressions and deployment isolation.
+
+### RUNTIME-11 — Dependency security and reproducible builds
+
+**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P1.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [requirements.txt](../requirements.txt), [constraints/windows-py312.txt](../constraints/windows-py312.txt).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Django 6.0.8 has subsequent 6.0.9 security patch; pip check passes but does not establish security. Build-tool availability/locks need follow-up. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Django 6.0.9 isolated dependency and repeat-package gate complete at 4aa7ac70. Independent clean-PC replay still pending.
+
+### RUNTIME-12 — GitHub CI and branch/source protection
+
+**PARTIALLY_IMPLEMENTED** · Windows, deployment and release · P1.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [.github/workflows/browser-regression.yml](../.github/workflows/browser-regression.yml).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: PR/manual browser workflow exists; Pages run is not backend acceptance. Fresh M15 backend CI/required checks not confirmed. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: M20 publish approved CI changes and verify actual remote checks.
+
+### RUNTIME-13 — M20 automated source/finance/privacy/backup gates
+
+**COMPLETE_VERIFIED** · Windows, deployment and release · P1.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [artifacts/audit/ALFRED_MASTER_AUDIT_CONTINUATION.md](../artifacts/audit/ALFRED_MASTER_AUDIT_CONTINUATION.md).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Prior combined 65 tests plus overlapping later narrow runs; audit reproduced 2 gate gaps. No final full gate result.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Development-only 0052410 has partial focused evidence; full gate interrupted. Synthetic ignored-file overwrite and JSON credential misses are confirmed. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Existing M20 source/operator/privacy/financial/restore/approval gates fixed and executed; scripts/release_gate.py, tests/test_release_gate.py; frozen 4aa7ac70 local gate. Remote CI not demonstrated.
+
+### RUNTIME-14 — M21 rehearsal, failure injection and rollback acceptance
+
+**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P1.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [artifacts/audit/ALFRED_MASTER_AUDIT_CONTINUATION.md](../artifacts/audit/ALFRED_MASTER_AUDIT_CONTINUATION.md).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Code/helper tests present; no complete actual M21 acceptance receipt.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: M20 branch contains orchestration/tests; full native/browser/packaged rehearsal was not executed. Real acceptance remains open. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: M21 actual disposable promotion/failure/restore/source-rollback/browser rehearsal PASS at 4aa7ac70; scripts/release_acceptance.py. Separate PC, normal account and device-loss acceptance remain open.
+
+### RUNTIME-15 — Local/LAN hosting and optional Docker stack
+
+**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P2.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [docker-compose.local.yml](../docker-compose.local.yml), [docs/LOCAL_HOSTING.md](../docs/LOCAL_HOSTING.md).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py), [tests/test_local_stack_ops.py](../tests/test_local_stack_ops.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Loopback/local native is current target; Compose/Celery profiles exist but do not prove present sustained Docker acceptance. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Keep local privacy; no new public cloud hosting wiring.
+
+### RUNTIME-16 — Real-account and manual accessibility acceptance
+
+**BLOCKED_APPROVAL** · Windows, deployment and release · P1.
+
+- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
+- APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
+- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py), [tests/test_user_data_browser.py](../tests/test_user_data_browser.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Limitations/dependencies: Synthetic Chrome/HTTP success does not replace normal sign-in, screen-reader and actual account checks. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Owner signs in normally under acceptance checklist; no password in chat.
+
+## Preserved technical decisions and dated implementation evidence
+
+The following dated ledger preserves unique migration policies, C1–C10, exact commits, commands, evidence paths and limitations. Earlier words such as “next”, “active” or “pending” apply to their dated checkpoint; current execution and 143-feature statuses above take precedence. Production claims describe historical deployment evidence, not fresh runtime health.
+
+<details>
+<summary>Dated implementation ledger and currency decision contract</summary>
+
+### Earlier project implementation ledger
 
 ## Active post-audit implementation — 2026-10-15
 
@@ -1059,7 +2708,7 @@ historical results below remain reference material, not fresh acceptance.
 
 **Current status — 2026-10-15:** M14/M15 consolidated source is deployed and GitHub master matches 3932f391aa4eed7b3200ad3b034f7991435e01e4. Dated release results are 619 backend/15 Chrome/35 native (overlapping packaged scope); this audit independently ran 86 focused tests, zero skips, plus isolated system/drift checks. Normal-account, real-provider, clean-PC and device-loss acceptance remain incomplete. Port 8000 did not respond during the audit; no service action was taken. M20 is unfinished separate development; M16–M19/M21 are not declared complete.
 
-Use the [authoritative feature matrix](ALFRED_MASTER_FEATURE_MATRIX.md), [completion roadmap](ALFRED_COMPLETION_ROADMAP.md) and [acceptance plan](ALFRED_END_TO_END_ACCEPTANCE.md). The earlier progress narrative below is historical module detail, not proof of current production availability or comprehensive AI accuracy.
+Use the [authoritative feature matrix](PROJECT_STATUS.md), [completion roadmap](PROJECT_STATUS.md) and [acceptance plan](ALFRED_END_TO_END_ACCEPTANCE.md). The earlier progress narrative below is historical module detail, not proof of current production availability or comprehensive AI accuracy.
 
 Final read-only observation: /health/live/ returned 200 on a runserver listener;
 /health/native/ returned 404. No audit restart occurred. Actual DB/worker/native
@@ -1259,3 +2908,5 @@ deployment requires a separate explicit decision and is outside current scope.
 - balance-sheet vehicle classification is heuristic and should still be reviewed against real ownership/use patterns where the financial treatment matters
 - auto-training is now safe and stateful, but several modules still remain heuristic, placeholder, or data-poor and should not be treated as fully learned systems yet
 - parser adaptation is materially stronger now, but "all document types without fail" is still not a truthful guarantee for arbitrary or severely degraded files
+
+</details>

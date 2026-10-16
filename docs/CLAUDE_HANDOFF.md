@@ -1,6 +1,6 @@
 # Claude audit and completion prompt
 
-**Superseded handoff — 2026-10-15:** Use the [code-verified master completion prompt](../artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md), [matrix](ALFRED_MASTER_FEATURE_MATRIX.md) and actual checkpoint. Do not repeat the earlier whole-project audit or restart deployed M14/M15 tasks. This older handoff remains reference material, not current implementation authorization.
+**Superseded handoff — 2026-10-15:** Use the [code-verified master completion prompt](../artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md), [matrix](PROJECT_STATUS.md) and actual checkpoint. Do not repeat the earlier whole-project audit or restart deployed M14/M15 tasks. This older handoff remains reference material, not current implementation authorization.
 
 Copy the prompt below into Claude Code with this repository open. It asks Claude
 to inspect the current state first, because release and runtime evidence can

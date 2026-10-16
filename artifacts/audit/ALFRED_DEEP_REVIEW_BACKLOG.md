@@ -2,7 +2,7 @@
 
 ## Current audited disposition — 2026-10-15
 
-The [whole-project audit](ALFRED_WHOLE_PROJECT_AUDIT_20261015.md), [matrix](../../docs/ALFRED_MASTER_FEATURE_MATRIX.md) and [roadmap](../../docs/ALFRED_COMPLETION_ROADMAP.md) supersede the historical table. Main and fresh remote master are 3932f391; no live operation was performed.
+The [whole-project audit](ALFRED_WHOLE_PROJECT_AUDIT_20261015.md), [matrix](../../docs/PROJECT_STATUS.md) and [roadmap](../../docs/PROJECT_STATUS.md) supersede the historical table. Main and fresh remote master are 3932f391; no live operation was performed.
 
 | Existing ID | Current disposition |
 | --- | --- |

@@ -1,3 +1,5 @@
+> **Historical record, closed 2026-10-17.** The only active status, roadmap and resume instructions are [../../docs/PROJECT_STATUS.md](../../docs/PROJECT_STATUS.md). Preserve this dated evidence; do not execute obsolete next-step instructions.
+
 # Executable Codex master completion prompt for ALFRED
 
 **Execution override, 2026-10-15:** The audit is complete. Resume committed

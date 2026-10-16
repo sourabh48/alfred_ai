@@ -7,7 +7,7 @@ registry/cache/media/queues and an absent local env file; disable startup traini
 and real OpenAI/cloud. Obtain the configured SDK before Python commands. Existing
 M20 history is integrated in the post-audit branch. Exact source pins, M16/M17
 evidence and M18 clean-environment progress are in [Project Status](PROJECT_STATUS.md).
-See the [roadmap](ALFRED_COMPLETION_ROADMAP.md) and
+See the [roadmap](PROJECT_STATUS.md) and
 [master prompt](../artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md).
 
 M18 removes the retired interactive OAuth/voice SDKs from direct requirements.

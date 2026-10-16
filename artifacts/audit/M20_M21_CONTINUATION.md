@@ -1,3 +1,5 @@
+> **Historical record, closed 2026-10-17.** The only active status, roadmap and resume instructions are [../../docs/PROJECT_STATUS.md](../../docs/PROJECT_STATUS.md). Preserve this dated evidence; do not execute obsolete next-step instructions.
+
 # M20/M21 implementation checkpoint
 
 ## Verified local candidate — 2026-10-16

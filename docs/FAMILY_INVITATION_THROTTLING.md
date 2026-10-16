@@ -1,6 +1,6 @@
 # Family invitation abuse protection
 
-**Promotion reconciliation — 2026-10-15:** M14 invitation/session/CSRF/consent protections are incorporated in deployed M15 3932f391. The development-only slice note below is historical. family.0004 was applied during M14 deployment, resetting historical financial sharing OFF while preserving relationships. Normal-account invite/revoke/visibility acceptance is still pending. [Matrix](ALFRED_MASTER_FEATURE_MATRIX.md).
+**Promotion reconciliation — 2026-10-15:** M14 invitation/session/CSRF/consent protections are incorporated in deployed M15 3932f391. The development-only slice note below is historical. family.0004 was applied during M14 deployment, resetting historical financial sharing OFF while preserving relationships. Normal-account invite/revoke/visibility acceptance is still pending. [Matrix](PROJECT_STATUS.md).
 
 Only authenticated POSTs to `/api/family/account-links/` and
 `/api/family/account-links/accept/` consume independent account quotas.

@@ -4,7 +4,7 @@
 
 ALFRED has a deployed M15 finance/AI/UI baseline, not a fully accepted original product. Public main source and independently queried GitHub master both equal **3932f391aa4eed7b3200ad3b034f7991435e01e4**. The audit is isolated in **audit/alfred-master-completion-20261015**, at F:/ALFRED_DEV/alfred-master-audit. Application source was not changed by this audit.
 
-The [143-feature matrix](../../docs/ALFRED_MASTER_FEATURE_MATRIX.md) is authoritative for bounded capability status: 61 COMPLETE_VERIFIED, 29 IMPLEMENTED_NOT_ACCEPTED, 34 PARTIALLY_IMPLEMENTED, 11 NOT_IMPLEMENTED, five BLOCKED_APPROVAL and three BLOCKED_EXTERNAL. These are inventory counts, not a percentage of product completion. COMPLETE_VERIFIED denotes technical scope with named evidence; it does not certify real-account, real-provider or model accuracy.
+The [143-feature matrix](../../docs/PROJECT_STATUS.md) is authoritative for bounded capability status: 61 COMPLETE_VERIFIED, 29 IMPLEMENTED_NOT_ACCEPTED, 34 PARTIALLY_IMPLEMENTED, 11 NOT_IMPLEMENTED, five BLOCKED_APPROVAL and three BLOCKED_EXTERNAL. These are inventory counts, not a percentage of product completion. COMPLETE_VERIFIED denotes technical scope with named evidence; it does not certify real-account, real-provider or model accuracy.
 
 Priority findings are broad Windows read permissions on private DB/configuration, accepted nonfinite User income input, a subsequent Django security release and two reproducible failures in unfinished M20 gates. Initial port 8000/PID checks did not establish service health. A later read-only poll found a runserver listener, /health/live/ 200 and /health/native/ 404; runtime/database/worker identity is not re-established by that response. No start/stop, permission repair or DB mutation was performed.
 
@@ -208,7 +208,7 @@ Materialized cache contracts and historical synthetic high-volume/concurrency ev
 
 ## Requirements and completion policy
 
-Read the [roadmap](../../docs/ALFRED_COMPLETION_ROADMAP.md), [external integration register](../../docs/ALFRED_EXTERNAL_INTEGRATIONS.md), [acceptance plan](../../docs/ALFRED_END_TO_END_ACCEPTANCE.md) and [executable master prompt](ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md).
+Read the [roadmap](../../docs/PROJECT_STATUS.md), [external integration register](../../docs/ALFRED_EXTERNAL_INTEGRATIONS.md), [acceptance plan](../../docs/ALFRED_END_TO_END_ACCEPTANCE.md) and [executable master prompt](ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md).
 
 Full product completion requires owner-approved scope, bounded technical completion, actual normal-account acceptance, calibrated claimed AI behavior, current provider permissions/acceptance where claimed, clean-PC install/upgrade/recovery and an exact approved release. Optional providers can remain disabled only if the product explicitly communicates that limitation; they cannot be described as completed live capabilities.
 

@@ -7,7 +7,7 @@ integrated/package acceptance remains pending. See [retention policy](TRAVEL_PRO
 and [selective refresh](TRAVEL_PROVIDERS.md#selective-research-refresh).
 The dated deployed M15 scope below is unchanged.
 
-**Current integrated scope — 2026-10-15:** Structured Travel conversation/preferences, saved plans, source freshness, estimates, day edits and map geometry are in deployed M15 source. General LLM trip reasoning, broad candidate/show-more pools, true alternate/scenic routes, verified bike legality and road-network detours remain partial. Photos are not video/social publication. Hotels/flights are disabled without approved provider access; rail/bus/permit links are not live inventory. T09/M16 development progress is recorded above; it has not been deployed. [Feature matrix](ALFRED_MASTER_FEATURE_MATRIX.md), [provider register](ALFRED_EXTERNAL_INTEGRATIONS.md).
+**Current integrated scope — 2026-10-15:** Structured Travel conversation/preferences, saved plans, source freshness, estimates, day edits and map geometry are in deployed M15 source. General LLM trip reasoning, broad candidate/show-more pools, true alternate/scenic routes, verified bike legality and road-network detours remain partial. Photos are not video/social publication. Hotels/flights are disabled without approved provider access; rail/bus/permit links are not live inventory. T09/M16 development progress is recorded above; it has not been deployed. [Feature matrix](PROJECT_STATUS.md), [provider register](ALFRED_EXTERNAL_INTEGRATIONS.md).
 
 Alfred now starts travel planning from dates, a budget, duration or a craving.
 Open **Travel Planner** and try:

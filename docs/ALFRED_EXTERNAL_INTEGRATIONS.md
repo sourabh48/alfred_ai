@@ -38,7 +38,7 @@ Reviewed 2026-10-15 against source 3932f391aa4eed7b3200ad3b034f7991435e01e4. Thi
 | Google speech / gTTS | Historical unrouted voice_assistant.py prototype | Retired from post-audit development and automatic package collection | No supported voice workflow or approved live acceptance | No provider activation; cost/retention unverified | Future local speech/consented external voice is a separate implementation, not completed by retiring this prototype |
 | GitHub Actions / Pages | .github/workflows/browser-regression.yml; docs site | IMPLEMENTED PR/manual CI + documentation site | Fresh remote SHA matches M15; Pages run does not prove application CI | Account CI minutes/storage rules; current limits unverified | No runtime/private source upload; M20 CI publish/settings need authorization. Documentation hosting is not app hosting |
 
-Paths abbreviated in the table resolve under apps/ unless otherwise stated; full verified source references are in the [feature matrix](ALFRED_MASTER_FEATURE_MATRIX.md).
+Paths abbreviated in the table resolve under apps/ unless otherwise stated; full verified source references are in the [feature matrix](PROJECT_STATUS.md).
 
 ## Verified official pricing/lifecycle facts
 
