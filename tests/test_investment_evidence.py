@@ -165,6 +165,17 @@ class InvestmentEvidenceTests(TestCase):
             service.review(self.owner,self.document.pk,self.investment.pk,revision=revision,fields=['current_value'],confirm=True)
         self.assertEqual(InvestmentDocumentEvidence.objects.get().reviewed_fields,{})
 
+    def test_revision_binds_displayed_snapshot_when_an_edit_races_the_initial_read(self):
+        owned=service._owned
+        def changed(*args,**kwargs):
+            document,row=owned(*args,**kwargs)
+            Investment.objects.filter(pk=row.pk).update(current_value='3456.78')
+            return document,row
+        with patch.object(service,'_owned',side_effect=changed): stale=self.current()
+        self.assertEqual(stale['fields']['current_value']['current'],'2345.67')
+        self.assertEqual(self.confirm(revision=stale['revision']).status_code,409)
+        self.assertEqual(InvestmentDocumentEvidence.objects.get().reviewed_fields,{})
+
     def test_renamed_holding_retains_original_field_evidence_without_inheriting_confirmation(self):
         self.confirm()
         apply_correction(self.owner,scope='investment_document',document_id=self.document.pk,

@@ -1009,11 +1009,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 invested_amount='1234.56',current_value='2345.67'), 'baseline':owner}
         return rows,local
 
-    def test_investment_field_review_correction_revocation_and_stale_source(self):
+    def investment_document_fixture(self,row):
         from django.core.files.uploadedfile import SimpleUploadedFile
-        from apps.investments.models import InvestmentImportDocument, Investment
+        from apps.investments.models import InvestmentImportDocument
         from apps.investments.services.document_evidence import capture_import
-        rows,_=self.canonical_grounding_fixture(); row=rows['investment']
         media=Path(self.enterContext(TemporaryDirectory(prefix='alfred-investment-field-browser-')))
         self.enterContext(override_settings(MEDIA_ROOT=media))
         raw=dict(asset_name=row.asset_name,institution=row.institution,current_value='2345.6700',
@@ -1022,6 +1021,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             uploaded_file=SimpleUploadedFile('synthetic-portfolio.pdf',b'%PDF-SYNTHETIC-FIELDS'),parser_status='parsed',
             extracted_payload={'investments':[raw],'text':'SYNTHETIC-DO-NOT-DISPLAY'})
         document.linked_investments.add(row); capture_import(document,[row],extraction=[raw])
+        return document
+
+    def test_investment_field_review_correction_revocation_and_stale_source(self):
+        from apps.investments.models import Investment
+        rows,_=self.canonical_grounding_fixture(); row=rows['investment']
+        document=self.investment_document_fixture(row)
         self.login(); self.browser.get(self.live_server_url+f'/documents/investments/{document.pk}/records/{row.pk}/')
         self.wait.until(lambda _: '2345.6700' in self.text('statementEvidence'))
         self.assertNotIn('SYNTHETIC-DO-NOT-DISPLAY',self.browser.page_source)
@@ -1048,6 +1053,27 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('investment-field-stale-mobile')
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(self.text('statementEvidence'),'')
+
+    def test_investment_grounded_answer_opens_exact_private_field_citation(self):
+        from apps.investments.services.document_evidence import evidence, review, FIELDS
+        rows,local=self.canonical_grounding_fixture(); row=rows['investment']; owner=self.scenario['user']
+        document=self.investment_document_fixture(row)
+        detail=evidence(owner,document.pk,row.pk)
+        review(owner,document.pk,row.pk,revision=detail['revision'],fields=list(FIELDS),confirm=True)
+        self.login(); self.browser.get(self.live_server_url+f'/ai/financial-records/investment/{row.pk}/')
+        self.wait.until(lambda _: 'owner_confirmed_document_field' in self.text('canonicalEvidence'))
+        self.memory_click('#canonicalEvidence a[href^="/ai/insights/"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value')==f'investment:{row.pk}')
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain this record')
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: f'canonical-investment-{row.pk}' in self.text('intelligenceAnswers'))
+        self.assertIn('2,345.67 · Currency not recorded',self.text('intelligenceAnswers'))
+        self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+        self.capture('investment-grounded-field-citation')
+        self.memory_click(f'#intelligenceAnswers a[href="{detail["citation_url"]}"]')
+        self.wait.until(lambda _: 'owner_confirmed' in self.text('statementEvidence'))
+        self.assertIn('2345.6700',self.text('statementEvidence'))
+        self.assertNotIn('synthetic-portfolio.pdf',json.dumps(local.reason.call_args.args[0]))
 
     def test_canonical_financial_sources_corrections_citations_and_mobile(self):
         from selenium.webdriver.support.ui import Select

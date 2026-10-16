@@ -1,5 +1,5 @@
 """Synthetic bank provenance in the existing local assistant; no real providers."""
-from datetime import date
+from datetime import date, datetime, timezone as utc_timezone
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -193,7 +193,9 @@ class BankStatementGroundingTests(TestCase):
     def test_history_stays_gated_and_warning_is_not_saved_as_model_turn(self):
         from apps.ml_engine.services.conversation_history import ConversationHistory
         self.assertFalse(settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED)
-        with override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=True):
+        with override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=True), patch(
+                'apps.ml_engine.services.conversation_history.datetime',wraps=datetime) as clock:
+            clock.now.return_value=datetime(2026,10,17,0,0,2,680000,tzinfo=utc_timezone.utc)
             history=ConversationHistory(self.store); history.configure(self.owner,enabled=True,consent=True,days=1)
             record=history.create(self.owner,'Synthetic test only')
             payload=dict(conversation_id=record['id'],conversation_revision=0,request_id=uuid4().hex)
@@ -202,7 +204,9 @@ class BankStatementGroundingTests(TestCase):
             self.confirm(); response=self.post(**payload); self.assertEqual(response.status_code,200)
             turn=history.get(self.owner,record['id'])['turns'][0]
             self.assertEqual(turn['transaction_id'],self.row.pk)
-            self.assertNotIn('data',turn['sources'][0]); self.assertNotIn('2.68',json.dumps(turn))
+            self.assertEqual(set(turn['sources'][0]),{'ref','classification','url','verified_at'})
+            self.assertNotIn('2.68',turn['answer'])
+            self.assertIn('2.68',turn['saved_at'])  # Timestamp text is not copied financial evidence.
             self.assertTrue(self.post(**payload).json()['historical'])
             self.assertEqual(self.post(**(payload|{'transaction_id':self.row.pk+1})).status_code,409)
             history.configure(self.owner,enabled=False)

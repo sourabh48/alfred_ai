@@ -141,15 +141,37 @@ def record_source(user, kind, identity):
         fields=('invested_amount','monthly_sip','current_value'); helper=investment_money
         documents=row.source_documents.all()
         if documents.exclude(user=user).exists(): raise Http404
-        related=list(documents.values('id','parser_status','updated_at'))
+        from apps.investments.services.document_evidence import evidence
+        related=[]; document_sources=[]; confirmed={field:[] for field in fields}
+        # shortcut: bound reads to five source files; add explicit selection for larger histories.
+        if documents.count()>5:
+            available=False
+            related=list(documents.order_by('pk').values('id','parser_status','updated_at')[:6])
+        else:
+            for document in documents.order_by('pk'):
+                detail=evidence(user,document.pk,row.pk)
+                related.append(dict(id=document.pk,revision=detail['revision'],fields=detail['fields'],source_status=detail['source_status']))
+                document_sources.append(dict(document_id=document.pk,url=detail['citation_url'],source_status=detail['source_status']))
+                for field in fields:
+                    if (detail['fields'][field]['verification']=='owner_confirmed' and
+                            detail['fields'][field]['current']==format(helper(getattr(row,field)),'.2f')):
+                        confirmed[field].append(document.pk)
         data.update(applicable_date=row.updated_at.isoformat(),asset_type=row.asset_type,market_price_as_of=None,
-            verification='imported_record_not_field_verified' if related else 'user_recorded')
+            verification='source_review_limit' if not available else 'owner_confirmed_document_fields' if all(confirmed.values()) else 'imported_record_not_field_verified' if related else 'user_recorded',
+            document_sources=document_sources)
         data['limitations'].append('Portfolio values are recorded positions, not live market quotes. Original import text never overrides a current corrected register value.')
+        if related: data['limitations'].append('Field confirmation is the owner\'s attestation, not independent broker authentication. Unconfirmed, unavailable or changed document evidence remains unverified.')
     data['amounts']={field:_amount(getattr(row,field),helper,data['verification'],f'{row._meta.label}.{field}') for field in fields}
+    if kind=='investment':
+        for field in fields:
+            data['amounts'][field].update(source_document_ids=confirmed[field])
+            if available and confirmed[field]: data['amounts'][field]['evidence_status']='owner_confirmed_document_field'
     revision_data=dict(owner=row.user_id,record=list(MODELS[kind].objects.filter(pk=row.pk).values())[0],related=related,data=data)
     if not available:
         for value in data['amounts'].values(): value.update(amount=None,evidence_status='unavailable')
-    return _source(kind,row.pk,data,revision_data,available=available)
+    source=_source(kind,row.pk,data,revision_data,available=available)
+    if kind=='investment' and len(document_sources)==1 and all(confirmed.values()): source['url']=document_sources[0]['url']
+    return source
 
 
 def choices(user):

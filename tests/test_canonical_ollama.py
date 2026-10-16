@@ -14,6 +14,31 @@ from tests import test_canonical_evidence as fixtures
 
 @skipUnless(os.environ.get('ALFRED_RUN_OLLAMA_GROUNDING')=='true','Explicit synthetic real-local acceptance required.')
 class CanonicalOllamaAcceptance(TestCase):
+    def test_real_local_inference_from_owner_confirmed_investment_fields(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.investments.models import InvestmentImportDocument
+        from apps.investments.services.document_evidence import capture_import, evidence, review, FIELDS
+        fixtures.CanonicalEvidenceTests.setUp(self)
+        self.assertFalse(settings.ALFRED_MEMORY_OPENAI_AUTHORIZED)
+        self.assertFalse(settings.ALFRED_MEMORY_CLOUD_AUTHORIZED)
+        self.assertFalse(settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED)
+        document=InvestmentImportDocument.objects.create(user=self.owner,file_name='synthetic-portfolio.pdf',
+            uploaded_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC-INVESTMENT'),parser_status='parsed')
+        document.linked_investments.add(self.investment)
+        capture_import(document,[self.investment])
+        detail=evidence(self.owner,document.pk,self.investment.pk)
+        review(self.owner,document.pk,self.investment.pk,revision=detail['revision'],fields=list(FIELDS),confirm=True)
+        store=MemoryStore(settings.ALFRED_MEMORY_DIR,embedder=OllamaEmbeddings())
+        with patch('apps.ml_engine.services.hybrid_intelligence.reason_with_memory',side_effect=AssertionError('No external reasoning')):
+            result=hybrid_answer(store,self.owner,'Explain this record',scope='financial_records',
+                record_type='investment',record_id=self.investment.pk,local=OllamaReasoner())
+        self.assertEqual(result['provider'],'ollama'); self.assertFalse(result['financial_authority'])
+        source=next(item for item in result['sources'] if item['ref']==f'canonical-investment-{self.investment.pk}')
+        self.assertEqual(source['data']['amounts']['current_value']['amount'],'2345.67')
+        self.assertIsNone(source['data']['amounts']['current_value']['currency'])
+        self.assertEqual(source['data']['amounts']['current_value']['evidence_status'],'owner_confirmed_document_field')
+        self.assertEqual(source['url'],detail['citation_url'])
+
     def test_real_local_inference_and_encrypted_memory_reopen_with_synthetic_record(self):
         fixtures.CanonicalEvidenceTests.setUp(self)
         self.assertFalse(settings.ALFRED_MEMORY_OPENAI_AUTHORIZED)

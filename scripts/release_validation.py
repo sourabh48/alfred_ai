@@ -23,7 +23,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_family_invitation_atomic", "test_family_invitation_throttling", "test_file_uploader_persistence",
     "test_financial_baseline_alignment", "test_global_abuse_limits", "test_hybrid_intelligence",
     "test_intelligence_currency", "test_intelligence_ui", "test_investment_and_relationship_advisory",
-    "test_investment_evidence", "test_investment_evidence_migration",
+    "test_investment_evidence", "test_investment_evidence_migration", "test_investment_grounding",
     "test_investment_money", "test_loan_diagnostics", "test_loan_foreclosure_money",
     "test_loan_lifecycle_and_reports", "test_loan_money_field", "test_loan_money_runtime",
     "test_loan_related_money_runtime", "test_loan_verification", "test_loan_verification_api",

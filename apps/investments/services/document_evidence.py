@@ -49,7 +49,7 @@ def _state(document, row, proof):
     payload = document.extracted_payload if isinstance(document.extracted_payload, dict) else {}
     current = {field:format(investment_money(getattr(row,field)),'.2f') for field in FIELDS}
     original = proof.source_values if proof else {}
-    base = _digest(dict(record=list(Investment.objects.filter(pk=row.pk).values())[0],
+    base = _digest(dict(record={field.attname:getattr(row,field.attname) for field in row._meta.concrete_fields},
         document_id=document.pk, document_owner=document.user_id, parser_status=document.parser_status,
         updated=document.updated_at.isoformat(), payload=payload, original=original,
         file=fingerprint, file_name=document.uploaded_file.name, name=document.file_name))
