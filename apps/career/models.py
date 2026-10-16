@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from apps.expenses.money import ExpenseMoneyField
 
 
 class CareerProfile(models.Model):
@@ -7,10 +8,21 @@ class CareerProfile(models.Model):
     role = models.CharField(max_length=100)
     experience_years = models.FloatField()
     skills = models.TextField()
-    last_salary = models.FloatField(default=0)
+    last_salary = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
 
     def __str__(self):
         return self.role
+
+
+class CareerProfileMoneySnapshot(models.Model):
+    original_career_profile_id = models.PositiveBigIntegerField(unique=True)
+    career_profile = models.ForeignKey(CareerProfile, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="career_money_snapshots")
+    source_values = models.JSONField()
+    normalized_values = models.JSONField()
+    policy = models.CharField(max_length=30, default="career-money-v1")
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
 class CareerResume(models.Model):

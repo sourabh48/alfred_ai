@@ -11,7 +11,7 @@ from django.db.models import Q
 from alfred_ai.services.materialized_cache import invalidate_user_materialized_payloads
 from apps.behavioral.models import BehavioralSignal
 from apps.budgets.models import Budget, BudgetMoneySnapshot
-from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, CareerResumeLearningMemory
+from apps.career.models import CareerJobAnalysis, CareerProfile, CareerProfileMoneySnapshot, CareerResume, CareerResumeLearningMemory
 from apps.expenses.models import BankAccount, BankAccountMoneySnapshot, Expense, ExpenseMoneySnapshot, StatementUpload
 from apps.family.models import Dependent, FamilyAccountLink
 from apps.integrations.models import CreditReportUpload, CreditScore, EmailConnection, VerifiedExternalInsight
@@ -140,6 +140,7 @@ def clear_user_fed_data(user) -> dict:
         CareerJobAnalysis.objects.filter(user=user).delete()
         career_resume_qs.delete()
         CareerResumeLearningMemory.objects.filter(user=user).delete()
+        CareerProfileMoneySnapshot.objects.filter(user=user).delete()
         CareerProfile.objects.filter(user=user).delete()
 
         ExpenseMoneySnapshot.objects.filter(user=user).delete()

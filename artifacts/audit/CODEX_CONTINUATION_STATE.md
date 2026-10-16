@@ -1,5 +1,31 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## FIN-MONEY Career completion — 2026-10-16
+
+User source committed `2f48d3edf50555299e4072dfd2f9441a3b435af9`; same isolated
+feature/fin-money-tail-20261016 worktree. Career salary unit follows it; verify
+actual HEAD. last_salary only is Decimal cents with numeric API, finite bounds,
+signed legacy compatibility; experience/raw extraction/confidence unchanged.
+Migration career.0005_career_salary_decimal retains owned originals, applied
+markers and guarded reverse; owner reset clears owned orphan snapshots.
+
+Evidence artifacts/post-audit/fin-money-profiles-20261016: 63 career-integration
+backend PASS, one final full-PUT contract PASS, one final Chrome salary save/
+reload PASS; system/drift/exact Career migration plan PASS. Synthetic alias
+backup/independent restore, SQLite integrity/FKs, all unrelated financial/family
+typed rows, source preservation and exact reverse PASS. Cent salary baseline has
+zero mismatches. Browser initially failed because fixture submitted blank required
+skills (HTTP 400), not Decimal conversion; now fills skills and backend covers
+blank rejection/full valid PUT. Failures retained; no waiver, zero final skips.
+
+Next implement Mobility nine money fields/7 models only, keep quantities/rates
+Float. Inspect Decimal/float derived fuel/forecast math and JSON boundaries. Reuse
+LoanRelatedMoneySnapshot's typed-link/original-parent approach for recovery;
+nullable actual cost differs from zero. User/Career validation precedes Mobility.
+No production source/DB/service/ACL/key/backup/remote/provider action; production
+DOWN on read-only check. Frozen 4aa7ac70 untouched. Currency schema/design stays
+separate and historical currency unknown. Do not rerun Banking/Budget/M16-M21.
+
 ## FIN-MONEY User completion — 2026-10-16
 
 Same worktree/branch, starting HEAD 814d4dad. This checkpoint accompanies User

@@ -16,7 +16,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_alfred_brain", "test_api_session_security", "test_auth_pages", "test_bike_document_parser",
     "test_budget_money", "test_budget_money_migration",
     "test_career_api_errors", "test_career_job_http", "test_career_recruiter_and_evidence",
-    "test_career_resume_upload", "test_credit_report_upload", "test_document_center_and_statement_import",
+    "test_career_resume_upload", "test_career_money", "test_credit_report_upload", "test_document_center_and_statement_import",
     "test_document_extraction", "test_document_grounding_acceptance", "test_document_retry_integrity",
     "test_document_review_and_retry", "test_expense_money_identity", "test_expense_money_runtime", "test_experimental_retirement",
     "test_family_account_links", "test_family_api_errors", "test_family_consent_migration",

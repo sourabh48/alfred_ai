@@ -1,8 +1,11 @@
 from rest_framework import serializers
 from apps.users.money import ProfileMoneySerializerField
+from apps.expenses.money import NumericMoneySerializerField
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 
 class CareerProfileSerializer(serializers.ModelSerializer):
+    last_salary = NumericMoneySerializerField(required=False)
+
     class Meta:
         model = CareerProfile
         fields = "__all__"

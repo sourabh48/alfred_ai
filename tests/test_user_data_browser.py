@@ -122,6 +122,24 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 f'#accountProfileForm [name="{field}"]').get_attribute('value'), amount)
         self.capture('user-decimal-profile-reload')
 
+    def test_career_decimal_salary_save_and_reload_preserves_experience(self):
+        from decimal import Decimal
+        from apps.career.models import CareerProfile
+        self.login(); self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR,
+            '#careerProfileForm [name=last_salary]').get_attribute('value') != '')
+        for field, value in {'last_salary': '12345.67', 'experience_years': '4.5', 'skills': 'Python, SQL'}.items():
+            element = self.browser.find_element(self.By.CSS_SELECTOR, f'#careerProfileForm [name="{field}"]')
+            element.clear(); element.send_keys(value)
+        self.memory_click('#careerProfileForm button[type=submit]')
+        self.wait.until(lambda _: 'updated' in self.text('careerFormFeedback'))
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR,
+            '#careerProfileForm [name=last_salary]').get_attribute('value') == '12345.67')
+        row = CareerProfile.objects.get(user=self.scenario['user'])
+        self.assertEqual((row.last_salary, row.experience_years), (Decimal('12345.67'), 4.5))
+        self.capture('career-decimal-salary-reload')
+
     def test_candidate_verification_and_correction_refresh_owned_settings(self):
         from apps.ml_engine.services.persistent_memory import MemoryStore
         from tests.test_persistent_memory import SyntheticEmbeddings

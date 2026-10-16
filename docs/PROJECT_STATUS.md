@@ -8,6 +8,32 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
+### FIN-MONEY — Career salary complete locally, 2026-10-16
+
+User implementation committed as `2f48d3edf50555299e4072dfd2f9441a3b435af9`.
+CareerProfile.last_salary now uses the existing bounded finite Decimal-cent field
+and numeric serializer, preserving the previous signed-value policy. Experience,
+scores, confidence, raw resume evidence and income/projection rules are unchanged.
+New migration `career.0005_career_salary_decimal` depends on career.0004 plus the
+existing User dependency. Owned original snapshots, applied markers, guarded
+reverse and owner/orphan reset follow M13. No currency inference or production use.
+
+Evidence in `artifacts/post-audit/fin-money-profiles-20261016`: career-focused
+15 PASS; career-integration **63 backend PASS**, including canonical baseline,
+projection and document correction/retry; career-contract-final one full-PUT
+contract PASS; career-browser-final **one Chrome PASS**, salary save/reload and
+experience preserved. Initial browser fixture sent blank skills and correctly
+received HTTP 400 under the existing required-skills API contract; fixture now
+supplies skills, and an explicit backend regression verifies both outcomes.
+Failed diagnostic receipts remain. Zero final skips/failures. System/drift and
+exact one-Career-migration plan PASS. Synthetic alias backup/restore, integrity/FK,
+forward/reverse, raw evidence/parent/owner preservation and unrelated financial/
+family row hashes reconcile. Cent-valued salary fallback baseline unchanged.
+
+Next: Mobility's nine monetary fields across seven models, including nullable
+actual cost; preserve parent links and derived output contracts. No new full
+release/package gate and no change to frozen 4aa7ac70 or production 3932f391.
+
 ### FIN-MONEY — User income/rent complete locally, 2026-10-16
 
 Based on FIN-MONEY checkpoint `814d4dad`, same isolated branch. User
