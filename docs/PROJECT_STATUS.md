@@ -73,29 +73,71 @@ future authorized candidate integration/release gate, not a production migration
 Changed-source credential/private-path scan: PASS, 28 files, no findings;
 AST-only graph update completed successfully. No external scan/API used.
 
-### FIN-CURRENCY — separate design disposition, 2026-10-16
+### FIN-CURRENCY — reviewed decision contract, 2026-10-16
 
-No currency migration or historical backfill is part of FIN-MONEY. Source review:
-User, Career and the nine Mobility money fields do not persist a currency code;
-neither do the existing Expense/Bank/Loan/Investment monetary registers. The
-legacy `static/js/app.js::formatCurrency` INR convention is presentation only.
-`hybrid_intelligence.source_context` deliberately emits `currency: null` and
-`currency_status: not_recorded`; its deterministic presentation suppresses
-unsupported model numeric/currency claims. `formatRecordedMoney` labels missing
-currency rather than inferring it. These contracts remain unchanged.
+Review baseline: `feb650834deb782f0b3f813d4c9231b911eb5255`, isolated worktree
+F:/ALFRED_DEV/post-audit. **REVIEW COMPLETE; CONTRACT NOT APPROVED; SCHEMA BLOCKED.**
+Budget/User/Career/Mobility conversions are complete and not reopened. No runtime,
+schema, migration, provider or historical value changes are authorized by this
+review. The recommendations below are proposals, not approved defaults in code.
 
-Next scoped design must establish an authoritative per-record currency code or
-explicit unknown, with source/owner attestation and correction provenance. Never
-derive historical currency from country, locale, INR labels or an AI narrative.
-Keep unknown history unknown unless independent record evidence is explicitly
-reviewed. Plan per-currency totals and a separate unknown bucket; mixed-currency
-sums require an explicit, dated FX source, rate provenance and Decimal rounding
-policy. Existing aggregate behavior is a legacy convention, not verified
-multi-currency accounting. Decide which record owns currency, account/transfer
-compatibility, precision for non-cent currencies, API transitions and reversible
-migrations before implementation. This is an unapproved design proposal, not an
-implemented schema or permission for provider calls/backfill. Currency/FX tests,
-approval and release acceptance remain open; no historical value is relabeled.
+#### Actual execution boundaries and proposed ownership
+
+| Domain | Inspected implementation today | Proposed currency owner after approval |
+| --- | --- | --- |
+| Banking / Expenses | [models](../apps/expenses/models.py), [serializers](../apps/expenses/serializers.py), [statement parser](../apps/expenses/services/statement_import.py), [posting/deduplication](../apps/expenses/services/statement_lifecycle.py), [identity](../apps/expenses/services/transaction_intelligence.py): numeric amounts; no canonical currency field or parser currency contract. Account uniqueness is user + account_number. | Account denomination plus immutable transaction settlement denomination and statement evidence. Explicitly confirmed account currency may prefill a **new** posting, never relabel history. Foreign merchant amount/fee/booked FX need separate evidence; account number alone may not identify a multi-currency subaccount. |
+| Loans / settlement / closure | [models](../apps/loans/models.py), [API](../apps/loans/serializers.py), [PDF parser](../apps/loans/services/loan_pdf_parser.py), [import](../apps/loans/views.py), [settlement](../apps/loans/services/loan_foreclosure_service.py): Decimal contract/payment/closure amounts, no denomination guard. | Loan contract denomination owns principal/EMI/balance; child evidence records its actual source denomination. Cross-currency payment needs explicit bank-booked credited amount/rate/fees, never a reference-rate guess. |
+| Investments | [models](../apps/investments/models.py), [serializers](../apps/investments/serializers.py), [imports](../apps/investments/services/portfolio_intelligence.py), [summary/growth](../apps/investments/views.py): InvestmentCurrencySerializerField validates **amounts**, not ISO codes; totals have no currency partition. | Explicit position valuation/cost-basis denomination; each source quote keeps its own denomination/as-of. Asset units such as crypto are not fiat currency codes. Do not subtract cost from valuation or combine SIPs without compatible denomination. |
+| User / Career income / rent | [User fields](../apps/users/models.py), [profile API](../apps/users/serializers.py), [Career model](../apps/career/models.py), [income selection](../apps/career/services/income_intelligence.py), [opportunity form](../apps/career/forms.py), [job evidence](../apps/career/services/job_intelligence.py): profile salary has no currency; opportunity JSON carries currency/period but contains INR fallbacks and `$` -> USD interpretation. | Separate currency for each income/rent input or a reviewed income-source record; do not make one User.country/profile default authoritative for all amounts. Career salary period must stay explicit alongside currency; advisory job JSON never labels profile history. |
+| Budgets / savings / cash flow | [Budget](../apps/budgets/models.py), [API](../apps/budgets/serializers.py), [plan selection](../apps/budgets/services/budget_intelligence.py), [canonical baseline](../apps/expenses/services/financial_intelligence.py): month-based plans and derived income/obligation/savings totals lack currency partitions. | One denomination per Budget; spend and utilization only compare compatible amounts. Derived savings/cash flow inherit a validated input group, not a display locale. No automatic correction of recorded Budget.spent. |
+| Mobility / Travel | [registers](../apps/mobility/models.py), [APIs](../apps/mobility/serializers.py), [plan persistence](../apps/mobility/services/travel_conversation.py), [budget](../apps/mobility/services/travel/costs.py), [quote precision](../apps/mobility/services/travel/money.py), [stays](../apps/mobility/services/travel/providers/accommodation.py), [flights](../apps/mobility/services/travel/providers/transport.py): stored amounts lack codes; Travel estimates explicitly use INR; provider quote strings carry currency and sometimes a separate due-at-property currency. Only matching INR whole-trip quotes qualify in the current budget evidence path; no FX. | Each valuation, receipt, fuel cost, trip spend and quote owns denomination. Plan budget is a **target** denomination, not all trip transactions' currency. Retain raw provider scale, freshness, scope and separate fee/property currency; never equate an estimate with a booked price. |
+| Family / tax / risk / reports | [Family totals](../apps/family/views.py) sum consented member baselines; [Indian tax policy](../apps/ml_engine/services/tax_policy.py) and [deductions](../apps/ml_engine/services/tax_optimizer.py) use amounts without a record currency contract. [Report API](../apps/reports/views.py) lists owned GeneratedReport file references, not a currency-aware export engine. | Preserve owner consent before grouping summaries. Indian tax inputs need explicit INR eligibility; country/policy does not prove a historical record's currency. Reports/ratios/forecasts carry source groups, as-of, completeness and FX basis; no universal scalar across currencies. |
+| UI / AI / cache | [formatter](../static/js/app.js) uses legacy INR; [source_context/present_answer](../apps/ml_engine/services/hybrid_intelligence.py) emit currency null/not_recorded and suppress unsupported numeric prose; [baseline/revision](../apps/expenses/services/financial_intelligence.py) and [relationship matching](../apps/expenses/services/financial_relationships.py) have no currency partition. | Locale only formats. AI may cite certified structured groups, never supply code/rate/amount. Currency/provenance corrections invalidate owner caches and derived reports; they never enlarge Family access or private memory/document access. |
+
+#### Decision matrix
+
+| ID / decision required | Recommended safe contract | Blocking condition / current behavior |
+| --- | --- | --- |
+| C1 — ownership and denomination changes | Recommend metadata on existing records, per monetary input where a row can differ (User income/rent and BikeProfile value/income support); a common code only for an explicitly same-denomination contract/position/Budget. Retain source, confirmation basis, actor/time and prior value. Do not add a parallel financial register. | Approve this ownership layout, parent/child invariants and multi-currency account identity. Account/loan denomination cannot silently change after postings. Salary period also needs evidence; currency approval does not authorize inferring historical periods or rescaling salaries. No model changes now. |
+| C2 — unknown historical currency | Persist null; API currency null + not_recorded. Unknown is a state, not an ISO code (`UNKNOWN`/`XXX` must not stand for guessed currency). Corrections require reviewed independent evidence or explicit owner attestation, with provenance. | Already a user constraint: never backfill from INR labels, location, model prose, ambiguous symbols, existing advisory defaults or a newly set account preference. Zero amount does not establish currency. |
+| C3 — mixed totals / missing coverage | Certified totals, net worth, budgets, percentages and family sums operate per **known matching** currency. Unknown records remain a review collection with counts/source values, **not a certified unknown-currency subtotal**. Missing components make results incomplete, not zero. | Approve legacy scalar behavior before known mixed records can enter calculations. Existing canonical totals are legacy arithmetic conventions, not proven same-currency financial facts. |
+| C4 — ISO codes and precision | Version an offline reviewed ISO 4217 registry: uppercase alphabetic code, validity dates and minor unit. Preserve valid historical withdrawn codes. Proposed initial posting allowlist INR/USD/EUR/GBP fits current 14/2 storage; not a claim that these are configured today. | Approve initial supported set and scale policy. Current cent quantizers cannot preserve three-decimal monetary input; do not silently round unsupported currencies, fund/metal units or crypto into cents. Retain provider evidence separately. No registry download at app startup. |
+| C5 — reporting currency | Optional owner-selected reporting preference controls presentation/derived conversion only. It never supplies record denomination or labels historical amounts. | Decide whether an overall converted report is needed in phase one. Recommended first delivery: grouped totals with **FX disabled**; no reporting base selected automatically. |
+| C6 — FX source, purpose and freshness | Reference FX is optional, read-only valuation evidence: base/quote, rate direction/precision, provider, effective date, fetched time, publication calendar, source/hash and policy version. Use an on-or-before as-of fixing; never a future rate. Certified conversion requires the expected published fixing; missing/stale/suspended pairs abstain. Round final derived amounts only under an approved policy. | No FX engine or approved source exists. A future reference feed must not supply actual settlement/tax filing values. ECB is an informational candidate, not selected or authorized; actual booked FX remains bank evidence. Approve source coverage/terms, historical-date policy, staleness/calendar and rounding before activation. |
+| C7 — API/UI compatibility | Proposed additive typed money evidence uses exact decimal text + code/null + status/provenance, with per-currency groups/completeness. Preserve existing numeric fields during an agreed transition; missing totals are not coerced to zero. Clearly distinguish legacy-assumption output from certified output. | Choose versioned endpoint/opt-in versus coordinated contract change. A known mixed input cannot continue through an unlabeled legacy scalar: reject incompatible writes or make the total explicitly unavailable under the approved API. Existing consumers must be inventoried at cutover. |
+| C8 — imports / matching / corrections | Preserve original amount text, parser evidence, owner/account links, transfer legs and historical fingerprints. Currency candidates stay unverified until approved evidence resolves ambiguity/conflict. Gate new transfer/loan-payment/portfolio matching on compatible denomination; cross-FX allocation needs explicit evidence. | Do not rewrite existing deduplication hashes/signatures. Approve versioned rules for genuinely distinct new multi-currency postings, reimport/correction idempotence and atomic rejection with no partial financial writes. |
+| C9 — reports, caches and privacy | Every new report/AI amount identifies source currency, as-of, completeness and any FX estimate separately. Invalidation keys include currency/provenance/policy revisions. Apply existing owner/Family consent filtering **before** grouping. | Reports, tax, Career comparisons, budget utilization, family aggregation, model features and display helpers must be covered before mixed-currency activation. No private amount or account data is sent to a rate provider. |
+| C10 — reversible migration / downgrade | After approval, separate expand-only nullable metadata migrations by domain, no money rewrite/backfill/default INR. Keep owner-scoped original metadata and guarded correction history; rehearse exact counts, values, identities, ownership, forward/reverse and independent restore. | Reversibility is conditional: refuse downgrade if it would erase new denomination/FX semantics or make an old app combine mixed data. Preserve evidence and require an explicitly reviewed source/data rollback path; never blindly drop metadata or inherit the M15 recovery waiver. |
+
+**Approval package:** (1) record/profile/account ownership C1; (2) grouped/incomplete
+totals and API transition C3/C7; (3) supported ISO set/precision C4; (4) guarded
+metadata migration/downgrade C8/C10. C2 and privacy boundaries remain mandatory.
+C5/C6 can safely be deferred by approving grouped-only operation with no FX;
+provider approval is not required just to finish the local metadata contract.
+Do not enable mixed-currency writes before all relevant consumers are guarded.
+
+Required post-approval regressions: explicit/unknown/ambiguous/withdrawn codes;
+supported/unsupported scales; account/transaction/loan/position/profile currency
+conflicts; mixed and incomplete owner/Family totals; consent revocation; numeric
+API transition; import/reimport/fingerprint stability; cache/report invalidation;
+no LLM override; later FX calendar/weekend/stale/missing/future-rate cases; guarded
+forward/reverse with post-migration edits and independent restore. Existing
+[AI currency tests](../tests/test_intelligence_currency.py) cover presentation,
+not an ISO/FX/accounting implementation. No completed Decimal suite was repeated.
+
+Standards checked read-only on 2026-10-16: [SIX ISO 4217 maintenance lists](https://www.six-group.com/en/products-services/financial-information/market-reference-data/data-standards.html)
+provide current/historical codes and minor units. [ECB reference-rate documentation](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html)
+describes working-day publication around 16:00 CET and discourages transaction use.
+These are documentation checks, not real-provider acceptance, a chosen service,
+API integration or authorization. No rate values were imported.
+
+Next safe action: approve or amend C1/C3/C4/C7/C8/C10, explicitly keep C5/C6 OFF,
+then implement only the first approved nullable metadata domain and its synthetic
+rehearsal. This review itself is complete, not blocked by production downtime.
+The next independent roadmap item, AI-HISTORY, needs its own encrypted storage/
+retention/recovery contract (UNIT 9); AI-GROUND finance tools depend on currency.
+AI-HISTORY contract work can proceed independently while currency approval waits;
+it must preserve existing encrypted memory and require explicit history consent.
 
 ### FIN-MONEY — Career salary complete locally, 2026-10-16
 

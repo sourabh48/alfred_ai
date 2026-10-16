@@ -1,5 +1,56 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## FIN-CURRENCY decision review — 2026-10-16
+
+Resume baseline feb650834deb782f0b3f813d4c9231b911eb5255; same isolated
+F:/ALFRED_DEV/post-audit, feature/fin-money-tail-20261016. Review complete;
+currency contract NOT APPROVED, schema/migrations blocked pending the specific
+decision package in docs/PROJECT_STATUS.md (C1–C10). This checkpoint is docs-only.
+Do not repeat completed Budget/User/Career/Mobility conversions or old M16–M21 gates.
+
+Traced financial register models/APIs, statement/loan/investment imports and
+identity/matching, User/Career income selection, budgets/savings, Mobility/Travel
+quotes, tax, consented Family totals, reports, cache revisions and AI/UI output.
+Canonical registers have no currency metadata; advisory Career JSON has currency
+fallbacks/symbol interpretation and Travel quotes carry provider denomination.
+Neither supplies historical currency authority. InvestmentCurrencySerializerField
+validates numeric amounts, not ISO codes. Current 14/2 storage is not generic
+ISO-scale support. Unknown grouping is a review collection, not a certified total.
+
+Required approval: metadata on existing records, per-income/rent and per-BikeProfile
+value/income-support, compatible parent/child groups and multi-currency accounts;
+mixed/unknown completeness and scalar API cutover; ISO allowlist/precision;
+import identity/correction rules and conditional downgrade. Recommend exact
+decimal-text structured evidence, nullable unknown history, grouped-only totals,
+no FX/base currency default, no inferred codes. Future FX provider/date/calendar/
+freshness/rounding approval can be deferred entirely. New mixed currency writes
+must wait for all baseline/tax/family/budget/report/matching consumers to be safe.
+
+Read-only official SIX/ECB documentation checked, no provider connection, rate
+import, credentials or private upload. Existing source tests inspected, not run
+as new proof. Only existing PROJECT_STATUS and this continuation file changed;
+no duplicate Markdown report or schema/runtime changes. Document link/privacy/
+source-identity validation PASS: two existing Markdown files only, 40 local source
+links resolve, C1–C10 complete, credential/private-path scan clean, zero runtime/
+migration changes. Receipt artifacts/post-audit/fin-currency-20261016/
+review-validation.json. Exact baseline/frozen/master commits verified. No backend,
+browser, native or completed migration suites rerun for this docs-only change.
+
+Production DOWN is preserved from the latest read-only 09:20 UTC checkpoint;
+no restart, live financial DB access, production config/ACL/key/backup/GitHub action.
+Read-only listener recheck at 09:35 UTC still found zero port-8000 listeners;
+production Git HEAD remains 3932f391. No other operational actions were performed.
+Frozen 4aa7ac70fa27c1410e695470af5c3987235244b1 preserved. AWS retired; real OpenAI
+and cloud OFF. Previous recovery waiver is release-specific, not future approval.
+
+Safe resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
+git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 220.
+Read the concise C1–C10 decision table and approval package; obtain explicit
+contract approval before creating currency migrations. Review is finished, so
+do not restart financial discovery. AI-HISTORY is independent of FX but requires
+its own storage/retention/recovery design; AI-GROUND financial tools depend on
+this contract. No new feature sprint was needed to finish the requested review.
+
 ## FIN-MONEY User/Career/Mobility validation — 2026-10-16
 
 Worktree F:/ALFRED_DEV/post-audit; branch feature/fin-money-tail-20261016, based on
