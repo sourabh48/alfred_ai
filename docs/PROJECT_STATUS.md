@@ -11,8 +11,9 @@ service, paid provider or GitHub operation is authorized here.
 ### FIN-MONEY — User, Career and Mobility tail complete locally, 2026-10-16
 
 User source: `2f48d3edf50555299e4072dfd2f9441a3b435af9`; Career source:
-`f8c7ebb2400113713ba640e43e76d8340e4607b5`. This checkpoint accompanies the
-separate Mobility implementation, based on Career. All audited tail register
+`f8c7ebb2400113713ba640e43e76d8340e4607b5`; Mobility source:
+`ddb7fca22588f469ff4086766d014732f393cc6c`, based on Career. This documentation
+checkpoint follows that tested source. All audited tail register
 fields are now Decimal cents in development; the earlier Budget unit is retained
 without repeating its migration tests. No production remediation/deployment is
 claimed. Frozen release `4aa7ac70` remains unchanged and is not this new source.
@@ -64,11 +65,13 @@ their counts are reported separately, not added to 156.
 Evidence: `artifacts/post-audit/fin-money-profiles-20261016/`; failed initial runs
 remain diagnostic evidence, not accepted outcomes. No full release/package gate.
 
-Production read-only check at 2026-10-16 09:06 UTC: no port-8000 listener or
+Production read-only check at 2026-10-16 09:20 UTC: no port-8000 listener or
 production runtime process; HEAD remains 3932f391. Prior stale pre-reboot state is
 preserved. No restart, repair, live DB access, backup/ACL/key/remote action. AWS
 retired; real OpenAI/cloud OFF. Next is the separate currency design below and a
 future authorized candidate integration/release gate, not a production migration.
+Changed-source credential/private-path scan: PASS, 28 files, no findings;
+AST-only graph update completed successfully. No external scan/API used.
 
 ### FIN-CURRENCY — separate design disposition, 2026-10-16
 

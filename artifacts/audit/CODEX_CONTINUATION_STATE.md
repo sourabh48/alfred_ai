@@ -4,8 +4,9 @@
 
 Worktree F:/ALFRED_DEV/post-audit; branch feature/fin-money-tail-20261016, based on
 814d4dad. User implementation 2f48d3edf50555299e4072dfd2f9441a3b435af9 and Career
-f8c7ebb2400113713ba640e43e76d8340e4607b5 are committed. This checkpoint accompanies
-the separate Mobility unit; verify actual HEAD. Frozen release/post-audit-runtime-
+f8c7ebb2400113713ba640e43e76d8340e4607b5 are committed. Mobility source is now
+ddb7fca22588f469ff4086766d014732f393cc6c; this documentation-only checkpoint follows
+that tested source. Verify actual HEAD. Frozen release/post-audit-runtime-
 20261016 remains exactly 4aa7ac70fa27c1410e695470af5c3987235244b1; do not move,
 rebuild or reuse its old release counts as proof of these new schema changes.
 
@@ -47,7 +48,7 @@ PASS. First broad money-final-integration also used the wrong projection test
 module name; final invocation uses test_career_projection_simulation and passes.
 Do not count these diagnostic runs as successful or add overlapping suite counts.
 
-Production remains DOWN: read-only production-health-final.json at 09:06 UTC has
+Production remains DOWN: read-only production-health-end.json at 09:20 UTC has
 zero listeners/runtime processes; main HEAD 3932f391. No production DB opened,
 service restarted, configuration/ACL/key/backup/remote/provider action. The earlier
 stale runtime marker predates reboot; crash cause is not proven. Operator action
@@ -60,6 +61,10 @@ implementation until current committed evidence is read. Currency is a separate
 decision: unknown historical currency stays unknown, no display-INR backfill.
 Future release integration/package/real-account/production rollout remain gated;
 this work does not alter frozen 4aa7ac70 or authorize a new deployment.
+Privacy: changed-source scan PASS (28 files, zero findings), no external service;
+AST-only graph update native exit 0, log graph-money-final.log. New report files
+were not created; existing status, privacy and completion-prompt instructions
+were reconciled, with historical evidence preserved.
 
 ## FIN-MONEY Career completion — 2026-10-16
 
