@@ -102,6 +102,26 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: element.is_displayed() and element.is_enabled())
         element.click()
 
+    def test_user_decimal_profile_save_and_reload_keeps_exact_owned_cents(self):
+        from decimal import Decimal
+        self.login()
+        self.browser.get(self.live_server_url + '/settings/')
+        self.wait.until(lambda _: self.text('settingsProfileStatus') == 'Synced')
+        values = {'monthly_income': '10000.01', 'variable_income': '200.02', 'rent_or_emi': '1000.03'}
+        for field, amount in values.items():
+            element = self.browser.find_element(self.By.CSS_SELECTOR, f'#accountProfileForm [name="{field}"]')
+            element.clear(); element.send_keys(amount)
+        self.memory_click('#accountProfileForm button[type=submit]')
+        self.wait.until(lambda _: 'Profile saved' in self.text('settingsProfileFeedback'))
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('settingsProfileStatus') == 'Synced')
+        self.scenario['user'].refresh_from_db()
+        for field, amount in values.items():
+            self.assertEqual(getattr(self.scenario['user'], field), Decimal(amount))
+            self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,
+                f'#accountProfileForm [name="{field}"]').get_attribute('value'), amount)
+        self.capture('user-decimal-profile-reload')
+
     def test_candidate_verification_and_correction_refresh_owned_settings(self):
         from apps.ml_engine.services.persistent_memory import MemoryStore
         from tests.test_persistent_memory import SyntheticEmbeddings

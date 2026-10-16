@@ -42,6 +42,9 @@ Trip photos are user media, not extraction-only documents, and are not automatic
 
 The development FIN-MONEY Budget migration retains owner-scoped original float
 representations and normalized cents in `BudgetMoneySnapshot` for recovery.
+UserMoneySnapshot similarly retains original profile money for the development
+User migration; profile APIs exclude it, owner reset removes it, and account
+deletion cascades it. Neither snapshot type adds historical currency metadata.
 This evidence is not exposed by Budget APIs. Deleting a Budget does not destroy
 its recovery evidence; owner reset/account deletion removes that owner's
 snapshots, including orphan rows. It lives in the canonical financial database

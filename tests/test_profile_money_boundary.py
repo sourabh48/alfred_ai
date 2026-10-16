@@ -36,7 +36,7 @@ class ProfileMoneyBoundaryTests(TestCase):
                                       content_type="application/json")
                     self.assertEqual(response.status_code, 400)
                     self.user.refresh_from_db()
-                    self.assertEqual(self.user.monthly_income, 123.45)
+                    self.assertEqual(self.user.monthly_income, Decimal('123.45'))
                     self.assertEqual(self.user.city, "")
 
     def test_model_save_queryset_update_and_bulk_insert_reject_invalid_money(self):
@@ -50,7 +50,7 @@ class ProfileMoneyBoundaryTests(TestCase):
                 with self.assertRaises(ValidationError), transaction.atomic():
                     get_user_model().objects.bulk_create([get_user_model()(username="invalid-bulk", monthly_income=value)])
                 self.user.refresh_from_db()
-                self.assertEqual(self.user.monthly_income, 123.45)
+                self.assertEqual(self.user.monthly_income, Decimal('123.45'))
         self.assertFalse(get_user_model().objects.filter(username="invalid-bulk").exists())
 
     def test_signup_forms_reject_invalid_currency_and_keep_empty_optional_inputs(self):
@@ -71,9 +71,9 @@ class ProfileMoneyBoundaryTests(TestCase):
                 self.assertEqual(Decimal(str(self.user.monthly_income)), Decimal(str(value)))
                 self.assertIsInstance(UserSerializer(self.user).data["monthly_income"], float)
 
-    def test_model_form_and_clean_share_currency_boundary_without_schema_change(self):
+    def test_model_form_and_clean_share_decimal_currency_boundary(self):
         field = get_user_model()._meta.get_field("monthly_income")
-        self.assertEqual(field.deconstruct()[1], "django.db.models.FloatField")
+        self.assertEqual(field.formfield().clean('0.01'), Decimal('0.01'))
         with self.assertRaises(ValidationError):
             field.formfield().clean("0.001")
         self.user.monthly_income = float("inf")

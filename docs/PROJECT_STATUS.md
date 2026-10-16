@@ -8,6 +8,38 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
+### FIN-MONEY — User income/rent complete locally, 2026-10-16
+
+Based on FIN-MONEY checkpoint `814d4dad`, same isolated branch. User
+monthly_income/variable_income/rent_or_emi persist bounded Decimal cents. Existing
+strict finite/non-negative/two-decimal input validation and numeric API outputs
+remain; signup optional blanks remain zero. Rates/model features and income-mode
+heuristics were not redefined. No historical currency inference or new currency
+field. Frozen runtime candidate 4aa7ac70 and production 3932f391 unchanged.
+
+New migration: `users.0003_user_money_decimal`, depending on users.0002 only.
+It atomically validates all profiles, retains original float representations and
+HALF_UP normalized cents in UserMoneySnapshot, and applies with markers. Reverse
+only restores unchanged, applied, correctly linked values; new accounts and edits
+survive. Passwords, groups, sessions, identifiers, consents and related financial
+records are preserved. Owner reset/account deletion removes owned evidence.
+Snapshots remain private canonical-DB evidence, never profile API fields.
+
+Evidence: `artifacts/post-audit/fin-money-profiles-20261016/`: user-focused
+20 PASS; user-integration **98 backend PASS** (includes focused scope), no skips
+or failures; user-browser **two Chrome PASS** (profile cent save/reload and tax);
+user-rehearsal-final **one enhanced rehearsal PASS**, adding nonempty family data.
+SQLite backup/independent restore, integrity/FKs, alias isolation, original source
+bytes, exact reverse and unrelated typed row hashes all reconcile. Cent-valued
+history has zero canonical baseline mismatches. Existing login/session/group
+compatibility verified synthetically. user-checks system/drift PASS and plan is
+exactly the one User migration from the preceding schema. No production DB access.
+
+Read-only operational recheck: production port 8000 has no listener or runtime
+process; the prior stale pre-reboot runtime finding remains. No start/stop/repair.
+Next: independently scoped Career and Mobility register conversions. Currency
+metadata/FX policy stays separate; no deployment or provider activation authorized.
+
 ### Banking regression and production diagnosis — 2026-10-16
 
 Development starts at `08f39a88`; frozen runtime candidate `4aa7ac70` and its
@@ -60,8 +92,8 @@ unchanged, applied, still-owned fields; corrections/new rows remain, deleted row
 are not recreated. Owner reset removes owned snapshots, including orphan evidence.
 Snapshots are private canonical-DB recovery evidence, not encrypted AI memories.
 No currency column/backfill or FX assumption is introduced; legacy screen INR
-conventions remain unchanged. User/Career/Mobility Decimal storage and explicit
-currency design are still separate unfinished FIN-MONEY/FIN-CURRENCY work.
+conventions remain unchanged. Other domain conversions and currency design are
+separate work; see newer FIN-MONEY checkpoints above for current progress.
 
 Validation evidence under `artifacts/post-audit/fin-money-20261016/`:
 - `budget-focused/receipt.json`: 14 focused tests PASS (included in the combined run).
@@ -86,9 +118,8 @@ Production still 3932f391; new migration is not applied there. Frozen 4aa7ac70
 and package evidence remain their own immutable scope. No native rebuild/full
 release gate for this new unit yet. Existing clean-PC/installer, normal-account,
 independent device-loss/key recovery and remote CI/protection acceptance remain
-pending. Next safe unit: scoped User income/rent Decimal conversion, reusing its
-completed finite-input guards and preserving original values with independent
-baseline/reverse/recovery evidence. Never infer historical currency.
+pending. The next unit at this Budget checkpoint was User income/rent; newer
+checkpoints above supersede that next action. Never infer historical currency.
 
 ### Verified local runtime candidate — 2026-10-16
 

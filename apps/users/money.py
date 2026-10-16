@@ -1,7 +1,6 @@
-"""Validate profile currency before float storage; schema conversion remains separate."""
+"""Finite, bounded Decimal cents for reported profile money; currency is unknown."""
 from decimal import Decimal, InvalidOperation
 
-from django import forms
 from django.core.exceptions import ValidationError
 from django.db import models
 from rest_framework import serializers
@@ -18,29 +17,20 @@ def profile_money(value):
         amount = Decimal(str(value))
         if not amount.is_finite() or amount < 0 or amount > LIMIT or expense_money(amount) != amount:
             raise ValueError(MESSAGE)
-        return float(amount)
+        return expense_money(amount)
     except (InvalidOperation, TypeError, OverflowError, ValueError):
         raise ValueError(MESSAGE) from None
 
 
-class ProfileMoneyField(models.FloatField):
+class ProfileMoneyField(models.DecimalField):
     def to_python(self, value):
         try:
             return profile_money(value)
         except ValueError:
             raise ValidationError(MESSAGE, code="invalid") from None
 
-    def get_prep_value(self, value):
-        return self.to_python(value)
-
     def formfield(self, **kwargs):
-        return super().formfield(form_class=forms.DecimalField, max_digits=14,
-                                 decimal_places=2, min_value=0, max_value=LIMIT, **kwargs)
-
-    def deconstruct(self):
-        name, _, args, kwargs = super().deconstruct()
-        # Validation changes no SQL type, historical values or migration state.
-        return name, "django.db.models.FloatField", args, kwargs
+        return super().formfield(**{**kwargs, "min_value": 0, "max_value": LIMIT})
 
 
 class ProfileMoneySerializerField(serializers.FloatField):

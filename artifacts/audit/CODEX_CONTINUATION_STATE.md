@@ -1,5 +1,38 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## FIN-MONEY User completion — 2026-10-16
+
+Same worktree/branch, starting HEAD 814d4dad. This checkpoint accompanies User
+Decimal persistence; verify actual HEAD. Frozen 4aa7ac70 and production 3932f391
+are unchanged. No production DB access, service restart, backup/key/provider or
+GitHub action. Read-only port/process recheck still DOWN; prior stale runtime
+record predates reboot. Real OpenAI/cloud OFF, AWS retired.
+
+User monthly_income/variable_income/rent_or_emi are Decimal cents, same existing
+strict finite/non-negative/two-decimal guard and numeric API contract. Signup
+blanks zero. No historical currency inferred. users.0003_user_money_decimal is
+the only migration in this unit; original floats/independent normalized cents
+retained in UserMoneySnapshot, applied markers, guarded reverse; owner reset and
+account deletion remove owned snapshots. Existing passwords/groups/session/IDs
+and all related financial/family records preserved in synthetic tests.
+
+Evidence artifacts/post-audit/fin-money-profiles-20261016: user-focused 20 PASS;
+user-integration 98 backend PASS including focused scope; user-browser two Chrome
+PASS; user-rehearsal-final one enhanced financial/family/backup/alias/forward/
+reverse/source-byte reconciliation PASS. Zero final failures/skips. System/drift
+PASS, exact one-User-migration plan PASS. Cent-valued canonical baseline unchanged.
+New source tests: tests/test_user_money.py; necessary assertions updated in
+test_profile_money_boundary.py. Browser profile save/reload regression added.
+New suite included in existing M20 selection; no old full gates repeated.
+
+Next: CareerProfile.last_salary independent migration, then audited Mobility
+money fields with owner/source retention and financial comparisons. Inspect
+callers first; rates/confidence/quantities stay separate. Currency design separate,
+unknown historical currency stays unknown. Do not repeat Banking/Budget or audit.
+Use existing clean SDK after IDE SDK consultation and scripts.release_validation
+synthetic environment. Evidence run_task.py/run_checks.py provide safe focused
+commands. Update PROJECT_STATUS and this checkpoint at each verified unit.
+
 ## FIN-MONEY Budget completion — 2026-10-16
 
 Active `F:/ALFRED_DEV/post-audit`, `feature/fin-money-tail-20261016`, based on

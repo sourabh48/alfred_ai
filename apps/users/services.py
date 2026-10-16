@@ -34,6 +34,7 @@ from apps.mobility.models import (
 from apps.relationship.models import RelationshipProfile
 from apps.reports.models import ChatGPTImport, GeneratedReport, OperationalLog, SystemTicket
 from apps.risk.models import RiskSignal
+from .models import UserMoneySnapshot
 
 
 logger = logging.getLogger(__name__)
@@ -190,6 +191,7 @@ def clear_user_fed_data(user) -> dict:
         SystemTicket.objects.filter(user=user).delete()
         OperationalLog.objects.filter(user=user).delete()
 
+        UserMoneySnapshot.objects.filter(user=user).delete()
         user.monthly_income = 0
         user.variable_income = 0
         user.rent_or_emi = 0
