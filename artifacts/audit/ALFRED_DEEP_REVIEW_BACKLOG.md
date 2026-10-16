@@ -1,3 +1,5 @@
+> **Historical backlog, superseded 2026-10-17.** Use [PROJECT_STATUS.md](../../docs/PROJECT_STATUS.md) for current statuses, priorities and resume commands. Unique technical requirements below are preserved; dated next actions are not active instructions.
+
 # ALFRED deep review backlog
 
 ## Current audited disposition — 2026-10-15

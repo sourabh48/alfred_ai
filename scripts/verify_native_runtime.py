@@ -40,8 +40,8 @@ def main():
     if args.load_users < 1 or args.load_writes < 1 or args.load_seconds < 0:
         parser.error("load-users/load-writes must be positive and load-seconds cannot be negative")
     if args.memory:
-        # This scripted synthetic burst is not a production rate-limit test.
-        os.environ.setdefault("ALFRED_EXPENSIVE_ACCOUNT_LIMIT", "64")
+        # UI status polling plus restart/restore checks exceed 64; synthetic drill only.
+        os.environ.setdefault("ALFRED_EXPENSIVE_ACCOUNT_LIMIT", "128")
         os.environ.setdefault("ALFRED_API_ACCOUNT_LIMIT", "512")
     run = uuid.uuid4().hex[:10]
     data = ROOT / "artifacts" / "native-tests" / run

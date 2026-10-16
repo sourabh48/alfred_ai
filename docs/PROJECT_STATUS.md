@@ -24,12 +24,14 @@ Get-Content docs/PROJECT_STATUS.md -TotalCount 145
 
 ## Current execution and validation
 
-1. Consolidate documentation and preserve ignored/unique worktree payloads with per-file SHA-256 verification before ordinary `git worktree remove`; never force. Keep Git refs/frozen releases and uncertain work.
-2. Execute one integrated house backend/browser/privacy/configuration/native/Ollama gate using synthetic isolated data. New counts are PENDING until actual receipts exist; old results below are historical, not current-source certification.
+1. COMPLETE: all completed source was already integrated by ancestry. Eight obsolete checkouts removed with ordinary non-force Git operations after preserving and SHA-256 verifying 15,144 ignored/untracked payloads. Preservation manifests and owner/SYSTEM/admin-protected payloads are under `artifacts/consolidation-20261017/preserved-worktrees/`. The only registered worktrees are production (untouched) and this development checkout; all branches/frozen refs remain.
+2. COMPLETE: integrated house gate **911 backend / 53 Chrome PASS**, zero failures/skips; system/migration drift and source privacy PASS (869 paths/826 blobs, zero findings). Actual source-native/Ollama rehearsal PASS after the synthetic fixture correction below. Evidence: `combined-before-provenance`, `chrome-before-provenance`, `integrated-source-checks`, `native-corrected-fixture` under the consolidation evidence root. These certify integrated runtime source fb288465 plus the stated test-harness correction, not future implementation or a new packaged release.
 3. Next implementation: owner-confirmed investment-document **field** provenance using existing document review/correction, source receipts and owner citations. No new calculation or independent broker-authenticity claim.
 4. Commit each verified unit and update this file. No new status/audit/roadmap/checkpoint/prompt Markdown files. Historical continuation/audit/release reports remain evidence, not alternate active instructions.
 
 Current consolidation evidence: `artifacts/consolidation-20261017/` (ignored local machine-readable receipts, not source or private-provider uploads).
+
+Integration failure fixed: the first source-native run passed 28 checks but exhausted its synthetic expensive-account quota of 64 at post-restart retrieval (HTTP 429; persisted counter confirmed exactly 64 reservations). The drill now allows 128 only under its existing `--memory` synthetic mode; application/default production quotas are unchanged. A fresh complete source-native run passed, including actual local Ollama, encrypted-vault retrieval, outage recovery, worker crash/retry, scheduler, restart, local backup/restore, deletion and owner isolation. Failed receipts/partial report are retained; reruns are not summed. Fresh packaged candidate, independent PC, normal account and device-loss acceptance remain unclaimed.
 
 ## Counts and interpretation
 
@@ -720,7 +722,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **NOT_IMPLEMENTED** · ALFRED intelligence · P2.
 
-- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/services/voice_assistant.py](../apps/ml_engine/services/voice_assistant.py).
+- Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/services/voice_assistant.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/services/voice_assistant.py).
 - APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
 - Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
@@ -1413,7 +1415,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **IMPLEMENTED_NOT_ACCEPTED** · AI Council and developer intelligence · P2.
 
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
 - APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
 - Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
@@ -1424,7 +1426,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **NOT_IMPLEMENTED** · AI Council and developer intelligence · P2.
 
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
 - APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
 - Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
@@ -1435,7 +1437,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **NOT_IMPLEMENTED** · AI Council and developer intelligence · P1.
 
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
 - APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
 - Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
@@ -1446,7 +1448,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **PARTIALLY_IMPLEMENTED** · AI Council and developer intelligence · P2.
 
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
 - APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
 - Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
@@ -1457,7 +1459,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **NOT_IMPLEMENTED** · AI Council and developer intelligence · P2.
 
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](../apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
+- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
 - APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
 - Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
