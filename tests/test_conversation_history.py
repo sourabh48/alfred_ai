@@ -238,6 +238,29 @@ print('RESTART_PRIVATE_HISTORY_PASS')
         self.assertFalse(self.history.policy(self.alice)['rollback_requires_clear'])
         with closing(sqlite3.connect(backup)) as db: self.assertEqual(db.execute('SELECT COUNT(*) FROM conversations').fetchone()[0], 1)
         self.assertEqual(len(restarted.list_memories(self.alice)), 1)
+        baseline = subprocess.run(['git', 'show', 'bdabc389764119d95e2a002946b8fa8088c1bc6b:apps/ml_engine/services/persistent_memory.py'],
+            capture_output=True, text=True, encoding='utf-8', timeout=30, check=True).stdout
+        code = '''
+from django.conf import settings
+settings.configure()
+from datetime import datetime
+from pathlib import Path
+from types import ModuleType, SimpleNamespace
+import sys
+baseline=ModuleType('apps.ml_engine.services.rollback_baseline')
+baseline.__package__='apps.ml_engine.services'
+exec(sys.stdin.read(),baseline.__dict__)
+owner=SimpleNamespace(pk=int(sys.argv[2]),created_at=datetime.fromisoformat(sys.argv[3]),is_authenticated=True)
+store=baseline.MemoryStore(Path(sys.argv[1]),embedder=object())
+assert len(store.list_memories(owner))==1
+with store._transaction() as db:
+    assert db.execute('SELECT COUNT(*) FROM conversations').fetchone()[0]==0
+print('BASELINE_VAULT_ROLLBACK_PASS')
+'''
+        rollback = subprocess.run([sys.executable, '-B', '-c', code, str(self.store.directory), str(self.alice.pk),
+            self.alice.created_at.isoformat()], input=baseline, capture_output=True, text=True, timeout=30)
+        self.assertEqual(rollback.returncode, 0)
+        self.assertIn('BASELINE_VAULT_ROLLBACK_PASS', rollback.stdout)
 
     def test_account_reset_and_delete_revoke_history_without_touching_other_owner(self):
         from apps.users.services import clear_user_fed_data
@@ -282,3 +305,17 @@ print('RESTART_PRIVATE_HISTORY_PASS')
         self.history.configure(self.alice, enabled=False)
         self.assertEqual(snapshot(), before)
         self.assertEqual(resolve_canonical_financial_baseline(self.alice)['decimal_amounts'], baseline)
+
+    def test_failed_history_save_retains_only_redacted_error_class_and_reference(self):
+        record = self.create()
+        with patch('apps.ml_engine.api.views.hybrid_answer', side_effect=RuntimeError(self.question['query'])):
+            with self.assertLogs('apps.ml_engine.api.memory', level='ERROR') as captured:
+                response = self.post(self.turn(record))
+        self.assertEqual(response.status_code, 503)
+        self.assertTrue(response.json()['error_id'])
+        self.assertIn(response.json()['error_id'], captured.output[0])
+        self.assertIn('RuntimeError', captured.output[0])
+        for value in (self.question['query'], self.result['answer'], 'SYNTHETIC-PRIVATE-HISTORY-TITLE'):
+            self.assertNotIn(value, response.content.decode())
+            self.assertNotIn(value, ''.join(captured.output))
+        self.assertEqual(self.history.get(self.alice, record['id'])['turns'], [])

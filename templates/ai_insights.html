@@ -17,9 +17,29 @@
         </div>
         <button id="intelligenceNew" class="btn btn-outline-secondary btn-sm" type="button">New conversation</button>
     </div>
+    <details id="conversationHistoryPanel" class="conversation-evidence mb-3">
+        <summary>Private conversation history · <span id="conversationHistoryStatus">Checking local policy</span></summary>
+        <p class="small mt-2">Off unless you opt in. Saved transcripts are encrypted on this device and never synchronized or sent to cloud reasoning. They are AI hypotheses, separate from verified memories. New answers use current sources, not old transcripts.</p>
+        <p class="small">The key depends on this Windows profile; device-loss recovery is not verified. Deletion clears current history, but older backups may retain copies. Changing a source or memory does not rewrite saved conversations.</p>
+        <form id="conversationHistoryForm" data-live-refresh-hold="true">
+            <label for="conversationHistoryDays" class="form-label">Maximum age from conversation creation</label>
+            <input id="conversationHistoryDays" type="number" class="form-control mb-2" min="1" max="30" step="1" value="7" required disabled>
+            <label class="d-block mb-2"><input id="conversationHistoryConsent" type="checkbox" required disabled> I choose local history and this retention period, and understand the recovery and backup limits above.</label>
+            <button class="btn btn-outline-primary btn-sm" type="submit" disabled>Save history choice</button>
+        </form>
+        <div class="d-flex flex-wrap gap-2 my-3">
+            <button id="conversationHistoryDisable" class="btn btn-outline-secondary btn-sm" type="button" disabled>Disable and clear history</button>
+            <button id="conversationHistoryClear" class="btn btn-outline-danger btn-sm" type="button" disabled>Clear all conversations</button>
+        </div>
+        <p id="conversationHistoryFeedback" class="small" role="status" aria-live="polite"></p>
+        <label for="conversationHistoryTitle" class="form-label">Title for the next saved conversation</label>
+        <input id="conversationHistoryTitle" class="form-control mb-2" maxlength="128" autocomplete="off" placeholder="Private conversation" disabled>
+        <ul id="conversationHistoryList" class="list-unstyled" aria-label="Your saved conversations"></ul>
+    </details>
+    <p id="conversationHistoryCurrent" class="small text-muted" role="status">Page-only conversation</p>
     <div id="intelligenceEmpty" class="conversation-empty"><h3>What would you like to understand?</h3>
         <p>Ask about a saved memory, your financial snapshot or your Travel preferences.</p>
-        <p class="small">This conversation stays on this page. Save only facts you have checked.</p></div>
+        <p class="small">This conversation stays on this page unless you explicitly enable private history. Save only facts you have checked.</p></div>
     <div id="intelligenceAnswers" role="log" aria-live="polite" aria-label="Current conversation" class="conversation-messages"></div>
     <form id="intelligenceForm" class="conversation-composer" data-live-refresh-hold="true">
         <label for="intelligenceQuery" class="form-label">Your question</label>
@@ -34,7 +54,7 @@
             <select id="intelligenceDocument" class="form-select" disabled required></select></div></div>
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
             This question is public. Allow approved cloud fallback for this question if Ollama fails.</label>
-        <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions are not saved automatically.</p>
+        <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
         <div class="conversation-actions"><button class="btn btn-primary" type="submit">Ask ALFRED</button>
             <span class="small text-muted">Enter for a new line · Ctrl/⌘ + Enter to send</span></div>
     </form>
@@ -125,5 +145,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1"></script>
-<script src="/static/js/intelligence.js?v=2"></script>
+<script src="/static/js/intelligence.js?v=3"></script>
 {% endblock %}

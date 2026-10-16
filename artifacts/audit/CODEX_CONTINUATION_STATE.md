@@ -1,10 +1,11 @@
 # ALFRED CODEX CONTINUATION STATE
 
-## AI-HISTORY backend — 2026-10-16
+## AI-HISTORY local storage/API/UI — 2026-10-16
 
 Isolated F:/ALFRED_DEV/post-audit, feature/ai-history-20261016, based exactly on
-bdabc389764119d95e2a002946b8fa8088c1bc6b. This commit contains the tested encrypted
-backend/API unit. Verify actual HEAD; the preceding currency review is preserved.
+bdabc389764119d95e2a002946b8fa8088c1bc6b. Backend/API is committed as
+e9254953d35cf430e10046aeb92d3c7c7b6654e8. This checkpoint contains the subsequent
+tested UI unit. Verify actual HEAD; the preceding currency review is preserved.
 Read docs/PROJECT_STATUS.md for the active contract, files, retention/rollback and
 approval boundaries. No new duplicate report or currency schema implementation.
 
@@ -32,11 +33,48 @@ history-system system/drift/migrate/pending checks PASS.
 Vault upgrade/key preservation, new-process reopen, corruption, missing key,
 deletion after local copy and guarded downgrade are covered with synthetic data.
 
-Next: integrate existing assistant template/JS with owner consent, retention,
-create/list/reopen/delete/clear and historical labels; preserve page-only defaults,
-draft/error handling, financial evidence guards and no-cloud operation. Add focused
-Chrome flows including reload, owner/session/logout, stale edits and deletion.
-Commit that tested UI unit; update this checkpoint with exact backend commit SHA.
+Assistant template/JS now implements owner consent/retention, title/create,
+list/reopen/delete/clear/disable, historical-hypothesis/citation labels and current
+source/financial guards. No browser storage or historical prompt injection.
+Page-only is still default. Drafts survive model outage/stale revisions; retries
+are idempotent. Logout/permission loss/pagehide clear private text, cached pages
+recheck the session. A conflict refresh detects a missing/deleted/cleared/expired
+conversation and clears stale displayed turns without discarding the unsent draft.
+
+history-ui-backend: 53 PASS (14 history + hybrid/UI/session/currency), zero skips/
+failures. history-rollback-process: one enhanced PASS with pre-history bdabc389
+MemoryStore loaded in a separate process after disable+clear; preserved verified
+memories remain readable. No replacement key or financial mutation. Counts overlap.
+Final history-browser-validated: 5 Chrome PASS, zero skips/failures. Existing assistant
+desktop/mobile/keyboard/outage/theme behavior retained. New flows cover opt-in,
+reload/reopen, safe HTML text, owner isolation, delete/clear/disable, stale edits,
+outage/retry, operator gate, logout and cached-page clearing. Public-only synthetic
+fallback remains functional for page-only queries, refused for saved history.
+Screenshot review exposed old displayed turns after an external clear: corrected
+refresh/clear. A two-flow diagnostic rerun exposed composer readiness while history
+loaded; fixed visible busy/readiness controls and deterministic UI waits. The final
+five-flow run passes both corrections. Earlier failed revocation and passing
+isolated conflict diagnostic remain evidence, not the accepted final run.
+history-browser-source-resumed: 2 additional distinct Chrome PASS, owned verified
+memory/finance/Travel sources and explicit verified-save workflow plus exact
+currency source cards; zero skips/failures. Initial compatibility invocation was
+interrupted without a receipt, never treated as PASS. Only the privacy caption was
+clarified after these runs (page-only unless explicitly opted in); no behavior change.
+Total current browser coverage is seven distinct
+flows across the five- and two-flow runs, not repeated counts added together.
+Screenshots/evidence live under the existing ignored ai-history evidence root;
+review desktop/mobile, stale-draft and logout frames. No native rebuild/full gate.
+Source/privacy/link identity validation PASS: 14 changed files, 68 local links,
+zero findings, preserved FIN-CURRENCY C1–C10 text and frozen/master SHAs. No new
+Django migration or dependency; AST-only graph update completed successfully.
+
+Remaining private-use gate: approve retention/current-profile recovery limitations
+or an independently verified recovery design, and old-backup restoration policy.
+Operator flag stays OFF; no real-account/private-provider/recovery acceptance.
+Next independently safe unit is scoped AI-GROUND reviewed bank-statement document
+citations beyond current memory/loan scope; owned live references and stale/deleted
+abstention, no repetition of accepted loan grounding. Financial multi-currency tools remain blocked
+on C1–C10 approval. Do not begin currency migrations or repeat completed phases.
 Use house release_validation.environment and isolated M18 SDK, not production env.
 Safe resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
 git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 95.

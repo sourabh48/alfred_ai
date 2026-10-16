@@ -13,21 +13,145 @@ document.addEventListener("DOMContentLoaded", () => {
     const retry = document.getElementById("intelligenceRetry");
     const empty = document.getElementById("intelligenceEmpty");
     const localStatus = document.getElementById("intelligenceLocalStatus");
+    const historyForm = document.getElementById("conversationHistoryForm");
+    const historyConsent = document.getElementById("conversationHistoryConsent");
+    const historyDays = document.getElementById("conversationHistoryDays");
+    const historyTitle = document.getElementById("conversationHistoryTitle");
+    const historyList = document.getElementById("conversationHistoryList");
+    const historyFeedback = document.getElementById("conversationHistoryFeedback");
+    const historyCurrent = document.getElementById("conversationHistoryCurrent");
+    const historyClear = document.getElementById("conversationHistoryClear");
+    const historyDisable = document.getElementById("conversationHistoryDisable");
     let active = true, generation = 0, cloudAvailable = false, pending = false;
+    let historyPolicy = null, conversation = null, requestToken = null, historyBlocked = false;
+    const historyEnabled = () => Boolean(historyPolicy?.available && historyPolicy.enabled);
+    function updateHistoryControls() {
+        const locked = !active || pending || !historyPolicy?.available;
+        historyConsent.disabled = locked; historyDays.disabled = locked;
+        historyForm.querySelector("button").disabled = locked;
+        historyTitle.disabled = locked || !historyEnabled() || Boolean(conversation);
+        historyClear.disabled = !active || pending || !historyPolicy?.conversations;
+        historyDisable.disabled = !active || pending || !(historyPolicy?.enabled || historyPolicy?.conversations);
+        historyList.querySelectorAll("button").forEach(button => { button.disabled = !active || pending; });
+        historyCurrent.textContent = conversation ? `Saved locally: ${conversation.title} · expires ${new Date(conversation.expires_at).toLocaleString()}`
+            : historyEnabled() ? "New local conversation · saved only after a successful local answer" : "Page-only conversation";
+        updateScope(false);
+    }
+    function clearConversation(clearDraft = false) {
+        generation++; conversation = null; requestToken = null; historyBlocked = false;
+        answers.replaceChildren(); empty.hidden = false; retry.hidden = true; consent.checked = false;
+        if (clearDraft) { query.value = ""; historyTitle.value = ""; }
+        updateHistoryControls();
+    }
+    function forgetPrivatePage() {
+        active = false; generation++; conversation = null; historyPolicy = null; requestToken = null; historyBlocked = false;
+        answers.replaceChildren(); documentChoice.replaceChildren(); empty.hidden = false;
+        historyList.replaceChildren(); historyTitle.value = ""; historyConsent.checked = false; historyDays.value = "7";
+        query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false;
+        feedback.textContent = ""; historyFeedback.textContent = ""; retry.hidden = true;
+        document.getElementById("conversationHistoryStatus").textContent = "Checking local policy";
+        updateHistoryControls(); consent.disabled = true;
+    }
+    function applyHistory(data) {
+        historyPolicy = data.policy;
+        if (conversation && (!historyEnabled() || !(data.conversations || []).some(record => record.id === conversation.id))) {
+            clearConversation();
+            historyFeedback.textContent = "Conversation no longer available. Its displayed turns were cleared; your unsent draft is preserved.";
+        }
+        document.getElementById("conversationHistoryStatus").textContent = !historyPolicy.available
+            ? "Unavailable · operator retention/recovery approval required" : historyEnabled() ? "On · local only" : "Off";
+        if (historyPolicy.retention_days) historyDays.value = historyPolicy.retention_days;
+        historyList.replaceChildren();
+        (data.conversations || []).forEach(record => {
+            const item = document.createElement("li"); item.className = "d-flex flex-wrap gap-2 align-items-center mb-2";
+            const open = document.createElement("button"); open.type = "button"; open.className = "btn btn-outline-primary btn-sm";
+            open.textContent = record.title; open.setAttribute("aria-label", `Reopen ${record.title}`);
+            open.addEventListener("click", () => historyRequest(`/api/ai/conversations/${record.id}/`, {}, saved => {
+                clearConversation(); conversation = saved;
+                saved.turns.forEach(turn => renderTurn(turn, turn, generation, true));
+                historyFeedback.textContent = "Historical hypotheses only. Reopen source records or ask again for current evidence. Your unsent draft is preserved.";
+            }));
+            const remove = document.createElement("button"); remove.type = "button"; remove.className = "btn btn-outline-danger btn-sm";
+            remove.textContent = "Delete"; remove.setAttribute("aria-label", `Delete ${record.title}`);
+            remove.addEventListener("click", () => {
+                if (!confirm("Delete this conversation from current local history? Older backups may retain it.")) return;
+                historyRequest(`/api/ai/conversations/${record.id}/`, {method:"DELETE"}, () => {
+                    if (conversation?.id === record.id) clearConversation();
+                    historyFeedback.textContent = "Conversation deleted locally. Older backups may retain copies.";
+                }, true);
+            });
+            const age = document.createElement("span"); age.className = "small text-muted";
+            age.textContent = `Expires ${new Date(record.expires_at).toLocaleString()}`;
+            item.append(open, remove, age); historyList.append(item);
+        });
+        updateHistoryControls();
+    }
+    async function refreshHistory() {
+        const ticket = generation;
+        let data;
+        try { data = await Alfred.fetchJSON("/api/ai/conversations/"); }
+        catch (error) { if (active && ticket === generation && [401,403].includes(error.status)) forgetPrivatePage(); throw error; }
+        if (active && ticket === generation) applyHistory(data);
+    }
+    async function historyRequest(url, options, completed, refresh = false) {
+        if (pending || !active) return;
+        const ticket = generation, askButton = form.querySelector('button[type="submit"]');
+        pending = true; query.readOnly = true; askButton.disabled = true; answers.setAttribute("aria-busy", "true");
+        updateHistoryControls(); newConversation.disabled = true;
+        try {
+            const data = await Alfred.fetchJSON(url, options);
+            if (!active || ticket !== generation) return;
+            completed(data);
+            if (refresh) {
+                historyPolicy = null;
+                await refreshHistory().catch(error => { if (active) historyFeedback.textContent = `History status could not refresh. Reload before sending. ${error.message}`; });
+            }
+        } catch (error) {
+            if (active && ticket === generation) {
+                if ([401,403].includes(error.status)) forgetPrivatePage();
+                historyFeedback.textContent = error.message;
+            }
+        }
+        finally {
+            pending = false; query.readOnly = false; askButton.disabled = !active;
+            answers.setAttribute("aria-busy", "false"); newConversation.disabled = !active; updateHistoryControls();
+        }
+    }
+    historyForm.addEventListener("submit", event => {
+        event.preventDefault();
+        historyRequest("/api/ai/conversations/policy/", {method:"PUT", body:JSON.stringify({enabled:true, consent:historyConsent.checked, days:Number(historyDays.value)})}, () => {
+            historyConsent.checked = false;
+            historyFeedback.textContent = "Local history choice saved. Earlier page-only messages are not imported.";
+            clearConversation();
+        }, true);
+    });
+    historyDisable.addEventListener("click", () => {
+        if (!confirm("Disable history and clear all current local conversations? Backups may retain copies.")) return;
+        historyRequest("/api/ai/conversations/policy/", {method:"PUT", body:JSON.stringify({enabled:false})}, () => {
+            clearConversation(); historyConsent.checked = false; historyFeedback.textContent = "History disabled and cleared locally.";
+        }, true);
+    });
+    historyClear.addEventListener("click", () => {
+        if (!confirm("Clear all current local conversations? Your history choice stays on; backups may retain copies.")) return;
+        historyRequest("/api/ai/conversations/clear/", {method:"POST", body:JSON.stringify({confirm:true})}, () => {
+            clearConversation(); historyFeedback.textContent = "All current local conversations cleared. Backups may retain copies.";
+        }, true);
+    });
     function setLocalStatus(text, state) {
         localStatus.textContent = text; localStatus.dataset.state = state;
     }
-    function updateScope() {
+    function updateScope(resetConsent = true) {
         const documents = scope.value === "documents";
         document.getElementById("intelligenceDocumentField").classList.toggle("d-none", !documents);
         documentChoice.disabled = !documents;
-        consent.checked = false;
-        consent.disabled = scope.value !== "general" || !cloudAvailable;
+        if (resetConsent || scope.value !== "general" || !cloudAvailable || historyEnabled()) consent.checked = false;
+        consent.disabled = scope.value !== "general" || !cloudAvailable || historyEnabled();
     }
     async function refreshControls() {
         const ticket = generation;
-        const [insights, reasoning] = await Promise.all([Alfred.fetchJSON("/api/ai/personal-insights/?assistant_status=1"), Alfred.fetchJSON("/api/ai/memories/reason/")]);
+        const [insights, reasoning, history] = await Promise.all([Alfred.fetchJSON("/api/ai/personal-insights/?assistant_status=1"), Alfred.fetchJSON("/api/ai/memories/reason/"), Alfred.fetchJSON("/api/ai/conversations/")]);
         if (!active || ticket !== generation) return;
+        applyHistory(history);
         documentChoice.replaceChildren(new Option("Choose verified evidence", ""));
         (insights.assistant_documents || []).forEach(item => documentChoice.append(new Option(item.label, item.id)));
         cloudAvailable = reasoning.provider_available && reasoning.policy.enabled;
@@ -46,14 +170,67 @@ document.addEventListener("DOMContentLoaded", () => {
     retry.addEventListener("click", () => form.requestSubmit());
     newConversation.addEventListener("click", () => {
         if (pending) return;
-        generation++; answers.replaceChildren(); empty.hidden = false; query.value = "";
+        clearConversation(true);
         consent.checked = false; feedback.textContent = "New conversation. Previous messages cleared from this page."; retry.hidden = true; query.focus();
     });
+    function renderTurn(payload, result, ticket, historical = false) {
+        const row = document.createElement("article");
+        const userMessage = document.createElement("div"); userMessage.className = "conversation-message conversation-message--user";
+        const userLabel = document.createElement("span"); userLabel.className = "conversation-label"; userLabel.textContent = "You";
+        const question = document.createElement("p"); question.textContent = payload.query; userMessage.append(userLabel, question);
+        const assistantMessage = document.createElement("div"); assistantMessage.className = "conversation-message mt-3";
+        const label = document.createElement("span"); label.className = "conversation-label";
+        label.textContent = `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : "Approved cloud"}`;
+        const answer = document.createElement("p"); answer.textContent = result.answer;
+        if (historical) label.textContent = `Historical AI hypothesis · Ollama (local) · saved ${new Date(result.saved_at).toLocaleString()}`;
+        assistantMessage.append(label, answer); row.append(userMessage, assistantMessage);
+        const evidence = document.createElement("details"); evidence.className = "conversation-evidence";
+        const summary = document.createElement("summary"); summary.textContent = `Sources & evidence (${(result.sources || []).length})`;
+        evidence.append(summary); assistantMessage.append(evidence);
+        if (!result.sources?.length) { const note = document.createElement("p"); note.textContent = "Insufficient evidence for personal facts. This answer has no matching verified source."; evidence.append(note); }
+        (result.sources || []).forEach(source => {
+            const reference = document.createElement("p"); reference.textContent = `Source: ${source.ref} · ${source.classification}`;
+            evidence.append(reference);
+            const types = {owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence"};
+            const description = document.createElement("p"); description.textContent = `${types[source.classification] || 'Source'} · ${source.verified_at ? `Checked ${new Date(source.verified_at).toLocaleString()}` : 'Verification timestamp not recorded'}`; evidence.append(description);
+            if (historical) description.textContent = "Saved reference only; current existence and verification have not been checked.";
+            if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "")) {
+                const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
+            }
+            if (!historical && source.data) Object.entries(source.data).forEach(([key, value]) => {
+                if (key === "metric_states" || key === "amounts" || Object.hasOwn(source.data.amounts || {},key)) return;
+                const fact = document.createElement("p");
+                const monetary = source.classification === "canonical_financial_baseline" || key === "closure_amount";
+                const display = monetary && typeof value === "number" ? Alfred.formatCurrency(value) : (typeof value === "object" ? JSON.stringify(value) : String(value));
+                const state = source.data.metric_states?.[key]?.status;
+                fact.textContent = `${key.replaceAll("_", " ")}: ${display}${state ? ` (${state})` : ""}`;
+                evidence.append(fact);
+            });
+            Object.entries(historical ? {} : source.data?.amounts || {}).forEach(([key,value]) => {
+                const fact = document.createElement("p"); fact.className = "recorded-amount";
+                fact.textContent = `${key.replaceAll('_',' ')}: ${Alfred.formatRecordedMoney(value)} · ${value.evidence_status}`;
+                evidence.append(fact);
+            });
+        });
+        answers.append(row); empty.hidden = true;
+        const reviewButton = document.createElement("button"); reviewButton.type = "button"; reviewButton.className = "btn btn-outline-secondary btn-sm mt-3"; reviewButton.textContent = "Save answer as an unverified suggestion";
+        reviewButton.addEventListener("click", async () => {
+            reviewButton.disabled = true;
+            try { await Alfred.fetchJSON("/api/ai/memories/learning/",{method:"POST",body:JSON.stringify({action:"extract",text:result.answer.replaceAll("\n"," "),provenance:{source:"owner-proposed AI hypothesis",source_refs:(result.sources || []).map(source=>source.ref)},sensitivity:"sensitive"})}); if (active && ticket===generation) feedback.textContent = "Suggestion saved for review in AI Memory. It is not a verified fact."; }
+            catch (error) { if (active && ticket===generation) feedback.textContent = error.message; reviewButton.disabled = false; }
+        });
+        assistantMessage.append(reviewButton);
+        reviewButton.hidden = historical || Boolean(result.narrative_withheld);
+        while (answers.children.length > 20) answers.firstElementChild.remove();
+        evidence.open = true;
+    }
     form.addEventListener("submit", async event => {
         event.preventDefault();
         if (pending) return;
+        if (!historyPolicy || historyBlocked) { feedback.textContent = "Reopen the saved conversation or reload local history status before sending. Your draft is preserved."; return; }
         const ticket = generation, button = event.target.querySelector("button");
         pending = true; button.disabled = true; newConversation.disabled = true; query.readOnly = true; retry.hidden = true;
+        updateHistoryControls();
         answers.setAttribute("aria-busy", "true");
         setLocalStatus("Local model processing", "processing");
         feedback.textContent = "ALFRED is processing locally.";
@@ -62,68 +239,37 @@ document.addEventListener("DOMContentLoaded", () => {
         const payload = {query: query.value, scope: scope.value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
         if (scope.value === "documents") payload.document_id = Number(documentChoice.value);
         try {
+            if (historyEnabled()) {
+                if (!conversation) conversation = await Alfred.fetchJSON("/api/ai/conversations/", {method:"POST", body:JSON.stringify({title:historyTitle.value.trim() || "Private conversation"})});
+                if (!active || ticket !== generation) return;
+                const fingerprint = JSON.stringify(payload);
+                if (requestToken?.fingerprint !== fingerprint) requestToken = {fingerprint, id:crypto.randomUUID().replaceAll("-", "")};
+                Object.assign(payload, {cloud_consent:false, conversation_id:conversation.id, conversation_revision:conversation.revision, request_id:requestToken.id});
+            }
             const result = await Alfred.fetchJSON("/api/ai/personal-insights/", {method: "POST", body: JSON.stringify(payload)});
             if (!active || ticket !== generation) return;
-            const row = document.createElement("article");
-            const userMessage = document.createElement("div"); userMessage.className = "conversation-message conversation-message--user";
-            const userLabel = document.createElement("span"); userLabel.className = "conversation-label"; userLabel.textContent = "You";
-            const question = document.createElement("p"); question.textContent = payload.query; userMessage.append(userLabel, question);
-            const assistantMessage = document.createElement("div"); assistantMessage.className = "conversation-message mt-3";
-            const label = document.createElement("span"); label.className = "conversation-label";
-            label.textContent = `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : "Approved cloud"}`;
-            const answer = document.createElement("p"); answer.textContent = result.answer;
-            assistantMessage.append(label, answer); row.append(userMessage, assistantMessage);
-            const evidence = document.createElement("details"); evidence.className = "conversation-evidence";
-            const summary = document.createElement("summary"); summary.textContent = `Sources & evidence (${(result.sources || []).length})`;
-            evidence.append(summary); assistantMessage.append(evidence);
-            if (!result.sources?.length) { const note = document.createElement("p"); note.textContent = "Insufficient evidence for personal facts. This answer has no matching verified source."; evidence.append(note); }
-            (result.sources || []).forEach(source => {
-                const reference = document.createElement("p"); reference.textContent = `Source: ${source.ref} · ${source.classification}`;
-                evidence.append(reference);
-                const types = {owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence"};
-                const description = document.createElement("p"); description.textContent = `${types[source.classification] || 'Source'} · ${source.verified_at ? `Checked ${new Date(source.verified_at).toLocaleString()}` : 'Verification timestamp not recorded'}`; evidence.append(description);
-                if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "")) {
-                    const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
-                }
-                if (source.data) Object.entries(source.data).forEach(([key, value]) => {
-                    if (key === "metric_states" || key === "amounts" || Object.hasOwn(source.data.amounts || {},key)) return;
-                    const fact = document.createElement("p");
-                    const monetary = source.classification === "canonical_financial_baseline" || key === "closure_amount";
-                    const display = monetary && typeof value === "number" ? Alfred.formatCurrency(value) : (typeof value === "object" ? JSON.stringify(value) : String(value));
-                    const state = source.data.metric_states?.[key]?.status;
-                    fact.textContent = `${key.replaceAll("_", " ")}: ${display}${state ? ` (${state})` : ""}`;
-                    evidence.append(fact);
-                });
-                Object.entries(source.data?.amounts || {}).forEach(([key,value]) => {
-                    const fact = document.createElement("p"); fact.className = "recorded-amount";
-                    fact.textContent = `${key.replaceAll('_',' ')}: ${Alfred.formatRecordedMoney(value)} · ${value.evidence_status}`;
-                    evidence.append(fact);
-                });
-            });
-            answers.append(row); empty.hidden = true;
-            const reviewButton = document.createElement("button"); reviewButton.type = "button"; reviewButton.className = "btn btn-outline-secondary btn-sm mt-3"; reviewButton.textContent = "Save answer as an unverified suggestion";
-            reviewButton.addEventListener("click", async () => {
-                reviewButton.disabled = true;
-                try { await Alfred.fetchJSON("/api/ai/memories/learning/",{method:"POST",body:JSON.stringify({action:"extract",text:result.answer.replaceAll("\n"," "),provenance:{source:"owner-proposed AI hypothesis",source_refs:(result.sources || []).map(source=>source.ref)},sensitivity:"sensitive"})}); if (active && ticket===generation) feedback.textContent = "Suggestion saved for review in AI Memory. It is not a verified fact."; }
-                catch (error) { if (active && ticket===generation) feedback.textContent = error.message; reviewButton.disabled = false; }
-            });
-            assistantMessage.append(reviewButton);
-            reviewButton.hidden = Boolean(result.narrative_withheld);
-            while (answers.children.length > 10) answers.firstElementChild.remove();
+            if (result.conversation) conversation.revision = result.conversation.revision;
+            renderTurn(payload, result, ticket, Boolean(result.historical));
             feedback.textContent = result.retrieval_error?.detail || "Answer ready. Review the sources before acting.";
             if (result.narrative_withheld) feedback.textContent = `Unsupported model figures were withheld. Only source-card amounts are shown. ${result.retrieval_error?.detail || ''}`;
             setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
-            query.value = "";
-            evidence.open = true;
+            query.value = ""; requestToken = null;
+            if (historyEnabled()) await refreshHistory().catch(() => { historyPolicy = null; historyFeedback.textContent = "Answer saved, but history status could not refresh. Reload before another question."; });
         } catch (error) {
             if (active && ticket === generation) {
                 feedback.textContent = `${error.message}${error.reference ? ` Reference: ${error.reference}` : ""}`;
                 retry.hidden = error.status === 409 || error.status === 429 || error.status === 400;
+                if (error.status === 409 && conversation) {
+                    historyBlocked = true; feedback.textContent += " Reopen this conversation to review newer turns; your draft is preserved.";
+                    await refreshHistory().catch(() => { historyPolicy = null; });
+                    if (active && !conversation) feedback.textContent = "Conversation no longer available. Displayed turns cleared; your draft is preserved for a new conversation.";
+                }
                 setLocalStatus(error.code === "local_model_unavailable" ? "Ollama unavailable" : "Local request did not complete", "unavailable");
                 if (error.code === "reasoning_budget_reached") document.getElementById("intelligenceCloudStatus").textContent = "Cloud budget reached";
+                if ([401,403].includes(error.status)) { forgetPrivatePage(); feedback.textContent = "Session or history permission is no longer available. Sign in or reload before continuing."; }
             }
         }
-        finally { pending = false; consent.checked = false; button.disabled = false; button.textContent = "Ask ALFRED"; newConversation.disabled = false; query.readOnly = false; answers.setAttribute("aria-busy", "false"); }
+        finally { pending = false; consent.checked = false; button.disabled = !active; button.textContent = "Ask ALFRED"; newConversation.disabled = !active; query.readOnly = false; answers.setAttribute("aria-busy", "false"); updateHistoryControls(); }
     });
     document.getElementById("intelligenceMemoryForm").addEventListener("submit", async event => {
         event.preventDefault();
@@ -140,9 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     refreshControls().catch(error => { if (active) feedback.textContent = error.message; });
     window.addEventListener("pagehide", () => {
-        active = false; generation++; answers.replaceChildren(); documentChoice.replaceChildren(); empty.hidden = false;
-        query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false; feedback.textContent = "";
-        consent.disabled = true; retry.hidden = true;
+        forgetPrivatePage();
         document.getElementById("intelligenceMemorySensitivity").value = "sensitive";
     });
     window.addEventListener("pageshow", event => {

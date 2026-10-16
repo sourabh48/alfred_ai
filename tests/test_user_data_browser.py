@@ -624,6 +624,203 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.login()
             self.capture('m14-login-limit-recovered')
 
+    def private_history_fixture(self, authorized=True):
+        from unittest.mock import Mock
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.conversation_history import ConversationHistory
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-history-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),
+            ALFRED_CONVERSATION_HISTORY_AUTHORIZED=authorized, ALFRED_MEMORY_OPENAI_AUTHORIZED=False,
+            ALFRED_MEMORY_MOCK_REASONING=False, ALFRED_MEMORY_SYNC_PROVIDER=''))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
+        local = Mock(); local.reason.return_value = 'Synthetic historical hypothesis <img src=x onerror="window.historyLeak=true">'
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner', return_value=local))
+        self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') != 'Checking local policy')
+        self.memory_click('#conversationHistoryPanel > summary')
+        return ConversationHistory(MemoryStore(root/'vault')), local
+
+    def enable_private_history_ui(self):
+        self.memory_click('#conversationHistoryConsent')
+        self.memory_click('#conversationHistoryForm button')
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'On · local only')
+
+    def ask_history_question(self, text):
+        from selenium.webdriver.common.keys import Keys
+        question = self.browser.find_element(self.By.ID, 'intelligenceQuery')
+        self.wait.until(lambda _: not question.get_property('readOnly') and
+            self.browser.find_element(self.By.CSS_SELECTOR, '#intelligenceForm button[type=submit]').is_enabled())
+        question.clear(); question.send_keys(text, Keys.CONTROL, Keys.ENTER)
+
+    def test_private_history_consent_reload_delete_clear_disable_and_mobile(self):
+        from django.contrib.auth import get_user_model
+        history, local = self.private_history_fixture(); owner = self.scenario['user']
+        self.assertFalse(history.policy(owner)['enabled'])
+        self.ask_history_question('Synthetic unsaved question')
+        self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertEqual(history.policy(owner)['conversations'], 0)
+        self.enable_private_history_ui()
+        self.assertEqual(self.text('intelligenceAnswers'), '')
+        title = 'Synthetic <img src=x onerror="window.historyLeak=true">'
+        self.browser.find_element(self.By.ID, 'conversationHistoryTitle').send_keys(title)
+        self.ask_history_question('Synthetic private saved question')
+        self.wait.until(lambda _: 'Saved locally' in self.text('conversationHistoryCurrent'))
+        self.wait.until(lambda _: bool(self.browser.find_elements(self.By.CSS_SELECTOR, '#conversationHistoryList button')))
+        self.assertTrue(self.browser.find_element(self.By.ID, 'intelligenceCloudConsent').get_property('disabled'))
+        self.assertEqual(len(history.list(owner)), 1)
+        self.assertEqual(len(history.get(owner, history.list(owner)[0]['id'])['turns']), 1)
+        self.assertEqual(history.store.list_memories(owner), [])
+        calls = local.reason.call_count
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'On · local only')
+        self.assertEqual(self.text('intelligenceAnswers'), '')
+        self.memory_click('#conversationHistoryPanel > summary')
+        self.memory_click('#conversationHistoryList li button:first-child')
+        self.wait.until(lambda _: 'Historical AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertEqual(local.reason.call_count, calls)
+        self.assertFalse(self.browser.execute_script('return Boolean(window.historyLeak)'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, '#intelligenceAnswers .recorded-amount'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, '#intelligenceAnswers button').is_displayed())
+        stored = self.browser.execute_script('return JSON.stringify(localStorage)+JSON.stringify(sessionStorage)')
+        self.assertNotIn(title, stored); self.assertNotIn('Synthetic private saved question', stored)
+        self.capture('history-reopened-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('history-reopened-mobile')
+        other = get_user_model().objects.create_user(username='history-browser-other')
+        history.configure(other, enabled=True, consent=True, days=1); history.create(other, 'Other owner')
+        self.memory_click('#conversationHistoryList li button:nth-child(2)'); self.browser.switch_to.alert.accept()
+        self.wait.until(lambda _: history.policy(owner)['conversations'] == 0)
+        self.wait.until(lambda _: not self.browser.find_elements(self.By.CSS_SELECTOR, '#conversationHistoryList button'))
+        self.ask_history_question('Synthetic second saved question')
+        self.wait.until(lambda _: history.policy(owner)['conversations'] == 1)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'conversationHistoryClear').is_enabled())
+        self.memory_click('#conversationHistoryClear'); self.browser.switch_to.alert.accept()
+        self.wait.until(lambda _: history.policy(owner)['conversations'] == 0)
+        self.wait.until(lambda _: 'cleared' in self.text('conversationHistoryFeedback'))
+        self.assertTrue(history.policy(owner)['enabled'])
+        self.ask_history_question('Synthetic third saved question')
+        self.wait.until(lambda _: history.policy(owner)['conversations'] == 1)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'conversationHistoryDisable').is_enabled())
+        self.memory_click('#conversationHistoryDisable'); self.browser.switch_to.alert.accept()
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'Off')
+        self.assertEqual(history.policy(owner)['conversations'], 0)
+        self.assertEqual(len(history.list(other)), 1)
+
+    def test_private_history_outage_stale_edit_and_clear_keep_drafts(self):
+        from uuid import uuid4
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        history, local = self.private_history_fixture(); owner = self.scenario['user']
+        self.enable_private_history_ui()
+        local.reason.side_effect = EmbeddingUnavailable('synthetic-private-exception')
+        self.ask_history_question('Synthetic retry draft')
+        self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('value'), 'Synthetic retry draft')
+        self.assertNotIn('synthetic-private-exception', self.text('intelligenceFeedback'))
+        local.reason.side_effect = None
+        self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('readOnly'))
+        record = history.list(owner)[0]; request_id = uuid4().hex
+        question = dict(query='Synthetic concurrent question', scope='general', document_id=None)
+        generation, _ = history.prepare(owner, record['id'], record['revision'], request_id, question)
+        history.append(owner, record['id'], record['revision'], request_id, question,
+            dict(answer='Synthetic concurrent answer', provider='ollama', classification='ai_generated_hypothesis', financial_authority=False), generation)
+        calls = local.reason.call_count
+        self.ask_history_question('Synthetic stale draft')
+        self.wait.until(lambda _: 'Reopen this conversation' in self.text('intelligenceFeedback'))
+        self.assertEqual(local.reason.call_count, calls)
+        self.assertEqual(self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('value'), 'Synthetic stale draft')
+        self.assertFalse(self.browser.find_element(self.By.ID, 'intelligenceRetry').is_displayed())
+        self.memory_click('#conversationHistoryList li button:first-child')
+        self.wait.until(lambda _: 'Synthetic concurrent answer' in self.text('intelligenceAnswers'))
+        self.assertEqual(self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('value'), 'Synthetic stale draft')
+        self.ask_history_question('Synthetic stale draft')
+        try:
+            self.wait.until(lambda _: history.get(owner, record['id'])['revision'] == 3)
+        except Exception:
+            self.capture('history-reopen-save-failure')
+            raise
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('readOnly'))
+        def clear_during_answer(*args, **kwargs):
+            history.clear(owner)
+            return 'Synthetic answer rejected after clear'
+        local.reason.side_effect = clear_during_answer
+        self.ask_history_question('Synthetic clear draft')
+        self.wait.until(lambda _: 'Conversation no longer available' in self.text('intelligenceFeedback'))
+        self.assertEqual(self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('value'), 'Synthetic clear draft')
+        self.assertEqual(self.text('intelligenceAnswers'), '')
+        self.assertEqual(history.list(owner), [])
+        self.capture('history-stale-draft-preserved')
+
+    def test_private_history_operator_gate_logout_and_cached_page_clear(self):
+        from django.conf import settings
+        from django.contrib.sessions.models import Session
+        history, local = self.private_history_fixture(authorized=False); owner = self.scenario['user']
+        self.assertIn('operator retention/recovery approval', self.text('conversationHistoryStatus'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'conversationHistoryConsent').is_enabled())
+        self.assertFalse(history.policy(owner)['enabled'])
+        settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED = True
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'Off')
+        self.memory_click('#conversationHistoryPanel > summary'); self.enable_private_history_ui()
+        self.ask_history_question('Synthetic sensitive conversation')
+        self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('readOnly'))
+        self.browser.find_element(self.By.ID, 'intelligenceQuery').send_keys('Synthetic unsent private draft')
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}))")
+        self.assertEqual(self.text('intelligenceAnswers'), '')
+        self.assertEqual(self.text('conversationHistoryList'), '')
+        self.assertEqual(self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('value'), '')
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'On · local only')
+        self.memory_click('#conversationHistoryList li button:first-child')
+        self.wait.until(lambda _: 'Historical AI hypothesis' in self.text('intelligenceAnswers'))
+        session_key = self.browser.get_cookie('sessionid')['value']
+        def logout_during_answer(*args, **kwargs):
+            Session.objects.filter(session_key=session_key).delete()
+            return 'Synthetic answer rejected after logout'
+        local.reason.side_effect = logout_during_answer
+        self.ask_history_question('Synthetic logout draft')
+        self.wait.until(lambda _: 'Session or history permission' in self.text('intelligenceFeedback'))
+        self.assertEqual(self.text('intelligenceAnswers'), '')
+        self.assertEqual(self.text('conversationHistoryList'), '')
+        self.assertEqual(self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('value'), '')
+        self.assertEqual(len(history.get(owner, history.list(owner)[0]['id'])['turns']), 1)
+        self.capture('history-logout-cleared')
+
+    def test_private_history_never_reuses_public_cloud_consent(self):
+        from apps.ml_engine.services.memory_reasoning import configure_reasoning
+        from apps.ml_engine.services.hybrid_intelligence import hybrid_answer
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        history, local = self.private_history_fixture()
+        self.enterContext(override_settings(ALFRED_MEMORY_MOCK_REASONING=True))
+        configure_reasoning(history.store, self.scenario['user'], enabled=True, consent=True,
+            daily_tokens=4096, daily_microusd=10000)
+        local.reason.side_effect = EmbeddingUnavailable('synthetic local outage')
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'intelligenceCloudConsent').is_enabled())
+        self.assertIn('OpenAI disabled', self.text('intelligenceCloudStatus'))
+        with patch('apps.ml_engine.api.views.hybrid_answer', wraps=hybrid_answer) as request:
+            self.ask_history_question('Synthetic public retry question')
+            self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
+            self.assertFalse(request.call_args.kwargs['cloud_consent'])
+            self.memory_click('#intelligenceCloudConsent'); self.memory_click('#intelligenceRetry')
+            self.wait.until(lambda _: 'Mock (synthetic)' in self.text('intelligenceAnswers'))
+            self.assertTrue(request.call_args.kwargs['cloud_consent'])
+            self.memory_click('#conversationHistoryPanel > summary'); self.enable_private_history_ui()
+            self.assertFalse(self.browser.find_element(self.By.ID, 'intelligenceCloudConsent').is_enabled())
+            self.browser.execute_script("document.getElementById('intelligenceCloudConsent').checked=true")
+            self.ask_history_question('Synthetic private local draft')
+            self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
+            self.assertFalse(request.call_args.kwargs['cloud_consent'])
+        self.assertEqual(self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('value'), 'Synthetic private local draft')
+        record = history.list(self.scenario['user'])[0]
+        self.assertEqual(history.get(self.scenario['user'], record['id'])['turns'], [])
+
     def capture(self, name):
         self.browser.save_screenshot(str(self.artifacts / f"{name}.png"))
         (self.artifacts / f"{name}.txt").write_text(self.browser.find_element(self.By.TAG_NAME, "body").text, encoding="utf-8")

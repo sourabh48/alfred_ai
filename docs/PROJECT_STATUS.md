@@ -8,9 +8,11 @@ the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
 
-### AI-HISTORY — encrypted local backend verified, 2026-10-16
+### AI-HISTORY — safe local slice implemented, private activation gated, 2026-10-16
 
 Based on FIN-CURRENCY review `bdabc389764119d95e2a002946b8fa8088c1bc6b`.
+Backend implementation: `e9254953d35cf430e10046aeb92d3c7c7b6654e8`;
+the following UI/checkpoint unit builds on it in the same isolated branch.
 Currency C1–C10 recommendations below remain unapproved; no currency migration.
 Private history is independently implemented in the existing M15 vault, not a
 second memory engine: [service](../apps/ml_engine/services/conversation_history.py),
@@ -67,10 +69,63 @@ Counts are overlapping, not additive. System, migration drift, full disposable
 Django migration and no-pending-migration checks PASS. Separate
 `history-financial-reconciliation-fixed`: one PASS, zero financial-row or canonical
 Decimal baseline differences across save/clear/opt-out. Initial focused
-failures and safe diagnostics are preserved. Conversation navigation/consent UI
-and Chrome acceptance are the next bounded unit; no release/deployment is claimed.
+failures and safe diagnostics are preserved.
+
+The existing [assistant page](../templates/ai_insights.html) and
+[JavaScript](../static/js/intelligence.js) now provide consent/retention choice,
+conversation titles, navigation/reopen, new conversation, delete, clear and disable.
+Page-only remains the default; opting in does not import earlier page-only turns.
+Historical hypotheses have saved timestamps, source-reference limitations and no
+copied source amounts or fact-promotion button. No transcript/draft is placed in
+browser storage. Logout/permission loss/pagehide clears private DOM; restored
+pages fetch the current session. Stale edits require reopening, preserve drafts
+and never append silently. Deletion/expiry/clear detected on a rejected save also
+removes stale displayed turns. Model failures retain the draft and retry identity.
+New answers continue to use only current verified sources, not historical turns.
+
+`history-ui-backend`: **53 PASS**, zero failures/skips, including 14 history tests,
+hybrid/current-source grounding, Decimal/currency display, session and UI contracts.
+`history-rollback-process`: one strengthened regression PASS separately; a fresh
+process reopens ciphertext, then the exact pre-history MemoryStore from bdabc389
+reads preserved verified memories after explicit disable+clear. No key bytes or
+financial values changed. These overlapping runs are not combined into a total.
+Final `history-browser-validated`: **5 Chrome PASS**, zero failures/skips, synthetic consent,
+reload/reopen, deletion/clear/disable/other owner, outage/retry/stale edit, operator
+gate/logout/cached-page cleanup, and existing responsive page-only assistant.
+The fifth flow verifies that explicit public-only mock fallback still works for
+page-only questions while persistent history refuses it. Real OpenAI remains OFF.
+Screenshot review exposed stale displayed turns after another tab's clear; the
+UI refreshes history on conflict and clears those turns while retaining the draft.
+A diagnostic rerun exposed a composer readiness race during history navigation;
+composer/new/history controls now lock for the operation and tests wait for the
+visible ready state. That five-flow final run includes both corrections. Earlier
+failed `history-browser-revocation` and passing isolated conflict diagnostic are
+preserved, not accepted as the final gate. Reviewed screenshots accompany the
+validated run. Existing source-card and currency browser checks run separately
+because this UI refactors their shared renderer: `history-browser-source-resumed`,
+**2 Chrome PASS**, zero failures/skips. These are distinct from the five history/
+assistant flows, not reused historical counts. The previous source-compatibility
+invocation was interrupted with no receipt and is not counted as passed.
+JavaScript syntax and diff checks PASS. No fresh native package or full release
+suite was warranted/run; the frozen candidate is not rebuilt.
+
+**Remaining approval-sensitive decisions:** approve the explicit 1–30-day absolute
+retention contract and current-profile-only recovery risk or a separately verified
+portable recovery design before operator activation/private acceptance. Select
+backup retention/restore reconciliation for old transcript copies; the M15 waiver
+does not cover this feature. No canceled key-sealing workflow is resumed. Real-
+account history, separate-PC recovery and packaged acceptance are not claimed.
+Next independent safe implementation is AI-GROUND reviewed bank-statement
+document provenance/citations beyond current memory/loan scope, with owned-live
+evidence and stale/deleted abstention; do not repeat accepted loan grounding. Broader
+currency-aware financial tools still wait for C1–C10 approval. Do not start a new
+audit or rebuild existing M15 memory/sync/Ollama components.
 Production DOWN is preserved from the prior read-only checkpoint, not repaired.
 Frozen `4aa7ac70`, live source/database, backups and GitHub remain unchanged.
+Changed-source privacy/identity/link checks PASS: 14 files, 68 local references,
+zero findings; C1–C10 contract byte content unchanged, no new migration/dependency.
+AST-only graph update PASS. Evidence receipts and screenshots remain under the
+existing AI-HISTORY evidence directory, not in private backups or GitHub.
 
 ### FIN-MONEY — User, Career and Mobility tail complete locally, 2026-10-16
 
