@@ -12,7 +12,8 @@ service, paid provider or GitHub operation is authorized here.
 
 Based on FIN-CURRENCY review `bdabc389764119d95e2a002946b8fa8088c1bc6b`.
 Backend implementation: `e9254953d35cf430e10046aeb92d3c7c7b6654e8`;
-the following UI/checkpoint unit builds on it in the same isolated branch.
+UI/validated runtime source: `ddbca7e140ada74f41795e99e16eb7267acfdf8c`.
+This closing checkpoint changes documentation only, not tested runtime behavior.
 Currency C1–C10 recommendations below remain unapproved; no currency migration.
 Private history is independently implemented in the existing M15 vault, not a
 second memory engine: [service](../apps/ml_engine/services/conversation_history.py),

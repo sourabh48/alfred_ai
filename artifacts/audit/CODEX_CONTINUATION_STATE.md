@@ -4,8 +4,9 @@
 
 Isolated F:/ALFRED_DEV/post-audit, feature/ai-history-20261016, based exactly on
 bdabc389764119d95e2a002946b8fa8088c1bc6b. Backend/API is committed as
-e9254953d35cf430e10046aeb92d3c7c7b6654e8. This checkpoint contains the subsequent
-tested UI unit. Verify actual HEAD; the preceding currency review is preserved.
+e9254953d35cf430e10046aeb92d3c7c7b6654e8; UI/last fully verified runtime source is
+ddbca7e140ada74f41795e99e16eb7267acfdf8c. This closing documentation-only checkpoint
+records those source commits; verify actual HEAD. Currency review is preserved.
 Read docs/PROJECT_STATUS.md for the active contract, files, retention/rollback and
 approval boundaries. No new duplicate report or currency schema implementation.
 
