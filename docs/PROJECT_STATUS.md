@@ -3,10 +3,74 @@
 ## Active post-audit implementation — 2026-10-15
 
 Production remains 3932f391; audit baseline bced104 is preserved. Isolated work:
-F:/ALFRED_DEV/post-audit, feature/fin-money-tail-20261016. Audit is complete;
+F:/ALFRED_DEV/post-audit, feature/ai-history-20261016. Audit is complete;
 the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
+
+### AI-HISTORY — encrypted local backend verified, 2026-10-16
+
+Based on FIN-CURRENCY review `bdabc389764119d95e2a002946b8fa8088c1bc6b`.
+Currency C1–C10 recommendations below remain unapproved; no currency migration.
+Private history is independently implemented in the existing M15 vault, not a
+second memory engine: [service](../apps/ml_engine/services/conversation_history.py),
+[session APIs](../apps/ml_engine/api/conversations.py),
+[regressions](../tests/test_conversation_history.py).
+
+**Disabled by default:** `ALFRED_CONVERSATION_HISTORY_AUTHORIZED=false`. Audit
+UNIT 9 and the existing recovery guide leave private-use retention/recovery
+approval outstanding. Only isolated synthetic tests enable the operator flag.
+Even when available, each owner must explicitly opt in and choose 1–30 days;
+there is no inherited memory consent or automatic retention choice. No key export,
+rotation, passphrase dialog, real provider activation or production repair.
+
+Reuses current-user DPAPI master key, owner hash, restricted vault directory and
+Fernet encryption. Two additive private-vault tables store encrypted policy and
+per-conversation encrypted records/wrapped keys; titles, text, timestamps and
+request digests are encrypted. Only opaque IDs/owner hashes are outside ciphertext.
+No new Django migrations, dependencies, financial tables, plaintext chat index,
+embeddings, memory events or cloud snapshots. Existing vault upgrade preserves
+verified memories and key bytes. Missing/wrong keys and tampering fail closed.
+
+Session-only `/api/ai/conversations/`, `policy/`, `clear/` and `<id>/` support
+create/list/reopen/delete, opt-out and confirmed clear. Responses are private,
+no-store; CSRF and owner isolation apply even to accepted financial-sharing Family
+members. History-enabled `/api/ai/personal-insights/` requires revision/request ID,
+rechecks the current session after inference and rejects stale policy generations,
+expiry, deletion, reset and concurrent edits. An expired/logged-out session is
+flushed so Django's save-every-request cannot revive it. Successful turns commit
+atomically; retries are idempotent, errors retain no partial turn. Limits: 50
+conversations/owner, 20 turns/conversation, 256 KiB encrypted-record plaintext cap.
+
+Saved answers remain **AI hypotheses**, not verified memories or financial facts.
+Source references are historical metadata; canonical source values are not copied.
+Existing current-source grounding/numeric suppression remains authoritative. Old
+turns are reviewable transcripts, not new model context. History requests refuse
+cloud fallback; no transcript enters OpenAI, synchronization, retrieval or learning.
+Only the pre-existing explicit memory-review workflow can propose a separate fact.
+
+Retention is absolute from creation, never extended by activity or later policy
+lengthening; shortening applies immediately. Existing startup/scheduled memory
+expiry also cleans history. Delete/clear removes current rows and wrapped keys;
+full owner reset/account deletion also disables history, selected-memory reset
+does not. Verified-memory journal recovery cannot resurrect deleted transcripts.
+Old backups can still contain decryptable copies; **no irreversible erasure or
+portable device-loss recovery claim**. Current-profile recovery only is tested.
+Before source downgrade to a binary without history cleanup, disable and clear
+history, verify zero rows/disabled policies, or obtain an explicitly reviewed
+compatible restore plan. Do not blindly drop vault tables or restore old copies.
+
+Core evidence: `artifacts/post-audit/ai-history-20261016/`. `history-focused-fixed`:
+12 PASS; actual `history-core-integration`: **125 backend PASS**, zero failures/
+skips (history, vault, privacy/sync, hybrid/financial display, session/CSRF, reset).
+Counts are overlapping, not additive. System, migration drift, full disposable
+Django migration and no-pending-migration checks PASS. Separate
+`history-financial-reconciliation-fixed`: one PASS, zero financial-row or canonical
+Decimal baseline differences across save/clear/opt-out. Initial focused
+failures and safe diagnostics are preserved. Conversation navigation/consent UI
+and Chrome acceptance are the next bounded unit; no release/deployment is claimed.
+Production DOWN is preserved from the prior read-only checkpoint, not repaired.
+Frozen `4aa7ac70`, live source/database, backups and GitHub remain unchanged.
 
 ### FIN-MONEY — User, Career and Mobility tail complete locally, 2026-10-16
 

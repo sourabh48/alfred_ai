@@ -12,6 +12,7 @@ from apps.ml_engine.services.memory_sync import SyncConflict, MemorySynchronizer
 from apps.ml_engine.services.memory_reasoning import ReasoningBudgetExceeded, reason_with_memory, reasoning_provider, configure_reasoning, real_reasoning_authorized
 from apps.ml_engine.services.memory_learning import MemoryLearning
 from apps.ml_engine.services.memory_cloud import synchronizer, configured_provider
+from apps.ml_engine.services.conversation_history import ConversationConflict, ConversationPermission
 
 
 def memory_store():
@@ -32,6 +33,10 @@ class MemoryAPI(APIView):
 
     def handle_exception(self, exc):
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        if isinstance(exc, ConversationConflict):
+            return safe_error_response(exc, 'Conversation changed, expired or was cleared. Reopen it and review your draft before retrying.', logger_name=__name__, status_code=409)
+        if isinstance(exc, ConversationPermission):
+            return safe_error_response(exc, 'Private conversation history is not permitted. Check your session and local-only consent.', logger_name=__name__, status_code=403)
         if isinstance(exc, EmbeddingUnavailable):
             response = safe_error_response(exc, 'Local model is unavailable. Your draft is preserved; retry when Ollama is ready.', logger_name=__name__, status_code=503)
             response.data['code'] = 'local_model_unavailable'

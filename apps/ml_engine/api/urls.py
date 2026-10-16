@@ -1,8 +1,13 @@
 from django.urls import path
 from .views import AlfredExplainAPI, AlfredPersonalInsightsAPI, EmotionalSpendAPI, MLRuntimeControlAPI, MLRuntimeStatusAPI
 from .memory import MemoryCollectionAPI, MemoryDetailAPI, MemoryRetentionAPI, MemoryResetAPI, MemoryRestoreAPI, MemoryRetrieveAPI, MemorySyncAPI, MemoryReasoningAPI, MemoryLearningAPI
+from .conversations import ConversationPolicyAPI, ConversationCollectionAPI, ConversationDetailAPI, ConversationClearAPI
 
 urlpatterns = [
+    path("conversations/policy/", ConversationPolicyAPI.as_view()),
+    path("conversations/clear/", ConversationClearAPI.as_view()),
+    path("conversations/", ConversationCollectionAPI.as_view()),
+    path("conversations/<str:identity>/", ConversationDetailAPI.as_view()),
     path("memories/", MemoryCollectionAPI.as_view()),
     path("memories/reset/", MemoryResetAPI.as_view()),
     path("memories/retention/", MemoryRetentionAPI.as_view()),

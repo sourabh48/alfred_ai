@@ -72,10 +72,32 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
         return Response(intelligence)
 
     def post(self,request):
-        data=self.payload(('query','scope','document_id','cloud_consent','query_sensitivity'))
-        return Response(hybrid_answer(memory_store(),request.user,data.get('query'),scope=data.get('scope','general'),
+        data=self.payload(('query','scope','document_id','cloud_consent','query_sensitivity',
+                           'conversation_id','conversation_revision','request_id'))
+        store = memory_store()
+        identity = data.get('conversation_id')
+        history_fields = {'conversation_id','conversation_revision','request_id'}
+        if identity is None and history_fields & set(data): raise ValueError()
+        if identity is not None:
+            from .conversations import current_session
+            from ..services.conversation_history import ConversationHistory, ConversationPermission
+            if data.get('cloud_consent', False) is not False: raise ConversationPermission()
+            current_session(request)
+            history = ConversationHistory(store)
+            question = dict(query=data.get('query'), scope=data.get('scope','general'), document_id=data.get('document_id'))
+            generation, saved = history.prepare(request.user, identity, data.get('conversation_revision'), data.get('request_id'), question)
+            if saved:
+                record = history.get(request.user, identity)
+                current_session(request)
+                return Response({**saved, 'historical':True, 'conversation':{'id':identity, 'revision':record['revision']}})
+        result = hybrid_answer(store,request.user,data.get('query'),scope=data.get('scope','general'),
             document_id=data.get('document_id'),cloud_consent=data.get('cloud_consent',False),
-            query_sensitivity=data.get('query_sensitivity','sensitive')))
+            query_sensitivity=data.get('query_sensitivity','sensitive'))
+        if identity is not None:
+            current_session(request)
+            revision = history.append(request.user, identity, data.get('conversation_revision'), data.get('request_id'), question, result, generation)
+            result = {**result, 'conversation':{'id':identity, 'revision':revision}}
+        return Response(result)
 
 
 class MLRuntimeStatusAPI(APIView):

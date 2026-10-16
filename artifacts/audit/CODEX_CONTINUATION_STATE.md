@@ -1,5 +1,50 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## AI-HISTORY backend — 2026-10-16
+
+Isolated F:/ALFRED_DEV/post-audit, feature/ai-history-20261016, based exactly on
+bdabc389764119d95e2a002946b8fa8088c1bc6b. This commit contains the tested encrypted
+backend/API unit. Verify actual HEAD; the preceding currency review is preserved.
+Read docs/PROJECT_STATUS.md for the active contract, files, retention/rollback and
+approval boundaries. No new duplicate report or currency schema implementation.
+
+Implemented: two additive tables within existing MemoryStore, encrypted per-owner
+opt-in/retention and per-conversation key/records; session/CSRF owner APIs; bounded
+local-only atomic/idempotent turns; generation/revision fences; expiry, full reset,
+account deletion and journal non-resurrection. No transcript learning/embedding/
+cloud sync or automatic financial fact promotion. Session recheck flushes expired
+or logged-out sessions to prevent save-every-request renewal after inference.
+
+Feature operator gate ALFRED_CONVERSATION_HISTORY_AUTHORIZED is default OFF;
+per-owner consent/days are separately required. Audit retention/key-recovery
+decisions remain approval-sensitive. Test enablement is synthetic only. Existing
+DPAPI key remains profile-bound; no export/rotation/dialog. Backup copies can
+retain deleted history. Downgrade needs clear+disable and verification or an
+approved compatible restore plan; never silently drop tables or restore history.
+
+Evidence artifacts/post-audit/ai-history-20261016: focused-fixed 12 PASS, combined
+history-core-integration 125 backend PASS, zero failures/skips. Initial failures
+preserved and fixed: expired-session renewal boundary and an incorrectly placed
+storage-failure test injection. The final injection verifies append rollback.
+Separate history-financial-reconciliation-fixed: one PASS, zero financial-row or
+canonical Decimal baseline differences. Do not add overlapping counts.
+history-system system/drift/migrate/pending checks PASS.
+Vault upgrade/key preservation, new-process reopen, corruption, missing key,
+deletion after local copy and guarded downgrade are covered with synthetic data.
+
+Next: integrate existing assistant template/JS with owner consent, retention,
+create/list/reopen/delete/clear and historical labels; preserve page-only defaults,
+draft/error handling, financial evidence guards and no-cloud operation. Add focused
+Chrome flows including reload, owner/session/logout, stale edits and deletion.
+Commit that tested UI unit; update this checkpoint with exact backend commit SHA.
+Use house release_validation.environment and isolated M18 SDK, not production env.
+Safe resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
+git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 95.
+
+Frozen 4aa7ac70 unchanged. Production 3932f391 remains DOWN per prior read-only
+observation; no restart, DB/config/ACL/key/backup/provider/remote changes. AWS
+retired; real OpenAI and cloud OFF. No full M16–M21/release/package gate repeated.
+
 ## FIN-CURRENCY decision review — 2026-10-16
 
 Resume baseline feb650834deb782f0b3f813d4c9231b911eb5255; same isolated

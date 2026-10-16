@@ -471,6 +471,8 @@ ALFRED_MEMORY_OPENAI_AUTHORIZED = env.bool('ALFRED_MEMORY_OPENAI_AUTHORIZED', de
 ALFRED_MEMORY_OPENAI_PRICING_DATE = env('ALFRED_MEMORY_OPENAI_PRICING_DATE', default='')
 ALFRED_MEMORY_OLLAMA_MODEL = env('ALFRED_MEMORY_OLLAMA_MODEL', default='qwen3.5:4b')
 ALFRED_MEMORY_RELEVANCE_MIN_SCORE = env.float('ALFRED_MEMORY_RELEVANCE_MIN_SCORE', default=0.20)
+# Current-profile recovery/retention approval is separate from an owner's opt-in.
+ALFRED_CONVERSATION_HISTORY_AUTHORIZED = env.bool('ALFRED_CONVERSATION_HISTORY_AUTHORIZED', default=False)
 
 
 # ---------------------------------------------------------
