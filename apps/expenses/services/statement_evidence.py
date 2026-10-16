@@ -48,12 +48,12 @@ def document_name(upload):
     return name[:160] if name and not any(ord(char) < 32 for char in name) else f'Bank statement #{upload.pk}'
 
 
-def _file(upload):
-    if not upload.original_file:
+def file_reference(source_file):
+    if not source_file:
         return 'source_removed', None, None
     try:
         root = Path(settings.MEDIA_ROOT).resolve()
-        target = Path(upload.original_file.path).resolve()
+        target = Path(source_file.path).resolve()
         if not target.is_relative_to(root) or not target.is_file():
             return 'source_unavailable', None, None
         with target.open('rb') as stream:
@@ -79,7 +79,7 @@ def _owned(user, identity, document_id=None):
 def _state(row, proof):
     upload = row.statement_upload
     current = _values(row)
-    status, fingerprint, download = _file(upload)
+    status, fingerprint, download = file_reference(upload.original_file)
     payload = upload.extracted_payload if isinstance(upload.extracted_payload, dict) else {}
     metadata = dict(document_id=upload.pk, document_name=document_name(upload),
         statement_start=upload.statement_start.isoformat() if upload.statement_start else None,

@@ -21,6 +21,7 @@ budget, loan, investment and baseline. Each amount has exact decimal text, expli
 currency null/not_recorded, record identity, source field, applicable date,
 evidence status and content revision. No new model, migration, dependency or money
 calculation. Existing FIN-MONEY conversions and bank provenance remain intact.
+Assistant unit: `b49c14125af6b60c51b8965e8c221cf7ecc8f35e`.
 
 Canonical means the currently stored record, **not independent third-party proof**.
 Manual expenses are user recorded; bank imports still require the existing receipt
@@ -95,15 +96,58 @@ Example synthetic source: `canonical-investment-2`, corrected current value
 amount with Loan field provenance, not a new amortization estimate. Budget approval
 and actual market freshness remain explicitly unrecorded. Full document Q&A,
 approved currency/aggregation and separate-PC/real-account/package acceptance are
-not claimed. Next independent verified-document unit: an exact owner-only loan
-closure citation with source-file/liveness provenance, reusing the established
-verified closure path; do not build arbitrary PDF ingestion.
+not claimed. The next independent verified-document unit, exact loan-closure
+citations, is now implemented below; no arbitrary PDF ingestion was added.
 Integrated system/migration drift checks PASS. Changed-source privacy/link/identity
 validation PASS: 23 files, 74 local references, zero findings, unchanged C1–C10 and
 frozen/master SHAs. JavaScript syntax/diff checks and AST-only graph update PASS.
 History activation, OpenAI and cloud sync OFF; AWS retired. Production DOWN remains
 the prior finding, without new operational checks or repair. Production source/data,
 backups, frozen `4aa7ac70` and GitHub master are unchanged.
+
+### AI-GROUND — exact loan-closure citations and retained-file liveness, 2026-10-16
+
+Follow-on to canonical source/assistant commits above. The existing verified loan
+closure scope now cites `/documents/loan-closures/<id>/`, with an owner-only
+`/api/ai/closure-evidence/<id>/` API and the shared private record view. Citation
+links reopen the existing document selector, including older owned records. No new
+parser, financial write, money calculation, model, migration or dependency.
+
+Reuses the bank private-file helper as `file_reference`: same media-root boundary,
+bounded byte reads, private-media authorization and no raw text. Closure revision
+includes owner/loan linkage, current canonical amount/date, verification/update
+state and retained-file bytes. Missing/inaccessible retained files reject the
+answer; replacement/removal during inference invalidates it. Anonymous/foreign/
+withdrawn citation access is denied. Limits return safe 413; stale sources return
+safe conflict responses with references. No parser paths, OCR, notes, filenames or
+private citation URLs enter local document prompts or cloud providers.
+
+Legacy verified metadata with an empty file field is still a recorded source,
+explicitly **not_retained**, with no download and no independent bank authenticity
+claim. A nonempty path whose file disappeared is not silently treated as legacy
+metadata. No verification timestamp is invented from updated_at. Source money keeps
+exact decimal text, unknown currency, record/date/revision and field provenance.
+Historical encrypted transcripts keep reference metadata only; no fact promotion.
+
+`closure-citations-focused`: **81 backend PASS**, zero failures/skips, including
+canonical/bank/history/loan-source compatibility and synthetic no-financial-write
+checks. `closure-browser-final`: **3 Chrome PASS**, zero failures/skips: exact
+closure citation/file disappearance/metadata limit, existing currency source cards
+and bank confirmation/correction/withdrawal. Screenshots reviewed. These three
+flows are distinct from the four canonical browser flows above; backend counts
+overlap and are not added. Final system/drift checks PASS.
+`grounding-final-backend`: **154 backend PASS**, zero failures/skips on the combined
+canonical/bank/closure/history/finance/session source after closure integration.
+Earlier 149/81 runs are supporting evidence, not extra test totals.
+
+Remaining verified-document gap: field-level verification/provenance for investment
+and other document extractions before treating them as verified external facts.
+Current portfolio register retrieval is available with honest unverified-import
+labels, not verified PDF Q&A. Next safe action: inspect the existing investment
+document-review/correction contract and implement a bounded owner-confirmed field
+receipt, preserving original extraction and canonical values, with stale/deleted/
+foreign evidence abstention. No approved currency schema, budget approval state,
+actual live market pricing or production acceptance is implied.
 
 ### AI-GROUND — bank-statement provenance and local assistant, 2026-10-16
 

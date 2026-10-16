@@ -5,7 +5,8 @@
 Isolated F:/ALFRED_DEV/post-audit, feature/ai-ground-bank-20261016, based exactly on
 1b80138d470150de8f9fc1d1be831af1cecc8941. Source unit
 df386be6938e533cff5b9e20af11ba015672ee9a is committed; this assistant unit follows
-it. Verify actual HEAD. Read docs/PROJECT_STATUS.md, not a new report.
+it as b49c14125af6b60c51b8965e8c221cf7ecc8f35e. The next verified-document unit
+is implemented below; verify actual HEAD. Read docs/PROJECT_STATUS.md.
 
 Unit 1 implemented: canonical_evidence.py and read-only financial-evidence API;
 owned citation template/view; exact typed money/source/date/revision; expense,
@@ -48,11 +49,27 @@ requests or live model/runtime configuration changes. Test requires explicit
 ALFRED_RUN_OLLAMA_GROUNDING=true in an isolated synthetic runner; it is deliberately
 not included in mocked release labels. No claim of general model advice accuracy.
 
-Next independent verified-document unit: exact owner-only loan closure citation
-and source-file/liveness provenance on the existing verified closure path. Reuse
-bank private-file/resource controls. Legacy metadata-only records must be labeled
-honestly; no arbitrary PDF Q&A, new parser or currency schema. Real-account/native
-package acceptance and currency/budget-approval design remain unperformed/gated.
+Unit 3 implemented: exact owner-only closure citation/API and existing document
+selector reopening. Shared file_reference helper preserves bank media-root/resource
+controls, adds closure retained-file digest/liveness to source revisions. Missing
+retained files reject before inference; removal/replacement rejects in-flight
+answers. Legacy no-file metadata explicitly not_retained, no independent bank
+authenticity/download/verification-time claims. No raw documents or private URLs
+in document model prompts. Source records/financial values never changed.
+closure-citations-focused 81 backend PASS, zero skips/failures; includes canonical,
+bank/history/current-source regression. closure-browser-final 3 Chrome PASS, zero
+skips/failures, exact closure/file/legacy metadata, currency UI and bank review.
+Screenshots reviewed; three distinct flows in addition to canonical four, no
+overlapping backend counts summed. Final system/drift PASS, zero schema changes.
+grounding-final-backend: 154 backend PASS, zero failures/skips across combined
+canonical/bank/closure/history/finance/session source after closure integration.
+
+Next independent safe verified-document task: investment extraction field-level
+owner-confirmed receipt/provenance using existing import/review/correction, original
+evidence retained, current canonical values prioritized, stale/deleted/foreign
+sources abstain. Current investment register facts remain explicitly not verified
+PDF extraction. No arbitrary PDF Q&A, live prices, new currency schema or invented
+Budget approval state. Real-account/native package acceptance remains unperformed.
 Integrated system/drift and source privacy/link/identity checks PASS: 23 files,
 74 local references, zero findings; currency contract/frozen/master unchanged.
 Node syntax/diff checks and AST-only graph update PASS. No new migration/dependency.

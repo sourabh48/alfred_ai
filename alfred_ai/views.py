@@ -236,6 +236,34 @@ def documents_view(request):
 
 @login_required
 @require_http_methods(["GET"])
+def loan_closure_evidence_view(request, document_id):
+    from apps.ml_engine.services.hybrid_intelligence import source_context
+    from apps.ml_engine.services.persistent_memory import MemoryConflict
+    from alfred_ai.services.api_errors import safe_error_details
+    from django.http import Http404
+    from alfred_ai.services.upload_limits import UploadLimitExceeded
+    try:
+        source = source_context(request.user,'documents',document_id=document_id)[0]
+    except PermissionError as exc:
+        raise Http404 from exc
+    except UploadLimitExceeded as exc:
+        response = JsonResponse(safe_error_details(exc, 'Closure source exceeds supported processing limits.', logger_name=__name__), status=413)
+    except (ValueError, MemoryConflict) as exc:
+        response = JsonResponse(safe_error_details(exc, 'Closure evidence is unavailable. Review the source in Loans.', logger_name=__name__), status=409)
+    else:
+        source['available'] = True
+        source['data'].update(verification='verified_metadata_record',record_type='loan_closure',
+            provenance='LoanClosureDocument verification status',limitations=[
+                'Recorded verification does not prove independent bank authentication.',
+                'Original file is not retained; only verified metadata is available.' if source['source_file_status']=='not_retained' else 'Retained file is accessible to its owner. No OCR text is used in the answer.',
+                'Currency was not recorded.'])
+        response = render(request,'canonical_evidence.html',{'source':source})
+    response['Cache-Control'] = 'no-store, private'
+    return response
+
+
+@login_required
+@require_http_methods(["GET"])
 def canonical_evidence_view(request, kind, identity):
     from apps.ml_engine.services.canonical_evidence import record_source
     from alfred_ai.services.api_errors import safe_error_details

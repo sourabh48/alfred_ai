@@ -162,6 +162,13 @@ document.addEventListener("DOMContentLoaded", () => {
         applyHistory(history);
         documentChoice.replaceChildren(new Option("Choose verified evidence", ""));
         (insights.assistant_documents || []).forEach(item => documentChoice.append(new Option(item.label, item.id)));
+        const selectedDocument = documentChoice.value || requestedDocument;
+        if (/^[1-9]\d{0,15}$/.test(selectedDocument || "") && ![...documentChoice.options].some(option => option.value === selectedDocument)) {
+            const record = await Alfred.fetchJSON(`/api/ai/closure-evidence/${selectedDocument}/`);
+            if (!active || ticket !== generation) return;
+            documentChoice.append(new Option(`Verified closure record #${record.record_id}`, record.record_id));
+        }
+        if ([...documentChoice.options].some(option => option.value === selectedDocument)) documentChoice.value = selectedDocument;
         const selectedStatement = statementChoice.value || requestedTransaction;
         statementChoice.replaceChildren(new Option("Choose a source transaction", ""));
         (insights.assistant_statement_records || []).forEach(item => statementChoice.append(new Option(item.label, item.id)));
@@ -191,8 +198,9 @@ document.addEventListener("DOMContentLoaded", () => {
     scope.addEventListener("change", updateScope);
     const requestedScope = new URLSearchParams(location.search).get("scope");
     const requestedTransaction = new URLSearchParams(location.search).get("transaction");
+    const requestedDocument = new URLSearchParams(location.search).get("document");
     const requestedFinancial = `${new URLSearchParams(location.search).get("record_type")}:${new URLSearchParams(location.search).get("record_id")}`;
-    if (["finance","travel","bank_statements","financial_records"].includes(requestedScope)) scope.value = requestedScope;
+    if (["finance","travel","bank_statements","financial_records","documents"].includes(requestedScope)) scope.value = requestedScope;
     query.addEventListener("keydown", event => {
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
     });
@@ -223,7 +231,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const types = {owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records (currency-limited)", canonical_record:"Canonical stored record · not independent authentication", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence", owner_confirmed_statement_record:"Owner-confirmed bank-statement record (not independently bank-authenticated)", unverified_statement_record:"Bank-statement record · source review required"};
             const description = document.createElement("p"); description.textContent = `${types[source.classification] || 'Source'} · ${source.verified_at ? `Checked ${new Date(source.verified_at).toLocaleString()}` : 'Verification timestamp not recorded'}`; evidence.append(description);
             if (historical) description.textContent = "Saved reference only; current existence and verification have not been checked.";
-            if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(source.url || "") || /^\/ai\/financial-records\/(expense|budget|loan|investment|baseline)\/\d+\/$/.test(source.url || "")) {
+            if (!historical && source.source_file_status === "not_retained") {
+                const note = document.createElement("p"); note.textContent = "Verified metadata record only; original source file is not retained. This does not prove independent bank authenticity."; evidence.append(note);
+            }
+            if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(source.url || "") || /^\/documents\/loan-closures\/\d+\/$/.test(source.url || "") || /^\/ai\/financial-records\/(expense|budget|loan|investment|baseline)\/\d+\/$/.test(source.url || "")) {
                 const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
             }
             if (!historical && source.data) Object.entries(source.data).forEach(([key, value]) => {

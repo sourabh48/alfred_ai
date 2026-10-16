@@ -1083,6 +1083,40 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(self.text('canonicalEvidence'),'')
 
+    def test_verified_closure_exact_citation_file_liveness_and_metadata_limit(self):
+        from datetime import date
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.loans.models import LoanClosureDocument
+        rows,local=self.canonical_grounding_fixture()
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-closure-browser-synthetic-')))
+        self.enterContext(override_settings(MEDIA_ROOT=root/'media'))
+        document=LoanClosureDocument.objects.create(loan=rows['loan'],verification_status='verified',closure_amount='123.45',
+            closure_date=date(2026,9,1),file_name='Synthetic closure.pdf',
+            uploaded_file=SimpleUploadedFile('synthetic-closure.pdf',b'%PDF-synthetic-browser-closure'))
+        self.login(); self.browser.get(self.live_server_url+f'/documents/loan-closures/{document.pk}/')
+        self.wait.until(lambda _: '123.45' in self.text('canonicalEvidence'))
+        self.assertIn('Retained file is accessible to its owner',self.text('canonicalEvidence'))
+        self.memory_click('#canonicalEvidence a[href^="/ai/insights/"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceDocument').get_property('value')==str(document.pk))
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain this closure record')
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: f'loan-closure-{document.pk}' in self.text('intelligenceAnswers'))
+        self.assertIn('123.45 · Currency not recorded',self.text('intelligenceAnswers'))
+        self.assertTrue(self.browser.find_elements(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="/documents/loan-closures/{document.pk}/"]'))
+        self.capture('closure-exact-private-source-citation')
+        Path(document.uploaded_file.path).unlink()
+        self.memory_click('#intelligenceNew')
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain this closure record')
+        local.reason.reset_mock(); self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceAnswers').get_attribute('aria-busy')=='false')
+        local.reason.assert_not_called()
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'Explain this closure record')
+        document.uploaded_file=''; document.save(update_fields=['uploaded_file'])
+        self.browser.get(self.live_server_url+f'/documents/loan-closures/{document.pk}/')
+        self.wait.until(lambda _: 'Original file is not retained' in self.text('canonicalEvidence'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#canonicalEvidence a[href^="/media/"]'))
+        self.capture('closure-metadata-only-limit')
+
     def click_upload_button(self, form_id):
         button = self.browser.find_element(self.By.CSS_SELECTOR, f"#{form_id} button[type=submit]")
         self.browser.execute_script("arguments[0].scrollIntoView({behavior: 'instant', block: 'center'});", button)

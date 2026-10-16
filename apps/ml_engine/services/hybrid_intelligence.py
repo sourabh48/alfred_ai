@@ -77,10 +77,27 @@ def source_context(user,scope,document_id=None,transaction_id=None,record_type=N
     if LoanClosureDocument.objects.filter(loan_id=document.loan_id,verification_status='verified').exclude(
             closure_amount=document.closure_amount,closure_date=document.closure_date).exists():
         raise MemoryConflict('Verified closure evidence conflicts. Review the loan documents before asking again.')
-    return [{'ref':f'loan-closure-{document.pk}','classification':'verified_document_evidence','url':'/loans/',
+    from apps.expenses.services.statement_evidence import file_reference
+    from .canonical_evidence import _digest
+    from django.urls import reverse
+    status,fingerprint,download=file_reference(document.uploaded_file)
+    if document.uploaded_file and status!='available':
+        raise MemoryConflict('Retained closure source is unavailable; review the evidence before asking again.')
+    revision=_digest(dict(id=document.pk,loan=document.loan_id,owner=document.loan.user_id,
+        amount=str(document.closure_amount),date=document.closure_date,updated=document.updated_at,
+        verification=document.verification_status,file=fingerprint,file_name=document.uploaded_file.name))
+    return [{'ref':f'loan-closure-{document.pk}','classification':'verified_document_evidence',
+        'record_type':'loan_closure','record_id':document.pk,'revision':revision,
+        'as_of':document.closure_date.isoformat() if document.closure_date else None,
+        'source_file_status':status if document.uploaded_file else 'not_retained',
+        'source_download_url':download,
+        'url':reverse('loan_closure_evidence',kwargs={'document_id':document.pk}),
         'data':{'closure_amount':loan_money_float(document.closure_amount),
             'amounts':{'closure_amount':{'amount':format(loan_money(document.closure_amount),'.2f'),
-                'currency':None,'currency_status':'not_recorded','evidence_status':'verified'}},
+                'currency':None,'currency_status':'not_recorded','evidence_status':'verified',
+                'record_type':'loan_closure','record_id':document.pk,'revision':revision,
+                'as_of':document.closure_date.isoformat() if document.closure_date else None,
+                'provenance':'loans.LoanClosureDocument.closure_amount; recorded verification status'}},
             'closure_date':document.closure_date.isoformat() if document.closure_date else None}}]
 
 
@@ -129,11 +146,11 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         memories=[]
         retrieval_error=safe_error_details(exc,'Saved-memory retrieval is unavailable; this answer has no saved-memory grounding.',logger_name=__name__)
     # Filenames and private citation URLs are UI metadata, never model instructions.
-    model_tools=tools if scope not in ('bank_statements','financial_records','finance') else [{
+    model_tools=tools if scope not in ('bank_statements','financial_records','finance','documents') else [{
         'ref':source['ref'],'classification':source['classification'],
         'data':{key:value for key,value in source['data'].items() if key in
             ('transaction_date','statement_start','statement_end','verification','direction','category','classification',
-             'record_type','record_id','applicable_date','start_date','status','missed_payments','last_payment_date','last_applied_payment_date')}
+             'record_type','record_id','applicable_date','start_date','status','missed_payments','last_payment_date','last_applied_payment_date','closure_date')}
             |{'amounts':{key:{field:value[field] for field in ('amount','currency','currency_status','evidence_status')}
                 for key,value in source['data']['amounts'].items()}}} for source in tools]
     payload={'query':query,'sources':model_tools.copy()}; included=[]
