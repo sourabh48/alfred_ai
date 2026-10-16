@@ -986,6 +986,103 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('intelligenceAnswers'),'')
         self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceStatement').find_elements(self.By.TAG_NAME,'option'),[])
 
+    def canonical_grounding_fixture(self):
+        from datetime import date
+        from unittest.mock import Mock
+        from apps.budgets.models import Budget
+        from apps.loans.models import Loan
+        from apps.investments.models import Investment
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-canonical-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
+            ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(); local.reason.return_value='Synthetic recorded-value hypothesis. Review the owner source and limitations.'
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner',return_value=Mock()))
+        owner=self.scenario['user']
+        rows={'expense':Expense.objects.create(user=owner,amount='12.34',source='manual',transaction_date=date(2026,9,1)),
+            'budget':Budget.objects.create(user=owner,month='Jan 2025',base_budget='234.56',inflation_adjusted='245.67',spent='12.34'),
+            'loan':Loan.objects.create(user=owner,principal='1000.01',emi='100.01',remaining_balance='900.01',
+                interest_rate=5,tenure_months=12,start_date=date(2026,1,1)),
+            'investment':Investment.objects.create(user=owner,asset_name='SYNTHETIC-PRIVATE-ASSET',asset_type='equity',
+                invested_amount='1234.56',current_value='2345.67'), 'baseline':owner}
+        return rows,local
+
+    def test_canonical_financial_sources_corrections_citations_and_mobile(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.expenses.models import BankAccount
+        from apps.budgets.models import Budget
+        from apps.investments.models import Investment
+        from apps.loans.models import Loan
+        rows,local=self.canonical_grounding_fixture()
+        self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
+        self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'intelligenceFinancial').find_elements(self.By.TAG_NAME,'option'))>4)
+        Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('financial_records')
+        models=(Expense,BankAccount,Budget,Loan,Investment)
+        before=[list(model.objects.order_by('pk').values()) for model in models]
+        for kind,field,value in (('expense','amount','12.34'),('budget','base budget','234.56'),
+                                ('loan','emi','100.01'),('investment','current value','2,345.67')):
+            Select(self.browser.find_element(self.By.ID,'intelligenceFinancial')).select_by_value(f'{kind}:{rows[kind].pk}')
+            self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain this record')
+            self.memory_click('#intelligenceForm button')
+            self.wait.until(lambda _: f'canonical-{kind}-{rows[kind].pk}' in self.text('intelligenceAnswers'))
+            text=self.browser.find_element(self.By.CSS_SELECTOR,'#intelligenceAnswers article:last-child').text
+            self.assertIn(f'{field}: {value} · Currency not recorded',text)
+            self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_enabled())
+        self.assertEqual([list(model.objects.order_by('pk').values()) for model in models],before)
+        self.capture('canonical-multi-domain-source-cards')
+        self.memory_click(f'#intelligenceAnswers article:last-child a[href="/ai/financial-records/investment/{rows["investment"].pk}/"]')
+        self.wait.until(lambda _: '2345.67' in self.text('canonicalEvidence'))
+        self.assertIn('not live market quotes',self.text('canonicalEvidence'))
+        self.assertIn('Currency was not recorded',self.text('canonicalEvidence'))
+        self.capture('canonical-owned-portfolio-citation')
+        Investment.objects.filter(pk=rows['investment'].pk).update(current_value='3456.78')
+        self.browser.refresh(); self.wait.until(lambda _: '3456.78' in self.text('canonicalEvidence'))
+        self.assertNotIn('2345.67',self.text('canonicalEvidence'))
+        self.memory_click('#canonicalEvidence a[href^="/ai/insights/"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value')==f'investment:{rows["investment"].pk}')
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain this record')
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: '3,456.78 · Currency not recorded' in self.text('intelligenceAnswers'))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.querySelector('#intelligenceAnswers .recorded-amount').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('canonical-corrected-record-mobile')
+
+    def test_canonical_unsupported_stale_and_owner_only_citations_keep_drafts(self):
+        from apps.investments.models import Investment
+        from apps.ml_engine.services.canonical_evidence import record_source
+        rows,local=self.canonical_grounding_fixture(); row=rows['investment']
+        source=record_source(self.scenario['user'],'investment',row.pk)
+        foreign=get_user_model().objects.create_user(username='synthetic-canonical-browser-foreign')
+        from django.test import Client
+        client=Client(); client.force_login(foreign)
+        self.assertEqual(client.get(source['url']).status_code,404)
+        self.login(); self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=investment&record_id={row.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value')==f'investment:{row.pk}')
+        question='Convert this investment to USD'
+        query=self.browser.find_element(self.By.ID,'intelligenceQuery'); query.send_keys(question)
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
+        local.reason.assert_not_called()
+        self.assertEqual(query.get_property('value'),question)
+        self.memory_click('#intelligenceNew')
+        def changing(payload,**kwargs):
+            Investment.objects.filter(pk=row.pk).update(current_value='4567.89')
+            return 'SYNTHETIC-STALE-BROWSER-ANSWER'
+        local.reason.side_effect=changing
+        query.send_keys('Explain this record'); self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceAnswers').get_attribute('aria-busy')=='false')
+        self.assertNotIn('SYNTHETIC-STALE-BROWSER-ANSWER',self.text('intelligenceAnswers'))
+        self.assertEqual(query.get_property('value'),'Explain this record')
+        self.capture('canonical-stale-draft-preserved')
+        self.browser.get(self.live_server_url+source['url'])
+        self.wait.until(lambda _: '4567.89' in self.text('canonicalEvidence'))
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('canonicalEvidence'),'')
+
     def click_upload_button(self, form_id):
         button = self.browser.find_element(self.By.CSS_SELECTOR, f"#{form_id} button[type=submit]")
         self.browser.execute_script("arguments[0].scrollIntoView({behavior: 'instant', block: 'center'});", button)

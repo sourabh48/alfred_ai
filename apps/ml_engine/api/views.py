@@ -60,10 +60,12 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
     def get(self, request):
         from apps.loans.models import LoanClosureDocument
         from apps.expenses.services.statement_evidence import choices
+        from apps.ml_engine.services.canonical_evidence import choices as financial_choices
         intelligence = {} if request.query_params.get('assistant_status') == '1' else dict(build_financial_intelligence(request.user))
         intelligence['assistant_documents']=[{'id':identity,'label':f'Verified loan closure #{identity}'} for identity in
             LoanClosureDocument.objects.filter(loan__user=request.user,verification_status='verified').order_by('-id').values_list('id',flat=True)[:20]]
         intelligence['assistant_statement_records']=choices(request.user)
+        intelligence['assistant_financial_records']=financial_choices(request.user)
         if request.query_params.get('assistant_status') == '1':
             import time
             try:
@@ -74,7 +76,7 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
         return Response(intelligence)
 
     def post(self,request):
-        data=self.payload(('query','scope','document_id','transaction_id','cloud_consent','query_sensitivity',
+        data=self.payload(('query','scope','document_id','transaction_id','record_type','record_id','cloud_consent','query_sensitivity',
                            'conversation_id','conversation_revision','request_id'))
         store = memory_store()
         identity = data.get('conversation_id')
@@ -88,13 +90,15 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
             history = ConversationHistory(store)
             question = dict(query=data.get('query'), scope=data.get('scope','general'), document_id=data.get('document_id'))
             if 'transaction_id' in data: question['transaction_id']=data['transaction_id']
+            for key in ('record_type','record_id'):
+                if key in data: question[key]=data[key]
             generation, saved = history.prepare(request.user, identity, data.get('conversation_revision'), data.get('request_id'), question)
             if saved:
                 record = history.get(request.user, identity)
                 current_session(request)
                 return Response({**saved, 'historical':True, 'conversation':{'id':identity, 'revision':record['revision']}})
         result = hybrid_answer(store,request.user,data.get('query'),scope=data.get('scope','general'),
-            document_id=data.get('document_id'),transaction_id=data.get('transaction_id'),cloud_consent=data.get('cloud_consent',False),
+            document_id=data.get('document_id'),transaction_id=data.get('transaction_id'),record_type=data.get('record_type'),record_id=data.get('record_id'),cloud_consent=data.get('cloud_consent',False),
             query_sensitivity=data.get('query_sensitivity','sensitive'))
         if identity is not None:
             current_session(request)

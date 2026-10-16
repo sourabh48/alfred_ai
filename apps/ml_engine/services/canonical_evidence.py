@@ -91,7 +91,11 @@ def record_source(user, kind, identity):
             # Keep the bank receipt/revocation boundary; this selector must never bypass review.
             from .hybrid_intelligence import source_context
             source=source_context(user,'bank_statements',transaction_id=row.pk)[0]
-            source.update(record_type=kind,record_id=row.pk,available=source['data']['verification']=='owner_confirmed')
+            source.update(record_type=kind,record_id=row.pk,as_of=row.transaction_date.isoformat(),
+                available=source['data']['verification']=='owner_confirmed')
+            source['data'].update(record_type=kind,record_id=row.pk,applicable_date=source['as_of'])
+            for field,value in source['data']['amounts'].items():
+                value.update(record_type=kind,record_id=row.pk,as_of=source['as_of'],revision=source['revision'],provenance=f'expenses.Expense.{field}; owner-confirmed statement receipt')
             return source
         fields=('amount','closing_balance'); helper=expense_money
         available=(row.source=='manual' and row.amount>0 and row.direction in dict(Expense.DIRECTION_CHOICES)
@@ -116,6 +120,7 @@ def record_source(user, kind, identity):
         available=row.is_confirmed
         data.update(applicable_date=timezone.localdate().isoformat(),start_date=row.start_date.isoformat(),
             status=row.current_status,verification=row.verification_status,verification_source=row.verification_source,
+            missed_payments=row.missed_payments,
             last_payment_date=row.last_payment_date.isoformat() if row.last_payment_date else None,
             closed_on=row.closed_on.isoformat() if row.closed_on else None)
         data['limitations'].append('EMI is the persisted contractual installment; no new amortization or payment-date forecast is calculated. Missing remaining balance is unavailable, never principal or zero.')
@@ -128,6 +133,7 @@ def record_source(user, kind, identity):
         closures=list(row.closure_documents.filter(verification_status='verified').values('id','closure_amount','closure_date'))
         related+=closures
         if ((row.current_status in ('closed','foreclosed','prepaid') and row.remaining_balance not in (None,0)) or
+                row.payment_history.filter(loan_effect_applied=True).exclude(match_status='matched').exists() or
                 len({(value['closure_amount'],value['closure_date']) for value in closures})>1):
             available=False; data['verification']='conflicting_loan_records'
     else:

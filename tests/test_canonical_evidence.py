@@ -131,6 +131,13 @@ class CanonicalEvidenceTests(TestCase):
         document.linked_investments.add(self.investment)
         with self.assertRaises(Http404): record_source(self.owner,'investment',self.investment.pk)
 
+    def test_applied_payment_awaiting_review_is_conflicting_not_verified_repayment(self):
+        LoanPaymentHistory.objects.create(loan=self.loan,payment_date=date(2026,9,1),amount='100.01',
+            match_status='review',loan_effect_applied=True,expense_reference=self.expense)
+        result=record_source(self.owner,'loan',self.loan.pk)
+        self.assertFalse(result['available']); self.assertEqual(result['data']['verification'],'conflicting_loan_records')
+        self.assertEqual(result['data']['missed_payments'],0)
+
     def test_payment_source_revision_and_import_owner_boundary(self):
         from apps.loans.models import LoanImportDocument
         LoanPaymentHistory.objects.create(loan=self.loan,payment_date=date(2026,9,1),amount='100.01',

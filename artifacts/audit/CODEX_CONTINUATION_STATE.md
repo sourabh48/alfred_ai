@@ -3,8 +3,9 @@
 ## AI-GROUND Phase 2 canonical financial records — 2026-10-16
 
 Isolated F:/ALFRED_DEV/post-audit, feature/ai-ground-bank-20261016, based exactly on
-1b80138d470150de8f9fc1d1be831af1cecc8941. This first implementation/checkpoint
-follows it; verify actual HEAD. Read docs/PROJECT_STATUS.md, not a new report.
+1b80138d470150de8f9fc1d1be831af1cecc8941. Source unit
+df386be6938e533cff5b9e20af11ba015672ee9a is committed; this assistant unit follows
+it. Verify actual HEAD. Read docs/PROJECT_STATUS.md, not a new report.
 
 Unit 1 implemented: canonical_evidence.py and read-only financial-evidence API;
 owned citation template/view; exact typed money/source/date/revision; expense,
@@ -23,15 +24,38 @@ canonical-source-verified 46 backend PASS, zero skips/failures; includes existin
 bank source/hybrid and financial baseline. Exact canonical Decimal and financial
 rows have zero mismatches. System/migration drift PASS. No schema change; do not
 repeat old FIN-MONEY or release suites. Citation privacy reuses shared pagehide/
-cached-page cleanup; browser acceptance is pending the assistant unit.
+cached-page cleanup; assistant/browser acceptance follows below.
 
-Next: add financial_records scope/record_type/record_id to existing hybrid/API/UI;
-no arbitrary model tools. Unsupported record questions/FX/totals abstain locally;
-typed current source values and source revisions, safe citations, no raw labels or
-documents in prompts; revalidate before answers and refuse cloud fallback. Keep
-legacy finance source shape but withhold unknown-currency totals from assistant
-output. Test history/bank compatibility, browser, actual bounded synthetic Ollama
-when local models are available. Then next independent verified-document unit.
+Unit 2 implemented: financial_records scope/record_type/record_id in existing
+hybrid/API/UI and reference-only encrypted history compatibility. Allowlisted typed
+money/status/date context; no source names/account IDs/notes/raw documents/private
+URLs sent to a model. Local-only consent/fallback fence. Post-inference source
+revisions reject edits/delete/foreign parent/new conflict. Conservative supported
+English record requests only; other questions/FX/forecasts/approvals/totals abstain
+before retrieval/inference. No new calculator or model tool invocation. Existing
+finance shape preserved with unknown-currency totals withheld; only supported
+reported-income/housing fields remain. No changes to canonical financial APIs.
+
+canonical-combined-final: 149 backend PASS, zero failures/skips; covers financial
+source/cross-owner/races/corrections/reconciliation, bank/history/session/upload/
+reset and prior loan-document compatibility. canonical-browser-focused: 4 Chrome
+PASS, zero failures/skips, sources/citations/corrections/mobile/stale drafts plus
+bank/history compatibility. Screenshots reviewed. No overlapping counts summed.
+canonical-real-ollama: 1 separate real-local PASS, zero skips/failures, installed
+qwen3.5:4b/all-minilm, synthetic expense+verified memory, bounded inference, typed
+financial source and encrypted-store reopening/owner exclusion. No paid/cloud
+requests or live model/runtime configuration changes. Test requires explicit
+ALFRED_RUN_OLLAMA_GROUNDING=true in an isolated synthetic runner; it is deliberately
+not included in mocked release labels. No claim of general model advice accuracy.
+
+Next independent verified-document unit: exact owner-only loan closure citation
+and source-file/liveness provenance on the existing verified closure path. Reuse
+bank private-file/resource controls. Legacy metadata-only records must be labeled
+honestly; no arbitrary PDF Q&A, new parser or currency schema. Real-account/native
+package acceptance and currency/budget-approval design remain unperformed/gated.
+Integrated system/drift and source privacy/link/identity checks PASS: 23 files,
+74 local references, zero findings; currency contract/frozen/master unchanged.
+Node syntax/diff checks and AST-only graph update PASS. No new migration/dependency.
 
 History activation remains OFF; AWS retired, OpenAI/cloud OFF, frozen 4aa7ac70 and
 all FIN-MONEY history preserved. Production DOWN is prior evidence only; no service,

@@ -11,7 +11,8 @@ service, paid provider or GitHub operation is authorized here.
 ### AI-GROUND Phase 2 — individual canonical financial records, 2026-10-16
 
 Based exactly on `1b80138d470150de8f9fc1d1be831af1cecc8941`, on the same isolated
-feature/ai-ground-bank-20261016 branch. First bounded unit adds
+feature/ai-ground-bank-20261016 branch. Source unit
+`df386be6938e533cff5b9e20af11ba015672ee9a` adds
 [canonical evidence](../apps/ml_engine/services/canonical_evidence.py),
 [read-only owner APIs](../apps/ml_engine/api/financial_evidence.py),
 `/api/ai/financial-evidence/` and owner-only
@@ -50,10 +51,56 @@ precedence, budget/loan conflicts, null balance, original evidence, bank revocat
 and read-only API semantics are covered. `canonical-system`: system and migration
 drift PASS; no schema change or old money migration rehearsal needed.
 
-Next bounded unit wires these sources into existing assistant selection, local-only
-reasoning, unsupported-question abstention and post-inference revision checks,
-then validates browser flows and bounded actual local Ollama if available. This
-first unit does not yet claim assistant canonical-record inference acceptance.
+The assistant now supports `scope=financial_records`, `record_type` and `record_id`
+through the existing hybrid/API/UI. Sources revalidate after inference, including
+edits, deletion/reparenting, newly conflicting budgets, loan payment linkage and
+bank revocation. Explicit cloud consent is refused and local outage cannot fall
+back to OpenAI. Original text, notes, asset/account labels and private citation URLs
+are excluded from financial tool prompts; only allowlisted structured fields enter
+local inference. Model numeric/currency prose is suppressed; exact source cards
+remain authoritative. No automatic memory promotion or conversation activation.
+
+The initial supported questions are deliberately bounded English record requests,
+for example “Explain this record”, “Show my loan status” and “Review recorded
+values”. Unrecognized questions, forecasts, approvals, FX and totals abstain before
+retrieval/inference. This is not arbitrary financial advice/Q&A. Existing finance
+source keys remain, but unknown-currency totals are null/unavailable in assistant
+output; supported reported-income/housing fields remain readable. Financial
+dashboard/calculation APIs and stored baseline results are unchanged. Test/browser
+expectations are updated only for this necessary currency-safety boundary.
+
+`canonical-combined-final`: **149 backend PASS**, zero failures/skips (sources,
+hybrid, source races/conflicts, money/financial baseline, bank, history, uploads/
+retry, session/CSRF, reset and loan-document grounding compatibility). Financial
+rows, raw identities/fingerprints and canonical Decimal baseline have zero
+mismatches. `canonical-browser-focused`: **4 Chrome PASS**, zero failures/skips:
+multi-domain sources, owner citations/corrections/mobile, unsupported/stale drafts,
+bank review/correction and history outage/conflict. Desktop/mobile screenshots
+reviewed. Counts overlap earlier focused runs and are not summed.
+
+**Separate actual local acceptance:** `canonical-real-ollama`, **1 PASS**, zero
+skips/failures. Required installed local qwen3.5:4b/all-minilm models were detected
+without installation/configuration changes. A disposable synthetic expense and
+explicitly verified synthetic memory exercised real embeddings, one bounded local
+inference, typed owner source, encrypted-vault reopening and other-owner exclusion.
+No production database, paid call, external cloud, model download or live Ollama
+configuration change. This proves the bounded local path, not financial advice
+accuracy or broad model evaluation. The opt-in test is separate from mocked gates:
+[real acceptance](../tests/test_canonical_ollama.py).
+
+Example synthetic source: `canonical-investment-2`, corrected current value
+**3456.78**, currency null/not_recorded, provenance
+`investments.Investment.current_value`, owner-only
+`/ai/financial-records/investment/2/`. Loan EMI is the exact persisted contractual
+amount with Loan field provenance, not a new amortization estimate. Budget approval
+and actual market freshness remain explicitly unrecorded. Full document Q&A,
+approved currency/aggregation and separate-PC/real-account/package acceptance are
+not claimed. Next independent verified-document unit: an exact owner-only loan
+closure citation with source-file/liveness provenance, reusing the established
+verified closure path; do not build arbitrary PDF ingestion.
+Integrated system/migration drift checks PASS. Changed-source privacy/link/identity
+validation PASS: 23 files, 74 local references, zero findings, unchanged C1–C10 and
+frozen/master SHAs. JavaScript syntax/diff checks and AST-only graph update PASS.
 History activation, OpenAI and cloud sync OFF; AWS retired. Production DOWN remains
 the prior finding, without new operational checks or repair. Production source/data,
 backups, frozen `4aa7ac70` and GitHub master are unchanged.

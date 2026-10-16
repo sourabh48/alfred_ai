@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const scope = document.getElementById("intelligenceScope");
     const documentChoice = document.getElementById("intelligenceDocument");
     const statementChoice = document.getElementById("intelligenceStatement");
+    const financialChoice = document.getElementById("intelligenceFinancial");
     const consent = document.getElementById("intelligenceCloudConsent");
     const feedback = document.getElementById("intelligenceFeedback");
     const answers = document.getElementById("intelligenceAnswers");
@@ -46,7 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function forgetPrivatePage() {
         active = false; generation++; conversation = null; historyPolicy = null; requestToken = null; historyBlocked = false;
-        answers.replaceChildren(); documentChoice.replaceChildren(); statementChoice.replaceChildren(); empty.hidden = false;
+        answers.replaceChildren(); documentChoice.replaceChildren(); statementChoice.replaceChildren(); financialChoice.replaceChildren(); empty.hidden = false;
         historyList.replaceChildren(); historyTitle.value = ""; historyConsent.checked = false; historyDays.value = "7";
         query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false;
         feedback.textContent = ""; historyFeedback.textContent = ""; retry.hidden = true;
@@ -148,6 +149,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const statements = scope.value === "bank_statements";
         document.getElementById("intelligenceStatementField").classList.toggle("d-none", !statements);
         statementChoice.disabled = !statements;
+        const financial = scope.value === "financial_records";
+        document.getElementById("intelligenceFinancialField").classList.toggle("d-none", !financial);
+        financialChoice.disabled = !financial;
         if (resetConsent || scope.value !== "general" || !cloudAvailable || historyEnabled()) consent.checked = false;
         consent.disabled = scope.value !== "general" || !cloudAvailable || historyEnabled();
     }
@@ -167,6 +171,16 @@ document.addEventListener("DOMContentLoaded", () => {
             statementChoice.append(new Option(`${record.statement.document_name} · ${record.current.transaction_date} · record #${record.transaction_id}`, record.transaction_id));
         }
         if ([...statementChoice.options].some(option => option.value === selectedStatement)) statementChoice.value = selectedStatement;
+        const selectedFinancial = financialChoice.value || requestedFinancial;
+        financialChoice.replaceChildren(new Option("Choose a canonical record", ""));
+        (insights.assistant_financial_records || []).forEach(item => financialChoice.append(new Option(item.label, `${item.kind}:${item.id}`)));
+        if (/^(expense|budget|loan|investment|baseline):[1-9]\d{0,15}$/.test(selectedFinancial || "") && ![...financialChoice.options].some(option => option.value === selectedFinancial)) {
+            const [kind,id] = selectedFinancial.split(":");
+            const record = await Alfred.fetchJSON(`/api/ai/financial-evidence/${kind}/${id}/`);
+            if (!active || ticket !== generation) return;
+            financialChoice.append(new Option(`${kind} record #${record.record_id}`, selectedFinancial));
+        }
+        if ([...financialChoice.options].some(option => option.value === selectedFinancial)) financialChoice.value = selectedFinancial;
         cloudAvailable = reasoning.provider_available && reasoning.policy.enabled;
         setLocalStatus(insights.local_model_status === "available" ? "Ollama available" : "Ollama unavailable", insights.local_model_status === "available" ? "ready" : "unavailable");
         document.getElementById("intelligenceCloudStatus").textContent = !reasoning.real_provider_enabled
@@ -177,7 +191,8 @@ document.addEventListener("DOMContentLoaded", () => {
     scope.addEventListener("change", updateScope);
     const requestedScope = new URLSearchParams(location.search).get("scope");
     const requestedTransaction = new URLSearchParams(location.search).get("transaction");
-    if (["finance","travel","bank_statements"].includes(requestedScope)) scope.value = requestedScope;
+    const requestedFinancial = `${new URLSearchParams(location.search).get("record_type")}:${new URLSearchParams(location.search).get("record_id")}`;
+    if (["finance","travel","bank_statements","financial_records"].includes(requestedScope)) scope.value = requestedScope;
     query.addEventListener("keydown", event => {
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
     });
@@ -205,10 +220,10 @@ document.addEventListener("DOMContentLoaded", () => {
         (result.sources || []).forEach(source => {
             const reference = document.createElement("p"); reference.textContent = `Source: ${source.ref} · ${source.classification}`;
             evidence.append(reference);
-            const types = {owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence", owner_confirmed_statement_record:"Owner-confirmed bank-statement record (not independently bank-authenticated)", unverified_statement_record:"Bank-statement record · source review required"};
+            const types = {owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records (currency-limited)", canonical_record:"Canonical stored record · not independent authentication", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence", owner_confirmed_statement_record:"Owner-confirmed bank-statement record (not independently bank-authenticated)", unverified_statement_record:"Bank-statement record · source review required"};
             const description = document.createElement("p"); description.textContent = `${types[source.classification] || 'Source'} · ${source.verified_at ? `Checked ${new Date(source.verified_at).toLocaleString()}` : 'Verification timestamp not recorded'}`; evidence.append(description);
             if (historical) description.textContent = "Saved reference only; current existence and verification have not been checked.";
-            if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(source.url || "")) {
+            if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(source.url || "") || /^\/ai\/financial-records\/(expense|budget|loan|investment|baseline)\/\d+\/$/.test(source.url || "")) {
                 const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
             }
             if (!historical && source.data) Object.entries(source.data).forEach(([key, value]) => {
@@ -253,6 +268,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const payload = {query: query.value, scope: scope.value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
         if (scope.value === "documents") payload.document_id = Number(documentChoice.value);
         if (scope.value === "bank_statements") payload.transaction_id = Number(statementChoice.value);
+        if (scope.value === "financial_records") {
+            const [kind,id] = financialChoice.value.split(":");
+            payload.record_type = kind; payload.record_id = Number(id);
+        }
         try {
             if (historyEnabled()) {
                 if (!conversation) conversation = await Alfred.fetchJSON("/api/ai/conversations/", {method:"POST", body:JSON.stringify({title:historyTitle.value.trim() || "Private conversation"})});
