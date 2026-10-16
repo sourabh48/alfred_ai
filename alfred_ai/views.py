@@ -236,6 +236,16 @@ def documents_view(request):
 
 @login_required
 @require_http_methods(["GET"])
+def statement_evidence_view(request, document_id, transaction_id):
+    from apps.expenses.services.statement_evidence import evidence
+    detail = evidence(request.user, transaction_id, document_id=document_id)
+    response = render(request, 'statement_evidence.html', {'evidence':detail})
+    response['Cache-Control'] = 'no-store, private'
+    return response
+
+
+@login_required
+@require_http_methods(["GET"])
 def document_review_queue_api_view(request):
     return JsonResponse({"results": build_review_queue(request.user)}, encoder=DjangoJSONEncoder)
 

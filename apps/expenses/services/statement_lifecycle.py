@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 import logging
 
 from django.db import transaction
@@ -485,6 +486,7 @@ def _validate_transaction_money(parsed):
             expense_money(item.closing_balance)
 
 
+@transaction.atomic
 def _import_statement_transactions(*, user, upload: StatementUpload, bank_account, parsed: StatementParseResult) -> tuple[list, int]:
     _validate_transaction_money(parsed)
     if not parsed.transactions:
@@ -596,6 +598,8 @@ def _import_statement_transactions(*, user, upload: StatementUpload, bank_accoun
         )
 
     Expense.objects.bulk_create(to_create)
+    from .statement_evidence import capture_import
+    capture_import(to_create)
     return imported_transactions, skipped_count
 
 
@@ -605,4 +609,10 @@ def _apply_saved_corrections(parsed: StatementParseResult, extracted_payload: di
     parsed.account_holder = corrections.get("account_holder") or parsed.account_holder
     parsed.account_number = corrections.get("account_number") or parsed.account_number
     parsed.statement_kind = corrections.get("statement_kind") or parsed.statement_kind
+    for field in ('statement_start', 'statement_end'):
+        if corrections.get(field):
+            try:
+                setattr(parsed, field, date.fromisoformat(str(corrections[field])))
+            except ValueError:
+                pass
     parsed.parser_notes = " ".join(filter(None, [parsed.parser_notes, corrections.get("review_note", "")])).strip()

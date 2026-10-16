@@ -1,5 +1,46 @@
 # ALFRED CODEX CONTINUATION STATE
 
+## AI-GROUND bank provenance/owner review — 2026-10-16
+
+Current isolated branch feature/ai-ground-bank-20261016, worktree
+F:/ALFRED_DEV/post-audit, based exactly on 20b916ee00867b0f0cdcb5c758c697762fda897b.
+This implementation/checkpoint commit follows that AI-HISTORY baseline; verify
+actual HEAD. Read docs/PROJECT_STATUS.md for the active contract. No duplicate MD.
+
+Unit 1 implemented: additive expenses.0006 receipt model; immutable structured
+import snapshots; owner-only evidence API/review page/private-media citations;
+explicit confirmation/withdrawal with revision+generation fencing. Changes to
+canonical values, file bytes, dates, source/owner/account, parser status or conflicts
+invalidate review. Current values precede originals; historical originals are not
+invented. No financial writes, currency inference, AI memory promotion or alternate
+deduplicated source claims. Shared import transaction rolls back if receipt capture
+fails. Saved statement date corrections now survive the existing retry path.
+
+Evidence artifacts/post-audit/ai-ground-bank-20261016:
+provenance-core-integration 53 backend PASS, zero failures/skips; financial-row and
+canonical Decimal comparisons zero mismatches. Migration rehearsal checks forward
+and reverse plan, restored SQLite integrity/FKs, unchanged original table digests
+and original file hash. System/drift/disposable migrate/pending checks PASS.
+provenance-browser-final 1 Chrome PASS, zero failures/skips; normal synthetic login,
+confirmation/correction/withdrawal/mobile. Desktop/mobile screenshots reviewed.
+Earlier failed timing/helper browser attempts are retained, not final acceptance.
+No native package rebuild or full prior release/M16–M21 suite rerun.
+
+Next independently safe unit: add bank_statements scope/transaction selection to
+existing hybrid_intelligence.py and personal-insights API/UI. Verified records use
+current exact-decimal typed source cards with unknown currency; no raw documents,
+account numbers or filename instructions in model prompts. Unreviewed/conflicting/
+missing sources abstain before inference. Recheck source revision after inference;
+reject stale answers. Refuse cloud consent/fallback for this scope. Add focused
+hybrid/privacy/browser regressions, then commit/update this checkpoint.
+
+History operator activation remains OFF pending retention/recovery approval.
+FIN-CURRENCY C1–C10 unapproved. AWS decommissioned; OpenAI/cloud OFF. Frozen
+4aa7ac70 preserved; no production/data/config/key/backup/remote changes. Production
+DOWN is preserved prior evidence; no new production health check or restart.
+Safe resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
+git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 85.
+
 ## AI-HISTORY local storage/API/UI — 2026-10-16
 
 Isolated F:/ALFRED_DEV/post-audit, feature/ai-history-20261016, based exactly on

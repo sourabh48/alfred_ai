@@ -3,10 +3,62 @@
 ## Active post-audit implementation — 2026-10-15
 
 Production remains 3932f391; audit baseline bced104 is preserved. Isolated work:
-F:/ALFRED_DEV/post-audit, feature/ai-history-20261016. Audit is complete;
+F:/ALFRED_DEV/post-audit, feature/ai-ground-bank-20261016. Audit is complete;
 the 143-feature inventory is not regenerated. AWS is decommissioned by the user;
 older activation advice is superseded. No live configuration, ACL, database,
 service, paid provider or GitHub operation is authorized here.
+
+### AI-GROUND — bank-statement provenance and owner review, 2026-10-16
+
+Based exactly on AI-HISTORY `20b916ee00867b0f0cdcb5c758c697762fda897b`; its
+encryption, retention and default-OFF operator gate are preserved. The first unit
+adds [statement evidence](../apps/expenses/services/statement_evidence.py),
+[owner APIs](../apps/ml_engine/api/statements.py) and an authorized
+`/documents/statements/<document>/transactions/<record>/` review page. Import
+snapshots preserve original structured values, parser monetary identity, dates,
+document label and fingerprint. Corrected canonical Expense values take precedence;
+neither the original snapshot nor the existing import fingerprint is rewritten.
+Duplicate imports retain their original source link; no duplicate alternate
+provenance is invented. Raw PDF/OCR text is not copied into new diagnostic or memory
+fields. Existing owner-only private-media downloads are reused.
+
+Explicit record confirmation is separate from parser success and from trusted
+long-term memory. File bytes, source/owner/account linkage, date bounds, parser
+state, canonical edits, duplicate/conflicting records and revocation invalidate
+verification. Generation-fenced reviews reject stale confirmation requests. Owner
+confirmation is **not independent bank authentication**. Missing, partial or
+conflicting sources cannot be confirmed. Family financial-sharing consent does not
+grant access to these private documents. No amounts, balances or memories are
+modified by the review API; consent can be withdrawn without deleting transactions.
+
+One additive migration, `expenses.0006_statement_transaction_evidence`, creates
+only derived receipts. No historical backfill, currency inference, dependency or
+financial-column change. Legacy original extraction is explicitly “not retained”;
+an owner may review a current legacy row against its file without fabricating an
+original snapshot. Forward/reverse synthetic rehearsal independently restores a
+consistent SQLite copy, checks integrity/foreign keys, and proves all pre-existing
+table digests unchanged apart from migration history. Reversing drops only new
+receipts; preserve a backup and disable citation consumers before a reviewed source
+downgrade. Original financial records/files remain intact. Nothing applied live.
+
+Evidence: `artifacts/post-audit/ai-ground-bank-20261016/`.
+`provenance-core-integration`: **53 backend PASS**, zero failures/skips, covering
+provenance, ownership/CSRF, duplicate/transfer preservation, correction precedence,
+atomic failed imports, migration/rollback and reset. Canonical Decimal baseline and
+financial-row comparisons show zero mismatches. A reproduced saved-date correction
+bug is fixed in the existing retry helper: accepted statement dates survive retry.
+System, drift, disposable migration and pending-migration checks PASS.
+`provenance-browser-final`: **1 Chrome PASS**, zero failures/skips: owner review,
+correction, withdrawal and mobile layout; desktop/mobile screenshots reviewed.
+Earlier browser timing/helper failures are preserved and corrected, not counted.
+
+Next unit connects this reviewed source to the existing Ollama/hybrid assistant,
+with explicit uncertainty, typed amounts, fresh-source checks and local-only
+citations. The review page does not yet claim assistant bank-document grounding.
+Currency remains unrecorded; C1–C10 below remain unapproved. History activation,
+OpenAI and real cloud sync remain OFF; AWS stays retired. Frozen `4aa7ac70`,
+production, its database, backups and GitHub are unchanged. Production DOWN is the
+prior read-only observation, not a fresh health check or a repair claim.
 
 ### AI-HISTORY — safe local slice implemented, private activation gated, 2026-10-16
 

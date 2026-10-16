@@ -825,6 +825,65 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.save_screenshot(str(self.artifacts / f"{name}.png"))
         (self.artifacts / f"{name}.txt").write_text(self.browser.find_element(self.By.TAG_NAME, "body").text, encoding="utf-8")
 
+    def bank_statement_evidence_fixture(self):
+        from datetime import date
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.expenses.models import BankAccount, StatementUpload
+        from apps.expenses.services.statement_lifecycle import _import_statement_transactions
+        from apps.expenses.services.statement_evidence import evidence
+        from tests.test_expense_money_identity import parsed_fixture
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-ground-browser-synthetic-')))
+        self.enterContext(override_settings(MEDIA_ROOT=root/'media', ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
+            ALFRED_MEMORY_DIR=str(root/'unused-vault'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,
+            ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
+        owner=self.scenario['user']
+        account=BankAccount.objects.create(user=owner,account_number='TEST0001',current_balance='10.01')
+        upload=StatementUpload.objects.create(user=owner,bank_account=account,account_number=account.account_number,
+            source='bank_statement',parser_status='parsed',file_name='Synthetic September statement.pdf',
+            original_file=SimpleUploadedFile('synthetic-source.pdf',b'%PDF-synthetic-bank-source-only'),
+            statement_start=date(2026,9,1),statement_end=date(2026,9,30),
+            extracted_payload={'raw_text_excerpt':'SYNTHETIC-RAW-DOCUMENT-NEVER-PROMPT'})
+        _import_statement_transactions(user=owner,upload=upload,bank_account=account,parsed=parsed_fixture())
+        row=Expense.objects.get(statement_upload=upload)
+        return row,upload,evidence(owner,row.pk)
+
+    def test_bank_statement_citation_confirmation_correction_and_revocation(self):
+        from apps.expenses.models import BankAccount
+        from apps.expenses.services.statement_evidence import evidence
+        from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+        row,upload,item=self.bank_statement_evidence_fixture(); owner=self.scenario['user']
+        self.login(); self.browser.get(self.live_server_url+item['citation_url'])
+        self.wait.until(lambda _: self.text('statementEvidenceStatus')=='needs_owner_review')
+        self.capture('bank-evidence-initial')
+        self.assertEqual(self.text('statementEvidenceStatus'),'needs_owner_review')
+        before=[list(model.objects.values()) for model in (Expense,BankAccount)]
+        baseline=resolve_canonical_financial_baseline(owner)['decimal_amounts']
+        self.memory_click('#statementEvidenceForm button[type=submit]')
+        self.assertEqual(evidence(owner,row.pk)['verification'],'needs_owner_review')
+        self.memory_click('#statementEvidenceConfirm'); self.memory_click('#statementEvidenceForm button[type=submit]')
+        self.wait.until(lambda _: self.text('statementEvidenceStatus')=='owner_confirmed')
+        self.assertEqual([list(model.objects.values()) for model in (Expense,BankAccount)],before)
+        self.assertEqual(resolve_canonical_financial_baseline(owner)['decimal_amounts'],baseline)
+        self.capture('bank-evidence-owner-confirmed')
+        status=self.browser.execute_async_script('''
+            const [id,done]=arguments;
+            Alfred.fetchJSON(`/api/expenses/${id}/`,{method:'PATCH',body:JSON.stringify({amount:'7.77'})})
+                .then(()=>done(200)).catch(error=>done(error.status));
+        ''',row.pk)
+        self.assertEqual(status,200)
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('statementEvidenceStatus')=='needs_owner_review')
+        self.assertEqual(self.text('statementEvidenceStatus'),'needs_owner_review')
+        self.assertIn('7.77',self.text('statementEvidence')); self.assertIn('2.68',self.text('statementEvidence'))
+        self.memory_click('#statementEvidenceConfirm'); self.memory_click('#statementEvidenceForm button[type=submit]')
+        self.wait.until(lambda _: self.text('statementEvidenceStatus')=='owner_confirmed')
+        self.memory_click('#statementEvidenceRevoke'); self.browser.switch_to.alert.accept()
+        self.wait.until(lambda _: self.text('statementEvidenceStatus')=='needs_owner_review')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('bank-evidence-correction-mobile')
+
     def click_upload_button(self, form_id):
         button = self.browser.find_element(self.By.CSS_SELECTOR, f"#{form_id} button[type=submit]")
         self.browser.execute_script("arguments[0].scrollIntoView({behavior: 'instant', block: 'center'});", button)
