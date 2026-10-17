@@ -2,7 +2,7 @@ from django.urls import path
 from .statements import StatementEvidenceAPI
 from .investment_evidence import InvestmentEvidenceAPI
 from .loan_evidence import LoanEvidenceAPI
-from .financial_evidence import FinancialEvidenceAPI, ClosureEvidenceAPI
+from .financial_evidence import FinancialEvidenceAPI, FinancialSourcePageAPI, ClosureEvidenceAPI
 from .views import AlfredExplainAPI, AlfredPersonalInsightsAPI, EmotionalSpendAPI, MLRuntimeControlAPI, MLRuntimeStatusAPI
 from .memory import MemoryCollectionAPI, MemoryDetailAPI, MemoryRetentionAPI, MemoryResetAPI, MemoryRestoreAPI, MemoryRetrieveAPI, MemorySyncAPI, MemoryReasoningAPI, MemoryLearningAPI
 from .conversations import ConversationPolicyAPI, ConversationCollectionAPI, ConversationDetailAPI, ConversationClearAPI
@@ -12,6 +12,7 @@ urlpatterns = [
     path('investment-evidence/<int:document_id>/<int:identity>/', InvestmentEvidenceAPI.as_view()),
     path('closure-evidence/<int:identity>/', ClosureEvidenceAPI.as_view()),
     path('financial-evidence/', FinancialEvidenceAPI.as_view()),
+    path('financial-evidence/<str:kind>/<int:identity>/documents/', FinancialSourcePageAPI.as_view()),
     path('financial-evidence/<str:kind>/<int:identity>/', FinancialEvidenceAPI.as_view()),
     path('statement-evidence/', StatementEvidenceAPI.as_view()),
     path('statement-evidence/<int:identity>/', StatementEvidenceAPI.as_view()),

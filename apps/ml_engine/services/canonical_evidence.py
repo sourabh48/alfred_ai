@@ -5,6 +5,8 @@ import json
 import re
 
 from django.contrib.auth import get_user_model
+from django.core import signing
+from django.db.models import Count, Max
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -18,15 +20,159 @@ from apps.loans.models import Loan
 from apps.loans.money import loan_money
 from apps.investments.models import Investment
 from apps.investments.money import investment_money
-from .persistent_memory import _owner
+from .persistent_memory import _owner, MemoryConflict
 
 MODELS={'expense':Expense,'budget':Budget,'loan':Loan,'investment':Investment}
 KINDS=(*MODELS,'baseline')
 BASELINE_KEYS=('monthly_income','liquid_cash','recurring_emi_burden','total_assets','total_liabilities','net_worth')
+DOCUMENT_LIMIT=5
+CATALOG_SALT='alfred.financial-source-catalog.v1'
+PAGE_SALT='alfred.financial-source-page.v1'
+
+
+class SourceSelectionConflict(MemoryConflict):
+    pass
 
 
 def _digest(value):
     return sha256(json.dumps(value,sort_keys=True,allow_nan=False,default=str).encode()).hexdigest()
+
+
+def _owned_record(user, kind, identity):
+    _owner(user)
+    if kind not in MODELS or type(identity) is not int or identity<1: raise Http404
+    row=get_object_or_404(MODELS[kind],pk=identity,user=user)
+    if kind in ('loan','investment') and row.source_documents.exclude(user=user).exists(): raise Http404
+    if kind=='loan':
+        if row.consolidated_into_id and row.consolidated_into.user_id!=user.pk: raise Http404
+        if row.payment_history.filter(expense_reference__isnull=False).exclude(expense_reference__user=user).exists(): raise Http404
+    if kind=='expense':
+        if row.bank_account_id and row.bank_account.user_id!=user.pk: raise Http404
+        if row.source=='bank_statement' and row.statement_upload_id:
+            upload=row.statement_upload
+            if upload.user_id!=user.pk or (upload.bank_account_id and upload.bank_account.user_id!=user.pk): raise Http404
+    return row
+
+
+def _record_revision(row):
+    return _digest({field.attname:getattr(row,field.attname) for field in row._meta.concrete_fields})
+
+
+def _document_catalog(user, kind, identity):
+    row=_owned_record(user,kind,identity)
+    if kind in ('loan','investment'):
+        manager=row.source_documents
+        documents=manager.all()
+        # Through-row IDs advance on relinking, including links to older documents.
+        membership=manager.through.objects.filter(**{f'{kind}_id':identity}).aggregate(count=Count('pk'),version=Max('pk'))
+    elif kind=='expense':
+        from apps.expenses.models import StatementUpload
+        documents=StatementUpload.objects.filter(pk=row.statement_upload_id,user=user) if row.source=='bank_statement' else StatementUpload.objects.none()
+        membership=documents.aggregate(count=Count('pk'),version=Max('pk'))
+    else:
+        return row,None,None
+    return row,documents,dict(owner=user.pk,kind=kind,identity=identity,record=_record_revision(row),membership=membership)
+
+
+def _load_catalog(token, expected):
+    if not isinstance(token,str) or not 1<=len(token)<=4096: raise ValueError('Choose a current financial source list.')
+    try: stamp=signing.loads(token,salt=CATALOG_SALT,max_age=900)
+    except signing.SignatureExpired as exc: raise SourceSelectionConflict() from exc
+    except signing.BadSignature as exc: raise ValueError('Invalid source list.') from exc
+    if not isinstance(stamp,dict): raise ValueError('Invalid source list.')
+    if any(stamp.get(key)!=expected[key] for key in ('owner','kind','identity')): raise Http404
+    if stamp!=expected: raise SourceSelectionConflict()
+
+
+def _document_evidence(user, kind, row, document):
+    if kind=='loan':
+        from apps.loans.services.document_evidence import evidence
+    elif kind=='investment':
+        from apps.investments.services.document_evidence import evidence
+    else:
+        from apps.expenses.services.statement_evidence import evidence
+        return evidence(user,row.pk,document_id=document.pk)
+    return evidence(user,document.pk,row.pk)
+
+
+def _document_item(kind, row, document, detail):
+    if kind=='expense':
+        verification=detail['verification']
+        confirmed=verification=='owner_confirmed'
+        available=not verification.startswith('source_')
+        name=detail['statement']['document_name']; citation=detail['citation_url']
+        uploaded=document.uploaded_at
+        confirmed_fields=['transaction'] if confirmed else []
+    else:
+        confirmed_fields=[key for key,value in detail['fields'].items() if value['verification']=='owner_confirmed']
+        confirmed=len(confirmed_fields)==len(detail['fields'])
+        available=detail['source_status']=='available'
+        verification=('owner_confirmed' if confirmed else 'partially_owner_confirmed' if confirmed_fields else
+            'needs_owner_review' if detail['review_allowed'] else 'source_unavailable')
+        name=detail['document_name']; citation=detail['citation_url']; uploaded=document.created_at
+    return dict(document_id=document.pk,type='bank_statement' if kind=='expense' else f'{kind}_import',name=name,
+        uploaded_at=uploaded.isoformat(),verification=verification,confirmed_fields=confirmed_fields,
+        freshness='current_review' if confirmed else 'partial_review' if confirmed_fields else 'review_required' if available else 'unavailable',
+        source_status=detail.get('source_status',verification),revision=detail['revision'],url=citation,
+        selectable=available and bool(confirmed_fields))
+
+
+def document_page(user, kind, identity, *, cursor=None):
+    _owner(user)
+    if kind=='baseline':
+        if type(identity) is not int or identity!=user.pk: raise Http404
+        return dict(supported=False,items=[],count=0,next_cursor=None,limit=DOCUMENT_LIMIT)
+    row,documents,stamp=_document_catalog(user,kind,identity)
+    if documents is None: return dict(supported=False,items=[],count=0,next_cursor=None,limit=DOCUMENT_LIMIT)
+    after=0
+    if cursor is not None:
+        if not isinstance(cursor,str) or not 1<=len(cursor)<=8192: raise ValueError('Invalid source page.')
+        try: page=signing.loads(cursor,salt=PAGE_SALT,max_age=900)
+        except signing.SignatureExpired as exc: raise SourceSelectionConflict() from exc
+        except signing.BadSignature as exc: raise ValueError('Invalid source page.') from exc
+        if not isinstance(page,dict) or set(page)!= {'catalog','after'} or type(page['after']) is not int or page['after']<1:
+            raise ValueError('Invalid source page.')
+        token=page['catalog']; after=page['after']; _load_catalog(token,stamp)
+    else: token=signing.dumps(stamp,salt=CATALOG_SALT,compress=True)
+    rows=list(documents.filter(pk__gt=after).order_by('pk')[:DOCUMENT_LIMIT+1]); items=[]
+    from alfred_ai.services.upload_limits import UploadLimitExceeded
+    from apps.expenses.services.statement_evidence import document_name
+    for document in rows[:DOCUMENT_LIMIT]:
+        try: items.append(_document_item(kind,row,document,_document_evidence(user,kind,row,document)))
+        except UploadLimitExceeded:
+            items.append(dict(document_id=document.pk,type='bank_statement' if kind=='expense' else f'{kind}_import',
+                name=document_name(document),uploaded_at=(document.uploaded_at if kind=='expense' else document.created_at).isoformat(),
+                verification='processing_limit',freshness='unavailable',selectable=False,revision=None,url=None,confirmed_fields=[]))
+    if _document_catalog(user,kind,identity)[2]!=stamp: raise SourceSelectionConflict()
+    return dict(supported=True,items=items,count=stamp['membership']['count'],limit=DOCUMENT_LIMIT,catalog_token=token,
+        checked_at=timezone.now().isoformat(),next_cursor=signing.dumps(dict(catalog=token,after=rows[DOCUMENT_LIMIT-1].pk),salt=PAGE_SALT)
+        if len(rows)>DOCUMENT_LIMIT else None)
+
+
+def _selected_documents(user, kind, row, selection, token):
+    if (kind not in ('expense','loan','investment') or not isinstance(selection,list) or not 1<=len(selection)<=DOCUMENT_LIMIT
+            or any(not isinstance(item,dict) or set(item)!= {'id','revision'} or type(item['id']) is not int or item['id']<1
+                or not isinstance(item['revision'],str) or not re.fullmatch('[a-f0-9]{64}',item['revision']) for item in selection)
+            or len({item['id'] for item in selection})!=len(selection)):
+        raise ValueError('Choose one to five distinct reviewed financial sources.')
+    current,documents,stamp=_document_catalog(user,kind,row.pk)
+    _load_catalog(token,stamp)
+    if _record_revision(row)!=_record_revision(current): raise SourceSelectionConflict()
+    chosen={item['id']:item['revision'] for item in selection}
+    rows=list(documents.filter(pk__in=chosen).order_by('pk'))
+    if len(rows)!=len(chosen): raise Http404
+    details={}; fingerprints=set()
+    for document in rows:
+        detail=_document_evidence(user,kind,row,document)
+        if detail['revision']!=chosen[document.pk] or not _document_item(kind,row,document,detail)['selectable']:
+            raise SourceSelectionConflict()
+        fingerprint=detail.get('source_fingerprint')
+        if fingerprint and fingerprint in fingerprints: raise SourceSelectionConflict()
+        if fingerprint: fingerprints.add(fingerprint)
+        details[document.pk]=detail
+    if _document_catalog(user,kind,row.pk)[2]!=stamp: raise SourceSelectionConflict()
+    return rows,details,dict(mode='explicit',selected_count=len(rows),linked_count=stamp['membership']['count'],
+        unselected_count=stamp['membership']['count']-len(rows),limit=DOCUMENT_LIMIT)
 
 
 def _amount(value, helper, status, source):
@@ -74,13 +220,17 @@ def _source(kind, identity, data, revision_data, *, available=True):
         url=reverse('canonical_evidence',kwargs={'kind':kind,'identity':identity}),data=data)
 
 
-def record_source(user, kind, identity):
+def record_source(user, kind, identity, *, selected_documents=None, source_catalog=None):
     _owner(user)
     if kind not in KINDS or type(identity) is not int or identity<1: raise Http404
     if kind=='baseline':
+        if selected_documents is not None or source_catalog is not None: raise ValueError('This record has no document selection.')
         if identity!=user.pk: raise Http404
         return baseline_source(user)
-    row=get_object_or_404(MODELS[kind],pk=identity,user=user)
+    row=_owned_record(user,kind,identity)
+    selection=None; selected_rows=None; selected_details={}
+    if selected_documents is not None or source_catalog is not None:
+        selected_rows,selected_details,selection=_selected_documents(user,kind,row,selected_documents,source_catalog)
     data=dict(record_type=kind,record_id=row.pk,verification='user_recorded',
         applicable_date=None,provenance=f'{row._meta.label} persisted fields',amounts={},
         limitations=['Canonical recorded values are not independent third-party authentication.',
@@ -92,6 +242,10 @@ def record_source(user, kind, identity):
             # Keep the bank receipt/revocation boundary; this selector must never bypass review.
             from .hybrid_intelligence import source_context
             source=source_context(user,'bank_statements',transaction_id=row.pk)[0]
+            if selection:
+                detail=selected_details[row.statement_upload_id]
+                if source['revision']!=detail['revision']: raise SourceSelectionConflict()
+                source['data'].update(document_selection=selection,document_sources=[_document_item(kind,row,selected_rows[0],detail)])
             source.update(record_type=kind,record_id=row.pk,as_of=row.transaction_date.isoformat(),
                 available=source['data']['verification']=='owner_confirmed')
             source['data'].update(record_type=kind,record_id=row.pk,applicable_date=source['as_of'])
@@ -168,17 +322,16 @@ def record_source(user, kind, identity):
             from apps.investments.services.document_evidence import evidence
             proof_fields=fields
         document_sources=[]; confirmed={field:[] for field in proof_fields}
-        # shortcut: bound reads to five source files; add explicit selection for larger histories.
-        source_limit=documents.count()>5
+        source_limit=selection is None and documents.count()>DOCUMENT_LIMIT
         if source_limit:
             available=False
             related+=list(documents.order_by('pk').values('id','parser_status')[:6])
             data['limitations'].append('More than five source documents require explicit source selection before answering.')
         else:
-            for document in documents.order_by('pk'):
-                detail=evidence(user,document.pk,row.pk)
+            for document in selected_rows if selection else documents.order_by('pk'):
+                detail=selected_details[document.pk] if selection else evidence(user,document.pk,row.pk)
                 related.append(dict(id=document.pk,revision=detail['revision'],fields=detail['fields'],source_status=detail['source_status']))
-                document_sources.append(dict(document_id=document.pk,url=detail['citation_url'],source_status=detail['source_status']))
+                document_sources.append(_document_item(kind,row,document,detail))
                 for field in proof_fields:
                     if (getattr(row,field) is not None and detail['fields'][field]['verification']=='owner_confirmed' and
                             detail['fields'][field]['current']==format(helper(getattr(row,field)),'.2f')):
@@ -186,6 +339,9 @@ def record_source(user, kind, identity):
         document_verification=('source_review_limit' if source_limit else 'owner_confirmed_document_fields' if all(confirmed.values())
             else 'imported_record_not_field_verified' if document_sources else 'user_recorded')
         data.update(document_sources=document_sources,document_verification=document_verification)
+        if selection:
+            data['document_selection']=selection
+            data['limitations'].append('Only the explicitly selected document revisions were used. Unselected documents were not read or represented as reviewed; selected evidence never establishes independent bank/broker authenticity.')
         if kind=='investment': data['verification']=document_verification
         if document_sources:
             data['limitations'].append('Field confirmation is the owner\'s attestation, not independent bank/broker authentication. Current register corrections take precedence; unconfirmed, unavailable or changed document evidence remains unverified.')

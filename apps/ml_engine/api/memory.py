@@ -32,6 +32,11 @@ class MemoryAPI(APIView):
         return response
 
     def handle_exception(self, exc):
+        from apps.ml_engine.services.canonical_evidence import SourceSelectionConflict
+        if isinstance(exc, SourceSelectionConflict):
+            response=safe_error_response(exc,'Selected financial sources changed, are unavailable or duplicate one another. Refresh the source list and review your selection.',logger_name=__name__,status_code=409)
+            response.data['code']='financial_sources_changed'
+            return response
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
         if isinstance(exc, ConversationConflict):
             return safe_error_response(exc, 'Conversation changed, expired or was cleared. Reopen it and review your draft before retrying.', logger_name=__name__, status_code=409)

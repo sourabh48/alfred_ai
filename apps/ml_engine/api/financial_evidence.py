@@ -1,12 +1,18 @@
 """Owner-only read APIs; financial evidence never accepts mutations."""
 from rest_framework.response import Response
 from .memory import MemoryAPI
-from ..services.canonical_evidence import choices, record_source
+from ..services.canonical_evidence import choices, record_source, document_page
 
 
 class FinancialEvidenceAPI(MemoryAPI):
     def get(self, request, kind=None, identity=None):
         return Response({'records':choices(request.user)} if kind is None else record_source(request.user,kind,identity))
+
+
+class FinancialSourcePageAPI(MemoryAPI):
+    def get(self, request, kind, identity):
+        if set(request.query_params)-{'cursor'} or len(request.query_params.getlist('cursor'))>1: raise ValueError('Invalid source page.')
+        return Response(document_page(request.user,kind,identity,cursor=request.query_params.get('cursor')))
 
 
 class ClosureEvidenceAPI(MemoryAPI):

@@ -206,6 +206,11 @@ class ConversationHistory:
         # Historical citations keep references only, never copied canonical amounts or memory content.
         sources = [{key:source[key] for key in ('ref','classification','url','verified_at') if key in source}
                    for source in result.get('sources', [])]
+        for source in result.get('sources', []):
+            if source.get('data', {}).get('document_selection', {}).get('mode') == 'explicit':
+                sources += [dict(ref=f"{source['ref']}-document-{item['document_id']}",
+                    classification='selected_document_reference',url=item['url'])
+                    for item in source['data']['document_sources'] if item['url'] != source.get('url')]
         turn = dict(request_id=request_id, input_digest=sha256(_json(question).encode()).hexdigest(),
                     **question, answer=result['answer'], provider='ollama', classification='ai_generated_hypothesis',
                     financial_authority=False, sources=sources, narrative_withheld=bool(result.get('narrative_withheld')),

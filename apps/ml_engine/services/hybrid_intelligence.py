@@ -44,11 +44,11 @@ class OllamaReasoner(OllamaEmbeddings):
         return message['content']
 
 
-def source_context(user,scope,document_id=None,transaction_id=None,record_type=None,record_id=None):
+def source_context(user,scope,document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None):
     if scope=='general': return []
     if scope=='financial_records':
         from .canonical_evidence import record_source
-        return [record_source(user,record_type,record_id)]
+        return [record_source(user,record_type,record_id,selected_documents=selected_documents,source_catalog=source_catalog)]
     if scope=='bank_statements':
         from apps.expenses.services.statement_evidence import evidence
         record=evidence(user,transaction_id)
@@ -116,7 +116,7 @@ def present_answer(result,scope,query=''):
     return result
 
 
-def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,cloud_consent=False,query_sensitivity='sensitive',local=None):
+def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,cloud_consent=False,query_sensitivity='sensitive',local=None):
     from .canonical_evidence import KINDS, supported_question
     owner=_owner(user)
     if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents','bank_statements','financial_records')
@@ -126,12 +126,12 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             or (scope=='bank_statements' and (type(transaction_id) is not int or transaction_id<1))
             or (scope!='bank_statements' and transaction_id is not None)
             or (scope=='financial_records' and (record_type not in KINDS or type(record_id) is not int or record_id<1))
-            or (scope!='financial_records' and (record_type is not None or record_id is not None))):
+            or (scope!='financial_records' and (record_type is not None or record_id is not None or selected_documents is not None or source_catalog is not None))):
         raise ValueError('Choose a bounded question and an owned supported source.')
     if scope in ('bank_statements','financial_records') and cloud_consent:
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied('Private financial evidence is local only.')
-    tools=source_context(user,scope,document_id,transaction_id,record_type,record_id)
+    tools=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog)
     if scope in ('financial_records','finance') and (not tools[0]['available'] or (scope=='financial_records' and not supported_question(query))):
         return {'answer':'This request is not established by available compatible evidence. Ask “Explain this record” to inspect recorded values and limitations. Forecasts, currency conversions, unknown-currency totals and unsupported questions are unavailable.',
             'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
@@ -171,7 +171,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
         if any(item['id'] not in live for item in included): raise MemoryConflict('Answer context changed during inference.')
     from django.http import Http404
-    try: fresh=source_context(user,scope,document_id,transaction_id,record_type,record_id)
+    try: fresh=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog)
     except Http404 as exc: raise MemoryConflict('Canonical source became inaccessible during inference.') from exc
     if fresh!=tools: raise MemoryConflict('Canonical source changed during inference.')
     return present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,

@@ -66,7 +66,7 @@ def _state(document, row, proof):
             currency=None, currency_status='not_recorded', provenance=f'loans.Loan.{field}')
     detail = dict(document_id=document.pk, loan_id=row.pk, document_name=document_name(document),
         fields=fields, revision=_digest([base, proof.review_generation if proof else 0]),
-        source_status=status, review_allowed=allowed, source_download_url=download,
+        source_status=status, source_fingerprint=fingerprint, review_allowed=allowed, source_download_url=download,
         applicable_date=row.updated_at.isoformat(),
         citation_url=reverse('loan_import_evidence',kwargs={'document_id':document.pk,'identity':row.pk}),
         limitations=['Owner confirmation is not bank authentication, loan-contract confirmation or closure verification.',

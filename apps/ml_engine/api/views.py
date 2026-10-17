@@ -76,7 +76,7 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
         return Response(intelligence)
 
     def post(self,request):
-        data=self.payload(('query','scope','document_id','transaction_id','record_type','record_id','cloud_consent','query_sensitivity',
+        data=self.payload(('query','scope','document_id','transaction_id','record_type','record_id','selected_documents','source_catalog','cloud_consent','query_sensitivity',
                            'conversation_id','conversation_revision','request_id'))
         store = memory_store()
         identity = data.get('conversation_id')
@@ -90,7 +90,7 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
             history = ConversationHistory(store)
             question = dict(query=data.get('query'), scope=data.get('scope','general'), document_id=data.get('document_id'))
             if 'transaction_id' in data: question['transaction_id']=data['transaction_id']
-            for key in ('record_type','record_id'):
+            for key in ('record_type','record_id','selected_documents','source_catalog'):
                 if key in data: question[key]=data[key]
             generation, saved = history.prepare(request.user, identity, data.get('conversation_revision'), data.get('request_id'), question)
             if saved:
@@ -98,7 +98,8 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
                 current_session(request)
                 return Response({**saved, 'historical':True, 'conversation':{'id':identity, 'revision':record['revision']}})
         result = hybrid_answer(store,request.user,data.get('query'),scope=data.get('scope','general'),
-            document_id=data.get('document_id'),transaction_id=data.get('transaction_id'),record_type=data.get('record_type'),record_id=data.get('record_id'),cloud_consent=data.get('cloud_consent',False),
+            document_id=data.get('document_id'),transaction_id=data.get('transaction_id'),record_type=data.get('record_type'),record_id=data.get('record_id'),
+            selected_documents=data.get('selected_documents'),source_catalog=data.get('source_catalog'),cloud_consent=data.get('cloud_consent',False),
             query_sensitivity=data.get('query_sensitivity','sensitive'))
         if identity is not None:
             current_session(request)
