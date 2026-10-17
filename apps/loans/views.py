@@ -165,6 +165,8 @@ def _create_loan_import_document(*, request, upload_file, parsed: dict, created_
     )
     if created_loans:
         document.linked_loans.set(created_loans)
+        from .services.document_evidence import capture_import
+        capture_import(document, created_loans, extraction=parsed.get('loans'))
     return document
 
 

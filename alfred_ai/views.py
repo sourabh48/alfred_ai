@@ -299,8 +299,31 @@ def investment_evidence_view(request, document_id, identity):
     except Exception as exc:
         response=JsonResponse(safe_error_details(exc, 'Investment evidence is unavailable. Existing records are preserved.', logger_name=__name__), status=503)
     else:
-        response = render(request, 'investment_evidence.html', {'evidence':detail})
+        response = render(request, 'document_field_evidence.html', {'evidence':detail,
+            'record_kind':'investment','record_module':'investments','record_id':identity})
     response['Cache-Control'] = 'no-store, private'
+    return response
+
+
+@login_required
+@require_http_methods(["GET"])
+def loan_import_evidence_view(request, document_id, identity):
+    from apps.loans.services.document_evidence import evidence
+    from alfred_ai.services.api_errors import safe_error_details
+    from alfred_ai.services.upload_limits import UploadLimitExceeded
+    from django.http import Http404
+    try:
+        detail=evidence(request.user,document_id,identity)
+    except Http404:
+        raise
+    except UploadLimitExceeded as exc:
+        response=JsonResponse(safe_error_details(exc, 'Loan source exceeds supported processing limits.', logger_name=__name__), status=413)
+    except Exception as exc:
+        response=JsonResponse(safe_error_details(exc, 'Loan evidence is unavailable. Existing records are preserved.', logger_name=__name__), status=503)
+    else:
+        response=render(request,'document_field_evidence.html',{'evidence':detail,
+            'record_kind':'loan','record_module':'loans','record_id':identity})
+    response['Cache-Control']='no-store, private'
     return response
 
 

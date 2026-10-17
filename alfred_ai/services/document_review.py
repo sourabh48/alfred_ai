@@ -900,6 +900,9 @@ def _retry_statement_document(user, document_id: int) -> dict:
 
 def _retry_loan_document(user, document_id: int) -> dict:
     document = LoanImportDocument.objects.prefetch_related("linked_loans").get(user=user, pk=document_id)
+    from apps.loans.services.document_evidence import capture_import
+    from copy import deepcopy
+    capture_import(document, list(document.linked_loans.all()))
     unavailable = _retry_source_unavailable(document, "uploaded_file", _serialize_loan)
     if unavailable is not None:
         return unavailable
@@ -913,6 +916,7 @@ def _retry_loan_document(user, document_id: int) -> dict:
     finally:
         document.uploaded_file.close()
 
+    original_extraction = deepcopy(parsed.get('loans') or [])
     accepted = _saved_corrections(payload, ("document_type", "lender", "loan_type", "loan_account_number"))
     if accepted.get("document_type"):
         parsed["document_type"] = accepted["document_type"]
@@ -951,6 +955,7 @@ def _retry_loan_document(user, document_id: int) -> dict:
         document.summary = f"{linked_count} loan record(s) are now linked to this document after retry."
         document.save(update_fields=["document_type", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary"])
         document.linked_loans.add(*created_loans)
+        capture_import(document, created_loans, extraction=original_extraction)
     else:
         document.summary = document.summary or "Retry completed, but Alfred still needs review to map structured loan rows."
         document.save(update_fields=["document_type", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary"])
@@ -2624,6 +2629,8 @@ def _apply_statement_correction(user, document_id: int, corrections: dict) -> di
 @transaction.atomic
 def _apply_loan_correction(user, document_id: int, corrections: dict) -> dict:
     document = LoanImportDocument.objects.get(user=user, pk=document_id)
+    from apps.loans.services.document_evidence import capture_import
+    capture_import(document, list(document.linked_loans.all()))
     payload = dict(document.extracted_payload or {})
     accepted = dict(payload.get("accepted_corrections") or {})
     accepted.update(corrections)
