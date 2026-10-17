@@ -141,6 +141,97 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual((row.last_salary, row.experience_years), (Decimal('12345.67'), 4.5))
         self.capture('career-decimal-salary-reload')
 
+    def memory_evaluation_fixture(self):
+        from unittest.mock import Mock
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_memory_evaluation import synthetic_embedding
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-evaluation-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,
+            ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER='',ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False))
+        embedder=Mock(); embedder.embed.side_effect=synthetic_embedding
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=embedder))
+        store=MemoryStore(root/'vault'); owner=self.scenario['user']
+        identities=[store.save_verified(owner,{'statement':text},{'source':'Synthetic owner review'},verified=True)
+            for text in ('mountain preference','I prefer the coast','I dislike the coast')]
+        self.login(); self.browser.get(self.live_server_url+'/settings/')
+        self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'memoryEvaluationExpected').find_elements(self.By.TAG_NAME,'option'))==4)
+        return store,owner,identities
+
+    def test_multi_case_memory_evaluation_metrics_citations_mobile_and_clearing(self):
+        from selenium.webdriver.support.ui import Select
+        store,owner,identities=self.memory_evaluation_fixture()
+        query=self.browser.find_element(self.By.ID,'memoryEvaluationQuery')
+        expected=Select(self.browser.find_element(self.By.ID,'memoryEvaluationExpected'))
+        query.send_keys('mountain hiking'); expected.select_by_value(identities[0]); self.memory_click('#memoryEvaluationAdd')
+        query.send_keys('coast preference'); expected.select_by_value(identities[1]); expected.select_by_value(identities[2])
+        self.memory_click('#memoryEvaluationAdd')
+        query.send_keys('astronomy <img src=x onerror="window.evaluationLeak=true">')
+        self.memory_click('#memoryEvaluationAdd')
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryEvaluationCases > li')),3)
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: '3 questions. Precision: 100.0%. Recall: 100.0%.' in self.text('memoryEvaluationResult'))
+        self.assertIn('Negative-case abstention: 100.0%',self.text('memoryEvaluationResult'))
+        self.assertIn('Owner-checked citations: 3',self.text('memoryEvaluationResult'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryEvaluationDetails > li')),3)
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryEvaluationDetails a')),3)
+        self.assertFalse(self.browser.execute_script('return Boolean(window.evaluationLeak)'))
+        self.assertIn('astronomy <img',self.text('memoryEvaluationDetails'))
+        self.browser.execute_script("document.querySelector('#memoryEvaluationForm').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('memory-evaluation-multi-case-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.querySelector('#memoryEvaluationResult').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('memory-evaluation-multi-case-mobile')
+        self.memory_click(f'#memoryEvaluationDetails a[href="/settings/#memory-{identities[0]}"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,f'memory-{identities[0]}').is_displayed())
+        self.assertIn('mountain preference',self.browser.find_element(self.By.ID,f'memory-{identities[0]}').text)
+        self.memory_click('#memoryEvaluationClear')
+        self.assertEqual(self.text('memoryEvaluationCases'),''); self.assertEqual(self.text('memoryEvaluationDetails'),'')
+        self.browser.find_element(self.By.ID,'memoryEvaluationQuery').send_keys('private synthetic draft')
+        self.memory_click('#memoryEvaluationAdd')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        for identity in ('memoryEvaluationCases','memoryEvaluationDetails','memoryEvaluationResult','memoryEvaluationFeedback'):
+            self.assertEqual(self.text(identity),'')
+        self.assertEqual(self.browser.find_element(self.By.ID,'memoryEvaluationQuery').get_property('value'),'')
+
+    def test_multi_case_memory_evaluation_stale_source_and_model_outage_keep_drafts(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.ml_engine.services.memory_learning import MemoryLearning
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        store,owner,identities=self.memory_evaluation_fixture()
+        query=self.browser.find_element(self.By.ID,'memoryEvaluationQuery')
+        Select(self.browser.find_element(self.By.ID,'memoryEvaluationExpected')).select_by_value(identities[0])
+        query.send_keys('mountain private draft'); self.memory_click('#memoryEvaluationAdd')
+        retrieve=MemoryStore.retrieve
+        def correcting(instance,user,text,**kwargs):
+            result=retrieve(instance,user,text,**kwargs)
+            MemoryLearning(store).revise(owner,[identities[0]],{'statement':'corrected mountain preference'},verified=True)
+            return result
+        with patch.object(MemoryStore,'retrieve',autospec=True,side_effect=correcting):
+            self.memory_click('#memoryEvaluationForm button[type="submit"]')
+            self.wait.until(lambda _: 'Memory changed.' in self.text('memoryEvaluationFeedback'))
+        self.assertIn('mountain private draft',self.text('memoryEvaluationCases'))
+        self.assertEqual(self.text('memoryEvaluationResult'),''); self.assertEqual(self.text('memoryEvaluationDetails'),'')
+        self.memory_click('#memoryRefreshButton')
+        self.wait.until(lambda _: 'corrected mountain preference' in self.text('memoryList'))
+        self.assertIn('An expected source changed',self.text('memoryEvaluationCases'))
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: 'cannot be substituted automatically' in self.text('memoryEvaluationFeedback'))
+        self.memory_click('#memoryEvaluationCases button')
+        current=next(record['id'] for record in store.list_memories(owner) if 'corrected' in record['content']['statement'])
+        query.send_keys('mountain retry draft'); Select(self.browser.find_element(self.By.ID,'memoryEvaluationExpected')).select_by_value(current)
+        with patch.object(MemoryStore,'retrieve',side_effect=EmbeddingUnavailable('SYNTHETIC-PRIVATE F:/synthetic/private-key.txt')):
+            self.memory_click('#memoryEvaluationForm button[type="submit"]')
+            self.wait.until(lambda _: 'Local model is unavailable.' in self.text('memoryEvaluationFeedback'))
+        self.assertEqual(query.get_property('value'),'mountain retry draft')
+        self.assertNotIn('SYNTHETIC-PRIVATE',self.text('memoryEvaluationFeedback'))
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: 'First match correct: yes.' in self.text('memoryEvaluationResult'))
+        self.browser.execute_script("document.querySelector('#memoryEvaluationResult').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('memory-evaluation-stale-source-and-retry')
+
     def test_candidate_verification_and_correction_refresh_owned_settings(self):
         from apps.ml_engine.services.persistent_memory import MemoryStore
         from tests.test_persistent_memory import SyntheticEmbeddings
