@@ -1,5 +1,6 @@
 """Bounded explicit source selection; all records/files/providers are synthetic."""
 import json
+import time
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
@@ -72,6 +73,10 @@ class FinancialSourceSelectionTests(TestCase):
                 self.assertEqual([item['document_id'] for item in items],[d.pk for d in documents])
                 self.assertEqual(page['count'],7); self.assertEqual(page['limit'],5)
                 self.assertEqual(first['items'],items[:5])
+                with patch('django.core.signing.time.time',return_value=time.time()+2):
+                    previous=sources.document_page(self.owner,kind,self.rows[kind].pk,cursor=page['page_cursor'])
+                self.assertEqual(previous['catalog_token'],page['catalog_token'])
+                self.assertEqual(previous['items'],items[:5])
                 for item in items:
                     self.assertTrue(item['selectable']); self.assertEqual(item['verification'],'owner_confirmed')
                     self.assertEqual(item['freshness'],'current_review'); self.assertTrue(item['uploaded_at'])
@@ -184,6 +189,33 @@ class FinancialSourceSelectionTests(TestCase):
         self.assertEqual(response.status_code,409)
         self.assertNotIn('SYNTHETIC-DO-NOT-RETURN',response.content.decode())
         self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_processing_limit_item_is_shown_without_hiding_other_documents(self):
+        from alfred_ai.services.upload_limits import UploadLimitExceeded
+        documents=self.documents(); original=sources._document_evidence
+        def bounded(user,kind,row,document):
+            if document.pk==documents[0].pk: raise UploadLimitExceeded()
+            return original(user,kind,row,document)
+        with patch.object(sources,'_document_evidence',side_effect=bounded):
+            page,items=self.pages()
+            self.assertEqual(len(items),7); self.assertEqual(items[0]['verification'],'processing_limit')
+            self.assertFalse(items[0]['selectable']); self.assertTrue(items[-1]['selectable'])
+            detail=investment_evidence.evidence(self.owner,documents[0].pk,self.investment.pk)
+            response=self.post(page,[dict(document_id=documents[0].pk,revision=detail['revision'])])
+            self.assertEqual(response.status_code,413)
+        self.local.reason.assert_not_called()
+
+    def test_partial_field_selection_never_certifies_unconfirmed_fields_or_original_values(self):
+        documents=self.documents(count=1); document=documents[0]
+        detail=investment_evidence.evidence(self.owner,document.pk,self.investment.pk)
+        investment_evidence.review(self.owner,document.pk,self.investment.pk,revision=detail['revision'],
+            fields=['invested_amount','monthly_sip'],confirm=True,revoke=True)
+        page,items=self.pages(); self.assertEqual(items[0]['verification'],'partially_owner_confirmed')
+        result=self.answer(page,items)['sources'][0]['data']
+        self.assertEqual(result['amounts']['current_value']['evidence_status'],'owner_confirmed_document_field')
+        for field in ('invested_amount','monthly_sip'):
+            self.assertNotEqual(result['amounts'][field]['evidence_status'],'owner_confirmed_document_field')
+            self.assertEqual(result['amounts'][field]['source_document_ids'],[])
 
     def test_paging_and_answers_are_financially_read_only_with_no_memory_promotion(self):
         self.documents(); models=tuple(type(row) for row in self.rows.values())+(type(self.account),)

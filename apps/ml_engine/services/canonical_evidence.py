@@ -130,7 +130,7 @@ def document_page(user, kind, identity, *, cursor=None):
         try: page=signing.loads(cursor,salt=PAGE_SALT,max_age=900)
         except signing.SignatureExpired as exc: raise SourceSelectionConflict() from exc
         except signing.BadSignature as exc: raise ValueError('Invalid source page.') from exc
-        if not isinstance(page,dict) or set(page)!= {'catalog','after'} or type(page['after']) is not int or page['after']<1:
+        if not isinstance(page,dict) or set(page)!= {'catalog','after'} or type(page['after']) is not int or page['after']<0:
             raise ValueError('Invalid source page.')
         token=page['catalog']; after=page['after']; _load_catalog(token,stamp)
     else: token=signing.dumps(stamp,salt=CATALOG_SALT,compress=True)
@@ -145,6 +145,7 @@ def document_page(user, kind, identity, *, cursor=None):
                 verification='processing_limit',freshness='unavailable',selectable=False,revision=None,url=None,confirmed_fields=[]))
     if _document_catalog(user,kind,identity)[2]!=stamp: raise SourceSelectionConflict()
     return dict(supported=True,items=items,count=stamp['membership']['count'],limit=DOCUMENT_LIMIT,catalog_token=token,
+        page_cursor=signing.dumps(dict(catalog=token,after=after),salt=PAGE_SALT),
         checked_at=timezone.now().isoformat(),next_cursor=signing.dumps(dict(catalog=token,after=rows[DOCUMENT_LIMIT-1].pk),salt=PAGE_SALT)
         if len(rows)>DOCUMENT_LIMIT else None)
 

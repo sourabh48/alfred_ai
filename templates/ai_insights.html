@@ -65,6 +65,20 @@
         <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
         <div class="conversation-actions"><button class="btn btn-primary" type="submit">Ask ALFRED</button>
             <span class="small text-muted">Enter for a new line · Ctrl/⌘ + Enter to send</span></div>
+        <fieldset id="intelligenceSources" class="conversation-evidence mt-3 d-none" aria-describedby="intelligenceSourcesHelp">
+            <legend class="h6">Choose financial source documents</legend>
+            <p id="intelligenceSourcesHelp" class="small">Browse every linked source. Select one to five reviewed files across pages. Only selected revisions will be used; other files are not silently included. Owner confirmation is not independent authentication.</p>
+            <p id="intelligenceSourcesStatus" class="small" role="status" aria-live="polite"></p>
+            <ul id="intelligenceSourceItems" class="list-unstyled" aria-label="Source documents on this page"></ul>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <button id="intelligenceSourcesPrevious" type="button" class="btn btn-outline-secondary btn-sm">Previous sources</button>
+                <button id="intelligenceSourcesNext" type="button" class="btn btn-outline-secondary btn-sm">Next sources</button>
+                <button id="intelligenceSourcesRefresh" type="button" class="btn btn-outline-secondary btn-sm">Refresh source list</button>
+                <button id="intelligenceSourcesReset" type="button" class="btn btn-outline-secondary btn-sm">Clear selection</button>
+            </div>
+            <p class="small mb-1">Selected across all pages</p>
+            <ul id="intelligenceSourcesSelected" class="list-unstyled small" aria-label="Selected source documents"></ul>
+        </fieldset>
     </form>
     <p id="intelligenceFeedback" role="status" aria-live="polite" class="mt-2"></p>
     <button id="intelligenceRetry" class="btn btn-outline-primary" type="button" hidden>Retry question</button>
@@ -153,5 +167,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1"></script>
-<script src="/static/js/intelligence.js?v=10"></script>
+<script src="/static/js/intelligence.js?v=11"></script>
 {% endblock %}

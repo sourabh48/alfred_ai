@@ -1009,6 +1009,92 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 invested_amount='1234.56',current_value='2345.67'), 'baseline':owner}
         return rows,local
 
+    def financial_source_selection_fixture(self,kind):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.investments.models import InvestmentImportDocument
+        from apps.investments.services import document_evidence as investment
+        from apps.loans.models import LoanImportDocument
+        from apps.loans.services import document_evidence as loan
+        rows,local=self.canonical_grounding_fixture(); row=rows[kind]; owner=self.scenario['user']
+        media=Path(self.enterContext(TemporaryDirectory(prefix='alfred-source-selection-browser-')))
+        self.enterContext(override_settings(MEDIA_ROOT=media))
+        model,service=(InvestmentImportDocument,investment) if kind=='investment' else (LoanImportDocument,loan)
+        documents=[]
+        for index in range(7):
+            document=model.objects.create(user=owner,file_name=f'Synthetic {kind} source {index+1}.pdf',
+                uploaded_file=SimpleUploadedFile('synthetic.pdf',f'%PDF-SYNTHETIC-{kind}-{index}'.encode()),parser_status='parsed')
+            getattr(document,f'linked_{kind}s').add(row); service.capture_import(document,[row])
+            service.review(owner,document.pk,row.pk,revision=service.evidence(owner,document.pk,row.pk)['revision'],
+                fields=list(service.FIELDS),confirm=True)
+            documents.append(document)
+        self.login()
+        self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type={kind}&record_id={row.pk}')
+        self.wait.until(lambda _: '7 linked files' in self.text('intelligenceSourcesStatus'))
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceSourcesNext').is_enabled())
+        return row,documents,service,local
+
+    def test_financial_sources_page_selection_limit_exact_citations_mobile_and_privacy(self):
+        row,documents,service,local=self.financial_source_selection_fixture('investment')
+        for document in documents[:4]: self.memory_click(f'#intelligenceSourceItems input[value="{document.pk}"]')
+        self.memory_click('#intelligenceSourcesNext')
+        self.wait.until(lambda _: 'Page 2' in self.text('intelligenceSourcesStatus'))
+        self.memory_click(f'#intelligenceSourceItems input[value="{documents[-1].pk}"]')
+        self.memory_click(f'#intelligenceSourceItems input[value="{documents[-2].pk}"]')
+        self.assertIn('Five-source limit',self.text('intelligenceSourcesStatus'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceSourceItems input[value="{documents[-2].pk}"]').is_selected())
+        self.memory_click('#intelligenceSourcesPrevious')
+        self.wait.until(lambda _: 'Page 1' in self.text('intelligenceSourcesStatus'))
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceSourceItems input[value="{documents[0].pk}"]').is_selected())
+        for document in documents[1:4]: self.memory_click(f'#intelligenceSourceItems input[value="{document.pk}"]')
+        self.assertIn('2/5 selected',self.text('intelligenceSourcesStatus'))
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain this record')
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: f'canonical-investment-{row.pk}' in self.text('intelligenceAnswers'))
+        self.assertIn('2,345.67 · Currency not recorded',self.text('intelligenceAnswers'))
+        for document in (documents[0],documents[-1]):
+            url=service.evidence(self.scenario['user'],document.pk,row.pk)['citation_url']
+            self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{url}"]').is_displayed())
+        self.assertNotIn('Synthetic investment source 2.pdf',self.text('intelligenceAnswers'))
+        self.assertNotIn('Synthetic investment source',json.dumps(local.reason.call_args.args[0]))
+        self.browser.execute_script("document.querySelector('#intelligenceSources').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('financial-source-picker-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.querySelector('#intelligenceSources').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('financial-source-picker-mobile')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('intelligenceSourceItems'),''); self.assertEqual(self.text('intelligenceSourcesSelected'),'')
+        self.assertEqual(self.text('intelligenceAnswers'),'')
+
+    def test_financial_sources_stale_selection_refresh_and_exact_older_loan_citation(self):
+        row,documents,service,local=self.financial_source_selection_fixture('loan')
+        self.memory_click('#intelligenceSourcesNext')
+        self.wait.until(lambda _: 'Page 2' in self.text('intelligenceSourcesStatus'))
+        document=documents[-1]
+        self.memory_click(f'#intelligenceSourceItems input[value="{document.pk}"]')
+        detail=service.evidence(self.scenario['user'],document.pk,row.pk)
+        service.review(self.scenario['user'],document.pk,row.pk,revision=detail['revision'],fields=list(service.FIELDS),confirm=True,revoke=True)
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain this record')
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'Refresh the source list' in self.text('intelligenceSourcesStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'Explain this record')
+        self.assertEqual(self.text('intelligenceAnswers'),''); local.reason.assert_not_called()
+        self.capture('financial-source-stale-draft')
+        self.memory_click('#intelligenceSourcesRefresh')
+        self.wait.until(lambda _: 'Page 1' in self.text('intelligenceSourcesStatus'))
+        self.assertNotIn('source 7.pdf',self.text('intelligenceSourcesSelected'))
+        self.memory_click('#intelligenceSourcesNext')
+        self.wait.until(lambda _: 'Page 2' in self.text('intelligenceSourcesStatus'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceSourceItems input[value="{document.pk}"]').is_enabled())
+        self.memory_click(f'#intelligenceSourceItems input[value="{documents[-2].pk}"]')
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: f'canonical-loan-{row.pk}' in self.text('intelligenceAnswers'))
+        url=service.evidence(self.scenario['user'],documents[-2].pk,row.pk)['citation_url']
+        self.memory_click(f'#intelligenceAnswers a[href="{url}"]')
+        self.wait.until(lambda _: 'owner_confirmed' in self.text('statementEvidence'))
+        self.assertIn('100.01',self.text('statementEvidence')); self.capture('financial-selected-older-loan-citation')
+
     def loan_document_fixture(self,row):
         from django.core.files.uploadedfile import SimpleUploadedFile
         from apps.loans.models import LoanImportDocument

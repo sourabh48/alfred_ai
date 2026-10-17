@@ -24,8 +24,108 @@ document.addEventListener("DOMContentLoaded", () => {
     const historyCurrent = document.getElementById("conversationHistoryCurrent");
     const historyClear = document.getElementById("conversationHistoryClear");
     const historyDisable = document.getElementById("conversationHistoryDisable");
+    const sourcePanel = document.getElementById("intelligenceSources");
+    const sourceItems = document.getElementById("intelligenceSourceItems");
+    const sourceStatus = document.getElementById("intelligenceSourcesStatus");
+    const sourceSelected = document.getElementById("intelligenceSourcesSelected");
+    const sourcePrevious = document.getElementById("intelligenceSourcesPrevious");
+    const sourceNext = document.getElementById("intelligenceSourcesNext");
+    const sourceRefresh = document.getElementById("intelligenceSourcesRefresh");
+    const sourceReset = document.getElementById("intelligenceSourcesReset");
     let active = true, generation = 0, cloudAvailable = false, pending = false;
     let historyPolicy = null, conversation = null, requestToken = null, historyBlocked = false;
+    let sourceRequest = 0, picker = null;
+    function resetSources() {
+        sourceRequest++; picker = null; sourcePanel.classList.add("d-none");
+        sourceItems.replaceChildren(); sourceSelected.replaceChildren(); sourceStatus.textContent = "";
+    }
+    function sourceControls() {
+        const locked = !active || pending || picker?.loading || picker?.blocked;
+        form.querySelector('button[type="submit"]').disabled = !active || pending || Boolean(picker?.loading);
+        sourcePrevious.disabled = locked || !picker?.index;
+        sourceNext.disabled = locked || !picker?.next;
+        sourceRefresh.disabled = !active || pending || picker?.loading;
+        sourceReset.disabled = !active || pending || picker?.loading || picker?.blocked;
+        sourceItems.querySelectorAll("input").forEach(input => { input.disabled = locked || input.dataset.selectable !== "true"; });
+        sourceSelected.querySelectorAll("button").forEach(button => { button.disabled = locked; });
+    }
+    function renderSelection() {
+        sourceSelected.replaceChildren();
+        for (const item of picker.selected.values()) {
+            const row = document.createElement("li"); row.className = "d-flex flex-wrap gap-2 align-items-center mb-2";
+            const text = document.createElement("span"); text.textContent = item.name;
+            const remove = document.createElement("button"); remove.type = "button"; remove.className = "btn btn-outline-secondary btn-sm";
+            remove.textContent = "Remove"; remove.setAttribute("aria-label", `Remove ${item.name}`);
+            remove.addEventListener("click", () => {
+                picker.explicit = true; picker.selected.delete(item.document_id);
+                const input = sourceItems.querySelector(`input[value="${item.document_id}"]`); if (input) input.checked = false;
+                renderSelection();
+            });
+            row.append(text,remove); sourceSelected.append(row);
+        }
+        if (!picker.selected.size) {
+            const item = document.createElement("li"); item.textContent = picker.explicit || picker.count > 5
+                ? "No sources selected. Select a reviewed file before sending."
+                : "Automatic review of all linked files (up to five); choose files to use explicit selection.";
+            sourceSelected.append(item);
+        }
+        sourceStatus.textContent = `Page ${picker.index + 1} · ${picker.count} linked files · ${picker.selected.size}/5 selected. ${picker.count > 5 ? 'Explicit selection required.' : ''}`;
+        sourceReset.textContent = picker.count > 5 ? "Clear selection" : "Use automatic sources";
+        sourceControls();
+    }
+    async function loadSourcePage(cursor = null, index = 0) {
+        if (!picker || pending || !active) return;
+        const request = ++sourceRequest, state = picker, ticket = generation;
+        state.loading = true; state.blocked = false; sourceStatus.textContent = "Checking source revisions…";
+        sourcePanel.classList.remove("d-none"); sourcePanel.setAttribute("aria-busy", "true"); sourceControls();
+        const [kind,id] = state.key.split(":");
+        try {
+            const page = await Alfred.fetchJSON(`/api/ai/financial-evidence/${kind}/${id}/documents/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`);
+            if (!active || ticket !== generation || request !== sourceRequest || picker !== state) return;
+            if (!page.supported || !page.count) { state.count = 0; sourcePanel.classList.add("d-none"); return; }
+            if (state.catalog && state.catalog !== page.catalog_token) throw Object.assign(new Error("The source list changed. Refresh and select current revisions."), {status:409});
+            state.catalog = page.catalog_token; state.count = page.count; state.next = page.next_cursor; state.index = index;
+            state.pages[index] = page.page_cursor; sourceItems.replaceChildren();
+            page.items.forEach(item => {
+                const row = document.createElement("li"); row.className = "mb-3";
+                const label = document.createElement("label"); label.className = "d-flex gap-2 align-items-start";
+                const input = document.createElement("input"); input.type = "checkbox"; input.value = item.document_id;
+                input.dataset.selectable = String(item.selectable); input.checked = state.selected.has(item.document_id);
+                const detail = document.createElement("span"); detail.textContent = `${item.name} · ${item.type.replaceAll('_',' ')} · uploaded ${new Date(item.uploaded_at).toLocaleDateString()} · ${item.verification.replaceAll('_',' ')} · ${item.freshness.replaceAll('_',' ')}`;
+                input.addEventListener("change", () => {
+                    if (input.checked && state.selected.size >= 5) { input.checked = false; sourceStatus.textContent = "Five-source limit reached. Remove a selected source first; your selection is preserved."; return; }
+                    state.explicit = true;
+                    if (input.checked) state.selected.set(item.document_id,item); else state.selected.delete(item.document_id);
+                    renderSelection();
+                });
+                label.append(input,detail); row.append(label);
+                if (safeCitation(item.url)) { const link = document.createElement("a"); link.href = item.url; link.textContent = "Review source"; row.append(link); }
+                sourceItems.append(row);
+            });
+            renderSelection();
+        } catch (error) {
+            if (!active || ticket !== generation || request !== sourceRequest || picker !== state) return;
+            state.blocked = true; sourceStatus.textContent = `${error.message} Refresh the source list; your question draft is preserved.`;
+            if ([401,403].includes(error.status)) forgetPrivatePage();
+        } finally {
+            if (picker === state && request === sourceRequest) { state.loading = false; sourcePanel.setAttribute("aria-busy", "false"); sourceControls(); }
+        }
+    }
+    function ensureSources() {
+        const key = active && scope.value === "financial_records" ? financialChoice.value : "";
+        if (picker?.key === key) { sourceControls(); return; }
+        resetSources();
+        if (!key) return;
+        picker = {key,loading:false,blocked:false,count:0,catalog:null,next:null,index:0,pages:[null],explicit:false,selected:new Map()};
+        loadSourcePage();
+    }
+    sourcePrevious.addEventListener("click", () => loadSourcePage(picker.pages[picker.index - 1],picker.index - 1));
+    sourceNext.addEventListener("click", () => loadSourcePage(picker.next,picker.index + 1));
+    sourceRefresh.addEventListener("click", () => { resetSources(); ensureSources(); });
+    sourceReset.addEventListener("click", () => {
+        picker.selected.clear(); picker.explicit = picker.count > 5;
+        sourceItems.querySelectorAll("input").forEach(input => { input.checked = false; }); renderSelection();
+    });
     const historyEnabled = () => Boolean(historyPolicy?.available && historyPolicy.enabled);
     function updateHistoryControls() {
         const locked = !active || pending || !historyPolicy?.available;
@@ -41,12 +141,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function clearConversation(clearDraft = false) {
         generation++; conversation = null; requestToken = null; historyBlocked = false;
+        resetSources();
         answers.replaceChildren(); empty.hidden = false; retry.hidden = true; consent.checked = false;
         if (clearDraft) { query.value = ""; historyTitle.value = ""; }
         updateHistoryControls();
     }
     function forgetPrivatePage() {
         active = false; generation++; conversation = null; historyPolicy = null; requestToken = null; historyBlocked = false;
+        resetSources();
         answers.replaceChildren(); documentChoice.replaceChildren(); statementChoice.replaceChildren(); financialChoice.replaceChildren(); empty.hidden = false;
         historyList.replaceChildren(); historyTitle.value = ""; historyConsent.checked = false; historyDays.value = "7";
         query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false;
@@ -151,7 +253,8 @@ document.addEventListener("DOMContentLoaded", () => {
         statementChoice.disabled = !statements;
         const financial = scope.value === "financial_records";
         document.getElementById("intelligenceFinancialField").classList.toggle("d-none", !financial);
-        financialChoice.disabled = !financial;
+        financialChoice.disabled = !financial || pending || !active;
+        ensureSources();
         if (resetConsent || scope.value !== "general" || !cloudAvailable || historyEnabled()) consent.checked = false;
         consent.disabled = scope.value !== "general" || !cloudAvailable || historyEnabled();
     }
@@ -196,6 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateScope();
     }
     scope.addEventListener("change", updateScope);
+    financialChoice.addEventListener("change", ensureSources);
     const requestedScope = new URLSearchParams(location.search).get("scope");
     const requestedTransaction = new URLSearchParams(location.search).get("transaction");
     const requestedDocument = new URLSearchParams(location.search).get("document");
@@ -210,6 +314,9 @@ document.addEventListener("DOMContentLoaded", () => {
         clearConversation(true);
         consent.checked = false; feedback.textContent = "New conversation. Previous messages cleared from this page."; retry.hidden = true; query.focus();
     });
+    function safeCitation(url) {
+        return ['/loans/','/expenses/','/mobility/'].includes(url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(url || "") || /^\/documents\/(investments|loans)\/\d+\/records\/\d+\/$/.test(url || "") || /^\/documents\/loan-closures\/\d+\/$/.test(url || "") || /^\/ai\/financial-records\/(expense|budget|loan|investment|baseline)\/\d+\/$/.test(url || "");
+    }
     function renderTurn(payload, result, ticket, historical = false) {
         const row = document.createElement("article");
         const userMessage = document.createElement("div"); userMessage.className = "conversation-message conversation-message--user";
@@ -234,11 +341,17 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!historical && source.source_file_status === "not_retained") {
                 const note = document.createElement("p"); note.textContent = "Verified metadata record only; original source file is not retained. This does not prove independent bank authenticity."; evidence.append(note);
             }
-            if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(source.url || "") || /^\/documents\/(investments|loans)\/\d+\/records\/\d+\/$/.test(source.url || "") || /^\/documents\/loan-closures\/\d+\/$/.test(source.url || "") || /^\/ai\/financial-records\/(expense|budget|loan|investment|baseline)\/\d+\/$/.test(source.url || "")) {
+            if (safeCitation(source.url)) {
                 const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
             }
+            if (!historical) (source.data?.document_sources || []).forEach(item => {
+                if (item.url === source.url || !safeCitation(item.url)) return;
+                const reference = document.createElement("p");
+                const link = document.createElement("a"); link.href = item.url; link.textContent = `Source document: ${item.name}`;
+                reference.append(link,document.createTextNode(` · ${item.verification.replaceAll('_',' ')} · ${item.freshness.replaceAll('_',' ')}`)); evidence.append(reference);
+            });
             if (!historical && source.data) Object.entries(source.data).forEach(([key, value]) => {
-                if (key === "metric_states" || key === "amounts" || key === "document_sources" || key === "applied_payment_source" || Object.hasOwn(source.data.amounts || {},key)) return;
+                if (["metric_states","amounts","document_sources","document_selection","applied_payment_source"].includes(key) || Object.hasOwn(source.data.amounts || {},key)) return;
                 const fact = document.createElement("p");
                 const monetary = source.classification === "canonical_financial_baseline" || key === "closure_amount";
                 const display = value === null ? "Not recorded" : monetary && typeof value === "number" ? Alfred.formatCurrency(value) : (typeof value === "object" ? JSON.stringify(value) : String(value));
@@ -268,7 +381,10 @@ document.addEventListener("DOMContentLoaded", () => {
         event.preventDefault();
         if (pending) return;
         if (!historyPolicy || historyBlocked) { feedback.textContent = "Reopen the saved conversation or reload local history status before sending. Your draft is preserved."; return; }
-        const ticket = generation, button = event.target.querySelector("button");
+        if (scope.value === "financial_records" && picker && (picker.loading || picker.blocked || ((picker.explicit || picker.count > 5) && !picker.selected.size))) {
+            feedback.textContent = "Choose current reviewed source documents, or refresh the source list before sending. Your draft is preserved."; return;
+        }
+        const ticket = generation, button = event.target.querySelector('button[type="submit"]');
         pending = true; button.disabled = true; newConversation.disabled = true; query.readOnly = true; retry.hidden = true;
         updateHistoryControls();
         answers.setAttribute("aria-busy", "true");
@@ -282,6 +398,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (scope.value === "financial_records") {
             const [kind,id] = financialChoice.value.split(":");
             payload.record_type = kind; payload.record_id = Number(id);
+            if (picker?.explicit) {
+                payload.selected_documents = [...picker.selected.values()].map(item => ({id:item.document_id,revision:item.revision}));
+                payload.source_catalog = picker.catalog;
+            }
         }
         try {
             if (historyEnabled()) {
@@ -310,7 +430,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (active && ticket === generation) {
                 feedback.textContent = `${error.message}${error.reference ? ` Reference: ${error.reference}` : ""}`;
                 retry.hidden = error.status === 409 || error.status === 429 || error.status === 400;
-                if (error.status === 409 && conversation) {
+                if (error.code === "financial_sources_changed" && picker) {
+                    picker.blocked = true; sourceStatus.textContent = "Selected evidence changed or is unavailable. Refresh the source list and select current revisions. Your draft is preserved.";
+                } else if (error.status === 409 && conversation) {
                     historyBlocked = true; feedback.textContent += " Reopen this conversation to review newer turns; your draft is preserved.";
                     await refreshHistory().catch(() => { historyPolicy = null; });
                     if (active && !conversation) feedback.textContent = "Conversation no longer available. Displayed turns cleared; your draft is preserved for a new conversation.";
