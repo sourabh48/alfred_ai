@@ -1323,6 +1323,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local.reason.assert_not_called()
         self.assertEqual(query.get_property('value'),question)
         self.memory_click('#intelligenceNew')
+        query.send_keys('Show my loan status'); self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'Show my loan status' in self.text('intelligenceAnswers'))
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceAnswers').get_attribute('aria-busy')=='false')
+        self.assertIn('Insufficient evidence.',self.text('intelligenceFeedback'))
+        self.assertEqual(query.get_property('value'),'Show my loan status'); local.reason.assert_not_called()
+        self.capture('canonical-question-domain-abstention')
+        self.memory_click('#intelligenceNew')
         def changing(payload,**kwargs):
             Investment.objects.filter(pk=row.pk).update(current_value='4567.89')
             return 'SYNTHETIC-STALE-BROWSER-ANSWER'

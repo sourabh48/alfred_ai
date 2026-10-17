@@ -132,7 +132,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied('Private financial evidence is local only.')
     tools=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog)
-    if scope in ('financial_records','finance') and (not tools[0]['available'] or (scope=='financial_records' and not supported_question(query))):
+    if scope in ('financial_records','finance') and (not tools[0]['available'] or (scope=='financial_records' and not supported_question(query,kind=record_type))):
         return {'answer':'This request is not established by available compatible evidence. Ask “Explain this record” to inspect recorded values and limitations. Forecasts, currency conversions, unknown-currency totals and unsupported questions are unavailable.',
             'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
             'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}

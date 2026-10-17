@@ -97,6 +97,16 @@ class CanonicalGroundingTests(TestCase):
         self.local.reason.side_effect=conflicting
         with self.assertRaises(MemoryConflict): self.answer('budget')
 
+    def test_mismatched_question_domain_abstains_before_retrieval_or_inference(self):
+        cases=(('expense','Show my loan status'),('budget','Show my investment'),
+            ('loan','Show my expense'),('investment','Show my EMI'),('baseline','Review my loan'))
+        for kind,question in cases:
+            with self.subTest(kind=kind),patch.object(self.store,'retrieve',side_effect=AssertionError('No mismatched context')):
+                result=self.answer(kind,query=question)
+                self.assertEqual(result['provider'],'local_evidence')
+                self.assertEqual(result['grounding'],'insufficient_evidence')
+        self.local.reason.assert_not_called(); self.cloud.assert_not_called(); self.provider.assert_not_called()
+
     def test_cloud_consent_and_outage_never_exfiltrate_private_sources(self):
         self.assertEqual(self.post(cloud_consent=True,query_sensitivity='public').status_code,403)
         self.local.reason.assert_not_called()

@@ -14,6 +14,27 @@ from tests import test_canonical_evidence as fixtures
 
 @skipUnless(os.environ.get('ALFRED_RUN_OLLAMA_GROUNDING')=='true','Explicit synthetic real-local acceptance required.')
 class CanonicalOllamaAcceptance(TestCase):
+    def test_real_local_explicit_selection_beyond_five_documents(self):
+        from tests import test_financial_source_selection as selection_fixtures
+        from apps.ml_engine.services.canonical_evidence import document_page
+        fixtures.CanonicalEvidenceTests.setUp(self)
+        selection_fixtures.FinancialSourceSelectionTests.documents(self,'loan')
+        first=document_page(self.owner,'loan',self.loan.pk)
+        second=document_page(self.owner,'loan',self.loan.pk,cursor=first['next_cursor'])
+        chosen=second['items'][-1]
+        store=MemoryStore(settings.ALFRED_MEMORY_DIR,embedder=OllamaEmbeddings())
+        with patch('apps.ml_engine.services.hybrid_intelligence.reason_with_memory',side_effect=AssertionError('No external reasoning')):
+            result=hybrid_answer(store,self.owner,'Explain this record',scope='financial_records',
+                record_type='loan',record_id=self.loan.pk,local=OllamaReasoner(),
+                selected_documents=[dict(id=chosen['document_id'],revision=chosen['revision'])],source_catalog=first['catalog_token'])
+        self.assertEqual(result['provider'],'ollama'); self.assertFalse(result['financial_authority'])
+        source=result['sources'][0]
+        self.assertEqual(source['url'],chosen['url'])
+        self.assertEqual(source['data']['document_selection']['linked_count'],7)
+        self.assertEqual(source['data']['document_selection']['selected_count'],1)
+        self.assertEqual(source['data']['amounts']['emi']['amount'],'100.01')
+        self.assertIsNone(source['data']['amounts']['emi']['currency'])
+
     def test_real_local_inference_from_owner_confirmed_loan_fields(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
         from apps.loans.models import LoanImportDocument

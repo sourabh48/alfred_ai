@@ -209,3 +209,14 @@ class CanonicalEvidenceTests(TestCase):
         for query in ('What is the weather?','Convert my balance to INR','Show total records','Predict investment prices',
                       'Approve my budget','Explain future loan','Write a cheque'):
             self.assertFalse(supported_question(query),query)
+
+    def test_record_question_subjects_match_only_the_selected_canonical_domain(self):
+        subjects={'expense':('expense','transaction'),'budget':('budget',),'loan':('loan','EMI','repayment status'),
+            'investment':('investment',),'baseline':('baseline','income','rent')}
+        for kind in subjects:
+            for owner,nouns in subjects.items():
+                for noun in nouns:
+                    self.assertEqual(supported_question(f'Show my {noun}',kind=kind),owner==kind)
+            for noun in ('record','records','values','evidence','provenance'):
+                self.assertTrue(supported_question(f'Explain this {noun}',kind=kind))
+        self.assertFalse(supported_question('Explain this record',kind='unsupported'))
