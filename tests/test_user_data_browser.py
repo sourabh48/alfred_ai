@@ -1076,6 +1076,40 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('100.0100',self.text('statementEvidence'))
         self.assertNotIn('synthetic-loan.pdf',json.dumps(local.reason.call_args.args[0]))
 
+    def test_loan_payment_reference_opens_bank_review_and_tracks_revocation(self):
+        from apps.loans.models import LoanPaymentHistory
+        bank_row,upload,bank_detail=self.bank_statement_evidence_fixture()
+        rows,local=self.canonical_grounding_fixture(); row=rows['loan']
+        LoanPaymentHistory.objects.create(loan=row,payment_date=bank_row.transaction_date,amount=bank_row.amount,
+            expense_reference=bank_row,match_status='matched',loan_effect_applied=True)
+        citation=f'/ai/financial-records/loan/{row.pk}/'
+        self.login(); self.browser.get(self.live_server_url+citation)
+        self.wait.until(lambda _: 'unverified_transaction_reference' in self.text('canonicalEvidence'))
+        self.memory_click(f'#canonicalEvidence a[href="{bank_detail["citation_url"]}"]')
+        self.wait.until(lambda _: 'needs_owner_review' in self.text('statementEvidence'))
+        self.memory_click('#statementEvidenceConfirm'); self.memory_click('#statementEvidenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'owner_confirmed' in self.text('statementEvidence'))
+        self.browser.get(self.live_server_url+citation)
+        self.wait.until(lambda _: 'owner_confirmed_statement_reference' in self.text('canonicalEvidence'))
+        self.assertIn('recorded association only',self.text('canonicalEvidence'))
+        self.capture('loan-payment-owner-statement-reference')
+        self.memory_click('#canonicalEvidence a[href^="/ai/insights/"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value')==f'loan:{row.pk}')
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Show my repayment status')
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: f'canonical-loan-{row.pk}' in self.text('intelligenceAnswers'))
+        self.assertNotIn('applied payment source:',self.text('intelligenceAnswers'))
+        self.assertNotIn('/documents/statements/',json.dumps(local.reason.call_args.args[0]))
+        self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+        self.memory_click(f'#intelligenceAnswers a[href="{citation}"]')
+        self.wait.until(lambda _: 'owner_confirmed_statement_reference' in self.text('canonicalEvidence'))
+        self.memory_click(f'#canonicalEvidence a[href="{bank_detail["citation_url"]}"]')
+        self.wait.until(lambda _: 'owner_confirmed' in self.text('statementEvidence'))
+        self.memory_click('#statementEvidenceRevoke'); self.browser.switch_to.alert.accept()
+        self.wait.until(lambda _: 'needs_owner_review' in self.text('statementEvidence') and 'owner_confirmed' not in self.text('statementEvidence'))
+        self.browser.get(self.live_server_url+citation)
+        self.wait.until(lambda _: 'unverified_transaction_reference' in self.text('canonicalEvidence'))
+
     def investment_document_fixture(self,row):
         from django.core.files.uploadedfile import SimpleUploadedFile
         from apps.investments.models import InvestmentImportDocument

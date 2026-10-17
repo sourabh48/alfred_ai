@@ -127,10 +127,27 @@ def record_source(user, kind, identity):
         data['limitations'].append('EMI is the persisted contractual installment; no new amortization or payment-date forecast is calculated. Missing remaining balance is unavailable, never principal or zero.')
         latest=row.payment_history.filter(match_status='matched',loan_effect_applied=True).order_by('-payment_date','-pk').first()
         if latest:
+            reference=dict(transaction_id=None,url=None,verification='source_not_retained',
+                evidence_status='unavailable',revision=None)
+            expense=Expense.objects.filter(pk=latest.expense_reference_id,user=user).first()
+            if latest.expense_reference_id and expense is None and Expense.objects.filter(pk=latest.expense_reference_id).exists(): raise Http404
+            if expense:
+                if expense.bank_account_id and expense.bank_account.user_id!=user.pk: raise Http404
+                reference['transaction_id']=expense.pk
+                if expense.source!='bank_statement' or expense.statement_upload_id is not None:
+                    transaction_source=record_source(user,'expense',expense.pk)
+                    reference.update(url=transaction_source['url'],revision=transaction_source['revision'],
+                        verification=transaction_source['data']['verification'],
+                        evidence_status='owner_confirmed_statement_reference' if transaction_source.get('available')
+                            and transaction_source['classification']=='owner_confirmed_statement_record' else
+                            'owner_recorded_transaction_reference' if transaction_source.get('available') else 'unverified_transaction_reference')
             related.append(dict(id=latest.pk,date=latest.payment_date.isoformat(),amount=str(latest.amount),
                 remaining_balance=str(latest.remaining_balance),expense=latest.expense_reference_id,
-                expense_revision=_digest(Expense.objects.filter(pk=latest.expense_reference_id).values().first())))
-            data.update(last_applied_payment_id=latest.pk,last_applied_payment_date=latest.payment_date.isoformat())
+                expense_revision=_digest(Expense.objects.filter(pk=latest.expense_reference_id).values().first()),
+                transaction_source=reference))
+            data.update(last_applied_payment_id=latest.pk,last_applied_payment_date=latest.payment_date.isoformat(),
+                applied_payment_source=reference)
+            data['limitations'].append('The applied-payment transaction link is a recorded association only. It does not verify matching amounts/dates, settlement allocations or bank authenticity; no payment total is recalculated.')
         closures=list(row.closure_documents.filter(verification_status='verified').values('id','closure_amount','closure_date'))
         related+=closures
         if ((row.current_status in ('closed','foreclosed','prepaid') and row.remaining_balance not in (None,0)) or
