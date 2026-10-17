@@ -177,7 +177,8 @@ class MemoryReasoningAPI(MemoryAPI):
 
 class MemoryLearningAPI(MemoryAPI):
     def get(self,request):
-        return Response({'candidates':MemoryLearning(memory_store()).candidates(request.user)})
+        return Response({'candidates':MemoryLearning(memory_store()).candidates(request.user),
+            'evaluation_min_score':settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE})
 
     def post(self,request):
         data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases','min_score'))
@@ -189,6 +190,10 @@ class MemoryLearningAPI(MemoryAPI):
         learning=MemoryLearning(memory_store()); user=request.user
         if action=='extract': return Response({'candidate_ids':learning.extract(user,data.get('text'),data.get('provenance'),sensitivity=data.get('sensitivity','sensitive'))},status=201)
         if action=='verify': return Response({'id':learning.verify(user,data.get('id'),verified=data.get('verified',False),content=data.get('content'))})
-        if action=='evaluate': return Response(learning.evaluate(user,data.get('cases'),min_score=data.get('min_score')))
+        if action=='evaluate':
+            result=learning.evaluate(user,data.get('cases'),min_score=data.get('min_score'))
+            from .conversations import current_session
+            current_session(request)
+            return Response(result)
         identities=data.get('ids') if action=='consolidate' else [data.get('id')]
         return Response({'id':learning.revise(user,identities,data.get('content'),verified=data.get('verified',False),reembed=action=='reembed')})

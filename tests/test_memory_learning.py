@@ -123,7 +123,7 @@ class MemoryLearningTests(TestCase):
         self.assertEqual(result['recall_at_3'],1); self.assertEqual(result['mean_reciprocal_rank'],0.75)
         self.assertEqual(result['top_1_accuracy'],0.5); self.assertEqual(result['false_positive_rate'],1)
         self.assertEqual(result['abstention_rate'],0)
-        with patch.object(self.store,'retrieve',return_value=[{'id':coast}]):
+        with patch.object(self.store,'retrieve',return_value=[{'id':coast,'score':1.0}]):
             missed=self.learning.evaluate(self.alice,[{'query':'mountain','expected_id':mountain}])
         self.assertEqual(missed['recall_at_3'],0); self.assertEqual(missed['mean_reciprocal_rank'],0)
         self.assertIsNone(missed['false_positive_rate'])
