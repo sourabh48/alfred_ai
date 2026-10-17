@@ -202,7 +202,12 @@ class LoanEvidenceTests(TestCase):
     def test_source_limits_and_operational_failures_are_safe(self):
         citation=self.current()['citation_url']
         with override_settings(ALFRED_UPLOAD_FILE_BYTES=8):
-            for url in (self.endpoint(),citation): self.assertEqual(self.client.get(url).status_code,413)
+            for url in (self.endpoint(),citation,f'/ai/financial-records/loan/{self.loan.pk}/'):
+                self.assertEqual(self.client.get(url).status_code,413)
         with patch.object(service,'evidence',side_effect=RuntimeError('SYNTHETIC-PRIVATE-ERROR C:/private/document.pdf')):
             response=self.client.get(citation); self.assertEqual(response.status_code,503)
             self.assertTrue(response.json()['error_id']); self.assertNotIn('SYNTHETIC-PRIVATE-ERROR',response.content.decode())
+        with patch.object(service,'file_reference',side_effect=RuntimeError('SYNTHETIC-PRIVATE-ERROR C:/private/document.pdf')):
+            for url in (self.endpoint(),citation,f'/ai/financial-records/loan/{self.loan.pk}/',f'/api/ai/financial-evidence/loan/{self.loan.pk}/'):
+                response=self.client.get(url); self.assertEqual(response.status_code,503)
+                self.assertTrue(response.json()['error_id']); self.assertNotIn('SYNTHETIC-PRIVATE-ERROR',response.content.decode())

@@ -14,6 +14,7 @@
     {% if source.data.status %}<p>Recorded loan status: {{ source.data.status }}. Contract start: {{ source.data.start_date }}. Last recorded payment: {{ source.data.last_payment_date|default:"Not recorded" }}.</p>{% endif %}
     {% if source.data.last_applied_payment_id %}<p>Canonical applied-payment reference: #{{ source.data.last_applied_payment_id }}, {{ source.data.last_applied_payment_date }}.</p>{% endif %}
     <ul>{% for note in source.data.limitations %}<li>{{ note }}</li>{% endfor %}</ul>
+    {% if source.data.document_verification %}<p>Document field review: {{ source.data.document_verification }}. Contract/register verification remains separate.</p>{% endif %}
     {% for document in source.data.document_sources %}<a href="{{ document.url }}" class="btn btn-outline-secondary mb-3">Review source document #{{ document.document_id }} fields · {{ document.source_status }}</a>{% endfor %}
     {% if source.source_download_url %}<a href="{{ source.source_download_url }}" class="btn btn-outline-secondary">Open private source file</a>{% endif %}
     {% if source.record_type == 'loan_closure' %}<a href="/ai/insights/?scope=documents&amp;document={{ source.record_id }}" class="btn btn-outline-primary">Ask ALFRED about this closure record</a>

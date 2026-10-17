@@ -139,38 +139,50 @@ def record_source(user, kind, identity):
             available=False; data['verification']='conflicting_loan_records'
     else:
         fields=('invested_amount','monthly_sip','current_value'); helper=investment_money
+        data.update(applicable_date=row.updated_at.isoformat(),asset_type=row.asset_type,market_price_as_of=None)
+        data['limitations'].append('Portfolio values are recorded positions, not live market quotes. Original import text never overrides a current corrected register value.')
+    if kind in ('loan','investment'):
         documents=row.source_documents.all()
         if documents.exclude(user=user).exists(): raise Http404
-        from apps.investments.services.document_evidence import evidence
-        related=[]; document_sources=[]; confirmed={field:[] for field in fields}
+        if kind=='loan':
+            from apps.loans.services.document_evidence import evidence, FIELDS
+            proof_fields=FIELDS
+        else:
+            from apps.investments.services.document_evidence import evidence
+            proof_fields=fields
+        document_sources=[]; confirmed={field:[] for field in proof_fields}
         # shortcut: bound reads to five source files; add explicit selection for larger histories.
-        if documents.count()>5:
+        source_limit=documents.count()>5
+        if source_limit:
             available=False
-            related=list(documents.order_by('pk').values('id','parser_status','updated_at')[:6])
+            related+=list(documents.order_by('pk').values('id','parser_status')[:6])
+            data['limitations'].append('More than five source documents require explicit source selection before answering.')
         else:
             for document in documents.order_by('pk'):
                 detail=evidence(user,document.pk,row.pk)
                 related.append(dict(id=document.pk,revision=detail['revision'],fields=detail['fields'],source_status=detail['source_status']))
                 document_sources.append(dict(document_id=document.pk,url=detail['citation_url'],source_status=detail['source_status']))
-                for field in fields:
-                    if (detail['fields'][field]['verification']=='owner_confirmed' and
+                for field in proof_fields:
+                    if (getattr(row,field) is not None and detail['fields'][field]['verification']=='owner_confirmed' and
                             detail['fields'][field]['current']==format(helper(getattr(row,field)),'.2f')):
                         confirmed[field].append(document.pk)
-        data.update(applicable_date=row.updated_at.isoformat(),asset_type=row.asset_type,market_price_as_of=None,
-            verification='source_review_limit' if not available else 'owner_confirmed_document_fields' if all(confirmed.values()) else 'imported_record_not_field_verified' if related else 'user_recorded',
-            document_sources=document_sources)
-        data['limitations'].append('Portfolio values are recorded positions, not live market quotes. Original import text never overrides a current corrected register value.')
-        if related: data['limitations'].append('Field confirmation is the owner\'s attestation, not independent broker authentication. Unconfirmed, unavailable or changed document evidence remains unverified.')
+        document_verification=('source_review_limit' if source_limit else 'owner_confirmed_document_fields' if all(confirmed.values())
+            else 'imported_record_not_field_verified' if document_sources else 'user_recorded')
+        data.update(document_sources=document_sources,document_verification=document_verification)
+        if kind=='investment': data['verification']=document_verification
+        if document_sources:
+            data['limitations'].append('Field confirmation is the owner\'s attestation, not independent bank/broker authentication. Current register corrections take precedence; unconfirmed, unavailable or changed document evidence remains unverified.')
     data['amounts']={field:_amount(getattr(row,field),helper,data['verification'],f'{row._meta.label}.{field}') for field in fields}
-    if kind=='investment':
+    if kind in ('loan','investment'):
         for field in fields:
-            data['amounts'][field].update(source_document_ids=confirmed[field])
-            if available and confirmed[field]: data['amounts'][field]['evidence_status']='owner_confirmed_document_field'
+            data['amounts'][field].update(source_document_ids=confirmed.get(field,[]))
+            if available and confirmed.get(field): data['amounts'][field]['evidence_status']='owner_confirmed_document_field'
     revision_data=dict(owner=row.user_id,record=list(MODELS[kind].objects.filter(pk=row.pk).values())[0],related=related,data=data)
     if not available:
         for value in data['amounts'].values(): value.update(amount=None,evidence_status='unavailable')
     source=_source(kind,row.pk,data,revision_data,available=available)
-    if kind=='investment' and len(document_sources)==1 and all(confirmed.values()): source['url']=document_sources[0]['url']
+    if kind in ('loan','investment') and available and len(document_sources)==1 and all(confirmed.values()):
+        source['url']=document_sources[0]['url']
     return source
 
 

@@ -268,11 +268,15 @@ def canonical_evidence_view(request, kind, identity):
     from apps.ml_engine.services.canonical_evidence import record_source
     from alfred_ai.services.api_errors import safe_error_details
     from alfred_ai.services.upload_limits import UploadLimitExceeded
+    from django.http import Http404
+    from django.core.exceptions import PermissionDenied
     try:
         source = record_source(request.user, kind, identity)
+    except (Http404, PermissionDenied):
+        raise
     except UploadLimitExceeded as exc:
         response = JsonResponse(safe_error_details(exc, 'Financial source exceeds supported processing limits.', logger_name=__name__), status=413)
-    except ValueError as exc:
+    except Exception as exc:
         response = JsonResponse(safe_error_details(exc, 'Financial evidence is unavailable. Existing records are preserved.', logger_name=__name__), status=503)
     else:
         if kind == 'expense' and source['url'].startswith('/documents/statements/'):

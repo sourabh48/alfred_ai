@@ -1055,6 +1055,27 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(self.text('statementEvidence'),'')
 
+    def test_loan_grounded_answer_opens_owner_confirmed_field_citation(self):
+        from apps.loans.services.document_evidence import evidence, review, FIELDS
+        rows,local=self.canonical_grounding_fixture(); row=rows['loan']; owner=self.scenario['user']
+        document=self.loan_document_fixture(row); detail=evidence(owner,document.pk,row.pk)
+        review(owner,document.pk,row.pk,revision=detail['revision'],fields=list(FIELDS),confirm=True)
+        self.login(); self.browser.get(self.live_server_url+f'/ai/financial-records/loan/{row.pk}/')
+        self.wait.until(lambda _: 'owner_confirmed_document_field' in self.text('canonicalEvidence'))
+        self.memory_click('#canonicalEvidence a[href^="/ai/insights/"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value')==f'loan:{row.pk}')
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain this record')
+        self.memory_click('#intelligenceForm button')
+        self.wait.until(lambda _: f'canonical-loan-{row.pk}' in self.text('intelligenceAnswers'))
+        self.assertIn('100.01 · Currency not recorded',self.text('intelligenceAnswers'))
+        self.assertNotIn('document sources: [',self.text('intelligenceAnswers'))
+        self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+        self.capture('loan-grounded-field-citation')
+        self.memory_click(f'#intelligenceAnswers a[href="{detail["citation_url"]}"]')
+        self.wait.until(lambda _: 'owner_confirmed' in self.text('statementEvidence'))
+        self.assertIn('100.0100',self.text('statementEvidence'))
+        self.assertNotIn('synthetic-loan.pdf',json.dumps(local.reason.call_args.args[0]))
+
     def investment_document_fixture(self,row):
         from django.core.files.uploadedfile import SimpleUploadedFile
         from apps.investments.models import InvestmentImportDocument

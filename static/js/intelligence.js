@@ -234,7 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!historical && source.source_file_status === "not_retained") {
                 const note = document.createElement("p"); note.textContent = "Verified metadata record only; original source file is not retained. This does not prove independent bank authenticity."; evidence.append(note);
             }
-            if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(source.url || "") || /^\/documents\/investments\/\d+\/records\/\d+\/$/.test(source.url || "") || /^\/documents\/loan-closures\/\d+\/$/.test(source.url || "") || /^\/ai\/financial-records\/(expense|budget|loan|investment|baseline)\/\d+\/$/.test(source.url || "")) {
+            if (['/loans/','/expenses/','/mobility/'].includes(source.url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(source.url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(source.url || "") || /^\/documents\/(investments|loans)\/\d+\/records\/\d+\/$/.test(source.url || "") || /^\/documents\/loan-closures\/\d+\/$/.test(source.url || "") || /^\/ai\/financial-records\/(expense|budget|loan|investment|baseline)\/\d+\/$/.test(source.url || "")) {
                 const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
             }
             if (!historical && source.data) Object.entries(source.data).forEach(([key, value]) => {
