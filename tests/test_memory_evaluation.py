@@ -1,11 +1,13 @@
 """Synthetic multi-case retrieval quality, citation, privacy and revocation tests."""
 import json
 import time
+from datetime import timedelta
 from math import nan
 from unittest.mock import patch
 
 from django.contrib.sessions.models import Session
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
+from django.utils import timezone
 
 from apps.ml_engine.services.persistent_memory import MemoryConflict, MemoryStore
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
@@ -187,6 +189,18 @@ class MemoryEvaluationTests(TestCase):
         def logging_out(store,user,query,**kwargs):
             result=retrieve(store,user,query,**kwargs); Session.objects.filter(session_key=session).delete(); return result
         with patch.object(MemoryStore,'retrieve',autospec=True,side_effect=logging_out):
+            response=self.post([dict(query='SYNTHETIC-QUERY mountain',expected_ids=[owned])])
+        self.assertEqual(response.status_code,403)
+        self.assertNotIn(owned,response.content.decode()); self.assertNotIn('per_case',response.json())
+        self.assertFalse(Session.objects.filter(session_key=session).exists())
+
+    @override_settings(SESSION_SAVE_EVERY_REQUEST=True)
+    def test_failed_evaluation_cannot_refresh_a_session_that_expired_during_retrieval(self):
+        owned=self.save('mountain'); session=self.client.session.session_key
+        def expire_and_conflict(*args,**kwargs):
+            Session.objects.filter(session_key=session).update(expire_date=timezone.now()-timedelta(seconds=1))
+            raise MemoryConflict('Synthetic concurrent correction')
+        with patch.object(MemoryStore,'retrieve',side_effect=expire_and_conflict):
             response=self.post([dict(query='SYNTHETIC-QUERY mountain',expected_ids=[owned])])
         self.assertEqual(response.status_code,403)
         self.assertNotIn(owned,response.content.decode()); self.assertNotIn('per_case',response.json())

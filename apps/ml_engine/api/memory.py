@@ -191,9 +191,12 @@ class MemoryLearningAPI(MemoryAPI):
         if action=='extract': return Response({'candidate_ids':learning.extract(user,data.get('text'),data.get('provenance'),sensitivity=data.get('sensitivity','sensitive'))},status=201)
         if action=='verify': return Response({'id':learning.verify(user,data.get('id'),verified=data.get('verified',False),content=data.get('content'))})
         if action=='evaluate':
-            result=learning.evaluate(user,data.get('cases'),min_score=data.get('min_score'))
             from .conversations import current_session
-            current_session(request)
+            try:
+                result=learning.evaluate(user,data.get('cases'),min_score=data.get('min_score'))
+            finally:
+                # Failed runs must not let SAVE_EVERY_REQUEST renew an expired session.
+                current_session(request)
             return Response(result)
         identities=data.get('ids') if action=='consolidate' else [data.get('id')]
         return Response({'id':learning.revise(user,identities,data.get('content'),verified=data.get('verified',False),reembed=action=='reembed')})
