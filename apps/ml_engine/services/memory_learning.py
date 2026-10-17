@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import time
 from math import isfinite
 from uuid import uuid4
 
@@ -9,6 +10,9 @@ from cryptography.fernet import Fernet
 
 from .persistent_memory import _owner, _json, SENSITIVITIES, MemoryConflict
 from .memory_sync import valid_id
+from .local_embeddings import EmbeddingUnavailable
+
+EVALUATION_SECONDS=60
 
 
 class MemoryLearning:
@@ -81,6 +85,7 @@ class MemoryLearning:
             sensitivity=sensitivity,verified=True,supersedes=identities)
 
     def evaluate(self,user,cases,*,min_score=None):
+        deadline=time.monotonic()+EVALUATION_SECONDS
         records={r['id']:r for r in self.store.list_memories(user)}
         if not isinstance(cases,list) or not 1<=len(cases)<=20: raise ValueError('Provide at most twenty evaluation cases.')
         if min_score is not None and (isinstance(min_score,bool) or not isinstance(min_score,(int,float)) or not isfinite(min_score) or not -1<=min_score<=1):
@@ -101,11 +106,13 @@ class MemoryLearning:
         ranks=[]; false_positives=0; negative_cases=0; per_case=[]
         total_relevant=0; total_returned=0; total_expected=0
         for index,(case,expected) in enumerate(zip(cases,expected_cases),1):
-            results=self.store.retrieve(user,case['query'],limit=3,**({'min_score':min_score} if min_score is not None else {}))
+            if time.monotonic()>=deadline: raise EmbeddingUnavailable('Local evaluation deadline exceeded.')
+            results=self.store.retrieve(user,case['query'],limit=3,deadline=deadline,**({'min_score':min_score} if min_score is not None else {}))
+            if time.monotonic()>=deadline: raise EmbeddingUnavailable('Local evaluation deadline exceeded.')
             if (not isinstance(results,list) or len(results)>3 or any(not isinstance(item,dict)
                     or not valid_id(item.get('id')) or item['id'] not in records
                     or isinstance(item.get('score'),bool) or not isinstance(item.get('score'),(int,float))
-                    or not isfinite(item['score']) for item in results)
+                    or not isfinite(item['score']) or abs(item['score'])>1.000001 for item in results)
                     or len({item['id'] for item in results})!=len(results)):
                 raise MemoryConflict('Retrieval references are no longer valid for this owner.')
             for item in results:
@@ -126,6 +133,7 @@ class MemoryLearning:
         # No partial report survives correction, deletion, expiry or owner-state changes.
         if {r['id']:r for r in self.store.list_memories(user)}!=records:
             raise MemoryConflict('Memory changed during evaluation.')
+        if time.monotonic()>=deadline: raise EmbeddingUnavailable('Local evaluation deadline exceeded.')
         return {'cases':len(cases),'positive_cases':len(ranks),'negative_cases':negative_cases,
             'recall_at_3':sum(case['recall'] for case in per_case if case['recall'] is not None)/len(ranks) if ranks else None,
             'mean_reciprocal_rank':sum(ranks)/len(ranks) if ranks else None,
@@ -137,5 +145,6 @@ class MemoryLearning:
             'exact_match_rate':sum(case['exact_match'] for case in per_case)/len(cases),
             'citation_correctness':1.0 if total_returned else None,'checked_citations':total_returned,
             'min_score':min_score,'result_limit':3,'per_case':per_case,
+            'processing_budget_seconds':EVALUATION_SECONDS,
             'privacy':'owner_only_local','source_check':'unchanged_owner_snapshot',
             'ground_truth':'user_verified','generated_hypotheses_are_facts':False}

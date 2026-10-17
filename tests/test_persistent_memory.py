@@ -6,6 +6,7 @@ import json
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 import sqlite3
+import time
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
@@ -16,7 +17,7 @@ from apps.ml_engine.services.persistent_memory import MemoryStore
 
 
 class SyntheticEmbeddings:
-    def embed(self, text):
+    def embed(self, text, *, deadline=None):
         return ([1, 0, 0] if any(term in text.lower() for term in ('mountain', 'hiking', 'peaks')) else [0, 1, 0]), 'synthetic-model-v1'
 
 
@@ -190,6 +191,19 @@ class PersistentMemoryTests(TestCase):
 
 
 class LocalEmbeddingBoundaryTests(SimpleTestCase):
+    def test_shared_deadline_reaches_model_checks_and_embedding_request(self):
+        client=OllamaEmbeddings(); deadline=time.monotonic()+60
+        with patch.object(client,'_digest',return_value='a'*64) as digest,patch.object(client,'_request',return_value={'embeddings':[[1,0]]}) as request:
+            self.assertEqual(client.embed('synthetic query',deadline=deadline)[0],[1,0])
+        self.assertEqual(digest.call_count,2)
+        self.assertTrue(all(call.kwargs=={'deadline':deadline} for call in digest.call_args_list))
+        self.assertEqual(request.call_args.kwargs,{'deadline':deadline})
+
+    def test_expired_embedding_deadline_never_opens_connection(self):
+        with patch('apps.ml_engine.services.local_embeddings.HTTPConnection') as connect,self.assertRaises(EmbeddingUnavailable):
+            OllamaEmbeddings().embed('synthetic query',deadline=time.monotonic()-1)
+        connect.assert_not_called()
+
     def test_vectors_reject_empty_zero_nan_infinite_and_malformed_values(self):
         for value in ([], [0, 0], [float('nan')], [float('inf')], [True], ['synthetic'], [1] * 4097):
             with self.assertRaises(EmbeddingUnavailable):

@@ -111,7 +111,7 @@ class MemoryLearningTests(TestCase):
         self.assertEqual(self.store.restore_owner(self.alice),1)
 
     def test_evaluation_measures_ranking_misses_and_no_match_without_retaining_queries(self):
-        def embedding(text):
+        def embedding(text, *, deadline=None):
             return ([1.0,0.0] if 'mountain' in text else [0.0,1.0]),'synthetic-quality-model'
         with patch.object(self.embedder,'embed',side_effect=embedding):
             mountain=self.store.save_verified(self.alice,{'statement':'mountain'}, {'source':'synthetic'},verified=True)

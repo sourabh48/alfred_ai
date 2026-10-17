@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const evaluationForm = document.getElementById("memoryEvaluationForm");
     const evaluationAdd = document.getElementById("memoryEvaluationAdd");
     const evaluationClear = document.getElementById("memoryEvaluationClear");
-    let cases = [], currentMemories = new Map(), previousExpected = new Set([""]), evaluationPending = false, evaluationController = null;
+    let cases = [], currentMemories = new Map(), previousExpected = new Set([""]), editorNeedsReview = false, evaluationPending = false, evaluationController = null;
     let generation = 0;
     let active = true;
     function message(text) { if (active) feedback.textContent = text; }
@@ -59,18 +59,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (added.includes("")) [...expected.options].forEach(option => { option.selected = !option.value; });
         else if (selected.some(Boolean)) expected.options[0].selected = false;
         previousExpected = new Set([...expected.selectedOptions].map(option => option.value)); clearEvaluationResult();
+        editorNeedsReview = !expected.selectedOptions.length;
     });
     query.addEventListener("input", () => { clearEvaluationResult(); evaluationControls(); });
     evaluationThreshold.addEventListener("input", clearEvaluationResult);
     evaluationAdd.addEventListener("click", () => {
         try {
             cases = boundedCases([...cases,editorCase()]); query.value = "";
-            [...expected.options].forEach(option => { option.selected = !option.value; }); previousExpected = new Set([""]);
+            [...expected.options].forEach(option => { option.selected = !option.value; }); previousExpected = new Set([""]); editorNeedsReview = false;
             clearEvaluationResult(); renderCases(); evaluationFeedback.textContent = `${cases.length} questions added. No inference has run.`;
         } catch (error) { evaluationFeedback.textContent = error.message; }
     });
     evaluationClear.addEventListener("click", () => {
-        cases = []; query.value = ""; previousExpected = new Set([""]);
+        cases = []; query.value = ""; previousExpected = new Set([""]); editorNeedsReview = false;
         [...expected.options].forEach(option => { option.selected = !option.value; });
         clearEvaluationResult(); renderCases(); evaluationFeedback.textContent = "Questions and results cleared from this page.";
     });
@@ -113,6 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const proposedDrafts = new Map([...candidates.querySelectorAll('article')].map(row => [row.dataset.candidateId,{text:row.querySelector('textarea').value,checked:row.querySelector('input[type=checkbox]').checked}]));
         const ticket = ++generation;
         evaluationController?.abort(); evaluationController = null; evaluationPending = false; clearEvaluationResult();
+        evaluationForm.setAttribute("aria-busy","false");
         evaluationControls();
         const [payload, review] = await Promise.all([Alfred.fetchJSON("/api/ai/memories/"), Alfred.fetchJSON("/api/ai/memories/learning/")]);
         if (!active || ticket !== generation) return;
@@ -205,8 +207,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         [...categories].sort().forEach(value => category.append(new Option(value,value)));
         if (categories.has(previousCategory)) category.value = previousCategory;
-        const changedExpected = selectedExpected.some(id => id && !currentMemories.has(id));
-        [...expected.options].forEach(option => { option.selected = !changedExpected && selectedExpected.includes(option.value); });
+        const changedExpected = editorNeedsReview || selectedExpected.some(id => id && !currentMemories.has(id));
+        editorNeedsReview = changedExpected;
+        [...expected.options].forEach(option => { option.selected = !changedExpected && (selectedExpected.length ? selectedExpected.includes(option.value) : !option.value); });
         previousExpected = new Set([...expected.selectedOptions].map(option => option.value));
         if (changedExpected) evaluationFeedback.textContent = "Expected memories changed. Select current sources or explicitly choose no match; your question draft is preserved.";
         renderCases();
@@ -298,6 +301,9 @@ document.addEventListener("DOMContentLoaded", () => {
         try { submitted = boundedCases([...cases,...(query.value.trim() ? [editorCase()] : [])]); }
         catch (error) { evaluationFeedback.textContent = error.message; return; }
         const controller = new AbortController(); evaluationController = controller; evaluationPending = true; evaluationControls();
+        let timedOut = false;
+        // Transport grace does not extend the server's shared processing budget.
+        const timer = setTimeout(() => { timedOut = true; controller.abort(); },75000);
         clearEvaluationResult(); evaluationForm.setAttribute("aria-busy","true"); evaluationFeedback.textContent = `Checking ${submitted.length} questions locally…`;
         try {
             const result = await Alfred.fetchJSON("/api/ai/memories/learning/", {method: "POST",signal:controller.signal,body:JSON.stringify({action:"evaluate",cases:submitted,min_score:Number(evaluationThreshold.value)})});
@@ -306,7 +312,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const single = result.cases !== 1 ? "" : result.negative_cases
                 ? (result.false_positive_rate ? "Unexpected match returned. " : "No memory returned, as expected. ")
                 : `Expected match in first three: ${result.recall_at_3 ? 'yes' : 'no'}. First match correct: ${result.top_1_accuracy ? 'yes' : 'no'}. `;
-            quality.textContent = `${single}${result.cases} questions. Precision: ${percent(result.precision)}. Recall: ${percent(result.recall)}. Top match: ${percent(result.top_1_accuracy)}. First relevant rank score (1 is best): ${result.mean_reciprocal_rank === null ? 'not applicable' : result.mean_reciprocal_rank.toFixed(3)}. Negative-case abstention: ${percent(result.abstention_rate)}. False positives: ${percent(result.false_positive_rate)}. Exact matches: ${percent(result.exact_match_rate)}. Owner-checked citations: ${result.checked_citations}.`;
+            quality.textContent = [
+                `${single}${result.cases} questions. Precision: ${percent(result.precision)}. Recall: ${percent(result.recall)}.`,
+                `Top match: ${percent(result.top_1_accuracy)}. First relevant rank score (1 is best): ${result.mean_reciprocal_rank === null ? 'not applicable' : result.mean_reciprocal_rank.toFixed(3)}.`,
+                `Negative-case abstention: ${percent(result.abstention_rate)}. False positives: ${percent(result.false_positive_rate)}. Exact matches: ${percent(result.exact_match_rate)}.`,
+                `Owner-checked citations: ${result.checked_citations}; record correctness: ${percent(result.citation_correctness)}.`,
+                `Cohort: ${result.positive_cases} with expected matches, ${result.negative_cases} no-match questions.`
+            ].join(" ");
             result.per_case.forEach(item => {
                 const row = document.createElement("li"); row.className = "memory-card";
                 const question = document.createElement("p"); question.textContent = submitted[item.case-1].query;
@@ -323,11 +335,12 @@ document.addEventListener("DOMContentLoaded", () => {
             evaluationFeedback.textContent = "Owner and current-source checks passed for this run. Results measure your relevance labels, not truth or financial authority. No queries or results saved.";
         } catch (error) {
             if (active && ticket === generation) {
-                clearEvaluationResult(); evaluationFeedback.textContent = `${error.message} Question drafts are preserved.`;
+                clearEvaluationResult(); evaluationFeedback.textContent = `${timedOut ? 'Local evaluation timed out. No partial results are displayed.' : error.message} Question drafts are preserved.`;
                 if ([401,403].includes(error.status)) { window.dispatchEvent(new Event("pagehide")); feedback.textContent = "Session is no longer available. Sign in or reload before continuing."; }
             }
         }
         finally {
+            clearTimeout(timer);
             if (evaluationController === controller) { evaluationController = null; evaluationPending = false; evaluationForm.setAttribute("aria-busy","false"); evaluationControls(); }
         }
     });
@@ -336,6 +349,7 @@ document.addEventListener("DOMContentLoaded", () => {
         active = false; generation++; list.replaceChildren(); candidates.replaceChildren(); feedback.textContent = ""; search.value = "";
         category.replaceChildren(); document.getElementById("memoryCount").textContent = "";
         evaluationController?.abort(); evaluationController = null; evaluationPending = false;
+        evaluationForm.setAttribute("aria-busy","false"); editorNeedsReview = false;
         cases = []; currentMemories.clear(); previousExpected.clear(); evaluationCases.replaceChildren();
         expected.replaceChildren(); query.value = ""; clearEvaluationResult(); evaluationFeedback.textContent = ""; evaluationThreshold.value = ""; evaluationControls();
         document.getElementById("memorySyncStatus").textContent = "";

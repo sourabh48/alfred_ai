@@ -172,6 +172,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: '3 questions. Precision: 100.0%. Recall: 100.0%.' in self.text('memoryEvaluationResult'))
         self.assertIn('Negative-case abstention: 100.0%',self.text('memoryEvaluationResult'))
         self.assertIn('Owner-checked citations: 3',self.text('memoryEvaluationResult'))
+        self.assertIn('record correctness: 100.0%',self.text('memoryEvaluationResult'))
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryEvaluationDetails > li')),3)
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryEvaluationDetails a')),3)
         self.assertFalse(self.browser.execute_script('return Boolean(window.evaluationLeak)'))
@@ -231,6 +232,40 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'First match correct: yes.' in self.text('memoryEvaluationResult'))
         self.browser.execute_script("document.querySelector('#memoryEvaluationResult').scrollIntoView({block:'start',behavior:'instant'})")
         self.capture('memory-evaluation-stale-source-and-retry')
+
+    def test_memory_evaluation_pending_pagehide_discards_late_response_and_over_limit_preserves_cases(self):
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.memory_learning import MemoryLearning
+        store,owner,identities=self.memory_evaluation_fixture()
+        query=self.browser.find_element(self.By.ID,'memoryEvaluationQuery')
+        query.send_keys('mountain pending draft'); self.memory_click('#memoryEvaluationAdd')
+        entered=threading.Event(); release=threading.Event(); self.addCleanup(release.set)
+        retrieve=MemoryStore.retrieve
+        def delayed(instance,user,text,**kwargs):
+            entered.set(); release.wait(10); return retrieve(instance,user,text,**kwargs)
+        with patch.object(MemoryStore,'retrieve',autospec=True,side_effect=delayed):
+            self.memory_click('#memoryEvaluationForm button[type="submit"]')
+            self.wait.until(lambda _: entered.is_set())
+            self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+            release.set(); self.wait.until(lambda _: type(self).active_requests==0)
+            self.assertEqual(self.text('memoryEvaluationDetails'),''); self.assertEqual(self.text('memoryEvaluationCases'),'')
+            self.assertEqual(self.text('memoryEvaluationResult'),''); self.assertEqual(query.get_property('value'),'')
+            self.assertEqual(self.browser.find_element(self.By.ID,'memoryEvaluationForm').get_attribute('aria-busy'),'false')
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'memoryEvaluationExpected').find_elements(self.By.TAG_NAME,'option'))==4)
+        self.assertEqual(self.browser.execute_script("return [...document.querySelector('#memoryEvaluationExpected').selectedOptions].map(option=>option.value)"),[''])
+        for index in range(20):
+            query.send_keys(f'synthetic question {index+1}'); self.memory_click('#memoryEvaluationAdd')
+        query.send_keys('synthetic question 21')
+        with patch.object(MemoryLearning,'evaluate',side_effect=AssertionError('An oversized cohort must not run')) as evaluate:
+            self.memory_click('#memoryEvaluationAdd')
+            self.assertIn('no cases were dropped',self.text('memoryEvaluationFeedback'))
+            self.memory_click('#memoryEvaluationForm button[type="submit"]')
+            self.assertIn('no cases were dropped',self.text('memoryEvaluationFeedback'))
+            evaluate.assert_not_called()
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryEvaluationCases > li')),20)
+        self.assertEqual(query.get_property('value'),'synthetic question 21')
+        self.capture('memory-evaluation-limit-preserves-cases')
 
     def test_candidate_verification_and_correction_refresh_owned_settings(self):
         from apps.ml_engine.services.persistent_memory import MemoryStore

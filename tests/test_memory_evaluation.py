@@ -1,5 +1,6 @@
 """Synthetic multi-case retrieval quality, citation, privacy and revocation tests."""
 import json
+import time
 from math import nan
 from unittest.mock import patch
 
@@ -7,10 +8,11 @@ from django.contrib.sessions.models import Session
 from django.test import Client, TestCase
 
 from apps.ml_engine.services.persistent_memory import MemoryConflict, MemoryStore
+from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 from tests import test_memory_learning as fixtures
 
 
-def synthetic_embedding(text):
+def synthetic_embedding(text, *, deadline=None):
     text=text.lower()
     index=0 if 'mountain' in text or 'hiking' in text else 1 if 'coast' in text else 3 if 'bike' in text else 2
     return [int(i==index) for i in range(4)],'synthetic-evaluation-v1'
@@ -140,6 +142,34 @@ class MemoryEvaluationTests(TestCase):
         with patch.object(self.store,'list_memories',side_effect=[initial,changed]),self.assertRaises(MemoryConflict):
             self.learning.evaluate(self.alice,[dict(query='mountain',expected_ids=[owned])])
 
+    def test_one_shared_budget_stops_late_results_and_all_later_queries(self):
+        clock=[100.0]; deadlines=[]
+        def slow(user,query,**kwargs):
+            deadlines.append(kwargs['deadline']); clock[0]+=61; return []
+        with patch('apps.ml_engine.services.memory_learning.time.monotonic',side_effect=lambda:clock[0]),patch.object(self.store,'retrieve',side_effect=slow) as retrieve:
+            with self.assertRaises(EmbeddingUnavailable):
+                self.learning.evaluate(self.alice,[dict(query='synthetic first',expected_ids=[]),dict(query='synthetic second',expected_ids=[])])
+        self.assertEqual(deadlines,[160.0]); self.assertEqual(retrieve.call_count,1)
+
+    def test_every_query_receives_the_same_deadline(self):
+        with patch.object(self.store,'retrieve',return_value=[]) as retrieve:
+            result=self.learning.evaluate(self.alice,[dict(query='synthetic first',expected_ids=[]),dict(query='synthetic second',expected_ids=[])])
+        self.assertEqual(retrieve.call_count,2)
+        self.assertEqual(retrieve.call_args_list[0].kwargs['deadline'],retrieve.call_args_list[1].kwargs['deadline'])
+        self.assertEqual(result['processing_budget_seconds'],60)
+
+    def test_retrieval_rejects_invalid_deadline_and_discards_an_overdue_embedding(self):
+        self.save('mountain')
+        for deadline in (True,nan,float('inf'),'later'):
+            with self.assertRaises(ValueError): self.store.retrieve(self.alice,'mountain',deadline=deadline)
+        with patch.object(self.embedder,'embed') as embed,self.assertRaises(EmbeddingUnavailable):
+            self.store.retrieve(self.alice,'mountain',deadline=time.monotonic()-1)
+        embed.assert_not_called()
+        clock=[100.0]
+        def slow(text,**kwargs): clock[0]=161.0; return synthetic_embedding(text)
+        with patch('apps.ml_engine.services.persistent_memory.time.monotonic',side_effect=lambda:clock[0]),patch.object(self.embedder,'embed',side_effect=slow):
+            with self.assertRaises(EmbeddingUnavailable): self.store.retrieve(self.alice,'mountain',deadline=160.0)
+
     def test_evaluation_is_owner_session_csrf_no_store_and_does_not_invoke_cloud_or_training(self):
         owned=self.save('mountain'); cases=[dict(query='mountain',expected_ids=[owned])]
         csrf=Client(enforce_csrf_checks=True); csrf.force_login(self.alice)
@@ -161,3 +191,21 @@ class MemoryEvaluationTests(TestCase):
         self.assertEqual(response.status_code,403)
         self.assertNotIn(owned,response.content.decode()); self.assertNotIn('per_case',response.json())
         self.assertFalse(Session.objects.filter(session_key=session).exists())
+
+    def test_evaluation_preserves_canonical_financial_rows_fingerprints_and_decimal_baseline(self):
+        from django.contrib.auth import get_user_model
+        from apps.expenses.models import Expense, BankAccount
+        from apps.budgets.models import Budget
+        from apps.loans.models import Loan, LoanPaymentHistory
+        from apps.investments.models import Investment
+        from apps.family.models import FamilyAccountLink
+        from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+        from tests.user_acceptance_scenario import seed_acceptance_user
+        self.client.logout(); owner=seed_acceptance_user(self.client)['user']
+        identity=self.save('synthetic mountain preference',owner)
+        models=(get_user_model(),BankAccount,Expense,Budget,Loan,LoanPaymentHistory,Investment,FamilyAccountLink)
+        snapshot=lambda:[list(model.objects.order_by('pk').values()) for model in models]
+        before=snapshot(); baseline=resolve_canonical_financial_baseline(owner,fresh=True)['decimal_amounts']
+        self.learning.evaluate(owner,[dict(query='mountain',expected_ids=[identity]),dict(query='astronomy',expected_ids=[])],min_score=.45)
+        self.assertEqual(snapshot(),before)
+        self.assertEqual(resolve_canonical_financial_baseline(owner,fresh=True)['decimal_amounts'],baseline)

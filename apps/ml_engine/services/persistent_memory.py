@@ -290,7 +290,7 @@ class MemoryStore:
             self._sync_dirty(db, owner)
         return record['id']
 
-    def retrieve(self, user, query, *, limit=3, cloud=False, cloud_consent=False, min_score=None):
+    def retrieve(self, user, query, *, limit=3, cloud=False, cloud_consent=False, min_score=None, deadline=None):
         owner = _owner(user)
         if not isinstance(cloud, bool) or not isinstance(cloud_consent, bool):
             raise ValueError('Cloud reasoning requires explicit boolean consent.')
@@ -300,13 +300,18 @@ class MemoryStore:
             raise ValueError('Retrieval relevance must be a finite cosine threshold.')
         if cloud and cloud_consent is not True:
             raise PermissionError('Explicit cloud reasoning consent is required.')
+        if deadline is not None:
+            if isinstance(deadline,bool) or not isinstance(deadline,(int,float)) or not isfinite(deadline):
+                raise ValueError('Choose a finite local processing deadline.')
+            if time.monotonic()>=deadline: raise EmbeddingUnavailable('Local retrieval deadline exceeded.')
         with self._transaction() as db:
             self._expire(db, owner)
             records = [self._decode(db, identity, owner, ciphertext) for identity, ciphertext in
                 db.execute('SELECT id,record FROM memories WHERE owner=? ORDER BY id', (owner,))]
+        if deadline is not None and time.monotonic()>=deadline: raise EmbeddingUnavailable('Local retrieval deadline exceeded.')
         if not records:
             return []
-        vector, model = self.embedder.embed(query)
+        vector, model = self.embedder.embed(query,**({'deadline':deadline} if deadline is not None else {}))
         validate_vector(vector)
         results = []
         # shortcut: cosine scans at most 512 owner memories; add an index before raising that bound.
@@ -325,6 +330,7 @@ class MemoryStore:
             results = [item for item in results if item['id'] in live and (min_score is None or item['score']>=min_score)][:limit]
         if cloud and any(item['sensitivity'] != 'public' for item in results):
             raise PermissionError('Private memory is not approved for cloud reasoning.')
+        if deadline is not None and time.monotonic()>=deadline: raise EmbeddingUnavailable('Local retrieval deadline exceeded.')
         return results
 
     def restore_owner(self, user):

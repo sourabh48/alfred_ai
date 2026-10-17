@@ -28,7 +28,7 @@
         <textarea id="memoryEvaluationQuery" class="form-control mb-2" rows="2" maxlength="8192" required autocomplete="off"></textarea>
         <label for="memoryEvaluationExpected" class="form-label">Expected relevant memories</label>
         <select id="memoryEvaluationExpected" class="form-select mb-2" multiple size="4" required aria-describedby="memoryEvaluationHelp"><option value="" selected>No memory should match</option></select>
-        <p id="memoryEvaluationHelp" class="small">Select multiple matches with Ctrl/⌘ or your device's selection controls. A run reads at most three results per question. All questions together must fit 8192 UTF-8 bytes. Corrections, expiry and deletion invalidate old source IDs; review rather than replace them automatically.</p>
+        <p id="memoryEvaluationHelp" class="small">Select multiple matches with Ctrl/⌘ or your device's selection controls. A run reads at most three results per question, sharing a 60-second local processing budget. All questions together must fit 8192 UTF-8 bytes. Corrections, expiry and deletion invalidate old source IDs; review rather than replace them automatically.</p>
         <label for="memoryEvaluationThreshold" class="form-label">Minimum cosine relevance (not a probability)</label>
         <input id="memoryEvaluationThreshold" class="form-control mb-2" type="number" min="-1" max="1" step="any" required>
         <button class="btn btn-outline-primary" type="submit">Check Retrieval</button>
