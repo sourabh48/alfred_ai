@@ -194,6 +194,24 @@ class MemoryStore:
                 db.execute('SELECT id,record FROM memories WHERE owner=? ORDER BY id', (owner,))]
         return [dict(id=r['id'], content=r['content'], provenance=r['provenance'], sensitivity=r['sensitivity'], verified_at=r['verified_at']) for r in records]
 
+    def retrieval_profile(self, user):
+        """Describe the owner's indexed model, without exposing vectors or private source data."""
+        owner = _owner(user)
+        with self._transaction() as db:
+            self._expire(db, owner)
+            records = [self._decode(db, identity, owner, ciphertext) for identity, ciphertext in
+                db.execute('SELECT id,record FROM memories WHERE owner=? ORDER BY id', (owner,))]
+        profiles = set()
+        for record in records:
+            model = record.get('embedding_model')
+            if not isinstance(model, str) or not 1 <= len(model) <= 256:
+                raise EmbeddingUnavailable('Indexed embedding identity is unavailable.')
+            profiles.add((sha256(model.encode()).hexdigest(), len(validate_vector(record['embedding']))))
+        if len(profiles) > 1:
+            raise EmbeddingUnavailable('Stored memories require a consistent local embedding model.')
+        identity, dimensions = next(iter(profiles), (None, None))
+        return dict(indexed_memories=len(records), embedding_identity=identity, dimensions=dimensions)
+
     def retention_days(self, user):
         with self._transaction() as db:
             return self._retention(db, _owner(user))

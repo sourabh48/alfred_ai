@@ -103,6 +103,7 @@ class MemoryLearning:
             query_bytes+=len(case['query'].encode())
             if query_bytes>8192: raise ValueError('Evaluation questions must total at most 8192 bytes.')
             expected_cases.append(set(identities))
+        profile=self.store.retrieval_profile(user)
         ranks=[]; false_positives=0; negative_cases=0; per_case=[]
         total_relevant=0; total_returned=0; total_expected=0
         for index,(case,expected) in enumerate(zip(cases,expected_cases),1):
@@ -131,7 +132,8 @@ class MemoryLearning:
                 citations=[dict(id=item['id'],rank=i,score=item['score'],relevant=item['id'] in expected,
                     url=f"/settings/#memory-{item['id']}") for i,item in enumerate(results,1)]))
         # No partial report survives correction, deletion, expiry or owner-state changes.
-        if {r['id']:r for r in self.store.list_memories(user)}!=records:
+        if (self.store.retrieval_profile(user)!=profile
+                or {r['id']:r for r in self.store.list_memories(user)}!=records):
             raise MemoryConflict('Memory changed during evaluation.')
         if time.monotonic()>=deadline: raise EmbeddingUnavailable('Local evaluation deadline exceeded.')
         return {'cases':len(cases),'positive_cases':len(ranks),'negative_cases':negative_cases,
@@ -146,5 +148,7 @@ class MemoryLearning:
             'citation_correctness':1.0 if total_returned else None,'checked_citations':total_returned,
             'min_score':min_score,'result_limit':3,'per_case':per_case,
             'processing_budget_seconds':EVALUATION_SECONDS,
+            'retrieval_context':dict(protocol='owner-cosine-top3-v1',**profile,
+                comparison='same_model_cutoff_reviewed_cases_and_source_revisions_required',cohort_persistence='none'),
             'privacy':'owner_only_local','source_check':'unchanged_owner_snapshot',
             'ground_truth':'user_verified','generated_hypotheses_are_facts':False}

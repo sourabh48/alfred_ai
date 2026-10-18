@@ -40,6 +40,9 @@ class MemoryEvaluationOllamaAcceptance(TestCase):
         measurement['embedding_model']=fresh.embedder.model
         Path(os.environ['ALFRED_DIAGNOSTIC_OUTPUT']).with_name('quality.json').write_text(json.dumps(measurement,indent=2),encoding='utf-8')
         self.assertEqual(report['citation_correctness'],1)
+        self.assertEqual(len(report['retrieval_context']['embedding_identity']),64)
+        self.assertGreater(report['retrieval_context']['dimensions'],0)
+        self.assertEqual(report['retrieval_context']['indexed_memories'],3)
         self.assertGreaterEqual(report['recall'],.5)
         self.assertEqual(fresh.list_memories(self.alice),before)
         for identity in (old,deleted,foreign): self.assertNotIn(identity,json.dumps(report))

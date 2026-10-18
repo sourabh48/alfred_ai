@@ -2,6 +2,7 @@
 import json
 import time
 from datetime import timedelta
+from hashlib import sha256
 from math import nan
 from unittest.mock import patch
 
@@ -58,6 +59,11 @@ class MemoryEvaluationTests(TestCase):
         self.assertEqual(result['checked_citations'],3); self.assertEqual(result['positive_cases'],2)
         self.assertEqual(result['negative_cases'],3)
         self.assertFalse(result['generated_hypotheses_are_facts'])
+        context=result['retrieval_context']
+        self.assertEqual(context['protocol'],'owner-cosine-top3-v1')
+        self.assertEqual(context['indexed_memories'],3); self.assertEqual(context['dimensions'],4)
+        self.assertEqual(context['embedding_identity'],sha256(b'synthetic-evaluation-v1').hexdigest())
+        self.assertEqual(context['cohort_persistence'],'none')
         ids={cite['id'] for case in result['per_case'] for cite in case['citations']}
         self.assertEqual(ids,{current,coast,contrary})
         for identity in (original,deleted,foreign,candidate): self.assertNotIn(identity,json.dumps(result))
@@ -93,6 +99,38 @@ class MemoryEvaluationTests(TestCase):
             self.assertIsNone(result[key],key)
         self.assertEqual(result['abstention_rate'],1); self.assertEqual(result['checked_citations'],0)
         self.assertEqual(result['exact_match_rate'],1)
+        self.assertIsNone(result['retrieval_context']['embedding_identity'])
+        self.assertIsNone(result['retrieval_context']['dimensions'])
+        self.assertEqual(result['retrieval_context']['indexed_memories'],0)
+
+    def test_indexed_profile_excludes_foreign_models_and_does_not_expose_model_strings_or_vectors(self):
+        owned=self.save('mountain')
+        private_label='SYNTHETIC-PRIVATE-model-identity'
+        with patch.object(self.embedder,'embed',return_value=([1,2,3],private_label)):
+            self.save('astronomy',self.bob)
+        result=self.learning.evaluate(self.alice,[dict(query='mountain',expected_ids=[owned])])
+        context=result['retrieval_context']
+        self.assertEqual(context['indexed_memories'],1); self.assertEqual(context['dimensions'],4)
+        self.assertNotIn(private_label,json.dumps(result)); self.assertNotIn('embedding_model',json.dumps(result))
+        self.assertNotIn('embedding',context)
+        foreign=self.store.retrieval_profile(self.bob)
+        self.assertEqual(foreign['embedding_identity'],sha256(private_label.encode()).hexdigest())
+        self.assertEqual(foreign['dimensions'],3)
+
+    def test_changed_index_model_profile_discards_the_entire_report(self):
+        owned=self.save('mountain'); before=self.store.retrieval_profile(self.alice)
+        with patch.object(self.store,'retrieval_profile',side_effect=[before,before|{'dimensions':3}]),self.assertRaises(MemoryConflict):
+            self.learning.evaluate(self.alice,[dict(query='mountain',expected_ids=[owned])])
+
+    def test_mixed_indexed_models_fail_before_query_embedding_without_disclosing_identifiers(self):
+        owned=self.save('mountain')
+        with patch.object(self.embedder,'embed',return_value=([1,2,3],'SYNTHETIC-PRIVATE-different-model')):
+            self.save('coast')
+        with patch.object(MemoryStore,'retrieve',side_effect=AssertionError('Mixed index must not infer')) as retrieve:
+            response=self.post([dict(query='mountain',expected_ids=[owned])])
+        self.assertEqual(response.status_code,503); retrieve.assert_not_called()
+        self.assertNotIn('SYNTHETIC-PRIVATE',response.content.decode())
+        self.assertNotIn('retrieval_context',response.json())
 
     def test_legacy_single_expected_id_and_new_labels_have_identical_metrics(self):
         identity=self.save('mountain')

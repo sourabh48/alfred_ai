@@ -309,6 +309,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await Alfred.fetchJSON("/api/ai/memories/learning/", {method: "POST",signal:controller.signal,body:JSON.stringify({action:"evaluate",cases:submitted,min_score:Number(evaluationThreshold.value)})});
             if (!active || ticket !== generation) return;
             const percent = value => value === null ? "not applicable" : `${(value*100).toFixed(1)}%`;
+            const context = result.retrieval_context;
             const single = result.cases !== 1 ? "" : result.negative_cases
                 ? (result.false_positive_rate ? "Unexpected match returned. " : "No memory returned, as expected. ")
                 : `Expected match in first three: ${result.recall_at_3 ? 'yes' : 'no'}. First match correct: ${result.top_1_accuracy ? 'yes' : 'no'}. `;
@@ -317,7 +318,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 `Top match: ${percent(result.top_1_accuracy)}. First relevant rank score (1 is best): ${result.mean_reciprocal_rank === null ? 'not applicable' : result.mean_reciprocal_rank.toFixed(3)}.`,
                 `Negative-case abstention: ${percent(result.abstention_rate)}. False positives: ${percent(result.false_positive_rate)}. Exact matches: ${percent(result.exact_match_rate)}.`,
                 `Owner-checked citations: ${result.checked_citations}; record correctness: ${percent(result.citation_correctness)}.`,
-                `Cohort: ${result.positive_cases} with expected matches, ${result.negative_cases} no-match questions.`
+                `Cohort: ${result.positive_cases} with expected matches, ${result.negative_cases} no-match questions.`,
+                context.embedding_identity ? `Indexed model fingerprint: ${context.embedding_identity.slice(0,12)}; ${context.dimensions} dimensions; ${context.indexed_memories} memories.` : "No indexed model: empty memory vault.",
+                "Compare only the same model, cutoff, reviewed questions and source revisions. This run alone cannot establish model drift."
             ].join(" ");
             result.per_case.forEach(item => {
                 const row = document.createElement("li"); row.className = "memory-card";
