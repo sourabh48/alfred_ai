@@ -42,6 +42,10 @@ The existing Memory UI displays floors, per-cohort baseline/candidate/deltas, pe
 
 Actual Ollama `quality-reviewed-cohorts-real-reference`: **1 integration test PASS**, **52.770 seconds**, all-minilm:latest, cutoff 0.45, one reused same-model reference, **quality decision REJECT**. Preferences cohort: precision **0.50**, recall **1.00**; correction/conflict cohort: precision **0.5454545**, recall **0.75**. Both: abstention/citation identity **1.00**, zero owner violations and both foreign/stale probes rejected correctly. This is broader fictional evidence than the previous three cases, not general/real-account accuracy. The first redundant same-model double run hit the 120-second budget; it returned no verdict, is preserved, and is not counted as quality success. No threshold was lowered to hide the measured failure. Distinct real-model acceptance remains unperformed; no model/runtime/provider/configuration was changed.
 
+Quality unit committed as **1de014398257dfa5c188f78e06cce754fdf33b41**. Council core reuses [release helpers](../scripts/release_gate.py), [isolated/redacted test adapters](../scripts/release_validation.py), tracked skills and the existing local Ollama transport through [development_council.py](../scripts/development_council.py). The deterministic planner selects only noncomplete feature rows explicitly marked COUNCIL_SAFE_LOCAL below. Six roles are tracked; Developer is a legitimate Codex-host/human handoff, Reviewer/Security require explicit current-source host attestations, Tester executes real isolated house suites, and Coordinator verifies the host's expressly authorized exact Git commit. The Council itself never edits/stages/commits source, changes Git refs, runs generated commands or deploys. Ollama is a provider-neutral bounded advisory and cannot approve required roles or cause a provider/quota fallback.
+
+State is owner-protected SQLite plus an escaped local HTML interface under ignored `artifacts/council/`; this is operational evidence, not another status/roadmap document. Tasks deduplicate by reviewed objective, pin base/branch/scope/full source including this tracker, preserve interrupted tests, reject changed reviews, cap retries at two and reserve advisory input/output budgets. Native profiles share the same execution deadline and require a fresh passed nonempty report, an identical retained artifact/hash and final source revalidation. State/report symlinks/hardlinks fail closed. `council-core-corrected`: **16 backend PASS**, zero failures/skips (nine Council contracts plus seven quality contracts; overlaps earlier gates). Disposable Git acceptance includes exact host commit completion/reopening, duplicate tasks, blocked approvals, source/tracker invalidation, no-test evidence, model failures/budgets, interruption, native report/budget/source contracts and safe HTML. These are not actual fresh native or production acceptance. Scoped Codex review findings on refresh, source binding, automatic commit races and evidence are addressed by regression tests and the host-only commit design. The first core run's mock-result alias produced circular test data; corrected fixture passes. Next: one real development-worktree Council cycle for the safe AI-16 unit below, then source/system/drift/privacy closure.
+
 ### Multi-case private memory retrieval evaluation — 2026-10-17
 
 Backend unit reuses [MemoryLearning.evaluate](../apps/ml_engine/services/memory_learning.py) and the existing session/CSRF/no-store API. It accepts legacy single expected_id or an owner-reviewed expected_ids set per question, capped at 20 cases/8192 total UTF-8 query bytes/three returned references per case. Reports include per-case IDs, ranked owner citations, relevance/miss counts, precision/recall and abstention, plus aggregate precision, recall, ranking, exact match and negative-case false-positive/abstention metrics. Empty denominators remain not applicable. Citation correctness means current owner/record identity, not semantic truth or bank authenticity. Conflicting owner-confirmed statements can both be relevant and are never resolved or promoted by evaluation.
@@ -146,8 +150,8 @@ The denominator remains the original 143 audited capabilities, not new commit/su
 - BLOCKED_EXTERNAL: **3**
 - COMPLETE_VERIFIED: **64**
 - IMPLEMENTED_NOT_ACCEPTED: **32**
-- NOT_IMPLEMENTED: **13**
-- PARTIALLY_IMPLEMENTED: **26**
+- NOT_IMPLEMENTED: **11**
+- PARTIALLY_IMPLEMENTED: **28**
 
 Technical completion: **64/143 = 44.8%**. Remaining: **79**, including implemented but unaccepted and approval/external blockers. This is not a product acceptance percentage.
 
@@ -810,7 +814,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [multi-case/privacy/deadline](../tests/test_memory_evaluation.py), [learning compatibility](../tests/test_memory_learning.py), [separate real-local fixture](../tests/test_memory_evaluation_ollama.py), [Chrome](../tests/test_user_data_browser.py). Actual focused execution and measured synthetic metrics are recorded above; no statistical/general model accuracy claim.
 - Acceptance: synthetic backend/Chrome and bounded real-local embedding fixture PASS above; real-account, sustained outcome and production acceptance PENDING. No real provider enabled.
 - Limitations/dependencies: multi-case relevance/citation/abstention evaluation, explicit conflicting labels, current-source rejection and owner-indexed model fingerprints exist. Sustained drift, calibration and chronological production quality remain unestablished. Owner label relevance never proves claim truth; identical model fingerprints do not establish equivalent cohorts.
-- Next: reviewed synthetic cohort comparisons and explicit drift criteria, without private query persistence or autonomous training.
+- Next: [COUNCIL_SAFE_LOCAL] Explain per-case synthetic misses and unexpected source labels with cohort/policy identity in the existing comparison UI. No model tuning, private data, training or activation.
 
 ### AI-17 — Autonomous user task execution
 
@@ -1529,14 +1533,14 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### COUNCIL-02 — Planning/coding/review/security multi-agent application
 
-**NOT_IMPLEMENTED** · AI Council and developer intelligence · P2.
+**PARTIALLY_IMPLEMENTED** · AI Council and developer intelligence · P2.
 
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
-- APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
-- Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
-- Limitations/dependencies: Codex skills/hooks and inference routing do not form a working product AI Council. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Confirm original role/approval scope; build separately only after core completion.
+- Source: [development Council](../scripts/development_council.py), [existing skills](../.agents/skills/alfred-project-context/SKILL.md), [local Ollama adapter](../apps/ml_engine/services/hybrid_intelligence.py).
+- APIs/UI/models: development-only CLI and local escaped HTML status; owner-protected operational SQLite under ignored artifacts. No coding/production HTTP endpoint.
+- Tests: [Council contracts](../tests/test_development_council.py); actual focused counts/evidence above.
+- Acceptance: disposable Git cycle PASS; real development-worktree feature cycle pending below. Not unattended development or production acceptance.
+- Limitations/dependencies: deterministic Planner, Codex-host/human Developer/Reviewer/Security, isolated Tester and commit-verifying Coordinator. Optional local advice never approves a role. No autonomous patch execution, production operations, paid-provider routing or quota bypass.
+- Next: Prove one scoped real-source cycle using the AI-16 safe unit, then expand only reviewed tasks.
 
 ### COUNCIL-03 — Experimental self-improvement engine
 
@@ -1553,23 +1557,23 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **PARTIALLY_IMPLEMENTED** · AI Council and developer intelligence · P2.
 
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
-- APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
-- Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
-- Limitations/dependencies: Development Markdown checkpoints and runtime queues exist; persistent multi-agent task ownership/conflict resolution is absent. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Reuse checkpoint conventions, not a second hidden autonomous Git system.
+- Source: [persistent Council task state](../scripts/development_council.py).
+- APIs/UI/models: transactional task revisions, duplicate objectives, current-source role receipts, two-attempt limits, interrupted-worker leases and resumable host-commit verification.
+- Tests: [Council contracts](../tests/test_development_council.py), including restart and stale-source failures.
+- Acceptance: disposable local recovery PASS; host usage-limit behavior is a blocked handoff, not a simulated quota success.
+- Limitations/dependencies: SQLite/HTML holds only safe operational metadata; PROJECT_STATUS remains the single tracker. No scheduler launching endless task loops; no cloud context export or replacement Codex authentication.
+- Next: Exercise real-source pause/resume and completion, preserve evidence on every failure.
 
 ### COUNCIL-05 — AI development budget and human Git approval
 
-**NOT_IMPLEMENTED** · AI Council and developer intelligence · P2.
+**PARTIALLY_IMPLEMENTED** · AI Council and developer intelligence · P2.
 
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
-- APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
-- Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
-- Limitations/dependencies: Product-level council has no demonstrated policy engine; operator release approvals are distinct. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Require exact-SHA approvals, sandbox tests and no force pushes if council approved.
+- Source: [Council policy and evidence](../scripts/development_council.py), [existing release boundary](../scripts/release_gate.py).
+- APIs/UI/models: bounded contexts/reservations/output/iterations, shared execution deadline, explicit host reviews and authorization reference for exact immutable commit verification. No Council Git writes.
+- Tests: [Council budget/scope/approval contracts](../tests/test_development_council.py).
+- Acceptance: synthetic budget/failure/approval contracts PASS; actual source cycle pending. Paid providers remain unapproved/unimplemented in Council.
+- Limitations/dependencies: host attestations are explicit operator/Codex evidence, not cryptographic proof of account quota. Token values are conservative reservations; no invented measured usage. Previous deployment/recovery approvals never authorize Council production changes.
+- Next: Keep source verification, development commit authorization and production approval separate; no automatic fallback/spending/deployment.
 
 ### RUNTIME-01 — Native launcher, tray, worker and scheduler
 
