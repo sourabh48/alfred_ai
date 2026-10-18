@@ -376,6 +376,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await Alfred.fetchJSON("/api/ai/memories/learning/", {method:"POST",signal:controller.signal,body:JSON.stringify({action:"compare",baseline_model:baselineModel.value,candidate_model:candidateModel.value})});
             if (!active || ticket !== generation) return;
             comparisonStatus.textContent = `${result.decision.replaceAll("_"," ")}. Active model unchanged. Fictional cohort evidence does not establish general accuracy or sustained drift.`;
+            const execution=result.candidate_execution === 'baseline_reference_reused' ? 'one same-model reference; no independent candidate measured' : result.candidate_execution === 'independent_model_run' ? 'independent baseline and candidate measurements' : 'incomplete model evidence; no independent comparison established';
+            const contract=document.createElement("p"); contract.textContent=`Review contract ${result.cohort_id.slice(0,12)} · policy ${result.policy.version} · ${execution}.`; comparisonResults.append(contract);
             result.reasons.forEach(reason => { const row=document.createElement("p"); row.textContent=reason.replaceAll("_"," "); comparisonResults.append(row); });
             (result.candidate?.results || []).forEach(cohort => {
                 const row=document.createElement("article"); row.className="memory-card";
@@ -385,7 +387,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     const line=document.createElement("p"); line.textContent=`${item.metric.replaceAll("_"," ")}: baseline ${(item.baseline*100).toFixed(1)}%, candidate ${(item.candidate*100).toFixed(1)}%, change ${(item.delta*100).toFixed(1)} percentage points.`; row.append(line);
                 });
                 const guard=document.createElement("p"); guard.textContent=`Owner violations: ${cohort.owner_violations}; foreign reference rejected: ${cohort.owner_reference_rejected}; stale source rejected: ${cohort.stale_rejected}.`; row.append(guard);
-                const cases=document.createElement("p"); cases.textContent=cohort.per_case.map(item => `Case ${item.case}: ${item.matched} relevant, ${item.irrelevant} unexpected, ${item.missed} missed${item.abstained ? ", abstained" : ""}`).join(" · "); row.append(cases); comparisonResults.append(row);
+                const context=document.createElement("p"); context.textContent=`Indexed candidate model ${cohort.context.embedding_identity.slice(0,12)} · ${cohort.context.dimensions} dimensions. Source labels below belong only to this fictional contract.`; row.append(context);
+                cohort.per_case.forEach(item => {
+                    const detail=document.createElement("details"), title=document.createElement("summary"); title.textContent=`Case ${item.case}: ${item.matched} relevant, ${item.irrelevant} unexpected, ${item.missed} missed${item.abstained ? ', abstained' : ''}`;
+                    const question=document.createElement("p"); question.textContent=`Fictional question: ${item.fictional_question}`;
+                    const labels=document.createElement("p"); labels.textContent=`Expected: ${item.expected_sources.join(', ') || 'no match'}. Returned: ${item.returned_sources.join(', ') || 'no match'}. Unexpected: ${item.unexpected_sources.join(', ') || 'none'}. Missing: ${item.missing_sources.join(', ') || 'none'}.`;
+                    detail.append(title,question,labels); row.append(detail);
+                }); comparisonResults.append(row);
             });
         } catch (error) {
             if (active && ticket===generation) {

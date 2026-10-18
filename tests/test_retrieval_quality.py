@@ -7,6 +7,7 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+from apps.ml_engine.services.persistent_memory import MemoryConflict
 from apps.ml_engine.services.retrieval_quality import COHORTS, MODELS, POLICY, _BudgetedEmbeddings, assess, compare
 from tests import test_memory_learning as fixtures
 
@@ -52,6 +53,10 @@ class RetrievalQualityTests(TestCase):
             self.assertEqual(result['owner_violations'],0)
             self.assertTrue(result['owner_reference_rejected']); self.assertTrue(result['stale_rejected'])
             self.assertEqual(len(result['per_case']),12)
+            for case in result['per_case']:
+                self.assertEqual(case['unexpected_sources'],[]); self.assertEqual(case['missing_sources'],[])
+                self.assertEqual(set(case['expected_sources']),set(case['returned_sources']))
+                self.assertNotIn('citations',case); self.assertNotIn('expected_ids',case)
         before,after = report['baseline']['results'][0],report['candidate']['results'][0]
         self.assertNotEqual(before['context']['embedding_identity'],after['context']['embedding_identity'])
         self.assertEqual(self.store.list_memories(self.alice),[])
@@ -61,6 +66,7 @@ class RetrievalQualityTests(TestCase):
         self.assertEqual(report['decision'],'REJECT'); self.assertFalse(report['runtime_changed'])
         self.assertTrue(any(reason.endswith('recall_regression') for reason in report['reasons']))
         self.assertLess(report['candidate']['results'][0]['recall'],1)
+        self.assertEqual(report['candidate']['results'][0]['per_case'][0]['missing_sources'],['trail','corrected'])
 
     def test_identical_model_uses_one_reference_and_is_not_new_model_promotion_evidence(self):
         baseline=contract_comparison()['baseline']
@@ -69,6 +75,13 @@ class RetrievalQualityTests(TestCase):
         measure.assert_called_once()
         self.assertEqual(result['decision'],'REFERENCE_ONLY')
         self.assertEqual(result['candidate_execution'],'baseline_reference_reused')
+
+    def test_guard_failure_rejects_without_claiming_completed_model_measurements(self):
+        with patch('apps.ml_engine.services.retrieval_quality._measure',side_effect=MemoryConflict('Synthetic stale source')):
+            report=compare(*MODELS)
+        self.assertEqual(report['decision'],'REJECT')
+        self.assertIsNone(report['baseline']); self.assertIsNone(report['candidate'])
+        self.assertNotIn('candidate_execution',report)
 
     def test_thresholds_boundaries_missing_metrics_tamper_and_incomparable_cohorts(self):
         report=contract_comparison(); baseline=report['baseline']

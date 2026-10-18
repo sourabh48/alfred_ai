@@ -105,6 +105,15 @@ def _measure(adapter, deadline):
             store.delete_memory(owner, ids['deleted'])
             cases = [dict(query=query, expected_ids=[ids[key] for key in expected]) for query, expected in cohort['cases']]
             report = learning.evaluate(owner, cases, min_score=.45)
+            aliases={identity:key for key,identity in ids.items()}
+            explanations=[]
+            for case, (question, expected) in zip(report['per_case'],cohort['cases']):
+                returned=[aliases[cite['id']] for cite in case['citations']]
+                explanations.append(dict(
+                    **{key:value for key,value in case.items() if key not in ('expected_ids','citations')},
+                    fictional_question=question, expected_sources=list(expected), returned_sources=returned,
+                    unexpected_sources=[key for key in returned if key not in expected],
+                    missing_sources=[key for key in expected if key not in returned]))
             forbidden = {ids[old], ids['deleted'], ids['foreign']}
             violations = sum(cite['id'] in forbidden for case in report['per_case'] for cite in case['citations'])
             try:
@@ -127,8 +136,7 @@ def _measure(adapter, deadline):
                 abstention_rate=report['abstention_rate'], citation_correctness=report['citation_correctness'],
                 owner_violations=violations, owner_reference_rejected=owner_rejected, stale_rejected=stale_rejected,
                 context=report['retrieval_context'],
-                per_case=[{key: value for key, value in case.items() if key not in ('expected_ids', 'citations')}
-                    for case in report['per_case']]))
+                per_case=explanations))
     if len({(r['context']['embedding_identity'],r['context']['dimensions']) for r in results}) != 1:
         raise EmbeddingUnavailable('Local embedding model changed between cohorts.')
     return dict(cohort_id=COHORT_ID, cutoff=.45, results=results)

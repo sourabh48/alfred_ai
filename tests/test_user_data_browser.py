@@ -210,6 +210,11 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.memory_click('#memoryComparisonForm button')
             self.wait.until(lambda _: 'ELIGIBLE FOR REVIEW' in self.text('memoryComparisonStatus'))
         self.assertIn('Active model unchanged',self.text('memoryComparisonStatus'))
+        self.assertIn('policy synthetic-retrieval-v1',self.text('memoryComparisonResults'))
+        self.assertIn('independent baseline and candidate measurements',self.text('memoryComparisonResults'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryComparisonResults details')),24)
+        self.memory_click('#memoryComparisonResults details summary')
+        self.assertIn('Expected: trail, corrected',self.text('memoryComparisonResults'))
         self.assertIn('24 questions per model',self.text('memoryComparisonPolicy'))
         self.assertIn('candidate 100.0%',self.text('memoryComparisonResults'))
         self.assertIn('stale source rejected: true',self.text('memoryComparisonResults'))
@@ -218,6 +223,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.querySelector('#memoryComparisonStatus').scrollIntoView({block:'start',behavior:'instant'})")
         self.capture('reviewed-synthetic-model-comparison-mobile')
         self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),390)
+        guarded=report|dict(decision='REJECT',baseline=None,candidate=None,differences=[],reasons=['source_or_owner_revalidation_failed'])
+        guarded.pop('candidate_execution')
+        with patch('apps.ml_engine.services.retrieval_quality.compare',return_value=guarded):
+            self.memory_click('#memoryComparisonForm button')
+            self.wait.until(lambda _: 'incomplete model evidence' in self.text('memoryComparisonResults'))
+        self.assertNotIn('independent baseline and candidate measurements',self.text('memoryComparisonResults'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryComparisonResults article')),0)
         from threading import Event
         started,finish=Event(),Event()
         def delayed_comparison(*args,**kwargs):
