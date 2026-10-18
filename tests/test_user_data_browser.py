@@ -80,6 +80,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.get(self.live_server_url + "/login/")
         self.browser.find_element(self.By.NAME, "username").send_keys(username)
         self.browser.find_element(self.By.NAME, "password").send_keys(PASSWORD)
+        self.wait.until(lambda driver: driver.execute_script("return !document.getAnimations().some(a => a.playState === 'running' && a.effect?.target?.closest('.auth-panel'))"))
         self.browser.find_element(self.By.CSS_SELECTOR, 'button[type="submit"]').click()
         self.wait.until(lambda driver: driver.find_elements(self.By.ID, "dashboardPeriodNote"))
         self.wait.until(lambda driver: self.text("dashboardPeriodNote") and "Loading" not in self.text("dashboardPeriodNote"))
@@ -198,6 +199,56 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         for identity in ('memoryEvaluationCases','memoryEvaluationDetails','memoryEvaluationResult','memoryEvaluationFeedback'):
             self.assertEqual(self.text(identity),'')
         self.assertEqual(self.browser.find_element(self.By.ID,'memoryEvaluationQuery').get_property('value'),'')
+
+    def test_reviewed_synthetic_model_comparison_verdict_metrics_outage_and_mobile(self):
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from tests.test_retrieval_quality import contract_comparison
+        self.enterContext(override_settings(ALFRED_SYNTHETIC_QUALITY_ENABLED=True))
+        self.memory_evaluation_fixture()
+        report=contract_comparison()
+        with patch('apps.ml_engine.services.retrieval_quality.compare',return_value=report):
+            self.memory_click('#memoryComparisonForm button')
+            self.wait.until(lambda _: 'ELIGIBLE FOR REVIEW' in self.text('memoryComparisonStatus'))
+        self.assertIn('Active model unchanged',self.text('memoryComparisonStatus'))
+        self.assertIn('24 questions per model',self.text('memoryComparisonPolicy'))
+        self.assertIn('candidate 100.0%',self.text('memoryComparisonResults'))
+        self.assertIn('stale source rejected: true',self.text('memoryComparisonResults'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryComparisonResults article')),2)
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.browser.execute_script("document.querySelector('#memoryComparisonStatus').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('reviewed-synthetic-model-comparison-mobile')
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),390)
+        from threading import Event
+        started,finish=Event(),Event()
+        def delayed_comparison(*args,**kwargs):
+            started.set(); finish.wait(10); return report
+        with patch('apps.ml_engine.services.retrieval_quality.compare',side_effect=delayed_comparison):
+            self.memory_click('#memoryComparisonForm button')
+            self.wait.until(lambda _: started.is_set())
+            self.memory_click('#memoryRefreshButton')
+            self.wait.until(lambda _: 'cancelled by refresh' in self.text('memoryComparisonStatus'))
+            finish.set()
+            self.browser.execute_async_script('const done=arguments[0];setTimeout(done,400)')
+        self.assertEqual(self.text('memoryComparisonResults'),'')
+        self.assertNotIn('Comparing',self.text('memoryComparisonStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'memoryComparisonForm').get_attribute('aria-busy'),'false')
+        started.clear(); finish.clear()
+        with patch('apps.ml_engine.services.retrieval_quality.compare',side_effect=delayed_comparison):
+            self.memory_click('#memoryComparisonForm button')
+            self.wait.until(lambda _: started.is_set())
+            with patch('apps.ml_engine.services.memory_learning.MemoryLearning.candidates',side_effect=EmbeddingUnavailable('SYNTHETIC refresh unavailable')):
+                self.memory_click('#memoryRefreshButton')
+                self.wait.until(lambda _: 'Local model is unavailable' in self.text('memoryFeedback'))
+            self.assertIn('cancelled by refresh',self.text('memoryComparisonStatus'))
+            self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,'#memoryComparisonForm button').is_enabled())
+            finish.set()
+        with patch('apps.ml_engine.services.retrieval_quality.compare',side_effect=EmbeddingUnavailable('SYNTHETIC-PRIVATE outage')):
+            self.memory_click('#memoryComparisonForm button')
+            self.wait.until(lambda _: 'Comparison incomplete:' in self.text('memoryComparisonStatus'))
+        self.assertEqual(self.text('memoryComparisonResults'),'')
+        self.assertNotIn('SYNTHETIC-PRIVATE',self.text('memoryComparisonStatus'))
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('memoryComparisonStatus'),'')
 
     def test_multi_case_memory_evaluation_stale_source_and_model_outage_keep_drafts(self):
         from selenium.webdriver.support.ui import Select

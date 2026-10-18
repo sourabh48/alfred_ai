@@ -17,6 +17,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const evaluationForm = document.getElementById("memoryEvaluationForm");
     const evaluationAdd = document.getElementById("memoryEvaluationAdd");
     const evaluationClear = document.getElementById("memoryEvaluationClear");
+    const comparisonForm = document.getElementById("memoryComparisonForm"), comparisonStatus = document.getElementById("memoryComparisonStatus"), comparisonResults = document.getElementById("memoryComparisonResults");
+    const baselineModel = document.getElementById("memoryComparisonBaseline"), candidateModel = document.getElementById("memoryComparisonCandidate");
+    let comparisonController = null, comparisonEnabled = false;
     let cases = [], currentMemories = new Map(), previousExpected = new Set([""]), editorNeedsReview = false, evaluationPending = false, evaluationController = null;
     let generation = 0;
     let active = true;
@@ -113,6 +116,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }));
         const proposedDrafts = new Map([...candidates.querySelectorAll('article')].map(row => [row.dataset.candidateId,{text:row.querySelector('textarea').value,checked:row.querySelector('input[type=checkbox]').checked}]));
         const ticket = ++generation;
+        const comparisonCancelled = Boolean(comparisonController);
+        comparisonController?.abort(); comparisonController=null; comparisonResults.replaceChildren();
+        comparisonForm.setAttribute("aria-busy","false");
+        comparisonForm.querySelectorAll("select,button").forEach(control => { control.disabled=!active || !comparisonEnabled; });
+        if (comparisonCancelled) comparisonStatus.textContent="Comparison cancelled by refresh. Run again against the current view.";
         evaluationController?.abort(); evaluationController = null; evaluationPending = false; clearEvaluationResult();
         evaluationForm.setAttribute("aria-busy","false");
         evaluationControls();
@@ -126,6 +134,16 @@ document.addEventListener("DOMContentLoaded", () => {
             return [memory.id,`${text.length > 160 ? text.slice(0,160)+'…' : text} · ${memory.id.slice(0,8)}`];
         }));
         if (!evaluationThreshold.value) evaluationThreshold.value = review.evaluation_min_score;
+        comparisonEnabled = review.comparison.enabled === true;
+        [baselineModel,candidateModel].forEach(select => {
+            const previous = select.value; select.replaceChildren();
+            review.comparison.models.forEach(model => select.append(new Option(model,model)));
+            if (review.comparison.models.includes(previous)) select.value = previous;
+        });
+        const policy = review.comparison.policy;
+        document.getElementById("memoryComparisonPolicy").textContent = `${review.comparison.cohorts} fictional cohorts, ${review.comparison.cases} questions per model; precision ≥ ${policy.min_precision}, recall ≥ ${policy.min_recall}, no-match abstention ≥ ${policy.min_abstention_rate}, citation identity = 1, owner violations = 0. Maximum metric drop: ${policy.max_metric_drop}. Installed models only; no download. ${review.comparison.seconds}-second shared budget.`;
+        comparisonForm.querySelectorAll("select,button").forEach(control => { control.disabled = !comparisonEnabled || Boolean(comparisonController); });
+        if (!comparisonController) comparisonStatus.textContent = comparisonEnabled ? (comparisonCancelled ? "Comparison cancelled by refresh. Run again against the current view." : "Ready for a fictional local comparison; no runtime model will be changed.") : "Operator has not enabled synthetic model comparisons.";
         quality.textContent = "";
         category.replaceChildren(new Option("All categories", "")); selectedReset.disabled = true;
         const categories = new Set();
@@ -347,9 +365,43 @@ document.addEventListener("DOMContentLoaded", () => {
             if (evaluationController === controller) { evaluationController = null; evaluationPending = false; evaluationForm.setAttribute("aria-busy","false"); evaluationControls(); }
         }
     });
+    comparisonForm.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (!active || !comparisonEnabled || comparisonController) return;
+        const ticket = generation, controller = new AbortController(); comparisonController = controller;
+        comparisonForm.querySelectorAll("select,button").forEach(control => { control.disabled = true; });
+        comparisonForm.setAttribute("aria-busy","true"); comparisonResults.replaceChildren(); comparisonStatus.textContent = "Comparing fictional cohorts locally…";
+        const timer = setTimeout(() => controller.abort(),135000);
+        try {
+            const result = await Alfred.fetchJSON("/api/ai/memories/learning/", {method:"POST",signal:controller.signal,body:JSON.stringify({action:"compare",baseline_model:baselineModel.value,candidate_model:candidateModel.value})});
+            if (!active || ticket !== generation) return;
+            comparisonStatus.textContent = `${result.decision.replaceAll("_"," ")}. Active model unchanged. Fictional cohort evidence does not establish general accuracy or sustained drift.`;
+            result.reasons.forEach(reason => { const row=document.createElement("p"); row.textContent=reason.replaceAll("_"," "); comparisonResults.append(row); });
+            (result.candidate?.results || []).forEach(cohort => {
+                const row=document.createElement("article"); row.className="memory-card";
+                const title=document.createElement("h4"); title.className="h6"; title.textContent=`${cohort.cohort}: ${cohort.cases} questions`;
+                row.append(title);
+                result.differences.filter(item => item.cohort===cohort.cohort).forEach(item => {
+                    const line=document.createElement("p"); line.textContent=`${item.metric.replaceAll("_"," ")}: baseline ${(item.baseline*100).toFixed(1)}%, candidate ${(item.candidate*100).toFixed(1)}%, change ${(item.delta*100).toFixed(1)} percentage points.`; row.append(line);
+                });
+                const guard=document.createElement("p"); guard.textContent=`Owner violations: ${cohort.owner_violations}; foreign reference rejected: ${cohort.owner_reference_rejected}; stale source rejected: ${cohort.stale_rejected}.`; row.append(guard);
+                const cases=document.createElement("p"); cases.textContent=cohort.per_case.map(item => `Case ${item.case}: ${item.matched} relevant, ${item.irrelevant} unexpected, ${item.missed} missed${item.abstained ? ", abstained" : ""}`).join(" · "); row.append(cases); comparisonResults.append(row);
+            });
+        } catch (error) {
+            if (active && ticket===generation) {
+                comparisonResults.replaceChildren(); comparisonStatus.textContent=`Comparison incomplete: ${error.name === "AbortError" ? "processing stopped or timed out" : error.message}. No model changed.`;
+                if ([401,403].includes(error.status)) window.dispatchEvent(new Event("pagehide"));
+            }
+        } finally {
+            clearTimeout(timer);
+            if (comparisonController===controller) { comparisonController=null; comparisonForm.setAttribute("aria-busy","false"); comparisonForm.querySelectorAll("select,button").forEach(control => { control.disabled=!active || !comparisonEnabled; }); }
+        }
+    });
     refresh().catch(error => message(error.message));
     window.addEventListener("pagehide", () => {
         active = false; generation++; list.replaceChildren(); candidates.replaceChildren(); feedback.textContent = ""; search.value = "";
+        comparisonController?.abort(); comparisonController=null; comparisonEnabled=false; comparisonStatus.textContent=""; comparisonResults.replaceChildren(); baselineModel.replaceChildren(); candidateModel.replaceChildren(); document.getElementById("memoryComparisonPolicy").textContent="";
+        comparisonForm.setAttribute("aria-busy","false"); comparisonForm.querySelectorAll("select,button").forEach(control => { control.disabled=true; });
         category.replaceChildren(); document.getElementById("memoryCount").textContent = "";
         evaluationController?.abort(); evaluationController = null; evaluationPending = false;
         evaluationForm.setAttribute("aria-busy","false"); editorNeedsReview = false;

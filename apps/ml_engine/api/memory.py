@@ -177,16 +177,29 @@ class MemoryReasoningAPI(MemoryAPI):
 
 class MemoryLearningAPI(MemoryAPI):
     def get(self,request):
+        from ..services.retrieval_quality import configuration
         return Response({'candidates':MemoryLearning(memory_store()).candidates(request.user),
-            'evaluation_min_score':settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE})
+            'evaluation_min_score':settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE,
+            'comparison':dict(configuration(), enabled=settings.ALFRED_SYNTHETIC_QUALITY_ENABLED)})
 
     def post(self,request):
-        data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases','min_score'))
+        data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases','min_score','baseline_model','candidate_model'))
         allowed={'extract':{'action','text','provenance','sensitivity'},'verify':{'action','id','verified','content'},
             'correct':{'action','id','content','verified'},'consolidate':{'action','ids','content','verified'},
-            'reembed':{'action','id','verified'},'evaluate':{'action','cases','min_score'}}
+            'reembed':{'action','id','verified'},'evaluate':{'action','cases','min_score'},
+            'compare':{'action','baseline_model','candidate_model'}}
         action=data.get('action')
         if not isinstance(action,str) or action not in allowed or set(data)-allowed[action]: raise ValueError()
+        if action=='compare':
+            from rest_framework.exceptions import PermissionDenied
+            from ..services.retrieval_quality import compare
+            from .conversations import current_session
+            if not settings.ALFRED_SYNTHETIC_QUALITY_ENABLED: raise PermissionDenied('Synthetic model comparison is disabled by the operator.')
+            try:
+                result=compare(data.get('baseline_model'), data.get('candidate_model'))
+            finally:
+                current_session(request)
+            return Response(result)
         learning=MemoryLearning(memory_store()); user=request.user
         if action=='extract': return Response({'candidate_ids':learning.extract(user,data.get('text'),data.get('provenance'),sensitivity=data.get('sensitivity','sensitive'))},status=201)
         if action=='verify': return Response({'id':learning.verify(user,data.get('id'),verified=data.get('verified',False),content=data.get('content'))})
