@@ -11,7 +11,8 @@ from io import StringIO
 from django.test import SimpleTestCase
 
 from scripts import release_gate as release
-from scripts.development_council import BRANCH, Council, CouncilError, feature_queue, main
+from scripts.development_council import BRANCH, Council, CouncilError, LocalCouncilAdvisor, feature_queue, main
+from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 
 
 class DevelopmentCouncilTests(SimpleTestCase):
@@ -109,6 +110,7 @@ class DevelopmentCouncilTests(SimpleTestCase):
                 with patch('scripts.development_council.time.monotonic',side_effect=[0,offset]):
                     result=self.council.advise(task['id'],'reviewer',provider)
                 self.assertEqual(result['advisories'][-1]['status'],'BLOCKED')
+                self.assertEqual(result['advisories'][-1]['code'],'advisory_deadline_exceeded' if offset==31 else 'advisory_output_budget_exceeded')
                 self.assertEqual(result['roles']['reviewer']['status'],'NOT_RUN')
                 self.council.status(task['id']); html=(self.council.directory/'status.html').read_text(encoding='utf-8')
                 self.assertIn('reviewer: BLOCKED',html); self.assertIn('conservative reservation',html)
@@ -117,7 +119,7 @@ class DevelopmentCouncilTests(SimpleTestCase):
     def test_failed_optional_advice_has_nonzero_cli_exit_without_false_role_approval(self):
         task=self.plan(); output=StringIO()
         with patch('scripts.development_council.Council',return_value=self.council),patch(
-                'apps.ml_engine.services.hybrid_intelligence.OllamaReasoner') as provider,redirect_stdout(output):
+                'scripts.development_council.LocalCouncilAdvisor') as provider,redirect_stdout(output):
             provider.return_value.reason.side_effect=RuntimeError('SYNTHETIC-PRIVATE provider failure')
             code=main(['advise','--repo',str(self.repo),'--task',task['id'],'--role','planner'])
         self.assertEqual(code,2)
@@ -125,6 +127,61 @@ class DevelopmentCouncilTests(SimpleTestCase):
         self.assertEqual(evidence['advisories'][-1]['status'],'BLOCKED')
         self.assertEqual(evidence['roles']['developer']['status'],'NOT_RUN')
         self.assertNotIn('SYNTHETIC-PRIVATE',output.getvalue())
+
+    def test_advisory_failure_categories_never_retain_messages_or_approve_roles(self):
+        examples=[
+            (RuntimeError('SYNTHETIC-PRIVATE provider error'),'provider_failed'),
+            (EmbeddingUnavailable('SYNTHETIC-PRIVATE socket error'),'local_provider_unavailable'),
+            ('SYNTHETIC-PRIVATE not json','advisory_json_invalid'),
+            ('{"signals":[]}','advisory_schema_invalid'),
+            ('{"signals":["clear","clear"]}','advisory_schema_invalid'),
+            ('{"signals":[["clear"]]}','advisory_schema_invalid'),
+            ('{"signals":["clear"],"command":"SYNTHETIC-PRIVATE"}','advisory_schema_invalid'),
+        ]
+        for index,(reply,code) in enumerate(examples):
+            with self.subTest(code=code,index=index):
+                tracker=self.repo/'docs/PROJECT_STATUS.md'
+                tracker.write_text(tracker.read_text(encoding='utf-8').replace('review clarity',f'review clarity {index}'),encoding='utf-8')
+                self.git('add','docs/PROJECT_STATUS.md'); self.git('commit','-m','independent synthetic advisory objective')
+                task=self.plan(); provider=Mock()
+                if isinstance(reply,Exception): provider.reason.side_effect=reply
+                else: provider.reason.return_value=reply
+                result=self.council.advise(task['id'],'reviewer',provider)
+                advice=result['advisories'][-1]
+                self.assertEqual((advice['status'],advice['code']),('BLOCKED',code))
+                self.assertEqual(result['roles']['reviewer']['status'],'NOT_RUN')
+                self.assertNotIn('SYNTHETIC-PRIVATE',json.dumps(result))
+
+    def test_local_advisor_reuses_digest_transport_with_bounded_structured_signals(self):
+        advisor=LocalCouncilAdvisor()
+        envelope={'model':advisor.model,'done':True,'message':{'role':'assistant','content':'{"signals":["tests"]}'}}
+        with patch.object(advisor,'_digest',return_value='1'*64) as digest,patch.object(advisor,'_request',return_value=envelope) as request:
+            self.assertEqual(advisor.reason({'objective':'Review fictional fixture.'},max_output_tokens=256,deadline=30),envelope['message']['content'])
+        self.assertEqual(digest.call_count,2)
+        method,path,body=request.call_args.args
+        self.assertEqual((method,path),('POST','/api/chat'))
+        self.assertEqual(body['model'],'qwen3.5:4b'); self.assertFalse(body['stream']); self.assertFalse(body['think'])
+        self.assertEqual(body['options']['num_predict'],256); self.assertEqual(body['options']['temperature'],0)
+        self.assertFalse(body['format']['additionalProperties'])
+        self.assertEqual(body['format']['required'],['signals'])
+        self.assertIn('Never output code, commands',body['messages'][0]['content'])
+        self.assertNotIn('sources',body['messages'][1]['content'])
+        self.assertEqual(request.call_args.kwargs,{'deadline':30})
+
+    def test_local_advisor_rejects_model_swap_tool_calls_and_unbounded_tokens(self):
+        advisor=LocalCouncilAdvisor()
+        envelope={'model':advisor.model,'done':True,'message':{'role':'assistant','content':'{"signals":["clear"]}'}}
+        for changed in ({'model':'other-model'},{'done':False},{'message':{'role':'assistant','content':'{}','tool_calls':[{'name':'unsafe'}]}}):
+            with self.subTest(changed=changed),patch.object(advisor,'_digest',return_value='1'*64),patch.object(advisor,'_request',return_value=envelope|changed):
+                with self.assertRaisesRegex(CouncilError,'local_response_invalid'): advisor.reason({},deadline=30)
+        with patch.object(advisor,'_digest',side_effect=['1'*64,'2'*64]),patch.object(advisor,'_request',return_value=envelope):
+            with self.assertRaisesRegex(CouncilError,'local_model_changed'): advisor.reason({},deadline=30)
+        with patch.object(advisor,'_digest') as digest:
+            for tokens in (True,0,257):
+                with self.assertRaises(CouncilError): advisor.reason({},max_output_tokens=tokens,deadline=30)
+            with self.assertRaisesRegex(CouncilError,'advisory_context_budget_exceeded'):
+                advisor.reason({'objective':'x'*3900},deadline=30)
+            digest.assert_not_called()
 
     def test_interrupted_worker_is_not_restarted_without_confirmation_and_expired_lease(self):
         task=self.reviewed()
