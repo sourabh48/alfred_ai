@@ -5,11 +5,13 @@ import json
 import os
 import time
 from unittest.mock import Mock, patch
+from contextlib import redirect_stdout
+from io import StringIO
 
 from django.test import SimpleTestCase
 
 from scripts import release_gate as release
-from scripts.development_council import BRANCH, Council, CouncilError, feature_queue
+from scripts.development_council import BRANCH, Council, CouncilError, feature_queue, main
 
 
 class DevelopmentCouncilTests(SimpleTestCase):
@@ -95,6 +97,34 @@ class DevelopmentCouncilTests(SimpleTestCase):
         with self.assertRaises(CouncilError):
             for _ in range(10): result=self.council.advise(task['id'],'reviewer',provider)
         self.assertNotIn('SYNTHETIC-SECRET',json.dumps(self.council._read(task['id'])))
+
+    def test_late_or_oversized_advice_is_blocked_and_visible_without_raw_output(self):
+        for offset,reply in ((31,'{"signals":["clear"]}'),(1,'SYNTHETIC-PRIVATE-'+('x'*4096))):
+            with self.subTest(offset=offset):
+                # Each subcase uses an independent reviewed objective and budget.
+                tracker=self.repo/'docs/PROJECT_STATUS.md'
+                tracker.write_text(tracker.read_text(encoding='utf-8').replace('review clarity',f'review clarity {offset}'),encoding='utf-8')
+                self.git('add','docs/PROJECT_STATUS.md'); self.git('commit','-m','new synthetic reviewed objective')
+                task=self.plan(); provider=Mock(); provider.reason.return_value=reply
+                with patch('scripts.development_council.time.monotonic',side_effect=[0,offset]):
+                    result=self.council.advise(task['id'],'reviewer',provider)
+                self.assertEqual(result['advisories'][-1]['status'],'BLOCKED')
+                self.assertEqual(result['roles']['reviewer']['status'],'NOT_RUN')
+                self.council.status(task['id']); html=(self.council.directory/'status.html').read_text(encoding='utf-8')
+                self.assertIn('reviewer: BLOCKED',html); self.assertIn('conservative reservation',html)
+                self.assertIn('Required-role blockers:',html); self.assertNotIn('SYNTHETIC-PRIVATE',html)
+
+    def test_failed_optional_advice_has_nonzero_cli_exit_without_false_role_approval(self):
+        task=self.plan(); output=StringIO()
+        with patch('scripts.development_council.Council',return_value=self.council),patch(
+                'apps.ml_engine.services.hybrid_intelligence.OllamaReasoner') as provider,redirect_stdout(output):
+            provider.return_value.reason.side_effect=RuntimeError('SYNTHETIC-PRIVATE provider failure')
+            code=main(['advise','--repo',str(self.repo),'--task',task['id'],'--role','planner'])
+        self.assertEqual(code,2)
+        evidence=json.loads(output.getvalue())
+        self.assertEqual(evidence['advisories'][-1]['status'],'BLOCKED')
+        self.assertEqual(evidence['roles']['developer']['status'],'NOT_RUN')
+        self.assertNotIn('SYNTHETIC-PRIVATE',output.getvalue())
 
     def test_interrupted_worker_is_not_restarted_without_confirmation_and_expired_lease(self):
         task=self.reviewed()

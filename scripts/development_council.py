@@ -178,8 +178,11 @@ class Council:
                 raise CouncilError('advisory_budget_exhausted')
             current['reserved_tokens'] += reservation
         self._change(identity,reserve)
+        deadline = time.monotonic()+30
         try:
-            reply = provider.reason(payload, max_output_tokens=task['budgets']['output_tokens'], deadline=time.monotonic()+30)
+            reply = provider.reason(payload, max_output_tokens=task['budgets']['output_tokens'], deadline=deadline)
+            if time.monotonic()>deadline or not isinstance(reply,str) or len(reply.encode())>4096:
+                raise ValueError()
             value = json.loads(reply)
             if (set(value) != {'signals'} or not isinstance(value['signals'],list) or len(value['signals'])>7
                     or any(signal not in SIGNALS for signal in value['signals'])): raise ValueError()
@@ -273,7 +276,16 @@ class Council:
             rows.append('<h2>'+escape(task['feature']+' '+task['title'])+'</h2><p>'+escape(task['id']+' / '+task['stage'])+'</p><table><tr><th>Role</th><th>Status</th><th>Evidence</th></tr>')
             for role, result in task['roles'].items(): rows.append('<tr><td>'+escape(role)+'</td><td>'+escape(result['status'])+'</td><td>'+escape(result.get('code',result.get('provider','pending')))+ '</td></tr>')
             rows.append('</table><p>Tests: '+escape(str(task['roles']['tester'].get('tests','NOT_RUN')))+'; attempts '+str(task['attempts'])+'/2. Source: '+escape(task.get('source') or 'not reviewed')+'</p>')
-        html='<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ALFRED Development Council</title><style>body{font:16px system-ui;max-width:70rem;margin:2rem auto;padding:1rem;background:#102036;color:#eef4ff}table{border-collapse:collapse;width:100%}td,th{padding:.6rem;border:1px solid #779; text-align:left}p{overflow-wrap:anywhere}</style><h1>Development Council</h1><p>Local development evidence. No production, deployment, cloud or automatic model approval.</p>'+''.join(rows)+'</html>'
+            budget=task['budgets']
+            rows.append('<p>Advisory budget reserved: '+str(task['reserved_tokens'])+'/'+str(budget['reserved_tokens'])+' tokens (conservative reservation, not measured usage). Context limit: '+str(budget['context_bytes'])+' bytes; output limit: '+str(budget['output_tokens'])+' tokens. Test deadline: '+str(budget['seconds'])+' seconds.</p>')
+            rows.append('<h3>Optional model advice</h3><p>Advice never satisfies a required role. A blocked advisory does not approve or replace host review.</p>')
+            if not task.get('advisories'): rows.append('<p>NOT_RUN</p>')
+            for advice in task.get('advisories',[]):
+                rows.append('<p>'+escape(advice['role']+': '+advice['status']+'; signals: '+', '.join(advice['signals']))+'</p>')
+            blockers=[role+': '+result['status']+' ('+result.get('code',', '.join(result.get('codes',[])))+')' for role,result in task['roles'].items() if result['status']!='PASS']
+            rows.append('<p>Required-role blockers: '+escape('; '.join(blockers) or 'none')+'</p>')
+            if task.get('commit'): rows.append('<p>Verified host commit: '+escape(task['commit'])+'</p>')
+        html='<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ALFRED Development Council</title><style>body{font:16px system-ui;max-width:70rem;margin:2rem auto;padding:1rem;background:#102036;color:#eef4ff}table{border-collapse:collapse;width:100%;table-layout:fixed}td,th{padding:.6rem;border:1px solid #779;text-align:left;overflow-wrap:anywhere}p{overflow-wrap:anywhere}</style><h1>Development Council</h1><p>Local development evidence. No production, deployment, cloud or automatic model approval.</p>'+''.join(rows)+'</html>'
         target=self.directory/'status.html'
         if target.is_symlink() or (target.exists() and (not target.is_file() or target.stat().st_nlink!=1)):
             raise CouncilError('unsafe_status_output')
@@ -294,6 +306,7 @@ def main(argv=None):
     parser.add_argument('--authorization-reference'); parser.add_argument('--confirm-worker-stopped',action='store_true')
     parser.add_argument('--commit')
     args=parser.parse_args(argv)
+    blocked_advisory=False
     try:
         council=Council(args.repo)
         if args.command=='plan': result=council.plan(args.path,args.label,args.profile,args.feature)
@@ -308,10 +321,11 @@ def main(argv=None):
             if not settings.configured: settings.configure(ALFRED_MEMORY_OLLAMA_MODEL='qwen3.5:4b')
             from apps.ml_engine.services.hybrid_intelligence import OllamaReasoner
             result=council.advise(args.task,args.role,OllamaReasoner())
+            blocked_advisory=result['advisories'][-1]['status']=='BLOCKED'
         else: result=council.status(args.task)
         council.status(args.task)
         print(json.dumps(result,sort_keys=True))
-        return 2 if isinstance(result,dict) and result.get('stage')=='BLOCKED' else 0
+        return 2 if blocked_advisory or (isinstance(result,dict) and result.get('stage')=='BLOCKED') else 0
     except Exception as exc:
         print(json.dumps(dict(status='BLOCKED',code=str(exc) if isinstance(exc,CouncilError) else 'council_operation_failed',exception_type=type(exc).__name__)))
         return 2
