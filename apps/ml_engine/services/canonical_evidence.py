@@ -28,6 +28,7 @@ BASELINE_KEYS=('monthly_income','liquid_cash','recurring_emi_burden','total_asse
 DOCUMENT_LIMIT=5
 CATALOG_SALT='alfred.financial-source-catalog.v1'
 PAGE_SALT='alfred.financial-source-page.v1'
+DISCOVERY_LIMIT=4096
 
 
 class SourceSelectionConflict(MemoryConflict):
@@ -166,6 +167,77 @@ def document_page(user, kind, identity, *, cursor=None):
         page_cursor=signing.dumps(dict(catalog=token,after=after),salt=PAGE_SALT),
         checked_at=timezone.now().isoformat(),next_cursor=signing.dumps(dict(catalog=token,after=rows[DOCUMENT_LIMIT-1].pk),salt=PAGE_SALT)
         if len(rows)>DOCUMENT_LIMIT else None)
+
+
+def _discovery_catalog(user, kind, document_id):
+    from apps.expenses.models import StatementUpload
+    from apps.investments.models import InvestmentImportDocument
+    from apps.loans.models import LoanImportDocument
+    from apps.expenses.services.statement_evidence import file_reference
+    model={'expense':StatementUpload,'loan':LoanImportDocument,'investment':InvestmentImportDocument}.get(kind)
+    if model is None: raise Http404
+    document=None
+    if document_id is None:
+        rows=model.objects.filter(user=user)
+        date_field='uploaded_at' if kind=='expense' else 'created_at'
+        rows=rows.only('pk','user_id','file_name',date_field)
+        source=None
+    else:
+        document=get_object_or_404(model,user=user,pk=document_id)
+        rows=document.expenses.all() if kind=='expense' else getattr(document,f'linked_{kind}s').all()
+        if rows.exclude(user=user).exists(): raise Http404
+        if kind=='expense':
+            if document.bank_account_id and document.bank_account.user_id!=user.pk: raise Http404
+            rows=rows.filter(source='bank_statement')
+        source=dict(record=_record_revision(document),file=list(file_reference(document.original_file if kind=='expense' else document.uploaded_file)[:2]))
+    identities=list(rows.order_by('pk').values_list('pk',flat=True)[:DISCOVERY_LIMIT+1])
+    if len(identities)>DISCOVERY_LIMIT: raise ValueError('Document discovery exceeds its bounded record limit.')
+    stamp=dict(owner=user.pk,kind=kind,identity=document_id,purpose='document-discovery-v1',source=source,membership=_digest(identities))
+    return document,rows,stamp,len(identities)
+
+
+def document_record_page(user, kind, document_id=None, *, cursor=None):
+    """Owner-directed discovery only; existing evidence pages retain correction authority."""
+    from apps.expenses.services.statement_evidence import document_name
+    from alfred_ai.services.upload_limits import UploadLimitExceeded
+    _owner(user)
+    document,rows,stamp,count=_discovery_catalog(user,kind,document_id)
+    after=0
+    if cursor is not None:
+        if not isinstance(cursor,str) or not 1<=len(cursor)<=8192: raise ValueError('Invalid document discovery page.')
+        try: page=signing.loads(cursor,salt=PAGE_SALT,max_age=900)
+        except signing.SignatureExpired as exc: raise SourceSelectionConflict() from exc
+        except signing.BadSignature as exc: raise ValueError('Invalid document discovery page.') from exc
+        if not isinstance(page,dict) or set(page)!={'catalog','after'} or type(page['after']) is not int or page['after']<0: raise ValueError('Invalid document discovery page.')
+        token=page['catalog']; after=page['after']; _load_catalog(token,stamp)
+    else: token=signing.dumps(stamp,salt=CATALOG_SALT,compress=True)
+    selected=list(rows.filter(pk__gt=after).order_by('pk')[:DOCUMENT_LIMIT+1]); items=[]; revisions=[]
+    for row in selected[:DOCUMENT_LIMIT]:
+        if document is None:
+            items.append(dict(document_id=row.pk,name=document_name(row),type='bank_statement' if kind=='expense' else f'{kind}_import',
+                uploaded_at=(row.uploaded_at if kind=='expense' else row.created_at).isoformat(),verification='not_checked',full_text_qa=False))
+        else:
+            _owned_record(user,kind,row.pk)
+            try:
+                detail=_document_evidence(user,kind,row,document)
+                item=_document_item(kind,row,document,detail)
+                revisions.append((row.pk,dict(item)))
+                item.update(record_type=kind,record_id=row.pk,original_evidence=detail['original_status'] if kind=='expense' else
+                    {key:value['original_status'] for key,value in detail['fields'].items()})
+                items.append(item)
+            except UploadLimitExceeded:
+                items.append(dict(record_type=kind,record_id=row.pk,selectable=False,url=None,verification='processing_limit',grounding=None))
+    # A displayed attestation must still describe this exact owner/document/record revision.
+    for identity,expected in revisions:
+        current=_owned_record(user,kind,identity)
+        if _document_item(kind,current,document,_document_evidence(user,kind,current,document))!=expected: raise SourceSelectionConflict()
+    if _discovery_catalog(user,kind,document_id)[2]!=stamp: raise SourceSelectionConflict()
+    return dict(level='documents' if document is None else 'records',kind=kind,document_id=document_id,
+        document_name=document_name(document) if document else None,items=items,count=count,limit=DOCUMENT_LIMIT,
+        checked_at=timezone.now().isoformat(),full_text_qa=False,
+        limitation='Discovery is not document authentication or financial advice. Review current corrected values and separately retained original evidence; no currency is inferred.',
+        page_cursor=signing.dumps(dict(catalog=token,after=after),salt=PAGE_SALT),
+        next_cursor=signing.dumps(dict(catalog=token,after=selected[DOCUMENT_LIMIT-1].pk),salt=PAGE_SALT) if len(selected)>DOCUMENT_LIMIT else None)
 
 
 def _selected_documents(user, kind, row, selection, token):

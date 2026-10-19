@@ -12,8 +12,74 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("documentChatGPTImportForm").addEventListener("submit", submitChatGPTImport);
 
     loadDocumentCenter();
+    initDocumentSources();
     Alfred.enableLiveRefresh("documents-live", loadDocumentCenter, { rootId: "documentCenterRoot", interactionHoldMs: 4500 });
 });
+
+function initDocumentSources() {
+    const kind=document.getElementById('documentSourcesKind'), items=document.getElementById('documentSourcesItems'), status=document.getElementById('documentSourcesStatus');
+    const refresh=document.getElementById('documentSourcesRefresh'), documents=document.getElementById('documentSourcesDocuments');
+    const previous=document.getElementById('documentSourcesPrevious'), next=document.getElementById('documentSourcesNext');
+    let active=true, generation=0, controller=null, documentId=null, cursors=[null], index=0, nextCursor=null;
+    const readable=value => String(value || 'not recorded').replaceAll('_',' ');
+    function link(parent, text, url) {
+        const target=new URL(url,location.origin);
+        if (target.origin!==location.origin || !/^\/(?:documents\/|ai\/insights\/)/.test(target.pathname)) return;
+        const anchor=document.createElement('a'); anchor.className='btn btn-sm btn-outline-primary me-2 mb-2'; anchor.textContent=text; anchor.href=target.pathname+target.search; parent.append(anchor);
+    }
+    function reset(selected=null) { documentId=selected; cursors=[null]; index=0; nextCursor=null; return load(); }
+    async function load() {
+        if (!active) return;
+        controller?.abort(); const request=new AbortController(), ticket=++generation; controller=request;
+        items.replaceChildren(); items.setAttribute('aria-busy','true'); status.textContent='Checking your document sources…';
+        [kind,refresh,documents,previous,next].forEach(control => { control.disabled=true; });
+        const timer=setTimeout(() => request.abort(),30000);
+        try {
+            const path=`/api/ai/financial-documents/${kind.value}/${documentId===null ? '' : documentId+'/'}${cursors[index] ? '?cursor='+encodeURIComponent(cursors[index]) : ''}`;
+            const page=await Alfred.fetchJSON(path,{signal:request.signal});
+            if (!active || ticket!==generation) return;
+            cursors[index]=page.page_cursor; nextCursor=page.next_cursor;
+            status.textContent=`${page.level==='documents' ? 'Documents' : page.document_name+' · linked records'} · Page ${index+1} · ${page.count} supported entries · checked ${page.checked_at}. Full-document Q&A is unsupported.`;
+            if (!page.items.length) items.textContent='No supported linked sources. No answer or verified fact can be inferred from this list.';
+            page.items.forEach(item => {
+                const card=document.createElement('article'); card.className='mini-card';
+                const title=document.createElement('h3'); title.className='h6'; title.textContent=page.level==='documents' ? item.name : `${readable(item.record_type)} record #${item.record_id}`; card.append(title);
+                if (page.level==='documents') {
+                    const meta=document.createElement('p'); meta.textContent=`${readable(item.type)} · uploaded ${item.uploaded_at} · eligibility not checked until opened.`;
+                    const open=document.createElement('button'); open.type='button'; open.className='btn btn-sm btn-outline-primary'; open.dataset.documentId=item.document_id;
+                    open.textContent='Review linked records'; open.addEventListener('click',() => reset(item.document_id)); card.append(meta,open);
+                } else {
+                    const eligibility=document.createElement('p'); eligibility.textContent=`${item.selectable ? 'Eligible reviewed fields' : 'Not eligible'}: ${readable(item.grounding?.status || item.verification)}. Freshness: ${readable(item.freshness)}. Confirmed fields: ${(item.grounding?.eligible_fields || []).map(readable).join(', ') || 'none'}.`;
+                    const original=document.createElement('p'); original.textContent=`Original evidence: ${typeof item.original_evidence==='string' ? readable(item.original_evidence) : Object.entries(item.original_evidence || {}).map(([field,value]) => `${readable(field)}: ${readable(value)}`).join('; ') || 'not retained'}. Corrected values take precedence; check the review page.`;
+                    card.append(eligibility,original);
+                    if (item.url) link(card,'Review current values and original evidence',item.url);
+                    if (item.selectable) link(card,'Choose sources in local assistant',`/ai/insights/?scope=financial_records&record_type=${item.record_type}&record_id=${item.record_id}`);
+                }
+                items.append(card);
+            });
+        } catch (error) {
+            if (!active || ticket!==generation) return;
+            nextCursor=null; items.replaceChildren(); status.textContent=`Sources unavailable or changed. Refresh to recheck. ${error.name==='AbortError' ? 'The bounded request stopped.' : error.message}`;
+            if ([401,403].includes(error.status)) window.dispatchEvent(new Event('pagehide'));
+        } finally {
+            clearTimeout(timer);
+            if (ticket===generation) {
+                controller=null; items.setAttribute('aria-busy','false'); kind.disabled=refresh.disabled=!active;
+                documents.disabled=!active || documentId===null; previous.disabled=!active || index===0; next.disabled=!active || !nextCursor;
+            }
+        }
+    }
+    kind.addEventListener('change',() => reset()); refresh.addEventListener('click',() => reset(documentId)); documents.addEventListener('click',() => reset());
+    next.addEventListener('click',() => { if (nextCursor) { cursors[++index]=nextCursor; load(); } });
+    previous.addEventListener('click',() => { if (index>0) { index--; load(); } });
+    window.addEventListener('pagehide',() => {
+        active=false; generation++; controller?.abort(); controller=null; documentId=null; cursors=[null]; index=0; nextCursor=null;
+        items.replaceChildren(); status.textContent=''; items.setAttribute('aria-busy','false');
+        [kind,refresh,documents,previous,next].forEach(control => { control.disabled=true; });
+    });
+    window.addEventListener('pageshow',event => { if (event.persisted) { active=true; reset(); } });
+    load();
+}
 
 const reviewQueueState = new Map();
 const documentCenterCache = new Map();

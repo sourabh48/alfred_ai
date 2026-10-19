@@ -1286,6 +1286,74 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('intelligenceSourceItems'),''); self.assertEqual(self.text('intelligenceSourcesSelected'),'')
         self.assertEqual(self.text('intelligenceAnswers'),'')
 
+    def test_document_center_owned_source_discovery_review_pages_and_stale_refresh(self):
+        from selenium.webdriver.support.ui import Select
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.investments.models import InvestmentImportDocument
+        row,documents,service,local=self.financial_source_selection_fixture('investment')
+        owner=self.scenario['user']; document=documents[-1]
+        document.file_name='Synthetic <img src=x onerror="window.discoveryLeak=true">.pdf'; document.save()
+        linked=[row]
+        for index in range(6):
+            extra=type(row).objects.create(user=owner,asset_type='equity',asset_name=f'Synthetic discovery asset {index}',
+                invested_amount='100.01',current_value='120.05',monthly_sip='1.00')
+            document.linked_investments.add(extra); linked.append(extra)
+        service.capture_import(document,linked)
+        for current in linked:
+            detail=service.evidence(owner,document.pk,current.pk)
+            service.review(owner,document.pk,current.pk,revision=detail['revision'],fields=['current_value'],confirm=True)
+        self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentSourcesKind').is_enabled())
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        self.wait.until(lambda _: '7 supported entries' in self.text('documentSourcesStatus'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentSourcesItems article')),5)
+        draft=self.browser.find_element(self.By.ID,'documentChatGPTRawText'); draft.send_keys('SYNTHETIC unsent upload draft')
+        # Membership changes invalidate the old list instead of dropping a newly eligible document.
+        added=InvestmentImportDocument.objects.create(user=owner,file_name='Synthetic added.pdf',parser_status='parsed',
+            uploaded_file=SimpleUploadedFile('new.pdf',b'%PDF-SYNTHETIC-ADDED'))
+        self.memory_click('#documentSourcesNext')
+        self.wait.until(lambda _: 'Sources unavailable or changed' in self.text('documentSourcesStatus'))
+        self.assertEqual(self.text('documentSourcesItems'),'')
+        self.assertEqual(draft.get_property('value'),'SYNTHETIC unsent upload draft')
+        self.memory_click('#documentSourcesRefresh')
+        self.wait.until(lambda _: '8 supported entries' in self.text('documentSourcesStatus'))
+        self.memory_click('#documentSourcesNext')
+        self.wait.until(lambda _: 'Page 2' in self.text('documentSourcesStatus'))
+        self.assertIn('<img src=x onerror=',self.text('documentSourcesItems'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.discoveryLeak)'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{document.pk}"]')
+        self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus'))
+        self.assertIn('7 supported entries',self.text('documentSourcesStatus'))
+        self.assertIn('Eligible reviewed fields: reviewed fields only',self.text('documentSourcesItems'))
+        self.assertIn('not retained',self.text('documentSourcesItems'))
+        self.memory_click('#documentSourcesNext')
+        self.wait.until(lambda _: 'Page 2' in self.text('documentSourcesStatus'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentSourcesItems article')),2)
+        last=linked[-1]; detail=service.evidence(owner,document.pk,last.pk)
+        service.review(owner,document.pk,last.pk,revision=detail['revision'],fields=['current_value'],confirm=True,revoke=True)
+        self.memory_click('#documentSourcesRefresh')
+        self.wait.until(lambda _: 'Page 1' in self.text('documentSourcesStatus'))
+        self.memory_click('#documentSourcesNext')
+        self.wait.until(lambda _: 'Not eligible: owner review required' in self.text('documentSourcesItems'))
+        self.assertEqual(draft.get_property('value'),'SYNTHETIC unsent upload draft')
+        self.browser.execute_script("document.getElementById('documentSourcesStatus').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('document-discovery-records-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),390)
+        self.browser.execute_script("document.getElementById('documentSourcesTitle').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('document-discovery-records-mobile')
+        citation=detail['citation_url']
+        self.memory_click(f'#documentSourcesItems a[href="{citation}"]')
+        self.wait.until(lambda _: 'needs_owner_review' in self.text('statementEvidence'))
+        self.assertIn('120.05',self.text('statementEvidence'))
+        self.capture('document-discovery-exact-review')
+        local.reason.assert_not_called()
+        self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: 'Documents' in self.text('documentSourcesStatus'))
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('documentSourcesItems'),''); self.assertEqual(self.text('documentSourcesStatus'),'')
+
     def test_financial_sources_stale_selection_refresh_and_exact_older_loan_citation(self):
         row,documents,service,local=self.financial_source_selection_fixture('loan')
         self.memory_click('#intelligenceSourcesNext')

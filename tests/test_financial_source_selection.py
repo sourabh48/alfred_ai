@@ -62,6 +62,178 @@ class FinancialSourceSelectionTests(TestCase):
             record_type=kind,record_id=self.rows[kind].pk,selected_documents=self.selection(items),
             source_catalog=page['catalog_token'])|changes,content_type='application/json')
 
+    def test_document_discovery_catalog_is_bounded_complete_and_does_not_extract_or_infer(self):
+        for kind in ('loan','investment'):
+            documents=self.documents(kind)
+            with patch.object(sources,'_document_evidence',side_effect=AssertionError('Catalog is metadata only')):
+                first=sources.document_record_page(self.owner,kind)
+                second=sources.document_record_page(self.owner,kind,cursor=first['next_cursor'])
+                back=sources.document_record_page(self.owner,kind,cursor=first['page_cursor'])
+            self.assertEqual(first['count'],7); self.assertEqual(first['limit'],5)
+            self.assertEqual(first['items'],back['items'])
+            self.assertEqual([item['document_id'] for item in first['items']+second['items']],[row.pk for row in documents])
+            self.assertTrue(all(item['verification']=='not_checked' for item in first['items']))
+            self.assertFalse(first['full_text_qa']); self.assertFalse(second['next_cursor'])
+        self.local.reason.assert_not_called(); self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_discovery_paginates_linked_records_and_routes_exact_owner_review_citations(self):
+        document=self.documents(count=1)[0]; rows=[self.investment]
+        for index in range(6):
+            row=type(self.investment).objects.create(user=self.owner,asset_type='equity',asset_name=f'Synthetic asset {index}',
+                invested_amount='100.01',current_value='120.05',monthly_sip='1.00')
+            document.linked_investments.add(row); investment_evidence.capture_import(document,[row])
+            detail=investment_evidence.evidence(self.owner,document.pk,row.pk)
+            investment_evidence.review(self.owner,document.pk,row.pk,revision=detail['revision'],fields=['current_value'],confirm=True)
+            rows.append(row)
+        first=sources.document_record_page(self.owner,'investment',document.pk)
+        second=sources.document_record_page(self.owner,'investment',document.pk,cursor=first['next_cursor'])
+        self.assertEqual(first['count'],7)
+        self.assertEqual([item['record_id'] for item in first['items']+second['items']],[row.pk for row in rows])
+        for item in first['items']+second['items']:
+            self.assertTrue(item['selectable']); self.assertEqual(item['original_evidence']['current_value'],'not_retained')
+            self.assertEqual(self.client.get(item['url']).status_code,200)
+        self.client.force_login(self.other)
+        for item in first['items']+second['items']:
+            self.assertEqual(self.client.get(item['url']).status_code,404)
+
+    def test_discovery_original_evidence_correction_and_revocation_remain_separate_and_read_only(self):
+        from apps.investments.models import InvestmentDocumentEvidence
+        document=InvestmentImportDocument.objects.create(user=self.owner,file_name='<img src=x onerror=alert(1)>.pdf',
+            uploaded_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC-original'),parser_status='parsed',
+            extracted_text='SYNTHETIC-NEVER-DISCOVERY-OR-PROMPT')
+        document.linked_investments.add(self.investment)
+        investment_evidence.capture_import(document,[self.investment],originals={self.investment.pk:{'current_value':'123.45'}})
+        type(self.investment).objects.filter(pk=self.investment.pk).update(current_value='3456.78')
+        detail=investment_evidence.evidence(self.owner,document.pk,self.investment.pk)
+        investment_evidence.review(self.owner,document.pk,self.investment.pk,revision=detail['revision'],fields=['current_value'],confirm=True)
+        models=tuple(type(row) for row in self.rows.values())+(type(self.account),InvestmentDocumentEvidence)
+        before=[list(model.objects.order_by('pk').values()) for model in models]
+        baseline=resolve_canonical_financial_baseline(self.owner,fresh=True)['decimal_amounts']
+        page=sources.document_record_page(self.owner,'investment',document.pk); item=page['items'][0]
+        self.assertEqual(item['original_evidence']['current_value'],'retained_parser_value')
+        self.assertEqual(item['grounding']['eligible_fields'],['current_value']); self.assertTrue(item['selectable'])
+        self.assertNotIn('SYNTHETIC-NEVER',json.dumps(page)); self.assertNotIn('3456.78',json.dumps(page))
+        evidence=investment_evidence.evidence(self.owner,document.pk,self.investment.pk)
+        self.assertEqual((evidence['fields']['current_value']['original'],evidence['fields']['current_value']['current']),('123.45','3456.78'))
+        self.assertIsNone(evidence['fields']['current_value']['currency'])
+        self.assertEqual([list(model.objects.order_by('pk').values()) for model in models],before)
+        self.assertEqual(resolve_canonical_financial_baseline(self.owner,fresh=True)['decimal_amounts'],baseline)
+        investment_evidence.review(self.owner,document.pk,self.investment.pk,revision=evidence['revision'],fields=['current_value'],confirm=True,revoke=True)
+        self.assertFalse(sources.document_record_page(self.owner,'investment',document.pk)['items'][0]['selectable'])
+        self.assertEqual(self.store.list_memories(self.owner),[]); self.local.reason.assert_not_called(); self.cloud.assert_not_called()
+
+    def test_discovery_rejects_stale_membership_file_change_and_tampered_or_foreign_cursor(self):
+        documents=self.documents(); first=sources.document_record_page(self.owner,'investment')
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get('/api/ai/financial-documents/investment/',{'cursor':first['next_cursor']}).status_code,404)
+        self.client.force_login(self.owner)
+        for cursor in ('invalid',signing.dumps({'after':False,'catalog':'x'},salt=sources.PAGE_SALT)):
+            self.assertEqual(self.client.get('/api/ai/financial-documents/investment/',{'cursor':cursor}).status_code,400)
+        documents[-1].delete()
+        with self.assertRaises(sources.SourceSelectionConflict): sources.document_record_page(self.owner,'investment',cursor=first['next_cursor'])
+        document=documents[0]; record_page=sources.document_record_page(self.owner,'investment',document.pk)
+        Path(document.uploaded_file.path).write_bytes(b'%PDF-SYNTHETIC-replaced')
+        with self.assertRaises(sources.SourceSelectionConflict): sources.document_record_page(self.owner,'investment',document.pk,cursor=record_page['page_cursor'])
+        self.assertFalse(sources.document_record_page(self.owner,'investment',document.pk)['items'][0]['selectable'])
+        with patch.object(sources,'DISCOVERY_LIMIT',1),self.assertRaises(ValueError): sources.document_record_page(self.owner,'investment')
+
+    def test_discovery_detects_correction_revocation_unlink_and_deleted_evidence_during_page_read(self):
+        document=self.documents(count=1)[0]; original=sources._document_evidence
+        for change in ('correction','revocation','unlink','delete'):
+            with self.subTest(change=change),transaction.atomic():
+                changed=[]
+                def changing(*args):
+                    detail=original(*args)
+                    if not changed:
+                        changed.append(True)
+                        if change=='correction': type(self.investment).objects.filter(pk=self.investment.pk).update(current_value='999.99')
+                        elif change=='revocation': investment_evidence.review(self.owner,document.pk,self.investment.pk,revision=detail['revision'],fields=['current_value'],confirm=True,revoke=True)
+                        elif change=='unlink': document.linked_investments.remove(self.investment)
+                        else: type(self.investment).objects.filter(pk=self.investment.pk).delete()
+                    return detail
+                with patch.object(sources,'_document_evidence',side_effect=changing),self.assertRaises((sources.SourceSelectionConflict,Http404)):
+                    sources.document_record_page(self.owner,'investment',document.pk)
+                transaction.set_rollback(True)
+
+    def test_discovery_session_permissions_unsupported_types_and_no_mutations(self):
+        document=self.documents('loan',count=1)[0]; url=f'/api/ai/financial-documents/loan/{document.pk}/'
+        response=self.client.get(url); self.assertEqual(response.status_code,200); self.assertIn('no-store',response['Cache-Control'])
+        self.assertEqual(self.client.get(url,{'unexpected':'x'}).status_code,400)
+        self.assertEqual(self.client.get(url+'?cursor=x&cursor=y').status_code,400)
+        for method in ('post','put','delete'):
+            self.assertEqual(getattr(self.client,method)(url,{},content_type='application/json').status_code,405)
+        self.assertEqual(self.client.get('/api/ai/financial-documents/career/').status_code,404)
+        self.client.force_login(self.other); self.assertEqual(self.client.get(url).status_code,404)
+        self.client.logout(); self.assertIn(self.client.get(url).status_code,(401,403))
+
+    def test_discovery_rechecks_loan_related_conflicts_not_only_import_revision(self):
+        from datetime import date
+        from apps.loans.models import LoanClosureDocument, LoanPaymentHistory
+        document=self.documents('loan',count=1)[0]; original=sources._document_item
+        for conflict in ('payment','closure'):
+            with self.subTest(conflict=conflict),transaction.atomic():
+                changed=[]
+                def changing(*args):
+                    item=original(*args)
+                    if not changed:
+                        self.assertTrue(item['selectable']); changed.append(True)
+                        if conflict=='payment':
+                            LoanPaymentHistory.objects.create(loan=self.loan,payment_date=date(2026,2,1),amount='10.01',
+                                match_status='review',loan_effect_applied=True)
+                        else:
+                            for amount in ('100.01','200.02'):
+                                LoanClosureDocument.objects.create(loan=self.loan,verification_status='verified',
+                                    closure_amount=amount,closure_date=date(2026,2,1),file_name='synthetic-conflict.pdf')
+                    return item
+                with patch.object(sources,'_document_item',side_effect=changing),self.assertRaises(sources.SourceSelectionConflict):
+                    sources.document_record_page(self.owner,'loan',document.pk)
+                transaction.set_rollback(True)
+
+    def test_discovery_rechecks_bank_peer_conflicts_not_only_transaction_revision(self):
+        from apps.expenses.models import Expense, StatementUpload
+        from apps.expenses.services import statement_evidence as bank
+        from apps.expenses.services.statement_lifecycle import _import_statement_transactions
+        from tests.test_expense_money_identity import parsed_fixture
+        upload=StatementUpload.objects.create(user=self.owner,bank_account=self.account,account_number=self.account.account_number,
+            original_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC-DISCOVERY-PEERS'),file_name='synthetic-bank.pdf',parser_status='parsed')
+        _import_statement_transactions(user=self.owner,upload=upload,bank_account=self.account,parsed=parsed_fixture())
+        row=Expense.objects.get(statement_upload=upload)
+        row.external_reference='SYNTHETIC-PEER'; row.save(update_fields=['external_reference'])
+        detail=bank.evidence(self.owner,row.pk); bank.review(self.owner,row.pk,revision=detail['revision'],confirm=True)
+        original=sources._document_item
+        for conflict in ('duplicate','conflicting'):
+            with self.subTest(conflict=conflict),transaction.atomic():
+                changed=[]
+                def changing(*args):
+                    item=original(*args)
+                    if not changed:
+                        self.assertTrue(item['selectable']); changed.append(True)
+                        Expense.objects.create(user=self.owner,bank_account=self.account,amount='999.99' if conflict=='conflicting' else row.amount,
+                            transaction_date=row.transaction_date,direction=row.direction,external_reference=row.external_reference,
+                            raw_description=row.raw_description,transaction_fingerprint=row.transaction_fingerprint if conflict=='duplicate' else '')
+                    return item
+                with patch.object(sources,'_document_item',side_effect=changing),self.assertRaises(sources.SourceSelectionConflict):
+                    sources.document_record_page(self.owner,'expense',upload.pk)
+                transaction.set_rollback(True)
+
+    def test_discovery_bank_sources_use_existing_import_review_and_citation(self):
+        from apps.expenses.models import Expense, StatementUpload
+        from apps.expenses.services import statement_evidence as bank
+        from apps.expenses.services.statement_lifecycle import _import_statement_transactions
+        from tests.test_expense_money_identity import parsed_fixture
+        upload=StatementUpload.objects.create(user=self.owner,bank_account=self.account,account_number=self.account.account_number,
+            original_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC-DISCOVERY-BANK'),file_name='synthetic-bank.pdf',parser_status='parsed')
+        _import_statement_transactions(user=self.owner,upload=upload,bank_account=self.account,parsed=parsed_fixture())
+        row=Expense.objects.get(statement_upload=upload)
+        first=sources.document_record_page(self.owner,'expense',upload.pk)['items'][0]
+        self.assertFalse(first['selectable']); self.assertEqual(first['original_evidence'],'retained_import_snapshot')
+        detail=bank.evidence(self.owner,row.pk); bank.review(self.owner,row.pk,revision=detail['revision'],confirm=True)
+        item=sources.document_record_page(self.owner,'expense',upload.pk)['items'][0]
+        self.assertTrue(item['selectable']); self.assertEqual(item['url'],detail['citation_url'])
+        self.assertEqual(self.client.get(item['url']).status_code,200)
+        upload.bank_account.user=self.other; upload.bank_account.save()
+        with self.assertRaises(Http404): sources.document_record_page(self.owner,'expense',upload.pk)
+
     def test_document_eligibility_is_current_field_scoped_and_never_full_text_qa(self):
         for kind in ('investment','loan'):
             documents=self.documents(kind,count=1); document=documents[0]; row=self.rows[kind]
