@@ -3,6 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import json
 import os
+import subprocess
 import time
 from unittest.mock import Mock, patch
 from contextlib import redirect_stdout
@@ -37,7 +38,7 @@ class DevelopmentCouncilTests(SimpleTestCase):
     def reviewed(self,profile='backend'):
         task=self.plan(profile); (self.repo/'apps/sample.py').write_text('VALUE = 2\n',encoding='utf-8')
         source=self.council.snapshot(task)[0]
-        for role in ('developer','reviewer','security'): task=self.council.record(task['id'],role,'PASS',source,actor='synthetic_'+role)
+        for role in ('architect','developer','reviewer','security'): task=self.council.record(task['id'],role,'PASS',source,actor='synthetic_'+role)
         return task
 
     def passing(self,profile='backend'):
@@ -56,6 +57,105 @@ class DevelopmentCouncilTests(SimpleTestCase):
         self.assertEqual(council.complete(task['id'],commit,'synthetic-user-approval')['stage'],'COMPLETE')
         council.status(); html=(council.directory/'status.html').read_text(encoding='utf-8')
         self.assertIn('&lt;script&gt;',html); self.assertNotIn('<script>',html)
+
+    def test_seven_roles_architect_gate_coder_alias_and_guardian_do_not_authorize_release(self):
+        task=self.reviewed(); identity=task['id']; source=task['source']
+        self.assertEqual(task['contract_version'],3)
+        self.assertEqual(set(task['roles']),{'coordinator','architect','developer','reviewer','security','tester','release_guardian'})
+        self.assertEqual(task['selection']['code'],'reviewed_master_queue')
+        self.council.record(identity,'architect','BLOCKED',source,actor='synthetic_architect')
+        with self.assertRaisesRegex(CouncilError,'current_host_reviews_required'): self.council.test(identity)
+        self.council.record(identity,'architect','PASS',source,actor='synthetic_architect')
+        self.council.record(identity,'coder','PASS',source,actor='synthetic_developer')
+        with self.assertRaisesRegex(CouncilError,'explicit_host_review_required'):
+            self.council.record(identity,'release_guardian','PASS',source,actor='synthetic_developer')
+        with patch('scripts.development_council.run',return_value=dict(status='PASS',tests=1,skips=0)):
+            self.council.test(identity)
+        self.git('add','apps/sample.py'); self.git('commit','-m','synthetic seven-role change')
+        done=self.council.complete(identity,self.git('rev-parse','HEAD'),'synthetic-user-approval')
+        self.assertTrue(all(role['status']=='PASS' for role in done['roles'].values()))
+        guardian=done['roles']['release_guardian']
+        self.assertEqual(guardian['scope'],'development_checkpoint_only')
+        self.assertFalse(guardian['production_authorized']); self.assertFalse(guardian['release_ready'])
+        self.assertTrue(all(item['status']=='PASS' for item in guardian['gates'].values()))
+
+    def test_guardian_failure_is_retained_redacted_and_bounded_before_checkpoint_acceptance(self):
+        task=self.passing(); identity=task['id']
+        self.git('add','apps/sample.py'); self.git('commit','-m','synthetic pending guardian')
+        commit=self.git('rev-parse','HEAD')
+        with patch('scripts.development_council.privacy',side_effect=release.GateError('SYNTHETIC_PRIVATE_FINDING')):
+            blocked=self.council.complete(identity,commit,'synthetic-user-approval')
+        self.assertEqual(blocked['stage'],'BLOCKED'); self.assertNotIn('commit',blocked)
+        self.assertNotIn('SYNTHETIC_PRIVATE',json.dumps(blocked))
+        self.assertEqual(self.council.next_action(identity)['action'],'host_retry_release_guardian')
+        done=Council(self.repo).complete(identity,commit,'synthetic-user-approval')
+        self.assertEqual(done['stage'],'COMPLETE')
+        self.assertEqual([item['status'] for item in done['guardian_history']],['BLOCKED','PASS'])
+        self.council.status(identity)
+        self.assertIn('BLOCKED, PASS',(self.council.directory/'status.html').read_text(encoding='utf-8'))
+
+    def test_guardian_repeated_failure_cannot_loop_or_lose_test_and_failure_evidence(self):
+        task=self.passing(); identity=task['id']
+        self.git('add','apps/sample.py'); self.git('commit','-m','synthetic guardian blocked')
+        commit=self.git('rev-parse','HEAD')
+        with patch('scripts.development_council.privacy',side_effect=release.GateError('synthetic unavailable')):
+            for _ in range(2): self.council.complete(identity,commit,'synthetic-user-approval')
+            with self.assertRaisesRegex(CouncilError,'guardian_attempt_budget_exhausted'):
+                self.council.complete(identity,commit,'synthetic-user-approval')
+        retained=self.council._read(identity)
+        self.assertEqual(retained['stage'],'BLOCKED'); self.assertEqual(len(retained['guardian_history']),2)
+        self.assertEqual(retained['roles']['tester']['status'],'PASS')
+        self.assertEqual(self.council.next_action(identity)['action'],'guardian_attempt_budget_exhausted')
+
+    def test_guardian_operational_failures_reserve_and_retain_attempts_without_secret_messages(self):
+        task=self.passing(); identity=task['id']
+        self.git('add','apps/sample.py'); self.git('commit','-m','synthetic guardian transport failure')
+        commit=self.git('rev-parse','HEAD')
+        for failure in (subprocess.TimeoutExpired('SYNTHETIC_PRIVATE_COMMAND',120),OSError('SYNTHETIC_PRIVATE_PATH')):
+            with patch('scripts.development_council.privacy',side_effect=failure):
+                result=self.council.complete(identity,commit,'synthetic-user-approval')
+            self.assertEqual(result['stage'],'BLOCKED')
+            self.assertEqual(result['roles']['release_guardian']['exception_type'],type(failure).__name__)
+        self.assertEqual(len(result['guardian_history']),2); self.assertNotIn('SYNTHETIC_PRIVATE',json.dumps(result))
+        with self.assertRaisesRegex(CouncilError,'guardian_attempt_budget_exhausted'):
+            self.council.complete(identity,commit,'synthetic-user-approval')
+
+    def test_guardian_crash_preserves_lease_budget_and_requires_explicit_stopped_worker_resume(self):
+        task=self.passing(); identity=task['id']
+        self.git('add','apps/sample.py'); self.git('commit','-m','synthetic guardian interrupted')
+        commit=self.git('rev-parse','HEAD')
+        with patch('scripts.development_council.privacy',side_effect=KeyboardInterrupt()):
+            with self.assertRaises(KeyboardInterrupt): self.council.complete(identity,commit,'synthetic-user-approval')
+        retained=Council(self.repo)._read(identity)
+        self.assertEqual(retained['roles']['release_guardian']['status'],'RUNNING'); self.assertEqual(len(retained['guardian_history']),1)
+        self.assertEqual(self.council.next_action(identity)['status'],'WAIT')
+        with self.assertRaisesRegex(CouncilError,'guardian_already_running'):
+            self.council.complete(identity,commit,'synthetic-user-approval')
+        with self.assertRaisesRegex(CouncilError,'active_worker_lease_preserved'):
+            self.council.resume(identity,confirm_worker_stopped=True)
+        self.council._change(identity,lambda current:current['roles']['release_guardian'].update(started=time.time()-601))
+        self.assertEqual(self.council.next_action(identity)['action'],'confirm_guardian_stopped_before_resume')
+        self.council.resume(identity,confirm_worker_stopped=True)
+        done=self.council.complete(identity,commit,'synthetic-user-approval')
+        self.assertEqual(done['stage'],'COMPLETE')
+        self.assertEqual(done['guardian_history'][0]['code'],'interrupted_guardian_preserved')
+
+    def test_v2_task_remains_legacy_without_fabricated_architect_or_guardian_acceptance(self):
+        task=self.reviewed(); identity=task['id']
+        def legacy(current):
+            current['contract_version']=2
+            for key in ('architect','release_guardian'): current['roles'].pop(key)
+            current['roles']['planner']=dict(status='PASS',provider='deterministic',code='reviewed_master_queue')
+            current.pop('selection')
+        self.council._change(identity,legacy)
+        with patch('scripts.development_council.run',return_value=dict(status='PASS',tests=1,skips=0)):
+            self.council.test(identity)
+        self.git('add','apps/sample.py'); self.git('commit','-m','synthetic v2 checkpoint')
+        with patch('scripts.development_council.privacy',side_effect=AssertionError('No retroactive guardian')):
+            self.assertEqual(self.council.next_action(identity)['status'],'BLOCKED')
+            done=self.council.complete(identity,self.git('rev-parse','HEAD'),'synthetic-user-approval')
+        self.assertEqual(len(done['roles']),6); self.assertEqual(done['contract_version'],2)
+        self.assertNotIn('guardian_history',done)
 
     def test_duplicate_tasks_and_blocked_queue_do_not_spawn_coders(self):
         task=self.plan(); self.assertEqual(self.plan()['id'],task['id'])
@@ -215,7 +315,7 @@ class DevelopmentCouncilTests(SimpleTestCase):
         task=self.plan(); identity=task['id']
         self.assertEqual(self.council.handoff(identity)['next_action']['action'],'host_implementation')
         (self.repo/'apps/sample.py').write_text('VALUE = 2\n',encoding='utf-8'); source=self.council.snapshot(task)[0]
-        for role,action in (('developer','host_implementation_review'),('reviewer','independent_host_review'),('security','host_security_review')):
+        for role,action in (('architect','host_architecture_review'),('developer','host_implementation_review'),('reviewer','independent_host_review'),('security','host_security_review')):
             route=self.council.next_action(identity)
             self.assertEqual((route['action'],route['role']),(action,role)); self.assertFalse(route['automatic_execution'])
             self.council.record(identity,role,'PASS',source,actor='synthetic_'+role)
@@ -225,7 +325,7 @@ class DevelopmentCouncilTests(SimpleTestCase):
         self.assertEqual(self.council.next_action(identity)['action'],'authorized_host_commit_then_verify')
         self.assertEqual(self.git('rev-parse','HEAD'),task['base'])
         self.git('add','apps/sample.py'); self.git('commit','-m','authorized synthetic routing cycle')
-        self.assertEqual(self.council.next_action(identity)['status'],'BLOCKED')  # Host commit must still be verified.
+        self.assertEqual(self.council.next_action(identity)['action'],'verify_authorized_host_commit_and_guardian')
         self.council.complete(identity,self.git('rev-parse','HEAD'),'synthetic-user-approval')
         result=Council(self.repo).status(identity)[0]
         self.assertEqual(result['next_action']['action'],'historical_completed_receipt')
@@ -243,7 +343,7 @@ class DevelopmentCouncilTests(SimpleTestCase):
         self.council.resume(identity,confirm_worker_stopped=True)
         self.assertEqual(self.council.next_action(identity)['action'],'host_resolve_test_failure')
         (self.repo/'apps/sample.py').write_text('VALUE = 3\n',encoding='utf-8')
-        self.assertEqual(self.council.next_action(identity)['action'],'host_implementation_review')
+        self.assertEqual(self.council.next_action(identity)['action'],'host_architecture_review')
         (self.repo/'apps/outside.py').write_text('UNPLANNED = 1\n',encoding='utf-8')
         self.assertEqual(self.council.next_action(identity)['status'],'BLOCKED')
 
@@ -254,7 +354,7 @@ class DevelopmentCouncilTests(SimpleTestCase):
         self.assertFalse((self.repo/'apps/new.py').exists())
         self.council._change(identity,lambda current:current['paths'].remove('apps/new.py'))
         (self.repo/'apps/sample.py').write_text('VALUE = 2\n',encoding='utf-8'); source=self.council.snapshot(self.council._read(identity))[0]
-        for role in ('developer','reviewer','security'): self.council.record(identity,role,'PASS',source,actor='synthetic_'+role)
+        for role in ('architect','developer','reviewer','security'): self.council.record(identity,role,'PASS',source,actor='synthetic_'+role)
         self.council._change(identity,lambda current:current.update(attempts=2))
         self.assertEqual(self.council.next_action(identity)['action'],'test_attempt_budget_exhausted')
 

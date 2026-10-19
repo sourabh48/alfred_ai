@@ -17,11 +17,12 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts import release_gate as release
-from scripts.release_validation import SECRET, PRIVATE, environment, run
+from scripts.release_validation import SECRET, PRIVATE, environment, run, privacy
 from apps.ml_engine.services.local_embeddings import OllamaEmbeddings, EmbeddingUnavailable
 
 BRANCH = 'development/alfred-integrated'
 ROLES = ('planner', 'developer', 'reviewer', 'security', 'tester', 'coordinator')
+CURRENT_ROLES = ('coordinator', 'architect', 'developer', 'reviewer', 'security', 'tester', 'release_guardian')
 SIGNALS = {'clear', 'needs_review', 'ownership', 'financial', 'security', 'tests', 'concurrency'}
 PROPOSAL_ACTIONS = ('inspect', 'implement', 'test', 'review')
 ADVISORY_CODES = {'advisory_deadline_exceeded','advisory_output_budget_exceeded','advisory_schema_invalid',
@@ -141,10 +142,10 @@ class Council:
         base = release.git(self.repo, 'rev-parse', 'HEAD')
         identity = sha256(json.dumps(choice, sort_keys=True).encode()).hexdigest()
         task = dict(choice, id=identity[:16], identity=identity, base=base, paths=paths, labels=labels, profile=profile,
-            stage='AWAITING_DEVELOPER', revision=0, attempts=0, created=int(time.time()), source=None, contract_version=2,
+            stage='AWAITING_DEVELOPER', revision=0, attempts=0, created=int(time.time()), source=None, contract_version=3,
             budgets=dict(context_bytes=4096, reserved_tokens=8192, output_tokens=256, iterations=2, seconds=600),
-            reserved_tokens=0, roles={role:dict(status='NOT_RUN') for role in ROLES})
-        task['roles']['planner'] = dict(status='PASS', provider='deterministic', code='reviewed_master_queue')
+            reserved_tokens=0, roles={role:dict(status='NOT_RUN') for role in CURRENT_ROLES},
+            selection=dict(provider='deterministic',code='reviewed_master_queue'))
         with closing(sqlite3.connect(self.database)) as db, db:
             old = db.execute('SELECT body FROM tasks WHERE identity=?', (identity,)).fetchone()
             if old:
@@ -185,6 +186,7 @@ class Council:
         task = self._read(identity)
         return dict(task=task['id'], feature=task['feature'], objective=task['title'], base=task['base'], paths=task['paths'],
             labels=task['labels'], budgets=task['budgets'], developer='codex_host_or_human_required',
+            roles=list(task['roles']),contract_version=task.get('contract_version',1),
             next_action=self.next_action(identity),
             instructions=['Read AGENTS.md and PROJECT_STATUS.md; use applicable existing skills.',
                 'Use legitimate available Codex only; quota exhaustion means BLOCKED, never automatic provider switching.',
@@ -198,7 +200,29 @@ class Council:
             return dict(action=action,role=role,status=status,host_action_required=status not in ('WAIT','COMPLETE'),
                 automatic_execution=False,task=identity,base=task['base'])
         if task['stage']=='COMPLETE': return route('historical_completed_receipt',status='COMPLETE')
-        if release.git(self.repo,'branch','--show-current')!=BRANCH or release.git(self.repo,'rev-parse','HEAD')!=task['base']:
+        guardian=task['roles'].get('release_guardian',{})
+        if guardian.get('status')=='RUNNING':
+            if time.time()-guardian['started']>task['budgets']['seconds']:
+                return route('confirm_guardian_stopped_before_resume','release_guardian')
+            return route('wait_for_active_guardian','release_guardian','WAIT')
+        head=release.git(self.repo,'rev-parse','HEAD')
+        if release.git(self.repo,'branch','--show-current')!=BRANCH:
+            return route('pinned_branch_or_base_changed',status='BLOCKED')
+        if head!=task['base']:
+            try:
+                source,_=self.snapshot(task,commit=head)
+                expected=(task.get('contract_version',1)>=3
+                    and release.git(self.repo,'rev-list','--parents','-n','1',head).split()==[head,task['base']]
+                    and not release.git(self.repo,'status','--porcelain','--untracked-files=all')
+                    and source==task['source'] and self._reviews_valid(task,source)
+                    and task['roles']['tester'].get('source')==source and task['roles']['tester']['status']=='PASS')
+            except Exception: expected=False
+            if expected and task['stage']=='READY_FOR_AUTHORIZED_COMMIT':
+                return route('verify_authorized_host_commit_and_guardian','release_guardian')
+            if expected and task['stage']=='BLOCKED' and guardian.get('candidate')==head and guardian['status'] in ('FAIL','BLOCKED'):
+                if len(task.get('guardian_history',[]))>=task['budgets']['iterations']:
+                    return route('guardian_attempt_budget_exhausted','release_guardian','BLOCKED')
+                return route('host_retry_release_guardian','release_guardian')
             return route('pinned_branch_or_base_changed',status='BLOCKED')
         tester=task['roles']['tester']
         if tester['status']=='RUNNING':
@@ -211,7 +235,9 @@ class Council:
                 return route('host_implementation','developer')
             return route('current_source_requires_operator_review',status='BLOCKED')
         if not changed-{'docs/PROJECT_STATUS.md'}: return route('host_implementation','developer')
-        for role,action in (('developer','host_implementation_review'),('reviewer','independent_host_review'),('security','host_security_review')):
+        for role in self._review_roles(task):
+            action={'architect':'host_architecture_review','developer':'host_implementation_review',
+                'reviewer':'independent_host_review','security':'host_security_review'}[role]
             evidence=task['roles'][role]
             if evidence.get('source')!=source or evidence['status']!='PASS' or (task.get('contract_version',1)>=2 and not evidence.get('actor')):
                 return route(action,role)
@@ -230,18 +256,21 @@ class Council:
             task['test_history']=[dict(task['roles']['tester'],attempt=task['attempts'],legacy_summary=True)]
 
     def record(self, identity, role, status, source, *, provider='codex_host', codes=('reviewed',), actor=None):
-        if role not in ('developer', 'reviewer', 'security') or status not in ('PASS', 'FAIL', 'BLOCKED') or provider not in ('codex_host', 'human'):
+        if role=='coder': role='developer'
+        if role not in ('architect', 'developer', 'reviewer', 'security') or status not in ('PASS', 'FAIL', 'BLOCKED') or provider not in ('codex_host', 'human'):
             raise CouncilError('explicit_host_review_required')
         if not codes or len(codes)>8 or any(not re.fullmatch(r'[a-z_]{1,64}', code) for code in codes): raise CouncilError('safe_reason_codes_required')
         def update(task):
+            if role not in self._review_roles(task): raise CouncilError('role_not_in_task_contract')
             if actor is not None and (not isinstance(actor,str) or not re.fullmatch(r'[a-z][a-z0-9_-]{2,63}',actor)): raise CouncilError('safe_host_actor_required')
             if task.get('contract_version',1)>=2 and actor is None: raise CouncilError('explicit_host_actor_required')
             fingerprint, changed = self.snapshot(task)
             if source != fingerprint or not (changed - {'docs/PROJECT_STATUS.md'}): raise CouncilError('review_source_mismatch_or_no_implementation')
-            if task['stage'] in ('COMPLETE','COMMITTING') or task['roles']['tester']['status']=='RUNNING': raise CouncilError('task_busy_or_complete')
+            if task['stage'] in ('COMPLETE','COMMITTING','VERIFYING_RELEASE_GUARDIAN') or task['roles']['tester']['status']=='RUNNING': raise CouncilError('task_busy_or_complete')
             if task['source'] != source:
                 self._retain_legacy_test(task)
-                task['roles'].update({member:dict(status='NOT_RUN') for member in ('developer','reviewer','security','tester')})
+                reset=(*self._review_roles(task),'tester')+ (('release_guardian',) if task.get('contract_version',1)>=3 else ())
+                task['roles'].update({member:dict(status='NOT_RUN') for member in reset})
             task['source'] = source
             if role=='reviewer' and actor is not None and actor==task['roles']['developer'].get('actor'):
                 raise CouncilError('independent_host_reviewer_required')
@@ -321,11 +350,16 @@ class Council:
         return dict(result,advisory_result=next(item for item in result['advisories'] if item['id']==attempt_id),advisory_reused=False)
 
     @staticmethod
-    def _reviews_valid(task,source):
+    def _review_roles(task):
+        return (('architect',) if task.get('contract_version',1)>=3 else ())+('developer','reviewer','security')
+
+    @classmethod
+    def _reviews_valid(cls,task,source):
         roles=task['roles']
-        valid=all(roles[role].get('source')==source and roles[role]['status']=='PASS' for role in ('developer','reviewer','security'))
+        required=cls._review_roles(task)
+        valid=all(roles[role].get('source')==source and roles[role]['status']=='PASS' for role in required)
         if task.get('contract_version',1)>=2:
-            valid=valid and all(roles[role].get('actor') for role in ('developer','reviewer','security')) and roles['developer']['actor']!=roles['reviewer']['actor']
+            valid=valid and all(roles[role].get('actor') for role in required) and roles['developer']['actor']!=roles['reviewer']['actor']
         return bool(valid)
 
     def test(self, identity):
@@ -383,6 +417,14 @@ class Council:
     def resume(self, identity, *, confirm_worker_stopped=False):
         if not confirm_worker_stopped: raise CouncilError('worker_stop_confirmation_required')
         def update(task):
+            guardian=task['roles'].get('release_guardian',{})
+            if guardian.get('status')=='RUNNING':
+                if time.time()-guardian['started']<=task['budgets']['seconds']:
+                    raise CouncilError('active_worker_lease_preserved')
+                guardian.update(status='BLOCKED',code='interrupted_guardian_preserved')
+                task['guardian_history'][-1].update(guardian)
+                task['stage']='BLOCKED'
+                return
             if task['roles']['tester']['status']!='RUNNING' or time.time()-task['roles']['tester']['started']<=task['budgets']['seconds']:
                 raise CouncilError('active_worker_lease_preserved')
             task['roles']['tester']=dict(status='BLOCKED',code='interrupted_evidence_preserved')
@@ -394,17 +436,61 @@ class Council:
         """Verify a legitimate host's approved commit; this tool never edits or stages source."""
         if not re.fullmatch(r'[A-Za-z0-9_-]{8,80}', authorization or ''): raise CouncilError('development_commit_authorization_required')
         release.exact_commit(self.repo,commit)
-        def finish(task):
+        attempt_id=uuid4().hex; claimed=[]
+        def accept(task):
+            task.update(stage='COMPLETE',commit=commit,authorization=authorization)
+            task['roles']['coordinator']=dict(status='PASS',provider='deterministic',code='verified_authorized_host_commit')
+        def prepare(task):
             if task['stage']=='COMPLETE' and task.get('commit')==commit: return
+            if task['roles'].get('release_guardian',{}).get('status')=='RUNNING': raise CouncilError('guardian_already_running')
             if release.git(self.repo,'rev-parse','HEAD')!=commit or release.git(self.repo,'rev-list','--parents','-n','1',commit).split()!=[commit,task['base']] or release.git(self.repo,'status','--porcelain','--untracked-files=all'):
                 raise CouncilError('exact_clean_host_commit_required')
             fingerprint,changed=self.snapshot(task,commit=commit)
-            if (task['stage']!='READY_FOR_AUTHORIZED_COMMIT' or not changed
+            retry_guardian=(task.get('contract_version',1)>=3 and task['stage']=='BLOCKED'
+                and task['roles']['release_guardian']['status'] in ('FAIL','BLOCKED'))
+            if ((task['stage']!='READY_FOR_AUTHORIZED_COMMIT' and not retry_guardian) or not changed
                     or not self._reviews_valid(task,fingerprint)
                     or task['roles']['tester'].get('source')!=fingerprint or task['roles']['tester']['status']!='PASS'):
                 raise CouncilError('commit_gates_unsatisfied')
-            task.update(stage='COMPLETE',commit=commit,authorization=authorization)
-            task['roles']['coordinator']=dict(status='PASS',provider='deterministic',code='verified_authorized_host_commit')
+            if task.get('contract_version',1)>=3:
+                if len(task.get('guardian_history',[]))>=task['budgets']['iterations']:
+                    raise CouncilError('guardian_attempt_budget_exhausted')
+                task['roles']['release_guardian']=dict(id=attempt_id,status='RUNNING',source=fingerprint,
+                    started=int(time.time()),candidate=commit,scope='development_checkpoint_only')
+                task.setdefault('guardian_history',[]).append(dict(task['roles']['release_guardian']))
+                task['stage']='VERIFYING_RELEASE_GUARDIAN'; claimed.append(fingerprint)
+            else: accept(task)
+        task=self._change(identity,prepare)
+        if not claimed: return task
+        started=time.monotonic()
+        manifest=release.new_manifest('council-'+identity,commit,task['base'])
+        status='PASS'; code='m20_development_checkpoint_verified'; exception_type=None
+        try:
+            release.source_checks(self.repo,manifest)
+            privacy(self.repo,manifest)
+            if release.decision(manifest,('source','dependencies','migrations','privacy'))['status']!='PASS':
+                raise CouncilError('guardian_gates_unsatisfied')
+            if time.monotonic()-started>task['budgets']['seconds']: raise CouncilError('guardian_deadline_exceeded')
+        except Exception as exc:
+            status='BLOCKED'; code='guardian_validation_failed'; exception_type=type(exc).__name__
+        def finish(current):
+            guardian=current['roles']['release_guardian']
+            if guardian.get('id')!=attempt_id or guardian['status']!='RUNNING': return
+            result=dict(status=status,code=code,exception_type=exception_type,scope='development_checkpoint_only',
+                gates={name:manifest['gates'][name] for name in ('source','dependencies','migrations','privacy')},
+                production_authorized=False,release_ready=False,seconds=round(time.monotonic()-started,3))
+            if result['status']=='PASS':
+                try:
+                    if (release.git(self.repo,'rev-parse','HEAD')!=commit or release.git(self.repo,'branch','--show-current')!=BRANCH
+                            or release.git(self.repo,'status','--porcelain','--untracked-files=all')
+                            or self.snapshot(current,commit=commit)[0]!=claimed[0]
+                            or not self._reviews_valid(current,claimed[0])):
+                        raise CouncilError('guardian_source_changed')
+                except Exception as exc:
+                    result.update(status='BLOCKED',code='guardian_source_changed',exception_type=type(exc).__name__)
+            guardian.update(result); current['guardian_history'][-1].update(guardian)
+            if guardian['status']=='PASS': accept(current)
+            else: current['stage']='BLOCKED'
         return self._change(identity,finish)
 
     def status(self, identity=None):
@@ -416,15 +502,19 @@ class Council:
         for task in tasks:
             task['next_action']=self.next_action(task['id'])
             rows.append('<h2>'+escape(task['feature']+' '+task['title'])+'</h2><p>'+escape(task['id']+' / '+task['stage'])+'</p><table><tr><th>Role</th><th>Status</th><th>Evidence</th></tr>')
-            for role, result in task['roles'].items(): rows.append('<tr><td>'+escape(role)+'</td><td>'+escape(result['status'])+'</td><td>'+escape(result.get('code',result.get('provider','pending')))+ '</td></tr>')
+            for role, result in task['roles'].items(): rows.append('<tr><td>'+escape('coder' if role=='developer' and task.get('contract_version',1)>=3 else role)+'</td><td>'+escape(result['status'])+'</td><td>'+escape(result.get('code',result.get('provider','pending')))+ '</td></tr>')
             rows.append('</table><p>Tests: '+escape(str(task['roles']['tester'].get('tests','NOT_RUN')))+'; attempts '+str(task['attempts'])+'/2. Source: '+escape(task.get('source') or 'not reviewed')+'</p>')
             action=task['next_action']
             rows.append('<p>Next host action: '+escape(action['status']+' / '+action['action']+'; role '+(action['role'] or 'operator'))+'. Recommendation only; no automatic execution or new approval.</p>')
             rows.append('<p>Independent host attribution: '+escape('; '.join(role+': '+task['roles'][role].get('actor','legacy unspecified') for role in ('developer','reviewer','security')))+'. Aliases are host attestations, not cryptographic identity proof.</p>')
+            if task.get('contract_version',1)>=3:
+                rows.append('<p>Seven-role contract: coordinator selects the reviewed roadmap task and verifies its checkpoint; architect is a source-bound host review, not inherently independent. Release Guardian checks pinned source/privacy/dependency/migration gates only. Production authorization and full release readiness remain NOT_RUN; no deployment is performed.</p>')
+                rows.append('<p>Guardian attempts: '+escape(', '.join(item['status'] for item in task.get('guardian_history',[])) or 'NOT_RUN')+'. Failures remain evidence; retry budget is bounded.</p>')
             history=task.get('test_history',[])
             rows.append('<p>Retained test outcomes: '+escape('; '.join('attempt '+str(item['attempt'])+': '+item['status']+', '+str(item.get('tests','NOT_RUN'))+' executed, '+str(item.get('seconds','not recorded'))+' seconds' for item in history) or 'legacy summary only')+'. Counts across attempts are not distinct test coverage.</p>')
             budget=task['budgets']
             rows.append('<p>Advisory budget reserved: '+str(task['reserved_tokens'])+'/'+str(budget['reserved_tokens'])+' tokens (conservative reservation, not measured usage). Context limit: '+str(budget['context_bytes'])+' bytes; output limit: '+str(budget['output_tokens'])+' tokens. Test deadline: '+str(budget['seconds'])+' seconds.</p>')
+            rows.append('<p>Host account token/cost usage is not observable here. CLI model advice uses local Ollama only; no paid-provider fallback or quota bypass.</p>')
             rows.append('<h3>Optional model advice</h3><p>Advice never satisfies a required role. A blocked advisory does not approve or replace host review.</p>')
             rows.append('<p>Advisory context reuse: '+str(task.get('advice_cache_hits',0))+' cache hits; no additional model calls. Cached advice is not a fresh source review.</p>')
             if not task.get('advisories'): rows.append('<p>NOT_RUN</p>')
