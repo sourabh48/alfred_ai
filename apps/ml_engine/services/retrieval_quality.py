@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 from .local_embeddings import EmbeddingUnavailable, OllamaEmbeddings
 from .memory_learning import MemoryLearning
-from .persistent_memory import MemoryConflict, MemoryStore
+from .persistent_memory import MemoryConflict, MemoryStore, RETRIEVAL_PROTOCOLS
 
 
 MODELS = ('all-minilm:latest', 'nomic-embed-text:latest')
@@ -88,14 +88,30 @@ class _BudgetedEmbeddings:
         return result
 
 
-def _measure(adapter, deadline):
+class _SyntheticCache:
+    """Per-comparison fictional inputs only; no private or persistent embedding cache."""
+    def __init__(self,adapter): self.adapter,self.cache=adapter,{}
+
+    def embed(self,text,*,deadline=None):
+        if text in self.cache:
+            vector,model=self.cache[text]
+            if model!=self.adapter.model+'@'+self.adapter._digest(deadline=deadline):
+                raise EmbeddingUnavailable('Synthetic comparison model changed.')
+        else:
+            if len(self.cache)>=128: raise EmbeddingUnavailable('Synthetic comparison cache budget exceeded.')
+            vector,model=self.adapter.embed(text,deadline=deadline)
+            self.cache[text]=(tuple(vector),model)
+        return list(vector),model
+
+
+def _measure(adapter, deadline, *, protocol=RETRIEVAL_PROTOCOLS[0]):
     owner = SimpleNamespace(pk=1, created_at=datetime(2020, 1, 1, tzinfo=timezone.utc), is_authenticated=True)
     other = SimpleNamespace(pk=2, created_at=owner.created_at, is_authenticated=True)
     results = []
     for cohort in COHORTS:
         with TemporaryDirectory(prefix='alfred-quality-fictional-') as directory:
             embedder = _BudgetedEmbeddings(adapter, deadline)
-            store = MemoryStore(directory, embedder=embedder)
+            store = MemoryStore(directory, embedder=embedder,retrieval_protocol=protocol)
             learning = MemoryLearning(store)
             ids = {key: store.save_verified(other if key == 'foreign' else owner,
                 {'statement': text}, {'source': cohort['id']}, verified=True)
@@ -133,13 +149,14 @@ def _measure(adapter, deadline):
                 stale_rejected = False
             results.append(dict(cohort=cohort['id'], cases=report['cases'], positive_cases=report['positive_cases'],
                 negative_cases=report['negative_cases'], precision=report['precision'], recall=report['recall'],
+                precision_at_k=report['precision_at_k'],recall_at_k=report['recall_at_k'],retrieval_errors=report['retrieval_errors'],
                 abstention_rate=report['abstention_rate'], citation_correctness=report['citation_correctness'],
                 owner_violations=violations, owner_reference_rejected=owner_rejected, stale_rejected=stale_rejected,
                 context=report['retrieval_context'],
                 per_case=explanations))
     if len({(r['context']['embedding_identity'],r['context']['dimensions']) for r in results}) != 1:
         raise EmbeddingUnavailable('Local embedding model changed between cohorts.')
-    return dict(cohort_id=COHORT_ID, cutoff=.45, results=results)
+    return dict(cohort_id=COHORT_ID, cutoff=.45, protocol=protocol, results=results)
 
 
 def assess(baseline, candidate):
@@ -171,21 +188,27 @@ def assess(baseline, candidate):
     return dict(decision='REJECT' if reasons else 'ELIGIBLE_FOR_REVIEW', reasons=reasons, differences=differences)
 
 
-def compare(baseline_model, candidate_model, *, adapters=None):
+def compare(baseline_model, candidate_model, *, adapters=None, baseline_protocol=RETRIEVAL_PROTOCOLS[0], candidate_protocol=RETRIEVAL_PROTOCOLS[0]):
     if baseline_model not in MODELS or candidate_model not in MODELS: raise ValueError('Choose an approved local embedding model.')
+    if baseline_protocol not in RETRIEVAL_PROTOCOLS or candidate_protocol not in RETRIEVAL_PROTOCOLS: raise ValueError('Choose a supported retrieval protocol.')
     deadline = time.monotonic() + SECONDS
+    local_adapters={}
     def adapter(model):
         if adapters is not None: return adapters[model]
-        result = OllamaEmbeddings(); result.model = model
-        return result
+        if model not in local_adapters:
+            result = OllamaEmbeddings(); result.model = model
+            local_adapters[model]=_SyntheticCache(result)
+        return local_adapters[model]
     try:
-        baseline = _measure(adapter(baseline_model), deadline)
-        candidate = baseline if candidate_model == baseline_model else _measure(adapter(candidate_model), deadline)
+        baseline = _measure(adapter(baseline_model), deadline,protocol=baseline_protocol)
+        reused=candidate_model==baseline_model and candidate_protocol==baseline_protocol
+        candidate = baseline if reused else _measure(adapter(candidate_model), deadline,protocol=candidate_protocol)
     except MemoryConflict:
         return dict(configuration(), decision='REJECT', reasons=['source_or_owner_revalidation_failed'],
             baseline=None, candidate=None, differences=[], runtime_changed=False)
     assessment=assess(baseline,candidate)
-    if baseline_model==candidate_model and assessment['decision']=='ELIGIBLE_FOR_REVIEW': assessment['decision']='REFERENCE_ONLY'
+    if reused and assessment['decision']=='ELIGIBLE_FOR_REVIEW': assessment['decision']='REFERENCE_ONLY'
     return dict(configuration(), **assessment, baseline=baseline, candidate=candidate,
-        candidate_execution='baseline_reference_reused' if baseline_model==candidate_model else 'independent_model_run',
+        candidate_execution='baseline_reference_reused' if reused else 'independent_protocol_run' if baseline_model==candidate_model else 'independent_model_run',
+        baseline_protocol=baseline_protocol,candidate_protocol=candidate_protocol,
         baseline_model=baseline_model, candidate_model=candidate_model, runtime_changed=False)

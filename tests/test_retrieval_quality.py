@@ -8,7 +8,8 @@ from rest_framework.test import APIClient
 
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 from apps.ml_engine.services.persistent_memory import MemoryConflict
-from apps.ml_engine.services.retrieval_quality import COHORTS, MODELS, POLICY, _BudgetedEmbeddings, assess, compare
+from apps.ml_engine.services.retrieval_quality import COHORTS, MODELS, POLICY, _BudgetedEmbeddings, _SyntheticCache, assess, compare
+from apps.ml_engine.services.persistent_memory import RETRIEVAL_PROTOCOLS
 from tests import test_memory_learning as fixtures
 
 
@@ -82,6 +83,23 @@ class RetrievalQualityTests(TestCase):
         self.assertEqual(report['decision'],'REJECT')
         self.assertIsNone(report['baseline']); self.assertIsNone(report['candidate'])
         self.assertNotIn('candidate_execution',report)
+
+    def test_protocol_comparison_is_not_reused_or_automatic_runtime_activation(self):
+        report=compare(MODELS[0],MODELS[0],adapters={MODELS[0]:ContractEmbeddings()},candidate_protocol=RETRIEVAL_PROTOCOLS[1])
+        self.assertEqual(report['decision'],'ELIGIBLE_FOR_REVIEW')
+        self.assertEqual(report['candidate_execution'],'independent_protocol_run')
+        self.assertFalse(report['runtime_changed'])
+        self.assertEqual(report['candidate']['results'][0]['context']['protocol'],RETRIEVAL_PROTOCOLS[1])
+        self.assertNotEqual(report['baseline']['results'][0]['context']['embedding_identity'],report['candidate']['results'][0]['context']['embedding_identity'])
+
+    def test_synthetic_cache_reuses_only_identical_inputs_and_rechecks_real_model_identity(self):
+        from unittest.mock import Mock
+        raw=Mock(); raw.model=MODELS[0]; raw.embed.return_value=([1,0],MODELS[0]+'@'+'1'*64); raw._digest.return_value='1'*64
+        cache=_SyntheticCache(raw)
+        first=cache.embed('Fictional input',deadline=30); first[0][0]=0
+        self.assertEqual(cache.embed('Fictional input',deadline=30)[0],[1,0]); self.assertEqual(raw.embed.call_count,1)
+        raw._digest.return_value='2'*64
+        with self.assertRaises(EmbeddingUnavailable): cache.embed('Fictional input',deadline=30)
 
     def test_thresholds_boundaries_missing_metrics_tamper_and_incomparable_cohorts(self):
         report=contract_comparison(); baseline=report['baseline']

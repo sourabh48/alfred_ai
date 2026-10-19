@@ -7,10 +7,24 @@ from unittest import skipUnless
 from django.test import TestCase
 
 from apps.ml_engine.services.retrieval_quality import MODELS, compare
+from apps.ml_engine.services.persistent_memory import RETRIEVAL_PROTOCOLS
 
 
 @skipUnless(os.environ.get('ALFRED_RUN_OLLAMA_GROUNDING')=='true','Explicit fictional local acceptance required.')
 class RealRetrievalQualityTests(TestCase):
+    def test_development_protocol_candidate_is_measured_without_activation(self):
+        report=compare(MODELS[0],MODELS[0],candidate_protocol=RETRIEVAL_PROTOCOLS[1])
+        Path(os.environ['ALFRED_DIAGNOSTIC_OUTPUT']).with_name('development-protocol.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+        self.assertIn(report['decision'],('ELIGIBLE_FOR_REVIEW','REJECT'))
+        self.assertEqual(report['candidate_execution'],'independent_protocol_run')
+        self.assertFalse(report['runtime_changed']); self.assertEqual(report['cases'],24)
+        self.assertEqual(report['baseline_protocol'],RETRIEVAL_PROTOCOLS[0])
+        for side in ('baseline','candidate'):
+            for result in report[side]['results']:
+                self.assertEqual(result['owner_violations'],0); self.assertTrue(result['stale_rejected'])
+                self.assertTrue(result['owner_reference_rejected'])
+                self.assertEqual(set(result['precision_at_k']),{'1','2','3'})
+
     def test_reviewed_cohorts_produce_measured_verdict_without_model_activation(self):
         report=compare(MODELS[0],MODELS[0])
         Path(os.environ['ALFRED_DIAGNOSTIC_OUTPUT']).with_name('cohort-quality.json').write_text(json.dumps(report,indent=2),encoding='utf-8')

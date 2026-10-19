@@ -58,6 +58,9 @@ class MemoryEvaluationTests(TestCase):
         self.assertEqual(result['false_positive_rate'],0)
         self.assertEqual(result['checked_citations'],3); self.assertEqual(result['positive_cases'],2)
         self.assertEqual(result['negative_cases'],3)
+        self.assertEqual(result['precision_at_k'],{'1':1.0,'2':.75,'3':.5})
+        self.assertEqual(result['recall_at_k'],{'1':.75,'2':1.0,'3':1.0})
+        self.assertEqual(result['retrieval_errors'],dict(unexpected_references=0,missed_references=0,false_abstentions=0,false_matches=0))
         self.assertFalse(result['generated_hypotheses_are_facts'])
         context=result['retrieval_context']
         self.assertEqual(context['protocol'],'owner-cosine-top3-v1')

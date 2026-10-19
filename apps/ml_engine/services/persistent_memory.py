@@ -1,10 +1,12 @@
 """Verified owner-scoped local memories and an encrypted append-only restore journal."""
 from contextlib import contextmanager, closing
+from collections import Counter
 from datetime import datetime, timezone, timedelta
 from hashlib import sha256
 import json
 from math import hypot, isfinite
 import os
+import re
 from pathlib import Path
 import sqlite3
 import time
@@ -17,6 +19,23 @@ from .memory_key import private_directory, protect_key, MemoryStorageUnavailable
 
 
 SENSITIVITIES = {'public', 'personal', 'sensitive'}
+RETRIEVAL_PROTOCOLS = ('owner-cosine-top3-v1', 'owner-statement-specificity-top3-v1')
+
+
+def _statement_text(content):
+    return content['statement'] if set(content)=={'statement'} and isinstance(content['statement'],str) else _json(content)
+
+
+def _specific_sources(query, results, *, corpus=None):
+    """Prefer complete discriminating word matches; preserve dense-only paraphrase fallback."""
+    stop=set('the and for with from what which when where does how why who whose that this these those are was were has have can should would could'.split())
+    def words(text): return set(re.findall(r'[^\W\d_]{3,}',text.casefold()))-stop
+    corpus=results if corpus is None else corpus
+    terms={row['id']:words(_statement_text(row['content'])) for row in corpus}
+    frequency=Counter(word for value in terms.values() for word in value)
+    informative={word for word in words(query) if 0<frequency[word]<len(corpus)}
+    specific=[row for row in results if informative and informative<=terms[row['id']]]
+    return specific or results
 
 
 class MemoryConflict(ValueError):
@@ -41,7 +60,10 @@ def _owner(user):
 
 
 class MemoryStore:
-    def __init__(self, directory, *, embedder=None, timeout=10):
+    def __init__(self, directory, *, embedder=None, timeout=10, retrieval_protocol=RETRIEVAL_PROTOCOLS[0]):
+        if retrieval_protocol not in RETRIEVAL_PROTOCOLS: raise ValueError('Choose a supported local retrieval protocol.')
+        self.retrieval_protocol=retrieval_protocol
+        self.embedding_input='statement-text-v1' if retrieval_protocol==RETRIEVAL_PROTOCOLS[1] else 'legacy-json-v1'
         if not Path(directory).is_absolute():
             raise ValueError('Memory storage requires an absolute persistent directory.')
         deadline=time.monotonic()+timeout
@@ -206,7 +228,10 @@ class MemoryStore:
             model = record.get('embedding_model')
             if not isinstance(model, str) or not 1 <= len(model) <= 256:
                 raise EmbeddingUnavailable('Indexed embedding identity is unavailable.')
-            profiles.add((sha256(model.encode()).hexdigest(), len(validate_vector(record['embedding']))))
+            projection=record.get('embedding_input','legacy-json-v1')
+            if projection!=self.embedding_input: raise EmbeddingUnavailable('Explicit owner re-embedding is required for this retrieval protocol.')
+            identity=model if projection=='legacy-json-v1' else model+'|'+projection
+            profiles.add((sha256(identity.encode()).hexdigest(), len(validate_vector(record['embedding']))))
         if len(profiles) > 1:
             raise EmbeddingUnavailable('Stored memories require a consistent local embedding model.')
         identity, dimensions = next(iter(profiles), (None, None))
@@ -271,13 +296,14 @@ class MemoryStore:
         with self._transaction() as db:
             row = db.execute('SELECT epoch FROM owner_epochs WHERE owner=?', (owner,)).fetchone()
             epoch = row[0] if row else 0
-        vector, model = self.embedder.embed(text)
+        vector, model = self.embedder.embed(_statement_text(content) if self.embedding_input=='statement-text-v1' else text)
         validate_vector(vector)
         if not isinstance(model, str) or not 1 <= len(model) <= 256:
             raise EmbeddingUnavailable('Local embedding model identity is invalid.')
         record = dict(id=uuid4().hex, owner=owner, content=content, provenance=provenance,
             sensitivity=sensitivity, verified=True, verified_at=datetime.now(timezone.utc).isoformat(),
             embedding=vector, embedding_model=model)
+        if self.embedding_input!='legacy-json-v1': record['embedding_input']=self.embedding_input
         encoded = json.dumps(record, sort_keys=True, allow_nan=False).encode()
         with self._transaction() as db:
             row = db.execute('SELECT epoch FROM owner_epochs WHERE owner=?', (owner,)).fetchone()
@@ -329,6 +355,8 @@ class MemoryStore:
         if deadline is not None and time.monotonic()>=deadline: raise EmbeddingUnavailable('Local retrieval deadline exceeded.')
         if not records:
             return []
+        if any(record.get('embedding_input','legacy-json-v1')!=self.embedding_input for record in records):
+            raise EmbeddingUnavailable('Explicit owner re-embedding is required for this retrieval protocol.')
         vector, model = self.embedder.embed(query,**({'deadline':deadline} if deadline is not None else {}))
         validate_vector(vector)
         results = []
@@ -345,7 +373,10 @@ class MemoryStore:
         with self._transaction() as db:
             self._expire(db, owner)
             live = {r[0] for r in db.execute('SELECT id FROM memory_keys WHERE owner=?', (owner,))}
-            results = [item for item in results if item['id'] in live and (min_score is None or item['score']>=min_score)][:limit]
+            current=[item for item in results if item['id'] in live]
+            results=[item for item in current if min_score is None or item['score']>=min_score]
+            if self.retrieval_protocol==RETRIEVAL_PROTOCOLS[1]: results=_specific_sources(query,results,corpus=current)
+            results=results[:limit]
         if cloud and any(item['sensitivity'] != 'public' for item in results):
             raise PermissionError('Private memory is not approved for cloud reasoning.')
         if deadline is not None and time.monotonic()>=deadline: raise EmbeddingUnavailable('Local retrieval deadline exceeded.')
