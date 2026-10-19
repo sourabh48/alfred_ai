@@ -13,6 +13,7 @@
 - AWS retired permanently; paid OpenAI, real cloud synchronization and private conversation-history activation OFF. No cancelled key dialogs or key export. M15's device-loss waiver is not inherited.
 - FIN-CURRENCY C1–C10 below remain the unapproved design contract; no schema/backfill/FX/inferred INR. Preserve exact Decimal values, raw import evidence, fingerprints, owner/parent linkage and guarded rollback.
 - Both scoped Councils **696c858d48945a8f** (43fd6ea) and **194ba73f8aeeddfe** (a4d9f01) are **COMPLETE**, all six roles PASS with actual independent Reviewer/Security attribution. Same-ID relinks now invalidate old discovery cursors without changing retained fields/receipts. Next independently safe unit: backend-only bounded document questions over explicitly selected current owner-reviewed canonical records from one financial document, reusing existing context/citation/numeric-suppression checks. No arbitrary OCR/full-text retention, mixed totals, new extraction/index/memory system or approval-sensitive activation. Do not repeat either completed discovery unit.
+- Current user-priority continuation: extend the existing Council to seven operator roles before that document-question unit. Preserve the two completed v2 cycles exactly; add a source-bound Architect and deterministic M20-backed Release Guardian for new tasks, with legacy CLI/evidence compatibility. Host design review is not independent review; only actual separately attributed Reviewer evidence qualifies. All work remains development-only.
 
 Safe resume:
 
@@ -1640,7 +1641,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [Council contracts](../tests/test_development_council.py); actual focused counts/evidence above.
 - Acceptance: disposable contracts and five actual scoped host-mediated cycles PASS, including v2 independent actor/source/test/commit routing at d5078b9 (**30 backend + 1 status-browser flow**, overlaps combined evidence). Two later bounded local advisories produced signals/proposals only, never role approval; earlier blocked advice preserved. No unattended development/production or general model-review quality claim.
 - Limitations/dependencies: deterministic Planner, Codex-host/human Developer/Reviewer/Security, isolated Tester and commit-verifying Coordinator. Optional local advice never approves a role. No autonomous patch execution, production operations, paid-provider routing or quota bypass.
-- Next: Routing implemented at d5078b9. Use host-reviewed tasks such as DOC-07; keep recommendations, test evidence and authorized host actions distinct. No automatic patch/Git/production execution or model approval.
+- Next: [COUNCIL_SAFE_LOCAL] Extend existing Council to seven operator roles with source-bound Architect and deterministic M20-backed Release Guardian. Preserve v1/v2 historical tasks, explicit independent Reviewer attribution, budgets, bounded repairs, CLI/HTML and source-pinned testing. Guardian verifies development checkpoints only and never authorizes deployment, spending, migrations or financial writes. No new orchestration system, provider switch or automatic Git/production execution.
 
 ### COUNCIL-03 — Experimental self-improvement engine
 
