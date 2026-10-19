@@ -113,6 +113,22 @@ class FinancialSourceSelectionTests(TestCase):
         self.assertEqual(result['context_omitted'],0); self.assertFalse(result['financial_authority'])
         self.cloud.assert_not_called(); self.provider.assert_not_called()
 
+    def test_question_form_preserves_selected_reviewed_values_and_missing_field_abstention(self):
+        _,page=self.document_question_fixture()
+        data=self.document_question_data(page,query='What is my current value?')
+        response=self.client.post('/api/ai/personal-insights/',data,content_type='application/json')
+        self.assertEqual(response.status_code,200); result=response.json()
+        self.assertEqual(result['provider'],'ollama'); self.local.reason.assert_called_once()
+        self.assertEqual([row['url'] for row in result['sources']],[item['url'] for item in page['items']])
+        self.local.reason.reset_mock()
+        for query in ('What is my invested amount?','What is the monthly SIP?',
+                'What is my total current value?','What is the principal?','What was my current value?',
+                'What is my current value in INR?','What is my current value of record 999?'):
+            with self.subTest(query=query):
+                result=self.client.post('/api/ai/personal-insights/',data|{'query':query},content_type='application/json').json()
+                self.assertEqual(result['provider'],'local_evidence'); self.assertEqual(result['grounding'],'insufficient_evidence')
+        self.local.reason.assert_not_called(); self.cloud.assert_not_called(); self.provider.assert_not_called()
+
     def test_document_field_questions_abstain_without_every_selected_reviewed_value(self):
         document,page=self.document_question_fixture()
         data=self.document_question_data(page)
@@ -138,7 +154,8 @@ class FinancialSourceSelectionTests(TestCase):
         detail=loan_evidence.evidence(self.owner,document.pk,self.loan.pk)
         loan_evidence.review(self.owner,document.pk,self.loan.pk,revision=detail['revision'],fields=['emi'],confirm=True,revoke=True)
         page=sources.document_record_page(self.owner,'loan',document.pk)
-        for query in ('Show my EMI details','Review EMI values','Explain current EMI status','Show EMI and limitations'):
+        for query in ('Show my EMI details','Review EMI values','Explain current EMI status','Show EMI and limitations',
+                'What is the EMI?','What is my EMI details?'):
             with self.subTest(query=query):
                 response=self.client.post('/api/ai/personal-insights/',self.document_question_data(page,query=query),content_type='application/json')
                 self.assertEqual(response.status_code,200); self.assertEqual(response.json()['provider'],'local_evidence')

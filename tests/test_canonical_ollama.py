@@ -18,7 +18,7 @@ class CanonicalOllamaAcceptance(TestCase):
         from tests.test_financial_source_selection import FinancialSourceSelectionTests
         FinancialSourceSelectionTests.setUp(self)
         document,page=FinancialSourceSelectionTests.document_question_fixture(self,count=2)
-        result=hybrid_answer(None,self.owner,'Show current value',scope='financial_document',record_type='investment',
+        result=hybrid_answer(None,self.owner,'What is my current value?',scope='financial_document',record_type='investment',
             document_id=document.pk,source_catalog=page['catalog_token'],
             selected_records=[dict(id=item['record_id'],revision=item['revision']) for item in page['items']],local=OllamaReasoner())
         self.assertEqual(result['provider'],'ollama'); self.assertFalse(result['financial_authority'])

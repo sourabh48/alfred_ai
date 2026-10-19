@@ -531,7 +531,7 @@ def choices(user):
 def requested_amount_field(query, *, kind):
     fields={'expense':('amount','closing_balance'),'loan':('principal','emi','remaining_balance'),
         'investment':('invested_amount','monthly_sip','current_value')}
-    match=re.fullmatch(r'(?:explain|show|review) (?:my |this |the |selected |recorded |canonical |current )*(amount|closing balance|principal|emi|remaining balance|invested amount|monthly sip|current value)(?: details| values| status| and limitations)?',query.strip().lower().rstrip('?.!'))
+    match=re.fullmatch(r'(?:explain|show|review|what is) (?:my |this |the |selected |recorded |canonical |current )*(amount|closing balance|principal|emi|remaining balance|invested amount|monthly sip|current value)(?: details| values| status| and limitations)?',query.strip().lower().rstrip('?.!'))
     field=match[1].replace(' ','_') if match else None
     return field if field in fields.get(kind,()) else None
 
