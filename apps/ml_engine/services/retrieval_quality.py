@@ -67,9 +67,25 @@ COHORTS = (
 COHORT_ID = sha256(json.dumps(COHORTS, sort_keys=True).encode()).hexdigest()
 
 
-def configuration():
-    return dict(models=list(MODELS), policy=POLICY.copy(), cohort_id=COHORT_ID,
-        cohorts=len(COHORTS), cases=sum(len(c['cases']) for c in COHORTS), seconds=SECONDS,
+def _contract(suite):
+    if suite == 'development': return COHORTS, COHORT_ID
+    if suite != 'held_out': raise ValueError('Choose a supported fictional evaluation partition.')
+    from .retrieval_holdout import cohort, FIXTURE_SHA256
+    return (cohort(),), FIXTURE_SHA256
+
+
+def configuration(suite='development'):
+    from .retrieval_holdout import availability, POLICY_COMMIT, POLICY_SHA256
+    cohorts, identity = _contract(suite)
+    available = availability()
+    return dict(models=list(MODELS), policy=POLICY.copy(), cohort_id=identity,
+        cohorts=len(cohorts), cases=sum(len(c['cases']) for c in cohorts), seconds=SECONDS,
+        suite=suite, protocols=list(RETRIEVAL_PROTOCOLS), suites=['development','held_out'],
+        held_out_available=available, suite_options=[
+            dict(id='development',label='Development (tuning allowed)',cohorts=len(COHORTS),cases=sum(len(c['cases']) for c in COHORTS),available=True),
+            dict(id='held_out',label='Independent held-out (evaluation only)',cohorts=1,cases=12,available=available)],
+        frozen_policy_commit=POLICY_COMMIT,
+        frozen_policy_sha256=POLICY_SHA256, quality_scope='selected_partition_only_no_automatic_promotion',
         scope='reviewed_fictional_sources_only', promotion_requires_approval=True)
 
 
@@ -104,11 +120,12 @@ class _SyntheticCache:
         return list(vector),model
 
 
-def _measure(adapter, deadline, *, protocol=RETRIEVAL_PROTOCOLS[0]):
+def _measure(adapter, deadline, *, protocol=RETRIEVAL_PROTOCOLS[0], suite='development'):
+    cohorts, identity = _contract(suite)
     owner = SimpleNamespace(pk=1, created_at=datetime(2020, 1, 1, tzinfo=timezone.utc), is_authenticated=True)
     other = SimpleNamespace(pk=2, created_at=owner.created_at, is_authenticated=True)
     results = []
-    for cohort in COHORTS:
+    for cohort in cohorts:
         with TemporaryDirectory(prefix='alfred-quality-fictional-') as directory:
             embedder = _BudgetedEmbeddings(adapter, deadline)
             store = MemoryStore(directory, embedder=embedder,retrieval_protocol=protocol)
@@ -156,20 +173,23 @@ def _measure(adapter, deadline, *, protocol=RETRIEVAL_PROTOCOLS[0]):
                 per_case=explanations))
     if len({(r['context']['embedding_identity'],r['context']['dimensions']) for r in results}) != 1:
         raise EmbeddingUnavailable('Local embedding model changed between cohorts.')
-    return dict(cohort_id=COHORT_ID, cutoff=.45, protocol=protocol, results=results)
+    return dict(cohort_id=identity, suite=suite, cutoff=.45, protocol=protocol, results=results)
 
 
-def assess(baseline, candidate):
+def assess(baseline, candidate, *, suite='development'):
     """Objective development recommendation only; incomplete evidence cannot pass."""
+    contracts, identity = _contract(suite)
     reasons, differences = [], []
-    if (baseline.get('cohort_id') != COHORT_ID or candidate.get('cohort_id') != COHORT_ID
+    if (baseline.get('cohort_id') != identity or candidate.get('cohort_id') != identity
+            or baseline.get('suite') != suite or candidate.get('suite') != suite
             or baseline.get('cutoff') != .45 or candidate.get('cutoff') != .45
-            or len(baseline.get('results', [])) != len(COHORTS) or len(candidate.get('results', [])) != len(COHORTS)):
+            or len(baseline.get('results', [])) != len(contracts) or len(candidate.get('results', [])) != len(contracts)):
         return dict(decision='BLOCKED', reasons=['incomparable_or_incomplete_cohort'], differences=[])
     metrics = ('precision', 'recall', 'abstention_rate', 'citation_correctness')
-    for contract, before, after in zip(COHORTS, baseline['results'], candidate['results']):
+    for contract, before, after in zip(contracts, baseline['results'], candidate['results']):
+        positives = sum(bool(expected) for _, expected in contract['cases'])
         if any(result.get('cohort') != contract['id'] or result.get('cases') != len(contract['cases'])
-                or result.get('positive_cases') != 6 or result.get('negative_cases') != 6
+                or result.get('positive_cases') != positives or result.get('negative_cases') != len(contract['cases'])-positives
                 or len(result.get('per_case', [])) != len(contract['cases'])
                 for result in (before, after)):
             return dict(decision='BLOCKED', reasons=['incomplete_case_coverage'], differences=[])
@@ -188,9 +208,10 @@ def assess(baseline, candidate):
     return dict(decision='REJECT' if reasons else 'ELIGIBLE_FOR_REVIEW', reasons=reasons, differences=differences)
 
 
-def compare(baseline_model, candidate_model, *, adapters=None, baseline_protocol=RETRIEVAL_PROTOCOLS[0], candidate_protocol=RETRIEVAL_PROTOCOLS[0]):
+def compare(baseline_model, candidate_model, *, adapters=None, baseline_protocol=RETRIEVAL_PROTOCOLS[0], candidate_protocol=RETRIEVAL_PROTOCOLS[0], suite='development'):
     if baseline_model not in MODELS or candidate_model not in MODELS: raise ValueError('Choose an approved local embedding model.')
     if baseline_protocol not in RETRIEVAL_PROTOCOLS or candidate_protocol not in RETRIEVAL_PROTOCOLS: raise ValueError('Choose a supported retrieval protocol.')
+    config = configuration(suite)
     deadline = time.monotonic() + SECONDS
     local_adapters={}
     def adapter(model):
@@ -200,15 +221,15 @@ def compare(baseline_model, candidate_model, *, adapters=None, baseline_protocol
             local_adapters[model]=_SyntheticCache(result)
         return local_adapters[model]
     try:
-        baseline = _measure(adapter(baseline_model), deadline,protocol=baseline_protocol)
+        baseline = _measure(adapter(baseline_model), deadline,protocol=baseline_protocol,suite=suite)
         reused=candidate_model==baseline_model and candidate_protocol==baseline_protocol
-        candidate = baseline if reused else _measure(adapter(candidate_model), deadline,protocol=candidate_protocol)
+        candidate = baseline if reused else _measure(adapter(candidate_model), deadline,protocol=candidate_protocol,suite=suite)
     except MemoryConflict:
-        return dict(configuration(), decision='REJECT', reasons=['source_or_owner_revalidation_failed'],
+        return dict(config, decision='REJECT', reasons=['source_or_owner_revalidation_failed'],
             baseline=None, candidate=None, differences=[], runtime_changed=False)
-    assessment=assess(baseline,candidate)
+    assessment=assess(baseline,candidate,suite=suite)
     if reused and assessment['decision']=='ELIGIBLE_FOR_REVIEW': assessment['decision']='REFERENCE_ONLY'
-    return dict(configuration(), **assessment, baseline=baseline, candidate=candidate,
+    return dict(config, **assessment, baseline=baseline, candidate=candidate,
         candidate_execution='baseline_reference_reused' if reused else 'independent_protocol_run' if baseline_model==candidate_model else 'independent_model_run',
         baseline_protocol=baseline_protocol,candidate_protocol=candidate_protocol,
         baseline_model=baseline_model, candidate_model=candidate_model, runtime_changed=False)

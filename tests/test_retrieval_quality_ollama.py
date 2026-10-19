@@ -12,6 +12,21 @@ from apps.ml_engine.services.persistent_memory import RETRIEVAL_PROTOCOLS
 
 @skipUnless(os.environ.get('ALFRED_RUN_OLLAMA_GROUNDING')=='true','Explicit fictional local acceptance required.')
 class RealRetrievalQualityTests(TestCase):
+    def test_independent_heldout_protocol_candidate_is_measured_without_tuning_or_activation(self):
+        from apps.ml_engine.services.retrieval_holdout import FIXTURE_SHA256, POLICY_SHA256
+        report=compare(MODELS[0],MODELS[0],suite='held_out',candidate_protocol=RETRIEVAL_PROTOCOLS[1])
+        Path(os.environ['ALFRED_DIAGNOSTIC_OUTPUT']).with_name('independent-heldout-protocol.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+        # A completed experiment can correctly REJECT; never force a passing accuracy verdict.
+        self.assertIn(report['decision'],('ELIGIBLE_FOR_REVIEW','REJECT'))
+        self.assertEqual(report['cohort_id'],FIXTURE_SHA256); self.assertEqual(report['frozen_policy_sha256'],POLICY_SHA256)
+        self.assertEqual(report['suite'],'held_out'); self.assertEqual(report['cases'],12)
+        self.assertEqual(report['candidate_execution'],'independent_protocol_run'); self.assertFalse(report['runtime_changed'])
+        for side in ('baseline','candidate'):
+            cohort=report[side]['results'][0]
+            self.assertEqual(cohort['owner_violations'],0); self.assertTrue(cohort['stale_rejected'])
+            self.assertTrue(cohort['owner_reference_rejected']); self.assertEqual(len(cohort['per_case']),12)
+            self.assertEqual(set(cohort['precision_at_k']),{'1','2','3'})
+
     def test_development_protocol_candidate_is_measured_without_activation(self):
         report=compare(MODELS[0],MODELS[0],candidate_protocol=RETRIEVAL_PROTOCOLS[1])
         Path(os.environ['ALFRED_DIAGNOSTIC_OUTPUT']).with_name('development-protocol.json').write_text(json.dumps(report,indent=2),encoding='utf-8')

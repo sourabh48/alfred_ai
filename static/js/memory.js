@@ -19,6 +19,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const evaluationClear = document.getElementById("memoryEvaluationClear");
     const comparisonForm = document.getElementById("memoryComparisonForm"), comparisonStatus = document.getElementById("memoryComparisonStatus"), comparisonResults = document.getElementById("memoryComparisonResults");
     const baselineModel = document.getElementById("memoryComparisonBaseline"), candidateModel = document.getElementById("memoryComparisonCandidate");
+    function comparisonSelect(id, text) {
+        const label=document.createElement("label"), select=document.createElement("select");
+        label.htmlFor=id; label.className="form-label"; label.textContent=text;
+        select.id=id; select.className="form-select mb-2"; select.disabled=true; select.required=true;
+        comparisonForm.insertBefore(label,comparisonForm.querySelector("button")); comparisonForm.insertBefore(select,comparisonForm.querySelector("button"));
+        return select;
+    }
+    const comparisonSuite=comparisonSelect("memoryComparisonSuite","Fictional evaluation partition");
+    const candidateProtocol=comparisonSelect("memoryComparisonProtocol","Candidate retrieval protocol (comparison only)");
+    document.getElementById("memoryComparisonTitle").nextElementSibling.textContent="Development and independent held-out fictional cases test relevance, corrections, conflicting references and privacy guards. Held-out answers are evaluation-only: never tune from them. No private memory is read or trained on. Passing one partition is review evidence, never model activation or general accuracy.";
+    let comparisonConfig=null;
+    function comparisonPolicy() {
+        if (!comparisonConfig) return;
+        const suite=comparisonConfig.suite_options.find(item => item.id===comparisonSuite.value), policy=comparisonConfig.policy;
+        document.getElementById("memoryComparisonPolicy").textContent=`${suite.cohorts} fictional cohorts, ${suite.cases} questions per model; ${suite.label}. Precision ≥ ${policy.min_precision}, recall ≥ ${policy.min_recall}, no-match abstention ≥ ${policy.min_abstention_rate}, citation identity = 1, owner violations = 0. Maximum metric drop: ${policy.max_metric_drop}. Installed models only; no download. ${comparisonConfig.seconds}-second shared budget. Baseline uses the unchanged default protocol.`;
+    }
+    comparisonSuite.addEventListener("change",comparisonPolicy);
     let comparisonController = null, comparisonEnabled = false;
     let cases = [], currentMemories = new Map(), previousExpected = new Set([""]), editorNeedsReview = false, evaluationPending = false, evaluationController = null;
     let generation = 0;
@@ -140,8 +157,14 @@ document.addEventListener("DOMContentLoaded", () => {
             review.comparison.models.forEach(model => select.append(new Option(model,model)));
             if (review.comparison.models.includes(previous)) select.value = previous;
         });
-        const policy = review.comparison.policy;
-        document.getElementById("memoryComparisonPolicy").textContent = `${review.comparison.cohorts} fictional cohorts, ${review.comparison.cases} questions per model; precision ≥ ${policy.min_precision}, recall ≥ ${policy.min_recall}, no-match abstention ≥ ${policy.min_abstention_rate}, citation identity = 1, owner violations = 0. Maximum metric drop: ${policy.max_metric_drop}. Installed models only; no download. ${review.comparison.seconds}-second shared budget.`;
+        comparisonConfig=review.comparison;
+        const previousSuite=comparisonSuite.value, previousProtocol=candidateProtocol.value;
+        comparisonSuite.replaceChildren(); candidateProtocol.replaceChildren();
+        comparisonConfig.suite_options.forEach(item => { const option=new Option(item.label+(item.available ? '' : ' — blocked: frozen policy unavailable'),item.id); option.disabled=!item.available; comparisonSuite.append(option); });
+        comparisonConfig.protocols.forEach(protocol => candidateProtocol.append(new Option(protocol,protocol)));
+        if (comparisonConfig.suite_options.some(item => item.id===previousSuite && item.available)) comparisonSuite.value=previousSuite;
+        if (comparisonConfig.protocols.includes(previousProtocol)) candidateProtocol.value=previousProtocol;
+        comparisonPolicy();
         comparisonForm.querySelectorAll("select,button").forEach(control => { control.disabled = !comparisonEnabled || Boolean(comparisonController); });
         if (!comparisonController) comparisonStatus.textContent = comparisonEnabled ? (comparisonCancelled ? "Comparison cancelled by refresh. Run again against the current view." : "Ready for a fictional local comparison; no runtime model will be changed.") : "Operator has not enabled synthetic model comparisons.";
         quality.textContent = "";
@@ -373,11 +396,12 @@ document.addEventListener("DOMContentLoaded", () => {
         comparisonForm.setAttribute("aria-busy","true"); comparisonResults.replaceChildren(); comparisonStatus.textContent = "Comparing fictional cohorts locally…";
         const timer = setTimeout(() => controller.abort(),135000);
         try {
-            const result = await Alfred.fetchJSON("/api/ai/memories/learning/", {method:"POST",signal:controller.signal,body:JSON.stringify({action:"compare",baseline_model:baselineModel.value,candidate_model:candidateModel.value})});
+            const result = await Alfred.fetchJSON("/api/ai/memories/learning/", {method:"POST",signal:controller.signal,body:JSON.stringify({action:"compare",baseline_model:baselineModel.value,candidate_model:candidateModel.value,suite:comparisonSuite.value,candidate_protocol:candidateProtocol.value})});
             if (!active || ticket !== generation) return;
             comparisonStatus.textContent = `${result.decision.replaceAll("_"," ")}. Active model unchanged. Fictional cohort evidence does not establish general accuracy or sustained drift.`;
-            const execution=result.candidate_execution === 'baseline_reference_reused' ? 'one same-model reference; no independent candidate measured' : result.candidate_execution === 'independent_model_run' ? 'independent baseline and candidate measurements' : 'incomplete model evidence; no independent comparison established';
-            const contract=document.createElement("p"); contract.textContent=`Review contract ${result.cohort_id.slice(0,12)} · policy ${result.policy.version} · ${execution}.`; comparisonResults.append(contract);
+            const execution=result.candidate_execution === 'baseline_reference_reused' ? 'one same-model reference; no independent candidate measured' : result.candidate_execution === 'independent_protocol_run' ? 'same installed model; independent protocol measurements with identical synthetic embeddings reused' : result.candidate_execution === 'independent_model_run' ? 'independent baseline and candidate measurements' : 'incomplete model evidence; no independent comparison established';
+            const contract=document.createElement("p"); contract.textContent=`${result.suite === 'held_out' ? 'Independent held-out — evaluation only, no tuning' : 'Development — not independent acceptance'} · review contract ${result.cohort_id.slice(0,12)} · policy ${result.policy.version} · ${execution}. Only this partition was measured.`; comparisonResults.append(contract);
+            if (result.suite === 'held_out') { const binding=document.createElement("p"); binding.textContent=`Retrieval source frozen at ${result.frozen_policy_commit.slice(0,12)} · SHA-256 ${result.frozen_policy_sha256.slice(0,12)}. New policy requires a new independent holdout.`; comparisonResults.append(binding); }
             result.reasons.forEach(reason => { const row=document.createElement("p"); row.textContent=reason.replaceAll("_"," "); comparisonResults.append(row); });
             (result.candidate?.results || []).forEach(cohort => {
                 const row=document.createElement("article"); row.className="memory-card";
@@ -388,6 +412,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 const guard=document.createElement("p"); guard.textContent=`Owner violations: ${cohort.owner_violations}; foreign reference rejected: ${cohort.owner_reference_rejected}; stale source rejected: ${cohort.stale_rejected}.`; row.append(guard);
                 const context=document.createElement("p"); context.textContent=`Indexed candidate model ${cohort.context.embedding_identity.slice(0,12)} · ${cohort.context.dimensions} dimensions. Source labels below belong only to this fictional contract.`; row.append(context);
+                const ranking=document.createElement("p"); ranking.textContent=`Positive-case precision@k / recall@k: ${[1,2,3].map(k => `@${k}: ${(cohort.precision_at_k[k]*100).toFixed(1)}% / ${(cohort.recall_at_k[k]*100).toFixed(1)}%`).join('; ')}. Precision divides by k; recall divides by expected references. These differ from returned-reference precision above; sparse expected labels limit precision@3.`; row.append(ranking);
+                const errors=document.createElement("p"), counts=cohort.retrieval_errors;
+                errors.textContent=`Retrieval errors: ${counts.unexpected_references} unexpected references, ${counts.missed_references} missed references, ${counts.false_abstentions} false abstentions, ${counts.false_matches} false matches.`; row.append(errors);
                 cohort.per_case.forEach(item => {
                     const detail=document.createElement("details"), title=document.createElement("summary"); title.textContent=`Case ${item.case}: ${item.matched} relevant, ${item.irrelevant} unexpected, ${item.missed} missed${item.abstained ? ', abstained' : ''}`;
                     const question=document.createElement("p"); question.textContent=`Fictional question: ${item.fictional_question}`;
@@ -409,6 +436,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("pagehide", () => {
         active = false; generation++; list.replaceChildren(); candidates.replaceChildren(); feedback.textContent = ""; search.value = "";
         comparisonController?.abort(); comparisonController=null; comparisonEnabled=false; comparisonStatus.textContent=""; comparisonResults.replaceChildren(); baselineModel.replaceChildren(); candidateModel.replaceChildren(); document.getElementById("memoryComparisonPolicy").textContent="";
+        comparisonConfig=null; comparisonSuite.replaceChildren(); candidateProtocol.replaceChildren();
         comparisonForm.setAttribute("aria-busy","false"); comparisonForm.querySelectorAll("select,button").forEach(control => { control.disabled=true; });
         category.replaceChildren(); document.getElementById("memoryCount").textContent = "";
         evaluationController?.abort(); evaluationController = null; evaluationPending = false;

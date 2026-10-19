@@ -201,8 +201,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.ID,'memoryEvaluationQuery').get_property('value'),'')
 
     def test_reviewed_synthetic_model_comparison_verdict_metrics_outage_and_mobile(self):
+        from selenium.webdriver.support.ui import Select
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
-        from tests.test_retrieval_quality import contract_comparison
+        from apps.ml_engine.services.retrieval_quality import compare, MODELS
+        from apps.ml_engine.services.persistent_memory import RETRIEVAL_PROTOCOLS
+        from apps.ml_engine.services.retrieval_holdout import cohort
+        from tests.test_retrieval_quality import contract_comparison, ContractEmbeddings
         self.enterContext(override_settings(ALFRED_SYNTHETIC_QUALITY_ENABLED=True))
         self.memory_evaluation_fixture()
         report=contract_comparison()
@@ -219,10 +223,30 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('candidate 100.0%',self.text('memoryComparisonResults'))
         self.assertIn('stale source rejected: true',self.text('memoryComparisonResults'))
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryComparisonResults article')),2)
+        self.assertIn('Development — not independent acceptance',self.text('memoryComparisonResults'))
+        self.assertIn('Positive-case precision@k / recall@k',self.text('memoryComparisonResults'))
+        self.assertIn('Precision divides by k; recall divides by expected references.',self.text('memoryComparisonResults'))
+        self.assertIn('Retrieval errors: 0 unexpected references',self.text('memoryComparisonResults'))
+        heldout=compare(MODELS[0],MODELS[0],adapters={MODELS[0]:ContractEmbeddings(cohorts=(cohort(),))},suite='held_out',candidate_protocol=RETRIEVAL_PROTOCOLS[1])
+        Select(self.browser.find_element(self.By.ID,'memoryComparisonSuite')).select_by_value('held_out')
+        Select(self.browser.find_element(self.By.ID,'memoryComparisonProtocol')).select_by_value(RETRIEVAL_PROTOCOLS[1])
+        self.assertIn('12 questions per model',self.text('memoryComparisonPolicy'))
+        with patch('apps.ml_engine.services.retrieval_quality.compare',return_value=heldout) as compared:
+            self.memory_click('#memoryComparisonForm button')
+            self.wait.until(lambda _: 'Independent held-out — evaluation only' in self.text('memoryComparisonResults'))
+        self.assertEqual(compared.call_args.kwargs,dict(suite='held_out',candidate_protocol=RETRIEVAL_PROTOCOLS[1]))
+        self.assertIn('same installed model; independent protocol measurements',self.text('memoryComparisonResults'))
+        self.assertIn('Retrieval source frozen at 0651e7a9fb48',self.text('memoryComparisonResults'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryComparisonResults details')),12)
+        self.memory_click('#memoryComparisonResults details summary')
+        self.assertIn('Expected: pigment, counterclaim',self.text('memoryComparisonResults'))
+        self.capture('independent-heldout-contract-desktop')
         self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
         self.browser.execute_script("document.querySelector('#memoryComparisonStatus').scrollIntoView({block:'start',behavior:'instant'})")
-        self.capture('reviewed-synthetic-model-comparison-mobile')
+        self.capture('independent-heldout-contract-mobile')
         self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),390)
+        Select(self.browser.find_element(self.By.ID,'memoryComparisonSuite')).select_by_value('development')
+        Select(self.browser.find_element(self.By.ID,'memoryComparisonProtocol')).select_by_value(RETRIEVAL_PROTOCOLS[0])
         guarded=report|dict(decision='REJECT',baseline=None,candidate=None,differences=[],reasons=['source_or_owner_revalidation_failed'])
         guarded.pop('candidate_execution')
         with patch('apps.ml_engine.services.retrieval_quality.compare',return_value=guarded):

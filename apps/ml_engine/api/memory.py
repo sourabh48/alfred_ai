@@ -183,11 +183,11 @@ class MemoryLearningAPI(MemoryAPI):
             'comparison':dict(configuration(), enabled=settings.ALFRED_SYNTHETIC_QUALITY_ENABLED)})
 
     def post(self,request):
-        data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases','min_score','baseline_model','candidate_model'))
+        data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases','min_score','baseline_model','candidate_model','suite','baseline_protocol','candidate_protocol'))
         allowed={'extract':{'action','text','provenance','sensitivity'},'verify':{'action','id','verified','content'},
             'correct':{'action','id','content','verified'},'consolidate':{'action','ids','content','verified'},
             'reembed':{'action','id','verified'},'evaluate':{'action','cases','min_score'},
-            'compare':{'action','baseline_model','candidate_model'}}
+            'compare':{'action','baseline_model','candidate_model','suite','baseline_protocol','candidate_protocol'}}
         action=data.get('action')
         if not isinstance(action,str) or action not in allowed or set(data)-allowed[action]: raise ValueError()
         if action=='compare':
@@ -196,7 +196,8 @@ class MemoryLearningAPI(MemoryAPI):
             from .conversations import current_session
             if not settings.ALFRED_SYNTHETIC_QUALITY_ENABLED: raise PermissionDenied('Synthetic model comparison is disabled by the operator.')
             try:
-                result=compare(data.get('baseline_model'), data.get('candidate_model'))
+                options={key:data[key] for key in ('suite','baseline_protocol','candidate_protocol') if key in data}
+                result=compare(data.get('baseline_model'), data.get('candidate_model'),**options)
             finally:
                 current_session(request)
             return Response(result)

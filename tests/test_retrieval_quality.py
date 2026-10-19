@@ -8,20 +8,23 @@ from rest_framework.test import APIClient
 
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 from apps.ml_engine.services.persistent_memory import MemoryConflict
-from apps.ml_engine.services.retrieval_quality import COHORTS, MODELS, POLICY, _BudgetedEmbeddings, _SyntheticCache, assess, compare
+from apps.ml_engine.services.retrieval_quality import COHORTS, MODELS, POLICY, _BudgetedEmbeddings, _SyntheticCache, assess, compare, configuration
 from apps.ml_engine.services.persistent_memory import RETRIEVAL_PROTOCOLS
 from tests import test_memory_learning as fixtures
 
 
 class ContractEmbeddings:
-    def __init__(self, identity='contract-baseline-v1', degraded=False):
+    def __init__(self, identity='contract-baseline-v1', degraded=False, *, cohorts=COHORTS):
         self.identity, self.degraded = identity, degraded
+        # Expected-label vectors validate metrics/control flow only, never real accuracy.
+        self.cohorts=cohorts
         self.mapping = {}
         offset = 0
-        for cohort in COHORTS:
+        for cohort in cohorts:
             local = {key: offset+i for i, key in enumerate(cohort['records'])}
             local['corrected'] = local['trail'] if 'trail' in local else offset+7
             if 'contrary' in local: local['contrary'] = local['coast']
+            if 'counterclaim' in local: local['counterclaim'] = local['pigment']
             for key, text in cohort['records'].items(): self.mapping[text] = local[key]
             self.mapping[cohort['correction'][1]] = local['corrected']
             for i, (query, expected) in enumerate(cohort['cases']):
@@ -31,12 +34,14 @@ class ContractEmbeddings:
     def embed(self, text, *, deadline=None):
         if text.startswith('{'): text = json.loads(text)['statement']
         index = self.mapping[text]
-        if self.degraded and text in {c['cases'][0][0] for c in COHORTS}: index = 63
+        if self.degraded and text in {c['cases'][0][0] for c in self.cohorts}: index = 63
         return [int(i == index) for i in range(64)], self.identity
 
 
-def contract_comparison(degraded=False):
-    return compare(*MODELS, adapters={MODELS[0]:ContractEmbeddings(), MODELS[1]:ContractEmbeddings('contract-candidate-v2', degraded)})
+def contract_comparison(degraded=False, *, suite='development', candidate_protocol=RETRIEVAL_PROTOCOLS[0]):
+    from apps.ml_engine.services.retrieval_quality import _contract
+    cohorts,_=_contract(suite)
+    return compare(*MODELS, adapters={MODELS[0]:ContractEmbeddings(cohorts=cohorts), MODELS[1]:ContractEmbeddings('contract-candidate-v2', degraded,cohorts=cohorts)},suite=suite,candidate_protocol=candidate_protocol)
 
 
 class RetrievalQualityTests(TestCase):
@@ -92,6 +97,54 @@ class RetrievalQualityTests(TestCase):
         self.assertEqual(report['candidate']['results'][0]['context']['protocol'],RETRIEVAL_PROTOCOLS[1])
         self.assertNotEqual(report['baseline']['results'][0]['context']['embedding_identity'],report['candidate']['results'][0]['context']['embedding_identity'])
 
+    def test_independent_holdout_commitment_and_partition_separation(self):
+        from hashlib import sha256
+        from apps.ml_engine.services import retrieval_holdout as held
+        self.assertEqual(len(held.RAW.encode()),1587)
+        self.assertEqual(sha256(held.RAW.encode()).hexdigest(),held.FIXTURE_SHA256)
+        cohort=held.cohort()
+        self.assertEqual(len(cohort['cases']),12)
+        self.assertEqual(sum(bool(expected) for _,expected in cohort['cases']),6)
+        self.assertFalse(set(cohort['records'].values()) & {value for item in COHORTS for value in item['records'].values()})
+        self.assertFalse({query for query,_ in cohort['cases']} & {query for item in COHORTS for query,_ in item['cases']})
+        cohort['records'].clear()
+        self.assertEqual(len(held.cohort()['records']),7)  # No mutable shared fixture.
+        self.assertEqual(POLICY['min_precision'],.90); self.assertEqual(POLICY['min_recall'],.85)
+        self.assertEqual(POLICY['min_abstention_rate'],.95); self.assertEqual(POLICY['max_metric_drop'],.05)
+
+    def test_heldout_binds_labels_policy_and_complete_metrics_without_runtime_changes(self):
+        from apps.ml_engine.services.retrieval_holdout import FIXTURE_SHA256, POLICY_COMMIT, POLICY_SHA256
+        report=contract_comparison(suite='held_out',candidate_protocol=RETRIEVAL_PROTOCOLS[1])
+        self.assertEqual(report['suite'],'held_out'); self.assertEqual(report['cohort_id'],FIXTURE_SHA256)
+        self.assertEqual(report['frozen_policy_commit'],POLICY_COMMIT); self.assertEqual(report['frozen_policy_sha256'],POLICY_SHA256)
+        self.assertEqual(report['cases'],12); self.assertEqual(report['decision'],'ELIGIBLE_FOR_REVIEW')
+        self.assertEqual(report['quality_scope'],'selected_partition_only_no_automatic_promotion')
+        self.assertFalse(report['runtime_changed']); self.assertEqual(self.store.list_memories(self.alice),[])
+        cohort=report['candidate']['results'][0]
+        self.assertCountEqual(cohort['per_case'][0]['returned_sources'],['pigment','counterclaim'])
+        self.assertEqual(cohort['retrieval_errors'],dict(unexpected_references=0,missed_references=0,false_abstentions=0,false_matches=0))
+        for k in ('1','2','3'):
+            self.assertIn(k,cohort['precision_at_k']); self.assertIn(k,cohort['recall_at_k'])
+        self.assertEqual(assess(report['baseline'],report['candidate'])['decision'],'BLOCKED')
+        missing=deepcopy(report['candidate']); missing['results'][0]['per_case'].pop()
+        self.assertEqual(assess(report['baseline'],missing,suite='held_out')['decision'],'BLOCKED')
+        for case in cohort['per_case']:
+            self.assertNotIn('expected_ids',case); self.assertNotIn('citations',case)
+        self.assertEqual(contract_comparison(True,suite='held_out')['decision'],'REJECT')
+
+    def test_modified_holdout_or_policy_blocks_before_model_and_does_not_break_default_configuration(self):
+        from apps.ml_engine.services import retrieval_holdout as held
+        for path,value in (('RAW',held.RAW+' '),('POLICY_SHA256','0'*64)):
+            with self.subTest(path=path),patch.object(held,path,value):
+                self.assertFalse(configuration()['held_out_available'])
+                with patch('apps.ml_engine.services.retrieval_quality.OllamaEmbeddings') as model:
+                    with self.assertRaises(ValueError): compare(*MODELS,suite='held_out')
+                    model.assert_not_called()
+        with patch.object(held.Path,'read_bytes',side_effect=OSError('SYNTHETIC-private path')):
+            self.assertFalse(configuration()['held_out_available'])
+        for suite in ('remote',None,{}):
+            with self.assertRaises(ValueError): compare(*MODELS,suite=suite)
+
     def test_synthetic_cache_reuses_only_identical_inputs_and_rechecks_real_model_identity(self):
         from unittest.mock import Mock
         raw=Mock(); raw.model=MODELS[0]; raw.embed.return_value=([1,0],MODELS[0]+'@'+'1'*64); raw._digest.return_value='1'*64
@@ -121,8 +174,23 @@ class RetrievalQualityTests(TestCase):
         with patch('apps.ml_engine.api.memory.memory_store',side_effect=AssertionError('No private vault')):
             self.assertEqual(self.client.post('/api/ai/memories/learning/',payload,content_type='application/json').status_code,403)
             with override_settings(ALFRED_SYNTHETIC_QUALITY_ENABLED=True):
-                for extra in ({'candidate_model':'remote-model:cloud'},{'cases':[]},{'policy':{'min_recall':0}}):
+                for extra in ({'candidate_model':'remote-model:cloud'},{'cases':[]},{'policy':{'min_recall':0}},{'suite':'unreviewed'},{'candidate_protocol':'unknown'}):
                     self.assertEqual(self.client.post('/api/ai/memories/learning/',payload|extra,content_type='application/json').status_code,400)
+
+    @override_settings(ALFRED_SYNTHETIC_QUALITY_ENABLED=True)
+    def test_api_selects_frozen_holdout_only_and_never_reads_private_memory_or_cloud(self):
+        self.client.force_login(self.alice)
+        payload=dict(action='compare',baseline_model=MODELS[0],candidate_model=MODELS[1],suite='held_out',candidate_protocol=RETRIEVAL_PROTOCOLS[1])
+        report=contract_comparison(suite='held_out',candidate_protocol=RETRIEVAL_PROTOCOLS[1])
+        with patch('apps.ml_engine.api.memory.memory_store',side_effect=AssertionError('No private vault')),patch('apps.ml_engine.services.retrieval_quality.compare',return_value=report) as compared:
+            response=self.client.post('/api/ai/memories/learning/',payload,content_type='application/json')
+        self.assertEqual(response.status_code,200); self.assertIn('no-store',response['Cache-Control'])
+        compared.assert_called_once_with(*MODELS,suite='held_out',candidate_protocol=RETRIEVAL_PROTOCOLS[1])
+        self.assertEqual(response.json()['cases'],12); self.assertEqual(response.json()['suite'],'held_out')
+        with patch('apps.ml_engine.services.retrieval_holdout.POLICY_SHA256','0'*64):
+            response=self.client.post('/api/ai/memories/learning/',payload,content_type='application/json')
+        self.assertEqual(response.status_code,400)
+        self.assertNotIn('persistent_memory',response.content.decode())
 
     @override_settings(ALFRED_SYNTHETIC_QUALITY_ENABLED=True)
     def test_session_csrf_no_store_and_offline_failure(self):
