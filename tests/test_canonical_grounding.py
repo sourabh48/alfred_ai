@@ -107,6 +107,32 @@ class CanonicalGroundingTests(TestCase):
                 self.assertEqual(result['grounding'],'insufficient_evidence')
         self.local.reason.assert_not_called(); self.cloud.assert_not_called(); self.provider.assert_not_called()
 
+    def test_explicit_amount_questions_reuse_exact_canonical_values_and_reject_missing_or_wrong_domains(self):
+        from decimal import Decimal
+        for kind,field in (('expense','amount'),('expense','closing_balance'),('loan','principal'),('loan','emi'),
+                ('loan','remaining_balance'),('investment','invested_amount'),('investment','monthly_sip'),('investment','current_value')):
+            with self.subTest(kind=kind,field=field):
+                row=self.rows[kind]; row.refresh_from_db()
+                result=self.answer(kind,query='Show recorded '+field.replace('_',' '))
+                value=getattr(row,field)
+                self.assertEqual(result['provider'],'local_evidence' if value is None else 'ollama')
+                if value is not None:
+                    self.assertEqual(Decimal(result['sources'][0]['data']['amounts'][field]['amount']),value)
+                    self.assertIsNone(result['sources'][0]['data']['amounts'][field]['currency'])
+        self.local.reason.reset_mock()
+        with patch.object(self.store,'retrieve',side_effect=AssertionError('No unsupported retrieval')):
+            for kind,question in (('expense','Show principal'),('loan','Show invested amount'),('investment','Show closing balance')):
+                self.assertEqual(self.answer(kind,query=question)['provider'],'local_evidence')
+            type(self.loan).objects.filter(pk=self.loan.pk).update(remaining_balance=None)
+            self.assertEqual(self.answer('loan',query='Show remaining balance')['provider'],'local_evidence')
+        self.local.reason.assert_not_called(); self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_explicit_zero_amount_is_recorded_and_does_not_become_missing(self):
+        type(self.investment).objects.filter(pk=self.investment.pk).update(current_value='0.00')
+        result=self.answer('investment',query='Review current value and limitations')
+        self.assertEqual(result['provider'],'ollama')
+        self.assertEqual(result['sources'][0]['data']['amounts']['current_value']['amount'],'0.00')
+
     def test_cloud_consent_and_outage_never_exfiltrate_private_sources(self):
         self.assertEqual(self.post(cloud_consent=True,query_sensitivity='public').status_code,403)
         self.local.reason.assert_not_called()

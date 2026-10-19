@@ -528,10 +528,19 @@ def choices(user):
             dict(kind='baseline',id=user.pk,label='Reported baseline fields (currency-limited)')]
 
 
+def requested_amount_field(query, *, kind):
+    fields={'expense':('amount','closing_balance'),'loan':('principal','emi','remaining_balance'),
+        'investment':('invested_amount','monthly_sip','current_value')}
+    match=re.fullmatch(r'(?:explain|show|review) (?:my |this |the |selected |recorded |canonical |current )*(amount|closing balance|principal|emi|remaining balance|invested amount|monthly sip|current value)(?: details| values| status| and limitations)?',query.strip().lower().rstrip('?.!'))
+    field=match[1].replace(' ','_') if match else None
+    return field if field in fields.get(kind,()) else None
+
+
 def supported_question(query, *, kind=None):
     # shortcut: fail-closed English record questions; expand only with evaluated intent fixtures.
     text=query.strip().lower().rstrip('?.!')
     if re.search(r'\b(?:total|sum|aggregate|convert|conversion|exchange|fx|forecast|predict|tomorrow|future|weather|buy|sell|approve|approval|authentic|currency|inr|usd|eur|gbp)\b',text): return False
+    if requested_amount_field(query,kind=kind): return True
     match=re.fullmatch(r'(?:explain|show|review) (?:my |this |the |selected |recorded |canonical |current )*(?P<subject>record|records|values|expense|transaction|budget|loan|investment|baseline|emi|repayment status|evidence|provenance|income|rent)(?: details| values| status| and limitations)?',text)
     if not match: return False
     if kind is None: return True

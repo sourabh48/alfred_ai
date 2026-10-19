@@ -1328,6 +1328,44 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         for identity in ('intelligenceSourceItems','intelligenceSourcesSelected','intelligenceFinancialDocumentContext','intelligenceAnswers'):
             self.assertEqual(self.text(identity),'')
 
+    def test_financial_document_field_questions_require_every_selected_reviewed_value(self):
+        document,records,service,local=self.financial_document_question_fixture(); owner=self.scenario['user']
+        detail=service.evidence(owner,document.pk,records[0].pk)
+        service.review(owner,document.pk,records[0].pk,revision=detail['revision'],fields=['invested_amount'],confirm=True)
+        cloud=self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.reasoning_provider'))
+        self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_document&record_type=investment&document_id={document.pk}')
+        self.wait.until(lambda _: '7 linked records' in self.text('intelligenceSourcesStatus'))
+        for row in records[:2]: self.memory_click(f'#intelligenceSourceItems input[value="{row.pk}"]')
+        draft=self.browser.find_element(self.By.ID,'intelligenceQuery'); draft.send_keys('Show invested amount')
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'Insufficient evidence' in self.text('intelligenceFeedback'))
+        self.assertEqual(draft.get_property('value'),'Show invested amount'); local.reason.assert_not_called()
+        self.memory_click(f'#intelligenceSourceItems input[value="{records[1].pk}"]')
+        self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: 'Ollama available' in self.text('intelligenceLocalStatus'))
+        self.assertIn('1,234.56',self.text('intelligenceAnswers')); self.assertEqual(draft.get_property('value'),'')
+        self.assertEqual(local.reason.call_count,1)
+        records[0].current_value='4321.09'; records[0].save()
+        detail=service.evidence(owner,document.pk,records[0].pk)
+        service.review(owner,document.pk,records[0].pk,revision=detail['revision'],fields=['current_value'],confirm=True)
+        local.reason.reset_mock(); draft.send_keys('Show current value')
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'Selected evidence changed' in self.text('intelligenceSourcesStatus'))
+        self.assertEqual(draft.get_property('value'),'Show current value'); local.reason.assert_not_called()
+        self.memory_click('#intelligenceSourcesRefresh')
+        self.wait.until(lambda _: '0/3 selected' in self.text('intelligenceSourcesStatus'))
+        self.memory_click(f'#intelligenceSourceItems input[value="{records[0].pk}"]')
+        local.reason.return_value='The amount is INR 99999.99.'
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'Unsupported model figures were withheld' in self.text('intelligenceFeedback'))
+        self.assertIn('4,321.09',self.text('intelligenceAnswers')); self.assertIn('Currency not recorded',self.text('intelligenceAnswers'))
+        self.assertNotIn('99999.99',self.text('intelligenceAnswers'))
+        citation=service.evidence(owner,document.pk,records[0].pk)['citation_url']
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
+        cloud.assert_not_called()
+        self.browser.execute_script("document.querySelector('#intelligenceAnswers > article:last-child').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('document-field-questions-reviewed-current-values')
+
     def test_financial_document_questions_stale_outage_retry_and_no_history(self):
         from selenium.webdriver.support.ui import Select
         from uuid import uuid4

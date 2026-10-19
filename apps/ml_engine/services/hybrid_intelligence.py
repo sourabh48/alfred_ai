@@ -120,7 +120,7 @@ def present_answer(result,scope,query=''):
 
 
 def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None,cloud_consent=False,query_sensitivity='sensitive',local=None):
-    from .canonical_evidence import KINDS, supported_question
+    from .canonical_evidence import KINDS, supported_question, requested_amount_field
     owner=_owner(user)
     if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents','bank_statements','financial_records','financial_document')
             or type(cloud_consent) is not bool or query_sensitivity not in ('public','personal','sensitive')
@@ -137,7 +137,9 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied('Private financial evidence is local only.')
     tools=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
-    if scope in ('financial_records','financial_document','finance') and (any(not tool['available'] for tool in tools) or (scope in ('financial_records','financial_document') and not supported_question(query,kind=record_type))):
+    field=requested_amount_field(query,kind=record_type) if scope in ('financial_records','financial_document') else None
+    missing_field=field and any(tool['data'].get('amounts',{}).get(field,{}).get('amount') is None for tool in tools)
+    if scope in ('financial_records','financial_document','finance') and (any(not tool['available'] for tool in tools) or missing_field or (scope in ('financial_records','financial_document') and not supported_question(query,kind=record_type))):
         return {'answer':'This request is not established by available compatible evidence. Ask “Explain this record” to inspect recorded values and limitations. Forecasts, currency conversions, unknown-currency totals and unsupported questions are unavailable.',
             'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
             'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}

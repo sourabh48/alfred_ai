@@ -101,6 +101,49 @@ class FinancialSourceSelectionTests(TestCase):
         self.assertEqual(resolve_canonical_financial_baseline(self.owner,fresh=True)['decimal_amounts'],baseline)
         self.cloud.assert_not_called(); self.provider.assert_not_called()
 
+    def test_document_field_question_returns_each_selected_reviewed_current_value(self):
+        document,page=self.document_question_fixture()
+        data=self.document_question_data(page,query='Show current value')
+        response=self.client.post('/api/ai/personal-insights/',data,content_type='application/json')
+        self.assertEqual(response.status_code,200); result=response.json()
+        self.assertEqual(result['provider'],'ollama'); self.local.reason.assert_called_once()
+        for index,source in enumerate(result['sources']):
+            self.assertEqual(source['url'],page['items'][index]['url'])
+            self.assertEqual(source['data']['amounts']['current_value']['currency_status'],'not_recorded')
+        self.assertEqual(result['context_omitted'],0); self.assertFalse(result['financial_authority'])
+        self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_document_field_questions_abstain_without_every_selected_reviewed_value(self):
+        document,page=self.document_question_fixture()
+        data=self.document_question_data(page)
+        for question in ('Show invested amount','Show monthly SIP','Show principal','Show total current value','Show current value in INR','Show current value of record 999'):
+            with self.subTest(question=question):
+                result=self.client.post('/api/ai/personal-insights/',data|{'query':question},content_type='application/json').json()
+                self.assertEqual(result['provider'],'local_evidence'); self.assertEqual(result['grounding'],'insufficient_evidence')
+        self.local.reason.assert_not_called()
+        selected=data['selected_records'][:1]
+        result=self.client.post('/api/ai/personal-insights/',data|{'query':'Show invested amount','selected_records':selected},content_type='application/json').json()
+        self.assertEqual(result['provider'],'ollama'); self.assertEqual(result['sources'][0]['data']['amounts']['invested_amount']['amount'],'2000.01')
+        self.local.reason.reset_mock()
+        detail=investment_evidence.evidence(self.owner,document.pk,self.investment.pk)
+        investment_evidence.review(self.owner,document.pk,self.investment.pk,revision=detail['revision'],fields=['current_value'],confirm=True,revoke=True)
+        fresh=sources.document_record_page(self.owner,'investment',document.pk)
+        data=self.document_question_data(fresh,query='Show current value')
+        result=self.client.post('/api/ai/personal-insights/',data,content_type='application/json').json()
+        self.assertEqual(result['provider'],'local_evidence'); self.local.reason.assert_not_called()
+        self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_document_emi_details_variants_require_current_reviewed_emi_without_fallback(self):
+        document=self.documents('loan',count=1)[0]
+        detail=loan_evidence.evidence(self.owner,document.pk,self.loan.pk)
+        loan_evidence.review(self.owner,document.pk,self.loan.pk,revision=detail['revision'],fields=['emi'],confirm=True,revoke=True)
+        page=sources.document_record_page(self.owner,'loan',document.pk)
+        for query in ('Show my EMI details','Review EMI values','Explain current EMI status','Show EMI and limitations'):
+            with self.subTest(query=query):
+                response=self.client.post('/api/ai/personal-insights/',self.document_question_data(page,query=query),content_type='application/json')
+                self.assertEqual(response.status_code,200); self.assertEqual(response.json()['provider'],'local_evidence')
+        self.local.reason.assert_not_called(); self.cloud.assert_not_called(); self.provider.assert_not_called()
+
     def test_document_question_rejects_invalid_duplicate_unlinked_and_foreign_selections(self):
         _,page=self.document_question_fixture(); data=self.document_question_data(page)
         invalid=(None,[],data['selected_records']*2,[data['selected_records'][0]]*2,[dict(id=True,revision='a'*64)],

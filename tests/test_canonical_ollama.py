@@ -14,6 +14,19 @@ from tests import test_canonical_evidence as fixtures
 
 @skipUnless(os.environ.get('ALFRED_RUN_OLLAMA_GROUNDING')=='true','Explicit synthetic real-local acceptance required.')
 class CanonicalOllamaAcceptance(TestCase):
+    def test_real_local_explicit_reviewed_current_value_question(self):
+        from tests.test_financial_source_selection import FinancialSourceSelectionTests
+        FinancialSourceSelectionTests.setUp(self)
+        document,page=FinancialSourceSelectionTests.document_question_fixture(self,count=2)
+        result=hybrid_answer(None,self.owner,'Show current value',scope='financial_document',record_type='investment',
+            document_id=document.pk,source_catalog=page['catalog_token'],
+            selected_records=[dict(id=item['record_id'],revision=item['revision']) for item in page['items']],local=OllamaReasoner())
+        self.assertEqual(result['provider'],'ollama'); self.assertFalse(result['financial_authority'])
+        self.assertEqual([item['data']['amounts']['current_value']['amount'] for item in result['sources']],['2345.67','120.05'])
+        self.assertEqual([item['url'] for item in result['sources']],[item['url'] for item in page['items']])
+        self.assertTrue(all(item['data']['amounts']['current_value']['currency'] is None for item in result['sources']))
+        self.cloud.assert_not_called(); self.provider.assert_not_called()
+
     def test_real_local_bounded_records_from_one_reviewed_document(self):
         from tests.test_financial_source_selection import FinancialSourceSelectionTests
         FinancialSourceSelectionTests.setUp(self)
