@@ -254,6 +254,126 @@ class FinancialSourceSelectionTests(TestCase):
             self.assertFalse(first['full_text_qa']); self.assertFalse(second['next_cursor'])
         self.local.reason.assert_not_called(); self.cloud.assert_not_called(); self.provider.assert_not_called()
 
+    def metadata_documents(self,kind='investment',count=7):
+        from datetime import datetime,timezone
+        from apps.expenses.models import StatementUpload
+        if kind=='expense':
+            documents=[StatementUpload.objects.create(user=self.owner,bank_account=self.account,file_name='Synthetic match.pdf',
+                original_file=SimpleUploadedFile('synthetic.pdf',f'%PDF-SYNTHETIC-METADATA-{index}'.encode()),parser_status='parsed') for index in range(count)]
+        else: documents=self.documents(kind,count=count)
+        field='uploaded_at' if kind=='expense' else 'created_at'
+        for index,document in enumerate(documents):
+            stamp=datetime(2026,10,20 if index<6 else 21,0 if index==0 else 23,0 if index==0 else 59,0 if index==0 else 59,
+                0 if index==0 else 999999,tzinfo=timezone.utc)
+            type(document).objects.filter(pk=document.pk).update(file_name='Synthetic match.pdf',**{field:stamp})
+        return documents
+
+    def filter_documents(self,kind='investment',**payload):
+        return self.client.post(f'/api/ai/financial-documents/{kind}/',payload,content_type='application/json')
+
+    def test_metadata_filters_owner_before_paging_duplicate_names_and_inclusive_utc_days(self):
+        for kind in ('expense','investment','loan'):
+            with self.subTest(kind=kind):
+                documents=self.metadata_documents(kind)
+                type(documents[0]).objects.create(user=self.other,file_name='Synthetic match.pdf')
+                query=dict(name=' MATCH.PDF ',date_from='2026-10-20',date_to='2026-10-20')
+                response=self.filter_documents(kind,**query); self.assertEqual(response.status_code,200)
+                first=response.json(); self.assertEqual((first['count'],len(first['items'])),(6,5))
+                second=self.filter_documents(kind,**query,cursor=first['next_cursor']).json()
+                back=self.filter_documents(kind,**query,cursor=first['page_cursor']).json()
+                self.assertEqual([item['document_id'] for item in first['items']+second['items']],[row.pk for row in documents[:6]])
+                self.assertEqual(back['items'],first['items']); self.assertEqual(second['catalog_token'],first['catalog_token'])
+                self.assertIsNone(second['next_cursor']); self.assertIn('no-store',response['Cache-Control'])
+                decoded=signing.loads(first['catalog_token'],salt=sources.CATALOG_SALT)
+                self.assertNotIn('MATCH.PDF',json.dumps(decoded).upper())
+                self.assertEqual(self.filter_documents(kind,name='missing').json()['count'],0)
+        self.local.reason.assert_not_called(); self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_metadata_name_matches_only_displayed_basename_with_literal_and_unicode_search(self):
+        document=self.documents(count=1)[0]
+        for stored,query,expected in (
+                (r'C:\SYNTHETIC-PRIVATE-DIRECTORY\Shown.PDF','shown.pdf',1),
+                (r'C:\SYNTHETIC-PRIVATE-DIRECTORY\Shown.PDF','private-directory',0),
+                ('ŚWIT 100%_literal.pdf','świt 100%_',1),('ŚWIT 100%_literal.pdf','100X',0),
+                ('x'*170+'HIDDEN.pdf','hidden',0),('',f'Bank statement #{document.pk}',1)):
+            with self.subTest(query=query):
+                type(document).objects.filter(pk=document.pk).update(file_name=stored)
+                response=self.filter_documents(name=query); self.assertEqual(response.status_code,200)
+                self.assertEqual(response.json()['count'],expected)
+                self.assertNotIn('SYNTHETIC-PRIVATE-DIRECTORY',json.dumps(response.json()))
+
+    def test_metadata_invalid_filters_csrf_session_owner_cursor_and_legacy_methods(self):
+        self.metadata_documents(); url='/api/ai/financial-documents/investment/'
+        for data in (dict(name=None),dict(name=True),dict(name='x'*129),dict(name='bad\nname'),dict(date_from=None),
+                dict(date_from='2026-02-30'),dict(date_to='20261020'),dict(date_from=' 2026-10-20'),
+                dict(date_to='2026-10-20T00:00:00'),dict(date_from='2026-10-21',date_to='2026-10-20'),dict(unexpected='x')):
+            with self.subTest(data=data): self.assertEqual(self.filter_documents(**data).status_code,400)
+        self.assertEqual(self.client.post(url+'?name=not-logged',{},content_type='application/json').status_code,400)
+        self.assertEqual(self.client.get(url,{'name':'match'}).status_code,400)
+        guarded=Client(enforce_csrf_checks=True); guarded.force_login(self.owner)
+        self.assertEqual(guarded.post(url,{},content_type='application/json').status_code,403)
+        guarded.get('/documents/'); token=guarded.cookies['csrftoken'].value
+        self.assertEqual(guarded.post(url,{'name':'match'},content_type='application/json',HTTP_X_CSRFTOKEN=token).status_code,200)
+        page=self.filter_documents(name='match').json(); self.client.force_login(self.other)
+        self.assertEqual(self.filter_documents(name='match').json()['count'],0)
+        self.assertEqual(self.filter_documents(name='match',cursor=page['next_cursor']).status_code,404)
+        self.client.logout(); self.assertIn(self.filter_documents(name='match').status_code,(401,403))
+
+    def test_metadata_cursor_binds_filters_and_all_matching_metadata_revisions(self):
+        documents=self.metadata_documents(); query=dict(name='match',date_from='2026-10-20',date_to='2026-10-20')
+        page=self.filter_documents(**query).json()
+        for changes in (dict(name='other'),dict(date_from='2026-10-19'),dict(date_to='2026-10-21')):
+            self.assertEqual(self.filter_documents(**(query|changes),cursor=page['next_cursor']).status_code,409)
+        self.assertEqual(self.client.get('/api/ai/financial-documents/investment/',{'cursor':page['next_cursor']}).status_code,409)
+        for change in ('name','timestamp','owner','delete'):
+            with self.subTest(change=change),transaction.atomic():
+                row=type(documents[0]).objects.filter(pk=documents[-2].pk)
+                if change=='name': row.update(file_name='Synthetic match amended.pdf')
+                elif change=='timestamp': row.update(created_at='2026-10-20T12:00:00Z')
+                elif change=='owner': row.update(user=self.other)
+                else: row.delete()
+                self.assertEqual(self.filter_documents(**query,cursor=page['next_cursor']).status_code,409)
+                transaction.set_rollback(True)
+
+    def test_metadata_concurrent_edit_during_catalog_or_page_build_fails_closed(self):
+        documents=self.metadata_documents(); from apps.expenses.services import statement_evidence
+        original=statement_evidence.document_name
+        for trigger in (1,8):
+            with self.subTest(trigger=trigger),transaction.atomic():
+                calls=[]
+                def changed(row):
+                    calls.append(row.pk)
+                    if len(calls)==trigger: type(documents[0]).objects.filter(pk=documents[-1].pk).update(file_name='Synthetic match edited.pdf')
+                    return original(row)
+                with patch.object(statement_evidence,'document_name',side_effect=changed):
+                    self.assertEqual(self.filter_documents(name='match').status_code,409)
+                transaction.set_rollback(True)
+
+    def test_metadata_bounds_never_return_a_truncated_count_or_include_other_owners(self):
+        documents=self.metadata_documents(count=2)
+        with patch.object(sources,'DISCOVERY_LIMIT',1):
+            self.assertEqual(self.filter_documents(name='absent').status_code,400)
+            type(documents[0]).objects.filter(pk=documents[-1].pk).update(user=self.other)
+            response=self.filter_documents(name='match'); self.assertEqual(response.status_code,200)
+            self.assertEqual(response.json()['count'],1)
+        self.assertEqual(self.filter_documents(date_to='0001-01-01').json()['count'],0)
+        self.assertEqual(self.filter_documents(date_to='9999-12-31').json()['count'],1)
+
+    def test_metadata_search_preserves_existing_selection_originals_money_and_revocation(self):
+        documents=self.documents(); page,items=self.pages()
+        models=tuple(type(row) for row in self.rows.values())+(type(self.account),)
+        before=[list(model.objects.order_by('pk').values()) for model in models]
+        baseline=resolve_canonical_financial_baseline(self.owner,fresh=True)['decimal_amounts']
+        filtered=self.filter_documents(name='investment-6').json()
+        self.assertEqual([item['document_id'] for item in filtered['items']],[documents[-1].pk])
+        result=self.answer(page,items[:1]); self.assertEqual(result['sources'][-1]['url'],items[0]['url'])
+        self.assertEqual([list(model.objects.order_by('pk').values()) for model in models],before)
+        self.assertEqual(resolve_canonical_financial_baseline(self.owner,fresh=True)['decimal_amounts'],baseline)
+        detail=investment_evidence.evidence(self.owner,documents[0].pk,self.investment.pk)
+        investment_evidence.review(self.owner,documents[0].pk,self.investment.pk,revision=detail['revision'],fields=list(investment_evidence.FIELDS),confirm=True,revoke=True)
+        with self.assertRaises(sources.SourceSelectionConflict): self.answer(page,items[:1])
+        self.cloud.assert_not_called(); self.provider.assert_not_called()
+
     def test_discovery_paginates_linked_records_and_routes_exact_owner_review_citations(self):
         document=self.documents(count=1)[0]; rows=[self.investment]
         for index in range(6):

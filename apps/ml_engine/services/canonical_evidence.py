@@ -1,5 +1,5 @@
 """Read-only individual financial records; unknown currencies never form new totals."""
-from datetime import datetime
+from datetime import date, datetime, time, timezone as datetime_timezone
 from hashlib import sha256
 import json
 import re
@@ -169,18 +169,45 @@ def document_page(user, kind, identity, *, cursor=None):
         if len(rows)>DOCUMENT_LIMIT else None)
 
 
-def _discovery_catalog(user, kind, document_id):
+def _discovery_filters(filters):
+    if filters is None: filters={}
+    if not isinstance(filters,dict) or set(filters)-{'name','date_from','date_to'}: raise ValueError('Invalid document filters.')
+    result={key:filters.get(key,'') for key in ('name','date_from','date_to')}
+    if (any(not isinstance(value,str) for value in result.values()) or len(result['name'])>128
+            or len(result['name'].encode())>512 or any(ord(char)<32 or ord(char)==127 for char in result['name'])):
+        raise ValueError('Choose a bounded document name and ISO date range.')
+    result['name']=result['name'].strip().casefold()
+    for key in ('date_from','date_to'):
+        value=result[key]
+        if value:
+            if not re.fullmatch(r'\d{4}-\d{2}-\d{2}',value): raise ValueError('Use YYYY-MM-DD upload dates.')
+            date.fromisoformat(value)
+    if result['date_from'] and result['date_to'] and result['date_from']>result['date_to']: raise ValueError('Upload date range is reversed.')
+    return result
+
+
+def _discovery_catalog(user, kind, document_id, filters=None):
     from apps.expenses.models import StatementUpload
     from apps.investments.models import InvestmentImportDocument
     from apps.loans.models import LoanImportDocument
-    from apps.expenses.services.statement_evidence import file_reference
+    from apps.expenses.services.statement_evidence import file_reference, document_name
     model={'expense':StatementUpload,'loan':LoanImportDocument,'investment':InvestmentImportDocument}.get(kind)
     if model is None: raise Http404
-    document=None; links=None
+    document=None; links=None; metadata=None
     if document_id is None:
+        filters=_discovery_filters(filters)
         rows=model.objects.filter(user=user)
         date_field='uploaded_at' if kind=='expense' else 'created_at'
         rows=rows.only('pk','user_id','file_name',date_field)
+        for key,lookup,boundary in (('date_from','gte',time.min),('date_to','lte',time.max)):
+            if filters[key]: rows=rows.filter(**{date_field+'__'+lookup:datetime.combine(date.fromisoformat(filters[key]),boundary,tzinfo=datetime_timezone.utc)})
+        candidates=list(rows.order_by('pk')[:DISCOVERY_LIMIT+1])
+        if len(candidates)>DISCOVERY_LIMIT: raise ValueError('Document discovery exceeds its bounded record limit. Narrow the upload-date range.')
+        # Match the displayed basename, never an internal directory or a truncated page.
+        candidates=[row for row in candidates if filters['name'] in document_name(row).casefold()]
+        identities=[row.pk for row in candidates]
+        metadata=_digest([(row.pk,row.file_name,getattr(row,date_field)) for row in candidates])
+        rows=rows.filter(pk__in=identities)
         source=None
     else:
         document=get_object_or_404(model,user=user,pk=document_id)
@@ -193,18 +220,20 @@ def _discovery_catalog(user, kind, document_id):
             manager=getattr(document,f'linked_{kind}s')
             links=manager.through.objects.filter(**{manager.source_field_name+'_id':document.pk}).aggregate(count=Count('pk'),version=Max('pk'))
         source=dict(record=_record_revision(document),file=list(file_reference(document.original_file if kind=='expense' else document.uploaded_file)[:2]))
-    identities=list(rows.order_by('pk').values_list('pk',flat=True)[:DISCOVERY_LIMIT+1])
-    if len(identities)>DISCOVERY_LIMIT: raise ValueError('Document discovery exceeds its bounded record limit.')
+        identities=list(rows.order_by('pk').values_list('pk',flat=True)[:DISCOVERY_LIMIT+1])
+        if len(identities)>DISCOVERY_LIMIT: raise ValueError('Document discovery exceeds its bounded record limit.')
     stamp=dict(owner=user.pk,kind=kind,identity=document_id,purpose='document-discovery-v1',source=source,membership=_digest(identities),links=links)
+    if document_id is None: stamp.update(filters=_digest(filters),metadata=metadata)
     return document,rows,stamp,len(identities)
 
 
-def document_record_page(user, kind, document_id=None, *, cursor=None):
+def document_record_page(user, kind, document_id=None, *, cursor=None, filters=None):
     """Owner-directed discovery only; existing evidence pages retain correction authority."""
     from apps.expenses.services.statement_evidence import document_name
     from alfred_ai.services.upload_limits import UploadLimitExceeded
     _owner(user)
-    document,rows,stamp,count=_discovery_catalog(user,kind,document_id)
+    if document_id is not None and filters is not None: raise ValueError('Filters apply to the document list, not linked records.')
+    document,rows,stamp,count=_discovery_catalog(user,kind,document_id,filters)
     after=0
     if cursor is not None:
         if not isinstance(cursor,str) or not 1<=len(cursor)<=8192: raise ValueError('Invalid document discovery page.')
@@ -234,7 +263,7 @@ def document_record_page(user, kind, document_id=None, *, cursor=None):
     for identity,expected in revisions:
         current=_owned_record(user,kind,identity)
         if _document_item(kind,current,document,_document_evidence(user,kind,current,document))!=expected: raise SourceSelectionConflict()
-    if _discovery_catalog(user,kind,document_id)[2]!=stamp: raise SourceSelectionConflict()
+    if _discovery_catalog(user,kind,document_id,filters)[2]!=stamp: raise SourceSelectionConflict()
     return dict(level='documents' if document is None else 'records',kind=kind,document_id=document_id,
         document_name=document_name(document) if document else None,items=items,count=count,limit=DOCUMENT_LIMIT,
         checked_at=timezone.now().isoformat(),full_text_qa=False,

@@ -20,6 +20,10 @@ function initDocumentSources() {
     const kind=document.getElementById('documentSourcesKind'), items=document.getElementById('documentSourcesItems'), status=document.getElementById('documentSourcesStatus');
     const refresh=document.getElementById('documentSourcesRefresh'), documents=document.getElementById('documentSourcesDocuments');
     const previous=document.getElementById('documentSourcesPrevious'), next=document.getElementById('documentSourcesNext');
+    const filterForm=document.getElementById('documentSourcesFilters'), name=document.getElementById('documentSourcesName');
+    const from=document.getElementById('documentSourcesFrom'), to=document.getElementById('documentSourcesTo');
+    const filterControls=[name,from,to,document.getElementById('documentSourcesApply'),document.getElementById('documentSourcesClear')];
+    let appliedFilters={name:'',date_from:'',date_to:''};
     let active=true, generation=0, controller=null, documentId=null, cursors=[null], index=0, nextCursor=null;
     const readable=value => String(value || 'not recorded').replaceAll('_',' ');
     function link(parent, text, url) {
@@ -32,15 +36,18 @@ function initDocumentSources() {
         if (!active) return;
         controller?.abort(); const request=new AbortController(), ticket=++generation; controller=request;
         items.replaceChildren(); items.setAttribute('aria-busy','true'); status.textContent='Checking your document sources…';
-        [kind,refresh,documents,previous,next].forEach(control => { control.disabled=true; });
+        [kind,refresh,documents,previous,next,...filterControls].forEach(control => { control.disabled=true; });
         const timer=setTimeout(() => request.abort(),30000);
         try {
-            const path=`/api/ai/financial-documents/${kind.value}/${documentId===null ? '' : documentId+'/'}${cursors[index] ? '?cursor='+encodeURIComponent(cursors[index]) : ''}`;
-            const page=await Alfred.fetchJSON(path,{signal:request.signal});
+            const filtered=documentId===null && Object.values(appliedFilters).some(Boolean);
+            const path=`/api/ai/financial-documents/${kind.value}/${documentId===null ? '' : documentId+'/'}${!filtered && cursors[index] ? '?cursor='+encodeURIComponent(cursors[index]) : ''}`;
+            const options={signal:request.signal};
+            if (filtered) Object.assign(options,{method:'POST',body:JSON.stringify({...appliedFilters,...(cursors[index] ? {cursor:cursors[index]} : {})})});
+            const page=await Alfred.fetchJSON(path,options);
             if (!active || ticket!==generation) return;
             cursors[index]=page.page_cursor; nextCursor=page.next_cursor;
-            status.textContent=`${page.level==='documents' ? 'Documents' : page.document_name+' · linked records'} · Page ${index+1} · ${page.count} supported entries · checked ${page.checked_at}. Full-document Q&A is unsupported.`;
-            if (!page.items.length) items.textContent='No supported linked sources. No answer or verified fact can be inferred from this list.';
+            status.textContent=`${page.level==='documents' ? 'Documents'+(filtered ? ' · filters applied' : '') : page.document_name+' · linked records'} · Page ${index+1} · ${page.count} supported entries · checked ${page.checked_at}. Full-document Q&A is unsupported.`;
+            if (!page.items.length) items.textContent=filtered ? 'No documents match these filters. No answer or verified fact can be inferred from this list.' : 'No supported linked sources. No answer or verified fact can be inferred from this list.';
             if (page.level==='records' && page.count) link(items,'Ask about selected reviewed records',`/ai/insights/?scope=financial_document&record_type=${page.kind}&document_id=${page.document_id}`);
             page.items.forEach(item => {
                 const card=document.createElement('article'); card.className='mini-card';
@@ -66,17 +73,26 @@ function initDocumentSources() {
             clearTimeout(timer);
             if (ticket===generation) {
                 controller=null; items.setAttribute('aria-busy','false'); kind.disabled=refresh.disabled=!active;
+                filterControls.forEach(control => { control.disabled=!active || documentId!==null; });
                 documents.disabled=!active || documentId===null; previous.disabled=!active || index===0; next.disabled=!active || !nextCursor;
             }
         }
     }
+    filterForm.addEventListener('submit',event => {
+        event.preventDefault(); if (!active || documentId!==null) return;
+        appliedFilters={name:name.value.trim(),date_from:from.value,date_to:to.value}; reset();
+    });
+    document.getElementById('documentSourcesClear').addEventListener('click',() => {
+        filterForm.reset(); appliedFilters={name:'',date_from:'',date_to:''}; reset();
+    });
     kind.addEventListener('change',() => reset()); refresh.addEventListener('click',() => reset(documentId)); documents.addEventListener('click',() => reset());
     next.addEventListener('click',() => { if (nextCursor) { cursors[++index]=nextCursor; load(); } });
     previous.addEventListener('click',() => { if (index>0) { index--; load(); } });
     window.addEventListener('pagehide',() => {
         active=false; generation++; controller?.abort(); controller=null; documentId=null; cursors=[null]; index=0; nextCursor=null;
+        filterForm.reset(); appliedFilters={name:'',date_from:'',date_to:''};
         items.replaceChildren(); status.textContent=''; items.setAttribute('aria-busy','false');
-        [kind,refresh,documents,previous,next].forEach(control => { control.disabled=true; });
+        [kind,refresh,documents,previous,next,...filterControls].forEach(control => { control.disabled=true; });
     });
     window.addEventListener('pageshow',event => { if (event.persisted) { active=true; reset(); } });
     load();

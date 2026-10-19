@@ -1439,6 +1439,122 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('intelligenceSourceItems'),''); self.assertEqual(self.text('intelligenceSourcesSelected'),'')
         self.assertEqual(self.text('intelligenceAnswers'),'')
 
+    def document_metadata_filter_fixture(self):
+        from datetime import datetime,timezone
+        from selenium.webdriver.support.ui import Select
+        row,documents,service,local=self.financial_source_selection_fixture('investment')
+        owner=self.scenario['user']
+        for index,document in enumerate(documents):
+            stamp=datetime(2026,10,20 if index<6 else 21,0 if index==0 else 23,0 if index==0 else 59,0 if index==0 else 59,
+                0 if index==0 else 999999,tzinfo=timezone.utc)
+            filename='Synthetic report.pdf' if index else 'Synthetic <img src=x onerror="window.filterLeak=true"> report.pdf'
+            type(document).objects.filter(pk=document.pk).update(file_name=filename,created_at=stamp)
+            detail=service.evidence(owner,document.pk,row.pk)
+            service.review(owner,document.pk,row.pk,revision=detail['revision'],fields=list(service.FIELDS),confirm=True)
+        other=get_user_model().objects.create_user(username='synthetic-metadata-foreign')
+        type(documents[0]).objects.create(user=other,file_name='Synthetic report.pdf')
+        self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentSourcesKind').is_enabled())
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        self.wait.until(lambda _: '7 supported entries' in self.text('documentSourcesStatus'))
+        self.browser.find_element(self.By.ID,'documentSourcesName').send_keys('report')
+        self.browser.execute_script("document.getElementById('documentSourcesFrom').value='2026-10-20';document.getElementById('documentSourcesTo').value='2026-10-20';")
+        self.memory_click('#documentSourcesApply')
+        self.wait.until(lambda _: '6 supported entries' in self.text('documentSourcesStatus'))
+        return row,documents,service,local
+
+    def test_document_metadata_filters_pages_names_dates_and_privacy(self):
+        row,documents,service,local=self.document_metadata_filter_fixture()
+        self.assertIn('filters applied',self.text('documentSourcesStatus'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentSourcesItems article')),5)
+        self.assertFalse(self.browser.execute_script('return Boolean(window.filterLeak)'))
+        draft=self.browser.find_element(self.By.ID,'documentChatGPTRawText'); draft.send_keys('SYNTHETIC unsent upload draft')
+        self.browser.execute_script('''
+            window.documentFilterRequests=[];const original=window.fetch;
+            window.fetch=function(input,options){const url=typeof input==='string'?input:input.url;
+                if(url.includes('/api/ai/financial-documents/'))window.documentFilterRequests.push({url,method:options?.method||'GET'});
+                return original.apply(this,arguments);};
+        ''')
+        self.memory_click('#documentSourcesNext')
+        self.wait.until(lambda _: 'Page 2' in self.text('documentSourcesStatus'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentSourcesItems article')),1)
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#documentSourcesItems button[data-document-id="{documents[5].pk}"]').is_displayed())
+        self.memory_click('#documentSourcesPrevious')
+        self.wait.until(lambda _: 'Page 1' in self.text('documentSourcesStatus'))
+        self.browser.execute_script("document.getElementById('documentSourcesFilters').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('document-filters-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.getElementById('documentSourcesFilters').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('document-filters-mobile')
+        name=self.browser.find_element(self.By.ID,'documentSourcesName'); name.clear(); name.send_keys('absent')
+        self.memory_click('#documentSourcesApply')
+        self.wait.until(lambda _: '0 supported entries' in self.text('documentSourcesStatus'))
+        self.assertIn('No documents match',self.text('documentSourcesItems'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'documentSourcesNext').is_enabled())
+        self.assertEqual(draft.get_property('value'),'SYNTHETIC unsent upload draft')
+        self.browser.execute_script("document.getElementById('documentSourcesFrom').value='2026-10-21';")
+        self.memory_click('#documentSourcesApply')
+        self.wait.until(lambda _: 'Sources unavailable or changed' in self.text('documentSourcesStatus'))
+        self.assertEqual(name.get_property('value'),'absent')
+        self.assertEqual(self.browser.find_element(self.By.ID,'documentSourcesFrom').get_property('value'),'2026-10-21')
+        requests=self.browser.execute_script('return window.documentFilterRequests')
+        self.assertTrue(requests); self.assertTrue(all(item['method']=='POST' and '?' not in item['url'] for item in requests))
+        self.assertEqual(self.browser.current_url,self.live_server_url+'/documents/')
+        self.memory_click('#documentSourcesClear')
+        self.wait.until(lambda _: '7 supported entries' in self.text('documentSourcesStatus'))
+        for identity in ('documentSourcesName','documentSourcesFrom','documentSourcesTo'):
+            self.assertEqual(self.browser.find_element(self.By.ID,identity).get_property('value'),'')
+        name.send_keys('SYNTHETIC-PRIVATE-DRAFT')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        for identity in ('documentSourcesName','documentSourcesFrom','documentSourcesTo'):
+            self.assertEqual(self.browser.find_element(self.By.ID,identity).get_property('value'),'')
+        self.assertEqual(self.text('documentSourcesItems'),''); self.assertEqual(self.text('documentSourcesStatus'),'')
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: '7 supported entries' in self.text('documentSourcesStatus'))
+        self.assertEqual(name.get_property('value'),''); local.reason.assert_not_called()
+
+    def test_document_filters_stale_refresh_and_reviewed_question_selection(self):
+        from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+        row,documents,service,local=self.document_metadata_filter_fixture(); owner=self.scenario['user']
+        cloud=self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.reasoning_provider'))
+        before=resolve_canonical_financial_baseline(owner,fresh=True)['decimal_amounts']
+        type(documents[0]).objects.filter(pk=documents[5].pk).update(file_name='Synthetic report revised.pdf')
+        self.memory_click('#documentSourcesNext')
+        self.wait.until(lambda _: 'Sources unavailable or changed' in self.text('documentSourcesStatus'))
+        self.assertEqual(self.text('documentSourcesItems'),'')
+        self.assertEqual(self.browser.find_element(self.By.ID,'documentSourcesName').get_property('value'),'report')
+        self.memory_click('#documentSourcesRefresh')
+        self.wait.until(lambda _: '6 supported entries' in self.text('documentSourcesStatus'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{documents[0].pk}"]')
+        self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'documentSourcesName').is_enabled())
+        self.memory_click('#documentSourcesDocuments')
+        self.wait.until(lambda _: '6 supported entries' in self.text('documentSourcesStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'documentSourcesName').get_property('value'),'report')
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{documents[0].pk}"]')
+        self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus'))
+        self.memory_click('#documentSourcesItems a[href*="scope=financial_document"]')
+        self.wait.until(lambda _: '1 linked records' in self.text('intelligenceSourcesStatus'))
+        self.memory_click(f'#intelligenceSourceItems input[value="{row.pk}"]')
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain selected records')
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: '2,345.67' in self.text('intelligenceAnswers'))
+        citation=service.evidence(owner,documents[0].pk,row.pk)['citation_url']
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
+        self.assertIn('Currency not recorded',self.text('intelligenceAnswers'))
+        self.assertNotIn('filterLeak',json.dumps(local.reason.call_args.args[0]))
+        detail=service.evidence(owner,documents[0].pk,row.pk)
+        service.review(owner,documents[0].pk,row.pk,revision=detail['revision'],fields=list(service.FIELDS),confirm=True,revoke=True)
+        local.reason.reset_mock()
+        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain selected records')
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'Selected evidence changed' in self.text('intelligenceSourcesStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'Explain selected records')
+        local.reason.assert_not_called(); cloud.assert_not_called()
+        self.assertEqual(resolve_canonical_financial_baseline(owner,fresh=True)['decimal_amounts'],before)
+
     def test_document_center_owned_source_discovery_review_pages_and_stale_refresh(self):
         from selenium.webdriver.support.ui import Select
         from django.core.files.uploadedfile import SimpleUploadedFile

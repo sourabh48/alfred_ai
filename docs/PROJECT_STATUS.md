@@ -1,6 +1,6 @@
 # ALFRED Project Status
 
-**Only active overview, feature matrix, roadmap and continuation checkpoint. Updated 2026-10-19.**
+**Only active overview, feature matrix, roadmap and continuation checkpoint. Updated 2026-10-20.**
 
 ## Resume here
 
@@ -33,6 +33,18 @@ Get-Content docs/PROJECT_STATUS.md -TotalCount 145
 4. Commit each verified unit and update this file. No new status/audit/roadmap/checkpoint/prompt Markdown files. Historical continuation/audit/release reports remain evidence, not alternate active instructions.
 
 Current consolidation evidence: `artifacts/consolidation-20261017/` (ignored local machine-readable receipts, not source or private-provider uploads).
+
+### DOC-06 owned metadata filters — 2026-10-20
+
+Resumed clean **342c0bad24e352dc0ccc4078d3d33710fd71b1d3** on the sole existing development branch/worktree. Existing seven-role Council **1f7f380994e26e91** pins that base, seven scoped source/UI/test/tracker paths and a 600-second/two-attempt browser gate. No Council rebuild, optional advisory/model-role calls, new dependency, schema or production action.
+
+The existing document discovery service now accepts a bounded displayed-basename substring (Unicode casefold, literal characters) and inclusive **UTC upload-date** bounds. The owner and date window are applied before the existing 4096-candidate metadata cap, and displayed-name filtering occurs before five-item keyset pagination/counting. Oversized catalogs fail completely and request a narrower date window; filename search never silently searches only the first 4096 or five records. Duplicate names keep distinct IDs. Signed catalogs contain filter/metadata hashes, not raw search terms, and recheck all matching names/timestamps/membership before returning. Filter/cursor changes, concurrent edits, deletion or ownership changes require refresh. Linked-record catalogs and reviewed selections retain their separate current revisions, originals/corrections, revocation, owner citations, exact Decimal values and unknown-currency rules.
+
+Filtered reads use CSRF-protected JSON **POST on the existing list endpoint** so private search terms do not enter URLs/access logs; GET remains cursor-only and linked-record POST remains 405. Search fields are validated, never stored in memory/history/indexes or sent to a model/cloud. The existing Documents UI provides explicit Apply/Clear, current counts/empty/error states, preserved applied filters on return from linked records, draft preservation, request cancellation and page-hide clearing. Filters lock while viewing linked records, without changing the separate assistant picker. No arbitrary PDF/OCR extraction/search/Q&A, financial writes, currency inference or activation.
+
+`doc06-filter-first`: **56 backend PASS**, zero failures/skips, covering bank/loan/investment metadata, owner-before-limit/pagination, duplicate and Unicode/literal/basename search, inclusive UTC boundaries/year extremes, malformed dates/ranges/types, CSRF/session/foreign cursors, signed filter/metadata binding, concurrent edits, unchanged selected evidence/originals and synthetic financial baseline/fingerprints. `doc06-filter-chrome-first`: **2 actual Chrome PASS**, **54.431s**, zero failures/skips, including paging/back, empty/invalid results, draft preservation, POST-only private filters, stale refresh, page-hide/cache return, safe hostile-name rendering, exact document-to-assistant citations and revocation rejection. Actual desktop/390px filter screenshots reviewed PASS. Separate `doc06-local-ollama`: **one real local synthetic PASS**, **21.322s**, existing two-reviewed-record acceptance; this is not general accuracy or a new model promotion. System/migration-drift and JavaScript syntax PASS. Overlapping counts are not added.
+
+Actual independent `doc_discovery_review` initial Reviewer/scoped Security inspection found no actionable issues; final source-bound approval, host Architect/Coder attestations, Council Tester, Guardian and ordinary commit are **PENDING** at this checkpoint. Graphify AST refresh was attempted but **BLOCKED by Windows Application Control (ApplicationFailedException)**; no policy bypass or paid fallback. Existing graph/source navigation remains read-only; graph freshness is not claimed. No fresh native/package, real-account/provider or device-loss acceptance. Counts stay **64 verified / 32 unaccepted / 29 partial / 10 missing / 5 approval / 3 external = 143**, 79 not fully verified. DOC-06 stays PARTIALLY_IMPLEMENTED because metadata filtering is not general full-document knowledge. After this task closes, the next independent DOC-07 unit is evaluated, allowlisted financial-field questions (for example current value) over the existing selected current reviewed projections; full arbitrary PDF/OCR work and retention/provider/currency decisions remain gated.
 
 ### Seven-role Development Council continuation — 2026-10-19
 
@@ -1677,7 +1689,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [Council contracts](../tests/test_development_council.py); actual focused counts/evidence above.
 - Acceptance: disposable contracts and five actual scoped host-mediated cycles PASS, including v2 independent actor/source/test/commit routing at d5078b9 (**30 backend + 1 status-browser flow**, overlaps combined evidence). Two later bounded local advisories produced signals/proposals only, never role approval; earlier blocked advice preserved. No unattended development/production or general model-review quality claim.
 - Limitations/dependencies: deterministic Planner, Codex-host/human Developer/Reviewer/Security, isolated Tester and commit-verifying Coordinator. Optional local advice never approves a role. No autonomous patch execution, production operations, paid-provider routing or quota bypass.
-- Next: Seven-role extension is implemented at f649da6; exercise its actual v3 source/test/commit/Guardian cycle on the recorded DOC-07 task. Preserve legacy receipts and existing budgets; no Council rebuild, paid fallback, automatic patch/Git/production execution or deployment approval.
+- Next: Seven-role extension f649da6 and actual v3 DOC-07 backend/UI cycles b0bc54a/7cccbc1 are complete. Continue scoped DOC-06 and subsequent approved local tasks using current-source independent reviews, tests and Guardian checks. Preserve legacy receipts/budgets; no rebuild, paid fallback, automatic patch/Git/production execution or deployment approval.
 
 ### COUNCIL-03 — Experimental self-improvement engine
 
