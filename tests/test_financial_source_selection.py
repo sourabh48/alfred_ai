@@ -166,6 +166,39 @@ class FinancialSourceSelectionTests(TestCase):
         self.client.force_login(self.other); self.assertEqual(self.client.get(url).status_code,404)
         self.client.logout(); self.assertIn(self.client.get(url).status_code,(401,403))
 
+    def test_discovery_relink_generation_invalidates_identical_final_membership(self):
+        for kind in ('loan','investment'):
+            document=self.documents(kind,count=1)[0]; row=self.rows[kind]
+            manager=getattr(document,f'linked_{kind}s')
+            for timing in ('between_pages','during_read'):
+                with self.subTest(kind=kind,timing=timing):
+                    before=sources._document_evidence(self.owner,kind,row,document)
+                    page=sources.document_record_page(self.owner,kind,document.pk)
+                    original=sources._document_item; changed=[]
+                    def relink():
+                        manager.remove(row); manager.add(row)
+                    def changing(*args):
+                        item=original(*args)
+                        if not changed: changed.append(True); relink()
+                        return item
+                    if timing=='between_pages':
+                        relink()
+                        with self.assertRaises(sources.SourceSelectionConflict):
+                            sources.document_record_page(self.owner,kind,document.pk,cursor=page['page_cursor'])
+                    else:
+                        with patch.object(sources,'_document_item',side_effect=changing),self.assertRaises(sources.SourceSelectionConflict):
+                            sources.document_record_page(self.owner,kind,document.pk)
+                    self.assertEqual(list(manager.values_list('pk',flat=True)),[row.pk])
+                    after=sources._document_evidence(self.owner,kind,row,document)
+                    self.assertEqual(before,after)
+                    fresh=sources.document_record_page(self.owner,kind,document.pk)
+                    self.assertTrue(fresh['items'][0]['selectable'])
+                    self.client.force_login(self.other)
+                    self.assertEqual(self.client.get(fresh['items'][0]['url']).status_code,404)
+                    self.assertEqual(self.client.get(f'/api/ai/financial-documents/{kind}/{document.pk}/',{'cursor':fresh['page_cursor']}).status_code,404)
+                    self.client.force_login(self.owner)
+        self.local.reason.assert_not_called(); self.cloud.assert_not_called(); self.provider.assert_not_called()
+
     def test_discovery_rechecks_loan_related_conflicts_not_only_import_revision(self):
         from datetime import date
         from apps.loans.models import LoanClosureDocument, LoanPaymentHistory

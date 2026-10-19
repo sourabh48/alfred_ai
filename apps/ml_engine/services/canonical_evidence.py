@@ -176,7 +176,7 @@ def _discovery_catalog(user, kind, document_id):
     from apps.expenses.services.statement_evidence import file_reference
     model={'expense':StatementUpload,'loan':LoanImportDocument,'investment':InvestmentImportDocument}.get(kind)
     if model is None: raise Http404
-    document=None
+    document=None; links=None
     if document_id is None:
         rows=model.objects.filter(user=user)
         date_field='uploaded_at' if kind=='expense' else 'created_at'
@@ -189,10 +189,13 @@ def _discovery_catalog(user, kind, document_id):
         if kind=='expense':
             if document.bank_account_id and document.bank_account.user_id!=user.pk: raise Http404
             rows=rows.filter(source='bank_statement')
+        else:
+            manager=getattr(document,f'linked_{kind}s')
+            links=manager.through.objects.filter(**{manager.source_field_name+'_id':document.pk}).aggregate(count=Count('pk'),version=Max('pk'))
         source=dict(record=_record_revision(document),file=list(file_reference(document.original_file if kind=='expense' else document.uploaded_file)[:2]))
     identities=list(rows.order_by('pk').values_list('pk',flat=True)[:DISCOVERY_LIMIT+1])
     if len(identities)>DISCOVERY_LIMIT: raise ValueError('Document discovery exceeds its bounded record limit.')
-    stamp=dict(owner=user.pk,kind=kind,identity=document_id,purpose='document-discovery-v1',source=source,membership=_digest(identities))
+    stamp=dict(owner=user.pk,kind=kind,identity=document_id,purpose='document-discovery-v1',source=source,membership=_digest(identities),links=links)
     return document,rows,stamp,len(identities)
 
 
