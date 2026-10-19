@@ -242,6 +242,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Expected: pigment, counterclaim',self.text('memoryComparisonResults'))
         self.capture('independent-heldout-contract-desktop')
         self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
         self.browser.execute_script("document.querySelector('#memoryComparisonStatus').scrollIntoView({block:'start',behavior:'instant'})")
         self.capture('independent-heldout-contract-mobile')
         self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),390)
