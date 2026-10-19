@@ -1252,6 +1252,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def test_financial_sources_page_selection_limit_exact_citations_mobile_and_privacy(self):
         row,documents,service,local=self.financial_source_selection_fixture('investment')
+        self.assertIn('Eligible fields only: invested amount, monthly sip, current value',self.text('intelligenceSourceItems'))
+        self.assertIn('Full-document Q&A is unsupported',self.text('intelligenceSourceItems'))
         for document in documents[:4]: self.memory_click(f'#intelligenceSourceItems input[value="{document.pk}"]')
         self.memory_click('#intelligenceSourcesNext')
         self.wait.until(lambda _: 'Page 2' in self.text('intelligenceSourcesStatus'))
@@ -1304,6 +1306,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#intelligenceSourcesNext')
         self.wait.until(lambda _: 'Page 2' in self.text('intelligenceSourcesStatus'))
         self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceSourceItems input[value="{document.pk}"]').is_enabled())
+        self.assertIn('Not eligible: owner review required',self.text('intelligenceSourceItems'))
         self.memory_click(f'#intelligenceSourceItems input[value="{documents[-2].pk}"]')
         self.memory_click('#intelligenceForm button[type="submit"]')
         self.wait.until(lambda _: f'canonical-loan-{row.pk}' in self.text('intelligenceAnswers'))

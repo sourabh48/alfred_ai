@@ -99,6 +99,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     renderSelection();
                 });
                 label.append(input,detail); row.append(label);
+                const eligibility = document.createElement("p"); eligibility.className = "small mb-1";
+                const grounding = item.grounding;
+                eligibility.textContent = grounding?.status === "reviewed_fields_only"
+                    ? `Eligible fields only: ${grounding.eligible_fields.map(field => field.replaceAll('_',' ')).join(', ')}. `
+                    : `Not eligible: ${(grounding?.status || 'source_unavailable').replaceAll('_',' ')}. `;
+                eligibility.append(document.createTextNode("Full-document Q&A is unsupported. Owner review is not bank/broker authentication; currency is not inferred. Sources are rechecked when sending."));
+                row.append(eligibility);
                 if (safeCitation(item.url)) { const link = document.createElement("a"); link.href = item.url; link.textContent = "Review source"; row.append(link); }
                 sourceItems.append(row);
             });

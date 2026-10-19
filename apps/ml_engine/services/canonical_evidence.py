@@ -95,6 +95,12 @@ def _document_evidence(user, kind, row, document):
     return evidence(user,document.pk,row.pk)
 
 
+def _loan_conflict(row, closures):
+    return ((row.current_status in ('closed','foreclosed','prepaid') and row.remaining_balance not in (None,0)) or
+        row.payment_history.filter(loan_effect_applied=True).exclude(match_status='matched').exists() or
+        len({(value['closure_amount'],value['closure_date']) for value in closures})>1)
+
+
 def _document_item(kind, row, document, detail):
     if kind=='expense':
         verification=detail['verification']
@@ -110,11 +116,23 @@ def _document_item(kind, row, document, detail):
         verification=('owner_confirmed' if confirmed else 'partially_owner_confirmed' if confirmed_fields else
             'needs_owner_review' if detail['review_allowed'] else 'source_unavailable')
         name=detail['document_name']; citation=detail['citation_url']; uploaded=document.created_at
+    # Eligibility is a current field-level preflight, never permission for arbitrary document Q&A.
+    record_conflict=kind=='loan' and _loan_conflict(row,row.closure_documents.filter(verification_status='verified').values('closure_amount','closure_date'))
+    reason=('source_unavailable' if not available else
+        'source_conflict' if record_conflict or verification in ('conflicting_source','conflicting_records','duplicate_records') else
+        'document_review_required' if verification=='document_needs_review' or (kind!='expense' and not detail['review_allowed']) else
+        'owner_review_required' if not confirmed_fields else
+        'record_confirmation_required' if kind=='loan' and not row.is_confirmed else 'reviewed_fields_only')
+    eligible=reason=='reviewed_fields_only'
+    grounding=dict(status=reason,eligible_fields=confirmed_fields if eligible else [],
+        scope='financial_records',full_text_qa=False,
+        limitation='Only current owner-reviewed structured fields are eligible. Selection and source revisions are rechecked before and after local inference. '
+            'No arbitrary document Q&A, independent bank/broker authentication or inferred currency.')
     return dict(document_id=document.pk,type='bank_statement' if kind=='expense' else f'{kind}_import',name=name,
         uploaded_at=uploaded.isoformat(),verification=verification,confirmed_fields=confirmed_fields,
         freshness='current_review' if confirmed else 'partial_review' if confirmed_fields else 'review_required' if available else 'unavailable',
         source_status=detail.get('source_status',verification),revision=detail['revision'],url=citation,
-        selectable=available and bool(confirmed_fields))
+        selectable=eligible,grounding=grounding)
 
 
 def document_page(user, kind, identity, *, cursor=None):
@@ -305,9 +323,7 @@ def record_source(user, kind, identity, *, selected_documents=None, source_catal
             data['limitations'].append('The applied-payment transaction link is a recorded association only. It does not verify matching amounts/dates, settlement allocations or bank authenticity; no payment total is recalculated.')
         closures=list(row.closure_documents.filter(verification_status='verified').values('id','closure_amount','closure_date'))
         related+=closures
-        if ((row.current_status in ('closed','foreclosed','prepaid') and row.remaining_balance not in (None,0)) or
-                row.payment_history.filter(loan_effect_applied=True).exclude(match_status='matched').exists() or
-                len({(value['closure_amount'],value['closure_date']) for value in closures})>1):
+        if _loan_conflict(row,closures):
             available=False; data['verification']='conflicting_loan_records'
     else:
         fields=('invested_amount','monthly_sip','current_value'); helper=investment_money
