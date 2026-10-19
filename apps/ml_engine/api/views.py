@@ -76,9 +76,14 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
         return Response(intelligence)
 
     def post(self,request):
-        data=self.payload(('query','scope','document_id','transaction_id','record_type','record_id','selected_documents','source_catalog','cloud_consent','query_sensitivity',
+        data=self.payload(('query','scope','document_id','transaction_id','record_type','record_id','selected_documents','source_catalog','selected_records','cloud_consent','query_sensitivity',
                            'conversation_id','conversation_revision','request_id'))
-        store = memory_store()
+        document_question=data.get('scope')=='financial_document'
+        if document_question:
+            from .conversations import current_session
+            current_session(request)
+            if data.get('conversation_id') is not None: raise ValueError('Document-question persistence is not supported.')
+        store = None if document_question else memory_store()
         identity = data.get('conversation_id')
         history_fields = {'conversation_id','conversation_revision','request_id'}
         if identity is None and history_fields & set(data): raise ValueError()
@@ -97,10 +102,13 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
                 record = history.get(request.user, identity)
                 current_session(request)
                 return Response({**saved, 'historical':True, 'conversation':{'id':identity, 'revision':record['revision']}})
-        result = hybrid_answer(store,request.user,data.get('query'),scope=data.get('scope','general'),
-            document_id=data.get('document_id'),transaction_id=data.get('transaction_id'),record_type=data.get('record_type'),record_id=data.get('record_id'),
-            selected_documents=data.get('selected_documents'),source_catalog=data.get('source_catalog'),cloud_consent=data.get('cloud_consent',False),
-            query_sensitivity=data.get('query_sensitivity','sensitive'))
+        try:
+            result = hybrid_answer(store,request.user,data.get('query'),scope=data.get('scope','general'),
+                document_id=data.get('document_id'),transaction_id=data.get('transaction_id'),record_type=data.get('record_type'),record_id=data.get('record_id'),
+                selected_documents=data.get('selected_documents'),source_catalog=data.get('source_catalog'),selected_records=data.get('selected_records'),cloud_consent=data.get('cloud_consent',False),
+                query_sensitivity=data.get('query_sensitivity','sensitive'))
+        finally:
+            if document_question: current_session(request)
         if identity is not None:
             current_session(request)
             revision = data.get('conversation_revision')

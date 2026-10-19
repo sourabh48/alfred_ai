@@ -239,8 +239,49 @@ def document_record_page(user, kind, document_id=None, *, cursor=None):
         document_name=document_name(document) if document else None,items=items,count=count,limit=DOCUMENT_LIMIT,
         checked_at=timezone.now().isoformat(),full_text_qa=False,
         limitation='Discovery is not document authentication or financial advice. Review current corrected values and separately retained original evidence; no currency is inferred.',
-        page_cursor=signing.dumps(dict(catalog=token,after=after),salt=PAGE_SALT),
+        catalog_token=token,page_cursor=signing.dumps(dict(catalog=token,after=after),salt=PAGE_SALT),
         next_cursor=signing.dumps(dict(catalog=token,after=selected[DOCUMENT_LIMIT-1].pk),salt=PAGE_SALT) if len(selected)>DOCUMENT_LIMIT else None)
+
+
+def document_record_sources(user, kind, document_id, selection, token):
+    """Current reviewed projections only; never combine money or extract arbitrary text."""
+    _owner(user)
+    if kind not in ('expense','loan','investment') or type(document_id) is not int or document_id<1: raise Http404
+    if (not isinstance(selection,list) or not 1<=len(selection)<=3
+            or any(not isinstance(item,dict) or set(item)!={'id','revision'} or type(item['id']) is not int or item['id']<1
+                or not isinstance(item['revision'],str) or not re.fullmatch('[a-f0-9]{64}',item['revision']) for item in selection)
+            or len({item['id'] for item in selection})!=len(selection)):
+        raise ValueError('Choose one to three distinct currently reviewed records.')
+    def read():
+        document,rows,stamp,_=_discovery_catalog(user,kind,document_id)
+        _load_catalog(token,stamp)
+        if rows.filter(pk__in=[item['id'] for item in selection]).count()!=len(selection): raise Http404
+        result=[]
+        for chosen in sorted(selection,key=lambda item:item['id']):
+            row=_owned_record(user,kind,chosen['id'])
+            detail=_document_evidence(user,kind,row,document)
+            item=_document_item(kind,row,document,detail)
+            if detail['revision']!=chosen['revision'] or not item['selectable']: raise SourceSelectionConflict()
+            _,_,record_stamp=_document_catalog(user,kind,row.pk)
+            source=record_source(user,kind,row.pk,selected_documents=[dict(id=document_id,revision=chosen['revision'])],
+                source_catalog=signing.dumps(record_stamp,salt=CATALOG_SALT,compress=True))
+            if not source['available']: raise SourceSelectionConflict()
+            fields=('amount','closing_balance') if kind=='expense' else item['grounding']['eligible_fields']
+            excluded={key:'not_recorded' if value['amount'] is None else 'not_reviewed_from_selected_document'
+                for key,value in source['data']['amounts'].items() if key not in fields}
+            source['data']['amounts']={key:value for key,value in source['data']['amounts'].items() if key in fields}
+            if not any(value['amount'] is not None for value in source['data']['amounts'].values()): raise SourceSelectionConflict()
+            source['data']={key:value for key,value in source['data'].items() if key in ('record_type','record_id','applicable_date',
+                'provenance','amounts','limitations','document_sources','document_selection')}
+            source.update(url=item['url'],document_id=document_id,classification='owner_reviewed_document_record')
+            source['data'].update(document_name=item['name'],document_id=document_id,verification='owner_confirmed_document_fields',unreviewed_fields=excluded)
+            source['data']['limitations'].append('Only reviewed fields from this selected document are shown separately. No combined amount, currency, independent authenticity or arbitrary document text is established.')
+            result.append(source)
+        if _discovery_catalog(user,kind,document_id)[2]!=stamp: raise SourceSelectionConflict()
+        return result
+    result=read()
+    if read()!=result: raise SourceSelectionConflict()
+    return result
 
 
 def _selected_documents(user, kind, row, selection, token):

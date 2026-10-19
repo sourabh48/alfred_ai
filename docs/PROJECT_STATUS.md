@@ -46,6 +46,16 @@ Postcommit closure: bootstrap **686c7d593e9bda26 COMPLETE** at **f649da661dcf60a
 
 Operator CLI is the existing `scripts/development_council.py`. Resolve the configured SDK to `$taskPython`, then use `plan --feature DOC-07 --path ... --label ...`, `handoff --task ID`, `inspect --task ID`, source-bound `record --task ID --role architect|coder|reviewer|security --actor ACTOR --status PASS|FAIL|BLOCKED --source FINGERPRINT`, `test --task ID`, `status --task ID` and `complete --task ID --commit EXACT_SHA --authorization-reference DEVELOPMENT_APPROVAL`. The legitimate host makes the ordinary tested Git commit; Council never stages/commits source. `resume --task ID --confirm-worker-stopped` only releases an expired, actually stopped worker. Reviewers must be genuinely separate actors; role aliases are attestations, not identity/quota proof. Existing local `artifacts/council/status.html` is a safe evidence view, not a second project tracker or application/production agent.
 
+### DOC-07 bounded document questions — 2026-10-19
+
+Council **faf7449750df0154**, contract v3, pins clean base **cfffd0c332db86ceae3451427ab3e2b26e8e9017** and seven existing backend/test/tracker paths. The existing Insights API accepts `financial_document` plus one owned bank, investment or loan import and **one to three explicitly selected reviewed canonical record revisions**. Signed owner/document catalogs bind the whole current membership; deterministic record ordering, bounded field projection, duplicate/conflicting/foreign/changed/missing evidence rejection and repeated before/after inference checks prevent partial or stale answers. Exact private review citations preserve corrected-value precedence and original evidence. Each authoritative Decimal amount stays separate with currency `not_recorded`; no totals, FX, inferred currency, independent authenticity or arbitrary OCR/PDF comprehension is claimed.
+
+Local reasoning reuses the existing intent gate, 4096-byte evidence context, 256-token/30-second inference budget and unsupported numeric/currency narrative suppression. Only selected reviewed fields reach the model; unreviewed fields are labeled without their values. This mode creates no memory vault, retrieves no unrelated memories, writes no conversation history or financial records, and rejects cloud consent. Session freshness is rechecked on success and error so expired sessions cannot be renewed by SAVE_EVERY_REQUEST. Existing canonical, bank and conversation callers retain their behavior. No migration, dependency, configuration or provider/history activation change.
+
+`document-questions-projection`: **68 backend PASS**, zero failures/skips, **32.405s**. Cases cover bank/investment/loan selection, original/corrected fields, unknown currency, exact owner-only citations, strict malformed/foreign/duplicate/over-budget selections, unsupported totals/questions, numeric narrative suppression, pre/during-inference correction/revocation/relink/deletion/owner/file races, session/CSRF/expiry, outages, no vault/cloud/history, unchanged canonical financial baseline and statement/transaction fingerprints. Earlier 47-test execution overlaps and is not added. `document-questions-real-local`: **one bounded actual Ollama PASS**, **17.072s**, two fictional reviewed holdings with exact values/citations and unknown currency. This validates the installed local path, not general model accuracy, arbitrary document Q&A or promotion of the rejected embedding model.
+
+Actual independent `doc_discovery_review` initially found no actionable correctness/security issues; final source-bound Reviewer/Security approval, host Architect/Coder attestations, Council Tester, Guardian and ordinary commit are **PENDING** at this checkpoint. No new browser/native/package acceptance is claimed for this backend. DOC-07 moves from NOT_IMPLEMENTED to **PARTIALLY_IMPLEMENTED** because bounded document-level questions now execute; full arbitrary-document acceptance and UI wiring remain incomplete. Counts: **64 verified / 32 unaccepted / 29 partial / 10 missing / 5 approval / 3 external = 143**, still **79 not fully verified / 44.8% technical**. Next isolated unit after this Council closes: expose explicit document-record selection in the existing assistant UI. All production, frozen-candidate, money/currency/history/provider and recovery restrictions remain unchanged.
+
 ### DOC-07 bounded eligibility continuation — 2026-10-19
 
 Recovered clean integrated HEAD **f17fcd753ba03a563517979521ea9eb607eeb166**, newer than the supplied dfdeac09 checkpoint (verified ancestor); no interrupted tracked/untracked source changes found. Retrieval/held-out and Council setup are already complete within the scopes above and are not repeated. One development checkout/branch is retained; production and frozen 4aa7ac70 remain untouched.
@@ -263,8 +273,8 @@ The denominator remains the original 143 audited capabilities, not new commit/su
 - BLOCKED_EXTERNAL: **3**
 - COMPLETE_VERIFIED: **64**
 - IMPLEMENTED_NOT_ACCEPTED: **32**
-- NOT_IMPLEMENTED: **11**
-- PARTIALLY_IMPLEMENTED: **28**
+- NOT_IMPLEMENTED: **10**
+- PARTIALLY_IMPLEMENTED: **29**
 
 Technical completion: **64/143 = 44.8%**. Remaining: **79**, including implemented but unaccepted and approval/external blockers. This is not a product acceptance percentage.
 
@@ -722,13 +732,13 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### DOC-07 — AI Q&A over arbitrary financial documents
 
-**NOT_IMPLEMENTED** · Document intelligence · P2.
+**PARTIALLY_IMPLEMENTED** · Document intelligence · P2.
 
 - Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js), [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py).
 - APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
 - Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py), [tests/test_document_grounding_acceptance.py](../tests/test_document_grounding_acceptance.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
-- Limitations/dependencies: Hybrid grounding currently accepts owned memories and verified loan closure projections, not arbitrary PDF/OCR corpora. Existing owner/session controls; canonical data availability; acceptance plan.
+- Limitations/dependencies: Local hybrid grounding supports canonical financial facts, owner-reviewed bank/investment/loan fields and at most three explicitly selected reviewed records from one supported document. Exact private citations and stale-source rejection do not establish independent document authenticity. Arbitrary PDF/OCR corpora and full document Q&A remain unsupported; the new document-question UI is pending. Existing owner/session controls, canonical records and reviewed source revisions are required; no unknown-currency totals or private cloud fallback.
 - Next: [COUNCIL_SAFE_LOCAL] Implement backend-only bounded document questions over at most three explicitly selected owned canonical records linked to one supported financial import. Reuse reviewed-field contexts, exact citations and before/after source revalidation; reject stale/foreign/conflicting/unsupported selections. No totals, FX, inferred currency, raw OCR retention, alternate extraction/index/memory path, financial writes or provider/history activation. Test privacy, races and baseline/fingerprint invariance before a UI unit.
 
 ### DOC-08 — Loan closure document Q&A and abstention

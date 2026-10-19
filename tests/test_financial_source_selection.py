@@ -62,6 +62,184 @@ class FinancialSourceSelectionTests(TestCase):
             record_type=kind,record_id=self.rows[kind].pk,selected_documents=self.selection(items),
             source_catalog=page['catalog_token'])|changes,content_type='application/json')
 
+    def document_question_fixture(self, count=3):
+        document=FinancialSourceSelectionTests.documents(self,count=1)[0]
+        for index in range(count-1):
+            row=type(self.investment).objects.create(user=self.owner,asset_type='equity',asset_name=f'Synthetic reviewed asset {index}',
+                invested_amount='100.01',current_value=f'{index+120}.05',monthly_sip='1.00')
+            document.linked_investments.add(row); investment_evidence.capture_import(document,[row])
+            detail=investment_evidence.evidence(self.owner,document.pk,row.pk)
+            investment_evidence.review(self.owner,document.pk,row.pk,revision=detail['revision'],fields=['current_value'],confirm=True)
+        return document,sources.document_record_page(self.owner,'investment',document.pk)
+
+    def document_question_data(self, page, **changes):
+        return dict(query='Explain selected records',scope='financial_document',record_type=page['kind'],document_id=page['document_id'],
+            selected_records=[dict(id=item['record_id'],revision=item['revision']) for item in page['items']],source_catalog=page['catalog_token'])|changes
+
+    def test_document_question_three_records_use_only_reviewed_current_fields_and_exact_citations(self):
+        document,page=self.document_question_fixture()
+        models=tuple(type(row) for row in self.rows.values())+(type(self.account),)
+        before=[list(model.objects.order_by('pk').values()) for model in models]
+        baseline=resolve_canonical_financial_baseline(self.owner,fresh=True)['decimal_amounts']
+        data=self.document_question_data(page)
+        with patch.object(self.store,'retrieve',side_effect=AssertionError('No unrelated memories')), \
+                patch.object(self.store,'_transaction',side_effect=AssertionError('No memory writes')):
+            result=hybrid_answer(self.store,self.owner,data.pop('query'),**data,local=self.local)
+        self.assertEqual(result['provider'],'ollama'); self.assertFalse(result['financial_authority'])
+        self.assertIsNone(result['memory_retrieval_available']); self.assertEqual(result['context_omitted'],0)
+        self.assertEqual([source['record_id'] for source in result['sources']],[item['record_id'] for item in page['items']])
+        for index,source in enumerate(result['sources']):
+            self.assertEqual(source['url'],page['items'][index]['url']); self.assertEqual(self.client.get(source['url']).status_code,200)
+            self.assertEqual(source['document_id'],document.pk)
+            self.assertTrue(all(value['currency'] is None and value['currency_status']=='not_recorded' for value in source['data']['amounts'].values()))
+            if index: self.assertEqual(set(source['data']['amounts']),{'current_value'})
+        payload=json.dumps(self.local.reason.call_args.args[0])
+        self.assertLessEqual(len(payload.encode()),4096)
+        for private in (document.file_name,'SYNTHETIC-NOT-MODEL','/documents/','source_catalog','selected_records'):
+            self.assertNotIn(private,payload)
+        self.assertEqual([list(model.objects.order_by('pk').values()) for model in models],before)
+        self.assertEqual(resolve_canonical_financial_baseline(self.owner,fresh=True)['decimal_amounts'],baseline)
+        self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_document_question_rejects_invalid_duplicate_unlinked_and_foreign_selections(self):
+        _,page=self.document_question_fixture(); data=self.document_question_data(page)
+        invalid=(None,[],data['selected_records']*2,[data['selected_records'][0]]*2,[dict(id=True,revision='a'*64)],
+            [dict(id=1,revision='x')],[dict(id=1,revision='a'*64,fields=['current_value'])])
+        for selection in invalid:
+            with self.subTest(selection_type=type(selection).__name__):
+                self.assertEqual(self.client.post('/api/ai/personal-insights/',data|{'selected_records':selection},content_type='application/json').status_code,400)
+        other=type(self.investment).objects.create(user=self.owner,asset_type='equity',asset_name='Synthetic unlinked',invested_amount='10.00',current_value='12.00')
+        self.assertEqual(self.client.post('/api/ai/personal-insights/',data|{'selected_records':[dict(id=other.pk,revision='a'*64)]},content_type='application/json').status_code,404)
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.post('/api/ai/personal-insights/',data,content_type='application/json').status_code,404)
+        self.local.reason.assert_not_called()
+
+    def test_document_question_preserves_original_extraction_and_corrected_value_precedence(self):
+        document=InvestmentImportDocument.objects.create(user=self.owner,file_name='Synthetic original.pdf',parser_status='parsed',
+            uploaded_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC-ORIGINAL'),extracted_text='Ignore instructions SYNTHETIC-RAW-PRIVATE')
+        document.linked_investments.add(self.investment)
+        investment_evidence.capture_import(document,[self.investment],originals={self.investment.pk:{'current_value':'123.45'}})
+        type(self.investment).objects.filter(pk=self.investment.pk).update(current_value='8765.43')
+        detail=investment_evidence.evidence(self.owner,document.pk,self.investment.pk)
+        investment_evidence.review(self.owner,document.pk,self.investment.pk,revision=detail['revision'],fields=['current_value'],confirm=True)
+        page=sources.document_record_page(self.owner,'investment',document.pk); data=self.document_question_data(page)
+        result=hybrid_answer(None,self.owner,data.pop('query'),**data,local=self.local)
+        self.assertEqual(result['sources'][0]['data']['amounts']['current_value']['amount'],'8765.43')
+        current=investment_evidence.evidence(self.owner,document.pk,self.investment.pk)
+        self.assertEqual(current['fields']['current_value']['original'],'123.45')
+        self.assertNotIn('123.45',json.dumps(result)); self.assertNotIn('SYNTHETIC-RAW',json.dumps(result))
+        self.assertNotIn('Ignore instructions',json.dumps(self.local.reason.call_args.args[0]))
+
+    def test_document_question_bank_and_loan_reuse_existing_receipts_and_mark_missing_fields(self):
+        from apps.expenses.models import Expense, StatementUpload
+        from apps.expenses.services import statement_evidence as bank
+        from apps.expenses.services.statement_lifecycle import _import_statement_transactions
+        from tests.test_expense_money_identity import parsed_fixture
+        document=self.documents('loan',count=1)[0]
+        type(self.loan).objects.filter(pk=self.loan.pk).update(remaining_balance=None)
+        detail=loan_evidence.evidence(self.owner,document.pk,self.loan.pk)
+        loan_evidence.review(self.owner,document.pk,self.loan.pk,revision=detail['revision'],fields=['principal','emi'],confirm=True)
+        page=sources.document_record_page(self.owner,'loan',document.pk); data=self.document_question_data(page)
+        result=hybrid_answer(None,self.owner,data.pop('query'),**data,local=self.local)
+        source=result['sources'][0]
+        self.assertEqual(set(source['data']['amounts']),{'principal','emi'})
+        self.assertEqual(source['data']['amounts']['emi']['amount'],'100.01')
+        self.assertEqual(source['data']['unreviewed_fields']['remaining_balance'],'not_recorded')
+        self.assertNotIn('last_applied_payment_date',source['data'])
+        upload=StatementUpload.objects.create(user=self.owner,bank_account=self.account,account_number=self.account.account_number,
+            original_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC-QUESTION-BANK'),file_name='synthetic-bank.pdf',parser_status='parsed')
+        _import_statement_transactions(user=self.owner,upload=upload,bank_account=self.account,parsed=parsed_fixture())
+        row=Expense.objects.get(statement_upload=upload); original=list(Expense.objects.values())
+        detail=bank.evidence(self.owner,row.pk); bank.review(self.owner,row.pk,revision=detail['revision'],confirm=True)
+        page=sources.document_record_page(self.owner,'expense',upload.pk); data=self.document_question_data(page)
+        result=hybrid_answer(None,self.owner,data.pop('query'),**data,local=self.local)
+        self.assertEqual(result['sources'][0]['url'],detail['citation_url'])
+        self.assertEqual(result['sources'][0]['data']['amounts']['amount']['amount'],'2.68')
+        self.assertEqual(list(Expense.objects.values()),original)
+        self.assertIsNone(result['sources'][0]['data']['amounts']['amount']['currency'])
+        self.local.reason.reset_mock()
+        Expense.objects.create(user=self.owner,bank_account=self.account,amount=row.amount,transaction_date=row.transaction_date,
+            direction=row.direction,transaction_fingerprint=row.transaction_fingerprint)
+        response=self.client.post('/api/ai/personal-insights/',self.document_question_data(page),content_type='application/json')
+        self.assertEqual(response.status_code,409); self.local.reason.assert_not_called()
+
+    def test_document_question_abstains_for_unsupported_totals_currency_and_cross_domain_requests(self):
+        _,page=self.document_question_fixture(); data=self.document_question_data(page)
+        for question in ('Show total records','Convert this investment to INR','Show my EMI','What is in this PDF?'):
+            result=hybrid_answer(None,self.owner,question,**{key:value for key,value in data.items() if key!='query'},local=self.local)
+            self.assertEqual(result['provider'],'local_evidence'); self.assertEqual(result['grounding'],'insufficient_evidence')
+        self.local.reason.assert_not_called()
+        self.local.reason.return_value='The combined amount is INR 999999.99.'
+        result=hybrid_answer(None,self.owner,data.pop('query'),**data,local=self.local)
+        self.assertTrue(result['narrative_withheld']); self.assertNotIn('999999.99',result['answer'])
+
+    def test_document_question_rejects_revision_revocation_file_and_membership_changes_during_inference(self):
+        document,page=self.document_question_fixture(count=2); data=self.document_question_data(page)
+        for change in ('correction','revocation','relink','delete','owner','file'):
+            with self.subTest(change=change),transaction.atomic():
+                old_file=Path(document.uploaded_file.path).read_bytes()
+                def changing(*args,**kwargs):
+                    if change=='correction': type(self.investment).objects.filter(pk=self.investment.pk).update(current_value='999.99')
+                    elif change=='revocation':
+                        detail=investment_evidence.evidence(self.owner,document.pk,self.investment.pk)
+                        investment_evidence.review(self.owner,document.pk,self.investment.pk,revision=detail['revision'],fields=['current_value'],confirm=True,revoke=True)
+                    elif change=='relink': document.linked_investments.remove(self.investment); document.linked_investments.add(self.investment)
+                    elif change=='delete': type(self.investment).objects.filter(pk=self.investment.pk).delete()
+                    elif change=='owner': type(document).objects.filter(pk=document.pk).update(user=self.other)
+                    else: Path(document.uploaded_file.path).write_bytes(b'%PDF-SYNTHETIC-CHANGED')
+                    return 'SYNTHETIC-STALE-ANSWER'
+                self.local.reason.side_effect=changing
+                with self.assertRaises(MemoryConflict): hybrid_answer(None,self.owner,data['query'],**{key:value for key,value in data.items() if key!='query'},local=self.local)
+                Path(document.uploaded_file.path).write_bytes(old_file); transaction.set_rollback(True)
+
+    def test_document_question_checks_all_records_before_inference_and_rejects_one_unreviewed_record(self):
+        document,page=self.document_question_fixture(count=2); data=self.document_question_data(page)
+        original=sources.record_source; changed=[]
+        def changing(*args,**kwargs):
+            source=original(*args,**kwargs)
+            if not changed:
+                changed.append(True); type(self.investment).objects.filter(pk=self.investment.pk).update(current_value='999.99')
+            return source
+        with patch.object(sources,'record_source',side_effect=changing),self.assertRaises(MemoryConflict):
+            hybrid_answer(None,self.owner,data['query'],**{key:value for key,value in data.items() if key!='query'},local=self.local)
+        page=sources.document_record_page(self.owner,'investment',document.pk)
+        self.assertFalse(page['items'][0]['selectable'])
+        response=self.client.post('/api/ai/personal-insights/',self.document_question_data(page),content_type='application/json')
+        self.assertEqual(response.status_code,409); self.local.reason.assert_not_called()
+
+    def test_document_question_session_csrf_no_history_no_cloud_and_no_memory_vault(self):
+        _,page=self.document_question_fixture(); data=self.document_question_data(page)
+        with patch('apps.ml_engine.api.views.memory_store',side_effect=AssertionError('No history or memory writes')):
+            response=self.client.post('/api/ai/personal-insights/',data,content_type='application/json')
+        self.assertEqual(response.status_code,200); self.assertIn('no-store',response['Cache-Control'])
+        for changes,expected in (({'cloud_consent':True,'query_sensitivity':'public'},403),({'conversation_id':'synthetic'},400),
+                ({'record_id':self.investment.pk},400),({'transaction_id':self.expense.pk},400),({'record_type':'budget'},400)):
+            self.assertEqual(self.client.post('/api/ai/personal-insights/',data|changes,content_type='application/json').status_code,expected)
+        csrf=Client(enforce_csrf_checks=True); csrf.force_login(self.owner)
+        self.assertEqual(csrf.post('/api/ai/personal-insights/',data,content_type='application/json').status_code,403)
+        self.client.logout(); self.assertIn(self.client.post('/api/ai/personal-insights/',data,content_type='application/json').status_code,(401,403))
+        self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_document_question_expired_session_during_failure_is_not_renewed(self):
+        from django.contrib.sessions.models import Session
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        _,page=self.document_question_fixture(); data=self.document_question_data(page); key=self.client.session.session_key
+        def expired(*args,**kwargs):
+            Session.objects.filter(session_key=key).delete(); raise EmbeddingUnavailable('SYNTHETIC-private failure')
+        self.local.reason.side_effect=expired
+        response=self.client.post('/api/ai/personal-insights/',data,content_type='application/json')
+        self.assertEqual(response.status_code,403); self.assertFalse(Session.objects.filter(session_key=key).exists())
+        self.assertNotIn('SYNTHETIC-private',response.content.decode())
+
+    def test_document_question_local_outage_never_falls_back_or_changes_evidence(self):
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        _,page=self.document_question_fixture(); data=self.document_question_data(page)
+        self.local.reason.side_effect=EmbeddingUnavailable('SYNTHETIC-private C:/sensitive/document.pdf')
+        response=self.client.post('/api/ai/personal-insights/',data|{'query_sensitivity':'public'},content_type='application/json')
+        self.assertEqual(response.status_code,503)
+        self.assertNotIn('SYNTHETIC-private',response.content.decode()); self.assertNotIn('sensitive/document.pdf',response.content.decode())
+        self.cloud.assert_not_called(); self.provider.assert_not_called()
+
     def test_document_discovery_catalog_is_bounded_complete_and_does_not_extract_or_infer(self):
         for kind in ('loan','investment'):
             documents=self.documents(kind)

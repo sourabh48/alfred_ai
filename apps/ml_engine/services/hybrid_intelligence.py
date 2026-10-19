@@ -44,8 +44,11 @@ class OllamaReasoner(OllamaEmbeddings):
         return message['content']
 
 
-def source_context(user,scope,document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None):
+def source_context(user,scope,document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None):
     if scope=='general': return []
+    if scope=='financial_document':
+        from .canonical_evidence import document_record_sources
+        return document_record_sources(user,record_type,document_id,selected_records,source_catalog)
     if scope=='financial_records':
         from .canonical_evidence import record_source
         return [record_source(user,record_type,record_id,selected_documents=selected_documents,source_catalog=source_catalog)]
@@ -107,7 +110,7 @@ def present_answer(result,scope,query=''):
     for source in result.get('sources',[]): claims=claims.replace(str(source['ref']),'')
     currency=any(category(char)=='Sc' for char in claims) or re.search(r'\b(?:INR|USD|EUR|GBP|JPY|AUD|CAD|CNY|CHF|dollars?|rupees?|euros?|pounds?|yen)\b',claims,re.I)
     intent=claims+' '+(query if scope=='general' else '')
-    financial=scope in ('finance','documents','bank_statements','financial_records') or re.search(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',intent,re.I)
+    financial=scope in ('finance','documents','bank_statements','financial_records','financial_document') or re.search(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',intent,re.I)
     numbers=re.search(r'\d',claims)
     withheld=bool((currency and (numbers or financial)) or (financial and numbers))
     if withheld:
@@ -116,23 +119,25 @@ def present_answer(result,scope,query=''):
     return result
 
 
-def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,cloud_consent=False,query_sensitivity='sensitive',local=None):
+def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None,cloud_consent=False,query_sensitivity='sensitive',local=None):
     from .canonical_evidence import KINDS, supported_question
     owner=_owner(user)
-    if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents','bank_statements','financial_records')
+    if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents','bank_statements','financial_records','financial_document')
             or type(cloud_consent) is not bool or query_sensitivity not in ('public','personal','sensitive')
-            or (scope=='documents' and (type(document_id) is not int or document_id<1))
-            or (scope!='documents' and document_id is not None)
+            or (scope in ('documents','financial_document') and (type(document_id) is not int or document_id<1))
+            or (scope not in ('documents','financial_document') and document_id is not None)
             or (scope=='bank_statements' and (type(transaction_id) is not int or transaction_id<1))
             or (scope!='bank_statements' and transaction_id is not None)
             or (scope=='financial_records' and (record_type not in KINDS or type(record_id) is not int or record_id<1))
-            or (scope!='financial_records' and (record_type is not None or record_id is not None or selected_documents is not None or source_catalog is not None))):
+            or (scope not in ('financial_records','financial_document') and (record_type is not None or record_id is not None or selected_documents is not None or source_catalog is not None))
+            or (scope=='financial_document' and (record_type not in ('expense','loan','investment') or record_id is not None or selected_documents is not None))
+            or (scope!='financial_document' and selected_records is not None)):
         raise ValueError('Choose a bounded question and an owned supported source.')
-    if scope in ('bank_statements','financial_records') and cloud_consent:
+    if scope in ('bank_statements','financial_records','financial_document') and cloud_consent:
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied('Private financial evidence is local only.')
-    tools=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog)
-    if scope in ('financial_records','finance') and (not tools[0]['available'] or (scope=='financial_records' and not supported_question(query,kind=record_type))):
+    tools=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
+    if scope in ('financial_records','financial_document','finance') and (any(not tool['available'] for tool in tools) or (scope in ('financial_records','financial_document') and not supported_question(query,kind=record_type))):
         return {'answer':'This request is not established by available compatible evidence. Ask “Explain this record” to inspect recorded values and limitations. Forecasts, currency conversions, unknown-currency totals and unsupported questions are unavailable.',
             'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
             'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}
@@ -141,12 +146,12 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
             'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}
     retrieval_error=None
-    try: memories=store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
+    try: memories=[] if scope=='financial_document' else store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
     except EmbeddingUnavailable as exc:
         memories=[]
         retrieval_error=safe_error_details(exc,'Saved-memory retrieval is unavailable; this answer has no saved-memory grounding.',logger_name=__name__)
     # Filenames and private citation URLs are UI metadata, never model instructions.
-    model_tools=tools if scope not in ('bank_statements','financial_records','finance','documents') else [{
+    model_tools=tools if scope not in ('bank_statements','financial_records','financial_document','finance','documents') else [{
         'ref':source['ref'],'classification':source['classification'],
         'data':{key:value for key,value in source['data'].items() if key in
             ('transaction_date','statement_start','statement_end','verification','direction','category','classification',
@@ -166,16 +171,17 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         if not cloud_consent or query_sensitivity!='public' or scope!='general': raise
         return present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
             daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD),scope,query)
-    with store._transaction() as db:
-        store._expire(db,owner)
-        live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
-        if any(item['id'] not in live for item in included): raise MemoryConflict('Answer context changed during inference.')
+    if scope!='financial_document':
+        with store._transaction() as db:
+            store._expire(db,owner)
+            live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
+            if any(item['id'] not in live for item in included): raise MemoryConflict('Answer context changed during inference.')
     from django.http import Http404
-    try: fresh=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog)
+    try: fresh=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
     except Http404 as exc: raise MemoryConflict('Canonical source became inaccessible during inference.') from exc
     if fresh!=tools: raise MemoryConflict('Canonical source changed during inference.')
     return present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
-        'memory_retrieval_available':retrieval_error is None,'retrieval_error':retrieval_error,
+        'memory_retrieval_available':None if scope=='financial_document' else retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
             'url':f"/settings/#memory-{item['id']}",'verified_at':item['verified_at'],
             'score':item['score']} for item in included]+tools,'context_omitted':len(memories)-len(included)},scope,query)
