@@ -185,10 +185,44 @@ class Council:
         task = self._read(identity)
         return dict(task=task['id'], feature=task['feature'], objective=task['title'], base=task['base'], paths=task['paths'],
             labels=task['labels'], budgets=task['budgets'], developer='codex_host_or_human_required',
+            next_action=self.next_action(identity),
             instructions=['Read AGENTS.md and PROJECT_STATUS.md; use applicable existing skills.',
                 'Use legitimate available Codex only; quota exhaustion means BLOCKED, never automatic provider switching.',
                 'Edit only this task scope; preserve drafts, money, ownership and disabled provider/history controls.',
                 'No deployment, production access, keys, spending, cloud, GitHub push, force operations or automatic self-editing.'])
+
+    def next_action(self, identity):
+        """Deterministic navigation only: no model call, command execution or role mutation."""
+        task=self._read(identity)
+        def route(action,role=None,status='ACTION_REQUIRED'):
+            return dict(action=action,role=role,status=status,host_action_required=status not in ('WAIT','COMPLETE'),
+                automatic_execution=False,task=identity,base=task['base'])
+        if task['stage']=='COMPLETE': return route('historical_completed_receipt',status='COMPLETE')
+        if release.git(self.repo,'branch','--show-current')!=BRANCH or release.git(self.repo,'rev-parse','HEAD')!=task['base']:
+            return route('pinned_branch_or_base_changed',status='BLOCKED')
+        tester=task['roles']['tester']
+        if tester['status']=='RUNNING':
+            if time.time()-tester['started']>task['budgets']['seconds']:
+                return route('confirm_worker_stopped_before_resume','tester')
+            return route('wait_for_active_tester','tester','WAIT')
+        try: source,changed=self.snapshot(task)
+        except CouncilError as exc:
+            if str(exc)=='source_missing_or_exceeds_budget' and task['stage']=='AWAITING_DEVELOPER' and any(not self._path(path).exists() for path in task['paths']):
+                return route('host_implementation','developer')
+            return route('current_source_requires_operator_review',status='BLOCKED')
+        if not changed-{'docs/PROJECT_STATUS.md'}: return route('host_implementation','developer')
+        for role,action in (('developer','host_implementation_review'),('reviewer','independent_host_review'),('security','host_security_review')):
+            evidence=task['roles'][role]
+            if evidence.get('source')!=source or evidence['status']!='PASS' or (task.get('contract_version',1)>=2 and not evidence.get('actor')):
+                return route(action,role)
+        if not self._reviews_valid(task,source): return route('independent_host_review','reviewer')
+        if tester.get('source')==source and tester['status']=='PASS':
+            if task['stage']=='READY_FOR_AUTHORIZED_COMMIT': return route('authorized_host_commit_then_verify','coordinator')
+            return route('test_receipt_state_requires_review',status='BLOCKED')
+        if task['attempts']>=task['budgets']['iterations']: return route('test_attempt_budget_exhausted',status='BLOCKED')
+        if tester['status'] in ('FAIL','BLOCKED'): return route('host_resolve_test_failure','developer')
+        if task['attempts'] and tester.get('source')==source and tester['status']=='NOT_RUN': return route('host_resolve_incomplete_tests','tester')
+        return route('run_scoped_isolated_tests','tester')
 
     @staticmethod
     def _retain_legacy_test(task):
@@ -380,9 +414,12 @@ class Council:
                 tasks=[json.loads(row[0]) for row in db.execute('SELECT body FROM tasks ORDER BY id')]
         rows=[]
         for task in tasks:
+            task['next_action']=self.next_action(task['id'])
             rows.append('<h2>'+escape(task['feature']+' '+task['title'])+'</h2><p>'+escape(task['id']+' / '+task['stage'])+'</p><table><tr><th>Role</th><th>Status</th><th>Evidence</th></tr>')
             for role, result in task['roles'].items(): rows.append('<tr><td>'+escape(role)+'</td><td>'+escape(result['status'])+'</td><td>'+escape(result.get('code',result.get('provider','pending')))+ '</td></tr>')
             rows.append('</table><p>Tests: '+escape(str(task['roles']['tester'].get('tests','NOT_RUN')))+'; attempts '+str(task['attempts'])+'/2. Source: '+escape(task.get('source') or 'not reviewed')+'</p>')
+            action=task['next_action']
+            rows.append('<p>Next host action: '+escape(action['status']+' / '+action['action']+'; role '+(action['role'] or 'operator'))+'. Recommendation only; no automatic execution or new approval.</p>')
             rows.append('<p>Independent host attribution: '+escape('; '.join(role+': '+task['roles'][role].get('actor','legacy unspecified') for role in ('developer','reviewer','security')))+'. Aliases are host attestations, not cryptographic identity proof.</p>')
             history=task.get('test_history',[])
             rows.append('<p>Retained test outcomes: '+escape('; '.join('attempt '+str(item['attempt'])+': '+item['status']+', '+str(item.get('tests','NOT_RUN'))+' executed, '+str(item.get('seconds','not recorded'))+' seconds' for item in history) or 'legacy summary only')+'. Counts across attempts are not distinct test coverage.</p>')

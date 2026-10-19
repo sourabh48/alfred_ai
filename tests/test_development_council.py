@@ -211,6 +211,65 @@ class DevelopmentCouncilTests(SimpleTestCase):
         with self.assertRaisesRegex(CouncilError,'duplicate_objective_scope_changed'):
             self.council.plan(['apps/sample.py'],['tests.test_council_fixture'],'browser')
 
+    def test_deterministic_routing_completes_host_cycle_without_model_or_git_writes(self):
+        task=self.plan(); identity=task['id']
+        self.assertEqual(self.council.handoff(identity)['next_action']['action'],'host_implementation')
+        (self.repo/'apps/sample.py').write_text('VALUE = 2\n',encoding='utf-8'); source=self.council.snapshot(task)[0]
+        for role,action in (('developer','host_implementation_review'),('reviewer','independent_host_review'),('security','host_security_review')):
+            route=self.council.next_action(identity)
+            self.assertEqual((route['action'],route['role']),(action,role)); self.assertFalse(route['automatic_execution'])
+            self.council.record(identity,role,'PASS',source,actor='synthetic_'+role)
+        self.assertEqual(self.council.next_action(identity)['action'],'run_scoped_isolated_tests')
+        with patch('scripts.development_council.run',return_value=dict(status='PASS',tests=1,skips=0)):
+            self.council.test(identity)
+        self.assertEqual(self.council.next_action(identity)['action'],'authorized_host_commit_then_verify')
+        self.assertEqual(self.git('rev-parse','HEAD'),task['base'])
+        self.git('add','apps/sample.py'); self.git('commit','-m','authorized synthetic routing cycle')
+        self.assertEqual(self.council.next_action(identity)['status'],'BLOCKED')  # Host commit must still be verified.
+        self.council.complete(identity,self.git('rev-parse','HEAD'),'synthetic-user-approval')
+        result=Council(self.repo).status(identity)[0]
+        self.assertEqual(result['next_action']['action'],'historical_completed_receipt')
+        self.assertEqual(result['next_action']['status'],'COMPLETE')
+
+    def test_routing_does_not_repeat_active_or_interrupted_tests_or_bypass_review(self):
+        task=self.reviewed(); identity=task['id']
+        def running(current): current['roles']['tester']=dict(status='RUNNING',started=time.time())
+        self.council._change(identity,running)
+        self.assertEqual(self.council.next_action(identity)['status'],'WAIT')
+        def interrupted(current): current['roles']['tester']['started']=time.time()-601
+        self.council._change(identity,interrupted)
+        self.assertEqual(self.council.next_action(identity)['action'],'confirm_worker_stopped_before_resume')
+        self.assertEqual(self.council._read(identity)['roles']['tester']['status'],'RUNNING')
+        self.council.resume(identity,confirm_worker_stopped=True)
+        self.assertEqual(self.council.next_action(identity)['action'],'host_resolve_test_failure')
+        (self.repo/'apps/sample.py').write_text('VALUE = 3\n',encoding='utf-8')
+        self.assertEqual(self.council.next_action(identity)['action'],'host_implementation_review')
+        (self.repo/'apps/outside.py').write_text('UNPLANNED = 1\n',encoding='utf-8')
+        self.assertEqual(self.council.next_action(identity)['status'],'BLOCKED')
+
+    def test_routing_blocks_exhausted_test_budget_and_does_not_create_missing_source(self):
+        task=self.plan(); identity=task['id']
+        self.council._change(identity,lambda current:current['paths'].append('apps/new.py'))
+        self.assertEqual(self.council.next_action(identity)['action'],'host_implementation')
+        self.assertFalse((self.repo/'apps/new.py').exists())
+        self.council._change(identity,lambda current:current['paths'].remove('apps/new.py'))
+        (self.repo/'apps/sample.py').write_text('VALUE = 2\n',encoding='utf-8'); source=self.council.snapshot(self.council._read(identity))[0]
+        for role in ('developer','reviewer','security'): self.council.record(identity,role,'PASS',source,actor='synthetic_'+role)
+        self.council._change(identity,lambda current:current.update(attempts=2))
+        self.assertEqual(self.council.next_action(identity)['action'],'test_attempt_budget_exhausted')
+
+    def test_routing_does_not_hide_incomplete_coverage_or_repeat_existing_pass_after_new_attestation(self):
+        task=self.reviewed(); identity=task['id']
+        with patch('scripts.development_council.run',return_value=dict(status='PASS',tests=0,skips=0)):
+            self.council.test(identity)
+        self.assertEqual(self.council.next_action(identity)['action'],'host_resolve_incomplete_tests')
+        with patch('scripts.development_council.run',return_value=dict(status='PASS',tests=1,skips=0)):
+            self.council.test(identity)
+        self.council.record(identity,'reviewer','PASS',task['source'],actor='synthetic_reviewer')
+        route=self.council.next_action(identity)
+        self.assertEqual((route['status'],route['action']),('BLOCKED','test_receipt_state_requires_review'))
+        self.assertFalse(route['automatic_execution'])
+
     def test_each_test_attempt_retains_source_status_counts_and_restarts_without_repeating(self):
         task=self.reviewed()
         with patch('scripts.development_council.run',return_value=dict(status='FAIL',tests=1,skips=0,code='suite_exit')):
