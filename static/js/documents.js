@@ -41,6 +41,7 @@ function initDocumentSources() {
             cursors[index]=page.page_cursor; nextCursor=page.next_cursor;
             status.textContent=`${page.level==='documents' ? 'Documents' : page.document_name+' · linked records'} · Page ${index+1} · ${page.count} supported entries · checked ${page.checked_at}. Full-document Q&A is unsupported.`;
             if (!page.items.length) items.textContent='No supported linked sources. No answer or verified fact can be inferred from this list.';
+            if (page.level==='records' && page.count) link(items,'Ask about selected reviewed records',`/ai/insights/?scope=financial_document&record_type=${page.kind}&document_id=${page.document_id}`);
             page.items.forEach(item => {
                 const card=document.createElement('article'); card.className='mini-card';
                 const title=document.createElement('h3'); title.className='h6'; title.textContent=page.level==='documents' ? item.name : `${readable(item.record_type)} record #${item.record_id}`; card.append(title);

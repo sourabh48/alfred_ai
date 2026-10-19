@@ -1250,6 +1250,159 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceSourcesNext').is_enabled())
         return row,documents,service,local
 
+    def financial_document_question_fixture(self):
+        from decimal import Decimal
+        row,documents,service,local=self.financial_source_selection_fixture('investment')
+        owner=self.scenario['user']; document=documents[-1]
+        document.file_name='Synthetic <img src=x onerror="window.documentQuestionLeak=true">.pdf'; document.save()
+        records=[row]
+        for index in range(6):
+            records.append(type(row).objects.create(user=owner,asset_type='equity',asset_name=f'Synthetic selected holding {index}',
+                invested_amount='100.01',current_value=Decimal('120.05')+index,monthly_sip='1.00'))
+        document.linked_investments.add(*records); service.capture_import(document,records)
+        for record in records:
+            detail=service.evidence(owner,document.pk,record.pk)
+            service.review(owner,document.pk,record.pk,revision=detail['revision'],fields=['current_value'],confirm=True)
+        return document,records,service,local
+
+    def test_financial_document_questions_explicit_records_pages_citations_and_privacy(self):
+        from selenium.webdriver.support.ui import Select
+        document,records,service,local=self.financial_document_question_fixture()
+        self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentSourcesKind').is_enabled())
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        self.wait.until(lambda _: '7 supported entries' in self.text('documentSourcesStatus'))
+        self.memory_click('#documentSourcesNext')
+        self.wait.until(lambda _: 'Page 2' in self.text('documentSourcesStatus'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{document.pk}"]')
+        self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus'))
+        self.memory_click('#documentSourcesItems a[href*="scope=financial_document"]')
+        self.wait.until(lambda _: '7 linked records' in self.text('intelligenceSourcesStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceScope').get_property('value'),'financial_document')
+        self.assertIn('0/3 selected',self.text('intelligenceSourcesStatus'))
+        self.assertIn('page-only',self.text('conversationHistoryCurrent'))
+        self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').get_property('disabled'))
+        draft=self.browser.find_element(self.By.ID,'intelligenceQuery'); draft.send_keys('Explain selected records')
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.assertIn('Choose current reviewed',self.text('intelligenceFeedback')); local.reason.assert_not_called()
+        for record in records[:2]: self.memory_click(f'#intelligenceSourceItems input[value="{record.pk}"]')
+        self.memory_click('#intelligenceSourcesNext')
+        self.wait.until(lambda _: 'Page 2' in self.text('intelligenceSourcesStatus'))
+        self.memory_click(f'#intelligenceSourceItems input[value="{records[-1].pk}"]')
+        self.memory_click(f'#intelligenceSourceItems input[value="{records[-2].pk}"]')
+        self.assertIn('Three-record limit',self.text('intelligenceSourcesStatus'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceSourceItems input[value="{records[-2].pk}"]').is_selected())
+        self.memory_click('#intelligenceSourcesPrevious')
+        self.wait.until(lambda _: 'Page 1' in self.text('intelligenceSourcesStatus'))
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceSourceItems input[value="{records[0].pk}"]').is_selected())
+        self.assertIn('3/3 selected',self.text('intelligenceSourcesStatus'))
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: f'canonical-investment-{records[-1].pk}' in self.text('intelligenceAnswers'))
+        selected=(records[0],records[1],records[-1]); owner=self.scenario['user']
+        for record in selected:
+            citation=service.evidence(owner,document.pk,record.pk)['citation_url']
+            self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceAnswers .recorded-amount')),3)
+        self.assertNotIn(f'canonical-investment-{records[2].pk}',self.text('intelligenceAnswers'))
+        self.assertIn('Currency not recorded',self.text('intelligenceAnswers'))
+        self.assertIn('not_reviewed_from_selected_document',self.text('intelligenceAnswers'))
+        prompt=json.dumps(local.reason.call_args.args[0])
+        self.assertNotIn('documentQuestionLeak',prompt); self.assertNotIn('/documents/',prompt)
+        self.assertFalse(self.browser.execute_script('return Boolean(window.documentQuestionLeak)'))
+        self.assertEqual(draft.get_property('value'),'')
+        self.browser.execute_script("document.getElementById('intelligenceSources').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('document-questions-record-picker-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.getElementById('intelligenceSources').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('document-questions-record-picker-mobile')
+        citation=service.evidence(owner,document.pk,records[1].pk)['citation_url']
+        self.memory_click(f'#intelligenceAnswers a[href="{citation}"]')
+        self.wait.until(lambda _: 'owner_confirmed' in self.text('statementEvidence'))
+        self.assertIn('120.05',self.text('statementEvidence')); self.capture('document-questions-private-citation')
+        self.browser.back()
+        self.wait.until(lambda _: '7 linked records' in self.text('intelligenceSourcesStatus'))
+        self.assertIn('0/3 selected',self.text('intelligenceSourcesStatus'))
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        for identity in ('intelligenceSourceItems','intelligenceSourcesSelected','intelligenceFinancialDocumentContext','intelligenceAnswers'):
+            self.assertEqual(self.text(identity),'')
+
+    def test_financial_document_questions_stale_outage_retry_and_no_history(self):
+        from selenium.webdriver.support.ui import Select
+        from uuid import uuid4
+        from apps.ml_engine.services.conversation_history import ConversationHistory
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        document,records,service,local=self.financial_document_question_fixture()
+        # Synthetic consent only: document questions must remain page-only even for an opted-in owner.
+        self.enterContext(override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=True))
+        history=ConversationHistory(MemoryStore(settings.ALFRED_MEMORY_DIR)); owner=self.scenario['user']
+        history.configure(owner,enabled=True,consent=True,days=1); saved=history.create(owner,'Synthetic retained empty conversation')
+        self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_document&record_type=investment&document_id={document.pk}')
+        self.wait.until(lambda _: '7 linked records' in self.text('intelligenceSourcesStatus'))
+        self.assertEqual(self.text('conversationHistoryStatus'),'On · local only')
+        self.assertIn('never saved',self.text('conversationHistoryCurrent'))
+        self.memory_click('#conversationHistoryPanel > summary')
+        self.memory_click('#conversationHistoryList li button:first-child')
+        self.wait.until(lambda _: 'Historical hypotheses only' in self.text('conversationHistoryFeedback'))
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').is_enabled())
+        self.wait.until(lambda _: '7 linked records' in self.text('intelligenceSourcesStatus'))
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceSourceItems input[value="{records[0].pk}"]').is_enabled())
+        Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('general')
+        question=dict(query='Synthetic competing history turn',scope='general',document_id=None); identity=uuid4().hex
+        generation,_=history.prepare(owner,saved['id'],0,identity,question)
+        history.append(owner,saved['id'],0,identity,question,dict(answer='Synthetic saved competing hypothesis',
+            provider='ollama',classification='ai_generated_hypothesis',financial_authority=False),generation)
+        draft=self.browser.find_element(self.By.ID,'intelligenceQuery'); draft.send_keys('Explain selected records')
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'Reopen this conversation' in self.text('intelligenceFeedback'))
+        local.reason.assert_not_called()
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').is_enabled())
+        Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('financial_document')
+        self.wait.until(lambda _: '7 linked records' in self.text('intelligenceSourcesStatus'))
+        self.assertIn('never saved',self.text('conversationHistoryCurrent'))
+        self.memory_click(f'#intelligenceSourceItems input[value="{records[0].pk}"]')
+        local.reason.side_effect=EmbeddingUnavailable('SYNTHETIC-PRIVATE-OCR C:/private/source.pdf')
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
+        self.assertEqual(draft.get_property('value'),'Explain selected records')
+        self.assertIn('1/3 selected',self.text('intelligenceSourcesStatus'))
+        self.assertNotIn('SYNTHETIC-PRIVATE-OCR',self.text('intelligenceFeedback'))
+        detail=service.evidence(owner,document.pk,records[0].pk)
+        service.review(owner,document.pk,records[0].pk,revision=detail['revision'],fields=list(service.FIELDS),confirm=True,revoke=True)
+        local.reason.side_effect=None; local.reason.reset_mock()
+        self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: 'Refresh the source list' in self.text('intelligenceSourcesStatus'))
+        self.assertEqual(draft.get_property('value'),'Explain selected records')
+        self.assertEqual(self.text('intelligenceAnswers'),''); local.reason.assert_not_called()
+        self.capture('document-questions-stale-draft')
+        records[1].current_value='321.09'; records[1].save()
+        detail=service.evidence(owner,document.pk,records[1].pk)
+        service.review(owner,document.pk,records[1].pk,revision=detail['revision'],fields=['current_value'],confirm=True)
+        self.memory_click('#intelligenceSourcesRefresh')
+        self.wait.until(lambda _: '0/3 selected' in self.text('intelligenceSourcesStatus'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceSourceItems input[value="{records[0].pk}"]').is_enabled())
+        self.memory_click(f'#intelligenceSourceItems input[value="{records[1].pk}"]')
+        started=threading.Event(); finish=threading.Event(); self.addCleanup(finish.set)
+        def delayed_answer(*args,**kwargs):
+            started.set()
+            if not finish.wait(10): raise RuntimeError('Synthetic delayed-answer test did not release the model')
+            return 'Synthetic current reviewed-field hypothesis'
+        local.reason.side_effect=delayed_answer
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        self.wait.until(lambda _: started.is_set())
+        self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceScope').is_enabled())
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceSourceItems input[value="{records[1].pk}"]').is_enabled())
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceScope').get_property('value'),'financial_document')
+        finish.set()
+        self.wait.until(lambda _: '321.09' in self.text('intelligenceAnswers'))
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').is_enabled())
+        self.assertNotIn('120.05',self.text('intelligenceAnswers')); self.assertEqual(draft.get_property('value'),'')
+        self.assertEqual(len(history.list(owner)),1); self.assertEqual(history.get(owner,saved['id'])['revision'],1)
+        self.assertEqual([turn['query'] for turn in history.get(owner,saved['id'])['turns']],['Synthetic competing history turn'])
+        self.assertEqual(MemoryStore(settings.ALFRED_MEMORY_DIR).list_memories(owner),[])
+
     def test_financial_sources_page_selection_limit_exact_citations_mobile_and_privacy(self):
         row,documents,service,local=self.financial_source_selection_fixture('investment')
         self.assertIn('Eligible fields only: invested amount, monthly sip, current value',self.text('intelligenceSourceItems'))

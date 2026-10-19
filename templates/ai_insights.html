@@ -51,6 +51,7 @@
             <option value="travel">My Travel preferences</option><option value="documents">Verified loan closure evidence</option>
             <option value="bank_statements">My bank-statement records</option>
             <option value="financial_records">My canonical financial records</option>
+            <option value="financial_document">Reviewed records from one document</option>
         </select>
         </div><div id="intelligenceDocumentField" class="d-none mb-2"><label for="intelligenceDocument" class="form-label">Verified evidence</label>
             <select id="intelligenceDocument" class="form-select" disabled required></select></div>
@@ -60,13 +61,17 @@
         <div id="intelligenceFinancialField" class="d-none mb-2"><label for="intelligenceFinancial" class="form-label">Owned financial record</label>
             <select id="intelligenceFinancial" class="form-select" disabled required></select>
             <p class="small">Ask “Explain this record”, “Show my loan status” or “Review recorded values”. Other questions may be unsupported. Recorded values are not independent authentication; budget approval and live market prices are not established. Currency-limited totals remain unavailable.</p></div></div>
+        <div id="intelligenceFinancialDocumentField" class="d-none mb-2">
+            <p id="intelligenceFinancialDocumentContext" class="small">Choose an owned import in Documents, then explicitly select reviewed records. Questions are page-only; no totals or arbitrary PDF/OCR questions.</p>
+            <a class="btn btn-outline-primary btn-sm" href="/documents/#documentSourcesTitle">Choose a financial document</a>
+        </div>
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
             This question is public. Allow approved cloud fallback for this question if Ollama fails.</label>
         <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
         <div class="conversation-actions"><button class="btn btn-primary" type="submit">Ask ALFRED</button>
             <span class="small text-muted">Enter for a new line · Ctrl/⌘ + Enter to send</span></div>
         <fieldset id="intelligenceSources" class="conversation-evidence mt-3 d-none" aria-describedby="intelligenceSourcesHelp">
-            <legend class="h6">Choose financial source documents</legend>
+            <legend id="intelligenceSourcesTitle" class="h6">Choose financial source documents</legend>
             <p id="intelligenceSourcesHelp" class="small">Browse every linked source. Select one to five reviewed files across pages. Only selected revisions will be used; other files are not silently included. Owner confirmation is not independent authentication.</p>
             <p id="intelligenceSourcesStatus" class="small" role="status" aria-live="polite"></p>
             <ul id="intelligenceSourceItems" class="list-unstyled" aria-label="Source documents on this page"></ul>
