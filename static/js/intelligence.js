@@ -450,14 +450,20 @@ document.addEventListener("DOMContentLoaded", () => {
             feedback.textContent = result.retrieval_error?.detail || "Answer ready. Review the sources before acting.";
             if (result.narrative_withheld) feedback.textContent = `Unsupported model figures were withheld. Only source-card amounts are shown. ${result.retrieval_error?.detail || ''}`;
             if (result.provider === "local_evidence") {
-                feedback.textContent = "Insufficient evidence. Review the source citation, then retry. Your draft is preserved; no model or cloud was used and no turn was saved.";
-                setLocalStatus("Evidence review required · no model used", "review");
-                retry.hidden = false;
+                if (result.grounding === "owner_confirmed_transaction_date") {
+                    feedback.textContent = "Recorded transaction dates ready. Review the owner-only sources. No model, cloud or saved conversation turn was used.";
+                    setLocalStatus("Owner-reviewed evidence · no model used", "ready");
+                    query.value = ""; requestToken = null; retry.hidden = true;
+                } else {
+                    feedback.textContent = "Insufficient evidence. Review the source citation, then retry. Your draft is preserved; no model or cloud was used and no turn was saved.";
+                    setLocalStatus("Evidence review required · no model used", "review");
+                    retry.hidden = false;
+                }
             } else {
                 setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
                 query.value = ""; requestToken = null;
             }
-            if (historyEnabled() && payload.scope !== "financial_document") await refreshHistory().catch(() => { historyPolicy = null; historyFeedback.textContent = "Answer saved, but history status could not refresh. Reload before another question."; });
+            if (historyEnabled() && payload.scope !== "financial_document") await refreshHistory().catch(() => { historyPolicy = null; historyFeedback.textContent = `${result.conversation_saved === true ? 'Answer saved, but history' : 'History'} status could not refresh. Reload before another question.`; });
         } catch (error) {
             if (active && ticket === generation) {
                 feedback.textContent = `${error.message}${error.reference ? ` Reference: ${error.reference}` : ""}`;

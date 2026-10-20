@@ -301,6 +301,7 @@ def document_record_sources(user, kind, document_id, selection, token):
             source['data']['amounts']={key:value for key,value in source['data']['amounts'].items() if key in fields}
             if not any(value['amount'] is not None for value in source['data']['amounts'].values()): raise SourceSelectionConflict()
             source['data']={key:value for key,value in source['data'].items() if key in ('record_type','record_id','applicable_date',
+                'transaction_date','original_transaction_date','original_status',
                 'provenance','amounts','limitations','document_sources','document_selection')}
             source.update(url=item['url'],document_id=document_id,classification='owner_reviewed_document_record')
             source['data'].update(document_name=item['name'],document_id=document_id,verification='owner_confirmed_document_fields',unreviewed_fields=excluded)
@@ -528,11 +529,14 @@ def choices(user):
             dict(kind='baseline',id=user.pk,label='Reported baseline fields (currency-limited)')]
 
 
-def requested_amount_field(query, *, kind):
-    fields={'expense':('amount','closing_balance'),'loan':('principal','emi','remaining_balance'),
+def requested_record_field(query, *, kind):
+    fields={'expense':('amount','closing_balance','transaction_date'),'loan':('principal','emi','remaining_balance'),
         'investment':('invested_amount','monthly_sip','current_value')}
-    match=re.fullmatch(r'(?:explain|show|review|what is) (?:my |this |the |selected |recorded |canonical |current )*(amount|closing balance|principal|emi|remaining balance|invested amount|monthly sip|current value)(?: details| values| status| and limitations)?',query.strip().lower().rstrip('?.!'))
+    text=query.strip().lower().rstrip('?.!')
+    match=re.fullmatch(r'(?:explain|show|review|what is|what are) (?:my |this |the |selected |recorded |canonical |current )*(amount|closing balance|principal|emi|remaining balance|invested amount|monthly sip|current value|transaction dates?)(?: details| values| status| and limitations)?',text)
     field=match[1].replace(' ','_') if match else None
+    if field=='transaction_dates': field='transaction_date'
+    if text.startswith('what are ') and field!='transaction_date': return None
     return field if field in fields.get(kind,()) else None
 
 
@@ -540,10 +544,10 @@ def supported_question(query, *, kind=None):
     # shortcut: fail-closed English record questions; expand only with evaluated intent fixtures.
     text=query.strip().lower().rstrip('?.!')
     if re.search(r'\b(?:total|sum|aggregate|convert|conversion|exchange|fx|forecast|predict|tomorrow|future|weather|buy|sell|approve|approval|authentic|currency|inr|usd|eur|gbp)\b',text): return False
-    if requested_amount_field(query,kind=kind): return True
-    match=re.fullmatch(r'(?:explain|show|review) (?:my |this |the |selected |recorded |canonical |current )*(?P<subject>record|records|values|expense|transaction|budget|loan|investment|baseline|emi|repayment status|evidence|provenance|income|rent)(?: details| values| status| and limitations)?',text)
+    if requested_record_field(query,kind=kind): return True
+    match=re.fullmatch(r'(?:explain|show|review) (?:my |this |the |selected |recorded |canonical |current )*(?P<subject>record|records|values|expense|transaction|budget|loan|investment|baseline|emi|repayment status|evidence|provenance|income|rent|(?:source |statement )(?:record|transaction))(?: details| values| status| and limitations)?',text)
     if not match: return False
     if kind is None: return True
-    subjects={'expense':('expense','transaction'),'budget':('budget',),'loan':('loan','emi','repayment status'),
+    subjects={'expense':('expense','transaction','source transaction','source record','statement record','statement transaction'),'budget':('budget',),'loan':('loan','emi','repayment status'),
         'investment':('investment',),'baseline':('baseline','income','rent')}
     return kind in subjects and match['subject'] in ('record','records','values','evidence','provenance',*subjects[kind])

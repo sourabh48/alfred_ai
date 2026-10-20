@@ -1,5 +1,6 @@
 """Ollama-first Insights reasoning; read-only sources, explicit public cloud fallback."""
 import json
+from datetime import date
 import re
 import time
 from unicodedata import category
@@ -44,6 +45,13 @@ class OllamaReasoner(OllamaEmbeddings):
         return message['content']
 
 
+def _iso_date(value):
+    if not isinstance(value,str): return None
+    try: parsed=date.fromisoformat(value).isoformat()
+    except ValueError: return None
+    return value if value==parsed else None
+
+
 def source_context(user,scope,document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None):
     if scope=='general': return []
     if scope=='financial_document':
@@ -55,7 +63,9 @@ def source_context(user,scope,document_id=None,transaction_id=None,record_type=N
     if scope=='bank_statements':
         from apps.expenses.services.statement_evidence import evidence
         record=evidence(user,transaction_id)
+        original=record['original'] if isinstance(record['original'],dict) else {}
         data={**record['statement'], 'transaction_date':record['current']['transaction_date'],
+            'original_transaction_date':_iso_date(original.get('transaction_date')),
             'verification':record['verification'], 'original_status':record['original_status'],
             'limitations':record['limitations'], 'amounts':{}}
         if record['verification']=='owner_confirmed':
@@ -120,7 +130,7 @@ def present_answer(result,scope,query=''):
 
 
 def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None,cloud_consent=False,query_sensitivity='sensitive',local=None):
-    from .canonical_evidence import KINDS, supported_question, requested_amount_field
+    from .canonical_evidence import KINDS, supported_question, requested_record_field
     owner=_owner(user)
     if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents','bank_statements','financial_records','financial_document')
             or type(cloud_consent) is not bool or query_sensitivity not in ('public','personal','sensitive')
@@ -137,9 +147,26 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied('Private financial evidence is local only.')
     tools=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
-    field=requested_amount_field(query,kind=record_type) if scope in ('financial_records','financial_document') else None
-    missing_field=field and any(tool['data'].get('amounts',{}).get(field,{}).get('amount') is None for tool in tools)
-    if scope in ('financial_records','financial_document','finance') and (any(not tool['available'] for tool in tools) or missing_field or (scope in ('financial_records','financial_document') and not supported_question(query,kind=record_type))):
+    def revalidate():
+        from django.http import Http404
+        try: fresh=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
+        except Http404 as exc: raise MemoryConflict('Canonical source became inaccessible during inference.') from exc
+        if fresh!=tools: raise MemoryConflict('Canonical source changed during inference.')
+    field=requested_record_field(query,kind='expense' if scope=='bank_statements' else record_type) if scope in ('bank_statements','financial_records','financial_document') else None
+    date_values=[]
+    if field=='transaction_date':
+        for source in tools:
+            data=source['data']; value=_iso_date(data.get('transaction_date'))
+            if (value is None or source['classification'] not in ('owner_confirmed_statement_record','owner_reviewed_document_record')
+                    or data.get('verification') not in ('owner_confirmed','owner_confirmed_document_fields')
+                    or data.get('original_status')!='retained_import_snapshot' or _iso_date(data.get('original_transaction_date')) is None):
+                date_values=[]; break
+            date_values.append((source['ref'],value))
+    missing_field=field and field!='transaction_date' and any(tool['data'].get('amounts',{}).get(field,{}).get('amount') is None for tool in tools)
+    if ((field=='transaction_date' and not date_values)
+            or (scope in ('financial_records','financial_document','bank_statements') and (missing_field
+                or not supported_question(query,kind='expense' if scope=='bank_statements' else record_type)))
+            or (scope in ('financial_records','financial_document','finance') and any(not tool['available'] for tool in tools))):
         return {'answer':'This request is not established by available compatible evidence. Ask “Explain this record” to inspect recorded values and limitations. Forecasts, currency conversions, unknown-currency totals and unsupported questions are unavailable.',
             'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
             'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}
@@ -147,6 +174,13 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         return {'answer':'This record is not currently supported by owner-confirmed source evidence. The source may be unreviewed, missing, incomplete or conflicting. Open the private citation and review it before asking again.',
             'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
             'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}
+    if date_values:
+        revalidate()
+        return {'answer':'Current recorded transaction dates (owner-confirmed; not independent bank authentication):\n'+
+                '\n'.join(f'{reference}: {value}' for reference,value in date_values),
+            'provider':'local_evidence','classification':'owner_recorded_fact','financial_authority':False,
+            'grounding':'owner_confirmed_transaction_date','sources':tools,'narrative_withheld':False,'context_omitted':0,
+            'memory_retrieval_available':None}
     retrieval_error=None
     try: memories=[] if scope=='financial_document' else store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
     except EmbeddingUnavailable as exc:
@@ -178,10 +212,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             store._expire(db,owner)
             live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
             if any(item['id'] not in live for item in included): raise MemoryConflict('Answer context changed during inference.')
-    from django.http import Http404
-    try: fresh=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
-    except Http404 as exc: raise MemoryConflict('Canonical source became inaccessible during inference.') from exc
-    if fresh!=tools: raise MemoryConflict('Canonical source changed during inference.')
+    revalidate()
     return present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
         'memory_retrieval_available':None if scope=='financial_document' else retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],

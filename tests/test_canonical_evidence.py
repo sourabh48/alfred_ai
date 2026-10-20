@@ -237,3 +237,18 @@ class CanonicalEvidenceTests(TestCase):
                 'What is my loan status?','What is my current value tomorrow?'):
             with self.subTest(query=query):
                 self.assertFalse(supported_question(query,kind='investment'))
+
+    def test_transaction_date_intents_are_exact_and_expense_only(self):
+        for query in ('What is the transaction date?','Show selected transaction dates','What are my transaction dates?',
+                'Review this transaction date and limitations'):
+            for kind in ('expense','loan','investment','budget','baseline',None):
+                with self.subTest(query=query,kind=kind):
+                    self.assertEqual(supported_question(query,kind=kind),kind=='expense')
+        for query in ('What is the date?','What is the transaction date on 01/09/2026?',
+                'Show total transaction dates','Predict future transaction dates','Show transaction dates in INR',
+                'What was the transaction date?','What is the transaction date of record 999?'):
+            with self.subTest(query=query): self.assertFalse(supported_question(query,kind='expense'))
+        for kind,field in (('loan','EMI'),('investment','current value'),('expense','amount')):
+            self.assertFalse(supported_question(f'What are my {field}?',kind=kind))
+        for query in ('Explain this source transaction','Explain this statement record'):
+            self.assertTrue(supported_question(query,kind='expense'))

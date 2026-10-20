@@ -64,6 +64,7 @@
         <div id="intelligenceFinancialDocumentField" class="d-none mb-2">
             <p id="intelligenceFinancialDocumentContext" class="small">Choose an owned import in Documents, then explicitly select reviewed records. Questions are page-only; no totals or arbitrary PDF/OCR questions.</p>
             <p class="small">Ask “What is my current value?” for investments, “What is the principal?” for loans or “Show closing balance” for bank records. Every selected record must have that current reviewed field; otherwise ALFRED abstains. Amounts stay separate and currency is not inferred.</p>
+            <p class="small">“What is the transaction date?” returns each selected bank record's current owner-reviewed ISO date, with its private source. These are transaction dates, not document-upload dates; no model or cloud is used.</p>
             <a class="btn btn-outline-primary btn-sm" href="/documents/#documentSourcesTitle">Choose a financial document</a>
         </div>
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>

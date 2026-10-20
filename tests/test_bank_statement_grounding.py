@@ -60,6 +60,134 @@ class BankStatementGroundingTests(TestCase):
         return self.client.post('/api/ai/personal-insights/',json.dumps(dict(
             query='Explain this source transaction',scope='bank_statements',transaction_id=self.row.pk)|changes),content_type='application/json')
 
+    def test_transaction_date_is_exact_reviewed_and_never_uses_memory_model_or_cloud(self):
+        from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+        self.confirm()
+        models=(Expense,BankAccount,StatementUpload,StatementTransactionEvidence)
+        before=[list(model.objects.order_by('pk').values()) for model in models]
+        baseline=resolve_canonical_financial_baseline(self.owner,fresh=True)['decimal_amounts']
+        with patch.object(self.store,'retrieve',wraps=self.store.retrieve) as retrieve:
+            result=hybrid_answer(self.store,self.owner,'What is the transaction date?',scope='bank_statements',
+                transaction_id=self.row.pk,local=self.local)
+        self.assertEqual(result['provider'],'local_evidence')
+        self.assertEqual(result['grounding'],'owner_confirmed_transaction_date')
+        self.assertIn('2026-09-01',result['answer']); self.assertIn(result['sources'][0]['ref'],result['answer'])
+        self.assertFalse(result['financial_authority']); self.assertFalse(result['narrative_withheld'])
+        self.assertEqual(result['sources'][0]['url'],evidence(self.owner,self.row.pk)['citation_url'])
+        self.assertEqual(self.client.get(result['sources'][0]['url']).status_code,200)
+        self.assertEqual(result['sources'][0]['data']['amounts']['amount']['currency_status'],'not_recorded')
+        retrieve.assert_not_called(); self.local.reason.assert_not_called()
+        self.cloud.assert_not_called(); self.cloud_reason.assert_not_called()
+        self.assertEqual([list(model.objects.order_by('pk').values()) for model in models],before)
+        self.assertEqual(resolve_canonical_financial_baseline(self.owner,fresh=True)['decimal_amounts'],baseline)
+
+    def test_transaction_date_correction_requires_review_and_keeps_original(self):
+        self.confirm()
+        original=StatementTransactionEvidence.objects.get(expense=self.row).source_values
+        changed=self.client.patch(f'/api/expenses/{self.row.pk}/',{'transaction_date':'2026-09-02'},content_type='application/json')
+        self.assertEqual(changed.status_code,200)
+        self.assertEqual(self.post(query='Show transaction date').json()['grounding'],'insufficient_evidence')
+        self.confirm()
+        result=self.post(query='Show transaction date').json()
+        self.assertEqual(result['grounding'],'owner_confirmed_transaction_date')
+        self.assertIn('2026-09-02',result['answer']); self.assertNotIn('2026-09-01',result['answer'])
+        self.assertEqual(result['sources'][0]['data']['original_transaction_date'],'2026-09-01')
+        self.assertEqual(StatementTransactionEvidence.objects.get(expense=self.row).source_values,original)
+        self.assertEqual(evidence(self.owner,self.row.pk)['original']['transaction_fingerprint'],original['transaction_fingerprint'])
+        self.local.reason.assert_not_called(); self.cloud_reason.assert_not_called()
+
+    def test_transaction_date_requires_retained_valid_original_and_current_evidence(self):
+        self.confirm(); proof=StatementTransactionEvidence.objects.get(expense=self.row)
+        original=proof.source_values
+        for value in ({},{'amount':'2.68'},{'transaction_date':'01/09/2026'},{'transaction_date':'2026-02-30'}):
+            with self.subTest(original=value):
+                proof.source_values=value; proof.save(update_fields=['source_values']); self.confirm()
+                result=self.post(query='What is the transaction date?').json()
+                self.assertEqual(result['grounding'],'insufficient_evidence')
+        proof.source_values=original; proof.save(update_fields=['source_values']); self.confirm()
+        known=source_context(self.owner,'bank_statements',transaction_id=self.row.pk)
+        for value in (None,'01/09/2026','20260901','2026-02-30',False):
+            with self.subTest(current=value), patch('apps.ml_engine.services.hybrid_intelligence.source_context',
+                    return_value=[known[0]|{'data':known[0]['data']|{'transaction_date':value}}]):
+                self.assertEqual(self.post(query='What is the transaction date?').json()['grounding'],'insufficient_evidence')
+        self.confirm(revoke=True)
+        self.assertEqual(self.post(query='What is the transaction date?').json()['grounding'],'insufficient_evidence')
+        self.local.reason.assert_not_called(); self.cloud_reason.assert_not_called()
+
+    def test_transaction_date_ambiguous_queries_conflicts_manual_and_foreign_sources_abstain(self):
+        self.confirm()
+        for query in ('What is the date?','Which day was this?','What happened on 01/09/2026?',
+                'What is the transaction date on 01/09/2026?','Show total transaction dates',
+                'Show transaction dates in INR','What was the transaction date?','Show transaction dates of record 999'):
+            with self.subTest(query=query):
+                self.assertEqual(self.post(query=query).json()['grounding'],'insufficient_evidence')
+        manual=Expense.objects.create(user=self.owner,source='manual',amount='1.23',transaction_date=date(2026,9,1),
+            direction='debit',classification='expense',category='shopping')
+        response=self.client.post('/api/ai/personal-insights/',dict(query='What is the transaction date?',
+            scope='financial_records',record_type='expense',record_id=manual.pk),content_type='application/json')
+        self.assertEqual(response.status_code,200); self.assertEqual(response.json()['grounding'],'insufficient_evidence')
+        self.assertEqual(self.post(query='Show transaction date',cloud_consent=True).status_code,403)
+        Expense.objects.create(user=self.owner,bank_account=self.account,statement_upload=self.upload,source='bank_statement',
+            transaction_date=self.row.transaction_date,direction=self.row.direction,raw_description=self.row.raw_description,
+            external_reference=self.row.external_reference,amount='9.99')
+        self.assertEqual(self.post(query='Show transaction date').json()['grounding'],'insufficient_evidence')
+        citation=evidence(self.owner,self.row.pk)['citation_url']
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(citation).status_code,404)
+        self.assertEqual(self.post(query='Show transaction date').status_code,404)
+        self.client.logout(); self.assertEqual(self.post(query='Show transaction date').status_code,403)
+        self.local.reason.assert_not_called(); self.cloud_reason.assert_not_called()
+
+    def test_unrecognized_temporal_questions_never_retrieve_or_infer(self):
+        self.confirm()
+        with patch.object(self.store,'retrieve',wraps=self.store.retrieve) as retrieve:
+            for query in ('Which record was from September?','What is the transaction time?'):
+                with self.subTest(query=query):
+                    result=hybrid_answer(self.store,self.owner,query,scope='bank_statements',transaction_id=self.row.pk,local=self.local)
+                    self.assertEqual(result['provider'],'local_evidence'); self.assertEqual(result['grounding'],'insufficient_evidence')
+        retrieve.assert_not_called(); self.local.reason.assert_not_called(); self.cloud_reason.assert_not_called()
+
+    def test_selected_transaction_dates_keep_every_explicit_record_and_reject_changes(self):
+        from apps.ml_engine.services.canonical_evidence import document_record_page
+        for index in (2,3):
+            _import_statement_transactions(user=self.owner,upload=self.upload,bank_account=self.account,
+                parsed=parsed_fixture(reference=f'REF-00{index}',description=f'Synthetic date record {index}',category='transfer'))
+        rows=list(Expense.objects.filter(statement_upload=self.upload).order_by('pk'))
+        Expense.objects.filter(pk=rows[-1].pk).update(transaction_date=date(2026,9,2))
+        for row in rows: review(self.owner,row.pk,revision=evidence(self.owner,row.pk)['revision'],confirm=True)
+        page=document_record_page(self.owner,'expense',self.upload.pk)
+        data=dict(query='What are the transaction dates?',scope='financial_document',record_type='expense',document_id=self.upload.pk,
+            source_catalog=page['catalog_token'],selected_records=[dict(id=item['record_id'],revision=item['revision']) for item in reversed(page['items'])])
+        before=[list(model.objects.order_by('pk').values()) for model in (Expense,BankAccount,StatementTransactionEvidence)]
+        result=self.client.post('/api/ai/personal-insights/',data,content_type='application/json').json()
+        self.assertEqual(result['grounding'],'owner_confirmed_transaction_date')
+        self.assertEqual([item['record_id'] for item in result['sources']],[row.pk for row in rows])
+        self.assertEqual([item['data']['transaction_date'] for item in result['sources']],['2026-09-01','2026-09-01','2026-09-02'])
+        for item in result['sources']:
+            self.assertIn(f"{item['ref']}: {item['data']['transaction_date']}",result['answer'])
+            self.assertEqual(self.client.get(item['url']).status_code,200)
+        self.assertEqual([list(model.objects.order_by('pk').values()) for model in (Expense,BankAccount,StatementTransactionEvidence)],before)
+        Expense.objects.filter(pk=rows[-1].pk).update(transaction_date=date(2026,9,3))
+        self.assertEqual(self.client.post('/api/ai/personal-insights/',data,content_type='application/json').status_code,409)
+        self.local.reason.assert_not_called(); self.cloud_reason.assert_not_called()
+
+    def test_transaction_date_revalidates_before_return_without_inference(self):
+        for change in ('date','withdraw','owner','delete'):
+            with self.subTest(change=change), transaction.atomic():
+                self.confirm(); calls=[]
+                def after_lookup(*args,**kwargs):
+                    result=source_context(*args,**kwargs); calls.append(1)
+                    if len(calls)==1:
+                        if change=='date': Expense.objects.filter(pk=self.row.pk).update(transaction_date=date(2026,9,2))
+                        elif change=='withdraw': self.confirm(revoke=True)
+                        elif change=='owner': BankAccount.objects.filter(pk=self.account.pk).update(user=self.other)
+                        else: Expense.objects.filter(pk=self.row.pk).delete()
+                    return result
+                with patch('apps.ml_engine.services.hybrid_intelligence.source_context',side_effect=after_lookup):
+                    self.assertEqual(self.post(query='Show transaction date').status_code,409)
+                transaction.set_rollback(True)
+        self.local.reason.assert_not_called(); self.cloud_reason.assert_not_called()
+
     def test_exact_values_citation_and_zero_financial_or_memory_changes(self):
         from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
         self.confirm()
@@ -201,7 +329,12 @@ class BankStatementGroundingTests(TestCase):
             payload=dict(conversation_id=record['id'],conversation_revision=0,request_id=uuid4().hex)
             response=self.post(**payload); self.assertEqual(response.status_code,200)
             self.assertFalse(response.json()['conversation_saved']); self.assertEqual(history.get(self.owner,record['id'])['turns'],[])
-            self.confirm(); response=self.post(**payload); self.assertEqual(response.status_code,200)
+            self.confirm()
+            dates=self.post(**(payload|{'query':'Show transaction date','request_id':uuid4().hex}))
+            self.assertEqual(dates.status_code,200); self.assertFalse(dates.json()['conversation_saved'])
+            self.assertEqual(dates.json()['grounding'],'owner_confirmed_transaction_date')
+            self.assertEqual(history.get(self.owner,record['id'])['turns'],[])
+            response=self.post(**payload); self.assertEqual(response.status_code,200)
             turn=history.get(self.owner,record['id'])['turns'][0]
             self.assertEqual(turn['transaction_id'],self.row.pk)
             self.assertEqual(set(turn['sources'][0]),{'ref','classification','url','verified_at'})
