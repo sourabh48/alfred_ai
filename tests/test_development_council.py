@@ -12,7 +12,7 @@ from io import StringIO
 from django.test import SimpleTestCase
 
 from scripts import release_gate as release
-from scripts.development_council import BRANCH, Council, CouncilError, LocalCouncilAdvisor, feature_queue, main
+from scripts.development_council import BRANCH, MAX_REVIEW_DECISIONS, Council, CouncilError, LocalCouncilAdvisor, feature_queue, main
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 
 
@@ -174,6 +174,107 @@ class DevelopmentCouncilTests(SimpleTestCase):
         with self.assertRaises(CouncilError): self.council.record(task['id'],'reviewer','PASS',task['source'],provider='ollama')
         (self.repo/'apps/extra.py').write_text('UNAPPROVED = True\n',encoding='utf-8')
         with self.assertRaises(CouncilError): self.council.snapshot(task)
+
+    def test_review_decisions_survive_source_repair_and_restart_without_reusing_approvals(self):
+        task=self.reviewed(); identity=task['id']
+        failed=self.council.record(identity,'reviewer','FAIL',task['source'],
+            actor='synthetic_reviewer',codes=('stale_source',))
+        self.assertEqual(failed['review_history'][-1]['codes'],['stale_source'])
+        (self.repo/'apps/sample.py').write_text('VALUE = 3\n',encoding='utf-8')
+        source=self.council.snapshot(task)[0]
+        repaired=self.council.record(identity,'coder','PASS',source,actor='synthetic_developer')
+        self.assertEqual(repaired['roles']['reviewer']['status'],'NOT_RUN')
+        with self.assertRaisesRegex(CouncilError,'current_host_reviews_required'): self.council.test(identity)
+        for role in ('architect','reviewer','security'):
+            repaired=self.council.record(identity,role,'PASS',source,actor='synthetic_'+role)
+        history=Council(self.repo)._read(identity)['review_history']
+        self.assertEqual([item['status'] for item in history],['PASS']*4+['FAIL']+['PASS']*4)
+        self.assertEqual(history[4]['source'],task['source']); self.assertEqual(history[-1]['source'],source)
+        self.assertTrue(all(type(item['recorded']) is int for item in history))
+        self.assertTrue(self.council._reviews_valid(repaired,source))
+
+    def test_identical_current_verdict_preserves_passed_tests_and_does_not_consume_history(self):
+        task=self.passing(); identity=task['id']
+        repeated=self.council.record(identity,'coder','PASS',task['source'],actor='synthetic_developer')
+        for field in ('stage','attempts','roles','test_history','review_history','reserved_tokens'):
+            self.assertEqual(repeated[field],task[field])
+        self.assertEqual(self.council.next_action(identity)['action'],'authorized_host_commit_then_verify')
+
+    def test_full_review_history_preserves_evidence_and_blocks_old_pass_on_new_verdict(self):
+        task=self.passing(); identity=task['id']
+        history=task['review_history']*(MAX_REVIEW_DECISIONS//len(task['review_history']))
+        self.council._change(identity,lambda current:current.update(review_history=history))
+        same=self.council.record(identity,'reviewer','PASS',task['source'],actor='synthetic_reviewer')
+        self.assertEqual(same['review_history'],history)
+        with self.assertRaisesRegex(CouncilError,'host_review_budget_exhausted'):
+            self.council.record(identity,'reviewer','FAIL',task['source'],actor='synthetic_reviewer',codes=('needs_repair',))
+        retained=Council(self.repo)._read(identity)
+        self.assertEqual(retained['review_history'],history); self.assertEqual(retained['stage'],'BLOCKED')
+        self.assertFalse(self.council._reviews_valid(retained,task['source']))
+        self.assertEqual(self.council.next_action(identity)['action'],'host_review_budget_exhausted')
+        with patch('scripts.development_council.run') as runner:
+            with self.assertRaisesRegex(CouncilError,'current_host_reviews_required'): self.council.test(identity)
+            runner.assert_not_called()
+        self.git('add','apps/sample.py'); self.git('commit','-m','synthetic exhausted review')
+        with self.assertRaisesRegex(CouncilError,'commit_gates_unsatisfied'):
+            self.council.complete(identity,self.git('rev-parse','HEAD'),'synthetic-user-approval')
+
+    def test_legacy_review_history_is_not_invented_and_codes_are_bounded(self):
+        task=self.reviewed(); identity=task['id']
+        self.council._change(identity,lambda current:current.pop('review_history'))
+        self.council.status(identity)
+        self.assertIn('NOT_RECORDED',(self.council.directory/'status.html').read_text(encoding='utf-8'))
+        for codes in (None,'reviewed',[],['bad path'],['a']*9,['x'*65],[1],['<script>']):
+            with self.subTest(codes=codes),self.assertRaisesRegex(CouncilError,'safe_reason_codes_required'):
+                self.council.record(identity,'reviewer','FAIL',task['source'],actor='synthetic_reviewer',codes=codes)
+        failed=self.council.record(identity,'reviewer','FAIL',task['source'],actor='synthetic_reviewer',codes=('needs_repair',))
+        self.assertEqual(len(failed['review_history']),1); self.assertEqual(failed['review_history'][0]['status'],'FAIL')
+        self.council._change(identity,lambda current:current['review_history'][0].update(actor='<script>synthetic</script>'))
+        self.council.status(identity); html=(self.council.directory/'status.html').read_text(encoding='utf-8')
+        self.assertIn('&lt;script&gt;synthetic&lt;/script&gt;',html); self.assertNotIn('<script>',html)
+
+    def test_cli_history_overflow_refreshes_ready_html_to_blocked(self):
+        task=self.passing(); identity=task['id']
+        history=task['review_history']*(MAX_REVIEW_DECISIONS//len(task['review_history']))
+        self.council._change(identity,lambda current:current.update(review_history=history))
+        self.council.status(identity)
+        page=self.council.directory/'status.html'
+        self.assertIn('authorized_host_commit_then_verify',page.read_text(encoding='utf-8'))
+        output=StringIO()
+        with redirect_stdout(output):
+            code=main(['record','--repo',str(self.repo),'--task',identity,'--role','reviewer',
+                '--status','FAIL','--source',task['source'],'--actor','synthetic_reviewer',
+                '--reason-code','needs_repair'])
+        self.assertEqual(code,2)
+        self.assertEqual(json.loads(output.getvalue())['code'],'host_review_budget_exhausted')
+        self.assertEqual(Council(self.repo)._read(identity)['review_history'],history)
+        html=page.read_text(encoding='utf-8')
+        self.assertIn('BLOCKED',html); self.assertIn('host_review_budget_exhausted',html)
+        self.assertNotIn('authorized_host_commit_then_verify',html)
+
+    def test_cli_reason_codes_and_failed_verdict_exit_do_not_claim_success(self):
+        task=self.reviewed(); identity=task['id']
+        for status,expected in (('FAIL',2),('BLOCKED',2),('PASS',0)):
+            output=StringIO()
+            with redirect_stdout(output):
+                code=main(['record','--repo',str(self.repo),'--task',identity,'--role','reviewer',
+                    '--status',status,'--source',task['source'],'--actor','synthetic_reviewer','--reason-code','source_checked'])
+            result=json.loads(output.getvalue())
+            self.assertEqual(code,expected)
+            self.assertEqual(result['review_history'][-1]['codes'],['source_checked'])
+            self.assertEqual(result['review_history'][-1]['status'],status)
+
+    def test_duplicate_or_full_history_never_bypasses_reviewer_independence_validation(self):
+        task=self.reviewed(); identity=task['id']
+        self.council.record(identity,'coder','PASS',task['source'],actor='synthetic_reviewer')
+        for status,full in (('PASS',False),('FAIL',True)):
+            if full:
+                self.council._change(identity,lambda current:current.update(
+                    review_history=[current['review_history'][-1]]*MAX_REVIEW_DECISIONS))
+            before=self.council._read(identity)
+            with self.subTest(full=full),self.assertRaisesRegex(CouncilError,'independent_host_reviewer_required'):
+                self.council.record(identity,'reviewer',status,task['source'],actor='synthetic_reviewer')
+            self.assertEqual(self.council._read(identity),before)
 
     def test_source_changes_during_testing_and_missing_coverage_block_completion(self):
         task=self.reviewed()
@@ -366,6 +467,9 @@ class DevelopmentCouncilTests(SimpleTestCase):
         with patch('scripts.development_council.run',return_value=dict(status='PASS',tests=1,skips=0)):
             self.council.test(identity)
         self.council.record(identity,'reviewer','PASS',task['source'],actor='synthetic_reviewer')
+        route=self.council.next_action(identity)
+        self.assertEqual(route['action'],'authorized_host_commit_then_verify')
+        self.council.record(identity,'reviewer','PASS',task['source'],actor='synthetic_reviewer',codes=('new_review',))
         route=self.council.next_action(identity)
         self.assertEqual((route['status'],route['action']),('BLOCKED','test_receipt_state_requires_review'))
         self.assertFalse(route['automatic_execution'])

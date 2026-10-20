@@ -23,6 +23,7 @@ from apps.ml_engine.services.local_embeddings import OllamaEmbeddings, Embedding
 BRANCH = 'development/alfred-integrated'
 ROLES = ('planner', 'developer', 'reviewer', 'security', 'tester', 'coordinator')
 CURRENT_ROLES = ('coordinator', 'architect', 'developer', 'reviewer', 'security', 'tester', 'release_guardian')
+MAX_REVIEW_DECISIONS = 64
 SIGNALS = {'clear', 'needs_review', 'ownership', 'financial', 'security', 'tests', 'concurrency'}
 PROPOSAL_ACTIONS = ('inspect', 'implement', 'test', 'review')
 ADVISORY_CODES = {'advisory_deadline_exceeded','advisory_output_budget_exceeded','advisory_schema_invalid',
@@ -200,6 +201,7 @@ class Council:
             return dict(action=action,role=role,status=status,host_action_required=status not in ('WAIT','COMPLETE'),
                 automatic_execution=False,task=identity,base=task['base'])
         if task['stage']=='COMPLETE': return route('historical_completed_receipt',status='COMPLETE')
+        if task.get('review_budget_exhausted'): return route('host_review_budget_exhausted',status='BLOCKED')
         guardian=task['roles'].get('release_guardian',{})
         if guardian.get('status')=='RUNNING':
             if time.time()-guardian['started']>task['budgets']['seconds']:
@@ -259,7 +261,8 @@ class Council:
         if role=='coder': role='developer'
         if role not in ('architect', 'developer', 'reviewer', 'security') or status not in ('PASS', 'FAIL', 'BLOCKED') or provider not in ('codex_host', 'human'):
             raise CouncilError('explicit_host_review_required')
-        if not codes or len(codes)>8 or any(not re.fullmatch(r'[a-z_]{1,64}', code) for code in codes): raise CouncilError('safe_reason_codes_required')
+        if not isinstance(codes,(list,tuple)) or not codes or len(codes)>8 or any(not isinstance(code,str) or not re.fullmatch(r'[a-z_]{1,64}', code) for code in codes):
+            raise CouncilError('safe_reason_codes_required')
         def update(task):
             if role not in self._review_roles(task): raise CouncilError('role_not_in_task_contract')
             if actor is not None and (not isinstance(actor,str) or not re.fullmatch(r'[a-z][a-z0-9_-]{2,63}',actor)): raise CouncilError('safe_host_actor_required')
@@ -267,16 +270,26 @@ class Council:
             fingerprint, changed = self.snapshot(task)
             if source != fingerprint or not (changed - {'docs/PROJECT_STATUS.md'}): raise CouncilError('review_source_mismatch_or_no_implementation')
             if task['stage'] in ('COMPLETE','COMMITTING','VERIFYING_RELEASE_GUARDIAN') or task['roles']['tester']['status']=='RUNNING': raise CouncilError('task_busy_or_complete')
+            if task['source']==source and role=='reviewer' and actor is not None and actor==task['roles']['developer'].get('actor'):
+                raise CouncilError('independent_host_reviewer_required')
+            decision=dict(status=status,source=source,provider=provider,codes=list(codes),**({'actor':actor} if actor else {}))
+            if task.get('review_budget_exhausted'): return
+            if task['source']==source and task['roles'][role]==decision: return
+            if len(task.get('review_history',[]))>=MAX_REVIEW_DECISIONS:
+                # A refused new verdict must not leave older PASS evidence usable.
+                task.update(stage='BLOCKED',review_budget_exhausted=True)
+                return
             if task['source'] != source:
                 self._retain_legacy_test(task)
                 reset=(*self._review_roles(task),'tester')+ (('release_guardian',) if task.get('contract_version',1)>=3 else ())
                 task['roles'].update({member:dict(status='NOT_RUN') for member in reset})
             task['source'] = source
-            if role=='reviewer' and actor is not None and actor==task['roles']['developer'].get('actor'):
-                raise CouncilError('independent_host_reviewer_required')
-            task['roles'][role] = dict(status=status, source=source, provider=provider, codes=list(codes),**({'actor':actor} if actor else {}))
+            task['roles'][role] = decision
+            task.setdefault('review_history',[]).append(dict(decision,role=role,recorded=int(time.time())))
             task['stage'] = 'AWAITING_REVIEW_AND_TESTS'
-        return self._change(identity, update)
+        result=self._change(identity, update)
+        if result.get('review_budget_exhausted'): raise CouncilError('host_review_budget_exhausted')
+        return result
 
     def advise(self, identity, role, provider, *, retry=False):
         """Bounded provider-neutral advisory. Model output can never satisfy a required role."""
@@ -355,6 +368,7 @@ class Council:
 
     @classmethod
     def _reviews_valid(cls,task,source):
+        if task.get('review_budget_exhausted'): return False
         roles=task['roles']
         required=cls._review_roles(task)
         valid=all(roles[role].get('source')==source and roles[role]['status']=='PASS' for role in required)
@@ -512,6 +526,14 @@ class Council:
                 rows.append('<p>Guardian attempts: '+escape(', '.join(item['status'] for item in task.get('guardian_history',[])) or 'NOT_RUN')+'. Failures remain evidence; retry budget is bounded.</p>')
             history=task.get('test_history',[])
             rows.append('<p>Retained test outcomes: '+escape('; '.join('attempt '+str(item['attempt'])+': '+item['status']+', '+str(item.get('tests','NOT_RUN'))+' executed, '+str(item.get('seconds','not recorded'))+' seconds' for item in history) or 'legacy summary only')+'. Counts across attempts are not distinct test coverage.</p>')
+            reviews=task.get('review_history',[])
+            rows.append('<details><summary>Retained host review decisions: '+str(len(reviews))+'/'+str(MAX_REVIEW_DECISIONS)+'</summary><p>Only recorded decisions are shown; older decisions are not reconstructed. History never substitutes for current-source approval.</p>')
+            if not reviews: rows.append('<p>NOT_RECORDED</p>')
+            for index,item in enumerate(reviews,1):
+                rows.append('<p>'+escape(str(index)+'. '+item['role']+': '+item['status']+'; '+', '.join(item['codes'])
+                    +'; source '+item['source']+'; '+item['provider']+' / '+item.get('actor','legacy unspecified')
+                    +'; '+time.strftime('%Y-%m-%d %H:%M:%S UTC',time.gmtime(item['recorded'])))+'</p>')
+            rows.append('</details>')
             budget=task['budgets']
             rows.append('<p>Advisory budget reserved: '+str(task['reserved_tokens'])+'/'+str(budget['reserved_tokens'])+' tokens (conservative reservation, not measured usage). Context limit: '+str(budget['context_bytes'])+' bytes; output limit: '+str(budget['output_tokens'])+' tokens. Test deadline: '+str(budget['seconds'])+' seconds.</p>')
             rows.append('<p>Host account token/cost usage is not observable here. CLI model advice uses local Ollama only; no paid-provider fallback or quota bypass.</p>')
@@ -544,6 +566,7 @@ def main(argv=None):
     parser.add_argument('--authorization-reference'); parser.add_argument('--confirm-worker-stopped',action='store_true')
     parser.add_argument('--commit')
     parser.add_argument('--actor'); parser.add_argument('--retry-advice',action='store_true')
+    parser.add_argument('--reason-code',action='append')
     args=parser.parse_args(argv)
     blocked_advisory=False
     try:
@@ -551,7 +574,12 @@ def main(argv=None):
         if args.command=='plan': result=council.plan(args.path,args.label,args.profile,args.feature)
         elif args.command=='handoff': result=council.handoff(args.task)
         elif args.command=='inspect': result={'source':council.snapshot(council._read(args.task))[0]}
-        elif args.command=='record': result=council.record(args.task,args.role,args.status,args.source,actor=args.actor)
+        elif args.command=='record':
+            try:
+                result=council.record(args.task,args.role,args.status,args.source,actor=args.actor,codes=args.reason_code or ('reviewed',))
+            except CouncilError as exc:
+                if str(exc)=='host_review_budget_exhausted': council.status(args.task)
+                raise
         elif args.command=='test': result=council.test(args.task)
         elif args.command=='resume': result=council.resume(args.task,confirm_worker_stopped=args.confirm_worker_stopped)
         elif args.command=='complete': result=council.complete(args.task,args.commit,args.authorization_reference)
@@ -561,7 +589,7 @@ def main(argv=None):
         else: result=council.status(args.task)
         council.status(args.task)
         print(json.dumps(result,sort_keys=True))
-        return 2 if blocked_advisory or (isinstance(result,dict) and result.get('stage')=='BLOCKED') else 0
+        return 2 if blocked_advisory or (args.command=='record' and args.status!='PASS') or (isinstance(result,dict) and result.get('stage')=='BLOCKED') else 0
     except Exception as exc:
         print(json.dumps(dict(status='BLOCKED',code=str(exc) if isinstance(exc,CouncilError) else 'council_operation_failed',exception_type=type(exc).__name__)))
         return 2
