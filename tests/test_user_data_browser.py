@@ -73,7 +73,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         # Drain real live-server requests before TransactionTestCase flushes
         # users and sessions; navigation can abort a fetch while its server
         # handler is still completing the response.
-        self.wait.until(lambda _: self.active_requests == 0)
+        from selenium.webdriver.support.ui import WebDriverWait
+        WebDriverWait(self.browser, max(20, settings.ALFRED_UPLOAD_PARSER_SECONDS) + 10).until(
+            lambda _: self.active_requests == 0)
         super().tearDown()
 
     def login(self, username="acceptance_demo"):
@@ -2062,6 +2064,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture("upload-valid-resume")
 
     def test_loan_diagnostics_are_safe_then_real_pdf_import_and_reimport_work(self):
+        from selenium.webdriver.support.ui import WebDriverWait
         import fitz
         from apps.loans.models import Loan, LoanImportDocument
         directory = self.enterContext(TemporaryDirectory(prefix="alfred-m14f-browser-"))
@@ -2095,8 +2098,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.browser.find_element(self.By.ID, "loanPdfFile").send_keys(str(file))
             self.browser.execute_script("document.getElementById('loanImportBtn').scrollIntoView({behavior:'instant', block:'center'});")
             self.browser.find_element(self.By.ID, "loanImportBtn").click()
-            self.wait.until(lambda _: LoanImportDocument.objects.filter(file_name=file.name, parser_status="parsed").count() == attempt)
-            self.wait.until(lambda _: self.browser.find_element(self.By.ID, "loanImportBtn").is_enabled())
+            WebDriverWait(self.browser, settings.ALFRED_UPLOAD_PARSER_SECONDS + 10).until(
+                lambda _: self.browser.find_element(self.By.ID, "loanImportBtn").is_enabled())
+            self.assertEqual(LoanImportDocument.objects.filter(file_name=file.name, parser_status="parsed").count(), attempt)
             rows = list(Loan.objects.filter(user=owner, loan_account_number="TESTM14F42").values_list("pk", "principal", "remaining_balance", "emi"))
             self.assertEqual(len(rows), 1)
             if attempt == 1:
