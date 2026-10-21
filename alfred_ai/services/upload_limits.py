@@ -11,7 +11,7 @@ import time
 import zipfile
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured, RequestDataTooBig, TooManyFieldsSent, TooManyFilesSent
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied, RequestDataTooBig, TooManyFieldsSent, TooManyFilesSent
 from django.core.files.uploadhandler import FileUploadHandler, TemporaryFileUploadHandler
 from django.core.files.uploadedfile import UploadedFile, TemporaryUploadedFile
 from django.core.files import temp as django_tempfile
@@ -313,6 +313,8 @@ class UploadProtectionMiddleware:
 
     def process_exception(self, request, exception):
         if getattr(request, "_bounded_upload", False):
+            if isinstance(exception, PermissionDenied):
+                return JsonResponse({"detail": "You do not have permission to perform this action."}, status=403)
             if isinstance(exception, (UploadLimitExceeded, UploadStorageUnavailable, UploadProtectionUnavailable, UploadFormatError)):
                 return JsonResponse({"detail": exception.default_detail}, status=exception.status_code)
             if isinstance(exception, OSError):
