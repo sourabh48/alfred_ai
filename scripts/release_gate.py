@@ -177,7 +177,16 @@ def report(manifest, output):
     return manifest
 
 
-def source_checks(repo, manifest, expected_dependencies=None, expected_migrations=None, target_repo=None):
+def classified_changes(repo, baseline, candidate):
+    paths = [p for p in git(repo, "diff", "--no-renames", "--name-only", "-z", baseline, candidate).split("\0") if p]
+    dependencies = [p for p in paths if re.search(r"(^|/)(requirements[^/]*\.txt|constraints/|"
+                                                 r"pyproject\.toml|.*lock(?:\.json)?$)", p)]
+    migrations = [p for p in paths if "/migrations/" in p and p.endswith(".py")]
+    return paths, dependencies, migrations
+
+
+def source_checks(repo, manifest, expected_dependencies=None, expected_migrations=None, target_repo=None,
+                  reviewed_source=None):
     repo = Path(repo).resolve()
     candidate = exact_commit(repo, manifest["candidate_sha"])
     baseline = exact_commit(repo, manifest["production_baseline_sha"])
@@ -187,16 +196,34 @@ def source_checks(repo, manifest, expected_dependencies=None, expected_migration
         raise GateError("candidate_worktree_dirty")
     if not ancestor(repo, baseline, candidate):
         raise GateError("baseline_diverged")
-    paths = git(repo, "diff", "--name-only", baseline, candidate).splitlines()
+    paths, dependencies, migrations = classified_changes(repo, baseline, candidate)
     policy = manifest.setdefault("change_policy", {"dependencies": [], "migrations": []})
-    if expected_dependencies is not None:
-        policy["dependencies"] = list(expected_dependencies)
-    if expected_migrations is not None:
-        policy["migrations"] = list(expected_migrations)
+    reviewed_source = reviewed_source or policy.get("reviewed_source")
+    if reviewed_source:
+        if expected_dependencies is not None or expected_migrations is not None:
+            raise GateError("conflicting_change_policy")
+        reviewed_source = exact_commit(repo, reviewed_source)
+        if not ancestor(repo, reviewed_source, candidate):
+            raise GateError("reviewed_source_not_in_candidate")
+        if ancestor(repo, reviewed_source, baseline):
+            # A historical review never approves new changes in a later release.
+            approved_dependencies, approved_migrations = [], []
+        elif ancestor(repo, baseline, reviewed_source):
+            _, approved_dependencies, approved_migrations = classified_changes(repo, baseline, reviewed_source)
+            approved_paths = approved_dependencies + approved_migrations
+            if approved_paths and git(repo, "--literal-pathspecs", "diff", "--name-only", "-z",
+                                      reviewed_source, candidate, "--", *approved_paths):
+                raise GateError("reviewed_change_content_mismatch")
+        else:
+            raise GateError("reviewed_source_baseline_diverged")
+        policy.update(reviewed_source=reviewed_source, dependencies=approved_dependencies,
+                      migrations=approved_migrations)
+    else:
+        if expected_dependencies is not None:
+            policy["dependencies"] = list(expected_dependencies)
+        if expected_migrations is not None:
+            policy["migrations"] = list(expected_migrations)
     expected_dependencies, expected_migrations = policy["dependencies"], policy["migrations"]
-    dependencies = [p for p in paths if re.search(r"(^|/)(requirements[^/]*\.txt|constraints/|"
-                                                 r"pyproject\.toml|.*lock(?:\.json)?$)", p)]
-    migrations = [p for p in paths if "/migrations/" in p and p.endswith(".py")]
     gate(manifest, "dependencies", "PASS" if set(dependencies) == set(expected_dependencies) else "FAIL",
          "dependency_changes_match" if set(dependencies) == set(expected_dependencies) else "unexpected_dependencies",
          paths=dependencies)
@@ -286,8 +313,9 @@ def main(argv=None):
     parser.add_argument("--baseline")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--target-repo", type=Path)
-    parser.add_argument("--expected-dependency", action="append", default=[])
-    parser.add_argument("--expected-migration", action="append", default=[])
+    parser.add_argument("--expected-dependency", action="append")
+    parser.add_argument("--expected-migration", action="append")
+    parser.add_argument("--reviewed-source", help="Exact reviewed dependency/migration source SHA, not deployment approval")
     parser.add_argument("--profile", choices=("targeted", "backend", "browser", "native", "packaged", "full"), default="targeted")
     parser.add_argument("--test-label", action="append", default=[])
     parser.add_argument("--with-ollama", action="store_true")
@@ -309,7 +337,8 @@ def main(argv=None):
     try:
         if args.command == "preflight":
             manifest = new_manifest(args.release_id or "", args.candidate, args.baseline)
-            source_checks(args.repo, manifest, args.expected_dependency, args.expected_migration, args.target_repo)
+            source_checks(args.repo, manifest, args.expected_dependency, args.expected_migration,
+                          args.target_repo, args.reviewed_source)
             from scripts.release_validation import privacy
             privacy(args.repo, manifest)
             if args.check_remote:

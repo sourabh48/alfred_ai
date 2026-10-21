@@ -178,6 +178,124 @@ class ReleaseSourceTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.assertIn("local_backup", result["promotion"]["blocked"])
         self.assertEqual(release.load(self.root / "report/release.json")["candidate_sha"], self.candidate)
 
+    def reviewed_changes(self):
+        self.commit("requirements.txt", "synthetic-package==1")
+        self.commit("apps/demo/migrations/0001_initial.py", "# synthetic reviewed migration")
+        reviewed = self.git("rev-parse", "HEAD")
+        self.commit("candidate.txt", "synthetic later source")
+        self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        return reviewed
+
+    def test_reviewed_source_cli_pins_content_and_survives_report_reload(self):
+        reviewed = self.reviewed_changes()
+        output = self.root / "reviewed"
+        code = release.main(["preflight", "--repo", str(self.repo), "--release-id", "synthetic-1",
+                             "--candidate", self.manifest["candidate_sha"], "--baseline", self.baseline,
+                             "--reviewed-source", reviewed, "--output", str(output)])
+        self.assertEqual(code, 0)
+        manifest = release.load(output / "release.json")
+        release.source_checks(self.repo, manifest)
+        self.assertEqual(manifest["change_policy"]["reviewed_source"], reviewed)
+        for name in ("dependencies", "migrations"):
+            self.assertEqual(manifest["gates"][name]["status"], "PASS")
+        self.assertFalse(manifest["promotion"]["ready"])
+        self.assertEqual(manifest["approval"]["status"], "NOT_RUN")
+
+    def test_reviewed_paths_with_changed_contents_or_mode_are_rejected(self):
+        reviewed = self.reviewed_changes()
+        self.git("update-index", "--chmod=+x", "requirements.txt")
+        self.git("commit", "-qm", "synthetic mode change")
+        self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        with self.assertRaisesRegex(release.GateError, "reviewed_change_content_mismatch"):
+            release.source_checks(self.repo, self.manifest, reviewed_source=reviewed)
+        self.commit("requirements.txt", "synthetic-package==2")
+        self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        with self.assertRaisesRegex(release.GateError, "reviewed_change_content_mismatch"):
+            release.source_checks(self.repo, self.manifest, reviewed_source=reviewed)
+
+    def test_reviewed_source_does_not_approve_extra_migrations_or_dependencies(self):
+        reviewed = self.reviewed_changes()
+        self.commit("requirements-extra.txt", "synthetic-package==2")
+        self.commit("apps/demo/migrations/0002_unreviewed.py", "# unreviewed")
+        self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        release.source_checks(self.repo, self.manifest, reviewed_source=reviewed)
+        self.assertEqual(self.manifest["gates"]["dependencies"]["status"], "FAIL")
+        self.assertEqual(self.manifest["gates"]["migrations"]["status"], "FAIL")
+
+    def test_quoted_and_globlike_reviewed_paths_are_checked_literally(self):
+        path = "apps/demo/requirements-é[1].txt"
+        self.commit(path, "synthetic-package==1")
+        reviewed = self.git("rev-parse", "HEAD")
+        self.commit(path, "synthetic-package==2")
+        self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        with self.assertRaisesRegex(release.GateError, "reviewed_change_content_mismatch"):
+            release.source_checks(self.repo, self.manifest, reviewed_source=reviewed)
+
+    def test_deleted_reviewed_path_is_rejected(self):
+        reviewed = self.reviewed_changes()
+        self.git("rm", "--", "requirements.txt")
+        self.git("commit", "-qm", "synthetic removed requirement")
+        self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        with self.assertRaisesRegex(release.GateError, "reviewed_change_content_mismatch"):
+            release.source_checks(self.repo, self.manifest, reviewed_source=reviewed)
+
+    def test_renaming_baseline_migration_outside_migrations_cannot_hide_removal(self):
+        self.commit("apps/demo/migrations/0000_baseline.py", "# retained synthetic migration")
+        self.manifest["production_baseline_sha"] = self.git("rev-parse", "HEAD")
+        reviewed = self.reviewed_changes()
+        self.git("mv", "apps/demo/migrations/0000_baseline.py", "retired.txt")
+        self.git("commit", "-qm", "synthetic migration removal by rename")
+        self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        release.source_checks(self.repo, self.manifest, reviewed_source=reviewed)
+        self.assertEqual(self.manifest["gates"]["migrations"]["status"], "FAIL")
+
+    def test_baseline_diverged_from_reviewed_merge_parent_is_rejected(self):
+        reviewed = self.reviewed_changes()
+        self.git("checkout", "-qb", "baseline-branch", self.baseline)
+        self.commit("other-baseline.txt", "synthetic baseline advancement")
+        self.manifest["production_baseline_sha"] = self.git("rev-parse", "HEAD")
+        self.git("merge", "--no-edit", reviewed)
+        self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        with self.assertRaisesRegex(release.GateError, "reviewed_source_baseline_diverged"):
+            release.source_checks(self.repo, self.manifest, reviewed_source=reviewed)
+
+    def test_review_allowance_is_not_inherited_by_later_release(self):
+        reviewed = self.reviewed_changes()
+        self.manifest["production_baseline_sha"] = self.manifest["candidate_sha"]
+        release.source_checks(self.repo, self.manifest, reviewed_source=reviewed)
+        self.assertEqual(self.manifest["change_policy"]["dependencies"], [])
+        self.assertEqual(self.manifest["change_policy"]["migrations"], [])
+        self.commit("requirements.txt", "synthetic-package==2")
+        self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
+        release.source_checks(self.repo, self.manifest)
+        self.assertEqual(self.manifest["gates"]["dependencies"]["status"], "FAIL")
+
+    def test_reviewed_source_requires_exact_ancestor_and_no_mixed_policy(self):
+        reviewed = self.reviewed_changes()
+        for value in (reviewed[:7], "f" * 40, "HEAD"):
+            with self.subTest(value=value), self.assertRaises(release.GateError):
+                release.source_checks(self.repo, self.manifest, reviewed_source=value)
+        with self.assertRaisesRegex(release.GateError, "conflicting_change_policy"):
+            release.source_checks(self.repo, self.manifest, ["requirements.txt"], reviewed_source=reviewed)
+        self.git("checkout", "-qb", "unreviewed-branch", self.baseline)
+        self.commit("unrelated.txt", "synthetic unrelated review")
+        diverged = self.git("rev-parse", "HEAD")
+        self.git("checkout", "--detach", self.manifest["candidate_sha"])
+        with self.assertRaisesRegex(release.GateError, "reviewed_source_not_in_candidate"):
+            release.source_checks(self.repo, self.manifest, reviewed_source=diverged)
+
+    def test_failed_reviewed_cli_has_nonzero_exit_and_no_ready_report(self):
+        reviewed = self.reviewed_changes()
+        self.commit("apps/demo/migrations/0001_initial.py", "# unreviewed replacement")
+        output = self.root / "rejected"
+        code = release.main(["preflight", "--repo", str(self.repo), "--release-id", "synthetic-1",
+                             "--candidate", self.git("rev-parse", "HEAD"), "--baseline", self.baseline,
+                             "--reviewed-source", reviewed, "--output", str(output)])
+        self.assertEqual(code, 1)
+        manifest = release.load(output / "release.json")
+        self.assertEqual(manifest["command_result"]["code"], "reviewed_change_content_mismatch")
+        self.assertFalse(manifest["promotion"]["ready"])
+
     def test_existing_release_output_cannot_silently_change_candidate(self):
         output = self.root / "report"
         release.report(self.manifest, output)
