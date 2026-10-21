@@ -1,6 +1,31 @@
 {
   "version": 1,
   "skills": {
+    "alfred-finance-correctness": {
+      "source": "./.agents/skills",
+      "sourceType": "local",
+      "computedHash": "a50ddcb84f3d6936672c89b0561d0e4b35efd9f56534ecad266acd4caba14777"
+    },
+    "alfred-project-context": {
+      "source": "./.agents/skills",
+      "sourceType": "local",
+      "computedHash": "4f9dbc476d386eb970e1b38ef16b7f021b48973eb375e4bce8bba51ebc05b60d"
+    },
+    "alfred-release-gate": {
+      "source": "./.agents/skills",
+      "sourceType": "local",
+      "computedHash": "fc43d5734eabca4db71b98505e19c6211fc714aac0fb11ed3d5a8e671aa2d74b"
+    },
+    "alfred-security-review": {
+      "source": "./.agents/skills",
+      "sourceType": "local",
+      "computedHash": "34a51c895c43e2d3f9dab0ecf3316fa8ab1fe857c3e3837724eb1f9620a222ca"
+    },
+    "alfred-travel-engineering": {
+      "source": "./.agents/skills",
+      "sourceType": "local",
+      "computedHash": "5c5f6a10ea297eaedb0a80e6b367893eb90e90c33d069ba6ca69f15fbc3bcade"
+    },
     "integration-resilience-engineer": {
       "source": "JetBrains/skills",
       "sourceType": "github",
