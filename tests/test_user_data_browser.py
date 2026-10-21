@@ -1242,7 +1242,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         cloud=self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.reasoning_provider',side_effect=AssertionError('No fallback')))
         self.login(); self.browser.get(self.live_server_url+f'/ai/insights/?scope=bank_statements&transaction={row.pk}')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
-        question='Keep this synthetic question through outage'
+        question='Explain this statement record'
         self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys(question)
         self.memory_click('#intelligenceForm button')
         self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))

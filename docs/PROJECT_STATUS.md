@@ -69,6 +69,8 @@ Manual test-setup diagnosis: raw pytest has no configured Django plugin/settings
 
 Postcommit COUNCIL-04 closure: **97ed191c82620f067c8f31c8b908144c652ebc69**, task **7d16cda585ffafc1 COMPLETE**, all seven roles PASS. Actual independent `council_release_review` accepted the repaired final three-file fingerprint **75459e91f25f020c02614e8f116262314253f34025d3749031d8c7baf96f0e48**. Existing Council Tester **82 PASS**, zero failures/skips, on SDK Django 6.0.8 (compatibility); the separate final repair run above used pinned 6.0.9. Release Guardian source/privacy PASS: 892 paths / 849 blobs / one commit, six reviewed synthetic identifiers, zero findings. This is a development checkpoint, not operational deployment approval. No Council rebuild is pending.
 
+Cache repair committed **81c6446d0efe1e9a32155134d98addef6630cac8**, with actual independent review and the recorded 36-test PASS. Browser outage fixture is verified by its one-case Chrome PASS and independent review; it preserves the current source allowlist and all failure/draft/revocation assertions.
+
 ### Master consolidation release gates — 2026-10-21
 
 The previous `master-consolidation-pinned-backend` and `master-consolidation-pinned-chrome` sessions also ended without completion receipts; no matching test process remained on resumption. Mark both **BLOCKED/interrupted**, with no invented test counts. `master-consolidation-pinned-schema` system/drift PASS and `candidate-source-privacy.json` remain valid for 97ed191: 903 paths / 1,526 blobs / 106 commits, ten reviewed synthetic identifiers and zero findings. Existing operator originals and merge previews remain preserved outside tracked source.
