@@ -20,7 +20,9 @@ class ExpenseMoneyMigrationTests(TransactionTestCase):
         executor = MigrationExecutor(connection)
         self.leaves = executor.loader.graph.leaf_nodes()
         self.addCleanup(lambda: MigrationExecutor(connection).migrate(self.leaves))
-        self.old_targets = [self.migrate_from if node[0] == "expenses" else node for node in self.leaves]
+        # Mobility's money conversion requires expenses/0005; rewind both dependents.
+        historical = {"expenses": self.migrate_from, "mobility": ("mobility", "0012_travel_bus_mode")}
+        self.old_targets = [historical.get(node[0], node) for node in self.leaves]
         executor.migrate(self.old_targets)
         self.old = executor.loader.project_state(self.old_targets).apps
         self.user = self.old.get_model("users", "User").objects.create(username="expense-migration-owner")
