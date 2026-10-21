@@ -358,6 +358,16 @@ class LargeDataMaterializationTests(TestCase):
                 self.assertTrue(row["last_generated_at"])
                 self.assertTrue(row["last_served_at"])
 
+        # Old proof must not certify the versioned financial baseline's traffic.
+        saved["observed_namespaces"] = ["financial-baseline" if name == "financial-baseline-display-v1" else name
+                                        for name in saved["observed_namespaces"]]
+        for row in saved["namespaces"]:
+            if row["namespace"] == "financial-baseline-display-v1":
+                row["namespace"] = "financial-baseline"
+        stale = validate_materialized_cache_traffic_proof(saved)
+        self.assertFalse(stale["accepted"])
+        self.assertIn("missing namespace telemetry: financial-baseline-display-v1", stale["blockers"])
+
     @override_settings(
         SECURE_SSL_REDIRECT=True,
         SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_PROTO", "https"),

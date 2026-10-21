@@ -1,6 +1,6 @@
 # ALFRED Project Status
 
-**Only active overview, feature matrix, roadmap and continuation checkpoint. Updated 2026-10-21.**
+**Only active overview, feature matrix, roadmap and continuation checkpoint. Updated 2026-10-22.**
 
 ## Resume here
 
@@ -25,6 +25,20 @@ git branch --show-current
 git rev-parse HEAD
 Get-Content docs/PROJECT_STATUS.md -TotalCount 145
 ```
+
+### Consolidation repair continuation — 2026-10-22
+
+Current committed development is **a7c0a0f7f8a9c929d76806a8e5b2d570be812bf8**, retaining COUNCIL-04 97ed191, reviewed-source CI c3614eb and privacy-reviewed operator reconciliation 78c2058. Primary/master remains 3932f391 with its seven original operator files unchanged; no merge/push/deployment has occurred. The durable broad backend run timed out at 1,184 recorded tests, 10 errors / five failures / 18 skips; its progress is incomplete, not a final suite count or PASS. Chrome completed **71 tests / one error / zero skips**. All failure evidence remains under `artifacts/consolidation-20261017/`.
+
+Confirmed repairs in progress:
+
+- Cache registry and traffic exercise still used `financial-baseline` after the canonical display cache was versioned. Three references now use `financial-baseline-display-v1`; the existing source/telemetry tests reproduced the failure, and an added assertion rejects an old-name proof. `consolidation-cache-registry-final-20261022`: **36 backend PASS**, zero errors/failures/skips, Django 6.0.9, including retention and canonical financial invariance.
+- The bank-outage browser fixture sent an arbitrary unsupported question; the completed intent guard correctly abstained before inference. Use the already supported statement-record explanation to exercise outage/draft/revocation, retaining all assertions. `consolidation-bank-outage-browser-20261022`: **one actual Chrome PASS**, zero skips. This repairs a fixture, not private inference permissions or arbitrary-PDF support.
+- Expense migration tests requested expenses/0004 and mobility/0013, although mobility/0013 depends on expenses/0005. Rewind the synthetic test frontier to mobility/0012 as well, preserving current leaves for upgrade/cleanup and the same targets for alias rollback. No migration file, snapshot or historical monetary value is changed. Actual independent `quality_review` confirmed this dependency conflict and narrow repair.
+- Multipart middleware converted Django PermissionDenied into a generic 500, reproducing actual HTTP 500 versus required 403 on the superuser-only career outcome route. The repair preserves a generic safe 403 without returning exception contents. Existing endpoint plus a sensitive-message regression cover it. Legacy job-HTTP tests are updated to the centralized safe transport and generic redacted API contract; no public-network safeguards are relaxed.
+- Two upload assertions failed only in the broad run and pass in the isolated reproduction. Their fixtures now use fresh owner-protected persistent throttle directories per test, following the existing global-abuse fixture; limits and independent abuse tests remain enabled. Django locmem clearing does not reset disk-backed quotas and was removed before acceptance. An exact historical 429 cause is not asserted without response evidence.
+
+Actual independent `quality_review` accepted the cache, historical migration frontier and supported browser question repairs with no remaining actionable correctness/security issue. The cache and browser scopes are verified above; final HTTP/security/privacy/alias-migration execution and separate middleware review remain pending. The a7c0a0f build was explicitly stopped after confirmed source regressions; its incomplete artifacts are preserved with BLOCKED receipt, never accepted as a package. No new package, final broad PASS, real-account acceptance or release readiness is claimed. Feature counts stay **64 complete / 79 not fully verified (143 total)**; no feature-count increase for test repairs.
 
 ## Current execution and validation
 
