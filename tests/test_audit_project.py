@@ -41,18 +41,24 @@ class AuditProjectTests(unittest.TestCase):
             self.assertTrue(env["DATABASE_URL"].startswith("sqlite:///"))
             self.assertEqual(Path(env["ALFRED_DATA_DIR"]), Path(directory).resolve())
 
-    def test_authoritative_matrix_and_prompt_cover_every_remaining_feature(self):
+    def test_authoritative_tracker_covers_historical_features_with_current_sources(self):
         import json
+        import re
         root = Path(__file__).resolve().parents[1]
         matrix_path = root / "artifacts/audit/alfred-master-feature-matrix.json"
         rows = json.loads(matrix_path.read_text(encoding="utf-8"))
-        self.assertEqual(audit.validate_matrix(root, matrix_path), [])
-        matrix = (root / "docs/ALFRED_MASTER_FEATURE_MATRIX.md").read_text(encoding="utf-8")
-        prompt = (root / "artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md").read_text(encoding="utf-8")
-        for row in rows:
-            self.assertIn(row["id"], matrix)
-            if row["status"] != "COMPLETE_VERIFIED":
-                self.assertIn(row["id"], prompt)
+        tracker_path = "docs/PROJECT_STATUS.md"
+        tracker = (root / tracker_path).read_text(encoding="utf-8")
+        inventory = tracker.split("## All 143 capabilities", 1)[1]
+        sections = re.findall(r"^### ([A-Z]+-\d+) [^\n]+\n(.*?)(?=^### |^## |\Z)", inventory, re.M | re.S)
+        self.assertEqual(len(rows), 143)
+        self.assertCountEqual([feature for feature, _ in sections], [row["id"] for row in rows])
+        for feature, section in sections:
+            self.assertRegex(section, r"\*\*(?:COMPLETE_VERIFIED|IMPLEMENTED_NOT_ACCEPTED|PARTIALLY_IMPLEMENTED|NOT_IMPLEMENTED|BLOCKED_EXTERNAL|BLOCKED_APPROVAL|REQUIRES_RESEARCH|UNKNOWN)\*\*", feature)
+        for match in audit.LINK.finditer(tracker):
+            target = audit.link_target(root, tracker_path, match[1].strip("<>"))
+            if target is not None:
+                self.assertTrue(target.is_file(), match[1])
 
 
 if __name__ == "__main__":

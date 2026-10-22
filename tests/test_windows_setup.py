@@ -16,10 +16,11 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "setup_windows.ps1"
 class WindowsSetupTests(unittest.TestCase):
     def test_setup_holds_native_locks_through_install_and_validation(self):
         from alfred_native import InstanceLock
+        from alfred_private_storage import private_directory
 
         code = SCRIPT.read_text().split("    $SetupNative = @'\n", 1)[1].split("\n'@", 1)[0]
         with tempfile.TemporaryDirectory(prefix="alfred-setup-lock-") as folder:
-            data = Path(folder)
+            data = private_directory(Path(folder))
             (data / "config").mkdir()
             key = data / "config/native.env"
             key.write_bytes(b"retained synthetic key")
