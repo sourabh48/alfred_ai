@@ -101,10 +101,20 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         ''',path,payload,csrf)
 
     def memory_click(self,selector):
-        element=self.browser.find_element(self.By.CSS_SELECTOR,selector)
-        self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});",element)
-        self.wait.until(lambda _: element.is_displayed() and element.is_enabled())
-        element.click()
+        from selenium.common.exceptions import ElementClickInterceptedException
+
+        def click_when_uncovered(_):
+            element=self.browser.find_element(self.By.CSS_SELECTOR,selector)
+            self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});",element)
+            if not element.is_displayed() or not element.is_enabled():
+                return False
+            try:
+                element.click()
+            except ElementClickInterceptedException:
+                return False
+            return True
+
+        self.wait.until(click_when_uncovered)
 
     def test_user_decimal_profile_save_and_reload_keeps_exact_owned_cents(self):
         from decimal import Decimal
