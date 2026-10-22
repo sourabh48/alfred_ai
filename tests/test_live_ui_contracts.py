@@ -179,6 +179,17 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn('Alfred.setPageBusy("dashboardRoot", true', script)
         self.assertIn('Alfred.fetchJSON("/api/expenses/dashboard/")', script)
 
+    def test_insights_polling_leaves_expensive_quota_for_owner_actions(self):
+        import math
+        import re
+
+        script = self._fetch_text("/static/js/ai_insights.js")
+        interval = re.search(r'enableLiveRefresh\("ai-insights-live"[^\n]+intervalMs:\s*(\d+)', script)
+        self.assertIsNotNone(interval)
+        polls = math.ceil(settings.ALFRED_EXPENSIVE_ACCOUNT_WINDOW_SECONDS * 1000 / int(interval[1]))
+        # Initial snapshot and assistant status also use the expensive bucket.
+        self.assertLessEqual(polls + 2, settings.ALFRED_EXPENSIVE_ACCOUNT_LIMIT // 2)
+
     def test_statement_upload_contracts_cover_documents_and_expenses_paths(self):
         documents_html = self._fetch_text("/documents/")
         documents_parser = _AssetParser()
