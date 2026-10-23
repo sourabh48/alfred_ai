@@ -1,11 +1,14 @@
 from collections import defaultdict
+import csv
 from datetime import date
 from decimal import Decimal
+from io import StringIO
 import logging
 import sys
 
 from django.db import transaction
 from django.db.models import Q
+from django.http import StreamingHttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
@@ -308,6 +311,37 @@ class ExpenseListCreateView(ListCreateAPIView):
             direction=validated.get("direction", "debit"),
         )
         sync_account_balance(expense.bank_account, expense.closing_balance)
+
+
+class ExpenseExportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        columns = ("id", "transaction_date", "direction", "classification", "category", "amount",
+                   "closing_balance", "merchant", "description", "external_reference", "source",
+                   "bank_account_id", "statement_upload_id")
+        queryset = Expense.objects.filter(user=request.user).order_by("-transaction_date", "-id").values_list(*columns)
+
+        def rows():
+            with StringIO(newline="") as buffer:
+                writer = csv.writer(buffer)
+                writer.writerow(columns)
+                yield buffer.getvalue()
+                for values in queryset.iterator(chunk_size=2000):
+                    buffer.seek(0)
+                    buffer.truncate(0)
+                    # CSV quoting alone does not stop spreadsheet formula execution.
+                    writer.writerow([
+                        "'" + value if isinstance(value, str) and (
+                            value.lstrip().startswith(("=", "+", "-", "@")) or value.startswith(("\t", "\r", "\n"))
+                        ) else value for value in values
+                    ])
+                    yield buffer.getvalue()
+
+        response = StreamingHttpResponse(rows(), content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="alfred-expenses.csv"'
+        response["Cache-Control"] = "private, no-store"
+        return response
 
 
 class ExpenseDetailView(RetrieveUpdateDestroyAPIView):

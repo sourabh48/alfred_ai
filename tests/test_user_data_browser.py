@@ -2460,6 +2460,21 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(row.category, "food")
         self.assertEqual((row.transaction_fingerprint, row.transaction_identity), (fingerprint, identity))
         self.assertEqual((row.amount, row.closing_balance, account.current_balance), (Decimal("2.68"), Decimal("10.01"), Decimal("10.01")))
+        account.current_balance = Decimal("80.00")
+        account.save(update_fields=["current_balance"])
+        self.wait.until(lambda driver: driver.execute_script("return expenseIndex.get(arguments[0])?.category === 'food';", row.pk))
+        self.browser.execute_script("openEditModal(arguments[0]);", row.pk)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "expenseSubmitBtn").is_displayed())
+        note = self.browser.find_element(self.By.CSS_SELECTOR, '#expenseForm [name="description"]')
+        note.clear()
+        note.send_keys("Owner corrected note")
+        self.memory_click("#expenseSubmitBtn")
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, "expenseSubmitBtn").is_displayed())
+        row.refresh_from_db()
+        account.refresh_from_db()
+        self.assertEqual((row.description, row.raw_description, row.category), ("Owner corrected note", "UPI SAMPLE MERCHANT", "food"))
+        self.assertEqual((row.transaction_fingerprint, row.transaction_identity), (fingerprint, identity))
+        self.assertEqual(account.current_balance, Decimal("80.00"))
         upload = StatementUpload.objects.create(user=user, bank_account=account, file_name="synthetic.pdf")
         parsed = parsed_fixture(closing=15.005)
         parsed.transactions[0].transaction_date = row.transaction_date
@@ -2471,6 +2486,32 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(displayed["amount"], 2.68)
         self.assertEqual(displayed["closing_balance"], 10.01)
         self.capture("expense-money-identity")
+
+    def test_expense_csv_download_contains_only_owner_values(self):
+        import csv
+        from io import StringIO
+        from apps.expenses.models import Expense
+
+        user = self.scenario["user"]
+        row = Expense.objects.create(user=user, amount="2.68", closing_balance="0.00", merchant="=1+1", description="Owner export note")
+        other = get_user_model().objects.create_user(username="csv-download-other")
+        foreign = Expense.objects.create(user=other, amount="999.99", merchant="FOREIGN-CSV-ONLY")
+        downloads = Path(self.enterContext(TemporaryDirectory(prefix="alfred-csv-download-")))
+        self.browser.execute_cdp_cmd("Page.setDownloadBehavior", {"behavior": "allow", "downloadPath": str(downloads)})
+        self.addCleanup(self.browser.execute_cdp_cmd, "Page.setDownloadBehavior", {"behavior": "default"})
+        self.login()
+        self.browser.get(self.live_server_url + "/expenses/")
+        self.memory_click("#expenseExportBtn")
+        target = downloads / "alfred-expenses.csv"
+        self.wait.until(lambda _: target.is_file() and not list(downloads.glob("*.crdownload")))
+        content = target.read_text(encoding="utf-8")
+        rows = list(csv.DictReader(StringIO(content)))
+        self.assertEqual(len(rows), Expense.objects.filter(user=user).count())
+        exported = next(item for item in rows if item["id"] == str(row.pk))
+        self.assertEqual((exported["amount"], exported["closing_balance"], exported["merchant"]), ("2.68", "0.00", "'=1+1"))
+        self.assertNotIn(str(foreign.pk), [item["id"] for item in rows])
+        self.assertNotIn("FOREIGN-CSV-ONLY", content)
+        self.capture("expense-csv-download")
 
     def test_old_transactions_show_their_actual_reporting_month(self):
         Expense.objects.filter(user=self.scenario["user"]).update(transaction_date=month_start(-1))

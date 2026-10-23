@@ -6,6 +6,7 @@ from .views import (
     ExpenseChartView,
     ExpenseDashboardView,
     ExpenseDetailView,
+    ExpenseExportView,
     ExpenseListCreateView,
     ExpenseStatementImportView,
     StatementUploadDetailView,
@@ -16,6 +17,7 @@ from .views import (
 
 urlpatterns = [
     path("", ExpenseListCreateView.as_view()),
+    path("export/", ExpenseExportView.as_view()),
     path("accounts/", BankAccountListCreateView.as_view()),
     path("accounts/<int:pk>/", BankAccountDetailView.as_view()),
     path("dashboard/", ExpenseDashboardView.as_view()),
