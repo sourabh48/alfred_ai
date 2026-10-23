@@ -58,3 +58,33 @@ class ExpenseCorrectionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.row.refresh_from_db()
         self.assertEqual((self.row.merchant, self.row.counterparty, self.row.company_name), ("", "", ""))
+
+    def test_import_cannot_be_relinked_or_relabelled_and_rejections_are_atomic(self):
+        second = BankAccount.objects.create(user=self.user, account_number="CORRECTION2", current_balance="45.00")
+        for payload in ({"bank_account": second.pk}, {"bank_account": None}, {"source": "manual"}):
+            with self.subTest(payload=payload):
+                response = self.client.patch(f"/api/expenses/{self.row.pk}/", {**payload, "amount": "500.00"}, format="json")
+                self.assertEqual(response.status_code, 400)
+                self.row.refresh_from_db()
+                self.assertEqual((self.row.bank_account_id, self.row.statement_upload_id, self.row.source, self.row.amount),
+                                 (self.account.pk, self.upload.pk, "bank_statement", Decimal("2.68")))
+        second.refresh_from_db()
+        self.assertEqual(second.current_balance, Decimal("45.00"))
+
+    def test_import_accepts_same_parent_and_source_and_manual_entry_can_move(self):
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"bank_account": self.account.pk, "source": "bank_statement", "category": "food"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        manual = Expense.objects.create(user=self.user, amount="4.00")
+        response = self.client.patch(f"/api/expenses/{manual.pk}/", {"bank_account": self.account.pk}, format="json")
+        self.assertEqual(response.status_code, 200)
+        manual.refresh_from_db()
+        self.assertEqual(manual.bank_account_id, self.account.pk)
+
+    def test_foreign_owner_cannot_edit_or_supply_an_account(self):
+        other = get_user_model().objects.create_user(username="correction-other")
+        account = BankAccount.objects.create(user=other, account_number="FOREIGN")
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"bank_account": account.pk}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.client.force_authenticate(other)
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"amount": "1.00"}, format="json")
+        self.assertEqual(response.status_code, 404)
