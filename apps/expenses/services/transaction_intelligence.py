@@ -97,6 +97,10 @@ PROTECTED_MERCHANT_KEYS = ("GOOGLE PAY", "GOOGLE PLAY", "NETFLIX", "SPOTIFY", "Y
 def hydrate_expense_data(*, user, payload: dict, initial_data: dict | None = None, instance: Expense | None = None) -> dict:
     data = dict(payload)
     provided_fields = set((initial_data or {}).keys())
+    if instance is not None:
+        for field in ("classification", "category", "payment_mode", "merchant", "external_reference",
+                      "raw_description", "description", "counterparty", "company_name"):
+            data.setdefault(field, getattr(instance, field))
 
     direction = data.get("direction") or getattr(instance, "direction", "debit")
     evidence = getattr(instance, "transaction_identity", {})
@@ -125,7 +129,7 @@ def hydrate_expense_data(*, user, payload: dict, initial_data: dict | None = Non
         or getattr(instance, "merchant", "")
     )
 
-    inferred = classify_transaction_text(source_text, direction) if source_text else {}
+    inferred = classify_transaction_text(source_text, direction) if source_text and instance is None else {}
     if inferred:
         inferred = apply_transaction_history_learning(
             user=user,
@@ -136,17 +140,17 @@ def hydrate_expense_data(*, user, payload: dict, initial_data: dict | None = Non
         )
 
     for field in ("classification", "category", "payment_mode", "merchant", "external_reference"):
-        if _should_fill(field, data, provided_fields):
+        if instance is None and _should_fill(field, data, provided_fields):
             fallback = getattr(instance, field, Expense._meta.get_field(field).get_default())
             data[field] = inferred.get(field) or data.get(field) or fallback
 
-    if _should_fill("raw_description", data, provided_fields):
+    if instance is None and _should_fill("raw_description", data, provided_fields):
         data["raw_description"] = inferred.get("raw_description", source_text)
-    if _should_fill("description", data, provided_fields):
+    if instance is None and _should_fill("description", data, provided_fields):
         data["description"] = inferred.get("description", source_text[:140] if source_text else "")
 
-    counterparty = data.get("counterparty") or inferred.get("counterparty") or data.get("merchant") or ""
-    company_name = data.get("company_name") or inferred.get("company_name") or _infer_company_name(counterparty, source_text)
+    counterparty = data["counterparty"] if instance is not None else data.get("counterparty") or inferred.get("counterparty") or data.get("merchant") or ""
+    company_name = data["company_name"] if instance is not None else data.get("company_name") or inferred.get("company_name") or _infer_company_name(counterparty, source_text)
     emotional = _detect_emotional_spend(
         user=user,
         amount=amount,
@@ -166,7 +170,7 @@ def hydrate_expense_data(*, user, payload: dict, initial_data: dict | None = Non
         amount=identity["amount"],
         direction=direction,
         external_reference=data.get("external_reference", getattr(instance, "external_reference", "")),
-        raw_description=data.get("raw_description") or source_text,
+        raw_description=data["raw_description"] if instance is not None else data.get("raw_description") or source_text,
         closing_balance=identity["closing_balance"],
     )
     data["is_emotional"] = emotional["is_emotional"]
