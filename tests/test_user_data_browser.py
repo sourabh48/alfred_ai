@@ -2757,6 +2757,78 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture("financial-health-reviewed-mobile")
         self.assertEqual(before, list(Expense.objects.filter(user=owner).values()))
 
+    def test_vehicle_service_and_refill_forms_keep_owned_cents_and_measurements(self):
+        from decimal import Decimal
+        from django.utils import timezone
+        from selenium.webdriver.support.ui import Select
+        from apps.mobility.models import BikeProfile, BikeServiceRecord, FuelRefillLog
+
+        owner=self.scenario["user"]
+        profile=BikeProfile.objects.create(user=owner,display_name="Acceptance Scooter",vehicle_type="scooter",bike_class="scooter")
+        foreign=get_user_model().objects.create_user(username="private_vehicle_record_owner")
+        private=BikeProfile.objects.create(user=foreign,display_name="PRIVATE-VEHICLE-ONLY")
+        FuelRefillLog.objects.create(user=foreign,bike_profile=private,bike_name="PRIVATE-VEHICLE-ONLY",refill_date=timezone.localdate(),fuel_liters=10,trip_meter_km=9999,total_cost=9999)
+        before=list(Expense.objects.filter(user=owner).values())
+        self.login()
+        self.browser.get(self.live_server_url+"/bike-service/")
+        self.wait.until(lambda _: any(option.get_attribute("value")==str(profile.pk) for option in self.browser.find_elements(self.By.CSS_SELECTOR,"#bikeRefillProfile option")))
+        Select(self.browser.find_element(self.By.ID,"bikeServiceProfile")).select_by_value(str(profile.pk))
+        for identifier,value in (("bikeServiceOdometer","200"),("bikeServiceCost","2.68"),("bikeServiceCenter","Acceptance Workshop")):
+            field=self.browser.find_element(self.By.ID,identifier); field.clear(); field.send_keys(value)
+        self.memory_click("#bikeServiceRecordForm button[type=submit]")
+        self.wait.until(lambda _: "saved" in self.text("bikeServiceRecordFeedback"))
+        self.wait.until(lambda _: "Acceptance Workshop" in self.text("bikeServiceLogList"))
+        self.browser.execute_script('''
+            const original=window.fetch;
+            window.fetch=(...args)=>original(...args).then(async response=>{
+                if(String(args[0]).includes('/bike-refills/') && args[1]?.method==='POST') {
+                    window.refillReceipt={status:response.status,body:await response.clone().json(),request:JSON.parse(args[1].body)};
+                }
+                return response;
+            });
+        ''')
+        Select(self.browser.find_element(self.By.ID,"bikeRefillProfile")).select_by_value(str(profile.pk))
+        for identifier,value in (("bikeRefillTripKm","0.2"),("bikeRefillFuelLiters","0.005"),("bikeRefillTotalCost","10.01"),("bikeRefillStation","Acceptance Pump"),("bikeRefillNotes","<img src=x onerror=window.refillInjected=true>")):
+            field=self.browser.find_element(self.By.ID,identifier); field.clear(); field.send_keys(value)
+        self.memory_click("#bikeRefillForm button[type=submit]")
+        feedback=self.wait.until(lambda _: self.text("bikeRefillFeedback"))
+        self.capture("vehicle-refill-save-feedback")
+        receipt=self.browser.execute_script("return window.refillReceipt;")
+        (self.artifacts/"vehicle-refill-response.json").write_text(json.dumps(receipt,indent=2),encoding="utf-8")
+        self.assertIn("saved",feedback,str(receipt))
+        self.assertEqual(receipt["request"]["refill_date"],timezone.localdate().isoformat())
+        self.wait.until(lambda _: "40 kmpl" in self.text("bikeRefillList"))
+        self.browser.execute_script("document.getElementById('bikeRefillList').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("vehicle-refill-layout")
+        layout=self.browser.execute_script("return [...document.querySelectorAll('#bikeRefillList .d-flex > div')].map(e=>({text:e.textContent,rect:e.getBoundingClientRect().toJSON(),display:getComputedStyle(e).display}));")
+        (self.artifacts/"vehicle-refill-layout.json").write_text(json.dumps(layout,indent=2),encoding="utf-8")
+        self.assertIn("0.005 L",self.text("bikeRefillList"))
+        self.assertIn("10.01",self.text("bikeRefillList"))
+        self.assertFalse(self.browser.execute_script("return Boolean(window.refillInjected);"))
+        self.assertNotIn("PRIVATE-VEHICLE-ONLY",self.text("bikeServiceRoot"))
+        refill=FuelRefillLog.objects.get(user=owner)
+        service=BikeServiceRecord.objects.get(user=owner)
+        self.assertEqual((refill.total_cost,refill.fuel_liters,refill.trip_meter_km),(Decimal("10.01"),0.005,0.2))
+        self.assertEqual((service.cost,service.bike_profile_id),(Decimal("2.68"),profile.pk))
+        self.browser.execute_script("document.getElementById('bikeRefillList').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("vehicle-refill-owned-precision")
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('bikeRefillList').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("vehicle-refill-owned-mobile")
+        self.browser.refresh()
+        self.wait.until(lambda _: "0.005 L" in self.text("bikeRefillList"))
+        self.assertIn("40 kmpl",self.text("bikeRefillList"))
+        self.browser.execute_script("const d=document.getElementById('bikeRefillDate');d.value='2026-01-01';d.dispatchEvent(new Event('input',{bubbles:true}));")
+        self.browser.execute_async_script("const done=arguments[0];loadBikeServiceDashboard().then(()=>done(true));")
+        self.assertEqual(self.browser.find_element(self.By.ID,"bikeRefillDate").get_attribute("value"),"2026-01-01")
+        self.memory_click("#bikeRefillList button")
+        self.wait.until(lambda driver: driver.switch_to.alert).accept()
+        self.wait.until(lambda _: "No refill logs yet" in self.text("bikeRefillList"))
+        self.assertFalse(FuelRefillLog.objects.filter(pk=refill.pk).exists())
+        self.assertTrue(FuelRefillLog.objects.filter(user=foreign).exists())
+        self.assertTrue(BikeServiceRecord.objects.filter(pk=service.pk).exists())
+        self.assertEqual(before,list(Expense.objects.filter(user=owner).values()))
+
     def test_expense_form_preserves_import_identity_and_bank_cents(self):
         from decimal import Decimal
         from types import SimpleNamespace

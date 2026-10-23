@@ -1,5 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
+from collections.abc import Mapping
+from math import isfinite
 
 from django.utils import timezone
 from rest_framework import serializers
@@ -155,12 +157,12 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
     def get_actual_mileage_kmpl(self, obj):
         if not obj.fuel_liters or not obj.trip_meter_km:
             return 0
-        return round((obj.trip_meter_km or 0) / max(obj.fuel_liters, 0.01), 2)
+        return round(obj.trip_meter_km / obj.fuel_liters, 2)
 
     def get_fuel_price_per_liter(self, obj):
         if not obj.fuel_liters:
             return 0
-        return money_float(Decimal(str(obj.total_cost or 0)) / max(Decimal(str(obj.fuel_liters)), Decimal('0.01')))
+        return money_float(Decimal(str(obj.total_cost or 0)) / Decimal(str(obj.fuel_liters)))
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -169,6 +171,10 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
         odometer_km = attrs.get("odometer_km", getattr(self.instance, "odometer_km", None))
         trip_meter_km = attrs.get("trip_meter_km", getattr(self.instance, "trip_meter_km", 0))
         fuel_liters = attrs.get("fuel_liters", getattr(self.instance, "fuel_liters", 0))
+
+        for field, value in (("trip_meter_km", trip_meter_km), ("fuel_liters", fuel_liters)):
+            if value is None or not isfinite(value):
+                raise serializers.ValidationError({field: "Measurement must be finite."})
 
         if request is not None and bike_profile and bike_profile.user_id != request.user.id:
             raise serializers.ValidationError({"bike_profile": "You can only use your own saved vehicle profiles."})
@@ -180,10 +186,18 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"trip_meter_km": "Trip value cannot be negative."})
         if fuel_liters is None or fuel_liters <= 0:
             raise serializers.ValidationError({"fuel_liters": "Fuel liters must be greater than zero."})
+        total_cost = attrs.get("total_cost", getattr(self.instance, "total_cost", 0))
+        if not isfinite(trip_meter_km / fuel_liters) or not isfinite(float(Decimal(str(total_cost)) / Decimal(str(fuel_liters)))):
+            raise serializers.ValidationError({"fuel_liters": "The entered measurements produce a result outside the supported numeric range."})
         return attrs
 
     def to_internal_value(self, data):
+        if not isinstance(data, Mapping):
+            return super().to_internal_value(data)
         normalized = data.copy()
+        for field in ("trip_meter_km", "fuel_liters"):
+            if isinstance(normalized.get(field), bool):
+                raise serializers.ValidationError({field: "Measurement must be numeric, not a boolean."})
         for field in ("bike_profile", "odometer_km", "trip_meter_km", "fuel_liters", "total_cost", "station_name", "notes"):
             if normalized.get(field) == "":
                 normalized[field] = None if field == "odometer_km" else (0 if field in {"trip_meter_km", "fuel_liters", "total_cost"} else "")

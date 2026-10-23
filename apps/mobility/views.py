@@ -880,7 +880,7 @@ class BikeServiceDashboardView(APIView):
             ttl_seconds=45,
             builder=lambda: _numeric_currency_payload(self._build_payload(request)),
         )
-        return Response(payload)
+        return Response({**payload, "current_date": timezone.localdate().isoformat()})
 
     def _build_payload(self, request):
         intelligence = bike_service_intelligence.build_dashboard(request.user)

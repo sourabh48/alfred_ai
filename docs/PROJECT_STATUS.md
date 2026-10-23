@@ -1,8 +1,13 @@
-﻿# ALFRED Project Status
+# ALFRED Project Status
 
 **Only active overview, feature matrix, roadmap and continuation checkpoint. Updated 2026-10-24.**
 
 ## Resume here
+
+- **BIKE-02 / FIVE-MILESTONE CHECKPOINT — 2026-10-24:** HEAD = this checkpoint commit (base `95f30bc`). DONE: accepted owner service/fuel/cost records using the existing Decimal-backed registers; the former float/migration limitation in BIKE-02 was stale. Fixed reproduced nonfinite/boolean/overflowing refill measurements before writes and inconsistent sub-0.01 L mileage/price denominators. Measurements retain their entered precision; stored money retains HALF_UP cents. Malformed bodies return 400. Actual Chrome uncovered a valid default refill being rejected when the browser calendar was ahead of the server: the dashboard now supplies its validation date outside the cached payload, the form uses it for defaults and preserves manually edited dates during refresh. No host/server timezone setting or future-date rule was changed. Long escaped notes also clipped cost/Delete controls in narrow desktop cards; text now wraps, with controls visible on desktop/mobile. Existing immediate correction/cache behavior passed and was left unchanged.
+  TESTS: **35 focused backend + one actual Chrome PASS**, zero skips; final `artifacts/vehicle-95f30bc/checkpoint-accepted.json`. Coverage: owner CRUD/profile isolation/CSRF, exact cents and independent 0.2 km / 0.005 L = 40 kmpl, unit price, zero/nonfinite/overflow/future-date/malformed rejection, read-only predictions, accounting invariants, cached corrections and server-date rollover. Browser exercises ordinary forms, escaped notes, visible costs/controls, server-date save, refresh/reopen, draft preservation and confirmed deletion while preserving foreign rows and financial history; desktop/390px screenshots inspected. Pre-fix/import-setup, API/date and layout failures retained. A new test initially expected fixed `40.0` formatting; corrected to the existing `40 kmpl` contract. Backend evidence reused after only UI/assertion changes. Prior money migration/rollback receipts remain applicable; schema/dependencies unchanged.
+  FEATURES: **68 verified / 28 unaccepted / 29 partial / 10 missing / five approval / three external = 143**. Five session modules: direction `ec9c161`, Career outcomes `81f88b8`, investment projections `76c1522`, financial-health acceptance `95f30bc`, and this service/fuel acceptance. **252 focused backend / eight actual Chrome** final passing checks across those modules, plus one overlapping direction screenshot flow. Newly verified CAREER-05, INV-03, FIN-04 and BIKE-02; DOC-07 remains partial. No employer/invoice authenticity, physical mileage accuracy, calibrated maintenance prediction or product-wide AI accuracy is claimed. Modified files alphabetically: `apps/mobility/serializers.py`, `apps/mobility/services/bike_service_intelligence.py`, `apps/mobility/views.py`, `docs/PROJECT_STATUS.md`, `static/js/bike_service.js`, `templates/mobility/bike_service_dashboard.html`, `tests/test_mobility_record_acceptance.py`, `tests/test_user_data_browser.py`.
+  BOUNDARY / BLOCKERS: first four modules at `95f30bc` passed AST refresh (exit 0), JavaScript/143-row/protected-ref guards and pinned privacy (**901 paths / 876 blobs / four commits, zero findings**) and were pushed; remote ref was independently verified. Evidence: `artifacts/source-boundary-76c1522/{graph,privacy-manifest,source-checks,push}.json`. Final module boundary receipts are `artifacts/vehicle-boundary-95f30bc/{graph,privacy-manifest,source-checks,push}.json`: if PASS and their candidate equals current HEAD with the matching remote ref, this boundary is complete and must not be repeated; otherwise finish it before new edits. No master/frozen-candidate change. Full release/CI/native/package/independent-PC gates were not rerun; accepted package is still source `3bc75ac`, so these new features remain source-only. Currency/history/provider/production approvals and packaged AI runtime blocker remain unchanged. NEXT TASK: BIKE-04 invoice/document review acceptance: inspect existing upload/extract/review lineage and owner/cost boundaries, use synthetic local evidence, and leave real private/provider authentication claims unaccepted. RESUME COMMAND: `Set-Location F:\ALFRED_DEV\post-audit; git status -sb; Get-Content docs/PROJECT_STATUS.md -Encoding UTF8 -TotalCount 12`.
 
 - **FIN-04 HEALTH ACCEPTANCE CHECKPOINT — 2026-10-24:** HEAD = this checkpoint commit (base `76c1522`; INV-03 accepted there). DONE: accepted existing financial-health and historical-spending indicators without changing application behavior. Independent stable-history and loss-making cases verify bounded heuristic scores, exact income/outflow/net cents, recorded reference month, all-history rates, zero/no-history distinction and read-only financial invariance. Transfers and large uncategorized debits remain excluded from confirmed cash flow; foreign history cannot change owned cached or fresh indicators. Ordinary reviewed-owner Chrome acceptance shows the expected score, estimated-risk and rule-based/not-credit-score labels, actual reporting month and all-history rate explanation; no owner financial writes. Prior unchanged review-required/empty/older-history Chrome receipts remain applicable.
   TESTS: **13 focused backend + one actual Chrome PASS**, zero skips. Initial two failed backend receipts retained: the new fixture first used an explicit expense and then an amount below the existing 50,000 review threshold; it now uses uncategorized 52,345.67. No product policy changed to fit the test. Final receipt `artifacts/health-76c1522/checkpoint-verified.json`, backend-verified/Chrome logs, inspected desktop/390px screenshots. Passing Chrome was reused while correcting only the backend fixture. Graph update/source privacy/development push are the next integration boundary.
@@ -492,12 +497,12 @@ The denominator remains the original 143 audited capabilities, not new commit/su
 
 - BLOCKED_APPROVAL: **5**
 - BLOCKED_EXTERNAL: **3**
-- COMPLETE_VERIFIED: **67**
-- IMPLEMENTED_NOT_ACCEPTED: **29**
+- COMPLETE_VERIFIED: **68**
+- IMPLEMENTED_NOT_ACCEPTED: **28**
 - NOT_IMPLEMENTED: **10**
 - PARTIALLY_IMPLEMENTED: **29**
 
-Technical completion: **67/143 = 46.9%**. Remaining: **76**, including implemented but unaccepted and approval/external blockers. This is not a product acceptance percentage.
+Technical completion: **68/143 = 47.6%**. Remaining: **75**, including implemented but unaccepted and approval/external blockers. This is not a product acceptance percentage.
 
 ## Prioritized remaining roadmap and approval boundaries
 
@@ -1816,14 +1821,14 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### BIKE-02 — Service records, fuel and costs
 
-**IMPLEMENTED_NOT_ACCEPTED** · Bike and mobility · P2.
+**COMPLETE_VERIFIED** · Bike and mobility · P2.
 
 - Source: [apps/mobility/services/bike_service_intelligence.py](../apps/mobility/services/bike_service_intelligence.py), [apps/mobility/services/bike_catalog.py](../apps/mobility/services/bike_catalog.py), [apps/mobility/urls.py](../apps/mobility/urls.py).
 - APIs/UI/models: /bike-service/ and /api/mobility/; supported routes in root URLs; BikeProfile, BikeServiceRecord, FuelRefillLog, BikeIssueReport, BikeDocument, BikeConditionSnapshot.
-- Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
-- Limitations/dependencies: CRUD/mileage/history exist; monetary amounts remain float in Mobility models. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Complete financial-tail migration and reviewed actual logs.
+- Tests: [tests/test_mobility_record_acceptance.py](../tests/test_mobility_record_acceptance.py), [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_mobility_money.py](../tests/test_mobility_money.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py), [tests/test_user_data_browser.py](../tests/test_user_data_browser.py). **35 backend / one actual Chrome PASS**, zero skips; `artifacts/vehicle-95f30bc/checkpoint-accepted.json` and inspected desktop/390px screenshots.
+- Acceptance: local ordinary-owner service/refill CRUD, linked profile isolation, Decimal cost/measurement precision, derived mileage/price, safe server-date defaults, cache corrections and usable mobile/desktop history verified with synthetic data. Foreign records and financial totals preserved.
+- Limitations/dependencies: Costs already use Decimal fields and existing migration receipts; quantities remain measurements. Owner-entered history is not invoice/odometer authenticity, tank calibration or predictive service accuracy. Native/package/private-account/provider acceptance remains separate.
+- Next: BIKE-04 document/invoice review acceptance; preserve source lineage and owner scope, without claiming real-document authenticity from fixtures.
 
 ### BIKE-03 — Maintenance prediction and condition tracking
 

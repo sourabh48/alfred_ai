@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
+from math import isfinite
 import re
 from statistics import mean
 
@@ -1000,7 +1001,10 @@ class BikeServiceIntelligenceService:
             return None
         if refill_log.fuel_liters <= 0 or refill_log.trip_meter_km <= 0:
             return None
-        return round(refill_log.trip_meter_km / refill_log.fuel_liters, 2)
+        if not isfinite(refill_log.fuel_liters) or not isfinite(refill_log.trip_meter_km):
+            return None
+        mileage = refill_log.trip_meter_km / refill_log.fuel_liters
+        return round(mileage, 2) if isfinite(mileage) else None
 
     def _build_mileage_trend(self, refill_logs, expected_mileage, source_name, source_url) -> dict:
         eligible_logs = [item for item in reversed(refill_logs[:10]) if self._refill_actual_mileage(item) is not None]
