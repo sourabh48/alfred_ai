@@ -2953,6 +2953,49 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertFalse(profile.media_learning_enabled)
         self.assertEqual(before, list(Expense.objects.filter(user=owner).values()))
 
+    def test_travel_places_provenance_stale_and_unavailable_are_explicit(self):
+        from copy import deepcopy
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import candidates_for
+        from tests.test_travel_places_acceptance import synthetic_place_result
+        owner = self.scenario["user"]
+        session = new_session(owner)
+        candidate = candidates_for(owner, {})[0]
+        candidate["places_result"] = synthetic_place_result()
+        candidate["quality"] = {"verified": ["places"]}
+        session.candidates = [candidate]; session.save()
+        before = deepcopy(session.candidates)
+        self.login(); self.browser.get(self.live_server_url + f"/mobility/?session={session.pk}")
+        selector = "#plannerEvidenceBody [data-places-evidence]"
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector))
+        text = self.browser.find_element(self.By.CSS_SELECTOR, selector).text
+        self.assertIn("RECENTLY_VERIFIED", text)
+        self.assertIn("Mapped hours: 24/7", text)
+        self.assertIn("Booking availability: UNKNOWN", text)
+        self.assertIn("Permit status: unverified", text)
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, selector+" [onerror]"))
+        links = self.browser.find_elements(self.By.CSS_SELECTOR, selector+" a")
+        self.assertTrue(any(a.get_attribute("href")=="https://www.openstreetmap.org/node/1" for a in links))
+        self.browser.execute_script("document.querySelector(arguments[0]).scrollIntoView({behavior:'instant',block:'center'});",selector)
+        self.capture("travel-places-source-desktop")
+        session.refresh_from_db(); self.assertEqual(session.candidates, before)
+        candidate["places_result"]["expires_at"] = (timezone.now()-timedelta(seconds=1)).isoformat()
+        session.candidates = [candidate]; session.save()
+        self.browser.refresh()
+        self.wait.until(lambda _: "STALE" in self.browser.find_element(self.By.CSS_SELECTOR, selector).text)
+        self.assertIn("Refresh before relying", self.browser.find_element(self.By.CSS_SELECTOR, selector).text)
+        candidate["places_result"] = {"provider": "overpass", "category": "places", "success": False,
+            "status": "unavailable", "freshness": "UNKNOWN", "error": "provider_not_configured", "payload": {}}
+        session.candidates = [candidate]; session.save()
+        self.browser.refresh()
+        self.wait.until(lambda _: "No current place results" in self.browser.find_element(self.By.CSS_SELECTOR, selector).text)
+        self.assertNotIn("Synthetic camp", self.browser.find_element(self.By.CSS_SELECTOR, selector).text)
+        self.browser.set_window_size(390, 844)
+        self.browser.execute_script("document.querySelector(arguments[0]).scrollIntoView({behavior:'instant',block:'center'});",selector)
+        self.capture("travel-places-unavailable-mobile")
+
     def test_expense_form_preserves_import_identity_and_bank_cents(self):
         from decimal import Decimal
         from types import SimpleNamespace

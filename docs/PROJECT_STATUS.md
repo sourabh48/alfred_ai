@@ -4,6 +4,10 @@
 
 ## Resume here
 
+- **TRAVEL-10 PROVENANCE ACCEPTANCE — 2026-10-24:** HEAD = this checkpoint commit (base `5c88944`). DONE: accepted local camping/attraction evidence freshness, provenance and stale/offline states. Reproduced malformed-date API errors and unsupported verification claims for missing/naive/future clocks or unsafe source links. Read-time ageing now abstains for unusable place evidence and removes it from verified categories without rewriting stored research. Expired place evidence is explicitly stale; original source/check/expiry times survive offline cache fallback. UI exposes mapped hours/access as leads, direct source citations, incomplete coverage and explicit UNKNOWN booking/opening and unverified permits. Screenshot review fixed low-contrast unavailable text using existing theme colors. No provider authentication/activation, private upload, pricing, currency or production change.
+  TESTS: **47 focused backend + one final actual Chrome PASS**, zero skips; `artifacts/places-5c88944/{backend-integrated,chrome-accepted}.json`, driver-backed `browser-accepted/browser_regression_summary.json`; desktop/narrow-screen results inspected. Six new acceptance tests plus existing provider/continuation regressions cover cache reuse, offline/partial/unconfigured behavior, unknown availability, invalid clocks/source links, original receipts, no read mutation and foreign ownership. Chrome uses disclosed synthetic places through the actual session API/UI, checks escaped names/citations, fresh-to-stale-to-unavailable transitions and responsive states. Pre-fix six-test reproduction (six failures/one error) and overlapping initial Chrome pass retained. No live POI accuracy, bookable camping or live permit acceptance claimed.
+  FEATURES: **70 verified / 26 unaccepted / 29 partial / 10 missing / five approval / three external = 143**. Newly verified TRAVEL-10, bounded to the requirement's freshness/provenance workflow. Files alphabetically: `apps/mobility/services/travel/presentation.py`, `docs/PROJECT_STATUS.md`, `static/css/travel_planner.css`, `static/js/travel_research_panels.js`, `tests/test_travel_places_acceptance.py`, `tests/test_user_data_browser.py`. Exact-source boundary receipts: `artifacts/places-boundary-5c88944/{graph,privacy-manifest,source-checks,push}.json`; finish non-PASS/mismatched receipts before editing. Master/frozen/package unchanged; all approval gates remain in force. NEXT TASK: FIN-05 budget/utilization/affordability acceptance; reuse completed Decimal fields/migration receipts and canonical baseline, test rounding/reconciliation, unknown income, owner/cache/UI behavior, then CAREER-02. RESUME COMMAND: `Set-Location F:\ALFRED_DEV\post-audit; git status -sb; git log -3 --oneline; Get-Content docs/PROJECT_STATUS.md -Encoding UTF8 -TotalCount 12`.
+
 - **REGISTRY RECOVERY / THREE-MODULE CHECKPOINT — 2026-10-24:** HEAD = this checkpoint commit (base `de7a498`). DONE: invoice replay/atomic posting `0dc9e66` and private media acceptance `de7a498` are committed, privacy-checked and pushed. Third module fixes reproduced registry receipt loss: serialize finite JSON before writes, load the latest snapshot for each update, coordinate threads/instances in one process, flush/fsync a same-directory temporary file and atomically replace the receipt. Publish in-memory metadata only after replacement succeeds. Corrupt/non-object input is unavailable to new readers and is preserved for operator review; updates cannot overwrite it. Exclusive initial creation avoids truncating existing receipts. This file records training metadata; it is not a planning/coding/review agent router or proof of model accuracy.
   TESTS: **28 focused backend PASS**, zero skips (`tests.test_model_registry_recovery`, `tests.test_ml_readiness`, `tests.test_ml_training_orchestrator`); `artifacts/registry-de7a498/backend-integrated.json`. Six registry checks cover failed serialization/nonfinite metrics, failed replacement/cleanup, stale-instance merge, corrupt input preservation, complete snapshots and concurrent threaded updates. Readiness/consent/revoked/stale/proxy-evidence fallbacks remain passing; no real training activation/model promotion. Pre-fix five-test reproduction retained (seven failed subtests/three errors). No UI/API contract changed in this module; the invoice and media Chrome evidence remains applicable. Prior module final receipts: invoice 24 backend + one Chrome; media 56 integration backend + ten final focused (eight overlap) + one final Chrome, all zero skips. Full suites/packages/native/independent-PC were not repeated.
   FEATURES: **69 verified / 27 unaccepted / 29 partial / 10 missing / five approval / three external = 143**. Newly verified this continuation: TRAVEL-19 only. BIKE-04 real layouts and COUNCIL-01 role/held-out acceptance remain open. Registry coordination is process-local; separate writer coordination is required before multi-process training. No schema/dependency/financial-record/production/provider/currency/history activation. Files alphabetically: `apps/ml_engine/core/alfred_registry.py`, `docs/PROJECT_STATUS.md`, `tests/test_model_registry_recovery.py`.
@@ -511,12 +515,12 @@ The denominator remains the original 143 audited capabilities, not new commit/su
 
 - BLOCKED_APPROVAL: **5**
 - BLOCKED_EXTERNAL: **3**
-- COMPLETE_VERIFIED: **69**
-- IMPLEMENTED_NOT_ACCEPTED: **27**
+- COMPLETE_VERIFIED: **70**
+- IMPLEMENTED_NOT_ACCEPTED: **26**
 - NOT_IMPLEMENTED: **10**
 - PARTIALLY_IMPLEMENTED: **29**
 
-Technical completion: **69/143 = 48.3%**. Remaining: **74**, including implemented but unaccepted and approval/external blockers. This is not a product acceptance percentage.
+Technical completion: **70/143 = 49.0%**. Remaining: **73**, including implemented but unaccepted and approval/external blockers. This is not a product acceptance percentage.
 
 ## Prioritized remaining roadmap and approval boundaries
 
@@ -1505,14 +1509,14 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-10 — Camping and attraction discovery
 
-**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+**COMPLETE_VERIFIED** · Travel · P2.
 
 - Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/providers/places.py](../apps/mobility/services/travel/providers/places.py).
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
 - Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Acceptance: 47 backend + one actual Chrome PASS, zero skips; `artifacts/places-5c88944/`. Synthetic local/API/UI freshness, provenance, invalid clocks, partial/offline/cache and owner isolation accepted; desktop/narrow-screen screenshots inspected. No live provider/booking/permit claim.
 - Limitations/dependencies: OSM/wiki POIs are not bookable camping availability or verified opening hours. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Accept freshness/provenance; leave booking claims unavailable.
+- Next: Retain read-time abstention and source/check/expiry receipts. Live location accuracy, opening, bookable availability and permits require their own authorized evidence.
 
 ### TRAVEL-11 — Hotel live availability
 

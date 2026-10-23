@@ -3,7 +3,7 @@ window.TravelResearchPanels = (() => {
     const esc = v => Alfred.escapeHtml(String(v ?? ""));
     const money = (v, currency="INR") => v == null ? "Not available" : `${esc(currency)} ${esc(Number(v).toLocaleString(undefined,{maximumFractionDigits:2}))}`;
     const stamp = v => v ? new Date(v).toLocaleString() : "Not checked";
-    const label = r => r?.freshness || "UNKNOWN";
+    const label = r => `${r?.freshness || "UNKNOWN"}${r?.stale ? " · STALE" : ""}`;
     let session, selectedName, map, layers, mapGeometry, mapEnabled = false;
     const $ = id => document.getElementById(id);
     function link(url, title) {
@@ -56,7 +56,7 @@ window.TravelResearchPanels = (() => {
     }
     function places(d) {
         const r = d.places_result || {};
-        return `<h3 class="h5">Places and useful stops</h3>${provenance(r)}${(r.payload?.places || []).slice(0,12).map(p=>`<article class="travel-source"><strong>${link(p.source_url,p.name)}</strong> · ${esc(p.category)}<p>${esc((p.reasons || []).join("; "))}</p><p class="small">${esc(p.opening_status || "UNKNOWN")} opening/access · popularity unverified</p></article>`).join("") || '<p>No current place results. Use the destination and map searches to investigate locally.</p>'}${searchLinks(d,["map","routing"])}`;
+        return `<div data-places-evidence><h3 class="h5">Places and useful stops</h3>${provenance(r)}${r.stale ? '<p role="status">Cached place evidence has expired. Refresh before relying on these leads.</p>' : ''}<p class="small">Mapped sites and hours are research leads. Opening/access: UNKNOWN · Booking availability: UNKNOWN · Permit status: unverified. Confirm directly with the site or authority.</p>${(r.payload?.places || []).slice(0,12).map(p=>`<article class="travel-source"><strong>${link(p.source_url,p.name)}</strong> · ${esc(p.category)}<p>${esc((p.reasons || []).join("; "))}</p><p class="small">Mapped hours: ${esc(p.opening_hours || "unknown")} · mapped access: ${esc(p.access || "unknown")} · popularity unverified</p></article>`).join("") || '<p>No current place results. Use the destination and map searches to investigate locally.</p>'}<p class="small">${esc(r.payload?.coverage || "Mapping coverage is incomplete; missing results do not prove no sites exist.")}</p>${searchLinks(d,["map","routing"])}</div>`;
     }
     function render(nextSession) {
         if (session?.id !== nextSession.id) selectedName = null;
