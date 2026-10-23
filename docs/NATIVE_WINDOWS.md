@@ -210,13 +210,19 @@ It uses synthetic records in disposable folders, never the live account.
 .\.venv\Scripts\python.exe manage.py test --noinput
 .\.venv\Scripts\python.exe -m PyInstaller packaging/ALFRED.spec --noconfirm
 .\.venv\Scripts\python.exe scripts/verify_native_runtime.py --executable dist/ALFRED/ALFRED.exe --browser
-& 'F:\ALFRED-tools\InnoSetup\ISCC.exe' packaging/ALFRED.iss
+.\.venv\Scripts\python.exe scripts/package_windows_release.py --bundle dist/ALFRED --output artifacts/windows-release --iscc F:/ALFRED-tools/InnoSetup/ISCC.exe
 ```
 
 Build tools are listed in `requirements-build.txt`. Inno Setup 6.7.3 builds the
 installer. `artifacts/ops/native_huey_verification.json` and
 `native_exe_verification.json` record integration results. The executable is
 built for Windows x64; validation on a clean second PC remains a separate check.
+
+Frozen bundles contain `build-provenance.json` with their exact Git commit and
+tree. Build start/end and distribution assembly require a clean matching
+checkout. Keep that source checked out through assembly and choose a fresh output
+directory; the package helper rejects older bundles and existing release outputs.
+Later checkpoints do not change the embedded source record.
 
 The existing Docker/Celery configuration is retained as an optional alternative.
 

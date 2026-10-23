@@ -1,10 +1,14 @@
 # Build from the repository root: python -m PyInstaller packaging/ALFRED.spec --noconfirm
 import os
 import shutil
+import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
 
 root = Path(SPECPATH).parent
+sys.path.insert(0,str(root))
+from scripts.package_windows_release import source_identity, write_build_provenance
+build_source = source_identity(root)
 os.environ["ALFRED_LOCAL_RUNTIME"] = "true"
 os.environ["ALFRED_AUTO_TRAIN_ON_STARTUP"] = "false"
 os.environ["ALFRED_TASK_BACKEND"] = "huey"
@@ -57,3 +61,4 @@ for name in ("Start ALFRED.cmd", "Stop ALFRED.cmd", "READ ME.txt"):
     shutil.copy2(root / "packaging" / "windows" / name, Path(coll.name) / name)
 shutil.copy2(root / "NOTICE.txt", Path(coll.name) / "NOTICE.txt")
 shutil.copy2(root / "packaging" / "project-identity.json", Path(coll.name) / "project-identity.json")
+write_build_provenance(Path(coll.name),build_source,root)
