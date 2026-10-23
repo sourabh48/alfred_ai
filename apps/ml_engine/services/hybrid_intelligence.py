@@ -153,17 +153,23 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         except Http404 as exc: raise MemoryConflict('Canonical source became inaccessible during inference.') from exc
         if fresh!=tools: raise MemoryConflict('Canonical source changed during inference.')
     field=requested_record_field(query,kind='expense' if scope=='bank_statements' else record_type) if scope in ('bank_statements','financial_records','financial_document') else None
-    date_values=[]
-    if field=='transaction_date':
+    metadata_field=field in ('transaction_date','category','classification')
+    field_values=[]
+    if metadata_field:
+        from apps.expenses.models import Expense
+        choices={'category':dict(Expense.CATEGORY_CHOICES),'classification':dict(Expense.CLASSIFICATION_CHOICES)}
         for source in tools:
-            data=source['data']; value=_iso_date(data.get('transaction_date'))
+            data=source['data']; value=data.get(field)
+            if field=='transaction_date': value=_iso_date(value)
+            else: value=choices[field].get(value) if isinstance(value,str) else None
             if (value is None or source['classification'] not in ('owner_confirmed_statement_record','owner_reviewed_document_record')
                     or data.get('verification') not in ('owner_confirmed','owner_confirmed_document_fields')
-                    or data.get('original_status')!='retained_import_snapshot' or _iso_date(data.get('original_transaction_date')) is None):
-                date_values=[]; break
-            date_values.append((source['ref'],value))
-    missing_field=field and field!='transaction_date' and any(tool['data'].get('amounts',{}).get(field,{}).get('amount') is None for tool in tools)
-    if ((field=='transaction_date' and not date_values)
+                    or data.get('original_status')!='retained_import_snapshot'
+                    or (field=='transaction_date' and _iso_date(data.get('original_transaction_date')) is None)):
+                field_values=[]; break
+            field_values.append((source['ref'],value))
+    missing_field=field and not metadata_field and any(tool['data'].get('amounts',{}).get(field,{}).get('amount') is None for tool in tools)
+    if ((metadata_field and not field_values)
             or (scope in ('financial_records','financial_document','bank_statements') and (missing_field
                 or not supported_question(query,kind='expense' if scope=='bank_statements' else record_type)))
             or (scope in ('financial_records','financial_document','finance') and any(not tool['available'] for tool in tools))):
@@ -174,12 +180,15 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         return {'answer':'This record is not currently supported by owner-confirmed source evidence. The source may be unreviewed, missing, incomplete or conflicting. Open the private citation and review it before asking again.',
             'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
             'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}
-    if date_values:
+    if field_values:
         revalidate()
-        return {'answer':'Current recorded transaction dates (owner-confirmed; not independent bank authentication):\n'+
-                '\n'.join(f'{reference}: {value}' for reference,value in date_values),
+        label={'transaction_date':'dates','category':'categories','classification':'classifications'}[field]
+        prefix='' if field=='transaction_date' else f'{field}: '
+        return {'answer':f'Current recorded transaction {label} (owner-confirmed; not independent bank authentication):\n'+
+                '\n'.join(f'{reference}: {prefix}{value}' for reference,value in field_values),
             'provider':'local_evidence','classification':'owner_recorded_fact','financial_authority':False,
-            'grounding':'owner_confirmed_transaction_date','sources':tools,'narrative_withheld':False,'context_omitted':0,
+            'grounding':'owner_confirmed_transaction_date' if field=='transaction_date' else 'owner_confirmed_transaction_classification',
+            'sources':tools,'narrative_withheld':False,'context_omitted':0,
             'memory_retrieval_available':None}
     retrieval_error=None
     try: memories=[] if scope=='financial_document' else store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)

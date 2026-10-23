@@ -60,6 +60,89 @@ class BankStatementGroundingTests(TestCase):
         return self.client.post('/api/ai/personal-insights/',json.dumps(dict(
             query='Explain this source transaction',scope='bank_statements',transaction_id=self.row.pk)|changes),content_type='application/json')
 
+    def test_recorded_classification_questions_are_exact_readonly_and_do_not_infer(self):
+        self.confirm()
+        models=(Expense,BankAccount,StatementUpload,StatementTransactionEvidence)
+        before=[list(model.objects.order_by('pk').values()) for model in models]
+        with patch.object(MemoryStore,'retrieve',side_effect=AssertionError('No retrieval for recorded labels')):
+            for field,choices in (('category',Expense.CATEGORY_CHOICES),('classification',Expense.CLASSIFICATION_CHOICES)):
+                with self.subTest(field=field):
+                    result=self.post(query=f'What is the recorded {field}?')
+                    self.assertEqual(result.status_code,200)
+                    data=result.json()
+                    self.assertEqual(data['grounding'],'owner_confirmed_transaction_classification')
+                    self.assertEqual(data['provider'],'local_evidence')
+                    self.assertIn(f'{field}: {dict(choices)[getattr(self.row,field)]}',data['answer'])
+                    self.assertIn(data['sources'][0]['ref'],data['answer'])
+                    self.assertEqual(data['sources'][0]['url'],evidence(self.owner,self.row.pk)['citation_url'])
+                    self.assertFalse(data['financial_authority']); self.assertIsNone(data['memory_retrieval_available'])
+                    canonical=hybrid_answer(self.store,self.owner,f'Show {field}',scope='financial_records',
+                        record_type='expense',record_id=self.row.pk,local=self.local)
+                    self.assertEqual(canonical['grounding'],data['grounding'])
+                    self.assertIn(f'{field}: {dict(choices)[getattr(self.row,field)]}',canonical['answer'])
+        self.local.reason.assert_not_called(); self.cloud_reason.assert_not_called()
+        self.assertEqual(self.store.list_memories(self.owner),[])
+        self.assertEqual([list(model.objects.order_by('pk').values()) for model in models],before)
+
+    def test_classification_correction_requires_review_and_preserves_original_labels(self):
+        original=StatementTransactionEvidence.objects.get(expense=self.row).source_values.copy()
+        self.confirm()
+        changed=self.client.patch(f'/api/expenses/{self.row.pk}/',{'category':'fuel'},content_type='application/json')
+        self.assertEqual(changed.status_code,200)
+        self.assertEqual(self.post(query='Show category').json()['grounding'],'insufficient_evidence')
+        self.confirm()
+        result=self.post(query='Show category').json()
+        self.assertEqual(result['grounding'],'owner_confirmed_transaction_classification')
+        self.assertIn('category: Fuel',result['answer'])
+        self.assertEqual(StatementTransactionEvidence.objects.get(expense=self.row).source_values,original)
+        self.confirm(revoke=True)
+        self.assertEqual(self.post(query='Show category').json()['grounding'],'insufficient_evidence')
+        self.local.reason.assert_not_called()
+
+    def test_recorded_labels_reject_missing_invalid_ambiguous_foreign_and_changed_sources(self):
+        self.confirm()
+        with patch.object(MemoryStore,'retrieve',side_effect=AssertionError('No unsupported inference')):
+            for query in ('Show category and amount','What are the categories?','Predict my category','Show merchant','Show loan category'):
+                self.assertEqual(self.post(query=query).json()['grounding'],'insufficient_evidence')
+            known=source_context(self.owner,'bank_statements',transaction_id=self.row.pk)
+            for value in (None,'not-a-category','<script>synthetic</script>',123,[],{}):
+                with patch('apps.ml_engine.services.hybrid_intelligence.source_context',return_value=[
+                        known[0]|{'data':known[0]['data']|{'category':value}}]):
+                    self.assertEqual(self.post(query='Show category').json()['grounding'],'insufficient_evidence')
+            def changed(*args,**kwargs):
+                sources=source_context(*args,**kwargs)
+                Expense.objects.filter(pk=self.row.pk).update(category='fuel')
+                return sources
+            with transaction.atomic():
+                with patch('apps.ml_engine.services.hybrid_intelligence.source_context',side_effect=changed):
+                    self.assertEqual(self.post(query='Show category').status_code,409)
+                transaction.set_rollback(True)
+        self.client.force_login(self.other)
+        self.assertEqual(self.post(query='Show classification').status_code,404)
+        self.local.reason.assert_not_called()
+
+    def test_selected_document_labels_keep_each_reference_and_reject_stale_selection(self):
+        from apps.ml_engine.services.canonical_evidence import document_record_page
+        _import_statement_transactions(user=self.owner,upload=self.upload,bank_account=self.account,
+            parsed=parsed_fixture(reference='REF-LABEL-002',description='Synthetic other category',category='transfer'))
+        rows=list(Expense.objects.filter(statement_upload=self.upload).order_by('pk'))
+        for row in rows: review(self.owner,row.pk,revision=evidence(self.owner,row.pk)['revision'],confirm=True)
+        page=document_record_page(self.owner,'expense',self.upload.pk)
+        payload=dict(query='Show category',scope='financial_document',record_type='expense',document_id=self.upload.pk,
+            source_catalog=page['catalog_token'],selected_records=[dict(id=item['record_id'],revision=item['revision']) for item in page['items']])
+        with patch.object(MemoryStore,'retrieve',side_effect=AssertionError('No document label retrieval')):
+            response=self.client.post('/api/ai/personal-insights/',payload,content_type='application/json')
+            self.assertEqual(response.status_code,200)
+            result=response.json(); self.assertEqual(result['grounding'],'owner_confirmed_transaction_classification')
+            self.assertEqual(len(result['sources']),2)
+            for source in result['sources']:
+                self.assertIn(f"{source['ref']}: category: {dict(Expense.CATEGORY_CHOICES)[source['data']['category']]}",result['answer'])
+                self.assertEqual(self.client.get(source['url']).status_code,200)
+                self.assertNotIn('raw_description',source['data']); self.assertNotIn('merchant',source['data'])
+            Expense.objects.filter(pk=rows[-1].pk).update(category='fuel')
+            self.assertEqual(self.client.post('/api/ai/personal-insights/',payload,content_type='application/json').status_code,409)
+        self.local.reason.assert_not_called()
+
     def test_transaction_date_is_exact_reviewed_and_never_uses_memory_model_or_cloud(self):
         from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
         self.confirm()
@@ -333,6 +416,10 @@ class BankStatementGroundingTests(TestCase):
             dates=self.post(**(payload|{'query':'Show transaction date','request_id':uuid4().hex}))
             self.assertEqual(dates.status_code,200); self.assertFalse(dates.json()['conversation_saved'])
             self.assertEqual(dates.json()['grounding'],'owner_confirmed_transaction_date')
+            self.assertEqual(history.get(self.owner,record['id'])['turns'],[])
+            labels=self.post(**(payload|{'query':'Show classification','request_id':uuid4().hex}))
+            self.assertEqual(labels.status_code,200); self.assertFalse(labels.json()['conversation_saved'])
+            self.assertEqual(labels.json()['grounding'],'owner_confirmed_transaction_classification')
             self.assertEqual(history.get(self.owner,record['id'])['turns'],[])
             response=self.post(**payload); self.assertEqual(response.status_code,200)
             turn=history.get(self.owner,record['id'])['turns'][0]

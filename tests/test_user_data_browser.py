@@ -1114,6 +1114,49 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
         self.capture('bank-evidence-correction-mobile')
 
+    def test_reviewed_transaction_classification_questions_show_labels_without_inference(self):
+        from unittest.mock import Mock
+        from apps.expenses.models import Expense
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        row,upload,item=self.bank_statement_evidence_fixture()
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(); local.reason.side_effect=AssertionError('Recorded labels must not infer')
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner',return_value=Mock()))
+        cloud=self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.reason_with_memory'))
+        self.login(); assistant=self.live_server_url+f'/ai/insights/?scope=bank_statements&transaction={row.pk}'
+        self.browser.get(assistant)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
+        question='What is the recorded category?'
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.ask_history_question(question)
+        self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),question)
+        self.memory_click('#intelligenceAnswers a[href^="/documents/statements/"]')
+        self.wait.until(lambda _: self.browser.execute_script("return document.getElementById('statementEvidenceStatus')?.textContent.trim()")=='needs_owner_review')
+        self.memory_click('#statementEvidenceConfirm'); self.memory_click('#statementEvidenceForm button[type=submit]')
+        self.wait.until(lambda _: self.browser.execute_script("return document.getElementById('statementEvidenceStatus')?.textContent.trim()")=='owner_confirmed')
+        self.browser.get(assistant)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        for field,choices in (('category',Expense.CATEGORY_CHOICES),('classification',Expense.CLASSIFICATION_CHOICES)):
+            self.ask_history_question(f'What is the recorded {field}?')
+            self.wait.until(lambda _: 'Recorded transaction classifications ready' in self.text('intelligenceFeedback'))
+            answer=self.browser.find_element(self.By.CSS_SELECTOR,'#intelligenceAnswers > article:last-child .conversation-message:not(.conversation-message--user) > p').text
+            self.assertIn(f'{field}: {dict(choices)[getattr(row,field)]}',answer)
+            self.assertIn('not independent bank authentication',answer)
+            self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'')
+            self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceRetry').is_displayed())
+            self.assertIn('no model used',self.text('intelligenceLocalStatus'))
+            self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{item["citation_url"]}"]').is_displayed())
+        self.capture('reviewed-transaction-classification')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('reviewed-transaction-classification-mobile')
+        local.reason.assert_not_called(); cloud.assert_not_called()
+
     def test_bank_transaction_date_questions_use_current_reviewed_sources(self):
         from unittest.mock import Mock
         from selenium.webdriver.support import expected_conditions as conditions
