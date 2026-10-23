@@ -13,6 +13,199 @@ from tests.test_release_gate import ReleaseRepositoryFixture
 
 
 class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
+    def test_complete_history_is_scanned_in_deterministic_bounded_batches(self):
+        self.commit('first.txt', 'x' * 400)
+        self.commit('second.txt', 'y' * 400)
+        self.manifest['candidate_sha'] = self.git('rev-parse', 'HEAD')
+        actual_run = validation.subprocess.run
+        batches = []
+
+        def run(command, **kwargs):
+            result = actual_run(command, **kwargs)
+            if command[-2:] == ['cat-file', '--batch']:
+                batches.append((kwargs['input'].decode().splitlines(), len(result.stdout)))
+            return result
+
+        with patch.object(validation, 'SOURCE_SCAN_BATCH_BYTES', 512), \
+             patch.object(validation, 'SOURCE_SCAN_TOTAL_BYTES', 2048), \
+             patch.object(validation.subprocess, 'run', side_effect=run):
+            result = validation.privacy(self.repo, self.manifest)
+        self.assertEqual(result['status'], 'PASS')
+        self.assertGreater(len(batches), 1)
+        oids = [oid for batch, _ in batches for oid in batch]
+        self.assertEqual(oids, sorted(set(oids)))
+        self.assertTrue(all(size <= 512 for _, size in batches))
+        self.assertGreater(result['evidence']['scanned_bytes'], 512)
+
+    def test_last_batch_and_removed_history_credentials_still_fail(self):
+        import hashlib
+
+        self.commit('padding.txt', 'x' * 400)
+        largest = max(line.split()[2] for line in self.git('ls-tree', '-r', 'HEAD').splitlines())
+        secret = 'sk-proj-' + 'a' * 40
+        for number in range(256):
+            text = f'# synthetic {number} credential={secret!r}'
+            raw = text.encode()
+            oid = hashlib.sha1(f'blob {len(raw)}\0'.encode() + raw).hexdigest()
+            if oid > largest:
+                break
+        else:
+            self.fail('Synthetic last-batch fixture unavailable')
+        self.commit('credential.txt', text)
+        actual_run = validation.subprocess.run
+        requests = []
+
+        def run(command, **kwargs):
+            if command[-2:] == ['cat-file', '--batch']:
+                requests.append(kwargs['input'].decode().splitlines())
+            return actual_run(command, **kwargs)
+
+        with patch.object(validation, 'SOURCE_SCAN_BATCH_BYTES', 512), \
+             patch.object(validation.subprocess, 'run', side_effect=run):
+            self.manifest['candidate_sha'] = self.git('rev-parse', 'HEAD')
+            result = validation.privacy(self.repo, self.manifest)
+            self.assertEqual(requests[-1][-1], oid)
+            self.assertGreater(len(requests), 1)
+            self.assertEqual(result['status'], 'FAIL')
+            self.assertNotIn(secret, json.dumps(result))
+            self.commit('credential.txt', '# removed synthetic credential')
+            self.manifest['candidate_sha'] = self.git('rev-parse', 'HEAD')
+            self.assertEqual(validation.privacy(self.repo, self.manifest)['status'], 'FAIL')
+
+    def test_historical_alias_prevents_fixture_exemption_across_batches(self):
+        text = (Path(__file__).parent / 'memory_s3_fixture.py').read_text(encoding='utf-8')
+        self.commit('tests/memory_s3_fixture.py', text)
+        self.commit('shadow.py', text)
+        self.commit('shadow.py', '# removed alias')
+        self.commit('padding.txt', 'x' * len(text))
+        self.manifest['candidate_sha'] = self.git('rev-parse', 'HEAD')
+        with patch.object(validation, 'SOURCE_SCAN_BATCH_BYTES', len(text.encode()) + 200):
+            result = validation.privacy(self.repo, self.manifest)
+        self.assertGreater(result['evidence']['batches'], 1)
+        self.assertEqual(result['status'], 'FAIL')
+
+    def test_malformed_batch_output_never_retains_a_prior_pass(self):
+        actual_run = validation.subprocess.run
+        for mutation in ('oid', 'type', 'size', 'extra_field', 'truncated', 'delimiter', 'trailing'):
+            def run(command, **kwargs):
+                result = actual_run(command, **kwargs)
+                if command[-2:] != ['cat-file', '--batch']:
+                    return result
+                header, body = result.stdout.split(b'\n', 1)
+                fields = header.split()
+                if mutation == 'oid': fields[0] = b'0' * 40
+                if mutation == 'type': fields[1] = b'tree'
+                if mutation == 'size': fields[2] = str(int(fields[2]) + 1).encode()
+                if mutation == 'extra_field': fields.append(b'extra')
+                result.stdout = b' '.join(fields) + b'\n' + body
+                if mutation == 'truncated': result.stdout = result.stdout[:-2]
+                if mutation == 'delimiter': result.stdout = result.stdout[:-1] + b'x'
+                if mutation == 'trailing': result.stdout += b'unexpected'
+                return result
+
+            with self.subTest(mutation=mutation), patch.object(validation.subprocess, 'run', side_effect=run):
+                release.gate(self.manifest, 'privacy', 'PASS', 'synthetic_old_scan')
+                with self.assertRaisesRegex(release.GateError, 'source_blob_identity_mismatch'):
+                    validation.privacy(self.repo, self.manifest)
+                self.assertEqual(self.manifest['gates']['privacy']['status'], 'NOT_RUN')
+
+    def test_later_batch_timeout_or_failure_does_not_report_success(self):
+        self.commit('padding.txt', 'x' * 400)
+        self.manifest['candidate_sha'] = self.git('rev-parse', 'HEAD')
+        actual_run = validation.subprocess.run
+        for timeout in (False, True):
+            batches = []
+
+            def run(command, **kwargs):
+                if command[-2:] == ['cat-file', '--batch']:
+                    batches.append(kwargs['timeout'])
+                    if len(batches) == 2:
+                        if timeout:
+                            raise subprocess.TimeoutExpired('git', 1, output=b'synthetic-private-content')
+                        return subprocess.CompletedProcess(command, 1, b'synthetic-private-content', b'')
+                return actual_run(command, **kwargs)
+
+            with self.subTest(timeout=timeout), patch.object(validation, 'SOURCE_SCAN_BATCH_BYTES', 512), \
+                 patch.object(validation.subprocess, 'run', side_effect=run):
+                with self.assertRaisesRegex(release.GateError, '^source_blob_scan_failed$') as failure:
+                    validation.privacy(self.repo, self.manifest)
+                self.assertEqual(len(batches), 2)
+                self.assertLess(batches[1], batches[0])
+                self.assertNotIn('synthetic-private-content', str(failure.exception) + json.dumps(self.manifest))
+                self.assertEqual(self.manifest['gates']['privacy']['status'], 'NOT_RUN')
+
+    def test_total_work_cap_rejects_before_reading_bodies(self):
+        actual_run = validation.subprocess.run
+        bodies = []
+
+        def run(command, **kwargs):
+            if command[-2:] == ['cat-file', '--batch']:
+                bodies.append(command)
+            return actual_run(command, **kwargs)
+
+        with patch.object(validation, 'SOURCE_SCAN_TOTAL_BYTES', 1), \
+             patch.object(validation.subprocess, 'run', side_effect=run):
+            with self.assertRaisesRegex(release.GateError, 'source_scan_object_budget'):
+                validation.privacy(self.repo, self.manifest)
+        self.assertEqual(bodies, [])
+
+    def test_scan_expiring_after_last_response_cannot_pass(self):
+        clock, scanned = [0], []
+
+        def scan(content):
+            scanned.append(content)
+            if len(scanned) == 2:
+                clock[0] = 121
+            return iter(())
+
+        with patch.object(validation.time, 'monotonic', side_effect=lambda: clock[0]), \
+             patch.object(validation, 'SECRET') as pattern:
+            pattern.finditer.side_effect = scan
+            with self.assertRaisesRegex(release.GateError, '^source_blob_scan_failed$'):
+                validation.privacy(self.repo, self.manifest)
+        self.assertEqual(len(scanned), 2)
+        self.assertEqual(self.manifest['gates']['privacy']['status'], 'NOT_RUN')
+
+    def test_exact_batch_frame_boundary_is_enforced(self):
+        entries = [entry.split() for entry in self.git('ls-tree', '-r', '-l', 'HEAD').splitlines()]
+        framed = sum(int(row[3]) + len(f'{row[2]} blob {row[3]}\n'.encode()) + 1 for row in entries)
+        for limit, expected in ((framed, 1), (framed - 1, 2)):
+            with self.subTest(limit=limit), patch.object(validation, 'SOURCE_SCAN_BATCH_BYTES', limit):
+                result = validation.privacy(self.repo, self.manifest)
+                self.assertEqual(result['status'], 'PASS')
+                self.assertEqual(result['evidence']['batches'], expected)
+
+    def test_commit_limit_is_checked_before_tree_traversal(self):
+        actual_git = release.git
+        trees = []
+
+        def git(repo, *args):
+            if args[0] == 'rev-list': return '\n'.join([self.candidate] * 1001)
+            if args[0] == 'ls-tree': trees.append(args)
+            return actual_git(repo, *args)
+
+        with patch.object(release, 'git', side_effect=git):
+            with self.assertRaisesRegex(release.GateError, 'source_scan_object_budget'):
+                validation.privacy(self.repo, self.manifest)
+        self.assertEqual(trees, [])
+
+    def test_object_limit_and_oversized_blob_fail_before_body_reads(self):
+        actual_git = release.git
+        for count, size in ((10001, 1), (1, 16 * 1024 * 1024 + 1)):
+            def git(repo, *args):
+                if args[0] == 'ls-tree':
+                    return ''.join(f'100644 blob {i:040x} {size}\tfile{i}.txt\0' for i in range(count))
+                return actual_git(repo, *args)
+
+            with self.subTest(count=count), patch.object(release, 'git', side_effect=git), \
+                 patch.object(validation.subprocess, 'run', wraps=validation.subprocess.run) as run:
+                if count > 10000:
+                    with self.assertRaisesRegex(release.GateError, 'source_scan_object_budget'):
+                        validation.privacy(self.repo, self.manifest)
+                else:
+                    self.assertEqual(validation.privacy(self.repo, self.manifest)['status'], 'FAIL')
+                self.assertFalse(any(call.args[0][-2:] == ['cat-file', '--batch'] for call in run.call_args_list))
+
     def test_quoted_json_access_and_refresh_tokens_fail_without_disclosing_values(self):
         for name in ("access_token", "refresh_token", "client_secret", "api_key"):
             value = "synthetic-credential-" + "x" * 40

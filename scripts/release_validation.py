@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 import uuid
 
 from scripts import release_gate as release
@@ -59,19 +60,25 @@ PUBLIC_TEST_IDENTIFIERS = {
     ("scripts/rehearse_money_migrations.py", "8c55aea836191192e8d863229227c32585de62f669d245e5383490ed6d125431"),
     ("tests/test_global_abuse_limits.py", "c3e1e29fc822d0b9a3e12bb120c19b9aeccdc5ea47169a4f4ff6b123e3a6ec22"),
 }
+SOURCE_SCAN_BATCH_BYTES = 64 * 1024 * 1024
+SOURCE_SCAN_TOTAL_BYTES = 128 * 1024 * 1024
 
 
 def privacy(repo, manifest):
     """Inspect pinned blobs, including intermediate history, without printing content."""
+    release.gate(manifest, "privacy", "NOT_RUN", "source_scan_pending")
     candidate, baseline = manifest["candidate_sha"], manifest["production_baseline_sha"]
     release.exact_commit(repo, candidate)
     release.exact_commit(repo, baseline)
     commits = release.git(repo, "rev-list", baseline + ".." + candidate).splitlines()
+    if len(commits) > 1000:
+        raise release.GateError("source_scan_object_budget")
     objects = {}
+    sizes = {}
     total_bytes = 0
     findings = []
     paths = set()
-    for commit in set(commits + [candidate]):
+    for commit in sorted(set(commits + [candidate])):
         for entry in release.git(repo, "ls-tree", "-r", "-l", "-z", commit).split("\0"):
             if not entry:
                 continue
@@ -87,39 +94,74 @@ def privacy(repo, manifest):
             else:
                 if oid not in objects:
                     total_bytes += int(size)
+                    sizes[oid] = int(size)
                 objects.setdefault(oid, set()).add(path)
-    if len(objects) > 10000 or total_bytes > 64 * 1024 * 1024 or len(commits) > 1000:
-        raise release.GateError("source_scan_object_budget")
-    result = subprocess.run(["git", "-C", str(repo), "cat-file", "--batch"],
-                            input="".join(oid + "\n" for oid in objects).encode(),
-                            capture_output=True, timeout=120)
-    if result.returncode:
-        raise release.GateError("source_blob_scan_failed")
-    position = 0
+                if len(objects) > 10000 or total_bytes > SOURCE_SCAN_TOTAL_BYTES:
+                    raise release.GateError("source_scan_object_budget")
+    # Bound each captured response, including framing, while retaining all history.
+    batches, batch, batch_bytes = [], [], 0
+    for oid in sorted(objects):
+        cost = len(f"{oid} blob {sizes[oid]}\n".encode()) + sizes[oid] + 1
+        if cost > SOURCE_SCAN_BATCH_BYTES:
+            raise release.GateError("source_scan_object_budget")
+        if batch and batch_bytes + cost > SOURCE_SCAN_BATCH_BYTES:
+            batches.append(batch)
+            batch, batch_bytes = [], 0
+        batch.append(oid)
+        batch_bytes += cost
+    if batch:
+        batches.append(batch)
     reviewed = 0
-    for oid, names in objects.items():
-        end = result.stdout.index(b"\n", position)
-        header = result.stdout[position:end].split()
-        if header[:2] != [oid.encode(), b"blob"]:
+    deadline = time.monotonic() + 120
+    for batch in batches:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise release.GateError("source_blob_scan_failed")
+        try:
+            result = subprocess.run(["git", "-C", str(repo), "cat-file", "--batch"],
+                                    input="".join(oid + "\n" for oid in batch).encode(),
+                                    capture_output=True, timeout=remaining)
+        except (OSError, subprocess.TimeoutExpired):
+            raise release.GateError("source_blob_scan_failed") from None
+        if result.returncode:
+            raise release.GateError("source_blob_scan_failed")
+        if len(result.stdout) > SOURCE_SCAN_BATCH_BYTES:
             raise release.GateError("source_blob_identity_mismatch")
-        size = int(header[2])
-        content = result.stdout[end + 1:end + 1 + size]
-        position = end + 1 + size + 1
-        for match in SECRET.finditer(content):
-            value = match.group()
-            known_fixture = (len(names) == 1 and (next(iter(names)), hashlib.sha256(value).hexdigest())
-                             in PUBLIC_TEST_IDENTIFIERS)
-            known_rehearsal = (names == {"scripts/rehearse_money_migrations.py"}
-                               and b"disposable-rehearsal-key-only" in value
-                               and b"Django DB is not disposable" in content)
-            if known_fixture or known_rehearsal:
-                reviewed += 1
-            else:
-                findings.append({"code": "credential_pattern", "blob_reference": oid[:16]})
+        position = 0
+        for oid in batch:
+            if time.monotonic() >= deadline:
+                raise release.GateError("source_blob_scan_failed")
+            names = objects[oid]
+            end = result.stdout.find(b"\n", position)
+            header = result.stdout[position:end].split() if end >= 0 else []
+            if header != [oid.encode(), b"blob", str(sizes[oid]).encode()]:
+                raise release.GateError("source_blob_identity_mismatch")
+            stop = end + 1 + sizes[oid]
+            if stop >= len(result.stdout) or result.stdout[stop:stop + 1] != b"\n":
+                raise release.GateError("source_blob_identity_mismatch")
+            content = result.stdout[end + 1:stop]
+            position = stop + 1
+            for match in SECRET.finditer(content):
+                value = match.group()
+                known_fixture = (len(names) == 1 and (next(iter(names)), hashlib.sha256(value).hexdigest())
+                                 in PUBLIC_TEST_IDENTIFIERS)
+                known_rehearsal = (names == {"scripts/rehearse_money_migrations.py"}
+                                   and b"disposable-rehearsal-key-only" in value
+                                   and b"Django DB is not disposable" in content)
+                if known_fixture or known_rehearsal:
+                    reviewed += 1
+                else:
+                    findings.append({"code": "credential_pattern", "blob_reference": oid[:16]})
+        if position != len(result.stdout):
+            raise release.GateError("source_blob_identity_mismatch")
+        del result
+    if time.monotonic() >= deadline:
+        raise release.GateError("source_blob_scan_failed")
     release.gate(manifest, "privacy", "FAIL" if findings else "PASS",
                  "source_privacy_findings" if findings else "pinned_source_privacy_verified",
                  paths=len(paths), blobs=len(objects), history_commits=len(commits),
-                 reviewed_synthetic_identifiers=reviewed, findings=findings)
+                 reviewed_synthetic_identifiers=reviewed, findings=findings,
+                 scanned_bytes=total_bytes, batches=len(batches))
     source = manifest["gates"]["source"].get("evidence", {})
     source["changed_paths"] = ["redacted-path-" + hashlib.sha256(path.encode()).hexdigest()[:16]
                                if PRIVATE.search(path) else path for path in source.get("changed_paths", [])]
