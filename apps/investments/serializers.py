@@ -1,3 +1,5 @@
+from math import isfinite
+
 from rest_framework import serializers
 from .money import investment_money, investment_total_float
 from .models import Investment, InvestmentImportDocument
@@ -16,11 +18,22 @@ class InvestmentCurrencySerializerField(serializers.Field):
         return investment_total_float(value)
 
 
+class InvestmentReturnRateField(serializers.FloatField):
+    def to_internal_value(self, data):
+        if isinstance(data, bool):
+            raise serializers.ValidationError("Return rate must be a finite percentage.")
+        value = super().to_internal_value(data)
+        if not isfinite(value):
+            raise serializers.ValidationError("Return rate must be a finite percentage.")
+        return value
+
+
 class InvestmentSerializer(serializers.ModelSerializer):
     invested_amount = InvestmentCurrencySerializerField(required=False)
     monthly_sip = InvestmentCurrencySerializerField(required=False)
     current_value = InvestmentCurrencySerializerField(required=False)
     gain_loss = serializers.FloatField(read_only=True)
+    annual_return_rate = InvestmentReturnRateField(required=False)
 
     class Meta:
         model = Investment

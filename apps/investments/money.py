@@ -1,5 +1,6 @@
 """Investment register currency; rates, NAV and extraction evidence are separate."""
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
+from math import isfinite
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -30,7 +31,7 @@ def investment_money(value) -> Decimal:
 def investment_total_float(value) -> float:
     """Numeric output for virtual totals, which may exceed a stored field bound."""
     amount = Decimal(str(value))
-    if not amount.is_finite():
+    if not amount.is_finite() or not isfinite(float(amount)):
         raise ValueError("Investment total must be finite.")
     with localcontext() as context:
         context.prec = max(30, amount.adjusted() + 4)

@@ -2626,6 +2626,59 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('growthChart').scrollIntoView({behavior: 'instant', block: 'center'});")
         self.capture("investment-month-zero-projection")
 
+    def test_investment_forecast_unavailable_and_recovery_preserve_holdings(self):
+        from decimal import Decimal
+        from apps.investments.models import Investment
+
+        position = Investment.objects.filter(user=self.scenario["user"]).first()
+        baseline = (position.current_value, position.monthly_sip, position.invested_amount)
+        foreign = get_user_model().objects.create_user(username="private_projection_owner")
+        Investment.objects.create(user=foreign, asset_name="PRIVATE-PROJECTION", current_value=99999999)
+        self.login()
+        self.browser.get(self.live_server_url + "/investments/")
+        self.wait.until(lambda driver: driver.execute_script(
+            "return Boolean(Chart.getChart(document.getElementById('growthChart')));"
+        ))
+
+        def update_rate(value):
+            return self.browser.execute_async_script('''
+                const [id,value,done]=arguments;
+                fetch('/api/investments/'+id+'/',{method:'PATCH',headers:{
+                    'Content-Type':'application/json',
+                    'X-CSRFToken':decodeURIComponent(document.cookie.split('; ').find(x=>x.startsWith('csrftoken=')).split('=')[1])
+                },body:JSON.stringify({annual_return_rate:value})})
+                    .then(async r=>done({status:r.status,data:await r.json()}));
+            ''', position.pk, value)
+
+        rejected = update_rate("Infinity")
+        self.assertEqual(rejected["status"], 400)
+        self.assertIn("annual_return_rate", rejected["data"])
+        self.assertEqual(update_rate(1e308)["status"], 200)
+        self.browser.execute_script("loadInvestmentDashboard();")
+        self.wait.until(lambda _: "supported numeric range" in self.text("investmentGrowthStatus"))
+        self.assertFalse(self.browser.find_element(self.By.ID, "growthChart").is_displayed())
+        self.assertFalse(self.browser.execute_script("return Boolean(Chart.getChart(document.getElementById('growthChart')));"))
+        self.assertNotIn("PRIVATE-PROJECTION", self.text("investmentRoot"))
+        self.browser.execute_script("document.getElementById('investmentGrowthStatus').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("investment-forecast-unavailable")
+        self.browser.set_window_size(390, 844)
+        self.browser.execute_script("document.getElementById('investmentGrowthStatus').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("investment-forecast-unavailable-mobile")
+        self.assertIn("holdings are unchanged", self.text("investmentGrowthStatus"))
+        self.assertEqual(update_rate(0)["status"], 200)
+        self.browser.execute_script("loadInvestmentDashboard();")
+        self.wait.until(lambda driver: driver.execute_script(
+            "return !document.getElementById('growthChart').hidden && Boolean(Chart.getChart(document.getElementById('growthChart')));"
+        ))
+        values = self.browser.execute_script("return Chart.getChart(document.getElementById('growthChart')).data.datasets[0].data;")
+        self.assertEqual(values[0], float(baseline[0]))
+        self.assertEqual(values[12], float(baseline[0] + 12 * baseline[1]))
+        self.assertFalse(self.browser.find_element(self.By.ID, "investmentGrowthStatus").is_displayed())
+        position.refresh_from_db()
+        self.assertEqual((position.current_value, position.monthly_sip, position.invested_amount), baseline)
+        self.assertEqual(position.annual_return_rate, 0)
+        self.assertGreaterEqual(position.current_value, Decimal("0"))
+
     def test_sample_totals_and_explanations_on_real_pages(self):
         self.login()
         summary = self.text("dashboardSummaryCards")

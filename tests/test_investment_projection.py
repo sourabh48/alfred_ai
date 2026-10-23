@@ -161,3 +161,92 @@ class InvestmentProjectionAPITests(TestCase):
         self.assertFalse(payload["_materialized"]["cached"])
         self.assertEqual(len(payload["values"]), 13)
         self.assertEqual(payload["values"][0], 100000)
+
+    def test_nonfinite_and_boolean_return_inputs_never_mutate_positions(self):
+        for value in ("NaN", "Infinity", "-Infinity", "1e309", True):
+            with self.subTest(value=value):
+                response = self.client.patch(
+                    f"/api/investments/{self.position.pk}/",
+                    {"annual_return_rate": value, "current_value": 123},
+                    content_type="application/json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("annual_return_rate", response.json())
+                self.position.refresh_from_db()
+                self.assertEqual(self.position.current_value, 100000)
+                self.assertEqual(self.position.annual_return_rate, 12)
+        response = self.client.post("/api/investments/", {
+            "asset_type": "cash", "asset_name": "Invalid rate", "annual_return_rate": "NaN",
+        }, content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Investment.objects.filter(user=self.user).count(), 1)
+
+    def test_extreme_finite_rate_keeps_recorded_summary_and_rounding_available(self):
+        from apps.investments.views import _investment_summary_payload
+        with patch("apps.investments.views.portfolio_intelligence_service.analyze_portfolio_risk", return_value={}), \
+             patch("apps.investments.views.portfolio_intelligence_service.get_market_trends_and_suggestions", return_value={}), \
+             patch("apps.investments.views.portfolio_intelligence_service.build_short_horizon_watchlist", return_value={}):
+            for rate, expected in ((1e308, 1e308), (2.675, 2.68), (-12, -12)):
+                with self.subTest(rate=rate):
+                    Investment.objects.filter(pk=self.position.pk).update(annual_return_rate=rate)
+                    summary = _investment_summary_payload(self.user)["summary"]
+                    self.assertEqual(summary["annual_return"], expected)
+                    self.assertEqual(summary["total_value"], 100000)
+
+    def test_unrepresentable_forecast_is_withheld_instead_of_partial_or_zero(self):
+        Investment.objects.filter(pk=self.position.pk).update(annual_return_rate=1e308)
+        payload = self._growth()
+        self.assertFalse(payload["available"])
+        self.assertEqual(payload["values"], [])
+        self.assertEqual(len(payload["labels"]), 13)
+        self.assertIn("supported numeric range", payload["unavailable_reason"])
+        self.position.refresh_from_db()
+        self.assertEqual(self.position.current_value, 100000)
+        self.assertEqual(self.position.annual_return_rate, 1e308)
+
+    def test_legacy_nonfinite_rate_withholds_the_whole_forecast(self):
+        Investment.objects.filter(pk=self.position.pk).update(annual_return_rate=float("inf"))
+        Investment.objects.create(user=self.user, asset_type="cash", current_value=500)
+        payload = self._growth()
+        self.assertFalse(payload["available"])
+        self.assertEqual(payload["values"], [])
+
+    def test_foreign_mutation_and_unauthenticated_growth_are_denied(self):
+        other = get_user_model().objects.create_user(username="projection_private")
+        private = Investment.objects.create(user=other, asset_name="Private", current_value=999)
+        for method in (self.client.patch, self.client.delete):
+            response = method(f"/api/investments/{private.pk}/", {}, content_type="application/json")
+            self.assertEqual(response.status_code, 404)
+        private.refresh_from_db()
+        self.assertEqual(private.current_value, 999)
+        self.client.logout()
+        self.assertIn(self.client.get("/api/investments/growth/").status_code, (401, 403))
+
+    def test_cent_totals_are_rounded_after_aggregation_without_record_mutation(self):
+        self.position.current_value = "0.05"
+        self.position.monthly_sip = "0.05"
+        self.position.annual_return_rate = 6
+        self.position.save()
+        Investment.objects.create(user=self.user, current_value="0.05", monthly_sip="0.05", annual_return_rate=6)
+        payload = self._growth()
+        self.assertEqual(payload["values"][:2], [0.10, 0.20])
+        from decimal import Decimal
+        expected = Decimal("0.05")
+        for _ in range(12):
+            expected = (expected + Decimal("0.05")) * Decimal("1.005")
+        self.assertEqual(payload["values"][12], float((expected * 2).quantize(Decimal("0.01"))))
+        self.position.refresh_from_db()
+        self.assertEqual(self.position.current_value, Decimal("0.05"))
+
+    def test_empty_portfolio_is_available_and_previous_v2_cache_is_ignored(self):
+        as_of = date(2026, 10, 1)
+        materialize_payload(
+            namespace="investments-growth", user_id=self.user.pk,
+            revision=f"{_investment_revision(self.user)}:growth-v2:{as_of:%Y-%m}", ttl_seconds=90,
+            builder=lambda: {"labels": ["Old Month"], "values": [102010]},
+        )
+        self.assertTrue(self._growth(as_of=as_of)["available"])
+        self.position.delete()
+        payload = self._growth()
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["values"], [0] * 13)
