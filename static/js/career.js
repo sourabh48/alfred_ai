@@ -1,6 +1,8 @@
 let salaryChart;
 let careerSimulationBaseline = null;
 let careerOpeningFilters = { country: "", state: "" };
+let careerOpportunities = [];
+let careerOpportunityPage = "/api/career/job-analyses/";
 
 document.addEventListener("DOMContentLoaded", () => {
     if (!document.getElementById("careerRoot")) {
@@ -14,6 +16,11 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("careerSimulationForm").addEventListener("submit", submitCareerSimulation);
     document.getElementById("careerOpeningCountryFilter")?.addEventListener("change", updateCareerOpeningFilters);
     document.getElementById("careerOpeningStateFilter")?.addEventListener("change", updateCareerOpeningFilters);
+    document.getElementById("careerOutcomesReload").addEventListener("click", () => loadCareerOpportunities(careerOpportunityPage));
+    document.getElementById("careerOutcomeAnalysis").addEventListener("change", event => {
+        renderCareerOutcomeForm(careerOpportunities.find(item => String(item.id) === event.target.value));
+    });
+    loadCareerOpportunities();
     loadCareerDashboard();
     Alfred.enableLiveRefresh("career-live", loadCareerDashboard, { rootId: "careerRoot" });
 });
@@ -396,6 +403,11 @@ function renderJobMatchPanel(analysis) {
     const payload = analysis.extracted_payload || {};
     const fit = payload.fit || {};
     const compensation = payload.compensation_benchmark || {};
+    let jobHref = "";
+    try {
+        const url = new URL(analysis.apply_url || analysis.job_url);
+        if (["http:", "https:"].includes(url.protocol) && !url.username && !url.password) jobHref = url.href;
+    } catch (_) { /* A missing or malformed source is displayed without an active link. */ }
     target.innerHTML = `
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
@@ -409,7 +421,7 @@ function renderJobMatchPanel(analysis) {
                     <div class="muted small mt-2"><strong>Compensation:</strong> ${compensation.available ? Alfred.escapeHtml(`${Alfred.formatCurrency(compensation.market_min_annual || 0)} to ${Alfred.formatCurrency(compensation.market_max_annual || compensation.market_min_annual || 0)} annual`) : "No salary-bearing evidence detected yet."}</div>
                     <div class="muted small mt-2">${Alfred.escapeHtml(analysis.strengths || "")}</div>
                     <div class="muted small mt-2">${Alfred.escapeHtml(analysis.gaps || "")}</div>
-                    <div class="mt-2"><a href="${analysis.apply_url || analysis.job_url}" target="_blank" rel="noopener">Open job link</a></div>
+                    <div class="mt-2">${jobHref ? `<a href="${Alfred.escapeHtml(jobHref)}" target="_blank" rel="noopener">Open job link</a>` : "Job link unavailable"}</div>
                 </div>
                 <div class="text-end">
                     <div class="metric-value" style="font-size:1.6rem;">${Alfred.formatNumber(analysis.fit_score || 0, 0)}/100</div>
@@ -419,6 +431,84 @@ function renderJobMatchPanel(analysis) {
             </div>
         </div>
     `;
+}
+
+function careerOpportunityLabel(item) {
+    return `${item.job_title || "Role"} · ${item.company || "Company not recorded"}${item.outcome?.outcome ? ` · ${item.outcome.outcome}` : ""}`;
+}
+
+function loadCareerOpportunities(url = "/api/career/job-analyses/") {
+    return Alfred.fetchJSON(url).then(data => {
+        careerOpportunityPage = url;
+        careerOpportunities = data.results || [];
+        const select = document.getElementById("careerOutcomeAnalysis");
+        select.replaceChildren(new Option(careerOpportunities.length ? "Choose an opportunity" : "No recorded opportunities", ""));
+        careerOpportunities.forEach(item => select.add(new Option(careerOpportunityLabel(item), item.id)));
+        document.getElementById("careerOutcomeListFeedback").classList.add("d-none");
+        for (const [id, target] of [["careerOutcomesPrevious", data.previous], ["careerOutcomesNext", data.next]]) {
+            const button = document.getElementById(id);
+            button.disabled = !target;
+            button.onclick = target ? () => loadCareerOpportunities(target) : null;
+        }
+        renderCareerOutcomeForm(null);
+    }).catch(error => showCareerFeedback("careerOutcomeListFeedback", error.message, "danger"));
+}
+
+function renderCareerOutcomeForm(item) {
+    const target = document.getElementById("careerOutcomeFormPanel");
+    if (!item) { target.replaceChildren(); return; }
+    const saved = item.outcome || {}, evidence = item.salary_evidence || {};
+    const value = key => Alfred.escapeHtml(String(saved[key] ?? evidence[key] ?? ""));
+    target.innerHTML = `
+        <form id="careerOutcomeForm" data-live-refresh-hold="true">
+            <p class="small muted">Annual comparisons assume 12 months or 2,080 hours. They are estimates, not predicted pay.</p>
+            <div class="row g-3">
+                <div class="col-md-6"><label class="form-label" for="careerOutcomeDecision">Your decision</label>
+                    <select class="form-select" id="careerOutcomeDecision" name="outcome" required>
+                        <option value="">Choose a decision</option><option value="accepted">Accepted</option><option value="rejected">Rejected</option>
+                    </select></div>
+                <div class="col-md-6"><label class="form-label" for="careerOutcomeDate">Decision date</label>
+                    <input class="form-control" id="careerOutcomeDate" name="decided_at" type="date" value="${value("decided_at")}" required></div>
+                <div class="col-md-6"><label class="form-label" for="careerOutcomeSalaryMin">Salary evidence minimum</label>
+                    <input class="form-control" id="careerOutcomeSalaryMin" name="salary_min" type="number" min="0.01" step="0.01" value="${value("salary_min")}" required></div>
+                <div class="col-md-6"><label class="form-label" for="careerOutcomeSalaryMax">Salary evidence maximum</label>
+                    <input class="form-control" id="careerOutcomeSalaryMax" name="salary_max" type="number" min="0.01" step="0.01" value="${value("salary_max")}" required></div>
+                <div class="col-md-6"><label class="form-label" for="careerOutcomeCurrency">Recorded currency code</label>
+                    <input class="form-control" id="careerOutcomeCurrency" name="salary_currency" maxlength="3" pattern="[A-Za-z]{3}" value="${value("salary_currency")}" required></div>
+                <div class="col-md-6"><label class="form-label" for="careerOutcomePeriod">Salary period</label>
+                    <select class="form-select" id="careerOutcomePeriod" name="salary_period" required>
+                        <option value="year">Per year</option><option value="month">Per month</option><option value="hour">Per hour</option>
+                    </select></div>
+                <div class="col-12"><label class="form-label" for="careerOutcomeSource">Reviewed source URL</label>
+                    <input class="form-control" id="careerOutcomeSource" name="source_url" type="url" value="${Alfred.escapeHtml(saved.source_url || item.job_url || "")}" required></div>
+                <div class="col-12"><label class="form-label" for="careerOutcomeLocation">Location</label>
+                    <input class="form-control" id="careerOutcomeLocation" name="location" value="${Alfred.escapeHtml(saved.location || item.location || "")}" required></div>
+                <div class="col-12"><label class="form-label" for="careerOutcomeNotes">Your notes</label>
+                    <textarea class="form-control" id="careerOutcomeNotes" name="notes" maxlength="1200">${value("notes")}</textarea></div>
+                <div class="col-12"><label class="form-label" for="careerOutcomeReason">Reason for rejection, if applicable</label>
+                    <textarea class="form-control" id="careerOutcomeReason" name="rejection_reason" maxlength="600">${value("rejection_reason")}</textarea></div>
+            </div>
+            <button class="btn btn-primary mt-3" type="submit">Save your outcome</button>
+            <div id="careerOutcomeFeedback" class="d-none alert mt-3 mb-0" role="status" aria-live="polite"></div>
+        </form>`;
+    const form = document.getElementById("careerOutcomeForm");
+    form.elements.outcome.value = saved.outcome || "";
+    form.elements.salary_period.value = saved.salary_period || evidence.salary_period || "year";
+    form.addEventListener("submit", event => {
+        event.preventDefault();
+        const button = form.querySelector("button[type=submit]"); button.disabled = true;
+        const payload = Object.fromEntries(new FormData(form).entries()); payload.revision = item.updated_at;
+        Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/outcome/`, {method:"PATCH", body:JSON.stringify(payload)})
+            .then(data => {
+                const index = careerOpportunities.findIndex(row => row.id === item.id);
+                if (index >= 0) careerOpportunities[index] = data.opportunity;
+                document.getElementById("careerOutcomeAnalysis").selectedOptions[0].textContent = careerOpportunityLabel(data.opportunity);
+                renderCareerOutcomeForm(data.opportunity);
+                showCareerFeedback("careerOutcomeFeedback", "Your outcome was saved as an owner report.", "success");
+            })
+            .catch(error => showCareerFeedback("careerOutcomeFeedback", error.message, "danger"))
+            .finally(() => { button.disabled = false; });
+    });
 }
 
 function renderCompensationBenchmark(benchmark) {
@@ -596,6 +686,7 @@ function submitCareerJobMatch(event) {
         .then(() => {
             showCareerFeedback("careerJobFeedback", "Job link analyzed.", "success");
             loadCareerDashboard();
+            loadCareerOpportunities();
         })
         .catch(error => showCareerFeedback("careerJobFeedback", error.message, "danger"));
 }
@@ -617,6 +708,7 @@ function submitCareerRecruiterLead(event) {
             form.reset();
             showCareerFeedback("careerRecruiterFeedback", "Recruiter lead analyzed.", "success");
             loadCareerDashboard();
+            loadCareerOpportunities();
         })
         .catch(error => showCareerFeedback("careerRecruiterFeedback", error.message, "danger"));
 }

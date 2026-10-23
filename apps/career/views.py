@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -21,7 +22,7 @@ from apps.integrations.services import verified_intelligence
 from apps.loans.models import Loan
 from apps.reports.services import operational_logging_service
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
-from .serializers import CareerJobAnalysisSerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
+from .serializers import CareerJobAnalysisSerializer, CareerOpportunitySerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
 
 
@@ -648,6 +649,19 @@ class CareerJobMatchView(APIView):
         )
 
 
+class CareerOpportunityPagination(PageNumberPagination):
+    page_size = 20
+
+
+class CareerOpportunityListView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CareerOpportunitySerializer
+    pagination_class = CareerOpportunityPagination
+
+    def get_queryset(self):
+        return CareerJobAnalysis.objects.filter(user=self.request.user).order_by('-created_at','-id')
+
+
 class CareerJobOutcomeView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser]
@@ -656,18 +670,31 @@ class CareerJobOutcomeView(APIView):
         analysis = CareerJobAnalysis.objects.filter(user=request.user, id=pk).first()
         if analysis is None:
             return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not isinstance(request.data,dict) or not isinstance(analysis.extracted_payload,dict):
+            return Response({'detail':'Review a structured opportunity and outcome payload.'},status=status.HTTP_400_BAD_REQUEST)
+        conflict={'detail':'This opportunity changed. Reload its saved outcome before editing again.'}
+        if 'revision' in request.data and request.data['revision']!=CareerJobAnalysisSerializer(analysis).data['updated_at']:
+            return Response(conflict,status=status.HTTP_409_CONFLICT)
+        previous=analysis.extracted_payload.get('opportunity_outcome')
+        payload=(previous if request.method=='PATCH' and isinstance(previous,dict) else {}) | request.data
         try:
-            outcome = job_intelligence.normalize_opportunity_outcome(analysis, request.data)
+            outcome = job_intelligence.normalize_opportunity_outcome(analysis, payload)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         extracted_payload = dict(analysis.extracted_payload or {})
         extracted_payload["opportunity_outcome"] = outcome
-        analysis.extracted_payload = extracted_payload
-        analysis.save(update_fields=["extracted_payload", "updated_at"])
+        # Compare-and-swap also protects SQLite, where select_for_update does not lock rows.
+        updated=CareerJobAnalysis.objects.filter(pk=analysis.pk,user=request.user,
+            updated_at=analysis.updated_at,extracted_payload=analysis.extracted_payload).update(
+                extracted_payload=extracted_payload,updated_at=timezone.now())
+        if not updated:
+            return Response(conflict,status=status.HTTP_409_CONFLICT)
+        analysis.refresh_from_db()
         return Response(
             {
                 "analysis": CareerJobAnalysisSerializer(analysis).data,
+                "opportunity": CareerOpportunitySerializer(analysis).data,
                 "opportunity_outcome": outcome,
                 "opportunity_outcome_learning": _career_outcome_learning_payload(request.user),
             }

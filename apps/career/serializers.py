@@ -3,6 +3,29 @@ from apps.users.money import ProfileMoneySerializerField
 from apps.expenses.money import NumericMoneySerializerField
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 
+
+class CareerOpportunitySerializer(serializers.ModelSerializer):
+    outcome = serializers.SerializerMethodField()
+    salary_evidence = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CareerJobAnalysis
+        fields = ('id','company','job_title','location','job_url','updated_at','outcome','salary_evidence')
+
+    def get_outcome(self, obj):
+        payload = obj.extracted_payload if isinstance(obj.extracted_payload, dict) else {}
+        outcome = payload.get('opportunity_outcome')
+        fields = ('outcome','salary_min','salary_max','salary_currency','salary_period','decided_at',
+                  'source_url','location','notes','rejection_reason','verification')
+        return {key:outcome[key] for key in fields if key in outcome} if isinstance(outcome,dict) else {}
+
+    def get_salary_evidence(self, obj):
+        payload = obj.extracted_payload if isinstance(obj.extracted_payload, dict) else {}
+        snapshot = payload.get('job_snapshot')
+        fields = ('salary_min','salary_max','salary_currency','salary_period')
+        return {key:snapshot[key] for key in fields if key in snapshot} if isinstance(snapshot,dict) else {}
+
+
 class CareerProfileSerializer(serializers.ModelSerializer):
     last_salary = NumericMoneySerializerField(required=False)
 

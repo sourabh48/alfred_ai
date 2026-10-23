@@ -1182,6 +1182,77 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
         local.reason.assert_not_called(); cloud.assert_not_called()
 
+    def test_career_outcomes_owner_history_save_correction_and_stale_draft(self):
+        from django.contrib.auth import get_user_model
+        from django.utils import timezone
+        from selenium.webdriver.support.ui import Select
+        from apps.career.models import CareerJobAnalysis, CareerProfile
+        owner=self.scenario['user']
+        source={'job_snapshot':{'salary_min':1000000,'salary_max':1200000,'salary_period':'year','salary_currency':'INR'},
+            'private_raw':'SYNTHETIC-PRIVATE-RAW-NOT-A-SUMMARY'}
+        row=CareerJobAnalysis.objects.create(user=owner,company='Synthetic Career Company',job_title='Synthetic analyst',
+            location='Bengaluru, Karnataka, India',job_url='https://example.org/synthetic-owner-job',extracted_payload=source)
+        newer=CareerJobAnalysis.objects.create(user=owner,company='Other owned company',job_title='Another opportunity',
+            location='Bengaluru, Karnataka, India',job_url='https://example.org/other-owner-job',
+            apply_url='javascript:window.__outcomeXss=1',extracted_payload=source)
+        foreign=get_user_model().objects.create_user(username='foreign-outcome-owner')
+        CareerJobAnalysis.objects.create(user=foreign,company='DO-NOT-SHOW-FOREIGN',job_title='Foreign role',job_url='https://example.org/foreign')
+        profile,_=CareerProfile.objects.get_or_create(user=owner,defaults=dict(role='Synthetic analyst',experience_years=4,skills='SQL',last_salary='10000.01'))
+        profile.refresh_from_db()
+        baseline=profile.last_salary
+        self.login(); self.browser.get(self.live_server_url+'/career/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,f'#careerOutcomeAnalysis option[value="{row.pk}"]'))
+        self.assertNotIn('DO-NOT-SHOW-FOREIGN',self.text('careerOutcomeAnalysis'))
+        self.wait.until(lambda _: 'Another opportunity' in self.text('careerJobMatchPanel'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#careerJobMatchPanel a[href^="javascript:"]'))
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(row.pk))
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID,'careerOutcomeForm'))
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeDecision')).select_by_value('accepted')
+        Select(self.browser.find_element(self.By.ID,'careerOutcomePeriod')).select_by_value('month')
+        for identity,value in (('careerOutcomeDate','2026-09-01'),('careerOutcomeSalaryMin','110000.01'),
+                ('careerOutcomeSalaryMax','120000.02'),('careerOutcomeNotes','<img src=x onerror="window.__outcomeXss=1"> Owner report')):
+            self.browser.execute_script("const e=document.getElementById(arguments[0]); e.value=arguments[1]; e.dispatchEvent(new Event('input',{bubbles:true}));",identity,value)
+        self.memory_click('#careerOutcomeForm button[type=submit]')
+        self.wait.until(lambda _: 'saved as an owner report' in self.text('careerOutcomeFeedback'))
+        row.refresh_from_db(); outcome=row.extracted_payload['opportunity_outcome']
+        self.assertEqual(outcome['outcome'],'accepted'); self.assertEqual(outcome['verification'],'owner_reported')
+        self.assertEqual(outcome['salary_min_annual'],1320000.12)
+        self.assertEqual(row.extracted_payload['job_snapshot'],source['job_snapshot'])
+        self.assertFalse(self.browser.execute_script('return Boolean(window.__outcomeXss)'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#careerOutcomeForm img'))
+        self.browser.execute_script("document.getElementById('careerOutcomeNotes').value='UNSAVED OWNER DRAFT'")
+        self.assertTrue(self.browser.execute_async_script('const done=arguments[0]; loadCareerDashboard({live:true}).then(()=>done(true),()=>done(false));'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'careerOutcomeNotes').get_property('value'),'UNSAVED OWNER DRAFT')
+        CareerJobAnalysis.objects.filter(pk=row.pk).update(
+            extracted_payload=row.extracted_payload|{'concurrent_source':'PRESERVE'},updated_at=timezone.now())
+        self.memory_click('#careerOutcomeForm button[type=submit]')
+        self.wait.until(lambda _: 'opportunity changed' in self.text('careerOutcomeFeedback'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'careerOutcomeNotes').get_property('value'),'UNSAVED OWNER DRAFT')
+        row.refresh_from_db(); self.assertEqual(row.extracted_payload['concurrent_source'],'PRESERVE')
+        self.memory_click('#careerOutcomesReload')
+        self.wait.until(lambda _: not self.browser.find_elements(self.By.ID,'careerOutcomeForm'))
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(row.pk))
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeDecision')).select_by_value('rejected')
+        reason=self.browser.find_element(self.By.ID,'careerOutcomeReason'); reason.send_keys('Owner-declared role mismatch')
+        self.memory_click('#careerOutcomeForm button[type=submit]')
+        self.wait.until(lambda _: 'saved as an owner report' in self.text('careerOutcomeFeedback'))
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,f'#careerOutcomeAnalysis option[value="{row.pk}"]'))
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(newer.pk))
+        self.assertEqual(self.browser.find_element(self.By.ID,'careerOutcomeDecision').get_property('value'),'')
+        self.assertEqual(self.browser.find_element(self.By.ID,'careerOutcomeSalaryMin').get_property('value'),'1000000')
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(row.pk))
+        self.assertEqual(self.browser.find_element(self.By.ID,'careerOutcomeDecision').get_property('value'),'rejected')
+        self.browser.execute_script("document.getElementById('careerOutcomesTitle').scrollIntoView({block:'start',behavior:'instant'}); window.scrollBy(0,-90)")
+        self.capture('career-outcome-owner-history')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.browser.execute_script("document.getElementById('careerOutcomeForm').scrollIntoView({block:'start',behavior:'instant'}); window.scrollBy(0,-90)")
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+        self.capture('career-outcome-owner-mobile')
+        profile.refresh_from_db(); self.assertEqual(profile.last_salary,baseline)
+        row.refresh_from_db(); self.assertEqual(row.extracted_payload['opportunity_outcome']['outcome'],'rejected')
+
     def test_reviewed_transaction_directions_keep_account_flow_transfer_and_reversal_distinct(self):
         from datetime import date
         from unittest.mock import Mock
