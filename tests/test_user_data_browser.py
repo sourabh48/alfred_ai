@@ -716,21 +716,18 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.text('conversationHistoryStatus') in (
             'Off', 'Unavailable · operator retention/recovery approval required'))
         self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_enabled())
-        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('synthetic mountain question')
-        self.memory_click('#intelligenceForm button')
+        self.ask_history_question('synthetic mountain question')
         self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
         self.assertIn(identity,self.text('intelligenceAnswers')); self.assertFalse(self.browser.execute_script('return Boolean(window.memoryLeak)'))
         self.assertEqual(len(store.list_memories(owner)),1)
         Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('finance')
-        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('show my financial snapshot')
-        self.memory_click('#intelligenceForm button')
+        self.ask_history_question('show my financial snapshot')
         self.wait.until(lambda _: 'canonical-finance' in self.text('intelligenceAnswers'))
         self.assertIn('canonical_financial_baseline',self.text('intelligenceAnswers'))
         from apps.mobility.models import TravelPreferenceProfile
         TravelPreferenceProfile.objects.update_or_create(user=owner,defaults={'novelty':0.4,'preferences':{'pace':'quiet'}})
         Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('travel')
-        self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('show my Travel preferences')
-        self.memory_click('#intelligenceForm button')
+        self.ask_history_question('show my Travel preferences')
         self.wait.until(lambda _: 'travel-preferences' in self.text('intelligenceAnswers'))
         self.assertIn('novelty: 0.4',self.text('intelligenceAnswers'))
         self.memory_click('#intelligenceMemorySave summary')
@@ -885,6 +882,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: not question.get_property('readOnly') and
             self.browser.find_element(self.By.CSS_SELECTOR, '#intelligenceForm button[type=submit]').is_enabled())
         question.clear(); question.send_keys(text, Keys.CONTROL, Keys.ENTER)
+        self.wait.until(lambda _: not question.get_property('readOnly'))
 
     def test_private_history_consent_reload_delete_clear_disable_and_mobile(self):
         from django.contrib.auth import get_user_model
