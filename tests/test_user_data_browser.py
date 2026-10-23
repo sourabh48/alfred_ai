@@ -2729,6 +2729,34 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn("—", self.text("dashboardFocusStrip"))
         self.capture("empty-dashboard")
 
+    def test_reviewed_financial_health_discloses_heuristic_and_owned_history(self):
+        from apps.expenses.services.financial_intelligence import build_financial_intelligence
+
+        owner = self.scenario["user"]
+        Expense.objects.filter(pk=self.scenario["transactions"]["0:review"]["id"]).delete()
+        foreign = get_user_model().objects.create_user(username="private_health_owner")
+        Expense.objects.create(user=foreign, amount="999999.99", category="shopping",
+            classification="expense", direction="debit", transaction_date=month_start(2),
+            description="PRIVATE-HEALTH-HISTORY", source="manual")
+        cache.clear()
+        expected = build_financial_intelligence(owner)["summary"]
+        before = list(Expense.objects.filter(user=owner).values())
+        self.login()
+        self.wait.until(lambda _: self.text("healthScoreValue") != "—")
+        self.assertEqual(int(self.text("healthScoreValue")), round(expected["financial_health_score"]))
+        self.assertIn("estimated risk", self.text("healthRiskPill"))
+        self.assertIn("Rule-based indicator from recorded history; not a credit score.", self.text("dashboardRoot"))
+        self.assertIn("Rates below cover all recorded months", self.text("dashboardPeriodNote"))
+        self.assertIn(month_start().strftime("%B %Y"), self.text("dashboardPeriodNote"))
+        self.assertNotIn("PRIVATE-HEALTH-HISTORY", self.text("dashboardRoot"))
+        self.assertFalse(self.browser.find_element(self.By.ID, "dashboardReviewNotice").is_displayed())
+        self.browser.execute_script("document.getElementById('healthScoreValue').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("financial-health-reviewed-owner")
+        self.browser.set_window_size(390, 844)
+        self.browser.execute_script("document.getElementById('healthScoreValue').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("financial-health-reviewed-mobile")
+        self.assertEqual(before, list(Expense.objects.filter(user=owner).values()))
+
     def test_expense_form_preserves_import_identity_and_bank_cents(self):
         from decimal import Decimal
         from types import SimpleNamespace
