@@ -57,7 +57,7 @@
             <select id="intelligenceDocument" class="form-select" disabled required></select></div>
         <div id="intelligenceStatementField" class="d-none mb-2"><label for="intelligenceStatement" class="form-label">Source transaction</label>
             <select id="intelligenceStatement" class="form-select" disabled required></select>
-            <p class="small">Choose a record, then open its citation to check and confirm it. Parser success alone is not verification. No currency is inferred.</p></div>
+            <p class="small">Choose a record, then open its citation to check and confirm it. Parser success alone is not verification. No currency is inferred. Ask “Show statement period” for its reviewed statement's inclusive start and end dates.</p></div>
         <div id="intelligenceFinancialField" class="d-none mb-2"><label for="intelligenceFinancial" class="form-label">Owned financial record</label>
             <select id="intelligenceFinancial" class="form-select" disabled required></select>
             <p class="small">Ask “Explain this record”, “Show my loan status” or “Review recorded values”. Other questions may be unsupported. Recorded values are not independent authentication; budget approval and live market prices are not established. Currency-limited totals remain unavailable.</p></div></div>
@@ -65,6 +65,7 @@
             <p id="intelligenceFinancialDocumentContext" class="small">Choose an owned import in Documents, then explicitly select reviewed records. Questions are page-only; no totals or arbitrary PDF/OCR questions.</p>
             <p class="small">Ask “What is my current value?” for investments, “What is the principal?” for loans or “Show closing balance” for bank records. Every selected record must have that current reviewed field; otherwise ALFRED abstains. Amounts stay separate and currency is not inferred.</p>
             <p class="small">“What is the transaction date?” returns each selected bank record's current owner-reviewed ISO date, with its private source. These are transaction dates, not document-upload dates; no model or cloud is used. “What is the recorded category?” and “Show classification” return the selected bank records' current reviewed labels with the same source safeguards.</p>
+            <p class="small">Ask “What period does this statement cover?” for the selected statement's inclusive start and end dates. Its current reviewed dates must agree with the retained source. ALFRED does not combine different statements or infer a period from transaction or upload dates.</p>
             <a class="btn btn-outline-primary btn-sm" href="/documents/#documentSourcesTitle">Choose a financial document</a>
         </div>
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>

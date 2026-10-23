@@ -302,6 +302,7 @@ def document_record_sources(user, kind, document_id, selection, token):
             if not any(value['amount'] is not None for value in source['data']['amounts'].values()): raise SourceSelectionConflict()
             source['data']={key:value for key,value in source['data'].items() if key in ('record_type','record_id','applicable_date',
                 'transaction_date','original_transaction_date','original_status','category','classification',
+                'statement_start','statement_end','original_statement_start','original_statement_end',
                 'provenance','amounts','limitations','document_sources','document_selection')}
             source.update(url=item['url'],document_id=document_id,classification='owner_reviewed_document_record')
             source['data'].update(document_name=item['name'],document_id=document_id,verification='owner_confirmed_document_fields',unreviewed_fields=excluded)
@@ -530,12 +531,15 @@ def choices(user):
 
 
 def requested_record_field(query, *, kind):
-    fields={'expense':('amount','closing_balance','transaction_date','category','classification'),'loan':('principal','emi','remaining_balance'),
+    fields={'expense':('amount','closing_balance','transaction_date','category','classification','statement_period'),'loan':('principal','emi','remaining_balance'),
         'investment':('invested_amount','monthly_sip','current_value')}
     text=query.strip().lower().rstrip('?.!')
-    match=re.fullmatch(r'(?:explain|show|review|what is|what are) (?:my |this |the |selected |recorded |canonical |current )*(amount|closing balance|principal|emi|remaining balance|invested amount|monthly sip|current value|transaction dates?|category|classification)(?: details| values| status| and limitations)?',text)
+    if kind=='expense' and re.fullmatch(r'(?:what (?:period|dates) does (?:this|the|my|selected|the selected) statement cover|when does (?:this|the|my|selected|the selected) statement start and end|what are (?:the |my |selected )?statement dates)',text):
+        return 'statement_period'
+    match=re.fullmatch(r'(?:explain|show|review|what is|what are) (?:my |this |the |selected |recorded |canonical |current )*(amount|closing balance|principal|emi|remaining balance|invested amount|monthly sip|current value|transaction dates?|category|classification|statement period|statement date range)(?: details| values| status| and limitations)?',text)
     field=match[1].replace(' ','_') if match else None
     if field=='transaction_dates': field='transaction_date'
+    if field=='statement_date_range': field='statement_period'
     if text.startswith('what are ') and field!='transaction_date': return None
     return field if field in fields.get(kind,()) else None
 

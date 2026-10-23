@@ -1114,6 +1114,74 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
         self.capture('bank-evidence-correction-mobile')
 
+    def test_statement_period_review_selection_boundaries_and_missing_evidence(self):
+        from dataclasses import replace
+        from datetime import date
+        from unittest.mock import Mock
+        from selenium.webdriver.support.ui import Select
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.expenses.models import BankAccount,Expense,StatementUpload
+        from apps.expenses.services.statement_evidence import evidence,review
+        from apps.expenses.services.statement_lifecycle import _import_statement_transactions
+        from tests.test_expense_money_identity import parsed_fixture
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        row,upload,item=self.bank_statement_evidence_fixture(); owner=self.scenario['user']
+        account=BankAccount.objects.create(user=owner,account_number='TEST-PERIOD-BROWSER',current_balance='10.01')
+        other_upload=StatementUpload.objects.create(user=owner,bank_account=account,account_number=account.account_number,
+            source='bank_statement',parser_status='parsed',file_name='Synthetic August statement.pdf',
+            original_file=SimpleUploadedFile('synthetic-period.pdf',b'%PDF-SYNTHETIC-PERIOD'),
+            statement_start=date(2026,8,1),statement_end=date(2026,8,31))
+        parsed=parsed_fixture(account=account.account_number,reference='REF-PERIOD-BROWSER')
+        parsed=replace(parsed,statement_start=date(2026,8,1),statement_end=date(2026,8,31),
+            transactions=[replace(parsed.transactions[0],transaction_date=date(2026,8,1))])
+        _import_statement_transactions(user=owner,upload=other_upload,bank_account=account,parsed=parsed)
+        other=Expense.objects.get(statement_upload=other_upload)
+        review(owner,other.pk,revision=evidence(owner,other.pk)['revision'],confirm=True)
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(); local.reason.side_effect=AssertionError('Statement periods must not infer')
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner',return_value=Mock()))
+        cloud=self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.reason_with_memory'))
+        self.login(); assistant=self.live_server_url+f'/ai/insights/?scope=bank_statements&transaction={row.pk}'
+        self.browser.get(assistant)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.ask_history_question('What period does this statement cover?')
+        self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'What period does this statement cover?')
+        self.memory_click('#intelligenceAnswers a[href^="/documents/statements/"]')
+        self.wait.until(lambda _: self.text('statementEvidenceStatus')=='needs_owner_review')
+        self.memory_click('#statementEvidenceConfirm'); self.memory_click('#statementEvidenceForm button[type=submit]')
+        self.wait.until(lambda _: self.text('statementEvidenceStatus')=='owner_confirmed')
+        self.browser.get(assistant)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        for record,period in ((row,'2026-09-01 through 2026-09-30 (inclusive)'),
+                (other,'2026-08-01 through 2026-08-31 (inclusive)'),(row,'2026-09-01 through 2026-09-30 (inclusive)')):
+            self.browser.execute_script("document.getElementById('intelligenceStatement').scrollIntoView({block:'center',behavior:'instant'})")
+            Select(self.browser.find_element(self.By.ID,'intelligenceStatement')).select_by_value(str(record.pk))
+            self.ask_history_question('Show statement period')
+            self.wait.until(lambda _: 'Recorded statement periods ready' in self.text('intelligenceFeedback'))
+            article=self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceAnswers > article')[-1]
+            self.assertIn(period,article.text)
+            self.assertTrue(article.find_elements(self.By.CSS_SELECTOR,f'a[href="{evidence(owner,record.pk)["citation_url"]}"]'))
+            self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'')
+            self.assertIn('no model used',self.text('intelligenceLocalStatus'))
+        self.browser.execute_script("document.querySelector('#intelligenceAnswers > article:last-child').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('statement-period-selected-source')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('statement-period-mobile')
+        StatementUpload.objects.filter(pk=other_upload.pk).update(statement_end=None)
+        self.browser.execute_script("document.getElementById('intelligenceStatement').scrollIntoView({block:'center',behavior:'instant'})")
+        Select(self.browser.find_element(self.By.ID,'intelligenceStatement')).select_by_value(str(other.pk))
+        self.ask_history_question('Show statement period')
+        self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'Show statement period')
+        self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+        local.reason.assert_not_called(); cloud.assert_not_called()
+
     def test_reviewed_transaction_classification_questions_show_labels_without_inference(self):
         from unittest.mock import Mock
         from apps.expenses.models import Expense

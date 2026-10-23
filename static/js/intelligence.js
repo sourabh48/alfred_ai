@@ -450,9 +450,10 @@ document.addEventListener("DOMContentLoaded", () => {
             feedback.textContent = result.retrieval_error?.detail || "Answer ready. Review the sources before acting.";
             if (result.narrative_withheld) feedback.textContent = `Unsupported model figures were withheld. Only source-card amounts are shown. ${result.retrieval_error?.detail || ''}`;
             if (result.provider === "local_evidence") {
-                if (["owner_confirmed_transaction_date", "owner_confirmed_transaction_classification"].includes(result.grounding)) {
-                    const label = result.grounding === "owner_confirmed_transaction_date" ? "dates" : "classifications";
-                    feedback.textContent = `Recorded transaction ${label} ready. Review the owner-only sources. No model, cloud or saved conversation turn was used.`;
+                if (["owner_confirmed_transaction_date", "owner_confirmed_transaction_classification", "owner_confirmed_statement_period"].includes(result.grounding)) {
+                    const label = result.grounding === "owner_confirmed_statement_period" ? "statement periods"
+                        : result.grounding === "owner_confirmed_transaction_date" ? "transaction dates" : "transaction classifications";
+                    feedback.textContent = `Recorded ${label} ready. Review the owner-only sources. No model, cloud or saved conversation turn was used.`;
                     setLocalStatus("Owner-reviewed evidence · no model used", "ready");
                     query.value = ""; requestToken = null; retry.hidden = true;
                 } else {

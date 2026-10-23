@@ -1,5 +1,6 @@
 """Synthetic bank provenance in the existing local assistant; no real providers."""
 from datetime import date, datetime, timezone as utc_timezone
+from dataclasses import replace
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -59,6 +60,130 @@ class BankStatementGroundingTests(TestCase):
     def post(self, **changes):
         return self.client.post('/api/ai/personal-insights/',json.dumps(dict(
             query='Explain this source transaction',scope='bank_statements',transaction_id=self.row.pk)|changes),content_type='application/json')
+
+    def period_statement(self,user,start,end):
+        account=BankAccount.objects.create(user=user,account_number=f'TEST-PERIOD-{user.pk}-{start}',current_balance='10.01')
+        upload=StatementUpload.objects.create(user=user,bank_account=account,account_number=account.account_number,
+            source='bank_statement',parser_status='parsed',file_name='Synthetic period statement.pdf',
+            original_file=SimpleUploadedFile('synthetic-period.pdf',b'%PDF-SYNTHETIC-PERIOD'),statement_start=start,statement_end=end)
+        parsed=parsed_fixture(account=account.account_number,reference=f'REF-PERIOD-{start}')
+        parsed=replace(parsed,statement_start=start,statement_end=end,transactions=[replace(parsed.transactions[0],transaction_date=start)])
+        _import_statement_transactions(user=user,upload=upload,bank_account=account,parsed=parsed)
+        row=Expense.objects.get(statement_upload=upload)
+        review(user,row.pk,revision=evidence(user,row.pk)['revision'],confirm=True)
+        return row,upload
+
+    def test_statement_period_is_exact_inclusive_cited_and_readonly_without_inference(self):
+        self.confirm()
+        models=(Expense,BankAccount,StatementUpload,StatementTransactionEvidence)
+        before=[list(model.objects.order_by('pk').values()) for model in models]
+        with patch.object(MemoryStore,'retrieve',side_effect=AssertionError('No period retrieval')):
+            for query in ('What is the statement period?','Show statement date range','What period does this statement cover?',
+                    'What dates does the selected statement cover?','When does this statement start and end?','What are the statement dates?'):
+                result=self.post(query=query)
+                self.assertEqual(result.status_code,200)
+                data=result.json(); self.assertEqual(data['grounding'],'owner_confirmed_statement_period')
+                self.assertIn('2026-09-01 through 2026-09-30 (inclusive)',data['answer'])
+                self.assertIn(data['sources'][0]['ref'],data['answer'])
+                self.assertEqual(data['sources'][0]['url'],evidence(self.owner,self.row.pk)['citation_url'])
+                self.assertEqual(self.client.get(data['sources'][0]['url']).status_code,200)
+                self.assertFalse(data['financial_authority']); self.assertIsNone(data['memory_retrieval_available'])
+            canonical=hybrid_answer(self.store,self.owner,'Show statement period',scope='financial_records',
+                record_type='expense',record_id=self.row.pk,local=self.local)
+            self.assertEqual(canonical['grounding'],'owner_confirmed_statement_period')
+        self.local.reason.assert_not_called(); self.cloud_reason.assert_not_called()
+        self.assertEqual(self.store.list_memories(self.owner),[])
+        self.assertEqual([list(model.objects.order_by('pk').values()) for model in models],before)
+
+    def test_statement_period_boundaries_include_start_end_and_leap_day_without_date_inference(self):
+        for day in (date(2026,9,1),date(2026,9,30)):
+            with transaction.atomic():
+                Expense.objects.filter(pk=self.row.pk).update(transaction_date=day)
+                self.confirm()
+                self.assertEqual(self.post(query='Show statement period').json()['grounding'],'owner_confirmed_statement_period')
+                transaction.set_rollback(True)
+        row,upload=self.period_statement(self.owner,date(2024,2,29),date(2024,2,29))
+        answer=self.post(query='Show statement period',transaction_id=row.pk).json()
+        self.assertIn('2024-02-29 through 2024-02-29 (inclusive)',answer['answer'])
+        Expense.objects.filter(pk=row.pk).update(transaction_date=date(2024,3,1))
+        self.assertEqual(self.post(query='Show statement period',transaction_id=row.pk).json()['grounding'],'insufficient_evidence')
+        self.local.reason.assert_not_called()
+
+    def test_missing_invalid_conflicting_and_unreviewed_statement_periods_abstain(self):
+        self.assertEqual(self.post(query='Show statement period').json()['grounding'],'insufficient_evidence')
+        proof=StatementTransactionEvidence.objects.get(expense=self.row)
+        original=proof.source_values.copy()
+        with patch.object(MemoryStore,'retrieve',side_effect=AssertionError('No missing-period inference')):
+            for change in ({'statement_start':None},{'statement_end':None},{'statement_end':'2026-09-31'},
+                    {'statement_start':'2026-10-01'},{'statement_start':'2026-08-01'},{}):
+                with transaction.atomic():
+                    proof.source_values=(original|change) if change else {k:v for k,v in original.items() if not k.startswith('statement_')}
+                    proof.save(update_fields=['source_values']); self.confirm()
+                    self.assertEqual(self.post(query='Show statement period').json()['grounding'],'insufficient_evidence')
+                    transaction.set_rollback(True)
+            with transaction.atomic():
+                StatementUpload.objects.filter(pk=self.upload.pk).update(statement_end=None)
+                self.confirm()
+                self.assertEqual(self.post(query='Show statement period').json()['grounding'],'insufficient_evidence')
+                transaction.set_rollback(True)
+        self.local.reason.assert_not_called()
+
+    def test_multiple_statements_accounts_and_foreign_documents_never_mix_periods(self):
+        from apps.ml_engine.services.canonical_evidence import document_record_page
+        self.confirm()
+        second,upload=self.period_statement(self.owner,date(2026,8,1),date(2026,8,31))
+        foreign,foreign_upload=self.period_statement(self.other,date(2025,12,1),date(2025,12,31))
+        for row,start,end in ((self.row,'2026-09-01','2026-09-30'),(second,'2026-08-01','2026-08-31')):
+            data=self.post(query='Show statement period',transaction_id=row.pk).json()
+            self.assertEqual(data['grounding'],'owner_confirmed_statement_period')
+            self.assertIn(f'{start} through {end}',data['answer']); self.assertNotIn('2025-12',str(data))
+            self.assertEqual(data['sources'][0]['data']['document_id'],row.statement_upload_id)
+        self.assertEqual(self.post(query='Show statement period',transaction_id=foreign.pk).status_code,404)
+        self.assertEqual(self.client.get(evidence(self.other,foreign.pk)['citation_url']).status_code,404)
+        page=document_record_page(self.owner,'expense',self.upload.pk)
+        payload=dict(query='Show statement period',scope='financial_document',record_type='expense',document_id=self.upload.pk,
+            source_catalog=page['catalog_token'],selected_records=[dict(id=second.pk,revision=evidence(self.owner,second.pk)['revision'])])
+        self.assertEqual(self.client.post('/api/ai/personal-insights/',payload,content_type='application/json').status_code,404)
+        self.local.reason.assert_not_called()
+
+    def test_statement_period_requires_one_explicit_document_and_revalidates_before_return(self):
+        self.confirm()
+        with patch.object(MemoryStore,'retrieve',side_effect=AssertionError('No ambiguous period inference')):
+            for query in ('Show statement period','What periods do these statements cover?','Show statement period and current balance'):
+                result=self.post(query=query,scope='general',transaction_id=None)
+                self.assertEqual(result.json()['grounding'],'insufficient_evidence')
+            known=source_context(self.owner,'bank_statements',transaction_id=self.row.pk)
+            mixed=known+[known[0]|{'ref':'synthetic-other-statement','data':known[0]['data']|{'document_id':self.upload.pk+1}}]
+            with patch('apps.ml_engine.services.hybrid_intelligence.source_context',return_value=mixed):
+                self.assertEqual(self.post(query='Show statement period').json()['grounding'],'insufficient_evidence')
+            def changed(*args,**kwargs):
+                sources=source_context(*args,**kwargs)
+                StatementUpload.objects.filter(pk=self.upload.pk).update(statement_end=date(2026,9,29))
+                return sources
+            with patch('apps.ml_engine.services.hybrid_intelligence.source_context',side_effect=changed):
+                self.assertEqual(self.post(query='Show statement period').status_code,409)
+        self.local.reason.assert_not_called()
+
+    def test_selected_statement_records_keep_exact_period_references_and_reject_stale_metadata(self):
+        from apps.ml_engine.services.canonical_evidence import document_record_page
+        _import_statement_transactions(user=self.owner,upload=self.upload,bank_account=self.account,
+            parsed=parsed_fixture(reference='REF-PERIOD-002',description='Synthetic second selected record'))
+        for row in Expense.objects.filter(statement_upload=self.upload):
+            review(self.owner,row.pk,revision=evidence(self.owner,row.pk)['revision'],confirm=True)
+        page=document_record_page(self.owner,'expense',self.upload.pk)
+        payload=dict(query='Show statement period',scope='financial_document',record_type='expense',document_id=self.upload.pk,
+            source_catalog=page['catalog_token'],selected_records=[dict(id=item['record_id'],revision=item['revision']) for item in page['items']])
+        result=self.client.post('/api/ai/personal-insights/',payload,content_type='application/json')
+        self.assertEqual(result.status_code,200)
+        data=result.json(); self.assertEqual(data['grounding'],'owner_confirmed_statement_period')
+        self.assertEqual(len(data['sources']),2)
+        for source in data['sources']:
+            self.assertIn(source['ref']+': 2026-09-01 through 2026-09-30 (inclusive)',data['answer'])
+            self.assertEqual(source['data']['document_id'],self.upload.pk)
+            self.assertEqual(self.client.get(source['url']).status_code,200)
+        StatementUpload.objects.filter(pk=self.upload.pk).update(statement_end=date(2026,9,29))
+        self.assertEqual(self.client.post('/api/ai/personal-insights/',payload,content_type='application/json').status_code,409)
+        self.local.reason.assert_not_called()
 
     def test_recorded_classification_questions_are_exact_readonly_and_do_not_infer(self):
         self.confirm()
@@ -420,6 +545,10 @@ class BankStatementGroundingTests(TestCase):
             labels=self.post(**(payload|{'query':'Show classification','request_id':uuid4().hex}))
             self.assertEqual(labels.status_code,200); self.assertFalse(labels.json()['conversation_saved'])
             self.assertEqual(labels.json()['grounding'],'owner_confirmed_transaction_classification')
+            self.assertEqual(history.get(self.owner,record['id'])['turns'],[])
+            period=self.post(**(payload|{'query':'Show statement period','request_id':uuid4().hex}))
+            self.assertEqual(period.status_code,200); self.assertFalse(period.json()['conversation_saved'])
+            self.assertEqual(period.json()['grounding'],'owner_confirmed_statement_period')
             self.assertEqual(history.get(self.owner,record['id'])['turns'],[])
             response=self.post(**payload); self.assertEqual(response.status_code,200)
             turn=history.get(self.owner,record['id'])['turns'][0]
