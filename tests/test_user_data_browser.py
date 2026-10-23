@@ -2829,6 +2829,65 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(BikeServiceRecord.objects.filter(pk=service.pk).exists())
         self.assertEqual(before,list(Expense.objects.filter(user=owner).values()))
 
+    def test_service_invoice_real_pdf_import_replay_preserves_reviewed_log(self):
+        from decimal import Decimal
+        from tests.test_service_import_receipts import synthetic_service_pdf
+        from selenium.webdriver.support.ui import Select
+        from apps.mobility.models import BikeProfile, BikeDocument, BikeServiceRecord
+        folder=Path(self.enterContext(TemporaryDirectory(prefix="alfred-synthetic-invoice-")))
+        source=folder/"synthetic-service-invoice.pdf"
+        source.write_bytes(synthetic_service_pdf())
+        renamed=folder/"renamed-service-invoice.pdf"; renamed.write_bytes(source.read_bytes())
+        owner=self.scenario["user"]
+        profile=BikeProfile.objects.create(user=owner,display_name="Synthetic Hunter",make="Royal Enfield",model_name="Hunter 350",vehicle_number="KA05MN4321")
+        before=list(Expense.objects.filter(user=owner).values())
+        self.login(); self.browser.get(self.live_server_url+"/bike-service/")
+        self.wait.until(lambda _: any(o.get_attribute("value")==str(profile.pk) for o in self.browser.find_elements(self.By.CSS_SELECTOR,"#bikeServiceImportProfile option")))
+        self.browser.execute_script('''
+            const open=XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open=function(method,url,...args){
+                if(String(url).includes('/bike-services/import/')) this.addEventListener('load',()=>{window.importReceipt={status:this.status,body:this.responseText};});
+                return open.call(this,method,url,...args);
+            };
+        ''')
+        Select(self.browser.find_element(self.By.ID,"bikeServiceImportProfile")).select_by_value(str(profile.pk))
+        self.browser.find_element(self.By.ID,"bikeServiceImportFile").send_keys(str(source))
+        self.memory_click("#bikeServiceImportForm button[type=submit]")
+        self.wait.until(lambda _: not self.browser.find_element(self.By.CSS_SELECTOR,"#bikeServiceImportForm button[type=submit]").get_property("disabled"))
+        receipt=self.browser.execute_script("return window.importReceipt;")
+        (self.artifacts/"service-import-response.json").write_text(json.dumps(receipt,indent=2),encoding="utf-8")
+        self.capture("service-invoice-first-result")
+        self.assertIn("1 service log created",self.text("bikeServiceImportFeedback"),str(receipt))
+        document=BikeDocument.objects.get(user=owner,document_type="invoice")
+        record=BikeServiceRecord.objects.get(user=owner,source_document=document)
+        self.assertEqual(record.cost,Decimal("2.68"))
+        self.assertIn("SYNTHETIC TEST DOCUMENT",document.source_text)
+        # The existing correction endpoint is exercised through this real authenticated browser session.
+        result=self.browser.execute_async_script('''
+            const [id,done]=arguments;
+            fetch('/api/documents/review-queue/resolve/',{method:'POST',headers:{'Content-Type':'application/json',
+            'X-CSRFToken':decodeURIComponent(document.cookie.split('; ').find(x=>x.startsWith('csrftoken=')).split('=')[1])},
+            body:JSON.stringify({scope:'vehicle_document',id,corrections:{cost:'3.01',service_center:'Owner Reviewed Workshop'}})})
+            .then(async r=>done({status:r.status,data:await r.json()}));
+        ''',document.pk)
+        self.assertEqual(result["status"],200)
+        self.browser.refresh()
+        self.wait.until(lambda _: "Owner Reviewed Workshop" in self.text("bikeServiceLogList"))
+        Select(self.browser.find_element(self.By.ID,"bikeServiceImportProfile")).select_by_value(str(profile.pk))
+        self.browser.find_element(self.By.ID,"bikeServiceImportFile").send_keys(str(renamed))
+        self.memory_click("#bikeServiceImportForm button[type=submit]")
+        self.wait.until(lambda _: "already imported; existing logs preserved" in self.text("bikeServiceImportFeedback"))
+        self.assertNotIn("service log created",self.text("bikeServiceImportFeedback"))
+        self.assertEqual(BikeServiceRecord.objects.filter(user=owner).count(),1)
+        self.assertEqual(BikeDocument.objects.filter(user=owner).count(),1)
+        record.refresh_from_db(); self.assertEqual(record.cost,Decimal("3.01"))
+        self.browser.execute_script("document.getElementById('bikeServiceImportFeedback').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("service-invoice-byte-replay")
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('bikeServiceLogList').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("service-invoice-reviewed-mobile")
+        self.assertEqual(before,list(Expense.objects.filter(user=owner).values()))
+
     def test_expense_form_preserves_import_identity_and_bank_cents(self):
         from decimal import Decimal
         from types import SimpleNamespace

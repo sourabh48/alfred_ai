@@ -1540,10 +1540,11 @@ function currentDateTimeLocal() {
 
 function summarizeBikeServiceImportBatch(results) {
     const summary = Alfred.summarizeUploadBatch(results, { itemLabel: "service file", successVerb: "imported" });
-    const createdLogs = summary.succeeded.filter(result => result.data?.service_record).length;
+    const createdLogs = summary.succeeded.filter(result => result.data?.service_record && !result.data?.duplicate).length;
+    const replayed = summary.succeeded.filter(result => result.data?.duplicate).length;
     return {
         ...summary,
-        message: createdLogs ? `${summary.message} ${createdLogs} service log${createdLogs === 1 ? "" : "s"} created.` : summary.message,
+        message: `${summary.message}${createdLogs ? ` ${createdLogs} service log${createdLogs === 1 ? "" : "s"} created.` : ""}${replayed ? ` ${replayed} already imported; existing logs preserved.` : ""}`,
     };
 }
 

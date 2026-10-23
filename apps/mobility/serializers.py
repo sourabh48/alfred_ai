@@ -524,6 +524,9 @@ class BikeDocumentSerializer(serializers.ModelSerializer):
         return obj.document_file.url
 
     def validate(self, attrs):
+        receipt = (getattr(self.instance, "extracted_payload", None) or {}).get("service_import_receipt")
+        if receipt and ("document_file" in attrs or ("bike_profile" in attrs and attrs["bike_profile"] != self.instance.bike_profile)):
+            raise serializers.ValidationError("Imported invoice source and vehicle links cannot be replaced. Upload a separate document or use document review corrections.")
         request = self.context.get("request")
         issue_date = attrs.get("issue_date", getattr(self.instance, "issue_date", None))
         expiry_date = attrs.get("expiry_date", getattr(self.instance, "expiry_date", None))
@@ -537,7 +540,9 @@ class BikeDocumentSerializer(serializers.ModelSerializer):
         return attrs
 
     def to_internal_value(self, data):
-        normalized = data.copy()
+        if not isinstance(data, Mapping):
+            return super().to_internal_value(data)
+        normalized = dict(data.items())
         for field in ("issue_date", "expiry_date", "document_number", "issuer", "vehicle_number", "notes"):
             if normalized.get(field) == "":
                 normalized[field] = None if field in {"issue_date", "expiry_date"} else ""
