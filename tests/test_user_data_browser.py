@@ -1182,6 +1182,73 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
         local.reason.assert_not_called(); cloud.assert_not_called()
 
+    def test_reviewed_transaction_directions_keep_account_flow_transfer_and_reversal_distinct(self):
+        from datetime import date
+        from unittest.mock import Mock
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.expenses.models import BankAccount, Expense, StatementUpload
+        from apps.expenses.services.statement_evidence import evidence, review
+        from apps.expenses.services.statement_lifecycle import _import_statement_transactions
+        from tests.test_expense_money_identity import parsed_fixture
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        row,upload,item=self.bank_statement_evidence_fixture(); owner=self.scenario['user']
+        account=BankAccount.objects.create(user=owner,account_number='TEST-DIRECTION-OTHER-ACCOUNT',current_balance='10.01')
+        credit_upload=StatementUpload.objects.create(user=owner,bank_account=account,account_number=account.account_number,
+            source='bank_statement',parser_status='parsed',file_name='Synthetic credited entry.pdf',
+            original_file=SimpleUploadedFile('synthetic-credit.pdf',b'%PDF-SYNTHETIC-CREDIT'),
+            statement_start=date(2026,9,1),statement_end=date(2026,9,30))
+        _import_statement_transactions(user=owner,upload=credit_upload,bank_account=account,
+            parsed=parsed_fixture(account=account.account_number,direction='credit',category='income',
+                description='AMBIGUOUS REVERSAL TRANSFER REFUND',reference='DIRECTION-CREDIT'))
+        credit=Expense.objects.get(statement_upload=credit_upload)
+        review(owner,credit.pk,revision=evidence(owner,credit.pk)['revision'],confirm=True)
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(); local.reason.side_effect=AssertionError('Recorded directions must not infer')
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner',return_value=Mock()))
+        cloud=self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.reason_with_memory'))
+        self.login(); assistant=self.live_server_url+f'/ai/insights/?scope=bank_statements&transaction={row.pk}'
+        self.browser.get(assistant)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        question='What is the transaction direction?'
+        self.ask_history_question(question)
+        self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),question)
+        self.memory_click('#intelligenceAnswers a[href^="/documents/statements/"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'statementEvidenceConfirm').is_enabled())
+        self.memory_click('#statementEvidenceConfirm'); self.memory_click('#statementEvidenceForm button[type=submit]')
+        self.wait.until(lambda _: self.text('statementEvidenceStatus')=='owner_confirmed')
+        Expense.objects.filter(pk=row.pk).update(category='transfer')
+        review(owner,row.pk,revision=evidence(owner,row.pk)['revision'],confirm=True)
+        for selected in (row,credit):
+            self.browser.get(self.live_server_url+f'/ai/insights/?scope=bank_statements&transaction={selected.pk}')
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(selected.pk))
+            self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+            self.ask_history_question(question)
+            self.wait.until(lambda _: 'Recorded transaction directions ready' in self.text('intelligenceFeedback'))
+            answer=self.browser.find_element(self.By.CSS_SELECTOR,'#intelligenceAnswers > article:last-child .conversation-message:not(.conversation-message--user) > p').text
+            self.assertIn('money out of' if selected.pk==row.pk else 'money into',answer)
+            self.assertEqual('Recorded category: Transfer' in answer,selected.pk==row.pk)
+            self.assertIn('Reversal status is not established',answer)
+            self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'')
+            self.assertIn('no model used',self.text('intelligenceLocalStatus'))
+            citation=evidence(owner,selected.pk)['citation_url']
+            self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
+            self.assertNotIn('AMBIGUOUS',self.text('intelligenceAnswers'))
+        self.capture('reviewed-transaction-direction-credit')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.browser.execute_script("document.querySelector('#intelligenceAnswers > article:last-child').scrollIntoView({block:'start',behavior:'instant'}); window.scrollBy(0,-90)")
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('reviewed-transaction-direction-mobile')
+        question='Was this transaction reversed?'
+        self.ask_history_question(question)
+        self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
+        self.assertIn('No reviewed reversal linkage',self.text('intelligenceAnswers'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),question)
+        local.reason.assert_not_called(); cloud.assert_not_called()
+
     def test_reviewed_transaction_classification_questions_show_labels_without_inference(self):
         from unittest.mock import Mock
         from apps.expenses.models import Expense

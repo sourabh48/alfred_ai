@@ -62,6 +62,16 @@ def _statement_period(data):
     return f'{start} through {end} (inclusive)'
 
 
+def _transaction_direction(data):
+    labels={'debit':'Debit (money out of this account)','credit':'Credit (money into this account)'}
+    direction=data.get('direction')
+    if not isinstance(direction,str) or direction not in labels or data.get('original_direction')!=direction:
+        return None
+    transfer=(' Recorded category: Transfer. This label does not establish a matched transfer or its other account.'
+        if data.get('category')=='transfer' else ' Transfer linkage is not established.')
+    return labels[direction]+'.'+transfer+' Reversal status is not established; direction alone does not prove income, spending or a refund.'
+
+
 def source_context(user,scope,document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None):
     if scope=='general': return []
     if scope=='financial_document':
@@ -76,6 +86,7 @@ def source_context(user,scope,document_id=None,transaction_id=None,record_type=N
         original=record['original'] if isinstance(record['original'],dict) else {}
         data={**record['statement'], 'transaction_date':record['current']['transaction_date'],
             'original_transaction_date':_iso_date(original.get('transaction_date')),
+            'original_direction':original.get('direction') if original.get('direction') in ('debit','credit') else None,
             'original_statement_start':_iso_date(original.get('statement_start')),
             'original_statement_end':_iso_date(original.get('statement_end')),
             'verification':record['verification'], 'original_status':record['original_status'],
@@ -167,7 +178,10 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     field=requested_record_field(query,kind='expense' if scope=='bank_statements' else record_type) if scope in ('bank_statements','financial_records','financial_document') else None
     period_query=requested_record_field(query,kind='expense')=='statement_period' or bool(
         re.search(r'\bstatements?\b',query,re.I) and re.search(r'\bperiods?\b|\bdate range\b|\bstart and end\b',query,re.I))
-    metadata_field=field in ('transaction_date','category','classification','statement_period')
+    direction_query=requested_record_field(query,kind='expense') in ('direction','transfer_status') or bool(
+        re.search(r'\b(?:directions?|debits?|credits?|transfers?|reversals?|reversed|refunds?)\b',query,re.I)
+        and re.search(r'\b(?:this|selected|transactions?|records?)\b',query,re.I))
+    metadata_field=field in ('transaction_date','category','classification','statement_period','direction','transfer_status')
     field_values=[]
     if metadata_field:
         from apps.expenses.models import Expense
@@ -176,6 +190,8 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             data=source['data']; value=data.get(field)
             if field=='transaction_date': value=_iso_date(value)
             elif field=='statement_period': value=_statement_period(data)
+            elif field in ('direction','transfer_status'):
+                value=_transaction_direction(data) if field=='direction' or data.get('category')=='transfer' else None
             else: value=choices[field].get(value) if isinstance(value,str) else None
             if (value is None or source['classification'] not in ('owner_confirmed_statement_record','owner_reviewed_document_record')
                     or data.get('verification') not in ('owner_confirmed','owner_confirmed_document_fields')
@@ -187,11 +203,12 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             or len({(source['data']['document_id'],value) for source,(_,value) in zip(tools,field_values)})!=1):
         field_values=[]
     missing_field=field and not metadata_field and any(tool['data'].get('amounts',{}).get(field,{}).get('amount') is None for tool in tools)
-    if ((period_query and field!='statement_period') or (metadata_field and not field_values)
+    if ((period_query and field!='statement_period') or (direction_query and field not in ('direction','transfer_status')) or (metadata_field and not field_values)
             or (scope in ('financial_records','financial_document','bank_statements') and (missing_field
                 or not supported_question(query,kind='expense' if scope=='bank_statements' else record_type)))
             or (scope in ('financial_records','financial_document','finance') and any(not tool['available'] for tool in tools))):
         return {'answer':('The statement period is unavailable. Choose one owner-reviewed statement with complete, consistent start and end dates. Missing, conflicting or ambiguous periods cannot be established from transaction or upload dates.' if period_query else
+                'This transaction request is not established by the selected evidence. A reviewed debit/credit must agree with its retained direction. A recorded Transfer category does not establish a paired transfer or another account. No reviewed reversal linkage is recorded; descriptions and amount signs are not proof.' if direction_query else
                 'This request is not established by available compatible evidence. Ask “Explain this record” to inspect recorded values and limitations. Forecasts, currency conversions, unknown-currency totals and unsupported questions are unavailable.'),
             'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
             'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}
@@ -201,9 +218,10 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}
     if field_values:
         revalidate()
-        label={'transaction_date':'transaction dates','category':'transaction categories','classification':'transaction classifications','statement_period':'statement periods'}[field]
+        label={'transaction_date':'transaction dates','category':'transaction categories','classification':'transaction classifications','statement_period':'statement periods','direction':'transaction directions','transfer_status':'transfer labels and directions'}[field]
         prefix='' if field in ('transaction_date','statement_period') else f'{field}: '
-        grounding={'transaction_date':'owner_confirmed_transaction_date','statement_period':'owner_confirmed_statement_period'}.get(field,'owner_confirmed_transaction_classification')
+        grounding={'transaction_date':'owner_confirmed_transaction_date','statement_period':'owner_confirmed_statement_period',
+            'direction':'owner_confirmed_transaction_direction','transfer_status':'owner_confirmed_transaction_direction'}.get(field,'owner_confirmed_transaction_classification')
         return {'answer':f'Current recorded {label} (owner-confirmed; not independent bank authentication):\n'+
                 '\n'.join(f'{reference}: {prefix}{value}' for reference,value in field_values),
             'provider':'local_evidence','classification':'owner_recorded_fact','financial_authority':False,

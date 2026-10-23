@@ -73,6 +73,134 @@ class BankStatementGroundingTests(TestCase):
         review(user,row.pk,revision=evidence(user,row.pk)['revision'],confirm=True)
         return row,upload
 
+    def test_reviewed_directions_distinguish_account_flow_from_transfer_labels_readonly(self):
+        with patch.object(MemoryStore,'retrieve',side_effect=AssertionError('No direction retrieval')):
+            for direction,category in (('debit','shopping'),('credit','income'),('debit','transfer'),('credit','transfer')):
+                with self.subTest(direction=direction,category=category), transaction.atomic():
+                    reference=f'DIRECTION-{direction}-{category}'
+                    _import_statement_transactions(user=self.owner,upload=self.upload,bank_account=self.account,
+                        parsed=parsed_fixture(direction=direction,category=category,reference=reference,
+                            description='AMBIGUOUS TRANSFER REVERSAL CREDIT DEBIT REFUND'))
+                    row=Expense.objects.get(statement_upload=self.upload,external_reference=reference)
+                    review(self.owner,row.pk,revision=evidence(self.owner,row.pk)['revision'],confirm=True)
+                    models=(Expense,BankAccount,StatementUpload,StatementTransactionEvidence)
+                    before=[list(model.objects.order_by('pk').values()) for model in models]
+                    for query in ('What is the transaction direction?','What are the transaction directions?','Show direction',
+                            'Is this transaction a debit or a credit?','Was this a credit or debit?'):
+                        response=self.post(query=query,transaction_id=row.pk)
+                        self.assertEqual(response.status_code,200)
+                        result=response.json()
+                        self.assertEqual(result['grounding'],'owner_confirmed_transaction_direction')
+                        self.assertEqual(result['provider'],'local_evidence'); self.assertFalse(result['financial_authority'])
+                        self.assertIn('money into' if direction=='credit' else 'money out of',result['answer'])
+                        self.assertIn('Reversal status is not established',result['answer'])
+                        self.assertEqual('Recorded category: Transfer' in result['answer'],category=='transfer')
+                        self.assertIn(result['sources'][0]['ref'],result['answer'])
+                        self.assertEqual(result['sources'][0]['url'],evidence(self.owner,row.pk)['citation_url'])
+                        self.assertEqual(result['sources'][0]['data']['original_direction'],direction)
+                        self.assertNotIn('AMBIGUOUS',json.dumps(result)); self.assertNotIn('TEST0001',json.dumps(result))
+                    canonical=hybrid_answer(self.store,self.owner,'Show transaction direction',scope='financial_records',
+                        record_type='expense',record_id=row.pk,local=self.local)
+                    self.assertEqual(canonical['grounding'],'owner_confirmed_transaction_direction')
+                    self.assertEqual([list(model.objects.order_by('pk').values()) for model in models],before)
+                    transaction.set_rollback(True)
+        self.local.reason.assert_not_called(); self.cloud_reason.assert_not_called()
+        self.assertEqual(self.store.list_memories(self.owner),[])
+
+    def test_transfer_question_requires_reviewed_label_not_description_or_credit(self):
+        self.confirm()
+        for category in ('shopping','income','transfer'):
+            with self.subTest(category=category), transaction.atomic():
+                Expense.objects.filter(pk=self.row.pk).update(category=category,raw_description='TRANSFER REVERSAL REFUND')
+                self.confirm()
+                for query in ('Is this transaction a transfer?','Is this a transfer?','Show transfer status'):
+                    result=self.post(query=query).json()
+                    self.assertEqual(result['grounding'],'owner_confirmed_transaction_direction' if category=='transfer' else 'insufficient_evidence')
+                    if category=='transfer':
+                        self.assertIn('Recorded category: Transfer',result['answer'])
+                        self.assertIn('does not establish a matched transfer or its other account',result['answer'])
+                transaction.set_rollback(True)
+        self.local.reason.assert_not_called()
+
+    def test_reversals_ambiguous_questions_and_wrong_scopes_abstain_without_inference(self):
+        self.confirm()
+        with patch.object(MemoryStore,'retrieve',side_effect=AssertionError('No direction guess')):
+            for query in ('Is this a reversal?','Was this transaction reversed?','Is this transaction a refund?',
+                    'Is this transaction a debit, credit, transfer or reversal?','Show direction and the other account'):
+                with self.subTest(query=query):
+                    result=self.post(query=query).json()
+                    self.assertEqual(result['grounding'],'insufficient_evidence')
+                    self.assertIn('not established',result['answer'])
+            self.assertIn('No reviewed reversal linkage',self.post(query='Was this transaction reversed?').json()['answer'])
+            for scope in ('general','finance'):
+                for query in ('Show direction','Is this a transfer?','Was this transaction reversed?'):
+                    result=hybrid_answer(self.store,self.owner,query,scope=scope,local=self.local)
+                    self.assertEqual(result['grounding'],'insufficient_evidence')
+            self.assertEqual(self.post(query='Show direction',cloud_consent=True).status_code,403)
+        self.local.reason.assert_not_called(); self.cloud_reason.assert_not_called()
+
+    def test_missing_invalid_or_conflicting_retained_direction_cannot_be_attested(self):
+        self.confirm(); proof=StatementTransactionEvidence.objects.get(expense=self.row)
+        original=proof.source_values.copy()
+        for direction in (None,'','credit','CREDIT','reversal',True,{'private':'DO-NOT-EXPOSE'}):
+            with self.subTest(original_direction=direction), transaction.atomic():
+                StatementTransactionEvidence.objects.filter(pk=proof.pk).update(source_values=original|{'direction':direction})
+                self.confirm()
+                result=self.post(query='Show transaction direction').json()
+                self.assertEqual(result['grounding'],'insufficient_evidence')
+                self.assertNotIn('DO-NOT-EXPOSE',json.dumps(result))
+                transaction.set_rollback(True)
+        known=source_context(self.owner,'bank_statements',transaction_id=self.row.pk)
+        for value in (None,False,[],{},'reversal','DEBIT'):
+            with self.subTest(current_direction=value), patch('apps.ml_engine.services.hybrid_intelligence.source_context',
+                    return_value=[known[0]|{'data':known[0]['data']|{'direction':value}}]):
+                self.assertEqual(self.post(query='Show direction').json()['grounding'],'insufficient_evidence')
+        Expense.objects.filter(pk=self.row.pk).update(direction='credit'); self.confirm()
+        self.assertEqual(self.post(query='Show direction').json()['grounding'],'insufficient_evidence')
+        self.local.reason.assert_not_called()
+
+    def test_direction_owner_review_revocation_and_source_race_boundaries(self):
+        self.assertEqual(self.post(query='Show direction').json()['grounding'],'insufficient_evidence')
+        self.confirm(); self.confirm(revoke=True)
+        self.assertEqual(self.post(query='Show direction').json()['grounding'],'insufficient_evidence')
+        self.confirm()
+        def changed(*args,**kwargs):
+            sources=source_context(*args,**kwargs)
+            Expense.objects.filter(pk=self.row.pk).update(direction='credit')
+            return sources
+        with transaction.atomic():
+            with patch('apps.ml_engine.services.hybrid_intelligence.source_context',side_effect=changed):
+                self.assertEqual(self.post(query='Show direction').status_code,409)
+            transaction.set_rollback(True)
+        citation=evidence(self.owner,self.row.pk)['citation_url']
+        self.client.force_login(self.other)
+        self.assertEqual(self.post(query='Show direction').status_code,404)
+        self.assertEqual(self.client.get(citation).status_code,404)
+        self.local.reason.assert_not_called()
+
+    def test_selected_document_directions_keep_records_separate_and_reject_cross_document_selection(self):
+        from apps.ml_engine.services.canonical_evidence import document_record_page
+        _import_statement_transactions(user=self.owner,upload=self.upload,bank_account=self.account,
+            parsed=parsed_fixture(direction='credit',category='transfer',reference='CREDIT-TRANSFER'))
+        rows=list(Expense.objects.filter(statement_upload=self.upload).order_by('pk'))
+        for row in rows: review(self.owner,row.pk,revision=evidence(self.owner,row.pk)['revision'],confirm=True)
+        page=document_record_page(self.owner,'expense',self.upload.pk)
+        payload=dict(query='What are the transaction directions?',scope='financial_document',record_type='expense',document_id=self.upload.pk,
+            source_catalog=page['catalog_token'],selected_records=[dict(id=item['record_id'],revision=item['revision']) for item in page['items']])
+        result=self.client.post('/api/ai/personal-insights/',payload,content_type='application/json').json()
+        self.assertEqual(result['grounding'],'owner_confirmed_transaction_direction')
+        self.assertEqual(len(result['sources']),2)
+        for source in result['sources']:
+            direction=dict(Expense.DIRECTION_CHOICES)[source['data']['direction']]
+            self.assertIn(source['ref']+': direction: '+direction,result['answer'])
+            self.assertEqual(self.client.get(source['url']).status_code,200)
+        other,_=self.period_statement(self.owner,date(2026,8,1),date(2026,8,31))
+        bad=payload|{'selected_records':[dict(id=other.pk,revision=evidence(self.owner,other.pk)['revision'])]}
+        self.assertEqual(self.client.post('/api/ai/personal-insights/',bad,content_type='application/json').status_code,404)
+        Expense.objects.filter(pk=rows[-1].pk).update(category='income')
+        self.assertEqual(self.client.post('/api/ai/personal-insights/',payload,content_type='application/json').status_code,409)
+        self.local.reason.assert_not_called()
+
     def test_statement_period_is_exact_inclusive_cited_and_readonly_without_inference(self):
         self.confirm()
         models=(Expense,BankAccount,StatementUpload,StatementTransactionEvidence)
