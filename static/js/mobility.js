@@ -221,13 +221,10 @@ function hydratePlanSelects(selectedPhotoPlan, selectedPhotoLog) {
 
     syncPhotoLogOptions(selectedPhotoLog);
     Alfred.setDisabledIfChanged(document.querySelector("#tripLogForm button[type='submit']"), !hasPlans);
-    Alfred.setDisabledIfChanged(document.querySelector("#tripPhotoForm button[type='submit']"), false);
     if (!hasPlans) {
         showFeedback("tripLogFeedback", "Create a travel plan before logging trip activity.", "warning");
-        hideFeedback("tripPhotoFeedback");
     } else {
         hideFeedback("tripLogFeedback");
-        hideFeedback("tripPhotoFeedback");
     }
 }
 
@@ -306,6 +303,8 @@ function submitTripLog(event) {
 function submitTripPhoto(event) {
     event.preventDefault();
     const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    if (button.disabled) return;
     const formData = new FormData(form);
     const payload = new FormData();
     formData.forEach((value, key) => {
@@ -313,9 +312,12 @@ function submitTripPhoto(event) {
             payload.append(key, value);
         }
     });
+    button.disabled = true;
+    button.textContent = "Uploading photo…";
     Alfred.fetchJSON("/api/mobility/trip-photos/", { method: "POST", body: payload })
         .then(() => { form.reset(); setMobilityDefaults(); showFeedback("tripPhotoFeedback", "Trip photo uploaded.", "success"); loadMobilityDashboard(); TravelPlanner.refreshPostTrip(); })
-        .catch(error => showFeedback("tripPhotoFeedback", error.message, "danger"));
+        .catch(error => showFeedback("tripPhotoFeedback", error.message, "danger"))
+        .finally(() => { button.disabled = false; button.textContent = "Upload Photo"; });
 }
 
 function deleteTravelPlan(id) { deleteRecord(`/api/mobility/travel-plans/${id}/`, "Delete this travel plan and its logs/photos?"); }
@@ -364,7 +366,6 @@ function setMobilityDefaults() {
     document.getElementById("tripStartDate").value = todayLocal();
     document.getElementById("tripEndDate").value = todayLocal();
     document.getElementById("logDate").value = todayLocal();
-    document.getElementById("photoTakenAt").value = currentDateTimeLocal();
 }
 function todayLocal() {
     const now = new Date();

@@ -2888,6 +2888,71 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture("service-invoice-reviewed-mobile")
         self.assertEqual(before,list(Expense.objects.filter(user=owner).values()))
 
+    def test_private_trip_photo_exif_review_and_gallery(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.models import TravelPlan, TripPhoto, TravelPreferenceProfile
+        from tests.test_travel_media_acceptance import synthetic_trip_jpeg
+        # Django's test-only public media handler must not bypass ALFRED's owner gate.
+        self.enterContext(patch("django.test.testcases._MediaFilesHandler._should_handle", return_value=False))
+        folder = Path(self.enterContext(TemporaryDirectory(prefix="alfred-browser-synthetic-media-")))
+        past = timezone.localdate() - timedelta(days=5)
+        source = folder / "synthetic-private.jpg"; source.write_bytes(synthetic_trip_jpeg(past))
+        owner = self.scenario["user"]
+        plan = TravelPlan.objects.create(user=owner, title="Synthetic private Coorg trip", destination="Coorg",
+            start_date=past, end_date=past, status="completed")
+        before = list(Expense.objects.filter(user=owner).values())
+        self.login(); self.browser.get(self.live_server_url + "/mobility/")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "photoPlan").find_elements(self.By.TAG_NAME, "option"))
+        self.browser.execute_script("document.getElementById('tripPhotoForm').closest('details').querySelector('summary').click();")
+        self.assertEqual(self.browser.find_element(self.By.ID, "photoTakenAt").get_attribute("value"), "")
+        self.browser.find_element(self.By.ID, "photoFile").send_keys(str(source))
+        caption = "Synthetic private <img src=x onerror=alert(1)>"
+        self.browser.find_element(self.By.ID, "photoCaption").send_keys(caption)
+        self.memory_click('#tripPhotoForm button[type="submit"]')
+        self.wait.until(lambda _: "Trip photo uploaded" in self.text("tripPhotoFeedback"))
+        photo = TripPhoto.objects.get(user=owner)
+        self.assertIsNone(photo.travel_plan_id)
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, f'#plannerMedia [data-photo="{photo.pk}"]'))
+        self.memory_click("#plannerMedia summary")
+        self.wait.until(lambda _: self.browser.execute_script("const i=document.querySelector('#plannerMedia img'); return i && i.complete && i.naturalWidth>0;"))
+        self.assertIn("please review", self.text("plannerMedia").lower())
+        self.browser.execute_script("const d=document.querySelector('#plannerMedia details'); d.open=true; d.scrollIntoView({behavior:'instant',block:'center'});")
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, "#plannerMedia img").is_displayed())
+        self.capture("private-photo-review-desktop")
+        self.memory_click(f'#plannerMedia [data-media="add"][data-photo="{photo.pk}"]')
+        self.wait.until(lambda _: not self.browser.find_elements(self.By.CSS_SELECTOR, f'#plannerMedia [data-photo="{photo.pk}"]'))
+        photo.refresh_from_db(); self.assertEqual(photo.travel_plan_id, plan.pk)
+        self.wait.until(lambda _: "Synthetic private Coorg trip" in self.text("tripPhotoGallery"))
+        self.assertIn(caption, self.text("tripPhotoGallery"))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, "#tripPhotoGallery [onerror]"))
+        self.wait.until(lambda _: self.browser.execute_script("const i=document.querySelector('#tripPhotoGallery img'); return i && i.complete && i.naturalWidth>0;"))
+        result = self.browser.execute_async_script("fetch(arguments[0]).then(async r=>arguments[1]({status:r.status,cache:r.headers.get('Cache-Control')}));",photo.image.url)
+        self.assertEqual(result, {"status": 200, "cache": "private, no-store"})
+        self.browser.refresh()
+        self.wait.until(lambda _: caption in self.text("tripPhotoGallery"))
+        self.browser.set_window_size(390, 844)
+        for theme in ("dark", "light"):
+            ratios = self.browser.execute_script(r'''
+                document.documentElement.dataset.theme=arguments[0];
+                const card=document.querySelector('#tripPhotoGallery .photo-card');
+                card.scrollIntoView({behavior:'instant',block:'center'});
+                const luminance=color=>color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>{
+                    v/=255; return v<=.04045 ? v/12.92 : ((v+.055)/1.055)**2.4;
+                }).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+                const bg=luminance(getComputedStyle(card).backgroundColor);
+                return [...card.querySelectorAll('.fw-semibold,.muted')].map(e=>{
+                    const fg=luminance(getComputedStyle(e).color);
+                    return (Math.max(bg,fg)+.05)/(Math.min(bg,fg)+.05);
+                });
+            ''', theme)
+            self.assertTrue(ratios and all(ratio >= 4.5 for ratio in ratios), (theme, ratios))
+            self.wait.until(lambda _: self.browser.execute_script("const r=document.querySelector('#tripPhotoGallery .photo-card').getBoundingClientRect(); return r.top<innerHeight && r.bottom>0;"))
+            self.capture(f"private-photo-gallery-{theme}-mobile")
+        profile = TravelPreferenceProfile.objects.get(user=owner)
+        self.assertFalse(profile.media_learning_enabled)
+        self.assertEqual(before, list(Expense.objects.filter(user=owner).values()))
+
     def test_expense_form_preserves_import_identity_and_bank_cents(self):
         from decimal import Decimal
         from types import SimpleNamespace

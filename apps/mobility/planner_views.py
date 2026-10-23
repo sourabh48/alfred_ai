@@ -245,7 +245,8 @@ class TravelFeedbackView(APIView):
 def photo_matches(photo, plan):
     if not photo.taken_at or not plan.start_date or not plan.end_date or plan.id in photo.ignored_plan_ids:
         return False
-    if not plan.start_date <= photo.taken_at.date() <= plan.end_date:
+    taken_date = timezone.localtime(photo.taken_at).date() if timezone.is_aware(photo.taken_at) else photo.taken_at.date()
+    if not plan.start_date <= taken_date <= plan.end_date:
         return False
     from .services.travel_media import near_destination
     return bool(plan.destination and ((photo.location_name and plan.destination.lower() in photo.location_name.lower())

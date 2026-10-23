@@ -307,6 +307,7 @@ class TripLogSerializer(serializers.ModelSerializer):
 
 
 class TripPhotoSerializer(serializers.ModelSerializer):
+    image = serializers.ImageField()
     travel_plan_title = serializers.CharField(source="travel_plan.title", read_only=True, default="Unassigned")
     trip_log_title = serializers.CharField(source="trip_log.title", read_only=True)
     photo_url = serializers.SerializerMethodField()
@@ -364,6 +365,10 @@ class TripPhotoSerializer(serializers.ModelSerializer):
             attrs["travel_plan"] = trip_log.travel_plan
         if (latitude is None) != (longitude is None):
             raise serializers.ValidationError("Provide both latitude and longitude together.")
+
+        if latitude is not None and (not isfinite(latitude) or not isfinite(longitude)
+                                     or not -90 <= latitude <= 90 or not -180 <= longitude <= 180):
+            raise serializers.ValidationError("Provide finite latitude (-90 to 90) and longitude (-180 to 180).")
 
         return attrs
 

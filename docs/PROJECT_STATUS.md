@@ -4,6 +4,11 @@
 
 ## Resume here
 
+- **TRAVEL-19 PRIVATE MEDIA ACCEPTANCE — 2026-10-24:** HEAD = this checkpoint commit (base `0dc9e66`, invoice replay committed/pushed there). DONE: accepted generated local JPEG/PNG upload, EXIF timestamp/GPS inference and private trip galleries. Fixed first-day UTC/local-date mismatch; invalid timestamps no longer discard valid GPS, and malformed/nonfinite/out-of-range/invalid-hemisphere DMS evidence abstains without losing valid dates. User metadata wins. Image decoding and finite coordinate validation precede storage. Trip associations require owner confirmation; ignored/stale/foreign matches are rejected. The form leaves unknown capture time blank, retains upload feedback and prevents repeat submit while busy. Screenshot review found unreadable dark gallery cards; existing theme variables restore caption/metadata contrast. No schema, dependency, provider activation or financial writes.
+  TESTS: **56 integration backend + 10 final focused backend PASS** (eight overlap), zero skips. Final actual Chrome **one PASS**, driver-backed, zero skips; ordinary upload, EXIF suggestion/preview, explicit Add, cached gallery/reopen, escaped captions, protected media no-store and both theme/mobile layouts. Caption/metadata contrast >=4.5 verified in Chrome; desktop and both narrow-screen theme screenshots inspected. Privacy: foreign media/API/association denied; anonymous media redirects to login; CSRF enforced; media learning needs both opt-ins, favourite and explicit tags. Existing middleware cache invalidation passed; no cache rewrite. Receipts: `artifacts/media-0dc9e66/{backend-integrated,backend-accepted,chrome-gallery}.json`, `browser-gallery/browser_regression_summary.json`; earlier failures and overlapping Chrome checks retained. Test-only Django public media serving is bypassed so Chrome exercises ALFRED's actual protected endpoint.
+  FEATURES: **69 verified / 27 unaccepted / 29 partial / 10 missing / five approval / three external = 143**. Newly verified TRAVEL-19 is local/source acceptance; no HEIC/unreviewed camera-layout universality, real location authenticity, public sharing, live provider or packaged acceptance claimed. BIKE-04 stays unaccepted pending approved real invoice/insurance layouts. Files alphabetically: `apps/mobility/planner_views.py`, `apps/mobility/serializers.py`, `apps/mobility/services/travel_media.py`, `docs/PROJECT_STATUS.md`, `static/css/style.css`, `static/js/mobility.js`, `templates/mobility/dashboard.html`, `tests/test_travel_media_acceptance.py`, `tests/test_user_data_browser.py`.
+  BOUNDARY: exact source AST/privacy/push receipts `artifacts/media-boundary-0dc9e66/{graph,privacy-manifest,source-checks,push}.json`; finish non-PASS/mismatched receipts before editing. Master/frozen/package unchanged; accepted package stays `3bc75ac`. NEXT TASK: COUNCIL-01 scoped registry persistence/recovery inspection after media boundary, without claiming planning/coding agents or enabling training; inspect current callers and reproduce any defect before changes. Registry routing/held-out model acceptance remains separate. If no defect is established, continue TRAVEL-10 freshness/provenance acceptance with booking availability explicitly unavailable. RESUME COMMAND: `Set-Location F:\ALFRED_DEV\post-audit; git status -sb; Get-Content docs/PROJECT_STATUS.md -Encoding UTF8 -TotalCount 14`.
+
 - **BIKE-04 INVOICE REPLAY CHECKPOINT — 2026-10-24:** HEAD = this checkpoint commit (base `3c09291`). DONE: recovered interrupted work and fixed duplicate service posting. Validated costs/chronology precede atomic document/log writes. Renamed byte replay returns the existing owned log, preserving reviewed cents/source; complete identity conflicts, stale vehicle edits, legacy identities and missing/ambiguous logs return 409 for review. Concurrent SQLite uploads post one log; failed posting rolls back rows/new raw files. Imported source/profile links are immutable. UI identifies replays. Actual PDF regression restores missing next-service checkpoints to unknown/None. No schema/dependencies/history or canonical expense writes changed.
   TESTS: **24 focused backend + one actual Chrome PASS**, zero skips; `artifacts/invoice-3c09291/{backend-integrated,chrome-accepted}.json`, driver-backed `browser-accepted/browser_regression_summary.json`; desktop/narrow-screen screenshots inspected. Covers cents, rollback, identity/replay, owner isolation, concurrency/retry, source immutability, review/delete compatibility and actual synthetic PDF parsing. Earlier reproduction, multipart file-copy, missing fixture dependency and zero-checkpoint failures retained; final checks pass with existing PyMuPDF. Prior service/refill Chrome also passed in `chrome-final.log` (not summed). Files alphabetically: `apps/mobility/serializers.py`, `apps/mobility/views.py`, `docs/PROJECT_STATUS.md`, `static/js/bike_service.js`, `tests/test_service_import_receipts.py`, `tests/test_user_data_browser.py`.
   FEATURES: **68 verified / 28 unaccepted / 29 partial / 10 missing / five approval / three external = 143**, unchanged. BIKE-04 remains IMPLEMENTED_NOT_ACCEPTED: approved real invoice/insurance layouts have not been accepted. Incomplete identifiers support byte replay only; legacy rows are not backfilled. Exact-source boundary receipts: `artifacts/invoice-boundary-3c09291/{graph,privacy-manifest,source-checks,push}.json`; finish any non-PASS/mismatched receipt before new edits. Package stays `3bc75ac`; native/runtime/independent-PC/production and approval gates unchanged. NEXT TASK: TRAVEL-19 local photo/EXIF/date/GPS and gallery acceptance, with explicit association confirmation and private media. RESUME COMMAND: `Set-Location F:\ALFRED_DEV\post-audit; git status -sb; Get-Content docs/PROJECT_STATUS.md -Encoding UTF8 -TotalCount 12`.
@@ -501,12 +506,12 @@ The denominator remains the original 143 audited capabilities, not new commit/su
 
 - BLOCKED_APPROVAL: **5**
 - BLOCKED_EXTERNAL: **3**
-- COMPLETE_VERIFIED: **68**
-- IMPLEMENTED_NOT_ACCEPTED: **28**
+- COMPLETE_VERIFIED: **69**
+- IMPLEMENTED_NOT_ACCEPTED: **27**
 - NOT_IMPLEMENTED: **10**
 - PARTIALLY_IMPLEMENTED: **29**
 
-Technical completion: **68/143 = 47.6%**. Remaining: **75**, including implemented but unaccepted and approval/external blockers. This is not a product acceptance percentage.
+Technical completion: **69/143 = 48.3%**. Remaining: **74**, including implemented but unaccepted and approval/external blockers. This is not a product acceptance percentage.
 
 ## Prioritized remaining roadmap and approval boundaries
 
@@ -1594,14 +1599,14 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-19 — Photos, GPS/date inference and trip galleries
 
-**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+**COMPLETE_VERIFIED** · Travel · P2.
 
 - Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel_media.py](../apps/mobility/services/travel_media.py).
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
 - Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Acceptance: Generated private JPEG/PNG, EXIF date/GPS, explicit owner association and gallery accepted: 56 backend integration + ten final focused (eight overlap), one actual Chrome PASS, zero skips. Receipts `artifacts/media-0dc9e66/`; both theme/mobile screenshots inspected. Source-only; no public upload/provider or packaged claim.
 - Limitations/dependencies: TripPhoto and EXIF review exist; inferred locations need user confirmation. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Accept authorized media layouts without publishing location.
+- Next: Preserve private/confirmed associations and opt-ins. Evaluate additional authorized camera/EXIF layouts separately; unknown EXIF timezones use the disclosed application timezone and do not establish location authenticity.
 
 ### TRAVEL-20 — Video management and social Travel profile
 
