@@ -88,3 +88,45 @@ class ExpenseCorrectionTests(TestCase):
         self.client.force_authenticate(other)
         response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"amount": "1.00"}, format="json")
         self.assertEqual(response.status_code, 404)
+
+    def test_unrelated_and_unchanged_balance_corrections_keep_account_snapshot(self):
+        for payload in ({"category": "food"}, {"amount": "3.335"}, {"closing_balance": "10.01"}, {"closing_balance": None}):
+            with self.subTest(payload=payload):
+                response = self.client.patch(f"/api/expenses/{self.row.pk}/", payload, format="json")
+                self.assertEqual(response.status_code, 200)
+                self.account.refresh_from_db()
+                self.assertEqual(self.account.current_balance, Decimal("80.00"))
+                self.assertIsNone(self.account.last_synced_at)
+
+    def test_historical_balance_correction_does_not_replace_newer_account_snapshot(self):
+        Expense.objects.create(user=self.user, bank_account=self.account, amount="1.00", closing_balance="70.00", transaction_date="2026-09-02")
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"closing_balance": "15.005"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.row.refresh_from_db()
+        self.account.refresh_from_db()
+        self.assertEqual(self.row.closing_balance, Decimal("15.01"))
+        self.assertEqual(self.account.current_balance, Decimal("80.00"))
+
+    def test_latest_explicit_balance_correction_syncs_exact_cents_and_zero(self):
+        for raw, expected in (("99.995", "100.00"), ("0", "0.00")):
+            with self.subTest(raw=raw):
+                response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"closing_balance": raw}, format="json")
+                self.assertEqual(response.status_code, 200)
+                self.row.refresh_from_db()
+                self.account.refresh_from_db()
+                self.assertEqual((self.row.closing_balance, self.account.current_balance), (Decimal(expected), Decimal(expected)))
+
+    def test_same_day_later_transaction_keeps_balance_authority(self):
+        Expense.objects.create(user=self.user, bank_account=self.account, amount="1.00", closing_balance="70.00", transaction_date=self.row.transaction_date)
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"closing_balance": "15.00"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.account.refresh_from_db()
+        self.assertEqual(self.account.current_balance, Decimal("80.00"))
+
+    def test_failed_explicit_balance_posting_rolls_back_correction(self):
+        with patch("apps.expenses.views.sync_account_balance", side_effect=ValueError("synthetic posting failure")):
+            with self.assertRaises(ValueError):
+                self.client.patch(f"/api/expenses/{self.row.pk}/", {"closing_balance": "20.00"}, format="json")
+        self.row.refresh_from_db()
+        self.account.refresh_from_db()
+        self.assertEqual((self.row.closing_balance, self.account.current_balance), (Decimal("10.01"), Decimal("80.00")))

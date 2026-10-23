@@ -319,8 +319,18 @@ class ExpenseDetailView(RetrieveUpdateDestroyAPIView):
 
     @transaction.atomic
     def perform_update(self, serializer):
+        balance_changed = (
+            "closing_balance" in serializer.validated_data
+            and serializer.validated_data["closing_balance"] != serializer.instance.closing_balance
+        )
         expense = serializer.save()
-        sync_account_balance(expense.bank_account, expense.closing_balance)
+        if balance_changed and expense.bank_account_id:
+            latest_id = (
+                Expense.objects.filter(user=self.request.user, bank_account_id=expense.bank_account_id, closing_balance__isnull=False)
+                .order_by("-transaction_date", "-id").values_list("pk", flat=True).first()
+            )
+            if latest_id == expense.pk:
+                sync_account_balance(expense.bank_account, expense.closing_balance)
 
 
 class ExpenseTimelineView(APIView):
