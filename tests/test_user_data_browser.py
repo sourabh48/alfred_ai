@@ -713,7 +713,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         store=MemoryStore(root/'vault'); owner=self.scenario['user']
         identity=store.save_verified(owner,{'statement':'synthetic mountain preference'},{'source':'synthetic owner review'},verified=True)
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
-        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').is_displayed())
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in (
+            'Off', 'Unavailable · operator retention/recovery approval required'))
         self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_enabled())
         self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('synthetic mountain question')
         self.memory_click('#intelligenceForm button')
@@ -868,7 +869,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local))
         self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner', return_value=local))
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
-        self.wait.until(lambda _: self.text('conversationHistoryStatus') != 'Checking local policy')
+        expected_policy = 'Off' if authorized else 'Unavailable · operator retention/recovery approval required'
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == expected_policy)
         self.memory_click('#conversationHistoryPanel > summary')
         return ConversationHistory(MemoryStore(root/'vault')), local
 
