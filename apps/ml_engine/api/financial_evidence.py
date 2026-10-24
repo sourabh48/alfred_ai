@@ -30,6 +30,16 @@ class DocumentRecordPageAPI(MemoryAPI):
             filters={key:value for key,value in data.items() if key!='cursor'}))
 
 
+class DocumentKnowledgeSearchAPI(MemoryAPI):
+    def post(self, request, kind, document_id):
+        from ..services.document_knowledge import search_document
+        if request.query_params:
+            raise ValueError('Search keywords belong in the request body.')
+        data = self.payload(('query', 'catalog_token'))
+        return Response(search_document(request.user, kind, document_id,
+            query=data.get('query'), catalog_token=data.get('catalog_token')))
+
+
 class ClosureEvidenceAPI(MemoryAPI):
     def get(self, request, identity):
         from ..services.hybrid_intelligence import source_context

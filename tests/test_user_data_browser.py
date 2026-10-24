@@ -2005,6 +2005,57 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local.reason.assert_not_called(); cloud.assert_not_called()
         self.assertEqual(resolve_canonical_financial_baseline(owner,fresh=True)['decimal_amounts'],before)
 
+    def test_selected_document_extraction_search_privacy_staleness_and_mobile(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.ml_engine.services.document_knowledge import LIMITATION
+        row,documents,service,local=self.financial_source_selection_fixture('investment')
+        document=documents[0]
+        document.extracted_text='Synthetic exit load applies for thirty days. <img src=x onerror="window.knowledgeLeak=true"> Original value 100.00.'
+        document.save()
+        before=list(type(row).objects.order_by('pk').values())
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: 'Documents' in self.text('documentSourcesStatus'))
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,f'#documentSourcesItems button[data-document-id="{document.pk}"]'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{document.pk}"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentKnowledgeQuery').is_displayed())
+        query=self.browser.find_element(self.By.ID,'documentKnowledgeQuery'); query.send_keys('exit load')
+        self.memory_click('#documentKnowledgeForm button[type="submit"]')
+        self.wait.until(lambda _: '1 extraction excerpt' in self.text('documentKnowledgeStatus'))
+        self.assertIn(document.extracted_text,self.text('documentKnowledgeResults'))
+        self.assertIn(LIMITATION,self.text('documentKnowledgeResults'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.knowledgeLeak)'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentKnowledgeResults img'))
+        link=self.browser.find_element(self.By.CSS_SELECTOR,'#documentKnowledgeResults a')
+        self.assertIn('/media/',link.get_attribute('href'))
+        self.assertFalse(self.browser.execute_script("return performance.getEntriesByType('resource').some(e => /[?&]query=/.test(e.name))"))
+        self.browser.execute_script("document.getElementById('documentKnowledgeForm').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('document-extraction-search-desktop')
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('documentKnowledgeForm').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('document-extraction-search-mobile')
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        query.clear(); query.send_keys('missing keywords')
+        self.memory_click('#documentKnowledgeForm button[type="submit"]')
+        self.wait.until(lambda _: 'does not prove' in self.text('documentKnowledgeStatus'))
+        self.assertNotIn(document.extracted_text,self.text('documentKnowledgeResults'))
+        document.extracted_text='Changed retained extraction'; document.save()
+        query.clear(); query.send_keys('exit load')
+        self.memory_click('#documentKnowledgeForm button[type="submit"]')
+        self.wait.until(lambda _: 'Selected extraction changed' in self.text('documentKnowledgeStatus'))
+        self.assertEqual(self.text('documentKnowledgeResults'),'')
+        self.assertEqual(query.get_property('value'),'exit load')
+        self.memory_click('#documentSourcesRefresh')
+        self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus') and self.browser.find_element(self.By.ID,'documentKnowledgeQuery').is_displayed())
+        self.assertEqual(query.get_property('value'),'')
+        self.memory_click('#documentSourcesDocuments')
+        self.wait.until(lambda _: 'Documents' in self.text('documentSourcesStatus'))
+        self.assertFalse(query.is_displayed())
+        self.assertEqual(list(type(row).objects.order_by('pk').values()),before)
+        local.reason.assert_not_called()
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('documentKnowledgeResults'),'')
+
     def test_document_center_owned_source_discovery_review_pages_and_stale_refresh(self):
         from selenium.webdriver.support.ui import Select
         from django.core.files.uploadedfile import SimpleUploadedFile
