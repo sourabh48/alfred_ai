@@ -132,7 +132,7 @@ function renderCareerSummary(profile, projection, resume, jobAnalysis, market, t
     const cards = [
         { title: "Experience", value: `${Alfred.formatNumber(profile.experience_years, 1)} yrs`, copy: profile.role || "Role pending" },
         { title: "Resume Parse", value: resume ? `${Alfred.formatNumber((resume.parse_confidence || 0) * 100, 0)}%` : "No resume", copy: resume ? (resume.parser_status_label || "Parsed") : "Upload a resume" },
-        { title: "Job Fit", value: jobAnalysis ? `${Alfred.formatNumber(jobAnalysis.fit_score || 0, 0)}/100` : "No job link", copy: jobAnalysis ? `${Alfred.escapeHtml(jobAnalysis.company || jobAnalysis.source_name || "Latest analysis")}` : "Paste a job URL" },
+        { title: "Rule-based Job Fit", value: jobAnalysis ? (jobAnalysis.fit_score == null ? "Unavailable" : `${Alfred.formatNumber(jobAnalysis.fit_score, 0)}/100`) : "No comparison", copy: jobAnalysis ? `${Alfred.escapeHtml(jobAnalysis.company || jobAnalysis.source_name || "Latest analysis")} · Not a hiring probability` : "Provide a job description" },
         {
             title: "Career Timing",
             value: timing?.readiness_score != null ? `${Alfred.formatNumber(timing.readiness_score || 0, 0)}/100` : (market ? `${Alfred.formatNumber(market.risk_score || 0, 0)}/100` : "N/A"),
@@ -177,7 +177,7 @@ function renderCareerChart(items) {
 function renderCareerInsights(projectionInsights, marketInsights, timing) {
     const target = document.getElementById("careerInsightList");
     const items = [...projectionInsights, ...(timing?.signals || []), ...marketInsights].slice(0, 7);
-    target.innerHTML = items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+    target.innerHTML = items.map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join("");
 }
 
 function renderCareerSnapshot(profile) {
@@ -294,16 +294,16 @@ function renderCareerTiming(timing) {
                 <span class="status-pill ${careerTone(timing.readiness_level)}">${Alfred.escapeHtml(timing.readiness_level || "guarded")}</span>
             </div>
         </div>
-        <div class="mini-card">
+        <div class="mini-card surface-card">
             <div class="fw-semibold mb-2">Current signals</div>
             <ul class="insight-list mb-0">
-                ${(timing.signals || []).map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("")}
+                ${(timing.signals || []).map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join("")}
             </ul>
         </div>
-        <div class="mini-card">
+        <div class="mini-card surface-card">
             <div class="fw-semibold mb-2">What blocks a bigger move</div>
             <ul class="insight-list mb-0">
-                ${(timing.blockers || []).map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("")}
+                ${(timing.blockers || []).map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join("")}
             </ul>
         </div>
         <div class="mini-card">
@@ -402,6 +402,7 @@ function renderJobMatchPanel(analysis) {
     }
     const payload = analysis.extracted_payload || {};
     const fit = payload.fit || {};
+    const sourcesOpen = target.querySelector('[data-fit-sources]')?.open || false;
     const compensation = payload.compensation_benchmark || {};
     let jobHref = "";
     try {
@@ -409,23 +410,32 @@ function renderJobMatchPanel(analysis) {
         if (["http:", "https:"].includes(url.protocol) && !url.username && !url.password) jobHref = url.href;
     } catch (_) { /* A missing or malformed source is displayed without an active link. */ }
     target.innerHTML = `
-        <div class="mini-card">
+        <div class="mini-card surface-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
                     <div class="fw-semibold">${Alfred.escapeHtml(analysis.job_title || "Job role")} <span class="muted small">${Alfred.escapeHtml(analysis.company || analysis.source_name || "")}</span></div>
                     <div class="muted small">${Alfred.escapeHtml(analysis.location || "Location not detected")}</div>
                     <div class="muted small mt-1">Source ${Alfred.escapeHtml(payload.job_snapshot?.source_kind || "job_page")}</div>
                     <div class="muted small mt-2">${Alfred.escapeHtml(analysis.summary || "")}</div>
-                    <div class="muted small mt-2"><strong>Matched:</strong> ${fit.matched_skills?.length ? Alfred.escapeHtml(fit.matched_skills.join(", ")) : "No strong overlap detected."}</div>
-                    <div class="muted small mt-2"><strong>Gaps:</strong> ${fit.missing_skills?.length ? Alfred.escapeHtml(fit.missing_skills.join(", ")) : "No major gap extracted."}</div>
+                    <div class="muted small mt-2"><strong>Matched listed terms${fit.sources?.length ? " [1, 2]" : ""}:</strong> ${fit.matched_skills?.length ? Alfred.escapeHtml(fit.matched_skills.join(", ")) : "No overlap established."}</div>
+                    <div class="muted small mt-2"><strong>Not listed in saved skills${fit.sources?.length ? " [1, 2]" : ""}:</strong> ${fit.missing_skills?.length ? Alfred.escapeHtml(fit.missing_skills.join(", ")) : "No additional term extracted; this does not confirm full coverage."}</div>
+                    <div class="small mt-2" data-fit-uncertainty>${(fit.uncertainty || ["Legacy comparison has no saved uncertainty or source references; analyze it again before relying on the score."]).map(item => `<p class="mb-1">${Alfred.escapeHtml(item)}</p>`).join("")}</div>
+                    <details class="mt-3 text-break" data-fit-sources ${sourcesOpen ? "open" : ""}>
+                        <summary>Saved comparison sources</summary>
+                        <div class="small mt-2">Captured with this analysis; not live or independently verified source claims.</div>
+                        ${(fit.sources || []).map((source, index) => `<div class="mt-2 small"><strong>[${index + 1}] ${Alfred.escapeHtml(source.label || source.kind)}</strong>
+                            <div>${Alfred.escapeHtml(source.kind || "")} ${source.record_id ? `record ${Alfred.escapeHtml(source.record_id)}` : ""} · Saved skills: ${Alfred.escapeHtml((source.skills || []).join(", ") || "Unavailable")}</div>
+                            <div>Experience field: ${source.experience_years == null ? "Unavailable" : Alfred.escapeHtml(source.experience_years)} years</div>
+                            ${source.excerpt ? `<blockquote class="mt-2 mb-0">${Alfred.escapeHtml(source.excerpt)}</blockquote>` : ""}</div>`).join("") || "No saved source references."}
+                    </details>
                     <div class="muted small mt-2"><strong>Compensation:</strong> ${compensation.available ? Alfred.escapeHtml(`${Alfred.formatCurrency(compensation.market_min_annual || 0)} to ${Alfred.formatCurrency(compensation.market_max_annual || compensation.market_min_annual || 0)} annual`) : "No salary-bearing evidence detected yet."}</div>
                     <div class="muted small mt-2">${Alfred.escapeHtml(analysis.strengths || "")}</div>
                     <div class="muted small mt-2">${Alfred.escapeHtml(analysis.gaps || "")}</div>
                     <div class="mt-2">${jobHref ? `<a href="${Alfred.escapeHtml(jobHref)}" target="_blank" rel="noopener">Open job link</a>` : "Job link unavailable"}</div>
                 </div>
                 <div class="text-end">
-                    <div class="metric-value" style="font-size:1.6rem;">${Alfred.formatNumber(analysis.fit_score || 0, 0)}/100</div>
-                    <div class="muted small">Fit score</div>
+                    <div class="metric-value" style="font-size:1.6rem;">${analysis.fit_score == null ? "Unavailable" : `${Alfred.formatNumber(analysis.fit_score, 0)}/100`}</div>
+                    <div class="muted small">Rule-based fit</div>
                     <div class="mt-2 muted small">Risk ${Alfred.formatNumber(analysis.market_risk_score || 0, 0)}/100</div>
                 </div>
             </div>

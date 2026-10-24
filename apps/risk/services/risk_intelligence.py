@@ -73,7 +73,7 @@ class RiskIntelligenceService:
         profile = CareerProfile.objects.filter(user=user).only("role").first()
         latest_job_analysis = (
             CareerJobAnalysis.objects.filter(user=user)
-            .only("fit_score", "company", "created_at")
+            .only("fit_score", "extracted_payload", "company", "created_at")
             .order_by("-created_at", "-id")
             .first()
         )
@@ -113,7 +113,8 @@ class RiskIntelligenceService:
             + max(0, 65 - (mobility_summary.get("latest_condition_score") or 0)) * 0.5
         )
 
-        fit_gap = max(0.0, 100.0 - float(getattr(latest_job_analysis, "fit_score", 0) or 0)) if latest_job_analysis else 24.0
+        available_fit = latest_job_analysis.available_fit_score if latest_job_analysis else None
+        fit_gap = max(0.0, 100.0 - float(available_fit or 0)) if latest_job_analysis else 24.0
 
         career_score = _clamp(
             (manual_layoff * 0.35)
@@ -157,7 +158,7 @@ class RiskIntelligenceService:
                 "drivers": [
                     f"Manual layoff snapshot {manual_layoff:.0f}/100",
                     f"External market risk {career_market['risk_score']:.0f}/100",
-                    f"Job-fit gap {fit_gap:.0f}/100" if latest_job_analysis else "No latest job-fit analysis yet",
+                    f"Rule-based job-fit gap {fit_gap:.0f}/100" if available_fit is not None else "Job-fit evidence unavailable; conservative risk fallback, not a measured gap",
                 ],
             },
             {
@@ -244,7 +245,7 @@ class RiskIntelligenceService:
             "action_items": action_items,
             "module_signals": {
                 "career_market_risk": round(career_market["risk_score"], 1),
-                "job_fit_score": round(float(getattr(latest_job_analysis, "fit_score", 0) or 0), 1) if latest_job_analysis else None,
+                "job_fit_score": round(available_fit, 1) if available_fit is not None else None,
                 "debt_burden_pct": round(debt_burden, 1),
                 "emergency_months": round(emergency_months, 1),
                 "average_stress": round(avg_stress, 1),
@@ -322,12 +323,12 @@ class RiskIntelligenceService:
                             "note": pending[0]["note"],
                         }
                     )
-        if latest_job_analysis and getattr(latest_job_analysis, "fit_score", 0) < 70:
+        if latest_job_analysis and (latest_job_analysis.available_fit_score or 0) < 70:
             actions.append(
                 {
-                    "title": "Close job-fit gaps",
+                    "title": "Review job-fit evidence" if latest_job_analysis.available_fit_score is None else "Close job-fit gaps",
                     "priority": "guarded",
-                    "note": "The latest analyzed role is below a 70/100 fit. Address the missing skills before prioritizing that role.",
+                    "note": ("Overall job fit is unavailable. Review the saved resume and JD before prioritizing that role." if latest_job_analysis.available_fit_score is None else "The latest analyzed role is below a 70/100 fit. Address the missing skills before prioritizing that role."),
                 }
             )
         return actions[:6]

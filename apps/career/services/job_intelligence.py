@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from decimal import Decimal, DecimalException
 import hashlib
 import json
+import math
 import re
 from statistics import median
 from urllib.parse import quote_plus, urlparse
@@ -19,6 +20,7 @@ from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot
 from apps.expenses.money import expense_money, money_float
 from apps.users.money import profile_money
+from .resume_intelligence import extract_skill_terms
 
 JOB_SKILLS = {
     "python", "sql", "excel", "power bi", "tableau", "django", "react", "node", "azure", "gcp",
@@ -84,9 +86,9 @@ COUNTRY_ALIASES = {
     "global": "Remote",
 }
 SALARY_BLOCK_RE = re.compile(
-    r"(?P<currency>INR|Rs\.?|\u20b9|USD|\$)?\s*"
-    r"(?P<first>\d[\d,]*(?:\.\d+)?)\s*(?P<first_unit>k|lpa|lakh|lakhs|crore|cr|million|m)?"
-    r"(?:\s*(?:-|to|\u2013|\u2014)\s*(?P<second>\d[\d,]*(?:\.\d+)?)\s*(?P<second_unit>k|lpa|lakh|lakhs|crore|cr|million|m)?)?"
+    r"(?<![\w.])(?P<currency>INR\b|Rs\.?\b|\u20b9|USD\b|\$)?\s*"
+    r"(?P<first>\d[\d,]*(?:\.\d+)?)\s*(?P<first_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?"
+    r"(?:\s*(?:-|to|\u2013|\u2014)\s*(?P<second>\d[\d,]*(?:\.\d+)?)\s*(?P<second_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?)?"
     r"\s*(?P<period>per\s+annum|per\s+year|/year|yearly|annual|annum|lpa|per\s+month|/month|monthly|month|pm|per\s+hour|/hour|hourly)?",
     re.IGNORECASE,
 )
@@ -262,37 +264,70 @@ class JobIntelligenceService:
             source_kind="recruiter_message",
         )
 
-    def compare_resume_to_job(self, resume_payload: dict, job: JobPostingSnapshot) -> dict:
-        resume_skills = {item.lower() for item in (resume_payload.get("skills") or [])}
-        required_skills = {item.lower() for item in job.required_skills}
+    def compare_resume_to_job(self, resume_payload: dict, job: JobPostingSnapshot, *, resume_source=None) -> dict:
+        resume_skills = {item.strip().casefold() for item in (resume_payload.get("skills") or []) if isinstance(item, str) and item.strip()}
+        required_skills = {item.strip().casefold() for item in job.required_skills if item.strip()}
         matched = sorted(skill.title() for skill in (resume_skills & required_skills))
         missing = sorted(skill.title() for skill in (required_skills - resume_skills))
         extra = sorted(skill.title() for skill in (resume_skills - required_skills))[:8]
-        role = (resume_payload.get("role") or "").lower()
+        role = (resume_payload.get("role") or "").strip().lower()
         role_fit = 1.0 if role and role in job.title.lower() else (0.75 if role and any(token in job.title.lower() for token in role.split()) else 0.5)
-        exp_years = float(resume_payload.get("experience_years") or 0)
+        try:
+            exp_years = float(resume_payload.get("experience_years"))
+            experience_known = math.isfinite(exp_years) and exp_years >= 0
+        except (TypeError, ValueError, OverflowError):
+            exp_years, experience_known = 0, False
+        if not experience_known:
+            exp_years = 0
         exp_fit = 1.0 if not job.experience_years or exp_years >= job.experience_years else max(exp_years / max(job.experience_years, 1), 0)
         skill_fit = 0.55 if not required_skills else len(matched) / len(required_skills)
         fit_score = round(min(((skill_fit * 0.6) + (exp_fit * 0.25) + (role_fit * 0.15)) * 100, 99), 1)
+        uncertainty = ["Rule-based overlap, not a hiring probability or independently verified proficiency.",
+                       "Catalog extraction covers up to 20 listed terms, not all requirements.",
+                       "Listed terms may be preferred or contextual; a missing term does not prove a missing skill."]
+        available = bool(resume_skills and required_skills and role and role != "profile pending" and job.title and experience_known and math.isfinite(job.experience_years) and job.experience_years > 0)
+        if not available:
+            uncertainty.append("Role, skill or experience evidence is incomplete; overall fit is unavailable.")
+        # shortcut: mixed/optional requirements need human review; do not infer their semantics.
+        ambiguous = re.search(r"\b(?:not required|no experience|optional|preferred|nice.to.have)\b", job.description, re.I)
+        conflicting = len({float(item.group(1)) for item in EXPERIENCE_RE.finditer(job.description)}) > 1
+        if ambiguous or conflicting:
+            available = False
+            uncertainty.append("Optional, negated or conflicting requirements need review; overall fit is unavailable.")
+        resume_source = resume_source or {"kind": "saved_fields", "label": "Saved resume/profile fields"}
+        if resume_source.get("parser_status", "parsed") not in ("parsed", "user_declared"):
+            available = False
+            uncertainty.append("The selected resume extraction needs review; overall fit is unavailable.")
+        if not available:
+            fit_score = None
         strengths, gaps = [], []
         if matched:
             strengths.append(f"Matched skills: {', '.join(matched[:8])}.")
-        if exp_fit >= 1:
+        if not (ambiguous or conflicting) and experience_known and job.experience_years > 0 and exp_fit >= 1:
             strengths.append("Experience level appears to meet or exceed the stated requirement.")
-        elif job.experience_years:
+        elif not (ambiguous or conflicting) and experience_known and job.experience_years:
             gaps.append(f"Resume appears below the stated experience mark of {job.experience_years:.1f} years.")
         if missing:
-            gaps.append(f"Likely missing or weak skills: {', '.join(missing[:8])}.")
+            gaps.append(f"JD terms not listed in the saved resume/profile skills: {', '.join(missing[:8])}. Review whether they are requirements.")
         if extra:
-            strengths.append(f"Extra adjacent strengths detected: {', '.join(extra[:6])}.")
+            strengths.append(f"Other listed resume/profile skills: {', '.join(extra[:6])}.")
         if job.salary_min or job.salary_max:
             strengths.append("The role exposes a pay range, so Alfred can compare it against your current compensation more concretely.")
         if not strengths:
-            strengths.append("General title alignment exists, but the fit signal is weak without stronger skill overlap.")
+            strengths.append("No skill overlap established from the saved fields.")
         if not gaps:
-            gaps.append("No major gap is obvious from the extracted description, but manual review is still required.")
+            gaps.append("No additional listed-term gap extracted; manual review is still required." if available else "Insufficient evidence to assess overall gaps; review the saved sources.")
         return {
             "fit_score": fit_score,
+            "score_status": "RULE_BASED" if available else "UNAVAILABLE",
+            "uncertainty": uncertainty,
+            "sources": [
+                {**resume_source, "skills": sorted(item.title() for item in resume_skills), "role": role,
+                 "experience_years": exp_years if experience_known else None},
+                {"kind": job.source_kind, "label": job.title or job.source_name,
+                 "skills": sorted(item.title() for item in required_skills), "experience_years": job.experience_years,
+                 "excerpt": job.description[:4000]},
+            ],
             "matched_skills": matched,
             "missing_skills": missing,
             "strengths": strengths[:5],
@@ -1398,12 +1433,11 @@ class JobIntelligenceService:
         return match.group(1) if match else ""
 
     def _extract_skills(self, text: str) -> list[str]:
-        lowered = text.lower()
-        return [skill.title() for skill in sorted(JOB_SKILLS) if skill in lowered][:20]
+        return extract_skill_terms(text, JOB_SKILLS)
 
     def _extract_experience(self, text: str) -> float:
         matches = [float(item.group(1)) for item in EXPERIENCE_RE.finditer(text)]
-        return max(matches) if matches else 0.0
+        return max((value for value in matches if math.isfinite(value)), default=0.0)
 
     def _extract_employment_type(self, ld_json: dict, text: str) -> str:
         raw = ld_json.get("employmentType")
@@ -1461,7 +1495,8 @@ class JobIntelligenceService:
             raise ValueError('Provide finite positive salary evidence in cents within the supported range.') from None
 
     def _parse_salary_text(self, text: str) -> dict | None:
-        match = SALARY_BLOCK_RE.search(text or "")
+        match = next((item for item in SALARY_BLOCK_RE.finditer(text or "")
+                      if item.group("currency") or item.group("first_unit") or item.group("second_unit")), None)
         if not match:
             return None
         fallback_unit = self._salary_unit_hint(match.group("period") or "")

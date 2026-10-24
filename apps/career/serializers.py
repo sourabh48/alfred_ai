@@ -82,6 +82,7 @@ class CareerResumeSerializer(serializers.ModelSerializer):
 
 
 class CareerJobAnalysisSerializer(serializers.ModelSerializer):
+    fit_score = serializers.FloatField(source="available_fit_score", read_only=True, allow_null=True)
     parser_status_label = serializers.CharField(source="get_parser_status_display", read_only=True)
 
     class Meta:

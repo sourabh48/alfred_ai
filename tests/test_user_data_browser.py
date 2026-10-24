@@ -56,6 +56,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         super().tearDownClass()
 
     def setUp(self):
+        self.browser.set_window_size(1440, 1200)
         directory = self.enterContext(TemporaryDirectory(prefix="alfred-browser-invite-limits-"))
         self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=directory,
             ALFRED_ABUSE_THROTTLE_DIR=str(Path(directory) / 'runtime-limits')))
@@ -83,7 +84,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.find_element(self.By.NAME, "username").send_keys(username)
         self.browser.find_element(self.By.NAME, "password").send_keys(PASSWORD)
         self.wait.until(lambda driver: driver.execute_script("return !document.getAnimations().some(a => a.playState === 'running' && a.effect?.target?.closest('.auth-panel'))"))
-        self.browser.find_element(self.By.CSS_SELECTOR, 'button[type="submit"]').click()
+        self.memory_click('form.row.g-3 button[type="submit"]')
         self.wait.until(lambda driver: driver.find_elements(self.By.ID, "dashboardPeriodNote"))
         self.wait.until(lambda driver: self.text("dashboardPeriodNote") and "Loading" not in self.text("dashboardPeriodNote"))
         self.wait.until(lambda driver: self.text("dashboardSummaryCards"))
@@ -101,16 +102,16 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         ''',path,payload,csrf)
 
     def memory_click(self,selector):
-        from selenium.common.exceptions import ElementClickInterceptedException
+        from selenium.common.exceptions import ElementClickInterceptedException, NoSuchElementException, StaleElementReferenceException
 
         def click_when_uncovered(_):
-            element=self.browser.find_element(self.By.CSS_SELECTOR,selector)
-            self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});",element)
-            if not element.is_displayed() or not element.is_enabled():
-                return False
             try:
+                element=self.browser.find_element(self.By.CSS_SELECTOR,selector)
+                self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});",element)
+                if not element.is_displayed() or not element.is_enabled():
+                    return False
                 element.click()
-            except ElementClickInterceptedException:
+            except (ElementClickInterceptedException, NoSuchElementException, StaleElementReferenceException):
                 return False
             return True
 
@@ -135,6 +136,58 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,
                 f'#accountProfileForm [name="{field}"]').get_attribute('value'), amount)
         self.capture('user-decimal-profile-reload')
+
+    def test_career_matching_cites_saved_sources_and_abstains_without_requirements(self):
+        self.browser.set_window_size(1440,1200)
+        from apps.career.models import CareerJobAnalysis, CareerResume
+        from tests.test_career_matching_acceptance import JD, RESUME, offline_career
+        from apps.expenses.models import BankAccount
+        from apps.investments.models import Investment
+        from apps.loans.models import Loan
+        offline_career(self)
+        models = (Expense, BankAccount, Investment, Loan)
+        before = [list(model.objects.values()) for model in models]
+        owner = self.scenario["user"]
+        resume = CareerResume.objects.create(user=owner, parser_status="parsed",
+            file_name='synthetic-<img src=x onerror="window.__matchXss=1">.txt', extracted_payload=RESUME)
+        self.login(); self.browser.get(self.live_server_url + "/career/")
+        self.wait.until(lambda _: "career" in self.browser.title.lower())
+        field = self.browser.find_element(self.By.ID, "careerRecruiterText")
+        field.send_keys(JD)
+        count = CareerJobAnalysis.objects.filter(user=owner).count()
+        self.memory_click('#careerRecruiterForm button[type="submit"]')
+        self.wait.until(lambda _: CareerJobAnalysis.objects.filter(user=owner).count() == count + 1)
+        self.wait.until(lambda _: "Rule-based fit score 80" in self.text("careerJobMatchPanel"))
+        self.assertIn("React", self.text("careerJobMatchPanel"))
+        self.assertIn("not a hiring probability", self.text("careerJobMatchPanel"))
+        self.assertIn("No salary-bearing evidence", self.text("careerJobMatchPanel"))
+        self.memory_click('[data-fit-sources] summary')
+        self.assertIn(resume.file_name, self.text("careerJobMatchPanel"))
+        self.assertIn(JD, self.text("careerJobMatchPanel"))
+        self.assertFalse(self.browser.execute_script("return !!window.__matchXss || !!document.querySelector('[data-fit-sources] img');"))
+        contrast = """const e=document.querySelector(arguments[0]), s=getComputedStyle(e), t=getComputedStyle(arguments[1] ? e.querySelector(arguments[1]) : e);
+            function light(c){const v=c.match(/[\\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2]}
+            const a=light(t.color),b=light(s.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);"""
+        self.assertGreaterEqual(self.browser.execute_script(contrast, "#careerJobMatchPanel .surface-card", "[data-fit-uncertainty]"),4.5)
+        self.assertGreaterEqual(self.browser.execute_script(contrast, "#careerInsightList li", None),4.5)
+        self.browser.execute_async_script("loadCareerDashboard({live:true}).then(arguments[0]);")
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR, '[data-fit-sources]').get_attribute('open'))
+        self.browser.execute_script("document.getElementById('careerJobMatchPanel').scrollIntoView({behavior:'instant',block:'start'});")
+        self.capture("career-matching-sources-desktop")
+        self.browser.refresh()
+        self.wait.until(lambda _: "Rule-based fit score 80" in self.text("careerJobMatchPanel"))
+        field = self.browser.find_element(self.By.ID, "careerRecruiterText")
+        field.send_keys("Contact the synthetic hiring team about opportunities.")
+        self.memory_click('#careerRecruiterForm button[type="submit"]')
+        self.wait.until(lambda _: "Fit unavailable" in self.text("careerJobMatchPanel"))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR, "#careerJobMatchPanel .metric-value").text, "Unavailable")
+        self.assertIn("incomplete", self.text("careerJobMatchPanel"))
+        self.assertEqual(before, [list(model.objects.values()) for model in models])
+        self.browser.set_window_size(390,844)
+        if not self.browser.find_element(self.By.CSS_SELECTOR, '[data-fit-sources]').get_attribute('open'):
+            self.memory_click('[data-fit-sources] summary')
+        self.browser.execute_script("document.getElementById('careerJobMatchPanel').scrollIntoView({behavior:'instant',block:'start'});")
+        self.capture("career-matching-unavailable-mobile")
 
     def test_career_decimal_salary_save_and_reload_preserves_experience(self):
         from decimal import Decimal

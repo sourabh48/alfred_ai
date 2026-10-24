@@ -124,3 +124,9 @@ class CareerJobAnalysis(models.Model):
 
     def __str__(self):
         return self.job_title or self.job_url
+
+    @property
+    def available_fit_score(self):
+        if (self.extracted_payload or {}).get("fit", {}).get("score_status") == "UNAVAILABLE":
+            return None
+        return self.fit_score

@@ -3011,7 +3011,19 @@ def _recruiter_parser_state(snapshot, *, attachment_present: bool = False) -> tu
 
 
 def _apply_recruiter_analysis_update(analysis: CareerJobAnalysis, snapshot, *, resume_payload: dict, keep_evidence: bool = True) -> None:
-    fit = job_intelligence.compare_resume_to_job(resume_payload, snapshot)
+    payload = dict(analysis.extracted_payload or {})
+    if isinstance(payload.get("resume_payload"), dict):
+        resume_payload = payload["resume_payload"]
+        sources = (payload.get("fit") or {}).get("sources") or []
+        resume_source = sources[0] if sources else {"kind": "saved_fields", "label": "Captured resume/profile fields; original record identity unavailable"}
+    else:
+        resume = CareerResume.objects.filter(user_id=analysis.user_id).order_by("-updated_at", "-id").first()
+        profile = CareerProfile.objects.filter(user_id=analysis.user_id).first() if resume is None else None
+        resume_source = {"kind": "resume_upload" if resume else "manual_profile",
+                         "record_id": resume.pk if resume else (profile.pk if profile else None),
+                         "label": resume.file_name if resume else "Manual career profile",
+                         "parser_status": resume.parser_status if resume else "user_declared"}
+    fit = job_intelligence.compare_resume_to_job(resume_payload, snapshot, resume_source=resume_source)
     compensation = job_intelligence.compensation_benchmark(
         role=snapshot.title or resume_payload.get("role") or "analyst",
         location=snapshot.location or "",
@@ -3020,7 +3032,6 @@ def _apply_recruiter_analysis_update(analysis: CareerJobAnalysis, snapshot, *, r
         openings_evidence=None,
         current_income_annual=0.0,
     )
-    payload = dict(analysis.extracted_payload or {})
     payload["source_kind"] = snapshot.source_kind
     payload["job_url"] = snapshot.job_url
     payload["apply_url"] = snapshot.apply_url
@@ -3047,10 +3058,10 @@ def _apply_recruiter_analysis_update(analysis: CareerJobAnalysis, snapshot, *, r
     analysis.company = snapshot.company[:180]
     analysis.job_title = snapshot.title[:180]
     analysis.location = snapshot.location[:180]
-    analysis.fit_score = fit["fit_score"]
+    analysis.fit_score = fit["fit_score"] if fit["fit_score"] is not None else 0
     analysis.strengths = "\n".join(fit["strengths"])
     analysis.gaps = "\n".join(fit["gaps"])
-    analysis.summary = f"Recruiter intake fit score {fit['fit_score']}/100 for {snapshot.title or 'this role'} at {snapshot.company or analysis.source_name}."
+    analysis.summary = (f"Rule-based fit score {fit['fit_score']}/100; not a hiring probability." if fit["fit_score"] is not None else "Fit unavailable: review incomplete or ambiguous resume/JD evidence.")
     analysis.extracted_payload = payload
     analysis.extracted_text = snapshot.description or analysis.extracted_text
     if not keep_evidence:

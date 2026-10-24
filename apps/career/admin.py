@@ -21,7 +21,7 @@ class CareerJobAnalysisAdmin(admin.ModelAdmin):
         "user",
         "job_title",
         "company",
-        "fit_score",
+        "available_fit_score",
         "market_risk_score",
         "opportunity_outcome_status",
         "opportunity_outcome_contract",
