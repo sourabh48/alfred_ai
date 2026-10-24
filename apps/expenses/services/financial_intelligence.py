@@ -81,8 +81,10 @@ def build_canonical_financial_baseline(user) -> dict:
     )
 
 
-def resolve_canonical_financial_baseline(user, *, fresh=False) -> dict:
-    payload = _build_canonical_financial_baseline_uncached(user) if fresh else build_canonical_financial_baseline(user)
+def resolve_canonical_financial_baseline(user, *, fresh=False, expenses=None, reference_date=None) -> dict:
+    # Explicit dated inputs must never reuse or overwrite the ordinary cached baseline.
+    payload = (_build_canonical_financial_baseline_uncached(user, expenses=expenses, reference_date=reference_date)
+               if fresh or expenses is not None or reference_date is not None else build_canonical_financial_baseline(user))
     return {key: value for key, value in payload.items() if key != "_materialized"}
 
 

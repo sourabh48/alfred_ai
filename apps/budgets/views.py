@@ -76,7 +76,7 @@ def _budget_dashboard_revision(user) -> str:
     return "|".join(
         str(value or "")
         for value in (
-            "budget-dashboard-v4",
+            "budget-dashboard-v5",
             today.strftime("%Y-%m-%d"),
             budget_meta["count"],
             budget_meta["max_id"],
@@ -192,6 +192,7 @@ def _build_budget_dashboard_payload(request) -> dict:
         "daily_affordability": daily_affordability,
         "ai_suggestions": suggestions.get("recommendations", []),
         "forecast": forecast.get("forecasts", []),
+        "forecast_evidence": {key: forecast[key] for key in ("as_of", "status", "method", "observations", "uncertainty", "backtest", "calibration_status", "assumptions") if key in forecast},
         "financial_baseline": baseline,
         "unavailable_sections": unavailable_sections,
     }

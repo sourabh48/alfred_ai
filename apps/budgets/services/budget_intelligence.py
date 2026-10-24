@@ -7,7 +7,7 @@ from __future__ import annotations
 import calendar
 from collections import defaultdict
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, List
 from django.utils import timezone
 
@@ -204,38 +204,70 @@ class BudgetIntelligenceService:
         }
 
     def forecast_finances(self, user, months_ahead: int = 6) -> Dict[str, any]:
-        """
-        Estimate the next N calendar months from recent recorded living costs.
-        """
-        # A transparent planning estimate based on observed living costs.
-        # Missing months are not observations of zero spending.
-        baseline = resolve_canonical_financial_baseline(user)
-        avg_expense = float(baseline.get("observed_average_monthly_variable_spend", 0) or 0)
-        has_history = baseline.get("metric_states", {}).get("observed_average_monthly_variable_spend", {}).get("status") != "unavailable"
-        trend = "held_constant" if has_history else "unknown"
-        monthly_income = float(baseline.get("monthly_income", 0) or 0)
-        fixed_obligations = float(baseline.get("fixed_obligations", 0) or 0)
-
-        forecasts = []
+        """A dated planning estimate, with observed errors rather than invented confidence."""
+        if type(months_ahead) is not int or not 1 <= months_ahead <= 24:
+            raise ValueError("Forecast horizon must be an integer from 1 to 24 months.")
         today = timezone.localdate()
-        for i in range(months_ahead):
-            predicted_expense = avg_expense
-            predicted_savings = monthly_income - predicted_expense - fixed_obligations
+        expenses = list(Expense.objects.filter(user=user, transaction_date__lte=today))
+        baseline = resolve_canonical_financial_baseline(user, expenses=expenses, reference_date=today)
+        monthly_income = Decimal(str(baseline.get("monthly_income", 0) or 0))
+        fixed_obligations = Decimal(str(baseline.get("fixed_obligations", 0) or 0))
+        income_known = baseline.get("metric_states", {}).get("monthly_income", {}).get("status", "unavailable") != "unavailable"
+        by_month = defaultdict(Decimal)
+        for expense, amount in variable_spend_rows(expenses, monthly_housing=user.rent_or_emi):
+            if expense.transaction_date < today.replace(day=1):
+                by_month[(expense.transaction_date.year, expense.transaction_date.month)] += amount
+        history = sorted(by_month.items())[-12:]
+        def average(values):
+            return (sum(values, Decimal("0")) / len(values)).quantize(Decimal(".01"), rounding=ROUND_HALF_UP)
+        recent = [amount for _, amount in history[-3:]]
+        avg_expense = average(recent) if recent else None
+        available = bool(recent) and income_known
+        forecasts = []
+        for i in range(months_ahead if available else 0):
+            predicted_savings = monthly_income - avg_expense - fixed_obligations
             month_index = today.year * 12 + today.month + i
             forecast_month = today.replace(year=month_index // 12, month=month_index % 12 + 1, day=1)
             forecasts.append({
                 "month": forecast_month.strftime("%B %Y"),
-                "predicted_expense": round(predicted_expense, 2),
-                "predicted_savings": round(predicted_savings, 2),
-                "cumulative_savings": round(predicted_savings * (i + 1), 2),
+                "month_key": forecast_month.strftime("%Y-%m"),
+                "predicted_expense": money_float(avg_expense),
+                "predicted_savings": money_float(predicted_savings),
+                "cumulative_savings": money_float(predicted_savings * (i + 1)),
             })
-
+        observations = [{"month": f"{year:04}-{month:02}", "living_spend": money_float(amount)} for (year, month), amount in history]
+        uncertainty = {"status": "UNAVAILABLE", "coverage_probability": None,
+                       "method": "At least three completed recorded months are needed for an observed range; no calibrated prediction interval is available."}
+        if len(recent) >= 3:
+            uncertainty.update(status="HISTORICAL_RANGE", expense_low=money_float(min(recent)), expense_high=money_float(max(recent)),
+                savings_low=money_float(monthly_income-fixed_obligations-max(recent)) if income_known else None,
+                savings_high=money_float(monthly_income-fixed_obligations-min(recent)) if income_known else None,
+                method="Range of the latest three completed recorded months; not a prediction interval or a bound on future spending.")
+        holdouts = []
+        errors = []
+        for index in range(3, len(history)):
+            predicted = average([amount for _, amount in history[index-3:index]])
+            actual = history[index][1]
+            errors.append(abs(actual-predicted))
+            holdouts.append({"month": observations[index]["month"], "training_through": observations[index-1]["month"],
+                             "predicted_expense": money_float(predicted), "actual_expense": money_float(actual)})
         return {
-            "current_monthly_expense_avg": round(avg_expense, 2),
-            "trend": trend,
-            "forecasts": forecasts if has_history and monthly_income > 0 else [],
-            "method": "Recent living-spend average; income and fixed costs held constant. Before investments and card settlements.",
-            "insights": self._generate_forecast_insights(forecasts, trend) if has_history and monthly_income > 0 else ["Add income and spending history before using a forecast."],
+            "as_of": today.isoformat(),
+            "status": "PLANNING_ESTIMATE" if available else "UNAVAILABLE",
+            "current_monthly_expense_avg": money_float(avg_expense) if recent else None,
+            "trend": "held_constant" if recent else "unknown",
+            "forecasts": forecasts,
+            "method": "Average of up to three completed recorded living-spend months; income and fixed costs held constant. Future and current partial months excluded.",
+            "observations": observations,
+            "uncertainty": uncertainty,
+            "backtest": {"status": "OBSERVED_ERROR" if errors else "UNAVAILABLE", "samples": len(errors),
+                         "mae": money_float(average(errors)) if errors else None, "holdouts": holdouts,
+                         "method": "Walk-forward one observed month ahead using only the preceding three observed months; sparse months are not filled with zero."},
+            "calibration_status": "NOT_CALIBRATED",
+            "assumptions": ["Recorded months may be incomplete; missing months are unknown, not zero.",
+                            "Before investments, card settlements and unrecorded bills; not a forecast of bank balances.",
+                            "Observed spending error does not validate future income or fixed-cost assumptions."],
+            "insights": self._generate_forecast_insights(forecasts, "held_constant") if available else ["Add income evidence and a completed recorded spending month before using a forecast."],
             "financial_baseline": baseline,
         }
 
@@ -343,16 +375,18 @@ class BudgetIntelligenceService:
         """Generate insights from financial forecasts."""
         insights = []
 
-        total_predicted_savings = sum(f["predicted_savings"] for f in forecasts)
+        total_predicted_savings = sum((Decimal(str(f["predicted_savings"])) for f in forecasts), Decimal("0"))
 
         if total_predicted_savings > 0:
             insights.append(
                 f"Estimated income left before investments and card payments: ₹{total_predicted_savings:,.0f} over {len(forecasts)} months."
             )
-        else:
+        elif total_predicted_savings < 0:
             insights.append(
                 f"⚠️ Current trajectory shows negative savings. Reduce discretionary spending."
             )
+        else:
+            insights.append("The estimate breaks even before investments, card payments and unrecorded bills.")
 
         if trend == "increasing":
             insights.append(

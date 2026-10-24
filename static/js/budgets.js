@@ -16,7 +16,7 @@ function loadBudgetDashboard(options = {}) {
         .then(data => {
             renderBudgetHero(data.summary, data.plan);
             renderBudgetSummary(data.summary, data.daily_affordability || {});
-            renderBudgetForecast(data.forecast || []);
+            renderBudgetForecast(data.forecast || [], data.forecast_evidence || {});
             renderBudgetAffordability(data.daily_affordability || {});
             renderBudgetCategories(data.budgets || []);
             renderBudgetSuggestions(data.ai_suggestions || []);
@@ -58,12 +58,25 @@ function renderBudgetSummary(summary, affordability) {
     `).join("");
 }
 
-function renderBudgetForecast(items) {
+function renderBudgetForecast(items, evidence) {
     const canvas = document.getElementById("budgetForecastChart");
     if (budgetForecastChart) {
         budgetForecastChart.destroy();
     }
-
+    const uncertainty = evidence.uncertainty || {};
+    const backtest = evidence.backtest || {};
+    const assumptionsOpen = document.querySelector('#budgetForecastEvidence details')?.open || false;
+    document.getElementById("budgetForecastEvidence").innerHTML = `
+        <p>${items.length ? "Planning estimate" : "Forecast unavailable: add income evidence and a completed recorded spending month"}. As of ${Alfred.escapeHtml(evidence.as_of || "unavailable")}. Not calibrated.</p>
+        <p>${Alfred.escapeHtml(evidence.method || "Forecast evidence is unavailable.")}</p>
+        <p>${uncertainty.status === "HISTORICAL_RANGE" ? `Historical monthly living-spend range: ${Alfred.formatCurrency(uncertainty.expense_low)} to ${Alfred.formatCurrency(uncertainty.expense_high)}.` : "Uncertainty range unavailable: fewer than three completed recorded months."} ${Alfred.escapeHtml(uncertainty.method || "No calibrated prediction interval is available.")}</p>
+        <p>${backtest.status === "OBSERVED_ERROR" ? `Walk-forward spending error (MAE): ${Alfred.formatCurrency(backtest.mae)} across ${Alfred.formatNumber(backtest.samples, 0)} held-out recorded months. This does not establish future forecast accuracy.` : "Chronological backtest unavailable: at least four completed recorded months are needed."}</p>
+        <details ${assumptionsOpen ? "open" : ""}><summary>Assumptions and recorded months</summary>
+            <ul>${(evidence.assumptions || []).map(item => `<li>${Alfred.escapeHtml(item)}</li>`).join("")}</ul>
+            <ul>${(evidence.observations || []).map(row => `<li>${Alfred.escapeHtml(row.month)}: ${Alfred.formatCurrency(row.living_spend)}</li>`).join("") || "<li>No completed recorded living-spend months.</li>"}</ul>
+        </details>`;
+    canvas.hidden = !items.length;
+    if (!items.length) return;
     budgetForecastChart = new Chart(canvas, {
         data: {
             labels: items.map(item => item.month),
@@ -161,7 +174,7 @@ function renderBudgetHistory(items) {
     }
 
     target.innerHTML = items.map(item => `
-        <div class="mini-card">
+        <div class="mini-card surface-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
                     <div class="fw-semibold">${Alfred.escapeHtml(item.month)}</div>

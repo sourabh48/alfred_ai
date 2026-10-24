@@ -189,6 +189,46 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('careerJobMatchPanel').scrollIntoView({behavior:'instant',block:'start'});")
         self.capture("career-matching-unavailable-mobile")
 
+    def test_cashflow_forecast_observations_errors_and_unknown_state_are_visible(self):
+        from apps.expenses.models import BankAccount
+        from apps.investments.models import Investment
+        from apps.loans.models import Loan
+        owner = self.scenario["user"]
+        for offset, amount in ((-5,"1000"),(-4,"2000"),(-3,"3000"),(1,"999999")):
+            Expense.objects.create(user=owner, amount=amount, category="food", classification="expense",
+                direction="debit", transaction_date=month_start(offset))
+        models = (Expense, BankAccount, Investment, Loan)
+        before = [list(model.objects.values()) for model in models]
+        empty = get_user_model().objects.create_user("synthetic_forecast_empty", password=PASSWORD)
+        self.login(); self.browser.get(self.live_server_url + "/budgets/")
+        self.wait.until(lambda _: "Walk-forward spending error (MAE)" in self.text("budgetForecastEvidence"))
+        evidence = self.text("budgetForecastEvidence")
+        self.assertIn("not a prediction interval", evidence)
+        self.assertIn("Not calibrated", evidence)
+        self.client.force_login(owner)
+        data = self.client.get("/api/budgets/dashboard/").json()
+        self.assertEqual(data["forecast"][0]["predicted_expense"], 6333.33)
+        self.assertEqual(data["forecast_evidence"]["backtest"]["samples"], 2)
+        self.assertTrue(self.browser.find_element(self.By.ID,"budgetForecastChart").is_displayed())
+        self.memory_click('#budgetForecastEvidence summary')
+        self.assertNotIn(month_start(1).strftime("%Y-%m"), self.text("budgetForecastEvidence"))
+        self.browser.execute_async_script("loadBudgetDashboard({live:true}).then(arguments[0]);")
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR, '#budgetForecastEvidence details').get_attribute('open'))
+        self.browser.execute_script("document.getElementById('budgetForecastEvidence').scrollIntoView({behavior:'instant',block:'start'});")
+        self.wait.until(lambda _: self.browser.execute_script("return !document.getAnimations().some(a=>a.playState==='running');"))
+        self.capture("cashflow-forecast-evidence-desktop")
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('budgetForecastEvidence').scrollIntoView({behavior:'instant',block:'start'});")
+        self.assertLessEqual(self.browser.execute_script("return document.documentElement.scrollWidth;"), self.browser.execute_script("return window.innerWidth;") + 1)
+        self.capture("cashflow-forecast-evidence-mobile")
+        self.login(empty.username); self.browser.get(self.live_server_url + "/budgets/")
+        self.wait.until(lambda _: "Forecast unavailable" in self.text("budgetForecastEvidence"))
+        self.assertIn("Chronological backtest unavailable", self.text("budgetForecastEvidence"))
+        self.assertFalse(self.browser.find_element(self.By.ID,"budgetForecastChart").is_displayed())
+        self.assertEqual(before, [list(model.objects.values()) for model in models])
+        self.browser.execute_script("document.getElementById('budgetForecastEvidence').scrollIntoView({behavior:'instant',block:'start'});")
+        self.capture("cashflow-forecast-unavailable-mobile")
+
     def test_career_decimal_salary_save_and_reload_preserves_experience(self):
         from decimal import Decimal
         from apps.career.models import CareerProfile

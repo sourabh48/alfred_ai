@@ -84,8 +84,10 @@ class UserDataAcceptanceTests(TestCase):
         self.assertEqual(budget["summary"]["total_remaining"], 20000)
         self.assertEqual(sum(item["spent"] for item in budget["budgets"]), 10000)
         self.assertEqual(budget["daily_affordability"]["remaining_budget"], 20000)
-        self.assertEqual(budget["forecast"][0]["predicted_expense"], 8666.67)
-        self.assertEqual(budget["forecast"][0]["predicted_savings"], 41333.33)
+        # The current partial month remains in the baseline, not forecast training.
+        self.assertEqual(budget["forecast"][0]["predicted_expense"], 8000)
+        self.assertEqual(budget["forecast"][0]["predicted_savings"], 42000)
+        self.assertNotIn(month_start().strftime("%Y-%m"), [row["month"] for row in budget["forecast_evidence"]["observations"]])
 
     def test_edits_refresh_cached_dashboard_and_networth(self):
         self.get_payload("/api/expenses/dashboard/")
