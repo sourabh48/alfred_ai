@@ -156,6 +156,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             file_name='synthetic-<img src=x onerror="window.__matchXss=1">.txt', extracted_payload=RESUME)
         self.login(); self.browser.get(self.live_server_url + "/career/")
         self.wait.until(lambda _: "career" in self.browser.title.lower())
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "careerRoot").get_attribute("data-page-busy") == "false"
+            and self.text("careerSummaryCards"))
         field = self.browser.find_element(self.By.ID, "careerRecruiterText")
         field.send_keys(JD)
         count = CareerJobAnalysis.objects.filter(user=owner).count()
