@@ -7,13 +7,14 @@ function initDocumentCorpus(getSelected) {
     const status=document.getElementById('documentCorpusStatus'), limits=document.getElementById('documentCorpusLimits');
     const uploadForm=document.getElementById('documentCorpusUpload'), uploadFile=document.getElementById('documentCorpusFile');
     const uploadConsent=document.getElementById('documentCorpusUploadConsent');
+    const question=document.getElementById('documentCorpusQuestion'), ask=document.getElementById('documentCorpusAsk');
     let active=true, busy=false, generation=0, controller=null, expiryTimer=null;
     function clearResults() { clearTimeout(expiryTimer); expiryTimer=null; results.replaceChildren(); }
     function node(tag, text, className='') {
         const element=document.createElement(tag); element.textContent=text; element.className=className; return element;
     }
     function controls() {
-        [ingest,consent,days,refresh,query,...uploadForm.elements,...form.querySelectorAll('button'),...listing.querySelectorAll('input,button')]
+        [ingest,consent,days,refresh,query,question,ask,...uploadForm.elements,...form.querySelectorAll('button'),...listing.querySelectorAll('input,button')]
             .forEach(control => { control.disabled=!active || busy; });
         ingest.disabled=!active || busy || !getSelected() || !consent.checked;
         listing.setAttribute('aria-busy',String(busy)); results.setAttribute('aria-busy',String(busy));
@@ -83,12 +84,13 @@ function initDocumentCorpus(getSelected) {
             if (!active || ticket!==generation) return;
             if (data.listing) renderList(data.listing);
             if (data.results) renderResults(data);
-            status.textContent=data.message || (data.results.length ? `${data.results.length} unverified excerpt(s).`+
+            status.textContent=data.answer || data.message || (data.results.length ? `${data.results.length} unverified excerpt(s).`+
                 (data.more_matches ? ' More matches exist; narrow the keywords.' : '') : 'No matching excerpt. This does not prove absence from the original.');
         } catch(error) {
             if (ticket!==generation) return;
             clearResults();
             status.textContent=error.status===409 ? 'Private sources changed, expired or were cleared. Refresh and re-ingest the selected original.' :
+                error.code==='local_model_unavailable' ? 'The local model is unavailable or did not complete within its unchanged deadline. Your question and keywords are preserved; no cloud fallback or answer was accepted.' :
                 error.status===413 ? 'The document exceeds a processing or storage limit. Choose a smaller file.' :
                 error.status===400 ? 'Check explicit consent, retention, keywords, selected documents and storage limits. Your query is preserved.' :
                 'Encrypted document knowledge is unavailable. Existing vault data is preserved. Refresh and check your session before retrying.';
@@ -113,6 +115,7 @@ function initDocumentCorpus(getSelected) {
         });
     });
     consent.addEventListener('change',controls);
+    [query,question].forEach(input=>input.addEventListener('input',()=>{clearResults();status.textContent='';}));
     ingest.addEventListener('click',()=>{
         const selected=getSelected();
         if (!selected || !consent.checked || !days.reportValidity()) return;
@@ -129,6 +132,13 @@ function initDocumentCorpus(getSelected) {
         if (!ids.length) { status.textContent='Select one to three private documents before searching.'; return; }
         perform(signal=>Alfred.fetchJSON(base+'search/',{method:'POST',body:JSON.stringify({ids,query:query.value}),signal}));
     });
+    ask.addEventListener('click',()=>{
+        const ids=[...listing.querySelectorAll('input:checked')].map(input=>input.value);
+        if (!ids.length) { status.textContent='Explicitly select one to three private documents first.'; return; }
+        if (!query.reportValidity() || !question.reportValidity()) return;
+        perform(signal=>Alfred.fetchJSON(base+'question/',{method:'POST',
+            body:JSON.stringify({ids,question:question.value,keywords:query.value}),signal}));
+    });
     function selectionChanged() {
         generation++; controller?.abort(); controller=null; busy=false; consent.checked=false;
         clearResults(); status.textContent='';
@@ -136,6 +146,7 @@ function initDocumentCorpus(getSelected) {
     }
     window.addEventListener('pagehide',()=>{
         active=false; selectionChanged(); listing.replaceChildren(); query.value=''; limits.textContent='';
+        question.value='';
         uploadForm.reset();
     });
     window.addEventListener('pageshow',event=>{if(event.persisted){active=true;controls();}});

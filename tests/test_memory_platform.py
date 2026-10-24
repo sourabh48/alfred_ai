@@ -51,6 +51,7 @@ class UnsupportedMemoryPlatformTests(TestCase):
             ("post", "/api/ai/document-corpus/", {"kind": "investment", "document_id": 1,
                 "catalog_token": "synthetic", "consent": True, "days": 1}),
             ("post", "/api/ai/document-corpus/search/", {"ids": ["a" * 32], "query": "SYNTHETIC-PRIVATE-DATA"}),
+            ("post", "/api/ai/document-corpus/question/", {"ids": ["a" * 32], "keywords": "synthetic", "question": "What is stated?"}),
             ("delete", "/api/ai/document-corpus/" + "a" * 32 + "/", {}),
             ("get", "/api/ai/document-corpus/" + "a" * 32 + "/original/", None),
         )

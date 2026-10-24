@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadDocumentCenter();
     initDocumentSources();
-    Alfred.enableLiveRefresh("documents-live", loadDocumentCenter, { rootId: "documentCenterRoot", interactionHoldMs: 4500 });
+    Alfred.enableLiveRefresh("documents-live", loadDocumentCenter, { rootId: "documentCenterRoot", interactionHoldMs: 4500, intervalMs: 30000 });
 });
 
 function initDocumentSources() {

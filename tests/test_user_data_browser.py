@@ -336,6 +336,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.ID,'memoryEvaluationQuery').get_property('value'),'')
 
     def test_reviewed_synthetic_model_comparison_verdict_metrics_outage_and_mobile(self):
+        # This tests rendered synthetic reports; current-source eligibility is tested separately.
+        from apps.ml_engine.services.retrieval_holdout import RAW
+        self.enterContext(patch('apps.ml_engine.services.retrieval_holdout.cohort',return_value=json.loads(RAW)))
         from selenium.webdriver.support.ui import Select
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
         from apps.ml_engine.services.retrieval_quality import compare, MODELS
@@ -2088,6 +2091,108 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(self.text('documentKnowledgeResults'),'')
 
+    def test_document_hub_idle_refresh_preserves_request_budget(self):
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: 'Documents' in self.text('documentSourcesStatus') and self.active_requests==0)
+        count="return performance.getEntriesByType('resource').filter(e=>e.name.includes('/api/expenses/uploads/')).length;"
+        before=self.browser.execute_script(count)
+        self.assertGreaterEqual(before,1)
+        self.browser.execute_async_script('setTimeout(arguments[0],12000);')
+        self.assertEqual(self.browser.execute_script(count),before)
+        status=self.browser.execute_async_script("fetch('/api/ai/financial-documents/expense/').then(r=>arguments[0](r.status));")
+        self.assertEqual(status,200)
+
+    def test_changed_retrieval_source_blocks_frozen_holdout_before_model(self):
+        from apps.ml_engine.services.retrieval_holdout import availability
+        from apps.ml_engine.services.retrieval_quality import MODELS
+        self.enterContext(override_settings(ALFRED_SYNTHETIC_QUALITY_ENABLED=True))
+        self.memory_evaluation_fixture()
+        self.assertFalse(availability())
+        option=self.browser.find_element(self.By.CSS_SELECTOR,'#memoryComparisonSuite option[value="held_out"]')
+        self.assertFalse(option.is_enabled())
+        self.assertIn('blocked: frozen policy unavailable',option.text)
+        with patch('apps.ml_engine.services.retrieval_quality.OllamaEmbeddings') as model:
+            result=self.memory_post('learning',dict(action='compare',baseline_model=MODELS[0],candidate_model=MODELS[1],suite='held_out'))
+        self.assertEqual(result['status'],400); model.assert_not_called()
+        self.assertNotIn('persistent_memory',str(result))
+
+    def test_private_document_questions_selection_conflict_abstention_and_stale_sources(self):
+        from unittest.mock import Mock
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.ml_engine.services.document_corpus import DocumentCorpus
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-document-question-browser-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=root/'vault'))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(select=Mock(return_value='{"state":"evidence","evidence":[0]}'))
+        self.enterContext(patch('apps.ml_engine.services.document_questions.DocumentQuestionReasoner',return_value=local))
+        corpus=DocumentCorpus(MemoryStore(root/'vault',embedder=SyntheticEmbeddings())); owner=self.scenario['user']
+        sources=[corpus.upload(owner,SimpleUploadedFile(name,text),consent=True,days=1)['document'] for name,text in (
+            ('Synthetic thirty-day policy.txt',b'Exit load applies for thirty days. <img src=x onerror="window.questionLeak=true">'),
+            ('Synthetic ninety-day policy.txt',b'Exit load applies for ninety days. No guaranteed returns.'))]
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusAsk').is_enabled())
+        query=self.browser.find_element(self.By.ID,'documentCorpusQuery'); query.send_keys('exit load')
+        question=self.browser.find_element(self.By.ID,'documentCorpusQuestion'); question.send_keys('For how long does the exit load apply?')
+        self.memory_click('#documentCorpusAsk')
+        self.assertIn('Explicitly select',self.text('documentCorpusStatus')); local.select.assert_not_called()
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
+        self.memory_click(f'#documentCorpusList input[value="{sources[0]["id"]}"]')
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'selected these exact unverified excerpts' in self.text('documentCorpusStatus'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.wait.until(lambda _: 'thirty days' in self.text('documentCorpusResults'))
+        self.assertIn('thirty days',self.text('documentCorpusResults'))
+        self.assertIn('Original SHA-256',self.text('documentCorpusResults'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.questionLeak)'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusResults img'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.capture('document-question-extractive-desktop')
+        query.clear(); query.send_keys('missing keywords')
+        self.assertEqual(self.text('documentCorpusResults'),'')
+        calls=local.select.call_count; self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'do not establish an answer' in self.text('documentCorpusStatus'))
+        self.assertEqual(local.select.call_count,calls)
+        query.clear(); query.send_keys('exit load')
+        self.memory_click(f'#documentCorpusList input[value="{sources[1]["id"]}"]')
+        local.select.return_value='{"state":"conflict","evidence":[0,1]}'
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'may conflict' in self.text('documentCorpusStatus'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.wait.until(lambda _: 'thirty days' in self.text('documentCorpusResults'))
+        self.assertIn('thirty days',self.text('documentCorpusResults')); self.assertIn('ninety days',self.text('documentCorpusResults'))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.browser.execute_script("document.getElementById('documentCorpusStatus').scrollIntoView({block:'start',behavior:'instant'});")
+        self.assertEqual(self.browser.execute_script('return innerWidth'),390)
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+        self.capture('document-question-conflict-390px')
+        local.select.return_value='{"state":"evidence","evidence":[999]}'
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'No answer was accepted' in self.text('documentCorpusStatus'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusResults article'))
+        self.assertNotIn('thirty days',self.text('documentCorpusResults'))
+        self.assertNotIn('ninety days',self.text('documentCorpusResults'))
+        def revoke(*args,**kwargs):
+            corpus.delete(owner,sources[0]['id'])
+            return '{"state":"conflict","evidence":[0,1]}'
+        local.select.side_effect=revoke
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'sources changed' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.text('documentCorpusResults'),'')
+        self.assertEqual(question.get_property('value'),'For how long does the exit load apply?')
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
+        local.select.side_effect=EmbeddingUnavailable('synthetic offline')
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'local model is unavailable' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.text('documentCorpusResults'),'')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(question.get_property('value'),'')
+
     def test_general_private_document_upload_pdf_text_and_owner_originals(self):
         from unittest.mock import Mock
         from tests.test_document_knowledge import text_pdf
@@ -2120,6 +2225,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         query=self.browser.find_element(self.By.ID,'documentCorpusQuery'); query.send_keys('local policy')
         self.memory_click('#documentCorpusSearch button')
         self.wait.until(lambda _: '1 unverified excerpt' in self.text('documentCorpusStatus'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.wait.until(lambda _: quote in self.text('documentCorpusResults'))
         self.assertIn(quote,self.text('documentCorpusResults'))
         self.assertFalse(self.browser.execute_script('return Boolean(window.generalCorpusLeak)'))
         self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusResults img'))

@@ -30,6 +30,16 @@ class DocumentCorpusSearchAPI(MemoryAPI):
         return Response(DocumentCorpus(memory_store()).search(request.user, data.get('ids'), data.get('query')))
 
 
+class DocumentCorpusQuestionAPI(MemoryAPI):
+    def post(self, request):
+        from ..services.document_questions import answer_question
+        if request.query_params:
+            raise ValueError('Questions and selected documents belong in the request body.')
+        data = self.payload(('ids', 'question', 'keywords'))
+        return Response(answer_question(DocumentCorpus(memory_store()), request.user,
+            data.get('ids'), data.get('question'), data.get('keywords')))
+
+
 class DocumentCorpusUploadAPI(MemoryAPI):
     def post(self, request):
         if request.query_params or request.content_type.split(';')[0] != 'multipart/form-data':

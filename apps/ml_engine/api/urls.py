@@ -6,11 +6,12 @@ from .financial_evidence import FinancialEvidenceAPI, FinancialSourcePageAPI, Cl
 from .views import AlfredExplainAPI, AlfredPersonalInsightsAPI, EmotionalSpendAPI, MLRuntimeControlAPI, MLRuntimeStatusAPI
 from .memory import MemoryCollectionAPI, MemoryDetailAPI, MemoryRetentionAPI, MemoryResetAPI, MemoryRestoreAPI, MemoryRetrieveAPI, MemorySyncAPI, MemoryReasoningAPI, MemoryLearningAPI
 from .conversations import ConversationPolicyAPI, ConversationCollectionAPI, ConversationDetailAPI, ConversationClearAPI
-from .document_corpus import DocumentCorpusAPI, DocumentCorpusSearchAPI, DocumentCorpusDetailAPI, DocumentCorpusUploadAPI, DocumentCorpusOriginalAPI
+from .document_corpus import DocumentCorpusAPI, DocumentCorpusSearchAPI, DocumentCorpusDetailAPI, DocumentCorpusUploadAPI, DocumentCorpusOriginalAPI, DocumentCorpusQuestionAPI
 
 urlpatterns = [
     path('document-corpus/', DocumentCorpusAPI.as_view()),
     path('document-corpus/search/', DocumentCorpusSearchAPI.as_view()),
+    path('document-corpus/question/', DocumentCorpusQuestionAPI.as_view()),
     path('document-corpus/upload/', DocumentCorpusUploadAPI.as_view()),
     path('document-corpus/<str:identity>/original/', DocumentCorpusOriginalAPI.as_view()),
     path('document-corpus/<str:identity>/', DocumentCorpusDetailAPI.as_view()),

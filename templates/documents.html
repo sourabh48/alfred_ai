@@ -85,7 +85,7 @@
             <button type="submit" class="btn btn-outline-primary mt-2">Store private document</button>
         </fieldset>
     </form>
-    <button id="documentCorpusRefresh" type="button" class="btn btn-outline-primary mb-2">Show or refresh private knowledge</button>
+    <button id="documentCorpusRefresh" type="button" class="btn btn-outline-primary mb-2" disabled>Show or refresh private knowledge</button>
     <p id="documentCorpusLimits" class="small"></p>
     <div id="documentCorpusList" class="data-stack mb-3" aria-busy="false"></div>
     <form id="documentCorpusSearch" method="post" autocomplete="off">
@@ -94,6 +94,12 @@
         <input id="documentCorpusQuery" type="search" class="form-control mb-2" maxlength="128" required>
         <button type="submit" class="btn btn-outline-primary">Search selected private documents</button>
     </form>
+    <div class="mt-3">
+        <label for="documentCorpusQuestion" class="form-label">Question about the selected excerpts (local AI)</label>
+        <input id="documentCorpusQuestion" type="text" class="form-control mb-2" maxlength="512" required autocomplete="off">
+        <p class="small">Use the keywords above to retrieve evidence, then ask about it. The fixed local model can select exact excerpts or abstain; it cannot author financial figures, reconcile conflicting documents or override corrected records. Scanned text and omitted context are unsupported. The 30-second AI deadline applies; no cloud fallback or saved question/history.</p>
+        <button id="documentCorpusAsk" type="button" class="btn btn-outline-primary">Ask using selected excerpts locally</button>
+    </div>
     <p id="documentCorpusStatus" role="status" aria-live="polite" class="mt-2"></p>
     <div id="documentCorpusResults" class="data-stack" aria-busy="false"></div>
 </section>
@@ -340,6 +346,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/document_corpus.js?v=2"></script>
-<script src="/static/js/documents.js?v=2.8"></script>
+<script src="/static/js/document_corpus.js?v=3"></script>
+<script src="/static/js/documents.js?v=2.9"></script>
 {% endblock %}

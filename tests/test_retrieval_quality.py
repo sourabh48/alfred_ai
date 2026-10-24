@@ -40,6 +40,13 @@ class ContractEmbeddings:
 
 def contract_comparison(degraded=False, *, suite='development', candidate_protocol=RETRIEVAL_PROTOCOLS[0]):
     from apps.ml_engine.services.retrieval_quality import _contract
+    if suite=='held_out':
+        from apps.ml_engine.services.retrieval_holdout import RAW
+        # Synthetic metric/rendering contract only, not current-source holdout acceptance.
+        with patch('apps.ml_engine.services.retrieval_holdout.cohort',return_value=json.loads(RAW)):
+            return compare(*MODELS, adapters={MODELS[0]:ContractEmbeddings(cohorts=(json.loads(RAW),)),
+                MODELS[1]:ContractEmbeddings('contract-candidate-v2',degraded,cohorts=(json.loads(RAW),))},
+                suite=suite,candidate_protocol=candidate_protocol)
     cohorts,_=_contract(suite)
     return compare(*MODELS, adapters={MODELS[0]:ContractEmbeddings(cohorts=cohorts), MODELS[1]:ContractEmbeddings('contract-candidate-v2', degraded,cohorts=cohorts)},suite=suite,candidate_protocol=candidate_protocol)
 
@@ -97,18 +104,20 @@ class RetrievalQualityTests(TestCase):
         self.assertEqual(report['candidate']['results'][0]['context']['protocol'],RETRIEVAL_PROTOCOLS[1])
         self.assertNotEqual(report['baseline']['results'][0]['context']['embedding_identity'],report['candidate']['results'][0]['context']['embedding_identity'])
 
-    def test_independent_holdout_commitment_and_partition_separation(self):
+    def test_committed_holdout_labels_remain_separate_from_development(self):
         from hashlib import sha256
         from apps.ml_engine.services import retrieval_holdout as held
         self.assertEqual(len(held.RAW.encode()),1587)
         self.assertEqual(sha256(held.RAW.encode()).hexdigest(),held.FIXTURE_SHA256)
-        cohort=held.cohort()
+        self.assertFalse(held.availability())
+        with self.assertRaises(ValueError): held.cohort()
+        cohort=json.loads(held.RAW)
         self.assertEqual(len(cohort['cases']),12)
         self.assertEqual(sum(bool(expected) for _,expected in cohort['cases']),6)
         self.assertFalse(set(cohort['records'].values()) & {value for item in COHORTS for value in item['records'].values()})
         self.assertFalse({query for query,_ in cohort['cases']} & {query for item in COHORTS for query,_ in item['cases']})
         cohort['records'].clear()
-        self.assertEqual(len(held.cohort()['records']),7)  # No mutable shared fixture.
+        self.assertEqual(len(json.loads(held.RAW)['records']),7)
         self.assertEqual(POLICY['min_precision'],.90); self.assertEqual(POLICY['min_recall'],.85)
         self.assertEqual(POLICY['min_abstention_rate'],.95); self.assertEqual(POLICY['max_metric_drop'],.05)
 
@@ -127,7 +136,9 @@ class RetrievalQualityTests(TestCase):
             self.assertIn(k,cohort['precision_at_k']); self.assertIn(k,cohort['recall_at_k'])
         self.assertEqual(assess(report['baseline'],report['candidate'])['decision'],'BLOCKED')
         missing=deepcopy(report['candidate']); missing['results'][0]['per_case'].pop()
-        self.assertEqual(assess(report['baseline'],missing,suite='held_out')['decision'],'BLOCKED')
+        from apps.ml_engine.services.retrieval_holdout import RAW
+        with patch('apps.ml_engine.services.retrieval_holdout.cohort',return_value=json.loads(RAW)):
+            self.assertEqual(assess(report['baseline'],missing,suite='held_out')['decision'],'BLOCKED')
         for case in cohort['per_case']:
             self.assertNotIn('expected_ids',case); self.assertNotIn('citations',case)
         self.assertEqual(contract_comparison(True,suite='held_out')['decision'],'REJECT')
