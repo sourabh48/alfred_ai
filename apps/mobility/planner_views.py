@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 from .models import BikeProfile, TravelFeedback, TravelPlan, TravelPlanningSession, TripPhoto
 from .serializers import TravelPlanSerializer
 from .services.travel_conversation import STYLE_WORDS, new_session, save_plan, send_message
+from apps.expenses.money import money_float
 from .services.travel_discovery import fact, learn, profile_for, value
 from .services.travel_research import STAGES, TERMINAL, evidence_payload, queue_research
 from .services.travel.presentation import age_saved_facts
@@ -32,6 +33,8 @@ class PlannerWriteThrottle(UserRateThrottle):
 def session_payload(session):
     session.refresh_from_db()
     run = session.research_runs.first()
+    outdated = bool(run and any(value(run.request, key) != value(session.state, key)
+                    for key in ("available_start_date", "available_end_date", "trip_duration")))
     candidates = deepcopy(session.candidates)
     now = timezone.now().isoformat()
     for candidate in candidates:
@@ -54,11 +57,14 @@ def session_payload(session):
             "map_config":map_configuration(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),
-            "research": ({"id": run.id, "status": run.status, "stage": STAGES.get(run.status, run.status),
-                          "deep": run.deep, "summary": run.summary, "error": run.error, "changes": run.changes,
-                          "sources_checked": run.sources_checked, "candidate_count": run.candidate_count,
-                          "created_at": run.created_at, "completed_at": run.completed_at,
-                          "evidence": [evidence_payload(e) for e in run.evidence.all()]} if run else None)})
+            "research": ({"id": run.id, "status": run.status, "outdated": outdated,
+                          "stage": "Recheck needed" if outdated else STAGES.get(run.status, run.status),
+                          "deep": run.deep,
+                          "summary": "Trip dates changed. Previous research applies to the earlier window; recheck weather and offers." if outdated else run.summary,
+                          "error": "" if outdated else run.error, "changes": [] if outdated else run.changes,
+                          "sources_checked": 0 if outdated else run.sources_checked, "candidate_count": run.candidate_count,
+                          "created_at": run.created_at, "completed_at": None if outdated else run.completed_at,
+                          "evidence": [] if outdated else [evidence_payload(e) for e in run.evidence.all()]} if run else None)})
 
 
 class TravelSessionList(APIView):
@@ -232,14 +238,15 @@ class TravelFeedbackView(APIView):
         for tag in disliked:
             learn(request.user, tag, False, f"Trip feedback: {plan.title}", .9)
         learn(request.user, "typical_duration", plan.duration_days, f"Completed trip: {plan.title}", .65)
-        learn(request.user, "typical_spend", plan.budget, f"Completed trip budget: {plan.title}", .55)
+        learn(request.user, "typical_spend", money_float(plan.budget), f"Completed trip budget: {plan.title}", .55)
         return Response({"saved": True})
 
 
 def photo_matches(photo, plan):
     if not photo.taken_at or not plan.start_date or not plan.end_date or plan.id in photo.ignored_plan_ids:
         return False
-    if not plan.start_date <= photo.taken_at.date() <= plan.end_date:
+    taken_date = timezone.localtime(photo.taken_at).date() if timezone.is_aware(photo.taken_at) else photo.taken_at.date()
+    if not plan.start_date <= taken_date <= plan.end_date:
         return False
     from .services.travel_media import near_destination
     return bool(plan.destination and ((photo.location_name and plan.destination.lower() in photo.location_name.lower())

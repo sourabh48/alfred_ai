@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -21,7 +22,7 @@ from apps.integrations.services import verified_intelligence
 from apps.loans.models import Loan
 from apps.reports.services import operational_logging_service
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
-from .serializers import CareerJobAnalysisSerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
+from .serializers import CareerJobAnalysisSerializer, CareerOpportunitySerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
 
 
@@ -122,7 +123,8 @@ def _career_timing_payload(user, profile, market: dict, latest_analysis=None, la
     emergency_months = float(baseline.get("liquid_runway_months", 0) or 0)
     fixed_load_ratio = float(baseline.get("debt_burden_ratio", 0) or 0)
     market_risk = float(market.get("risk_score", 0) or 0)
-    fit_score = float(getattr(latest_analysis, "fit_score", 0) or 0) if latest_analysis else 0.0
+    available_fit = latest_analysis.available_fit_score if latest_analysis else None
+    fit_score = float(available_fit or 0)
 
     readiness_score = _clamp(
         100
@@ -180,7 +182,7 @@ def _career_timing_payload(user, profile, market: dict, latest_analysis=None, la
         f"Liquid runway is {emergency_months:.1f} months.",
         f"Fixed monthly load is {fixed_load_ratio:.1f}% of income." if monthly_income else "Income data is still incomplete, so readiness is conservative.",
         f"External market risk is {market_risk:.0f}/100.",
-        f"Latest analyzed job-fit is {fit_score:.0f}/100." if latest_analysis else "No job-link fit has been analyzed yet.",
+        f"Latest rule-based job-fit is {fit_score:.0f}/100, not a hiring probability." if available_fit is not None else "Job-fit evidence is unavailable; review the saved sources.",
     ]
     blockers = []
     if emergency_months < 3:
@@ -188,7 +190,7 @@ def _career_timing_payload(user, profile, market: dict, latest_analysis=None, la
     if market_risk >= 55:
         blockers.append("Hiring conditions are still elevated-risk for this role.")
     if latest_analysis and fit_score < 65:
-        blockers.append("Close the visible skill or experience gaps before treating the matched role as a target.")
+        blockers.append("Review incomplete job-fit evidence before prioritizing a switch." if available_fit is None else "Close the visible skill or experience gaps before treating the matched role as a target.")
     if not blockers:
         blockers.append("No major blocker is dominant right now, but keep evidence and runway under review.")
 
@@ -213,7 +215,7 @@ def _career_data_pipeline_payload(profile, latest_resume, latest_analysis, proje
     job_payload = latest_analysis.extracted_payload if latest_analysis else {}
     manual_skill_count = len([item for item in (profile.skills or "").split(",") if item.strip()])
     evidence_count = len([item for item in [*(projection.get("evidence") or []), *(market.get("evidence") or [])] if item])
-    latest_fit = job_payload.get("fit", {}).get("fit_score", getattr(latest_analysis, "fit_score", 0) if latest_analysis else 0)
+    latest_fit = latest_analysis.available_fit_score if latest_analysis else None
 
     return {
         "collection": [
@@ -246,9 +248,9 @@ def _career_data_pipeline_payload(profile, latest_resume, latest_analysis, proje
             f"Evidence records currently attached: {evidence_count}.",
             f"Latest career timing review date is {career_timing['next_review_date']}.",
             (
-                f"Latest matched job contributes a fit score of {latest_fit}/100."
-                if latest_analysis
-                else "Job-fit influence is currently limited because no recent job link is stored."
+                f"Latest matched job contributes a rule-based fit score of {latest_fit}/100, not a hiring probability."
+                if latest_fit is not None
+                else "Job-fit influence is unavailable; review the saved resume and JD evidence."
             ),
         ],
     }
@@ -445,7 +447,12 @@ class CareerRecruiterMatchView(APIView):
         resume_payload = latest_resume.extracted_payload if latest_resume else _resume_payload_from_profile(profile)
         macro = verified_intelligence.macro_context()
         income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)
-        fit = job_intelligence.compare_resume_to_job(resume_payload, snapshot)
+        fit = job_intelligence.compare_resume_to_job(resume_payload, snapshot, resume_source={
+            "kind": "resume_upload" if latest_resume else "manual_profile",
+            "record_id": latest_resume.pk if latest_resume else profile.pk,
+            "label": latest_resume.file_name if latest_resume else "Manual career profile",
+            "parser_status": latest_resume.parser_status if latest_resume else "user_declared",
+        })
         market = job_intelligence.market_outlook(snapshot.title or profile.role, snapshot.company, macro=macro)
         openings = job_intelligence.suggest_openings(snapshot.title or profile.role, resume_payload.get("skills") or [])
         compensation = job_intelligence.compensation_benchmark(
@@ -494,11 +501,11 @@ class CareerRecruiterMatchView(APIView):
             parser_status=parser_status,
             parse_confidence=confidence,
             extracted_text=snapshot.description,
-            fit_score=fit["fit_score"],
+            fit_score=fit["fit_score"] if fit["fit_score"] is not None else 0,
             market_risk_score=market["risk_score"],
             strengths="\n".join(fit["strengths"]),
             gaps="\n".join(fit["gaps"]),
-            summary=f"Recruiter intake fit score {fit['fit_score']}/100 for {snapshot.title or 'this role'} at {snapshot.company or snapshot.source_name}.",
+            summary=(f"Rule-based fit score {fit['fit_score']}/100; not a hiring probability." if fit["fit_score"] is not None else "Fit unavailable: review incomplete or ambiguous resume/JD evidence."),
             extracted_payload={
                 "source_kind": snapshot.source_kind,
                 "intake_confidence": confidence,
@@ -572,7 +579,12 @@ class CareerJobMatchView(APIView):
         except Exception as exc:
             return _career_error_response(exc, "Job page could not be parsed. Check the URL and try again.")
 
-        fit = job_intelligence.compare_resume_to_job(resume_payload, job_snapshot)
+        fit = job_intelligence.compare_resume_to_job(resume_payload, job_snapshot, resume_source={
+            "kind": "resume_upload" if latest_resume else "manual_profile",
+            "record_id": latest_resume.pk if latest_resume else profile.pk,
+            "label": latest_resume.file_name if latest_resume else "Manual career profile",
+            "parser_status": latest_resume.parser_status if latest_resume else "user_declared",
+        })
         market = job_intelligence.market_outlook(job_snapshot.title or profile.role, job_snapshot.company, macro=macro)
         openings = job_intelligence.suggest_openings(job_snapshot.title or profile.role, resume_payload.get("skills") or [])
         compensation = job_intelligence.compensation_benchmark(
@@ -596,11 +608,11 @@ class CareerJobMatchView(APIView):
             parser_status=parser_status,
             parse_confidence=parse_confidence,
             extracted_text=job_snapshot.description,
-            fit_score=fit["fit_score"],
+            fit_score=fit["fit_score"] if fit["fit_score"] is not None else 0,
             market_risk_score=market["risk_score"],
             strengths="\n".join(fit["strengths"]),
             gaps="\n".join(fit["gaps"]),
-            summary=f"Fit score {fit['fit_score']}/100 for {job_snapshot.title or 'this role'} at {job_snapshot.company or job_snapshot.source_name}.",
+            summary=(f"Rule-based fit score {fit['fit_score']}/100; not a hiring probability." if fit["fit_score"] is not None else "Fit unavailable: review incomplete or ambiguous resume/JD evidence."),
             extracted_payload={
                 "resume_payload": resume_payload,
                 "job_snapshot": _job_snapshot_payload(job_snapshot),
@@ -648,6 +660,19 @@ class CareerJobMatchView(APIView):
         )
 
 
+class CareerOpportunityPagination(PageNumberPagination):
+    page_size = 20
+
+
+class CareerOpportunityListView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CareerOpportunitySerializer
+    pagination_class = CareerOpportunityPagination
+
+    def get_queryset(self):
+        return CareerJobAnalysis.objects.filter(user=self.request.user).order_by('-created_at','-id')
+
+
 class CareerJobOutcomeView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser]
@@ -656,18 +681,31 @@ class CareerJobOutcomeView(APIView):
         analysis = CareerJobAnalysis.objects.filter(user=request.user, id=pk).first()
         if analysis is None:
             return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not isinstance(request.data,dict) or not isinstance(analysis.extracted_payload,dict):
+            return Response({'detail':'Review a structured opportunity and outcome payload.'},status=status.HTTP_400_BAD_REQUEST)
+        conflict={'detail':'This opportunity changed. Reload its saved outcome before editing again.'}
+        if 'revision' in request.data and request.data['revision']!=CareerJobAnalysisSerializer(analysis).data['updated_at']:
+            return Response(conflict,status=status.HTTP_409_CONFLICT)
+        previous=analysis.extracted_payload.get('opportunity_outcome')
+        payload=(previous if request.method=='PATCH' and isinstance(previous,dict) else {}) | request.data
         try:
-            outcome = job_intelligence.normalize_opportunity_outcome(analysis, request.data)
+            outcome = job_intelligence.normalize_opportunity_outcome(analysis, payload)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         extracted_payload = dict(analysis.extracted_payload or {})
         extracted_payload["opportunity_outcome"] = outcome
-        analysis.extracted_payload = extracted_payload
-        analysis.save(update_fields=["extracted_payload", "updated_at"])
+        # Compare-and-swap also protects SQLite, where select_for_update does not lock rows.
+        updated=CareerJobAnalysis.objects.filter(pk=analysis.pk,user=request.user,
+            updated_at=analysis.updated_at,extracted_payload=analysis.extracted_payload).update(
+                extracted_payload=extracted_payload,updated_at=timezone.now())
+        if not updated:
+            return Response(conflict,status=status.HTTP_409_CONFLICT)
+        analysis.refresh_from_db()
         return Response(
             {
                 "analysis": CareerJobAnalysisSerializer(analysis).data,
+                "opportunity": CareerOpportunitySerializer(analysis).data,
                 "opportunity_outcome": outcome,
                 "opportunity_outcome_learning": _career_outcome_learning_payload(request.user),
             }

@@ -4,12 +4,21 @@ import os
 from .base import Provider, ProviderError, number, request_json
 
 
+def _coordinate(value):
+    if not isinstance(value,(list,tuple)) or len(value) not in (2,3):
+        raise ValueError('Invalid coordinate shape.')
+    point=[number(value[0],low=-180,high=180),number(value[1],low=-90,high=90)]
+    if len(value)==3: number(value[2])
+    return point
+
+
 class OpenRouteService(Provider):
     name = "openrouteservice"
     category = "routing"
     source_url = "https://openrouteservice.org/"
     attribution = "© openrouteservice by HeiGIT, CC BY-SA 4.0 | Data © OpenStreetMap contributors"
     ttl = timedelta(days=5)
+    version = 2  # Older cached geometries did not validate coordinate shape.
     allowed_parameters = {"start", "end", "mode", "avoid_expressways", "avoid_tolls", "preference"}
 
     def unavailable_reason(self):
@@ -20,7 +29,7 @@ class OpenRouteService(Provider):
         if mode not in {"car", "roadtrip", "motorcycle", "ride", "walking"}:
             raise ProviderError("transport_profile_unsupported")
         profile = "foot-walking" if mode == "walking" else "driving-car"
-        coordinates = [[number(c[0], low=-180, high=180), number(c[1], low=-90, high=90)] for c in (p["start"], p["end"])]
+        coordinates = [_coordinate(point) for point in (p["start"],p["end"])]
         avoid = []
         if p.get("avoid_expressways") and profile == "driving-car":
             avoid.append("highways")
@@ -40,9 +49,10 @@ class OpenRouteService(Provider):
         routes = []
         for feature in raw["features"][:3]:
             props, geometry = feature["properties"], feature["geometry"]
-            if geometry["type"] != "LineString" or len(geometry["coordinates"]) < 2:
+            if (geometry["type"] != "LineString" or not isinstance(geometry["coordinates"],(list,tuple))
+                    or len(geometry["coordinates"]) < 2):
                 raise ProviderError("malformed_response")
-            coords = [[number(c[0], low=-180, high=180), number(c[1], low=-90, high=90)] for c in geometry["coordinates"]]
+            coords = [_coordinate(point) for point in geometry["coordinates"]]
             routes.append({"distance_km": round(number(props["summary"]["distance"], low=0)/1000, 1),
                 "duration_hours": round(number(props["summary"]["duration"], low=0)/3600, 2),
                 "geometry": {"type": "LineString", "coordinates": coords}, "extras": props.get("extras", {}),

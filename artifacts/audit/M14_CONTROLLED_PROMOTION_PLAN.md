@@ -1,3 +1,5 @@
+> Historical operator evidence, preserved during consolidation on 2026-10-21. Current state and instructions: [../../docs/PROJECT_STATUS.md](../../docs/PROJECT_STATUS.md). Dated deployment/acceptance claims below are not current release approval.
+
 # Controlled M14 promotion plan — prepared, not executed
 
 Development checkout: `F:\ALFRED_DEV\m13c`.
@@ -205,3 +207,17 @@ keys with a restored DB; do not retire fallbacks or rotate tokens as part of thi
 approval. No source promotion, live migration, token operation or service change
 has been executed. Approval question is the user's required Step 5, not inferred:
 "Do you authorize promoting M14 to the live ALFRED installation and applying the verified family-sharing migration?"
+
+## Authorized execution receipt - 2026-10-11
+
+The user explicitly authorized the frozen 30e0b3f75e785f639897ad36c19090c6a4e8675f
+release and verified family migration. That exact source is installed on master;
+only family.0004 was applied. Backup freshness, private-copy rehearsal and live
+reconciliation PASS; historical sharing OFF and all other rows/values preserved.
+The live loopback service and worker are healthy. Actual HTTP/worker gate 21 PASS;
+private-copy authenticated compatibility/media/CSRF/upload gate 21 PASS. Recovery
+sets, current keys, configuration, media, jobs and operator edits are preserved.
+Profile-independent encrypted current recovery supplement also verified; no token
+re-encryption or remote push. See docs/M14_LIVE_DEPLOYMENT_20261011.md and protected
+live-deployment-receipt.json. Real-account password/browser acceptance is PENDING;
+entire deployment completion is not yet claimed. No M15 code is installed.

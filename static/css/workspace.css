@@ -36,6 +36,7 @@ h1, h2, h3, h4, h5, h6, .metric-value, .alfred-brand strong { font-family: inher
 .conversation-evidence { background: var(--alfred-surface-strong); border: 1px solid var(--alfred-stroke); border-radius: 10px; padding: .85rem; margin-top: 1rem; }
 .conversation-evidence summary { font-weight: 600; cursor: pointer; }
 .conversation-evidence p { font-size: .85rem; }
+.conversation-evidence li { overflow-wrap: anywhere; }
 .conversation-feedback { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
 .conversation-spinner { display: inline-block; width: .8rem; height: .8rem; border: 2px solid #b0bfdb; border-top-color: #1858d6; border-radius: 50%; animation: workspace-spin 1s linear infinite; }
 @keyframes workspace-spin { to { transform: rotate(360deg); } }

@@ -34,10 +34,9 @@ def run_proof(args,stack,parser):
     wire=None
     if args.provider=='s3-wire':
         from unittest.mock import patch
-        from apps.ml_engine.services.memory_cloud import S3MemoryProvider
-        from tests.memory_s3_fixture import PROFILE, SignedS3Fixture
+        from tests.memory_s3_fixture import PROFILE, SignedS3Fixture, LegacyS3FixtureProvider as S3MemoryProvider
         wire=SignedS3Fixture(root/'s3-wire.sqlite3')
-        stack.enter_context(patch('apps.ml_engine.services.memory_cloud.request',side_effect=wire.request))
+        stack.enter_context(patch('tests.memory_s3_fixture.request',side_effect=wire.request))
         provider=S3MemoryProvider(_owner(owner),PROFILE)
     else: provider=MockCloudProvider(root/'mock-provider')
     sync=MemorySynchronizer(store,provider)

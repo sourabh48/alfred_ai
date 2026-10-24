@@ -1,8 +1,23 @@
 # Configuration
 
+**Current native configuration — 2026-10-15:** Preserve operator files/keys; this audit did not load or overwrite their values. The selected live data directory is F:/ALFRED/restored-runtime, with explicit db.sqlite3 there. Do not initialize a new checkout database when resuming. ALFRED_MEMORY_OPENAI_AUTHORIZED and ALFRED_MEMORY_CLOUD_AUTHORIZED remain false, and no real sync provider is selected. Config/native.env/local.env must be untracked and owner-protected; current broad read grants are an audit finding requiring separately approved maintenance. See [provider activation boundaries](ALFRED_EXTERNAL_INTEGRATIONS.md).
+
 ALFRED now supports a config-backed UI copy layer so the shared brand, auth, error-page, expense, and ML-runtime guidance text does not need to stay hardcoded in templates.
 
 ## Files
+
+Post-audit Windows development checks private SQLite/config/cache permissions
+before use and protects retained/temporary uploads before writing data. A fresh
+source installation should select an empty private data directory and explicit
+SQLite path outside the code checkout. Use `ALFRED_DATA_DIR` for local config/key
+selection and `DATABASE_URL=sqlite:///...` for the matching absolute database path;
+`ALFRED_MEDIA_ROOT` selects a separate private source/debug upload directory
+(native continues to use its selected data directory's media subdirectory).
+verify the selected path before any initialization. Existing native data, keys or
+operator edits must be preserved, not moved or replaced by these examples.
+Broad existing file/directory ACLs fail safely and need the separately authorized
+[permission repair](NATIVE_WINDOWS.md#private-storage-permission-repair). No startup
+silently repairs production. No new migration is introduced by this protection.
 
 - `config/alfred_ui.example.json`
   Tracked example config committed to the repo.

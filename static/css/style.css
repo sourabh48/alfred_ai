@@ -1042,8 +1042,9 @@ h1, h2, h3, h4, h5, h6,
 .photo-card {
     overflow: hidden;
     border-radius: 1.2rem;
-    border: 1px solid rgba(16, 37, 63, 0.08);
-    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid var(--alfred-stroke);
+    background: var(--alfred-surface-strong);
+    color: var(--alfred-ink);
     box-shadow: var(--alfred-shadow-soft);
 }
 

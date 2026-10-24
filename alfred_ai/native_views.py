@@ -49,7 +49,11 @@ def private_media(request, path):
     name = target.relative_to(root).as_posix()
     for model, field, owner in fields:
         if apps.get_model(model).objects.filter(**{field: name, owner: request.user.pk}).exists():
-            response = FileResponse(target.open("rb"), as_attachment=True, filename=target.name)
+            try:
+                source = target.open("rb")
+            except OSError:
+                raise Http404 from None
+            response = FileResponse(source, as_attachment=True, filename=target.name)
             response["Cache-Control"] = "private, no-store"
             return response
     raise Http404

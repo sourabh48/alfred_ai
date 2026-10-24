@@ -1,0 +1,8 @@
+{
+  "code": "SOURCE_DEBUG_MEDIA",
+  "debug": true,
+  "native_runtime": false,
+  "anonymous_status": 200,
+  "synthetic_only": true,
+  "database_rows_written": false
+}

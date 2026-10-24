@@ -1,9 +1,13 @@
 from rest_framework import serializers
 from datetime import datetime
-from math import isfinite
 from .models import Budget
+from .money import BudgetMoneySerializerField
 
 class BudgetSerializer(serializers.ModelSerializer):
+    base_budget = BudgetMoneySerializerField()
+    inflation_adjusted = BudgetMoneySerializerField()
+    spent = BudgetMoneySerializerField(required=False)
+
     class Meta:
         model = Budget
         fields = "__all__"
@@ -16,9 +20,3 @@ class BudgetSerializer(serializers.ModelSerializer):
             except ValueError:
                 continue
         raise serializers.ValidationError("Enter a month and year, for example Sep 2026 or 2026-09.")
-
-    def validate(self, attrs):
-        for field in ("base_budget", "inflation_adjusted", "spent"):
-            if field in attrs and (not isfinite(attrs[field]) or attrs[field] < 0):
-                raise serializers.ValidationError({field: "Enter a finite amount of zero or more."})
-        return attrs

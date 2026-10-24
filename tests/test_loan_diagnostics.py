@@ -36,6 +36,8 @@ class LoanDiagnosticTests(TestCase):
     def setUp(self):
         directory = self.enterContext(TemporaryDirectory(prefix="alfred-m14f-"))
         self.directory = Path(directory)
+        from alfred_private_storage import private_directory
+        private_directory(self.directory)
         self.enterContext(override_settings(MEDIA_ROOT=directory, FILE_UPLOAD_TEMP_DIR=directory,
                                            ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=False))
         self.user = get_user_model().objects.create_user(username="m14f", password="Synthetic-X8!Lantern")

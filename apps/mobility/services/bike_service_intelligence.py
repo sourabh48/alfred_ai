@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
+from decimal import Decimal
+from math import isfinite
 import re
 from statistics import mean
 
@@ -9,6 +11,8 @@ from django.db.models import Count, Max, Q
 from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import materialize_payload
+from apps.expenses.money import money_float
+from apps.expenses.services.financial_intelligence import _numeric_currency_payload
 from apps.ml_engine.inference_adapters.service_cost_predictor import service_cost_predictor, service_type_score, vehicle_type_score
 from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TripLog
 from .bike_catalog import build_maintenance_guidance, build_route_maintenance_guidance
@@ -180,7 +184,7 @@ class BikeServiceIntelligenceService:
             user_id=user.id,
             revision=self._dashboard_revision(user),
             ttl_seconds=45,
-            builder=lambda: self._build_dashboard_uncached(user),
+            builder=lambda: _numeric_currency_payload(self._build_dashboard_uncached(user)),
         )
 
     def _build_dashboard_uncached(self, user) -> dict:
@@ -244,7 +248,7 @@ class BikeServiceIntelligenceService:
         annual_service_cost = round(sum(item.cost or 0 for item in scoped_service_records if (today - item.service_date).days <= 365), 2)
         trip_cost_total = round(sum(item.spend_amount or 0 for item in scoped_trip_logs), 2)
         trip_distance_total = round(sum(item.distance_km or 0 for item in scoped_trip_logs), 1)
-        cost_per_km = round(trip_cost_total / trip_distance_total, 2) if trip_distance_total else 0
+        cost_per_km = money_float(Decimal(str(trip_cost_total)) / Decimal(str(trip_distance_total))) if trip_distance_total else 0
         projected_next_service_cost = round(self._routine_service_baseline(scoped_service_records, profile=primary_profile) + sum(self._issue_cost(issue, scoped_issues) for issue in open_issues[:3]), 2)
         document_summary = self._document_summary(current_documents, today)
         modification_summary = self._detect_modifications(scoped_service_records, scoped_issues)
@@ -339,7 +343,7 @@ class BikeServiceIntelligenceService:
             user_id=user.id,
             revision=self._dashboard_revision(user),
             ttl_seconds=30,
-            builder=lambda: self._risk_snapshot_uncached(user),
+            builder=lambda: _numeric_currency_payload(self._risk_snapshot_uncached(user)),
         )
 
     def _risk_snapshot_uncached(self, user) -> dict:
@@ -542,7 +546,7 @@ class BikeServiceIntelligenceService:
         return self._current_documents(documents)
 
     def _routine_service_baseline(self, service_records: list[BikeServiceRecord], *, profile=None) -> float:
-        routine_costs = [item.cost for item in service_records if item.service_type == "routine" and item.cost]
+        routine_costs = [float(item.cost) for item in service_records if item.service_type == "routine" and item.cost]
         heuristic = round(mean(routine_costs[-3:]), 2) if routine_costs else 1800.0
         latest_record = next((item for item in service_records if item.cost), service_records[0] if service_records else None)
         if latest_record is None:
@@ -573,12 +577,12 @@ class BikeServiceIntelligenceService:
 
     def _issue_cost(self, issue: BikeIssueReport, issues: list[BikeIssueReport]) -> float:
         if issue.projected_cost:
-            return issue.projected_cost
+            return money_float(issue.projected_cost)
         rule = self._match_rule(issue.title, issue.symptom, issue.observation, issue.system)
         return self._blend_cost(rule["cost_range"], [item for item in issues if item.system == issue.system]) if rule else 800.0
 
     def _blend_cost(self, cost_range: tuple[int, int], history: list[BikeIssueReport]) -> float:
-        historical_costs = [item.actual_cost for item in history if item.actual_cost]
+        historical_costs = [float(item.actual_cost) for item in history if item.actual_cost]
         midpoint = (cost_range[0] + cost_range[1]) / 2
         if historical_costs:
             return round((mean(historical_costs[-3:]) * 0.65) + (midpoint * 0.35), 2)
@@ -997,7 +1001,10 @@ class BikeServiceIntelligenceService:
             return None
         if refill_log.fuel_liters <= 0 or refill_log.trip_meter_km <= 0:
             return None
-        return round(refill_log.trip_meter_km / refill_log.fuel_liters, 2)
+        if not isfinite(refill_log.fuel_liters) or not isfinite(refill_log.trip_meter_km):
+            return None
+        mileage = refill_log.trip_meter_km / refill_log.fuel_liters
+        return round(mileage, 2) if isfinite(mileage) else None
 
     def _build_mileage_trend(self, refill_logs, expected_mileage, source_name, source_url) -> dict:
         eligible_logs = [item for item in reversed(refill_logs[:10]) if self._refill_actual_mileage(item) is not None]
@@ -1018,7 +1025,7 @@ class BikeServiceIntelligenceService:
             "values": [round(item.cost or 0, 2) for item in reversed(service_records[:8])],
         }
 
-        monthly = defaultdict(lambda: {"service": 0.0, "trip": 0.0})
+        monthly = defaultdict(lambda: {"service": Decimal("0"), "trip": Decimal("0")})
         for item in service_records[:12]:
             key = (item.service_date.year, item.service_date.month)
             monthly[key]["service"] += item.cost or 0
@@ -1150,7 +1157,7 @@ class BikeServiceIntelligenceService:
         }
 
     def _build_fleet_summary(self, bike_profiles, service_records, documents) -> list[dict]:
-        service_costs = defaultdict(float)
+        service_costs = defaultdict(Decimal)
         current_documents = self._current_documents(documents)
         doc_counts = Counter(self._document_vehicle_key(document) for document in current_documents)
         for record in service_records:

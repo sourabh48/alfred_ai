@@ -175,6 +175,63 @@ class TravelRoutingTests(TestCase):
             provider.fetch({**p, "mode": "train"})
 
 
+    def test_malformed_route_points_do_not_become_valid_looking_coordinates(self):
+        provider=OpenRouteService()
+        p={'start':[77,12],'end':[76,11],'mode':'ride'}
+        for coordinates in (['77','12'],[[77,12],'76'],[[77,12,None],[76,11,10]],
+                [[77,12,0,1],[76,11,0,1]]):
+            with self.subTest(coordinates=coordinates), self.assertRaises((ValueError,TypeError,ProviderError)):
+                provider.normalize({'features':[{'geometry':{'type':'LineString','coordinates':coordinates},
+                    'properties':{'summary':{'distance':250000,'duration':18000}}}]},p)
+
+    @patch.dict('os.environ',{'TRAVEL_ORS_API_KEY':'fixture-secret'})
+    @patch('apps.mobility.services.travel.providers.routing.request_json')
+    def test_invalid_request_point_shapes_never_reach_transport(self,request):
+        for field in ('start','end'):
+            for point in ('77',None,{0:77,1:12},[77],[77,12,0,1]):
+                with self.subTest(field=field,point=point), self.assertRaises((ValueError,ProviderError)):
+                    OpenRouteService().fetch({'start':[77,12],'end':[76,11],field:point})
+        request.assert_not_called()
+
+    @patch.dict('os.environ',{'TRAVEL_ORS_API_KEY':'fixture-secret'})
+    @patch('apps.mobility.services.travel.providers.routing.request_json')
+    def test_malformed_route_is_unavailable_not_cached_or_mapped_as_live(self,request):
+        request.return_value=({'features':[{'geometry':{'type':'LineString','coordinates':['77','12']},
+            'properties':{'summary':{'distance':250000,'duration':18000}}}]},'synthetic-route-response')
+        result=query(OpenRouteService(),{'start':[77,12],'end':[76,11],'mode':'car'})
+        self.assertFalse(result.success); self.assertEqual(result.error,'malformed_response')
+        self.assertNotEqual(result.freshness,'LIVE')
+        self.assertFalse(VerifiedExternalInsight.objects.filter(scope='travel_provider').exists())
+        self.assertFalse(TravelProviderRequest.objects.filter(provider='openrouteservice',status='ok').exists())
+        features=map_features({'name':'Synthetic destination','route_result':result.as_dict()})
+        self.assertFalse(any(feature['geometry']['type']=='LineString' for feature in features['features']))
+
+    def test_finite_elevation_coordinates_and_explicit_zero_route_remain_supported(self):
+        result=OpenRouteService().normalize({'features':[{'geometry':{'type':'LineString','coordinates':[[0,0,-2],[0,0,3]]},
+            'properties':{'summary':{'distance':0,'duration':0}}}]},{'mode':'walking'})
+        route=result['routes'][0]
+        self.assertEqual(route['geometry']['coordinates'],[[0,0],[0,0]])
+        self.assertEqual(route['distance_km'],0); self.assertEqual(route['duration_hours'],0)
+        self.assertEqual(route['motorcycle_legal'],'UNKNOWN'); self.assertEqual(route['closures'],'UNKNOWN')
+
+    @patch.dict('os.environ',{'TRAVEL_ORS_API_KEY':'fixture-secret'})
+    @patch('apps.mobility.services.travel.providers.routing.request_json')
+    def test_legacy_route_cache_cannot_bypass_validation_and_is_preserved(self,request):
+        raw={'features':[{'geometry':{'type':'LineString','coordinates':['77','12']},
+            'properties':{'summary':{'distance':250000,'duration':18000}}}]}
+        request.return_value=(raw,'synthetic-legacy-route-response')
+        parameters={'start':[77,12],'end':[76,11],'mode':'car'}
+        legacy=OpenRouteService(); legacy.version=1; legacy.min_interval=0
+        with patch.object(legacy,'normalize',return_value={'routes':[{'geometry':{'type':'LineString','coordinates':[[7,7],[1,2]]}}]}):
+            self.assertTrue(query(legacy,parameters).success)
+        snapshot=VerifiedExternalInsight.objects.get(scope='travel_provider')
+        before=snapshot.payload.copy()
+        result=query(OpenRouteService(),parameters)
+        self.assertFalse(result.success); self.assertEqual(result.error,'malformed_response')
+        self.assertEqual(request.call_count,2)
+        snapshot.refresh_from_db(); self.assertEqual(snapshot.payload,before)
+
+
 class TravelWeatherTests(TestCase):
     def test_daily_weather_and_replan_does_not_cancel(self):
         provider = OpenMeteoWeather()

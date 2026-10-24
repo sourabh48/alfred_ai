@@ -7,6 +7,8 @@ from time import monotonic
 from uuid import uuid4
 
 import requests
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Avg, Count, Max, Q
 from django.utils import timezone
 
@@ -26,7 +28,7 @@ def _cache_result(record, error=""):
     return ProviderResult(**data)
 
 
-def query(provider, parameters, *, force=False):
+def query(provider, parameters, *, force=False, cache_only=False):
     try:
         parameters = provider.parameters(parameters)
     except (ValueError, TypeError, ProviderError):
@@ -50,6 +52,12 @@ def query(provider, parameters, *, force=False):
             return _cache_result(record, code)
         return ProviderResult(provider.name, provider.category, request_parameters=parameters,
             source_url=provider.source_url, attribution=provider.attribution, error=code)
+
+    if cache_only:
+        if record:
+            log("cache_hit")
+            return _cache_result(record)
+        return unavailable("refresh_not_requested")
 
     reason = provider.unavailable_reason()
     if reason:
@@ -123,10 +131,10 @@ def query(provider, parameters, *, force=False):
         source_url=provider.source_url, request_parameters=parameters)
 
 
-def query_with_fallback(providers, parameters, *, force=False):
+def query_with_fallback(providers, parameters, *, force=False, cache_only=False):
     attempts, stale = [], None
     for provider in providers:
-        result = query(provider, parameters, force=force)
+        result = query(provider, parameters, force=force, cache_only=cache_only)
         if result.success and not result.stale:
             result.fallback = attempts
             return result
@@ -149,3 +157,31 @@ def usage_summary():
     remaining = dict(TravelProviderState.objects.values_list("provider", "quota_remaining"))
     return [{**row, "cache_hit_ratio": round(row["cache_hits"]/row["requests"], 3),
              "quota_remaining": remaining.get(row["provider"])} for row in rows]
+
+
+def cleanup_request_history(*, apply=False):
+    """Prune expired telemetry only; shared leases and quota history remain authoritative."""
+    days = settings.TRAVEL_PROVIDER_REQUEST_RETENTION_DAYS
+    network_days = settings.TRAVEL_PROVIDER_NETWORK_RETENTION_DAYS
+    batch = settings.TRAVEL_PROVIDER_CLEANUP_BATCH_SIZE
+    if type(apply) is not bool or any(type(value) is not int or not 1 <= value <= maximum
+            for value, maximum in ((days, 3650), (network_days, 3650), (batch, 10000))):
+        raise ImproperlyConfigured("Invalid Travel request retention configuration.")
+    now = timezone.now()
+    cutoff = now - timedelta(days=days)
+    # query() counts the current UTC month; pruning must never replenish that quota.
+    network_cutoff = min(now - timedelta(days=network_days),
+                         now.replace(day=1, hour=0, minute=0, second=0, microsecond=0))
+    active = TravelProviderState.objects.filter(lease_until__gt=now).values('provider')
+    expired = TravelProviderRequest.objects.filter(
+        Q(network_call=False, created_at__lt=cutoff) |
+        Q(network_call=True, created_at__lt=network_cutoff))
+    protected = Q(status='in_progress', provider__in=active)
+    due = expired.exclude(protected)
+    eligible = due.count()
+    ids = list(due.order_by('created_at', 'pk').values_list('pk', flat=True)[:batch])
+    # Recheck leases at deletion, including abandoned attempts older than retention.
+    deleted = due.filter(pk__in=ids).delete()[0] if apply and ids else 0
+    return {'dry_run': not apply, 'eligible': eligible, 'selected': len(ids),
+            'deleted': deleted, 'remaining': due.count(), 'retained_active': expired.filter(protected).count(),
+            'request_cutoff': cutoff.isoformat(), 'network_cutoff': network_cutoff.isoformat()}

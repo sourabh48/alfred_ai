@@ -2,12 +2,17 @@
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import time
+from math import isfinite
 from uuid import uuid4
 
 from cryptography.fernet import Fernet
 
 from .persistent_memory import _owner, _json, SENSITIVITIES, MemoryConflict
 from .memory_sync import valid_id
+from .local_embeddings import EmbeddingUnavailable
+
+EVALUATION_SECONDS=60
 
 
 class MemoryLearning:
@@ -80,25 +85,75 @@ class MemoryLearning:
             sensitivity=sensitivity,verified=True,supersedes=identities)
 
     def evaluate(self,user,cases,*,min_score=None):
-        records={r['id'] for r in self.store.list_memories(user)}
+        deadline=time.monotonic()+EVALUATION_SECONDS
+        records={r['id']:r for r in self.store.list_memories(user)}
         if not isinstance(cases,list) or not 1<=len(cases)<=20: raise ValueError('Provide at most twenty evaluation cases.')
+        if min_score is not None and (isinstance(min_score,bool) or not isinstance(min_score,(int,float)) or not isfinite(min_score) or not -1<=min_score<=1):
+            raise ValueError('Choose a finite local relevance threshold.')
+        expected_cases=[]; query_bytes=0
         for case in cases:
-            if not isinstance(case,dict) or set(case)!= {'query','expected_id'} or not isinstance(case['query'],str) or not case['query'].strip() or len(case['query'].encode())>8192 or (case['expected_id'] is not None and (not valid_id(case['expected_id']) or case['expected_id'] not in records)):
+            if (not isinstance(case,dict) or set(case) not in ({'query','expected_id'},{'query','expected_ids'})
+                    or not isinstance(case['query'],str) or not case['query'].strip()):
                 raise ValueError('Evaluation requires bounded queries and owned verified ground truth.')
-        ranks=[]; false_positives=0; negative_cases=0
-        for case in cases:
-            results=self.store.retrieve(user,case['query'],limit=3,**({'min_score':min_score} if min_score is not None else {}))
-            if case['expected_id'] is None:
+            identities=case.get('expected_ids') if 'expected_ids' in case else ([] if case['expected_id'] is None else [case['expected_id']])
+            if (not isinstance(identities,list) or len(identities)>20
+                    or any(not valid_id(identity) or identity not in records for identity in identities)
+                    or len(set(identities))!=len(identities)):
+                raise ValueError('Choose current owner-confirmed expected memories, or no expected match.')
+            query_bytes+=len(case['query'].encode())
+            if query_bytes>8192: raise ValueError('Evaluation questions must total at most 8192 bytes.')
+            expected_cases.append(set(identities))
+        profile=self.store.retrieval_profile(user)
+        ranks=[]; false_positives=0; negative_cases=0; per_case=[]
+        total_relevant=0; total_returned=0; total_expected=0
+        for index,(case,expected) in enumerate(zip(cases,expected_cases),1):
+            if time.monotonic()>=deadline: raise EmbeddingUnavailable('Local evaluation deadline exceeded.')
+            results=self.store.retrieve(user,case['query'],limit=3,deadline=deadline,**({'min_score':min_score} if min_score is not None else {}))
+            if time.monotonic()>=deadline: raise EmbeddingUnavailable('Local evaluation deadline exceeded.')
+            if (not isinstance(results,list) or len(results)>3 or any(not isinstance(item,dict)
+                    or not valid_id(item.get('id')) or item['id'] not in records
+                    or isinstance(item.get('score'),bool) or not isinstance(item.get('score'),(int,float))
+                    or not isfinite(item['score']) or abs(item['score'])>1.000001 for item in results)
+                    or len({item['id'] for item in results})!=len(results)):
+                raise MemoryConflict('Retrieval references are no longer valid for this owner.')
+            for item in results:
+                if any(key in item and item[key]!=records[item['id']][key] for key in ('content','provenance','sensitivity','verified_at')):
+                    raise MemoryConflict('Retrieved memory changed during evaluation.')
+            retrieved={item['id'] for item in results}; relevant=len(expected & retrieved)
+            rank=next((1/(i+1) for i,item in enumerate(results) if item['id'] in expected),0)
+            if not expected:
                 negative_cases+=1; false_positives+=bool(results)
-            else:
-                ranks.append(next((1/(i+1) for i,r in enumerate(results) if r['id']==case['expected_id']),0))
-        # Immutable IDs make edits/deletions detectable without retaining private queries.
-        if {r['id'] for r in self.store.list_memories(user)}!=records:
+            else: ranks.append(rank)
+            total_relevant+=relevant; total_returned+=len(results); total_expected+=len(expected)
+            per_case.append(dict(case=index,expected_ids=sorted(expected),returned=len(results),matched=relevant,
+                missed=len(expected-retrieved),irrelevant=len(retrieved-expected),abstained=not results,
+                exact_match=expected==retrieved,precision=relevant/len(results) if results else None,
+                recall=relevant/len(expected) if expected else None,reciprocal_rank=rank if expected else None,
+                citations=[dict(id=item['id'],rank=i,score=item['score'],relevant=item['id'] in expected,
+                    url=f"/settings/#memory-{item['id']}") for i,item in enumerate(results,1)]))
+        # No partial report survives correction, deletion, expiry or owner-state changes.
+        if (self.store.retrieval_profile(user)!=profile
+                or {r['id']:r for r in self.store.list_memories(user)}!=records):
             raise MemoryConflict('Memory changed during evaluation.')
+        if time.monotonic()>=deadline: raise EmbeddingUnavailable('Local evaluation deadline exceeded.')
         return {'cases':len(cases),'positive_cases':len(ranks),'negative_cases':negative_cases,
-            'recall_at_3':sum(bool(rank) for rank in ranks)/len(ranks) if ranks else None,
+            'recall_at_3':sum(case['recall'] for case in per_case if case['recall'] is not None)/len(ranks) if ranks else None,
             'mean_reciprocal_rank':sum(ranks)/len(ranks) if ranks else None,
             'top_1_accuracy':sum(rank==1 for rank in ranks)/len(ranks) if ranks else None,
             'false_positive_rate':false_positives/negative_cases if negative_cases else None,
             'abstention_rate':1-false_positives/negative_cases if negative_cases else None,
+            'precision':total_relevant/total_returned if total_returned else None,
+            'recall':total_relevant/total_expected if total_expected else None,
+            'exact_match_rate':sum(case['exact_match'] for case in per_case)/len(cases),
+            'citation_correctness':1.0 if total_returned else None,'checked_citations':total_returned,
+            'precision_at_k':{str(k):sum(sum(c['relevant'] for c in case['citations'][:k])/k for case in per_case if case['expected_ids'])/len(ranks) if ranks else None for k in (1,2,3)},
+            'recall_at_k':{str(k):sum(sum(c['relevant'] for c in case['citations'][:k])/len(case['expected_ids']) for case in per_case if case['expected_ids'])/len(ranks) if ranks else None for k in (1,2,3)},
+            'retrieval_errors':dict(unexpected_references=total_returned-total_relevant,missed_references=total_expected-total_relevant,
+                false_abstentions=sum(bool(case['expected_ids']) and case['abstained'] for case in per_case),false_matches=false_positives),
+            'ranking_metric_scope':'positive_cases_only_fixed_k_denominator; negative_cases_measured_by_abstention',
+            'min_score':min_score,'result_limit':3,'per_case':per_case,
+            'processing_budget_seconds':EVALUATION_SECONDS,
+            'retrieval_context':dict(protocol=self.store.retrieval_protocol,**profile,
+                comparison='same_model_cutoff_reviewed_cases_and_source_revisions_required',cohort_persistence='none'),
+            'privacy':'owner_only_local','source_check':'unchanged_owner_snapshot',
             'ground_truth':'user_verified','generated_hypotheses_are_facts':False}

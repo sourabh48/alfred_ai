@@ -1,4 +1,930 @@
+> **Historical record, closed 2026-10-17.** The only active status, roadmap and resume instructions are [../../docs/PROJECT_STATUS.md](../../docs/PROJECT_STATUS.md). Preserve this dated evidence; do not execute obsolete next-step instructions.
+
+
+## M15 GitHub synchronization COMPLETE (2026-10-15)
+
+Explicit user YES authorized only the deployed M15 commit to sourabh48/alfred_ai
+master. Fetched origin/master was 30e0b3f75e785f639897ad36c19090c6a4e8675f;
+ordinary non-force fast-forward of 38 commits succeeded. A separate git ls-remote
+independently verified GitHub master and local HEAD both equal exactly:
+3932f391aa4eed7b3200ad3b034f7991435e01e4.
+
+FAST-FORWARD PASS; PRIVACY SCAN PASS. Reviewed all 801 target tracked paths and
+all 38 unpublished history trees; no tracked private data/DB/archive/key/runtime
+paths. Credential-pattern hits were explicitly synthetic S3 fixture identifiers
+and an isolated disposable rehearsal signing key, not operator credentials.
+Frozen source archive SHA256 matches the reviewed manifest. Local operator edits
+and untracked reports were not staged, committed or pushed. No new source commit.
+
+Live server, worker and scheduler were not restarted or reconfigured; listener
+and process start times remain unchanged. No financial database, credentials,
+keys, media, queue or recovery assets were modified by this Git operation.
+OpenAI real access and real memory cloud sync remain disabled. Backups preserved.
+Normal real-account acceptance remains PENDING USER. HDD backup USER REPORTED
+COPIED; external recovery verification WAIVED BY USER; device-loss recovery
+UNVERIFIED. Cancelled passphrase/key-sealing workflows remain cancelled.
+
+Checkpoint-only documentation updates follow the pinned push; original file
+bodies are preserved verbatim. Frozen review worktrees/commits remain unchanged.
+No application tests were rerun for this Git-only operation; prior validated
+release/deployment gates remain their own evidence, not new test counts.
+
+Push receipt: F:/ALFRED_DEV/isolated-tests/m15-github-push-execution-20261015.json
+Privacy evidence: F:/ALFRED_DEV/isolated-tests/m15-github-privacy-history-20261015.json
+Proposed next roadmap: F:/ALFRED_DEV/isolated-tests/M15_POST_RELEASE_ROADMAP_20261015.md
+NEXT DEVELOPMENT MILESTONE (proposed): M20 release-gate automation, with M21
+real-environment acceptance; later Travel T09/M16. Planning only, not started.
+Do not modify live financial data or infer authorization for another push/deploy.
+
+The earlier deployment/recovery text below is historical and is superseded where
+it says M15 GitHub push is pending or unapproved.
+
+---
+## M15 live deployment — technical validation PASS (2026-10-15)
+
+Explicit user YES authorized main-folder M14-to-M15 promotion and waived external
+HDD verification. Main master is now exactly 3932f391aa4eed7b3200ad3b034f7991435e01e4,
+ordinary 38-commit fast-forward from 30e0b3f75e785f639897ad36c19090c6a4e8675f.
+All completed M15 AI/memory/security/UI features are physically in the main folder.
+No new migrations, dependencies, application fixes or commits. Frozen candidates
+are unchanged. Existing SDK source-native service is running on loopback 8000,
+explicit private DB F:/ALFRED/restored-runtime/db.sqlite3.
+
+Fresh quiesced encrypted backup F:/ALFRED_BACKUPS/m15-prepromotion-20261015-000251:
+9,791 payloads, fourteen SQLite DBs independently authenticated/restored/reconciled.
+Encrypted archive SHA256 ae50ce8c657525a66fb6799e31f35e2337693a8c71558209d9b6e4a196779a65.
+All previous backups preserved. Six operator originals are protected; five files
+remain byte-exact and the entire original continuation file remains in this
+checkpoint's historical body and the encrypted recovery inventory.
+
+Final actual live restart/queue/worker/scheduler PASS. Forty-two canonical finance,
+family, Travel, account and migration table digests unchanged; 9,757 config/key/
+media hashes exact. Fourteen existing SQLite databases and the new memory DB pass
+integrity/FKs. Eight actual served static assets match the frozen source. Empty
+migration plan; family.0004 remains applied, never replayed. Family permissions,
+credentials, balances and historical records unchanged. OpenAI and real memory
+cloud sync remain disabled. No token re-encryption or private memory export.
+
+Actual fresh post-deployment gates: 21 live HTTP/queue; 26 private-copy module/
+owned-document/policy checks; 34 main-source native checks including seven Chrome
+workflows. Screenshot review PASS. Main-source run 01d493b116 uses synthetic data
+only, not a newly packaged executable or the real user's browser session.
+Prior frozen 619 backend/15 dev Chrome/35 packaged-native gate remains prior exact
+source evidence, not a rerun or an added count. Normal real-account sign-in/browser
+acceptance PENDING USER; no passwords requested or credentials changed.
+
+Normal live memory factory/encryption initialized an empty protected vault; zero
+user memory records were added. DPAPI journal key, cryptographic self-check and
+fresh-process local recovery PASS. Additional post-m15-memory.encrypted.zip in the
+same protected backup set preserves key/index; SHA256
+736f7d52d5ad5e6c7c217625fd000756f328ec9a86182aa5e3f5ae36355d8fc1.
+Device-loss recovery remains UNVERIFIED; external verification WAIVED BY USER;
+HDD copy USER REPORTED. Cancelled passphrase workflow stays cancelled.
+
+Initial verification-only PID/cache/lazy-key assumptions were corrected with
+observed lineage, SQLite checks and normal protected-key initialization. Their
+failure evidence is preserved; no critical application failure or rollback.
+Existing non-fatal Python regex SyntaxWarning is documented without a source fix.
+Graphify AST refresh completed (8,626 nodes / 22,372 edges), no paid API processing.
+
+GitHub fetched origin/master still 30e0b3f, safe fast-forward to deployed SHA.
+Pinned-source privacy review PASS; only known synthetic fixture identifier matched.
+NO M15 PUSH; SEPARATE AUTHORIZATION REQUIRED. Never force-push. Re-fetch before push.
+Detailed deployment/rollback/evidence: docs/M15_LIVE_DEPLOYMENT_20261015.md and
+F:/ALFRED_DEV/isolated-tests/m15-live-final-restart-reconciliation-20261015.json.
+
+NEXT: normal real-account browser acceptance and separate GitHub push approval.
+Do not start M16 or additional features as part of this deployment closure.
+
+---
 # ALFRED CODEX CONTINUATION STATE
+
+## AI-GROUND Phase 2 canonical financial records — 2026-10-16–17
+
+Isolated F:/ALFRED_DEV/post-audit, feature/ai-ground-bank-20261016, based exactly on
+1b80138d470150de8f9fc1d1be831af1cecc8941. Source unit
+df386be6938e533cff5b9e20af11ba015672ee9a is committed; this assistant unit follows
+it as b49c14125af6b60c51b8965e8c221cf7ecc8f35e. The next verified-document unit
+is committed as 9a02f168ea1394282ec77e4afc7ca5da2e002fbe; verify actual HEAD.
+Read docs/PROJECT_STATUS.md. Final source-boundary correction follows below.
+Last fully validated runtime source is 179db89625e4d77ef2f90bd221707397f2c4f2b1;
+this closing documentation-only checkpoint records it. Verify actual current HEAD.
+
+Unit 1 implemented: canonical_evidence.py and read-only financial-evidence API;
+owned citation template/view; exact typed money/source/date/revision; expense,
+budget, loan, investment and reported baseline fields. Reuses domain money helpers,
+Loan.current_status/persisted EMI/payment records and canonical baseline resolver
+(new optional fresh=True). No competing calculations or schema/migration changes.
+Bank expenses delegate unchanged receipt confirmation/revocation and owner citation.
+Budget approval metadata does not exist: expose owner-saved records honestly, not
+approved budgets. Same-period contradictions abstain. Loans require confirmed
+records; missing balances remain unknown and closure contradictions abstain.
+Investment positions are recorded values, not live quotes or verified extraction.
+Unknown-currency/derived baseline totals are withheld; C1–C10 remain gated.
+
+Evidence artifacts/post-audit/ai-ground-canonical-20261016:
+canonical-source-verified 46 backend PASS, zero skips/failures; includes existing
+bank source/hybrid and financial baseline. Exact canonical Decimal and financial
+rows have zero mismatches. System/migration drift PASS. No schema change; do not
+repeat old FIN-MONEY or release suites. Citation privacy reuses shared pagehide/
+cached-page cleanup; assistant/browser acceptance follows below.
+
+Unit 2 implemented: financial_records scope/record_type/record_id in existing
+hybrid/API/UI and reference-only encrypted history compatibility. Allowlisted typed
+money/status/date context; no source names/account IDs/notes/raw documents/private
+URLs sent to a model. Local-only consent/fallback fence. Post-inference source
+revisions reject edits/delete/foreign parent/new conflict. Conservative supported
+English record requests only; other questions/FX/forecasts/approvals/totals abstain
+before retrieval/inference. No new calculator or model tool invocation. Existing
+finance shape preserved with unknown-currency totals withheld; only supported
+reported-income/housing fields remain. No changes to canonical financial APIs.
+
+canonical-combined-final: 149 backend PASS, zero failures/skips; covers financial
+source/cross-owner/races/corrections/reconciliation, bank/history/session/upload/
+reset and prior loan-document compatibility. canonical-browser-focused: 4 Chrome
+PASS, zero failures/skips, sources/citations/corrections/mobile/stale drafts plus
+bank/history compatibility. Screenshots reviewed. No overlapping counts summed.
+canonical-real-ollama: 1 separate real-local PASS, zero skips/failures, installed
+qwen3.5:4b/all-minilm, synthetic expense+verified memory, bounded inference, typed
+financial source and encrypted-store reopening/owner exclusion. No paid/cloud
+requests or live model/runtime configuration changes. Test requires explicit
+ALFRED_RUN_OLLAMA_GROUNDING=true in an isolated synthetic runner; it is deliberately
+not included in mocked release labels. No claim of general model advice accuracy.
+
+Unit 3 implemented: exact owner-only closure citation/API and existing document
+selector reopening. Shared file_reference helper preserves bank media-root/resource
+controls, adds closure retained-file digest/liveness to source revisions. Missing
+retained files reject before inference; removal/replacement rejects in-flight
+answers. Legacy no-file metadata explicitly not_retained, no independent bank
+authenticity/download/verification-time claims. No raw documents or private URLs
+in document model prompts. Source records/financial values never changed.
+closure-citations-focused 81 backend PASS, zero skips/failures; includes canonical,
+bank/history/current-source regression. closure-browser-final 3 Chrome PASS, zero
+skips/failures, exact closure/file/legacy metadata, currency UI and bank review.
+Screenshots reviewed; three distinct flows in addition to canonical four, no
+overlapping backend counts summed. Final system/drift PASS, zero schema changes.
+grounding-final-backend: 154 backend PASS, zero failures/skips across combined
+canonical/bank/closure/history/finance/session source after closure integration.
+
+2026-10-17 final income boundary: allow reported monthly baseline income only if
+it equals the positive stored User.monthly_income. Legacy canonical resolver may
+label Career fallback reported_monthly_income even with User income empty; keep
+that service unchanged and withhold it from this stricter grounding contract.
+baseline-source-boundary-corrected: 32 backend PASS, zero skips/failures, source/
+hybrid/currency plus reproduction proving legacy 10000.00 remains unchanged.
+First fixture failed for missing required Career experience, safely retained and
+corrected. Do not add these overlapping checks to 154. No unresolved final failure.
+Final source privacy/link/identity PASS: 25 files, 74 local references, zero findings,
+preserved C1–C10/frozen/master identities. AST-only graph and Node/diff checks PASS.
+
+Next independent safe verified-document task: investment extraction field-level
+owner-confirmed receipt/provenance using existing import/review/correction, original
+evidence retained, current canonical values prioritized, stale/deleted/foreign
+sources abstain. Current investment register facts remain explicitly not verified
+PDF extraction. No arbitrary PDF Q&A, live prices, new currency schema or invented
+Budget approval state. Real-account/native package acceptance remains unperformed.
+Integrated system/drift and source privacy/link/identity checks PASS: 23 files,
+74 local references, zero findings; currency contract/frozen/master unchanged.
+Node syntax/diff checks and AST-only graph update PASS. No new migration/dependency.
+
+History activation remains OFF; AWS retired, OpenAI/cloud OFF, frozen 4aa7ac70 and
+all FIN-MONEY history preserved. Production DOWN is prior evidence only; no service,
+DB/config/ACL/key/backup/remote operations. No deployment approval requested.
+Resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
+git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 90.
+
+## AI-GROUND bank provenance/local assistant — 2026-10-16
+
+Current isolated branch feature/ai-ground-bank-20261016, worktree
+F:/ALFRED_DEV/post-audit, based exactly on 20b916ee00867b0f0cdcb5c758c697762fda897b.
+Provenance unit 35bf1a9e7377f7fa8ecd23f09b753dcddef09033 is committed. This next
+assistant unit/last fully validated runtime source is
+0778a2f8e0261bd775c05504b5f5ca4326b37ecf. This closing documentation-only checkpoint
+records those commits; verify actual HEAD. Read
+docs/PROJECT_STATUS.md for the active contract. No duplicate MD.
+
+Unit 1 implemented: additive expenses.0006 receipt model; immutable structured
+import snapshots; owner-only evidence API/review page/private-media citations;
+explicit confirmation/withdrawal with revision+generation fencing. Changes to
+canonical values, file bytes, dates, source/owner/account, parser status or conflicts
+invalidate review. Current values precede originals; historical originals are not
+invented. No financial writes, currency inference, AI memory promotion or alternate
+deduplicated source claims. Shared import transaction rolls back if receipt capture
+fails. Saved statement date corrections now survive the existing retry path.
+
+Evidence artifacts/post-audit/ai-ground-bank-20261016:
+provenance-core-integration 53 backend PASS, zero failures/skips; financial-row and
+canonical Decimal comparisons zero mismatches. Migration rehearsal checks forward
+and reverse plan, restored SQLite integrity/FKs, unchanged original table digests
+and original file hash. System/drift/disposable migrate/pending checks PASS.
+provenance-browser-final 1 Chrome PASS, zero failures/skips; normal synthetic login,
+confirmation/correction/withdrawal/mobile. Desktop/mobile screenshots reviewed.
+Earlier failed timing/helper browser attempts are retained, not final acceptance.
+No native package rebuild or full prior release/M16–M21 suite rerun.
+
+Unit 2 implemented: bank_statements scope/transaction selection in existing
+hybrid_intelligence.py/personal-insights API/UI, linked owner citation review and
+older-record reopening. Current typed exact amounts with unknown currency are
+separate from narrative. Unreviewed/partial/conflicting/missing evidence abstains
+before retrieval/inference. Source recheck rejects in-flight correction, metadata,
+file replacement/removal, owner reassignment, account/record deletion and withdrawal/
+reconfirmation. No raw documents/account numbers/filename instructions/private URLs
+in bank model context; no financial writes. Cloud consent/fallback refused. No
+automatic memory promotion/sync. Null closing balance explicitly unavailable.
+History warning not appended; validated local-model history stores references only.
+Default-OFF operator/privacy/retention contract unchanged.
+
+bank-grounding-integration 202 backend PASS, zero failures/skips; includes import,
+correction, owner/CSRF, loan grounding compatibility, history, upload budgets/reset.
+bank-null-conflict-final 1 additional targeted PASS after unavailable-balance
+presentation refinement. Do not sum overlapping runs. bank-browser-final 4 Chrome
+PASS, zero failures/skips: bank review/correction/older citation, outage/revocation/
+draft/pagehide, existing source/memory/finance/Travel and currency UI. Screenshots
+reviewed, including corrected 7.77 versus original 2.68 with currency unrecorded.
+First bank browser failure was a test punctuation assumption; established formatter
+unchanged. No package, production, prior full M16–M21/release gate rerun.
+bank-final-source 34 backend PASS, zero failures/skips on final source: all 11
+bank-grounding cases plus existing history/UI compatibility. No remaining failures.
+Changed-source privacy/link/identity check PASS: 21 files, 71 local references,
+zero findings; C1–C10 byte content and frozen/master identities unchanged. Node
+syntax/diff checks and AST-only graph update PASS. One additive migration only.
+
+Remaining: broader owner-scoped canonical expense/budget/portfolio tool selection,
+reviewed extraction beyond linked bank records; no arbitrary PDF Q&A/completeness
+claim. Real-account, actual model quality and packaged source acceptance pending.
+Next safe unit: inspect audited AI-GROUND canonical record evidence selectors and
+tests, implement one bounded read-only source without aggregation/currency inference.
+Do not repeat completed bank provenance, history or old audit/release phases.
+
+History operator activation remains OFF pending retention/recovery approval.
+FIN-CURRENCY C1–C10 unapproved. AWS decommissioned; OpenAI/cloud OFF. Frozen
+4aa7ac70 preserved; no production/data/config/key/backup/remote changes. Production
+DOWN is preserved prior evidence; no new production health check or restart.
+Safe resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
+git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 85.
+
+## AI-HISTORY local storage/API/UI — 2026-10-16
+
+Isolated F:/ALFRED_DEV/post-audit, feature/ai-history-20261016, based exactly on
+bdabc389764119d95e2a002946b8fa8088c1bc6b. Backend/API is committed as
+e9254953d35cf430e10046aeb92d3c7c7b6654e8; UI/last fully verified runtime source is
+ddbca7e140ada74f41795e99e16eb7267acfdf8c. This closing documentation-only checkpoint
+records those source commits; verify actual HEAD. Currency review is preserved.
+Read docs/PROJECT_STATUS.md for the active contract, files, retention/rollback and
+approval boundaries. No new duplicate report or currency schema implementation.
+
+Implemented: two additive tables within existing MemoryStore, encrypted per-owner
+opt-in/retention and per-conversation key/records; session/CSRF owner APIs; bounded
+local-only atomic/idempotent turns; generation/revision fences; expiry, full reset,
+account deletion and journal non-resurrection. No transcript learning/embedding/
+cloud sync or automatic financial fact promotion. Session recheck flushes expired
+or logged-out sessions to prevent save-every-request renewal after inference.
+
+Feature operator gate ALFRED_CONVERSATION_HISTORY_AUTHORIZED is default OFF;
+per-owner consent/days are separately required. Audit retention/key-recovery
+decisions remain approval-sensitive. Test enablement is synthetic only. Existing
+DPAPI key remains profile-bound; no export/rotation/dialog. Backup copies can
+retain deleted history. Downgrade needs clear+disable and verification or an
+approved compatible restore plan; never silently drop tables or restore history.
+
+Evidence artifacts/post-audit/ai-history-20261016: focused-fixed 12 PASS, combined
+history-core-integration 125 backend PASS, zero failures/skips. Initial failures
+preserved and fixed: expired-session renewal boundary and an incorrectly placed
+storage-failure test injection. The final injection verifies append rollback.
+Separate history-financial-reconciliation-fixed: one PASS, zero financial-row or
+canonical Decimal baseline differences. Do not add overlapping counts.
+history-system system/drift/migrate/pending checks PASS.
+Vault upgrade/key preservation, new-process reopen, corruption, missing key,
+deletion after local copy and guarded downgrade are covered with synthetic data.
+
+Assistant template/JS now implements owner consent/retention, title/create,
+list/reopen/delete/clear/disable, historical-hypothesis/citation labels and current
+source/financial guards. No browser storage or historical prompt injection.
+Page-only is still default. Drafts survive model outage/stale revisions; retries
+are idempotent. Logout/permission loss/pagehide clear private text, cached pages
+recheck the session. A conflict refresh detects a missing/deleted/cleared/expired
+conversation and clears stale displayed turns without discarding the unsent draft.
+
+history-ui-backend: 53 PASS (14 history + hybrid/UI/session/currency), zero skips/
+failures. history-rollback-process: one enhanced PASS with pre-history bdabc389
+MemoryStore loaded in a separate process after disable+clear; preserved verified
+memories remain readable. No replacement key or financial mutation. Counts overlap.
+Final history-browser-validated: 5 Chrome PASS, zero skips/failures. Existing assistant
+desktop/mobile/keyboard/outage/theme behavior retained. New flows cover opt-in,
+reload/reopen, safe HTML text, owner isolation, delete/clear/disable, stale edits,
+outage/retry, operator gate, logout and cached-page clearing. Public-only synthetic
+fallback remains functional for page-only queries, refused for saved history.
+Screenshot review exposed old displayed turns after an external clear: corrected
+refresh/clear. A two-flow diagnostic rerun exposed composer readiness while history
+loaded; fixed visible busy/readiness controls and deterministic UI waits. The final
+five-flow run passes both corrections. Earlier failed revocation and passing
+isolated conflict diagnostic remain evidence, not the accepted final run.
+history-browser-source-resumed: 2 additional distinct Chrome PASS, owned verified
+memory/finance/Travel sources and explicit verified-save workflow plus exact
+currency source cards; zero skips/failures. Initial compatibility invocation was
+interrupted without a receipt, never treated as PASS. Only the privacy caption was
+clarified after these runs (page-only unless explicitly opted in); no behavior change.
+Total current browser coverage is seven distinct
+flows across the five- and two-flow runs, not repeated counts added together.
+Screenshots/evidence live under the existing ignored ai-history evidence root;
+review desktop/mobile, stale-draft and logout frames. No native rebuild/full gate.
+Source/privacy/link identity validation PASS: 14 changed files, 68 local links,
+zero findings, preserved FIN-CURRENCY C1–C10 text and frozen/master SHAs. No new
+Django migration or dependency; AST-only graph update completed successfully.
+
+Remaining private-use gate: approve retention/current-profile recovery limitations
+or an independently verified recovery design, and old-backup restoration policy.
+Operator flag stays OFF; no real-account/private-provider/recovery acceptance.
+Next independently safe unit is scoped AI-GROUND reviewed bank-statement document
+citations beyond current memory/loan scope; owned live references and stale/deleted
+abstention, no repetition of accepted loan grounding. Financial multi-currency tools remain blocked
+on C1–C10 approval. Do not begin currency migrations or repeat completed phases.
+Use house release_validation.environment and isolated M18 SDK, not production env.
+Safe resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
+git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 95.
+
+Frozen 4aa7ac70 unchanged. Production 3932f391 remains DOWN per prior read-only
+observation; no restart, DB/config/ACL/key/backup/provider/remote changes. AWS
+retired; real OpenAI and cloud OFF. No full M16–M21/release/package gate repeated.
+
+## FIN-CURRENCY decision review — 2026-10-16
+
+Resume baseline feb650834deb782f0b3f813d4c9231b911eb5255; same isolated
+F:/ALFRED_DEV/post-audit, feature/fin-money-tail-20261016. Review complete;
+currency contract NOT APPROVED, schema/migrations blocked pending the specific
+decision package in docs/PROJECT_STATUS.md (C1–C10). This checkpoint is docs-only.
+Do not repeat completed Budget/User/Career/Mobility conversions or old M16–M21 gates.
+
+Traced financial register models/APIs, statement/loan/investment imports and
+identity/matching, User/Career income selection, budgets/savings, Mobility/Travel
+quotes, tax, consented Family totals, reports, cache revisions and AI/UI output.
+Canonical registers have no currency metadata; advisory Career JSON has currency
+fallbacks/symbol interpretation and Travel quotes carry provider denomination.
+Neither supplies historical currency authority. InvestmentCurrencySerializerField
+validates numeric amounts, not ISO codes. Current 14/2 storage is not generic
+ISO-scale support. Unknown grouping is a review collection, not a certified total.
+
+Required approval: metadata on existing records, per-income/rent and per-BikeProfile
+value/income-support, compatible parent/child groups and multi-currency accounts;
+mixed/unknown completeness and scalar API cutover; ISO allowlist/precision;
+import identity/correction rules and conditional downgrade. Recommend exact
+decimal-text structured evidence, nullable unknown history, grouped-only totals,
+no FX/base currency default, no inferred codes. Future FX provider/date/calendar/
+freshness/rounding approval can be deferred entirely. New mixed currency writes
+must wait for all baseline/tax/family/budget/report/matching consumers to be safe.
+
+Read-only official SIX/ECB documentation checked, no provider connection, rate
+import, credentials or private upload. Existing source tests inspected, not run
+as new proof. Only existing PROJECT_STATUS and this continuation file changed;
+no duplicate Markdown report or schema/runtime changes. Document link/privacy/
+source-identity validation PASS: two existing Markdown files only, 40 local source
+links resolve, C1–C10 complete, credential/private-path scan clean, zero runtime/
+migration changes. Receipt artifacts/post-audit/fin-currency-20261016/
+review-validation.json. Exact baseline/frozen/master commits verified. No backend,
+browser, native or completed migration suites rerun for this docs-only change.
+
+Production DOWN is preserved from the latest read-only 09:20 UTC checkpoint;
+no restart, live financial DB access, production config/ACL/key/backup/GitHub action.
+Read-only listener recheck at 09:35 UTC still found zero port-8000 listeners;
+production Git HEAD remains 3932f391. No other operational actions were performed.
+Frozen 4aa7ac70fa27c1410e695470af5c3987235244b1 preserved. AWS retired; real OpenAI
+and cloud OFF. Previous recovery waiver is release-specific, not future approval.
+
+Safe resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
+git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 220.
+Read the concise C1–C10 decision table and approval package; obtain explicit
+contract approval before creating currency migrations. Review is finished, so
+do not restart financial discovery. AI-HISTORY is independent of FX but requires
+its own storage/retention/recovery design; AI-GROUND financial tools depend on
+this contract. No new feature sprint was needed to finish the requested review.
+
+## FIN-MONEY User/Career/Mobility validation — 2026-10-16
+
+Worktree F:/ALFRED_DEV/post-audit; branch feature/fin-money-tail-20261016, based on
+814d4dad. User implementation 2f48d3edf50555299e4072dfd2f9441a3b435af9 and Career
+f8c7ebb2400113713ba640e43e76d8340e4607b5 are committed. Mobility source is now
+ddb7fca22588f469ff4086766d014732f393cc6c; this documentation-only checkpoint follows
+that tested source. Verify actual HEAD. Frozen release/post-audit-runtime-
+20261016 remains exactly 4aa7ac70fa27c1410e695470af5c3987235244b1; do not move,
+rebuild or reuse its old release counts as proof of these new schema changes.
+
+New migrations in this task: users.0003_user_money_decimal,
+career.0005_career_salary_decimal, mobility.0013_mobility_money_decimal. All are
+separate domain conversions with retained original values, applied markers and
+guarded rollback. The prior Budget unit is untouched. Mobility covers nine money
+fields/7 models with typed source and original parent/owner guards, preserving
+null versus zero. Decimal API/storage/caller boundaries, owner reset and private
+snapshot retention are complete; quantities/rates/model statistics remain separate.
+No currency inferred. PROJECT_STATUS is authoritative and now contains the scoped
+FIN-CURRENCY proposal; schema/FX/multi-currency implementation remains unapproved.
+
+Evidence root artifacts/post-audit/fin-money-profiles-20261016. Final combined
+money-integration-final: 156 backend PASS, no skips/failures. mobility-browser-final:
+3 Chrome PASS (vehicle accounting, invoice exact-cent correction, Travel saved
+plan/reload +390/768 viewports); screenshots reviewed, Travel console empty.
+User browser two and Career browser one previously PASS in their own units.
+money-system-final: system/drift and exact one Mobility migration from 0012 PASS.
+Earlier User/Career plans are exactly one respective migration. Independent alias
+SQLite backup/restore, integrity/FKs, typed unrelated rows and source bytes,
+guarded forward/reverse, and zero cent-valued baseline mismatches PASS.
+Enhanced three-domain-rehearsal-verified: one PASS after the combined run. It
+starts at users.0002/career.0004/mobility.0012, asserts precisely the three new
+migrations, checks converted monetary equality and strict typed hashes for every
+unconverted column/table, then exact reverse/source bytes. SQLite zero affinity
+changes in converted columns are expected, not a financial mismatch; an initial
+overstrict whole-table assertion was corrected without changing runtime code.
+mobility-outputs-final: one strengthened exact numeric dashboard/fuel/per-km
+output regression PASS. Only test assertions changed after the combined run;
+do not inflate its 156 count with these two overlapping enhanced tests.
+
+Failures retained: mobility-focused found a Decimal/float accumulator in shared
+vehicle positions; fixed with Decimal accumulation. mobility-focused-fixed then
+found only a test expectation after a successful edit; corrected. mobility-browser
+and travel-decimal-before exposed saved budget Decimal in JSON state/preferences;
+fixed explicit numeric JSON boundaries in new_session/save/feedback, new regression
+PASS. First broad money-final-integration also used the wrong projection test
+module name; final invocation uses test_career_projection_simulation and passes.
+Do not count these diagnostic runs as successful or add overlapping suite counts.
+
+Production remains DOWN: read-only production-health-end.json at 09:20 UTC has
+zero listeners/runtime processes; main HEAD 3932f391. No production DB opened,
+service restarted, configuration/ACL/key/backup/remote/provider action. The earlier
+stale runtime marker predates reboot; crash cause is not proven. Operator action
+requires separate authorization. AWS remains retired; real OpenAI/cloud OFF.
+
+Safe resume: Set-Location F:/ALFRED_DEV/post-audit; git status --short;
+git rev-parse HEAD; Get-Content docs/PROJECT_STATUS.md -TotalCount 125.
+Do not rerun audit, Banking fix, Budget migration or M16-M21 full gates. No new
+implementation until current committed evidence is read. Currency is a separate
+decision: unknown historical currency stays unknown, no display-INR backfill.
+Future release integration/package/real-account/production rollout remain gated;
+this work does not alter frozen 4aa7ac70 or authorize a new deployment.
+Privacy: changed-source scan PASS (28 files, zero findings), no external service;
+AST-only graph update native exit 0, log graph-money-final.log. New report files
+were not created; existing status, privacy and completion-prompt instructions
+were reconciled, with historical evidence preserved.
+
+## FIN-MONEY Career completion — 2026-10-16
+
+User source committed `2f48d3edf50555299e4072dfd2f9441a3b435af9`; same isolated
+feature/fin-money-tail-20261016 worktree. Career salary unit follows it; verify
+actual HEAD. last_salary only is Decimal cents with numeric API, finite bounds,
+signed legacy compatibility; experience/raw extraction/confidence unchanged.
+Migration career.0005_career_salary_decimal retains owned originals, applied
+markers and guarded reverse; owner reset clears owned orphan snapshots.
+
+Evidence artifacts/post-audit/fin-money-profiles-20261016: 63 career-integration
+backend PASS, one final full-PUT contract PASS, one final Chrome salary save/
+reload PASS; system/drift/exact Career migration plan PASS. Synthetic alias
+backup/independent restore, SQLite integrity/FKs, all unrelated financial/family
+typed rows, source preservation and exact reverse PASS. Cent salary baseline has
+zero mismatches. Browser initially failed because fixture submitted blank required
+skills (HTTP 400), not Decimal conversion; now fills skills and backend covers
+blank rejection/full valid PUT. Failures retained; no waiver, zero final skips.
+
+Next implement Mobility nine money fields/7 models only, keep quantities/rates
+Float. Inspect Decimal/float derived fuel/forecast math and JSON boundaries. Reuse
+LoanRelatedMoneySnapshot's typed-link/original-parent approach for recovery;
+nullable actual cost differs from zero. User/Career validation precedes Mobility.
+No production source/DB/service/ACL/key/backup/remote/provider action; production
+DOWN on read-only check. Frozen 4aa7ac70 untouched. Currency schema/design stays
+separate and historical currency unknown. Do not rerun Banking/Budget/M16-M21.
+
+## FIN-MONEY User completion — 2026-10-16
+
+Same worktree/branch, starting HEAD 814d4dad. This checkpoint accompanies User
+Decimal persistence; verify actual HEAD. Frozen 4aa7ac70 and production 3932f391
+are unchanged. No production DB access, service restart, backup/key/provider or
+GitHub action. Read-only port/process recheck still DOWN; prior stale runtime
+record predates reboot. Real OpenAI/cloud OFF, AWS retired.
+
+User monthly_income/variable_income/rent_or_emi are Decimal cents, same existing
+strict finite/non-negative/two-decimal guard and numeric API contract. Signup
+blanks zero. No historical currency inferred. users.0003_user_money_decimal is
+the only migration in this unit; original floats/independent normalized cents
+retained in UserMoneySnapshot, applied markers, guarded reverse; owner reset and
+account deletion remove owned snapshots. Existing passwords/groups/session/IDs
+and all related financial/family records preserved in synthetic tests.
+
+Evidence artifacts/post-audit/fin-money-profiles-20261016: user-focused 20 PASS;
+user-integration 98 backend PASS including focused scope; user-browser two Chrome
+PASS; user-rehearsal-final one enhanced financial/family/backup/alias/forward/
+reverse/source-byte reconciliation PASS. Zero final failures/skips. System/drift
+PASS, exact one-User-migration plan PASS. Cent-valued canonical baseline unchanged.
+New source tests: tests/test_user_money.py; necessary assertions updated in
+test_profile_money_boundary.py. Browser profile save/reload regression added.
+New suite included in existing M20 selection; no old full gates repeated.
+
+Next: CareerProfile.last_salary independent migration, then audited Mobility
+money fields with owner/source retention and financial comparisons. Inspect
+callers first; rates/confidence/quantities stay separate. Currency design separate,
+unknown historical currency stays unknown. Do not repeat Banking/Budget or audit.
+Use existing clean SDK after IDE SDK consultation and scripts.release_validation
+synthetic environment. Evidence run_task.py/run_checks.py provide safe focused
+commands. Update PROJECT_STATUS and this checkpoint at each verified unit.
+
+## FIN-MONEY Budget completion — 2026-10-16
+
+Active `F:/ALFRED_DEV/post-audit`, `feature/fin-money-tail-20261016`, based on
+08f39a88. Banking correction committed as `0e7e1df35c5afe279050253b97e92ad0ecfc04fc`.
+Verified Budget source: `cd696572f0a3ce69260fb1cf212ce700836fb453`.
+This documentation-only checkpoint follows that source; verify actual Git HEAD.
+Frozen `release/post-audit-runtime-20261016` remains exactly 4aa7ac70; do not
+move/rebuild it or reuse its 797/40/native evidence as proof of this new schema.
+
+Budget base_budget/inflation_adjusted/spent now Decimal cents, finite/non-negative,
+bounded, HALF_UP. Numeric API preserved; dashboard actual spending uses Decimal
+until output. Existing forecast/model estimates remain estimates. New owned
+BudgetMoneySnapshot retains original precision; owner reset clears own orphans.
+Only new migration: budgets.0002_budget_money_decimal, atomic capture/normalize
+with applied markers and guarded reverse preserving corrections/new rows/owners.
+Invalid history blocks before partial evidence. No currency field or inference.
+Files: apps/budgets/{money,models,serializers,views}.py, its new migration,
+apps/users/services.py, scripts/release_validation.py (new test labels),
+tests/test_budget_money.py and tests/test_budget_money_migration.py.
+
+Evidence: `artifacts/post-audit/fin-money-20261016/`. 14 focused PASS, then
+74 combined backend PASS including those 14, zero skips/failures. Three final
+Chrome PASS; prior eleven HTTP/UI contract checks and three separate original
+Banking repetitions also PASS. Keep original Banking and deterministic failing
+receipts. System/drift/one-migration plan PASS. File-backed synthetic backup,
+independent restore, integrity/FKs, alias forward, all unrelated typed table
+hashes and exact reverse/source preservation PASS. No production DB was opened.
+No full release/native/package gate rerun; Graphify AST graph updated.
+Changed-file privacy/link scan PASS: 12 staged paths, no credential/private-path
+findings, added local link resolves. No package or frozen report was rewritten.
+
+Production diagnosis is recorded below: service/listener/worker/scheduler absent,
+stale running/PIDs predate reboot. No repair/start/stop. Production/source/operator
+files, all private data/ACL/keys/backups, GitHub and real providers unchanged.
+AWS retired; real OpenAI/cloud OFF. All operational acceptance remains separate.
+
+Next: User monthly_income/variable_income/rent_or_emi Decimal unit, using the
+existing ProfileMoneyField finite guards, canonical baseline and snapshot pattern;
+trace callers and reverse/ownership first. Do not repeat Budget or core M13A-D.
+Use the existing clean SDK after IDE SDK consultation, never default/live env:
+artifacts/post-audit/m18-clean-resolver-be31990d/venv/Scripts/python.exe.
+Safe resume:
+```powershell
+Set-Location F:\ALFRED_DEV\post-audit
+git status --short
+git log -3 --oneline
+Get-Content -LiteralPath docs/PROJECT_STATUS.md -TotalCount 120
+```
+Read the audited UNIT 8 and scoped User models/forms/serializers/services/tests
+before editing. Deployment, live service repair and any production ACL/schema
+change need separate authorization. Do not reopen key dialogs or extend M15's waiver.
+
+## Active FIN-MONEY branch — Banking fix and read-only health, 2026-10-16
+
+Worktree `F:/ALFRED_DEV/post-audit`, branch `feature/fin-money-tail-20261016`,
+from `08f39a88e93ddd3a0e7995165c346c093e760cf0`. Verify actual HEAD; this
+checkpoint accompanies the Banking/Loan refresh correction. Frozen source
+`4aa7ac70fa27c1410e695470af5c3987235244b1` and all accepted packages unchanged.
+
+Production remains 3932f391 with existing operator changes. Read-only diagnosis:
+port 8000 has no listener; HTTP connection fails; no production runtime processes
+or matching Windows service. Runtime recorded running/PIDs 11376/7740 are stale
+and absent; logs/state predate Windows boot 2026-10-15 13:40 UTC. Native worker
+and its scheduler are inactive. Current-user autostart is absent. No crash cause
+proved. No live DB open, service/ACL/config/backup/provider/GitHub action taken.
+Operator must separately restore service with explicit restored-runtime data dir.
+
+Banking original workflow reproduced FAIL on Loan sort row.text, stale element.
+Root covered hero only, not controls; late responses also ignored interaction.
+Workspace root and response-time guard fixed; deterministic delayed-response
+test proves blocked row replacement during editing and normal idle refresh.
+13 PASS (two Chrome + eleven HTTP/UI contract checks), plus three separate
+original-workflow Chrome runs PASS, zero skips. Historical failed receipts kept.
+Safe redacted evidence: `artifacts/post-audit/fin-money-20261016/`.
+
+Next bounded unit already being implemented: Budget base_budget,
+inflation_adjusted, spent Decimal storage, owned original snapshots, guarded
+reverse, numeric API and deterministic dashboard cents. No currency inference;
+User/Career/Mobility and FIN-CURRENCY remain separate. Commit that unit only
+after focused boundary/ownership/migration/backup/reconciliation checks pass.
+Use existing clean SDK in artifacts/post-audit/m18-clean-resolver-be31990d/venv,
+consult configured SDK first, run only sanitized synthetic environments. Do not
+deploy, rebuild frozen RC, repeat full audit/gates or start production. Cloud and
+OpenAI remain OFF; AWS retired. Preserve all backups and cancelled key dialogs.
+
+## Latest verified checkpoint — runtime candidate, 2026-10-16
+
+Development: `F:/ALFRED_DEV/post-audit`, `fix/post-audit-critical-20261015`.
+Frozen tested source: `4aa7ac70fa27c1410e695470af5c3987235244b1`, local branch
+`release/post-audit-runtime-20261016`. This documentation checkpoint follows that
+source commit; verify actual Git HEAD, but do not substitute a newer docs HEAD for
+the frozen package/gate SHA. All audit/frozen history remains preserved.
+
+Exact source PASS: 797 backend / 40 Chrome / 34 source-native-Ollama, zero skips
+or failures. Fresh package PASS: 35 native checks including seven Chrome flows.
+Actual M21 PASS in `F:/ALFRED_DEV/post-audit-rehearsal-4aa7ac7`: local encrypted
+restore, typed financial/family reconciliation, exact promotion, nine Chrome,
+restart/memory persistence, worker crash, source rollback, nine after-rollback
+Chrome checks. Deliberate failure child FAIL + rollback PASS is expected; parent
+PASS. Earlier 874639f rollback FAIL and Banking browser failure remain preserved.
+No failure was waived or erased. Current technical PASS, production BLOCKED/
+unauthorized; fixture backup/operator evidence does not authorize a live target.
+
+Evidence:
+- `artifacts/release-gates/post-audit-quiescence-20261016/release.json` and `.md`.
+- `artifacts/releases/post-audit-4aa7ac7-28624710/build-receipt.json`,
+  `release-manifest.json`, `bundle-files.json`,
+  `native-exe-proof-2a2d0386a5.json`, `environment-lock-receipt.json`.
+- `artifacts/releases/post-audit-4aa7ac7-repeat-fa68edd5/repeat-receipt.json`:
+  all 10,322 file paths/bytes match, zero differences; no SDK installs during replay.
+- `artifacts/releases/post-audit-4aa7ac7-28624710/portable/portable-verification.json`:
+  468,439,826-byte application ZIP, all 10,322 entry sizes/hashes match. It is not a
+  private-data recovery archive. Separate-PC acceptance kit is prepared beside it.
+
+SDK: `artifacts/post-audit/m18-clean-resolver-be31990d/venv/Scripts/python.exe`,
+Python 3.12.10 / Django 6.0.9, no baseline fallback. 151 application packages + pip
+were unchanged when five verified build packages were installed. The package has
+156 hash-pinned build/validation inputs; two are source archives. Repeat build is
+same-host/same-SDK proof, not independent clean-PC/backend reproducibility.
+Actual SDK/query and safe resume details also remain in
+`artifacts/post-audit/session-state.json`.
+
+Production/GitHub master still 3932f391. No live source, private DB, ACL, token,
+key, provider setting, backup or service mutation; no push. Port 8000 was
+unreachable on the latest read-only check. Do not start/stop it under this task.
+Keep real OpenAI/cloud OFF. Never reopen cancelled key dialogs. M15 external
+recovery waiver does not transfer. Installer/second-PC, normal account, independent
+device-loss/key restore, remote CI and branch protection remain unverified.
+Default-layout backup rehearsal is not proof of custom external storage coverage.
+
+Next safe work: preserve frozen4aa and complete installer/clean-PC and scoped CI/
+human acceptance prerequisites; independent remaining product units follow
+PROJECT_STATUS.md / the existing roadmap. Do not rerun completed audit/P0/M16/M17.
+For status (BLOCKED is expected until operational gates and new approval exist):
+
+```powershell
+Set-Location F:\ALFRED_DEV\post-audit
+git status --short
+& '.\artifacts\post-audit\m18-clean-resolver-be31990d\venv\Scripts\python.exe' -B scripts/release_gate.py status --output artifacts/release-gates/post-audit-quiescence-20261016
+```
+
+Consult the configured SDK before invoking Python. Validation/rehearsal against
+this frozen report requires the exact frozen source; docs-only successor commits
+do not automatically inherit or replace its candidate identity.
+
+## Implementation checkpoint before the full gate — M20 quiescence, 2026-10-16
+
+Worktree `F:/ALFRED_DEV/post-audit`, branch `fix/post-audit-critical-20261015`.
+Audit bced104 and production 3932f391 remain preserved. This checkpoint commit
+contains the native stop/recovery lock correction; verify its actual Git HEAD.
+No live source/DB/config/ACL/service/GitHub/provider operation was performed.
+
+Clean SDK: `artifacts/post-audit/m18-clean-resolver-be31990d/venv/Scripts/python.exe`.
+151 resolved/installed runtime packages match; no baseline fallback. At source
+874639f142f224255c6704d9c32409f79bb0bb73: 792 backend, 40 Chrome, 34 source-native/
+Ollama PASS, zero final skips/failures. Retain the original Banking browser FAIL
+and interrupted retry. The 40-test diagnostic and normal retry passed; original
+Banking cause is unconfirmed. Source-native screenshots were reviewed.
+
+Actual M21 at `F:/ALFRED_DEV/post-audit-rehearsal-874639f/rehearsal.json` FAILED:
+promotion/nine Chrome/local restore/restart persistence passed, worker-crash
+rollback blocked with `native_writer_running`. Source/data/evidence are retained,
+and port 8150 was closed at inspection. Do not reuse or delete that sandbox.
+PID-only writer detection was reproduced; native stop also reported success
+before its OS locks were released. Recovery now holds both native OS locks and
+SQLite reservations; stop waits for both locks, with its existing timeout.
+No process is killed or financial data corrected by the fix.
+
+Proof: `artifacts/post-audit/writer-barrier-repro-4e872736/receipt.json` (14/three
+errors), `shutdown-lock-repro-65f45f6e/receipt.json` (two/three failed results),
+`writer-barrier-fixed-d0fc8bd7/receipt.json` (100 PASS, intermediate), and
+`shutdown-recovery-fixed-4daa6f27/receipt.json` (66 PASS, zero skips/failures).
+Do not add overlapping counts or transfer old full gates to this correction.
+
+Next: pin this committed HEAD, run the clean-SDK full gate and a new actual M21
+rehearsal, then build a fresh portable package. Local build preparation is at
+`artifacts/post-audit/m19-build-tools-3b6aacd1/build_verified_candidate.py`; it checks
+tool-wheel hashes, source identity/cleanliness, runtime package preservation and
+bundle inventory. Fixed build hash seed/timestamp do not prove bit-identical output
+until repeat builds are compared. Do not install tools while validation is active.
+Inno Setup/clean-PC lifecycle, real account/provider, independent device-loss/key
+recovery and remote CI remain NOT_RUN; no passphrase dialogs or inherited waiver.
+
+```powershell
+Set-Location F:\ALFRED_DEV\post-audit
+$candidate = (git rev-parse HEAD).Trim()
+$python = '.\artifacts\post-audit\m18-clean-resolver-be31990d\venv\Scripts\python.exe'
+& $python -B scripts/release_gate.py preflight --release-id post-audit-quiescence-20261016 --candidate $candidate --baseline 3932f391aa4eed7b3200ad3b034f7991435e01e4 --expected-dependency requirements.txt --expected-dependency constraints/windows-py312.txt --output artifacts/release-gates/post-audit-quiescence-20261016
+& $python -B scripts/release_gate.py validate --profile full --with-ollama --output artifacts/release-gates/post-audit-quiescence-20261016
+```
+
+Consult the configured SDK before invoking Python; use the explicit isolated SDK
+above, not production. Inspect completed receipts before retrying interrupted work.
+`artifacts/post-audit/session-state.json` retains current process/evidence state.
+Do not edit tracked source during a pinned run. Do not start another audit.
+
+## Latest task — post-audit implementation, 2026-10-15
+
+Critical source b162c8fb2c43b357e840c3a298d06ffa4bed3251 is fully locally verified:
+753 backend / 37 Chrome / 34 source-native-Ollama PASS, zero skips/failures.
+Actual M21 PASS in F:/ALFRED_DEV/post-audit-rehearsal-b162c8f: exact promotion,
+nine browser checks, restart/memory persistence, encrypted independent local
+restore, typed reconciliation, worker crash and actual source rollback. Child
+failure-injection FAIL is deliberate and its rollback PASS; parent is PASS.
+Technical decision PASS; promotion BLOCKED/unauthorized on external recovery,
+fresh package, real-account/device/installer and remote Git/CI/protection gates.
+No production/source/database/ACL/provider/GitHub mutation. All backups preserved.
+Existing status/evidence docs contain earlier failed attempts; do not rerun P0 or
+M15 unnecessarily. M16 retention implementation d66ce9904e560ade110ccf41be210eedc6f7b7e8
+passed 156 focused tests/system/drift and pinned source/privacy preflight plus nine
+targeted tests. Latest scope: artifacts/release-gates/post-audit-m16-d66ce99/release.json.
+Full gates remain NOT_RUN for newer M16 source; do not inherit the b162c8f PASS.
+M16 retention + selective refresh implementation is now COMPLETE in development:
+196 focused backend / 5 Chrome PASS, zero failures/skips; system/drift PASS.
+Receipts: artifacts/post-audit/m16-verified-d421da86/receipt.json and
+artifacts/post-audit/m16-final-chrome-56feb12f/receipt.json. Reviewed desktop/mobile
+screenshots include changed-dates-no-old-forecast.png. Source pin/limited gates:
+artifacts/release-gates/post-audit-m16-selective/release.json; read actual HEAD.
+New tests test_travel_refresh exercise caches/call avoidance, dates/offers/prices,
+quotas/leases, superseded jobs, location choice, preserved edits, old-banner
+filtering and atomic plan/session rollback. No migration/dependency added.
+Full release/native/package acceptance remains NOT_RUN for this newer source.
+Failed reproductions/fixture attempts remain in PROJECT_STATUS.md; do not delete.
+M17 cleanup is now COMPLETE in development: 114 focused backend tests, system/drift
+PASS with zero failures/skips (artifacts/post-audit/m17-integration-2bf509e2/receipt.json).
+Unrouted self-improve/GPT-2/source-scanner and voice/cloud-speech prototypes removed;
+supported hybrid/memory/registry/training retained. Legacy OAuth/token writer and
+fake import counters removed; historical tokens/recovery/model rows untouched.
+IMAP portfolio service uses one connection per import; a two-owner interleaving
+test proves isolation. Inline attachments preserved; refetch unavailable. Failures
+retain safe error IDs/classes; no raw credentials, text or cleanup exception logs.
+Seven retirement regressions are in test_experimental_retirement; the initial six
+failures and intermediate focused pass remain in m17-repro-d0730c23/m17-fixed-240a62d7.
+Pinned source/privacy/targeted proof: artifacts/release-gates/post-audit-m17-cleanup/release.json.
+No migration/dependency change. New full/native/package gates NOT_RUN. Original
+audit/matrix counts remain dated evidence; deleted-source links pin preserved M15.
+Next: M18 clean dependency reproducibility, then M19 fresh package. Current dev
+.venv uses read-only baseline library fallback; it is not a clean-install proof.
+Review actual requirements/constraints and existing package tooling; remove/update
+only proven obsolete dependencies, without major upgrades or new paid providers.
+Implementation pins: M16 3344ce21588dcaf41eb7655579cd978142c5fee2 and
+M17 86947a62e78359a5a62a51dacbcbbe2d3a3f484e; exact CLI preflight/targeted PASS.
+M18 has removed nine retired direct SDK requirements. Clean resolver PASS for 151
+packages (artifacts/post-audit/m18-clean-resolver-be31990d/receipt.json); startup
+with those SDK imports blocked PASS (m18-no-retired-sdks-eaa4689f). A standalone
+venv exists at m18-clean-resolver-be31990d/venv. Installation-receipt.json now
+records PASS: all 151 packages match, pip check/system/drift PASS, Django 6.0.9
+inside that venv without baseline fallback. Preserve it and its package cache.
+Pinned clean-SDK full gate 5f6bb76 passed 792 backend tests, then Chrome failed
+(38 tests/one quick-ideas-preferences error). Native/Ollama correctly NOT_RUN.
+Retain artifacts/release-gates/post-audit-clean-5f6bb76/release.json as FAIL.
+A delayed initial preference GET reproduced UI loss after a successful save;
+the DB retained the choice (preferences-read-stages-cf247671). Disabled initial
+fieldset, loading/save guard, safe unavailable state and v2 scripts correct it.
+Seven clean-SDK Chrome workflows PASS, zero skips, screenshots/JS syntax reviewed:
+artifacts/post-audit/preferences-loading-fixed-45eabf1a/receipt.json. New candidate
+needs a fresh pinned full gate; no earlier PASS is inherited. Use the clean venv:
+`.\artifacts\post-audit\m18-clean-resolver-be31990d\venv\Scripts\python.exe`.
+Next: preflight/full --with-ollama at the corrected HEAD, then M19 fresh portable
+package. Build-tool wheels/hash receipt m19-build-tools-3b6aacd1 are staged only.
+Inno Setup is unavailable in checked locations; installer acceptance is pending.
+Do not repeat M16/M17/P0/audit, overwrite old evidence or modify live/provider state.
+Safe status command from this worktree:
+`.\.venv\Scripts\python.exe -B scripts/release_gate.py status --output artifacts/release-gates/post-audit-m17-cleanup`
+Production, private DB, real providers and GitHub stay unchanged/unauthorized.
+
+### Earlier post-audit development checkpoints
+
+Current follow-on source unit M16 retention: 156 focused Travel/provider/source-
+native scheduling/recovery/promotion tests PASS, zero skips; system/drift PASS.
+Receipt artifacts/post-audit/m16-integration-a065eaeb/receipt.json. Nine initial
+tests overlap. New command cleanup_travel_requests is dry-run by default; --apply
+prunes one bounded batch. Config is 7/90 days and 1000 rows, runs every 15 minutes
+in source/native. Current UTC month/hour/day quotas and active attempts survive;
+abandoned old attempts expire. Only request telemetry is excluded from post-start
+canonical comparison; complete backup verification still includes every table.
+Freeze release/post-audit-critical-20261015 remains at b162c8f; do not transfer its
+full gate PASS to newer source. Next M16 unit: selective refresh/invalidation using
+existing cache keys/research revisions. No live operations or provider activation.
+
+Latest full source gate 3a46e1cb24234c586a40be446501a83c48cce2ea: 751 backend /
+37 Chrome / 34 source-native-Ollama PASS, zero failures/skips. Exact evidence and
+scopes in PROJECT_STATUS.md. Actual M21 exact promotion/nine browser checks and
+restart persistence PASS; worker-crash phase hit a missing nested evidence dir.
+Reproduced and corrected private directory creation; 33 focused acceptance/
+promotion/recovery tests PASS (m21-output-directory-2f27f838). Complete actual
+M21 rollback still pending. Preserve the failed sandbox and all backups.
+Next: finish private temporary-parent P0 follow-up, commit tested units, then pin
+and validate the corrected source before a new disposable M21 rehearsal.
+
+M21 output-directory correction committed 84b506a27343ed04909bb0ef8410a9ecb4fda812.
+P0 upload/OCR parent-creation gap then reproduced at file-open time and corrected:
+private parent before file creation; Django's Windows-safe temporary wrapper and
+scoped OCR cleanup retained. 115 focused storage/upload/document/loan/finance
+tests PASS, zero skips (private-temp-fixed-900cdd22). First wrapper attempt failed
+Windows reopening checks and is retained. See PROJECT_STATUS.md for exact paths.
+No production repair. Next pin the combined source, run system/drift/full isolated
+gate, then new actual M21 rehearsal; do not reuse or delete prior sandboxes.
+
+Earlier source f79690a8c42eab6b2ae3182445af5002a87da6a8: combined retry
+executed 750 backend tests / zero skips / one error. Correct fail-fast left
+browser/native NOT_RUN. Earlier attempt interrupted without final evidence.
+Safe logging omitted setup/subtest headers; reproduced and corrected to retain
+test IDs without parameter values. 15 runner tests PASS; 27 overlapping source/
+acceptance tests PASS. Receipts and next pinned run are in PROJECT_STATUS.md.
+Do not count focused reruns as resolving the full failure. Preserve failed
+rehearsal/rollback and backup evidence. Next: commit logging correction, full
+isolated gate, then new M21 sandbox outside source only after technical PASS.
+
+Audit is complete/frozen at bced10480512bed460b4aac1481a20753c4e1dce. Active worktree
+F:/ALFRED_DEV/post-audit, branch fix/post-audit-critical-20261015; read actual HEAD.
+Production remains 3932f391 and is unchanged. User superseded AWS activation:
+decommission all active AWS paths; preserve neutral crypto/sync/history. No live
+ACL repair, database/service operation, cloud/paid request or push is authorized.
+
+P0-B and P0-C implemented. Numeric API/schema compatibility retained; no migration.
+47 focused tests PASS / zero skips; migration drift PASS. Exact synthetic receipt
+artifacts/post-audit/money-media-3570b592/receipt.json. Files listed in authoritative
+docs/PROJECT_STATUS.md. Earlier failed test attempt was a fixture savepoint issue,
+fixed and retained. P0-A development now verifies owner/SYSTEM access, protects
+fresh runtime/config/memory/parser/recovery paths and refuses unsafe existing data.
+Pinned repair/rollback CLI requires authorization and quiesced writers. 117 focused
+backend PASS, 11 overlapping CLI PASS, 18 actual native PASS; evidence and changed
+files in PROJECT_STATUS.md. Production ACL repair is still approval-gated.
+Preceding verified money/media commit: bfabba99ef23d4c4cb4738307891717a6faf8087.
+M20 0052410 has been merged with a single verifier conflict resolved by preserving
+private scratch protection AND optional scratch_root. Both P0-D failures reproduced
+before their fixes; 70 focused tests PASS, 13 overlapping privacy/NOT_RUN tests
+PASS. Updated release BACKEND includes P0 regressions. Prior ACL commit fd507ab5ec4c0715c1854eda796df9ab7c799977.
+M20 integration commit: 6045904824a86413396eac16d5b16d9464dcd2fa. Its pinned
+preflight source/privacy scope PASS; overall readiness correctly BLOCKED.
+Django requirements/Windows pins now 6.0.9. Separate development .venv: 227 tests
+PASS, system/drift PASS; baseline libraries shared read-only (not clean packaging
+proof). Evidence in PROJECT_STATUS.md. SDK/production env unchanged.
+Dependency patch commit: d65d86be235847bf23e3e9993b6e9f2f8546d335.
+AWS runtime provider removed; configure command refuses without prompting or
+mutating profiles. Historical S3 protocol moved to tests with no real transport;
+neutral memory/sync unchanged. 86 focused tests PASS, two final overlapping
+decommission tests PASS, strict syntax compile PASS (known regex warning fixed).
+R2 selected as unimplemented candidate from official contracts; private-bucket
+verification/least-privilege/recovery acceptance remain prerequisites. No cloud
+account/provider is activated. See PROJECT_STATUS.md/provider register.
+AWS decommission commit: 3b73d78916b4c5f545e8148ec0abcaee143855cd. Its pinned
+combined gate ran 736 backend PASS, 34 native/Ollama PASS, 37 Chrome with one
+Travel quick-ideas timeout (isolated retry PASS); overall correctly FAIL. Preserve
+that gate receipt/history. No actual M21 rehearsal yet.
+Source/debug P0-A creation gaps reproduced and fixed: before-use SQLite/config/
+cache checks; private retained and streamed temporary uploads. 89 focused tests
+PASS, system/drift PASS; exact evidence and fixture correction in PROJECT_STATUS.
+No migration or production repair. Source/SDK main HEAD remains 3932f391.
+Source storage commit: 8978fe1d9bba453704a106d7e310ed3fc66cbc3e. Full attempt
+retained: 744 backend with 26 failures/28 errors from broad old shared media
+fixtures; 37 Chrome with one intermittent navigation error; 34 native PASS.
+Correction: fresh ALFRED_MEDIA_ROOT in release environments, media protection at
+startup, private M14F fixture and stripped standalone browser environments. 150
+focused tests PASS, 22 overlapping runner tests PASS, receipts in PROJECT_STATUS.
+M20 now stops after failed backend/browser; unexecuted gates remain NOT_RUN.
+Media-isolation commit e4c66471e34a4eae14eb90a1bae3ce13577a5925: pinned combined
+747 backend / 37 Chrome / 34 native-Ollama PASS, zero skips/failures. Exact receipt
+artifacts/release-gates/post-audit-isolated-e4c6647/release.json.
+Actual M21 ran in F:/ALFRED_DEV/post-audit-rehearsal-e4c6647. Backup/restore and
+baseline startup passed; post-FF clean tracked checkpoint hashes caused a false
+operator_file_changed_after_promotion. Actual source rollback PASS; data/config
+and evidence preserved. Rehearsal overall FAIL, no live action.
+Fix distinguishes clean tracked source from genuine operator overlays; still
+blocks dirty overlap/ignored collisions. CLI GateError identity unified. 58
+focused tests PASS, three overlapping CLI tests PASS; receipts in PROJECT_STATUS.
+Next: pin this correction, fresh combined gate, then new disposable rehearsal.
+Use local .venv; expected dependency paths only requirements.txt and
+constraints/windows-py312.txt. Source/production private data remain untouched.
+Do not restart audit, regenerate matrix or start a UI redesign.
+
+Safe resume: Get-Content -LiteralPath F:/ALFRED_DEV/post-audit/docs/PROJECT_STATUS.md.
+Use configured SDK read-only for current isolated tests; dependency patch must use
+a separate environment and never modify the production venv.
+
+## Latest authoritative task — whole-project audit, 2026-10-15
+
+Final AUD-11: source/non-native DEBUG media anonymously served a disposable
+synthetic file; native private_media is owner protected. Add UNIT 1A after finite
+User validation; no actual private file/live DEBUG configuration was tested.
+Reconciliation committed at 62558c0fa21633a050317adc401ac9ce440639d7.
+
+Verified audit implementation/evidence commit:
+d2b788c77209d41c84e1ed007aeaa93774410894. Its completed matrix/roadmap/master
+prompt is followed by documentation reconciliation only; read actual audit HEAD.
+
+Final read-only runtime poll found /health/live/ 200 and /health/native/ 404 on a
+manage.py runserver listener. Initial health/PID observations below are earlier
+snapshots; no audit start/restart. Data/worker/native identity remains unconfirmed.
+
+Audit: F:/ALFRED_DEV/alfred-master-audit, audit/alfred-master-completion-20261015; read actual HEAD. Initial inventory commit: 1c2e43491ddc2b3f64add7c6102cb56a8004f7c5. Main and fresh remote master: 3932f391aa4eed7b3200ad3b034f7991435e01e4. M15 was deployed/pushed under separate authorization; earlier candidate headings below are historical.
+
+Current user task superseded M20 engineering with audit/docs/matrix/roadmap/master prompt. No live source/service/database/config/key/backup/remote mutation. Normal-account/provider/clean-PC/installer/device-loss acceptance remains incomplete. Port 8000 did not respond and historic PIDs absent; no restart/repair performed.
+
+Findings: broad private DB/config read grants; nonfinite User inputs; remaining money/currency tail; current Django patch; Travel retention; experimental self-improve/mail dead ends; M20 operator/JSON privacy gate defects. M14/M15 implemented controls remain preserved, not reopened. M20 work is at 0052410 in F:/ALFRED_DEV/m20-release-gates, unfinished; interrupted full gate has no final backend/browser/native result.
+
+Fresh isolated audit: 86 tests PASS, zero skips, 59.061s; system/drift PASS. The [143-feature matrix](../../docs/PROJECT_STATUS.md) and [master prompt](ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md) define actual next engineering. Use [audit continuation](ALFRED_MASTER_AUDIT_CONTINUATION.md) for final commit/validation evidence; do not resume an earlier next-task heading.
+
+Safe command: Get-Content -LiteralPath F:/ALFRED_DEV/alfred-master-audit/artifacts/audit/ALFRED_MASTER_AUDIT_CONTINUATION.md. No paid/cloud/deployment/push authority inherited. Cancelled dialogs stay cancelled; HDD waiver M15-specific.
+
+## Historical continuation records preserved below
 ## M15 consolidated candidate frozen - local integration PASS, live blocked
 
 2026-10-14. Sole release source F:/ALFRED_DEV/m15-integrated, branch
@@ -3470,3 +4396,1624 @@ No full repository/installer/live-provider/real-account acceptance claimed.
 NEXT ACTION: start the isolated M15 vertical slice; live M14 awaits authorization.
 EXACT NEXT COMMAND:
 git -C F:/ALFRED_DEV/m13c worktree add -b codex/m15-persistent-memory-20261011 F:/ALFRED_DEV/m15 release/m14-20261011
+
+
+## Preserved local M14 operator checkpoint (historical)
+
+# ALFRED CODEX CONTINUATION STATE
+
+## Latest checkpoint - M14 closure checks; M15 encrypted mock sync remains isolated
+
+2026-10-11: Live master still 30e0b3f75e785f639897ad36c19090c6a4e8675f with
+unchanged application source; loopback native health 200. Family.0004 remains
+applied from verified deployment; no migration or private DB/token change this
+turn. Preserve original operator checkpoint/plan/skill-lock/untracked documents.
+All backups preserved. Supplement SHA256 rechecked unchanged, existing local
+9691-entry portable verification PASS. Archive and only supplementary recovery
+key are still on-device; no approved off-device destination/separate key location
+was supplied. OFF-DEVICE BACKUP PENDING; KEY EXPORTED SEPARATELY NO; no retained-
+copy restore proof. Do not claim DPAPI-only recovery survives Windows loss.
+
+REAL-ACCOUNT ACCEPTANCE PENDING in all eight requested areas; normal user sign-in
+was requested without asking credentials. No password changes/replacement account.
+GITHUB MASTER AWAITING APPROVAL; fetched remote da74570681165cfa46dd3186f95ee400643c41d6
+is still ancestor of frozen source. Ordinary exact-SHA fast-forward is prepared;
+re-fetch/recheck before separately authorized push and verify remote independently.
+No remote source update or M15 integration. See docs/M14_LIVE_DEPLOYMENT_20261011.md.
+
+M15 progress belongs ONLY F:/ALFRED_DEV/m15 on codex/m15-persistent-memory-20261011.
+Protocol f29d6d0c49d384c49d99559a85d2dfe959710ae3 plus separate runtime/API/mock
+reasoning milestone b05c3b0549241efd206e34f4c214db27c7d23f2a, clean isolated
+branch; exact evidence in external m15-sync-manifest.json. Updated gate:
+108 backend PASS, two synthetic Chrome PASS, 19 native checks PASS, real
+two-process Ollama encrypted mock sync/restart/retrieve PASS. Whole M15 remains
+INCOMPLETE, real cloud/OpenAI disabled. Live M14 remains frozen and healthy.
+
+## Latest checkpoint - M14 live promoted; service healthy, real-account acceptance pending
+
+2026-10-11: Explicit user authorization applied frozen source
+30e0b3f75e785f639897ad36c19090c6a4e8675f to live master, excluding all M15 work.
+Runtime F:/ALFRED/restored-runtime is healthy at loopback 127.0.0.1:8000 with
+worker heartbeat/startup probe PASS. Only family.0004_financial_sharing_opt_in
+was applied; dependencies intact and no pending migrations. All non-consent rows
+and financial values remain unchanged; family relationships preserved, historical
+financial sharing OFF both directions. Integrity/FKs/system/drift and post-start
+reconciliation PASS. Users must explicitly opt in again.
+
+Recovery set F:/ALFRED_BACKUPS/m14-prepromotion-20261011-1645 reverified: 9690
+protected hashes, fresh quiesced SQLite backup/independent restore, baseline/fresh/
+live table equality, private forward/reverse/replay PASS. Original portable archive
+hash unchanged. Additional portable-current-recovery.encrypted.zip contains 9691
+verified entries including current DB/config/keys/media/queue/source/operator data;
+separate ACL-private portable-current-recovery.key permits profile-independent
+recovery. No key output/Git storage/off-device export. All backups/files preserved.
+9681 config/key/media/model hashes match after deployment. Original 193 operator
+checkpoint additions, skill-lock changes and two untracked documents preserved.
+
+Live HTTP/worker smoke: 21 PASS. Private current-copy authenticated page/API/media/
+CSRF/upload compatibility: 21 PASS, three owned downloads and foreign denial.
+Existing frozen regression: 357 backend/12 Chrome/19 native PASS, unchanged source.
+Harness failures are preserved and explained; no unexplained application failure.
+See docs/M14_LIVE_DEPLOYMENT_20261011.md and protected deployment receipts.
+
+Final real-account password sign-in/browser acceptance PENDING, not claimed complete.
+Restored accounts include pre-existing unusable/unrecognized password encodings;
+credentials unchanged, no reset/token re-encryption/financial mutation performed.
+Keep loopback-only access. Await operator confirmation of required screens, balances,
+documents and OFF consent. Do not declare entire deployment complete until accepted.
+
+Fresh origin/master da74570681165cfa46dd3186f95ee400643c41d6 is an ancestor of
+the installed release; normal fast-forward can be authorized after re-fetch.
+No push/force push/new source commit. M15 remains clean in F:/ALFRED_DEV/m15 at
+a06f3e114f9bb1a53fccfbaedb9e0833dc93a20f, isolated on its existing branch.
+
+## Latest checkpoint - M14 stable Git integration, awaiting deployment approval
+
+2026-10-11: Target stable branch master was refreshed from origin/master
+da74570681165cfa46dd3186f95ee400643c41d6 in F:/ALFRED_DEV/m14-stable. Ordinary
+merge ffe2b7cfc64cf37e1a0ff90ec89de129269cc356 includes frozen 6050234 and required
+M13C/M13D ancestry, preserving the remote merge; no M15 commit is included.
+Native compatibility defect reproduced and corrected independently at
+d84a5e5b0d0c35a62d9290c1e403629e69ff17c6 (trusted source root in OCR subprocess).
+Final combined gate: 357 backend (342.618 s), 12 Chrome (136.881 s), zero failures/
+skips; separate native source/Chrome restart/recovery proof 19 checks PASS.
+The first repeat reused persistent synthetic limiter state; fixed test harness
+uses a fresh UUID runtime for each run. Evidence is preserved, including failures.
+
+Fresh verified recovery set F:/ALFRED_BACKUPS/m14-prepromotion-20261011-1645:
+read-only SQLite backup API, integrity/foreign keys/hash/independent restored DB,
+current-user DPAPI config/keys/media/models/limiter history/queue/operator edits,
+source Git bundle independently restored to installed a9d096e. Disposable private
+DB copies removed after verification. Protected set has 9690 files; profile-bound
+DPAPI is not an off-PC reinstall backup. Original portable backups preserved.
+Restored-copy actual plan is ONLY family.0004_financial_sharing_opt_in. Forward/
+rollback/replay preserve all canonical finance/family/user counts and row hashes
+except consent fields; historical grants OFF, relationships intact. No unexpected
+migration/drift; native configuration PASS. No live SQL mutation/service change.
+
+M14 DEVELOPMENT COMPLETE / RELEASE READY YES. Local master integration COMPLETE;
+remote origin/master remains unchanged. No push/PR or live source switch. Freeze
+master on release/m14-integrated-20261011 and record final integrated SHA/ranges in
+F:/ALFRED_DEV/isolated-tests/m14-stable-integration-manifest.json after this docs
+commit. Live source remains a9d096ea55839269fe6fce14d4f11ea2cbf05336 with original
+documentation/skill-lock edits and untracked operator documents preserved.
+Update only the existing promotion plan; recheck local-edit replay before an
+authorized switch. User Step 5 requires explicit source+family migration approval.
+Local-edit replay already rehearsed on the independent source clone: preserve
+all 193 operator-added checkpoint lines, skill lock and two untracked documents;
+runtime source diff empty. Prepared replay is protected outside Git.
+Live token re-encryption is separately authorized/backed up. No deployment.
+Expected downtime 15-30 min plus any work drain/acceptance delay; preserve keys,
+OFF consent, limiter histories and later writes under the tested rollback plan.
+
+M15 continues ONLY F:/ALFRED_DEV/m15 on codex/m15-persistent-memory-20261011.
+It receives the native compatibility correction as a one-way cherry-pick 80a5d3c;
+no M15 memory/UI/privacy change belongs in master. See its own checkpoint for
+synthetic protected-memory, delete/reset/retention and offline recovery evidence.
+
+## Repository
+
+Branch: codex/native-runtime-hardening-20260918
+Base commit: b4e89742717d0f4ce1d8b6e49ccb7b6b6abde525 (clean starting point for master note).
+Verified engineering source commit: db2f86d4f0101665abb0666a98644f91a3eda5ac, created during pre-Windows preparation on 2026-10-05. It preserves Phase 0/1, M12A/B/C and M13A/B source, migrations, tests and phase documentation. Read `git rev-parse HEAD` for the latest preparation commit.
+Working tree at this checkpoint update: Windows setup, dependency constraints, encrypted-recovery scripts, project-local skills, hardware/tooling notes, the post-restore Ollama/Codex handoff and historical SQLite recovery checks are committed and pushed. This documentation update records the user's reported OneDrive upload of the Desktop recovery bundle; the pendrive remains an alternative. Generated logs, browser proof and private/runtime data remain local/ignored. Safe audit/reinstall documents are explicitly allowed in Git. No installer promotion.
+
+## Active pre-Windows task
+
+The user has superseded engineering continuation with complete PC cleanup preparation. Do not resume M13C or execute post-Windows restoration now. The user reports uploading the prepared Desktop recovery folder to OneDrive and supplied a sharing link privately. Do not place that link or its access identifiers in Git. A 6 GB pendrive remains an alternative. Read `docs/WINDOWS_ENCRYPTED_RECOVERY.md` and the generated `artifacts/reinstall/PRE_REINSTALL_FINAL_STATUS.md`. The source/recovery implementation was pushed and independently verified at `5bf9cbe3e4c0c609e5fff5adf135ebcdc6a213b4`, which is the application source checkpoint bound into the encrypted archive. Later safe documentation commits may advance HEAD; independently verify the live remote after pushing them.
+
+On 2026-10-06 the user confirmed GitHub login, 2FA, recovery email, off-PC archive-password storage, required-secret recovery and Windows installation media: all YES. GitHub LFS capacity is no longer a gate for OneDrive or the pendrive. No temporary GitHub backup repository was created and no private backup uploaded to permanent source. Microsoft/OneDrive login, 2FA/recovery and recovery-email readiness after the wipe remain unconfirmed; ask YES/NO only, never credentials. ALFRED server and worker were gracefully stopped, with no active database writer. Docker was not running; WSL shutdown completed. Both main runtime locations were inventoried, together with a historical first-start profile, six earlier operator backups, cleanup/pre-update snapshots and unique private validation inputs. The offline historical Docker VHDX is required and included, rather than assumed unnecessary. All 17 required original and recovered SQLite databases passed integrity checks.
+
+The actual private staging backup outside Git contains 51,617 files totaling 303,836,313 bytes, plus internal manifests. A required historical WAL of 4,120,032 bytes was discovered by the strict verifier and added unchanged beside its staged database; every raw historical database was checked for this gap. Original/staged/extracted hashes and all 17 SQLite checks pass. Historical DB/WAL/SHM bytes are preserved: the verifier uses disposable shadow copies, including committed WAL state, rather than checking only six backup-API snapshots. Four focused synthetic recovery tests and Graphify update passed; completed application suites were not repeated. Detailed paths, timestamps and hashes remain inside the encrypted archive. The compromised historical signing key is retained privately for recovery only; rotation/re-encryption remains deferred until verified restoration.
+
+Real encryption and full local recovery validation are complete: one 7z AES-256/header-encrypted volume, `alfred-private-backup-20261006.7z.001`, 67,915,749 bytes. SHA256: `7a54b209a4bf5f8bca8d7346acfbe1c468629f88695df00a38736a68a7f6eed7`. The user entered the password only at native masked prompts; it is absent from commands, scripts, logs and Git. The prepared Desktop folder is `ALFRED_RECOVERY_20261006`, containing encrypted files, official portable 7-Zip, safe setup/restore/tooling notes and `VERIFY_SHA256.ps1`. Desktop copy hashes pass, and the checker rejects an incomplete synthetic copy. No plaintext private data or password is in the handoff folder.
+
+The OneDrive upload is USER-REPORTED, NOT YET VERIFIED. The sharing page returned HTTP 200, but no backup file was downloaded; no browser or OneDrive connector is available to perform its normal Download action here. The new `C:\ALFRED_ONEDRIVE_REMOTE_VERIFY` directory is reserved for a fresh web download of the whole bundle, outside Desktop, staging and sync caches. Preserve the downloaded ZIP, safely extract into a new directory, compare against the trusted 16-file upload-time hash snapshot, then reuse the trusted `prepare_encrypted_recovery.ps1 -Mode VerifyDownloaded` helper with native masked password prompts. Require archive integrity, complete extraction, all 51,617 private hashes and all 17 SQLite checks. No sharing-page response or local copy is evidence of cloud recovery. The physical pendrive is also unverified and remains an alternative.
+
+Desktop storage will be erased. After reinstall, download the retained OneDrive bundle or copy it from the verified pendrive back to Desktop, follow the saved restore guide, and retain that backup until finance/data/source/native recovery and historical-state preservation are proven. If using the pendrive, disconnect it during disk cleanup and do not reformat it into installation media. `SAFE TO REINSTALL WINDOWS = NO` until the selected retained-copy proof and its account-recovery readiness pass. Keep originals, staging and the upload-time Desktop bundle unchanged while comparing the cloud copy; do not install Ollama, rotate the old signing key or start feature work.
+
+Final pre-wipe hardware/tooling handoff: read `artifacts/reinstall/HARDWARE_BASELINE.md`, `AGENT_TOOLS_REINSTALL.md` and `OLLAMA_CODEX_HYBRID_PLAN.md`. The current machine has a Ryzen 5 3500X, 15.91 GiB RAM and an AMD RX 6700 XT with approximately 12 GiB driver-reported dedicated memory. Ollama installation, GPU/backend verification and model selection are strictly AFTER successful Windows/ALFRED restoration. No Ollama model or new application feature was installed or implemented during this phase. Repeated local-provider failure must checkpoint the existing task/diff/failing tests and hand it to hosted Codex, rather than restarting the work.
+
+The engineering verification entries below retain their historical pre-commit state; they do not override the newer source-preservation commit or active reinstall task.
+
+Additional local changes observed during this continuation: AGENTS.md Graphify guidance, .codex/ skill/hooks and graphify-out/ cache. These were preserved. The required code-graph refresh passed using an isolated temporary helper installation; see Repository housekeeping below. Do not remove or overwrite those local instructions/tool files.
+
+## Active master phase
+
+Master remediation note dated 2026-10-01; resumed 2026-10-05: Phase 0 complete; Phase 1 dependency/tax full gate passed; M12A/B/C implemented and 156 combined finance tests passed. M13A/B Loan currency stages complete: latest full backend 671 passed / 17 browser skips / exit 0, plus 2 separate Chrome workflows passed. Next is scoped M13C Investment register money, followed by remaining M13 domains and M14. This replaces the earlier Travel-only T09 priority. Do not restart completed Travel work or conduct another whole-repository audit.
+
+## Active subtask
+
+M13B is complete. Seventeen ancillary Loan fields now use bounded Decimal cents, with retained related snapshots/reset/migration 0015, exact foreclosure allocation, numeric JSON and history/canonical/tax/document compatibility. Finalized-settlement review cannot overwrite the register; explicit zero cannot infer closure; corrections roll back atomically. Final full backend: 688 run / 671 passed / 17 browser skips / zero failures/errors, 641.053 s, exit 0 at 2026-10-05 15:40:05 +05:30; artifacts/m13b-backend-verified-20261005.log/result JSON. Root sessions 75653 and 75735 are closed. Focused and Chrome evidence is below and in docs/MASTER_M13B_VERIFICATION_20261005.md. Final Graphify refresh passed, 7,220 nodes/18,817 edges; artifacts/m13b-graphify-update-complete-20261005.log/result JSON. No active test/refresh process remains. No operator DB migration, commit or release. Next subtask: M13C Investment register's three currency fields; see Exact next task. All application checks use isolated local-runtime SQLite/locmem and no helper PYTHONPATH.
+
+## Travel phase
+
+Prior T07 Decimal travel cost work remains complete. The new master note identifies origin/discovery/pagination/mode/alternatives/corridor/detour gaps for targeted remediation after higher-priority financial/security P0s. Prior recorded Travel phases are not proof of the newly expanded requirements. T09 telemetry retention remains open (master Phase 15), followed by scoped invalidation/telemetry (Phase 16).
+
+## Completed work
+
+- Master M00: tray test now expects guide.resolve().as_uri(); production unchanged. 7 tray and 32 native/recovery tests passed.
+- Master M01A: official current 6.0-series release verified on 2026-10-01; requirements and PyCharm venv updated from Django 6.0 to 6.0.8. System/migration checks and 53 settings/auth/finance tests passed. Resumed full gate passed 543 with 13 skips.
+- Master M01B: immutable versioned Decimal tax policy for FY 2025-26 / AY 2026-27; corrected new-regime slabs/rebate, cess ordering, rebate/surcharge marginal relief, residency/age/income-type handling, bounds/invalid-input checks, explicit unsupported-year errors and official metadata. API/cache/UI use explicit year; comparison and savings use the same income; payment deductions use selected FY. Legacy wrong static reference preserved but deactivated after replacement. 54 domain tests and one targeted Chrome test passed; screenshot inspected.
+- Added master backlog (all requested phases, reported gaps not presumed fixed). Exact commands, sources, limitations and failed-attempt history: docs/MASTER_PHASE01_VERIFICATION_20261001.md.
+- Master M12A: loan-level estimated/review/confirmed state, provenance and confirmation timestamp; explicit owner confirmation with complete terms; unconfirmed loans excluded from canonical debt, EMI, home proxies and direct loan advisories. Payment matching cannot confirm guessed terms or restore a pre-confirmation balance. Owned bureau evidence remains supported; missing EMI does not inherit a guess. Migration 0013 backfills safely without changing monetary values/history. 89 domain/migration tests and one Chrome workflow passed. Exact evidence and limitations: docs/MASTER_M12A_VERIFICATION_20261001.md.
+- M12A follow-up: parser retains explicit balance presence; legacy default zero requires review. Migration confirmation now requires matching raw/sync/loan identity and supported retained terms. User-created explicit current balances get a timestamp; unknown bureau EMI permits metadata edits while submitted zero remains invalid. 5 evidence/migration + 4 API tests passed, followed by the final combined 156-test gate.
+- Master M12B: every usage type counts positive recorded market value as an estimated asset; confirmed Loan ledger debt counted once; costs/income do not manufacture asset values or liabilities. Net-worth vehicle cache revision and API aliases updated, all-history costs labelled separately. Catalog updates preserve omitted owner financial values and explicit zeros. Initial 77-test run exposed this reset; fix passed 21 targeted tests and final combined gate. Chrome passed (9.374 s), screenshot inspected. Exact evidence: docs/MASTER_M12B_VERIFICATION_20261001.md.
+- Master M12C: month 0 recorded value; exact elapsed-month SIP/growth; 13 points 0..12; beginning-of-month contribution and rate assumptions explicit; growth cache version/local month anchor. 20 targeted tests passed, followed by final combined gate. Chrome passed (13.817 s), actual Chart.js values checked and screenshot inspected. Exact evidence: docs/MASTER_M12C_VERIFICATION_20261001.md.
+- Master M13A: seven Loan register fields use bounded Decimal cents with HALF_UP; numeric API output, exact register posting/home arithmetic, cache revisions and nullable zero semantics preserved. Migration 0014 retains source money/owner identity, applies once and reverses unchanged values without losing later edits. Data reset removes owned snapshots including orphans. Targeted migration/field/runtime/reset checks, 2 Chrome workflows and final whole-backend gate passed (628 passed, 16 browser skips, exit 0). The gate also corrected an old Decimal/float assertion and Travel usage's UTC/local-day mismatch, with deterministic midnight coverage. No operator DB migration. Exact evidence: docs/MASTER_M13A_VERIFICATION_20261005.md.
+- Master M13B: remaining 17 Loan-domain currency fields use the same bounded cents boundary. Migration 0015 retains raw values/linkage, applies once, guards rollback and owner reset, and reports child/register rounding differences without rewriting the register. Computed foreclosure allocation conserves each component and transaction; preserved history may retain different component amounts. Finalized evidence makes reconciliation repeat-safe and prevents review from erasing settlement state. Explicit accepted/requested zero cannot infer an unfinalized closure; later corrections do not reverse an already posted settlement. Numeric API/cache/canonical/tax/document boundaries and atomic correction passed focused gates, 2 distinct Chrome workflows and the final whole backend (671 passed / 17 browser skips / exit 0). Career DNS-only fixture repair also passed without changing runtime URL validation. Exact evidence/limits: docs/MASTER_M13B_VERIFICATION_20261005.md.
+- Prior T07: exact itinerary discount/range/target and quote-string fixes; 95 travel tests, 3 Chrome tests, Django check and source-native offline/restart verification passed. See docs/TRAVEL_T07_VERIFICATION_20261001.md. No redo.
+- Prior source/native config precedence, durable recovery, travel source/freshness/map/provider work remains. See docs/TRAVEL_CONTINUATION_VERIFICATION_20260930.md. Prior frozen candidate predates T07 and this master remediation.
+
+## Files changed
+
+M13A additionally: apps/loans/money.py and migrations/0014_loan_money_decimal.py (new); Loan model/snapshot, serializers, loan_intelligence/payment_review/views updates; loan_foreclosure_service.py; financial_intelligence.py/financial_relationships.py; bureau/credit/integrations tax/voice updates; apps/users/services.py reset. New tests/test_loan_money_field.py, test_loan_money_migration.py, test_loan_money_runtime.py, test_loan_money_retention.py; docs/MASTER_M13A_VERIFICATION_20261005.md. Gate follow-up: travel/cache.py usage local date and tests/test_travel_providers.py midnight coverage; test_loan_lifecycle_and_reports.py exact Decimal assertions.
+
+M13B additionally: migrations/0015_related_loan_money_decimal.py, LoanRelatedMoneySnapshot and 17 fields; shared Loan serializers/runtime/foreclosure/parser, financial_intelligence, tax_optimizer, user reset, document_review and public correction API; tests/test_related_loan_money_migration.py, test_loan_foreclosure_money.py, test_loan_related_money_runtime.py, expanded field/runtime/browser checks and fixed historical migration-test target states. docs/MASTER_M13B_PLAN_20261005.md records scope; docs/MASTER_M13B_VERIFICATION_20261005.md records actual evidence. See git status for exact dirty inventory.
+
+M13B full-gate follow-up: tests/test_career_recruiter_and_evidence.py mocks public DNS alongside the existing mocked page responses, avoiding live lookup failures. Production URL validation is unchanged. apps/loans/money.py docstring now reflects its related-field use; behavior unchanged.
+
+requirements.txt; apps/ml_engine/services/tax_policy.py (new), tax_optimizer.py; apps/integrations/views.py and services/verified_intelligence.py; templates/integrations/tax_optimizer.html; static/js/tax_optimizer.js; tests/test_native_tray.py, test_tax_policy.py (new), test_user_data_browser.py; docs/MASTER_PHASE01_VERIFICATION_20261001.md (new); this checkpoint and ALFRED_DEEP_REVIEW_BACKLOG.md (new).
+
+M12A additionally: apps/loans/models.py, serializers.py, views.py, services/loan_intelligence.py, payment_review.py, migrations/0013_loan_verification.py (new); apps/expenses/services/financial_intelligence.py; apps/integrations/services/credit_loan_sync.py, credit_score_tracker.py; apps/ml_engine/services/recommendation_engine.py, voice_assistant.py; templates/loans/list.html; static/js/loans.js; tests/test_loan_lifecycle_and_reports.py, test_loan_verification.py (new); docs/MASTER_M12A_VERIFICATION_20261001.md (new). Also updates the shared integrations/tax/browser files above. Use git status for the exact current inventory.
+
+M12A/B follow-up: credit_report_parser.py; tests/test_bureau_balance_evidence.py and test_loan_verification_api.py (new); apps/mobility/views.py; alfred_ai/services/calculation_risk.py; static/js/expenses.js; templates/expenses/list.html; tests/test_vehicle_accounting.py (new), test_document_center_and_statement_import.py; docs/MASTER_M12B_VERIFICATION_20261001.md (new). M12C: apps/investments/views.py, templates/investments/list.html, tests/test_investment_projection.py and docs/MASTER_M12C_VERIFICATION_20261001.md (new), plus shared browser test.
+
+## Migrations
+
+Created loans/0013 verification, 0014 Loan-register Decimal currency/snapshot and 0015 related Loan currency/snapshot migrations. Upgrade, reconciliation, repeat-safe application and edit-preserving rollback validated on disposable SQLite databases only, including a nondefault alias for 0015. No migration applied to a user database. Model/migration drift check passed. Existing mobility 0010-0012 were previously validated in isolated runtimes; older user database status unchanged. Other monetary-domain stages remain pending.
+
+## Focused tests
+
+Interpreter: F:\ALFRED\.venv\Scripts\python.exe, PyCharm Python 3.12.2, pip. MUST get_python_environment(filePath="manage.py") before every Python invocation.
+
+Isolated backend variables: ALFRED_LOCAL_RUNTIME=true; ALFRED_AUTO_TRAIN_ON_STARTUP=false; ALFRED_DATA_DIR=F:\ALFRED\artifacts\master-validation-20261001; DATABASE_URL=sqlite:///:memory:; CACHE_BACKEND=django.core.cache.backends.locmem.LocMemCache; CACHE_LOCATION=alfred-master-validation; ALFRED_RUN_BROWSER_TESTS=false. Browser runner selects isolated file SQLite; browser data dir master-browser-validation-20261001. Do not load the operator's real config/local.env for validation.
+
+Command: -m unittest tests.test_native_tray -v
+Passed: 7; Failed: 0; Skipped: 0; 0.033 s. artifacts/phase0-tray-20261001.log.
+Command: manage.py test tests.test_native_tray tests.test_native_runtime tests.test_native_launcher tests.test_native_observation tests.test_durable_queue --noinput --verbosity 1
+Passed: 32; Failed: 0; Skipped: 0; 2.209 s. artifacts/phase0-native-20261001.log.
+Command: manage.py test tests.test_auth_pages tests.test_platform_hardening tests.test_production_readiness_contracts tests.test_local_config tests.test_financial_baseline_alignment tests.test_financial_relationships --noinput --verbosity 1
+Passed: 53; Failed: 0; Skipped: 0; 48.544 s. artifacts/phase1-django-regression-20261001.log.
+Command: manage.py test tests.test_tax_policy tests.test_remaining_task_closures.TaxDeductionTests tests.test_financial_baseline_alignment tests.test_advisory_evidence_freshness tests.test_operational_hardening tests.test_application_smoke --noinput --verbosity 1
+Passed: 54; Failed: 0; Skipped: 0; 32.608 s. artifacts/phase1-tax-domain-final-20261001.log.
+Command: scripts/run_browser_regressions.py tests.test_user_data_browser.UserDataBrowserTests.test_tax_planning_uses_selected_year_and_income --browser Chrome --require-browser --artifact-dir artifacts/browser-tax-policy-20261001 --proof-label tax-policy-20261001
+Passed: 1; Failed: 0; Skipped: 0; 10.724 s (19.672 s runner). Screenshot inspected. artifacts/phase1-tax-browser-20261001.log.
+Command: manage.py check; manage.py makemigrations --check --dry-run (separate invocations with environment preflight)
+Passed: both exit 0, no issues/drift. artifacts/phase1-check-20261001.log and phase1-migrations-20261001.log.
+Command: node --check static/js/tax_optimizer.js; git diff --check
+Passed: both exit 0.
+
+Earlier failed attempts: initial tax test had a cold reference-cache fixture failure; first domain run found stale legacy-reference refresh behavior (fixed); a follow-up fixture omitted stale_after (fixed). Final domain run above passed all 54 including these regressions. Do not count failed attempts as passing evidence.
+
+M12A command: manage.py test tests.test_loan_verification tests.test_loan_lifecycle_and_reports tests.test_financial_baseline_alignment tests.test_financial_relationships tests.test_document_center_and_statement_import tests.test_remaining_task_closures tests.test_tax_policy --noinput --verbosity 1
+Passed: 89; Failed/Skipped: 0; 48.680 s; exit 0. artifacts/m12a-domain-final-20261001.log and result JSON. Data dir loan-validation-20261001; otherwise same isolated variables. System check, migration drift, node --check static/js/loans.js, and git diff --check also passed. Initial migration-test historical user-state error was fixed; earlier 88-domain run also passed. Chrome workflow passed (11.179 s) after a stale live-refresh button click was handled by bounded retry; final screenshot proof is recorded in the M12A verification note.
+
+Final M12A/B/C command: manage.py test tests.test_loan_verification tests.test_loan_verification_api tests.test_bureau_balance_evidence tests.test_vehicle_accounting tests.test_mobility_vehicle_dashboard tests.test_loan_lifecycle_and_reports tests.test_financial_baseline_alignment tests.test_financial_relationships tests.test_document_center_and_statement_import tests.test_remaining_task_closures tests.test_tax_policy tests.test_calculation_risk_snapshot tests.test_user_data_acceptance tests.test_investment_projection tests.test_investment_and_relationship_advisory --noinput --verbosity 1
+Passed: 156; Failed/Skipped: 0; 120.950 s; exit 0, finish 23:46:30 +05:30. artifacts/m12-finance-final-20261001.log and result JSON. Data dir finance-m12-validation-20261001; local runtime true, startup training false, in-memory DB, locmem cache. Final system/drift checks clear in m12-finance-check/migrations-20261001.log. Node syntax checks for expenses/loans/investments and whitespace check clear. Intentional mocked database-lock traceback is passing resilience coverage.
+Vehicle Chrome: 1 passed / 0 skips, 9.374 s, exit 0; artifacts/m12b-browser-20261001.log and browser-vehicle-accounting-20261001 summary. Projection Chrome: 1 passed / 0 skips, 13.817 s, exit 0; artifacts/m12c-browser-20261001.log and browser-investment-projection-20261001 summary. Both screenshots inspected. Projection narrow 20-test log has mistaken 20261002 filename suffix; actual run was Oct 1, and the final combined gate uses the correct suffix/standard flags.
+
+## Full-suite evidence
+
+Current M13B final gate: manage.py test --noinput --verbosity 1; 688 run, 671 passed, 17 disabled-browser skips, zero failures/errors, 641.053 s; exit 0 at 2026-10-05 15:40:05 +05:30. artifacts/m13b-backend-verified-20261005.log and result JSON. All M13A/B application paths and the deterministic Career fixtures are covered. Data dir related-loan-backend-verified-validation-20261005, memory SQLite, locmem; no operator configuration/helper PYTHONPATH. Initial M13B attempt: 688 run / 669 passed / 17 skipped / 2 Career fixture DNS errors, 746.737 s, exit 1; artifacts/m13b-backend-final-20261005.log/result JSON. The five-test Career module passed after fixture repair and the final full rerun cleared both errors. Do not count the initial attempt as passing evidence.
+
+M13A gate: manage.py test --noinput --verbosity 1; 644 run, 628 passed, 16 disabled-browser skips, zero failures/errors, 617.345 s; exit 0 at 2026-10-05 06:14:12 +05:30. artifacts/m13-loan-backend-final-20261005.log and result JSON. This includes M12A/B/C and M13A runtime changes, final migration-marker/field/reset tests, exact-value assertion and Travel midnight fix, and predates the new M13B changes. Earlier initial M13A run: 643 run, 625 passed, 16 skipped, one failure/error each, 639.053 s, exit 1; artifacts/m13-loan-backend-20261005.log and result JSON. Fixes passed targeted tests and the final whole gate; do not count the first attempt as passing.
+Master Phase 1: original run interrupted with no summary/result and no surviving process. Resumed manage.py test --noinput --verbosity 2 completed: 556 run, 543 passed, 13 skipped, 0 failed; 576.488 s; exit 0 at 2026-10-01 18:36:16 +05:30. Evidence artifacts/phase1-backend-gate-resumed-20261001.log and phase1-backend-gate-resumed-20261001-result.json. This predates M12A/B/C runtime changes; the current gate above supplies whole-backend evidence for them and M13A.
+Historical pre-T07 full backend: 529 run, 517 passed/0 failed/12 skipped, 562.575 s, exit 0; artifacts/travel-backend-20261001.log and result JSON. Historical 12 Chrome workflows passed separately. These predate current changes.
+Historical frozen build/offline runtime: 12,637 inspected files, private-file scan passed; frozen offline handoff 0.078 s, save/edit/restart/queue recovery passed, zero live sources. SHA256 1d3174cf8c9a3ad80063aacd624a8f355537d780c4f07eca086c6ac9c20b9c0c. September candidate does not contain T07 or master remediation; do not promote it as current.
+
+## Travel status
+
+Dynamic origin: M02 explicit/default/bare-city and around semantics pending focused remediation.
+Dynamic discovery: existing Wikivoyage provider; master dynamic-first/fallback behavior pending.
+Candidate pool: M03 >3 pool not yet verified/remediated.
+Pagination: M03 durable batches/show-more pending.
+Primary route: existing ORS implementation; M04 mode resolution pending.
+Alternative routes: structural support exists; M05 actual provider alternatives pending.
+Selected route: M05 persistence/scoped recalculation pending.
+Route POIs: M07 route-corridor implementation pending.
+50-km detour: M07 actual road-detour verification pending.
+Map: existing Leaflet geometry/markers/pan work preserved; master route selection/layer matrix pending.
+Weather: existing Open-Meteo/freshness/horizon guards; M09 focused reconciliation pending.
+Hotels: opt-in authorized Duffel stays; unverified external search links labelled; no new live proof.
+Flights: opt-in Duffel; estimates separate; no new live proof.
+Trains: live inventory unverified; official links only.
+Buses: live inventory unverified; external links only.
+Permits: authority/reference trust guards preserved; no new live checks.
+Caching: shared cache/lease/quota work exists; retention/scoped invalidation/circuit telemetry pending.
+
+## Finance status
+
+Tax: FY 2025-26 / AY 2026-27 ordinary-income Decimal engine and tests implemented. All other FY/AY rejected; no claim to implement TY 2026-27 or complete filed-return rules. Dashboard explicitly assumes resident/under-60/salary. Automatic deduction leads and HRA/home-loan/action eligibility still need focused work (M01C); planning assumptions labelled.
+Money Decimal migration: Travel T07 calculations complete. M13A/B cover 24 Loan-domain currency fields in source and disposable SQLite; originals/linkage retained, numeric JSON preserved, exact runtime allocation and finalized settlement guards implemented. M13B focused gates, 2 distinct Chrome workflows and final full backend (671 passed / 17 browser skips / exit 0) passed. Next M13C Investment register has three currency fields; Expense/BankAccount normalization requires a later dedicated deduplication/source-evidence stage. No operator database migration.
+Loan detection: M12A implemented; estimated/review loans remain visible but do not count toward debt/EMI/home proxies. Explicit owner confirmation or supported owned raw bureau evidence is required. Parser missing/explicit-zero evidence is preserved. Migration 0013 preserves values/history and is test-validated only. Payment-level acceptance is distinct from loan verification. Full M12A evidence is in its verification note.
+Vehicle net-worth semantics: M12B implemented; recorded positive market-value estimate is an asset for all usage types; actual confirmed loans count once; operating costs remain separate. Owner values survive catalog edits. Focused vehicle/mobility/browser and combined finance gates passed; no schema change or user DB migration.
+Investment projections: M12C implemented; exactly months iterations; month0 recorded value, 0..12 elapsed months, beginning-of-month SIP and entered annual rate/1200 assumptions, month-aware/versioned cache. Domain/browser and combined finance gates passed.
+
+## Security status
+
+HTTP: shared Travel public-HTTPS transport preserved; remaining Career/direct fetch paths reported unsafe (M14A), pending.
+Uploads: existing document/OCR/privacy protections preserved; master central resource-cap requirements pending.
+Passwords: M14B standard validators pending focused remediation.
+Authentication: M14C-D BasicAuthentication/TLS and scoped throttles pending.
+Privacy: family opt-in defaults and explicit source-retention modes pending reconciliation (M14G-H).
+Token encryption: current encryption exists; verified re-encryption/key retirement workflow pending (M14I).
+Django: patched to 6.0.8; Phase 1 full regression passed (543 passed / 13 skipped).
+
+## Remaining P0
+
+M13 staged monetary storage; M14 HTTP/auth/upload/error/privacy/key-rotation gaps. User note reports these; only targeted reads were made, and no blanket security/finance completion is claimed. Core M01B and M12A/B/C implemented; complete tax deduction evidence/eligibility tracked separately as M01C.
+
+## Remaining P1
+
+M02-M10 expanded Travel behavior/test matrix; M01C tax deduction provenance/eligibility; M12D planning assumptions; dependency/package reproducibility; master CI/protection; new frozen/clean-second-PC/installer/LAN/manual release acceptance. Phase 1 full gate passed; final master release gate and remote CI remain pending.
+
+## Remaining P2
+
+M15 bounded Travel telemetry retention preserving current-month quota/active rows and all evidence/plans/history. M16 scoped enrichment/invalidation and telemetry. M17 unsupported experimental ML exclusion. No obsolete “no remaining P0” claim from the old Travel checkpoint applies to the master note.
+
+## API keys required
+
+No keys needed for current tax/financial work. Existing Travel configuration: TRAVEL_USE_MODE=personal_noncommercial or licensed TRAVEL_OPEN_METEO_API_KEY; TRAVEL_ORS_API_KEY; authorized public HTTPS TRAVEL_OVERPASS_URL; optional Duffel Stays/flight access plus TRAVEL_DUFFEL_ALLOW_PAID_SEARCH=true; optional Brave storage/paid-search authorization or authorized SearXNG. Rail/bus require real authorized inventory agreements. Keys only in untracked config/local.env. Wiki no key; disable with TRAVEL_WEB_ENABLED=false. No paid calls this session.
+
+## Current blockers
+
+None for independent code remediation. Keyed/licensed live checks and clean-PC/manual release checks remain external acceptance limits. Existing operator config/local.env had previously unresolved PostgreSQL/Redis targets; not touched. Always use isolated variables for tests. No cloud wiring or credentials added.
+
+## Decisions made
+
+Local/LAN Windows-first; preserve existing models/ownership/history/native durability. Current master P0s outrank old T09 continuation. Same-series Django security patch only. Tax policies are source-reviewed version tables, not live scraped rules. Correctly reject unsupported years/special-rate income. Retain old reference history while deactivating obsolete tax table. No bookings/payments/card collection, secret changes or release promotion.
+
+## Do not redo
+
+Do not repeat the whole repository audit, T07 monetary travel work, historical preview audit, Phase 1 gate or completed focused tests without new failures/changes. M13B's final full gate passed and its session is closed; do not rerun it before new source changes justify another gate. Existing failed attempts are documented, not blockers after passing reruns. Do not use real runtime DB/config or old frozen binaries for current acceptance. Read UTF8. Preserve remaining backlog and this resumable checkpoint.
+
+## Exact next task
+
+Implement M13C: Investment.invested_amount, monthly_sip and current_value only. Reuse the strict HALF_UP currency/retained-original/apply-marker/owned rollback pattern; preserve annual_return_rate, parse_confidence, provider NAV/rates/scores and raw portfolio evidence. Cover numeric serializer/output, Decimal/rate arithmetic in investment summary/allocation/portfolio mix, canonical asset/tax totals, document correction/retry persistence, nullable/zero compatibility and owned reset. Preserve projection semantics already verified in M12C. Scoped orientation is retained in artifacts/m13c-storage-scope-graph-query-20261005.log. Expense.amount, Expense.closing_balance and BankAccount.current_balance are a later stage because normalized money also affects import fingerprints/deduplication, bank syncing and Loan detection. No real-data migration or blanket FloatField replacement. Do not restart the whole-repository audit or resume T09 first.
+
+## Repository housekeeping
+
+Normal git diff --check passed (artifacts/m13-final-diff-check-20261005.log/result JSON). Do not use core.autocrlf=false as a workaround for warnings; it makes CRLF content look like wholesale whitespace changes. No files were rewritten by that failed check.
+
+Graphify code refresh passed: 6,524 nodes / 17,885 edges, AST-only, no clustering/semantic extraction/model calls/HTML. Graphify was missing from PATH and the application environment. Temporary graphifyy 0.9.76 helper dependencies were installed with pip --target outside the repository; the application venv/requirements were not changed. Temporary target is recorded in artifacts/m13-graphify-tool-path-20261005.txt. Read the local .codex/skills/graphify/SKILL.md before using its workflow; follow new AGENTS.md guidance to query the graph before codebase questions and refresh it after source changes. The code index omits 24 unsupported files and 33 symbol-free sources; do not treat it as full semantic evidence.
+
+M13B first source refresh passed, 7,220 nodes / 18,816 edges; final refresh after the Career fixture and money helper docstring updates passed, 7,220 nodes / 18,817 edges. Both use the same AST-only/no-cluster mode and 24 unsupported / 33 symbol-free limitations. Latest evidence: artifacts/m13b-graphify-update-complete-20261005.log/result JSON. Application behavior was unchanged by the docstring update. Full backend, Chrome, system/drift and whitespace gates passed; no active process remains.
+
+The helper path may disappear when temporary files are cleaned; if missing, set up an isolated helper again. Set its PYTHONPATH only inside the separate Graphify command process, never for application tests/runtime (helper NumPy dependencies differ). Use the configured Python executable and perform the mandatory preflight for every Python command. Refresh evidence: artifacts/m13-graphify-update-final-20261005.log/result JSON. Initial missing-module attempt is retained as failed housekeeping history, not an application blocker. No active process remains.
+
+## Exact next command
+
+M13B verification passed; all root test/refresh sessions are closed. Next-stage orientation starts with:
+Get-Content -Encoding UTF8 docs/MASTER_M13B_VERIFICATION_20261005.md
+Before code exploration, in a separate Graphify command process after Python preflight:
+$loanGraphToolTarget=(Get-Content -Encoding UTF8 artifacts/m13-graphify-tool-path-20261005.txt -Raw).Trim()
+$env:PYTHONPATH=$loanGraphToolTarget
+& 'F:\ALFRED\.venv\Scripts\python.exe' -m graphify query 'Investment monetary storage summary allocation portfolio correction retry'
+Then use focused source reads after graph orientation:
+rg -n 'FloatField|invested_amount|monthly_sip|current_value|annual_return_rate' apps/investments/models.py apps/investments/serializers.py apps/investments/views.py
+rg -n '_create_or_update_investment|_portfolio_mix|_apply_investment_correction|_retry_investment_document' apps/investments/services/portfolio_intelligence.py alfred_ai/services/document_review.py
+Before any Python command: get_python_environment(filePath="manage.py"), then the isolated variables above.
+
+## M13C completion after Windows restoration — 2026-10-06
+
+M13C Investment currency storage is implemented and verified in the isolated
+`F:\ALFRED_DEV\m13c` worktree on `codex/investment-money-m13c-20261006`, based on
+`5687a82ecb43702e90822f19e958b164dfe4cfdd`. Continue development there. The restored
+source remains in `F:\ALFRED\alfred_ai` on the original development branch and its
+native runtime remains active using `F:\ALFRED\restored-runtime`. No M13C migration
+has been applied to private/operator databases. The code changes are uncommitted
+and have not been merged or pushed.
+
+The three Investment currency fields use bounded HALF_UP Decimal cents and owned
+retained-original/apply-marker/guarded rollback evidence. Numeric API output,
+summary/allocation/rate arithmetic, portfolio mix, canonical assets/tax callers,
+document correction/retry, atomic PDF persistence, explicit-zero behavior and
+owned orphan-snapshot reset are covered. Rates, confidence, NAV and raw evidence
+remain separate. Projection timing and local-month cache semantics are preserved.
+
+Final backend: 709 run, 692 passed, 17 browser skips, exit 0. Full serial Chrome:
+18 passed, zero skips, exit 0. Investment-specific Chrome also passed independently.
+The initial concurrent browser attempt crashed in Windows Python during test-user
+password creation; its log is retained and the serial retry passed. System/drift,
+whitespace and AST-only graph gates passed (7,398 nodes / 19,142 edges).
+Evidence: development `docs/MASTER_M13C_VERIFICATION_20261006.md` and
+`artifacts/audit/M13C_VERIFICATION_RESULT_20261006.json`; logs/proof summaries under
+`F:\ALFRED_RECOVERY\m13c-*`.
+
+Exact next development task: the dedicated Expense.amount, Expense.closing_balance
+and BankAccount.current_balance stage. Start with a scoped Graphify query tracing
+normalization, import fingerprints/deduplication, bank syncing and Loan detection.
+Preserve source evidence, ownership and linkage, and continue isolated validation.
+Do not repeat completed M13C gates without new source changes or failures.
+
+Restoration and safe operator signing-key retirement were completed separately;
+see `docs/WINDOWS_RESTORATION_VERIFIED_20261006.md`. Local real-account sign-in and
+private finance/Travel/media UI acceptance remain unconfirmed, and historical data
+plus the Docker VHDX require classification. Keep the Desktop backup, pristine
+copies and recovery repositories. Do not promote M13C to the operator runtime as
+part of development testing.
+
+## Current development checkpoint: M13D — 2026-10-06
+
+This supersedes the historical pre-Windows and uncommitted-M13C instructions above.
+Continue in `F:\ALFRED_DEV\m13c`, branch
+`codex/expense-bank-money-m13d-20261006`. The verified M13C implementation is
+already preserved at `4ac6c100dad83193244d2933814bf1d48dbbcde9`; do not restart it
+or completed audits. Hosted Codex completed the existing partial M13D changes.
+
+Expense.amount/closing_balance and BankAccount.current_balance now use bounded
+HALF_UP Decimal cents. Migration `expenses.0005_expense_bank_money_decimal`
+retains original values, ownership, links, normalization and apply markers;
+guards rollback and owned reset; and retains original transaction identity for
+historical fingerprints/reference deduplication. Transfers and independently
+recorded bank balances remain authoritative. Raw evidence, null/zero semantics,
+numeric API totals, atomic invalid-input rejection, account posting and Loan
+callers are covered. Remaining monetary domains and M14 remain outside this stage.
+
+Final backend: 737 run / 718 passed / 19 disabled-browser skips / no failures or
+errors, exit 0, 641.684 s. Full serial Chrome: 19 passed / no skips / exit 0,
+125.521 s, driver-backed. Focused M13D gate: 34 passed; combined synthetic rehearsal:
+1 passed; Loan/foreclosure compatibility gate: 38 passed; focused Expense Chrome:
+1 passed. Drift and whitespace gates passed. Final AST-only index: 7,498 nodes /
+19,529 edges, with the recorded 26 unclassified / 35 symbol-free limitations.
+Detailed failed-attempt history and contracts are in
+`docs/MASTER_M13D_VERIFICATION_20261006.md`. Logs/proof remain outside Git under
+`F:\ALFRED_RECOVERY\m13d-*`. An unrelated untracked restoration verification
+document is preserved and excluded from the M13D commit.
+
+Validated M13D source commit: `a78ba533b39285745e696b52569a69dafd952d69`.
+The subsequent combined private-copy rehearsal passed for exactly
+`investments.0004_investment_money_decimal` and
+`expenses.0005_expense_bank_money_decimal`: records and original-value snapshots reconciled with zero financial or ownership differences. Unrelated fields and retained evidence were unchanged. Repeat apply was idempotent; reversal restored the original application data.
+SQLite integrity passed and foreign-key violations were zero before/after.
+
+A separate verification process independently proved the fresh backup's schema,
+all 66 SQLite table counts/values through bidirectional SQL EXCEPT, integrity,
+foreign keys and SHA256. Source DB/WAL/SHM bytes still match the capture.
+Private DB unchanged: YES. Readiness for controlled live migration: YES for this
+verified source/database state. No M13C/D live migration, runtime promotion, push,
+release or installer promotion was performed. Detailed private evidence/copies
+are retained at `F:\ALFRED_RECOVERY\m13cd-private-rehearsal-20261006`; safe summary
+is `artifacts/audit/M13D_VERIFICATION_RESULT_20261006.json`.
+
+Exact next action: obtain explicit controlled-live-migration authorization; stop
+all runtime writers, revalidate the independently verified backup against current
+DB/WAL/SHM, promote validated development source to the runtime checkout, apply
+only the two named migrations, reconcile and restart. If bytes changed after
+capture, make and independently verify another fresh backup first. Keep all
+historical backups. Do not restart completed audits or M13C/D implementation.
+
+## Controlled M13C + M13D LIVE completion - 2026-10-07
+
+This supersedes earlier private-DB-not-migrated and authorization-pending entries.
+The user explicitly authorized this controlled live operation. Live source is
+F:\ALFRED\alfred_ai, HEAD a9d096ea55839269fe6fce14d4f11ea2cbf05336. It was safely
+fast-forwarded from 5687a82ecb43702e90822f19e958b164dfe4cfdd. Original local changes
+and conflicting untracked documents were preserved outside Git before promotion.
+No new product source changes, deployment commit, release or push were made.
+
+Live DB F:\ALFRED\restored-runtime\db.sqlite3 has exactly the two authorized
+migrations applied: investments.0004_investment_money_decimal and
+expenses.0005_expense_bank_money_decimal. Dependencies were already applied;
+full plan afterward is empty. Native runtime writers were gracefully stopped,
+process/lock checks passed, and the fresh backup was independently reverified
+before application. Runtime secrets/media/models were preserved unchanged.
+
+Protected pre-migration backup:
+F:\ALFRED_RECOVERY\m13cd-private-rehearsal-20261006\fresh-pre-migration-backup.sqlite3
+SHA256 29b06e610ea008b1d5cb042a21b7e50bf9ee2ef95f11a1083ee957ce5c8ffcb0.
+It matched the live DB/WAL/SHM capture before application and remains intact.
+All 66 original SQLite tables passed independent schema/counts/bidirectional
+SQL EXCEPT/integrity/foreign-key checks. Original backup and proof are unchanged.
+
+Operation evidence: F:\ALFRED_RECOVERY\m13cd-live-migration-20261007.
+Post-migration-before-restart.sqlite3 SHA256:
+971228fd90387e4947d42d3e3a0f3aff12e97b7440ac7878c1a4e92cefeaf4ed.
+Post-final-running.sqlite3 consistent snapshot SHA256:
+02e42ebd7d0d0a55d097191d51489919f7b56c35d268e4b664f67a653630c267.
+Detailed before/after source-file hashes, snapshots and private totals are in
+live-migration-result.json and final-operation-result.json outside Git.
+
+Pre-restart reconciliation passed across existing tables and intended conversion snapshots, with zero financial, ownership, reference, fingerprint or foreign-key differences. Detailed private record counts remain in protected local evidence.
+Only the two intended migration-state entries were added. Exact resulting schema
+matches the successful private-copy rehearsal. Database integrity passes.
+
+The initial post-apply harness stopped on cached executor state after successful
+application. Failure log/snapshot are retained. A fresh executor confirmed both
+migrations recorded with no pending plan; resumed reconciliation passed without
+reapplying either migration. No unexplained data mismatch or rollback occurred.
+Checkout CRLF/LF differences were verified as line endings only; exact tested
+migration file bytes and Git blobs were checked before application. Git index
+stat refresh confirmed no product source changes afterward.
+
+ALFRED restarted, gracefully stopped, and restarted again to verify persistence.
+It is running at http://127.0.0.1:8000/. Both actual queued startup worker probes
+completed. Final native readiness is 5/5: DB, cache, worker, scheduler and local
+security ready. All four health endpoints HTTP 200; DB/cache/ML runtime/startup
+checks ok. No pending/scheduled jobs or interrupted claims at final check; a
+consistent native queue backup passes integrity. All 69 post-migration tables
+were compared across restart with zero business-table changes. Startup added
+expected snapshot-model content types (3) and permissions (12); one existing
+account login timestamp and session records changed as authentication activity.
+All other user fields and credentials are unchanged. Private config/media/model
+file hashes remain identical; all referenced media are present. Read-only Decimal ORM/serialization checks passed; Loan/Travel/document data remained unchanged.
+
+Prior validated source tests remain 718 backend passed / 19 disabled-browser
+skips / 737 run; serial Chrome 19 passed / no skips. Completed engineering suites
+were not repeated. Live manual page acceptance remains PENDING: browser automation
+has no Chrome or in-app browser surface. An operator sign-in question was sent;
+UI review has not been confirmed. A login timestamp change does not establish
+visual finance/Travel/document acceptance. Do not claim it passed.
+
+Rollback required: NO. Protected verified backup, exact reverse rehearsal,
+private runtime config/local source preservation, consistent post snapshots and
+failure evidence remain available. Keep every recovery asset. Live DB changed
+only through the authorized conversion and recorded normal runtime/auth metadata.
+
+Exact next task: complete existing-account Finance/Expenses/BankAccounts/
+Investments/Loans/Travel and uploaded document/media UI acceptance at the live URL.
+Then classify preserved historical Docker data before unrelated engineering.
+Read LIVE_MIGRATION_REPORT.md and final-operation-result.json in the private
+operation evidence directory. Do not restart M13C/D work or completed audits;
+do not delete backups. Preserve source HEAD a9d096ea55839269fe6fce14d4f11ea2cbf05336
+for the deployed state; this continuation record is a local documentation update.
+
+## Recovery closure and resumed development — 2026-10-07
+
+This supersedes the recovery-only next action above. The user reports opening
+ALFRED and finding the data apparently intact. Recovery is closed for development
+as USER-REVIEWED PRELIMINARY UI ACCEPTANCE. No systematic Finance, Loans, Travel,
+uploaded document/media or other untested UI coverage is claimed passed. Prior
+live migration/reconciliation and 718 backend / 19 Chrome results remain recorded;
+they were not rerun. Live source remains a9d096ea55839269fe6fce14d4f11ea2cbf05336.
+
+Historical Docker data classification is DEFERRED, not complete. Preserve all
+Docker/VHDX, historical databases, encrypted/pristine backups, WAL/SHM, source
+preservation and recovery evidence. Later classify from disposable read-only
+copies and document provenance/unique data before considering any cleanup. No
+backup or recovery asset was deleted, modified or classified during this task.
+
+Development resumed in F:\ALFRED_DEV\m13c on the existing M13D development branch.
+Hosted Codex selected M14A Career job-page HTTP because current code still used
+requests.get after separate DNS validation, allowing redirects, a second DNS
+resolution and unbounded downloads. Reused existing public_http.request: public
+HTTPS only, one DNS resolution with pinned peer/TLS hostname, no redirects,
+HTML/XHTML MIME allowlist, 2,000,000-byte cap, compression rejection and bounded
+transport timeouts. BeautifulSoup consumes bounded bytes for encoding detection.
+Existing Workday/Ashby parser fixtures now mock the shared response boundary.
+
+Focused isolated gate: 17 tests passed, zero failures/skips; 3.947 seconds;
+Django system checks passed. Command: manage.py test tests.test_career_job_http
+ tests.test_career_recruiter_and_evidence tests.test_travel_http --noinput
+ --verbosity 1. Python: F:\ALFRED\alfred_ai\.venv\Scripts\python.exe.
+Explicit synthetic ALFRED_DATA_DIR, secret, in-memory SQLite and locmem cache
+prevented loading live private config/database. No network job fetch was made.
+Five new tests exercise actual shared transport from Career: pinned DNS/TLS,
+unsafe/private targets, blocked redirects, MIME/compression/declared and streamed
+size bounds, sanitized timeout and cleanup. No migration/full audit/full backend
+or browser suite was repeated. No runtime promotion, push or release.
+
+M14A is complete for this Career job-page bypass only; other HTTP callers remain
+unverified. M14B-I/privacy and remaining monetary domains remain open. T09/M15
+retention remains deferred behind these P0s. Exact next atomic task: inspect
+current password-validator enforcement at signup/password-change boundaries
+(M14B); implement the smallest missing boundary with focused tests using hosted
+Codex. If already enforced, advance to M14C/D auth/throttles. Do not repeat whole
+repository audits. Local Ollama remains for low-risk work; this security task
+used hosted Codex as directed by the hybrid policy.
+
+M14A housekeeping: AST-only Graphify update passed (7,509 nodes / 19,549 edges;
+26 unclassified / 35 symbol-free sources). Whitespace checks passed. Graphify's
+stale uv launcher failed initially; direct tool interpreter succeeded without
+installation or application dependency changes. Git commands use explicit
+--work-tree because automatic worktree detection fails in this restored checkout.
+
+## Current post-migration recovery status - 2026-10-07
+
+This section supersedes earlier pre-M13C continuation text. Live source remains
+HEAD a9d096ea55839269fe6fce14d4f11ea2cbf05336. Both investments.0004 and
+expenses.0005 Decimal migrations remain APPLIED LIVE. No migration, engineering
+implementation, financial-record write or cleanup occurred during acceptance.
+
+Read-only consistent snapshot SHA256:
+02e42ebd7d0d0a55d097191d51489919f7b56c35d268e4b664f67a653630c267,
+identical to the prior verified post-migration snapshot. Integrity PASS,
+foreign-key violations 0, 69 total tables (68 application tables plus
+sqlite_sequence). All 24 scoped financial/Travel/document tables unchanged:
+Financial registers, statement identities, transfer legs and monthly groups reconcile with zero mismatches or duplicate fingerprints. Saved Travel and referenced media remain locally readable.
+Private config/media/model hashes unchanged. Protected pre-migration backup
+and Desktop encrypted recovery archive retain verified hashes. All preserved.
+
+Native readiness 5/5 PASS, four health endpoints HTTP 200, worker/scheduler
+healthy, no interrupted claims/queued/scheduled jobs. ALFRED remains running
+at http://127.0.0.1:8000/ without an acceptance-phase restart. Actual local
+configured Codex and hosted Codex neutral-response smoke PASS. Finance/migration
+routing HOSTED and README routing LOCAL. Ollama uses its existing installation;
+no private data included in coding prompts and persistent execution policy unchanged.
+
+Historical Docker classification COMPLETE for the verified inventory. Sole
+historical VHDX is Docker bootstrap Linux data; no reachable ALFRED/database/
+PostgreSQL/volume payload identified. The initially UNKNOWN inode 12 is empty
+ext4 orphan bookkeeping, confirmed by superblock and all 35 blocks. Restored
+copy REGENERABLE; identical pristine backup RECOVERED and retained. Each is
+100663296 bytes (96 MiB), combined standalone storage 192 MiB. Wider recovery
+archive and rollback SQLite remain REQUIRED. Docker/WSL unnecessary for current
+native ALFRED or its verified recovery. No install, writable original mount or
+deletion. Detailed HISTORICAL_DOCKER_CLASSIFICATION.md is in private evidence.
+
+Every real-account screen and console/network acceptance item remains PENDING:
+no connected browser surface is available. Storage readability does not prove
+UI acceptance. Checklist: docs/POST_MIGRATION_UI_ACCEPTANCE_20261007.md in live
+checkout. Report only statuses and sanitized blockers, keeping credentials,
+financial figures, screenshots and document contents local. Operator checklist
+completion request sent; no verification yet received. Recovery closure PENDING.
+
+Evidence: F:\ALFRED_RECOVERY\post-migration-acceptance-20261007,
+RECOVERY_CLOSURE_REPORT.md, closure-readonly-checks.json, source-verification.json,
+hybrid-smoke-result.json and offline ext4 evidence. Initial checker used application
+table count against the historical total including sqlite_sequence; fixed count
+convention, no data/schema mismatch. First script/log/snapshot preserved.
+
+IMPORTANT CURRENT development HEAD: 6001a4ece2ab37ffba956625cba7b16c59fa5cac
+already contains the completed focused M14A Career HTTP fix. It was not promoted;
+live remains a9d096e. Do not repeat M14A, M13C/D or completed broad audits.
+Prior live baseline: backend 718 passed / 19 disabled-browser skips; Chrome 19
+passed. Completed suites not rerun. The existing development 17-test M14A gate
+is prior evidence. No high-risk modification began during recovery acceptance.
+
+Exact next action: operator completes the ten local read-only UI checks, compares
+figures locally and reports only PASS/FAIL/PENDING plus sanitized blockers.
+After acceptance, next provisional engineering task from CURRENT development
+checkpoint is M14B signup/password-change password-validator enforcement,
+using hosted Codex. If already enforced, advance to M14C/D as recorded.
+Keep every backup and recovery asset. No cleanup is authorized.
+
+## M14B password validation completed - 2026-10-07
+
+Development source commit: 18457eff06a1b964c9208093f378f93ec2e86922.
+Parent: 6001a4ece2ab37ffba956625cba7b16c59fa5cac (completed M14A Career HTTP fix).
+Worktree F:\ALFRED_DEV\m13c; branch codex/expense-bank-money-m13d-20261006.
+Current task: M14B standard Django password validation at user-facing writes.
+Confirmed root cause: AUTH_PASSWORD_VALIDATORS absent, although signup already
+uses UserCreationForm and admin uses Django's password-change form. Enabled
+similarity, minimum length (8), common-password and numeric-password validators
+in shared settings, inherited by native settings. No custom password API added.
+Existing credentials/login are unaffected; no user-row migration or rotation.
+Modified source: alfred_ai/settings.py, tests/test_password_security.py.
+
+Five focused new tests cover seven independent weak-signup cases, rejected
+password change without hash mutation, rejected and accepted actual admin
+password-change requests, and continued login with an existing weak credential.
+Before fix: five tests ran, nine failing assertions/subtests, zero errors.
+After fix: 30 tests passed, zero failures/skips, 22.486 s; system checks PASS.
+Integration gate included tests.test_auth_pages, tests.test_user_profile_api
+and tests.test_native_runtime. Test configuration explicitly selects synthetic
+ALFRED_DATA_DIR, synthetic signing key, in-memory SQLite, locmem cache and
+training disabled. No live private configuration/database/media accessed.
+Logs F:\ALFRED_DEV\isolated-tests\m14b-red.log and m14b-green.log.
+AST-only Graphify update --no-cluster PASS (7523 nodes / 19565 edges), no model/API.
+Whitespace/staged review PASS. Commit reused existing repository author identity
+per command; no global Git identity or credential setting changed.
+
+User now provisionally closes recovery and prioritizes development. Reported
+visual inspection satisfactory; individually unverified UI checks remain
+unclaimed and non-blocking. Docker classification previously completed; retained
+Docker/backup/repository cleanup remains deferred housekeeping, never automatic.
+Live checkout remains a9d096e and M13C/D stay applied; no source promotion or
+live private data mutation. Earlier 718 backend/19 Chrome baseline not rerun.
+
+Next atomic task: M14C remove unused API BasicAuthentication fallback and verify
+session authentication/CSRF at the actual profile API using hosted Codex.
+Current source still globally allows Basic auth and no application/script caller
+uses it. M14D throttles, M14F error leaks and M14G/H privacy remain open; do not
+repeat completed M14A/M14B, M13C/D, inferred-loan fixes or comprehensive audits.
+Exact next command (in F:\ALFRED_DEV\m13c, with the same isolated environment):
+F:\ALFRED\alfred_ai\.venv\Scripts\python.exe manage.py test tests.test_api_session_security --noinput --verbosity 1
+
+## M14C session-only API authentication completed - 2026-10-07
+
+Development source commit: 3497afedc41b090895422b0f1bda7119ec6d8d08.
+Parent: 18457eff06a1b964c9208093f378f93ec2e86922 (M14B).
+Removed unused global BasicAuthentication fallback. APIs now use existing Django
+sessions and require CSRF for authenticated writes; Basic credentials alone are
+rejected on HTTP and HTTPS. Application/scripts had no Basic-auth caller. This
+is an intentional source API contract change; future API clients must use the
+existing login/session/CSRF flow. No live deployment or credential changes.
+Modified: alfred_ai/settings.py, tests/test_api_session_security.py,
+tests/user_acceptance_scenario.py. Five new actual-profile-API tests verify
+blocked Basic reads/writes, session reads, CSRF rejection and valid CSRF writes.
+Before fix: 5 ran / 3 failing assertions/subtests. Final integration: 36 passed,
+0 failures/skips, 37.727 s (auth policy/pages/profile/family). Synthetic acceptance
+fixture suite: 8 passed / 0 failures/skips / 11.508 s. Relevant real Chrome
+login/dashboard workflow: 1 passed / 0 skips / 11.996 s. No full suite rerun.
+Initial Chrome fixture failed signup because its password resembled its username;
+changed only the synthetic shared password to an unrelated valid password and
+reran successfully. Production password validation remains unchanged. Logs in
+F:\ALFRED_DEV\isolated-tests\m14c-*.log; initial failure evidence preserved.
+All tests isolated synthetic configuration, SQLite/locmem or temporary browser
+SQLite/media, training disabled. No private runtime/database/provider credentials
+loaded. Graphify AST update requested; completion recorded in final checkpoint.
+
+Next verified P0: M14F Career API raw exception disclosure. Current unexpected
+exception handlers in recruiter intake, job-page parsing and career projection
+return exception text directly. Inspect relevant callers, add focused regression
+cases and replace the shared error boundary with safe messages/correlation IDs.
+Keep intentionally controlled serializer/outcome validation separate.
+Exact next command after configured-Python preflight and isolated environment:
+F:\ALFRED\alfred_ai\.venv\Scripts\python.exe manage.py test tests.test_career_api_errors --noinput --verbosity 1
+
+## Latest development checkpoint - M14B/M14C/M14F - 2026-10-07
+
+DEVELOPMENT STATUS: ACTIVE. Recovery is provisionally closed for development by
+explicit user instruction; visual inspection reportedly satisfactory. Untested
+individual operator screens remain unclaimed, but do not block development.
+Historical Docker classification was completed; retained-file cleanup is deferred
+housekeeping. Preserve encrypted backups, SQLite copies, VHDX and recovery Git repo.
+
+Actual development worktree: F:\ALFRED_DEV\m13c.
+Branch: codex/expense-bank-money-m13d-20261006.
+Last validated SOURCE HEAD: fb471b619b569b7647bcff1cab590539ae9f6d33.
+Completed source commits:
+- 6001a4ece2ab37ffba956625cba7b16c59fa5cac: prior M14A Career pinned HTTP fix.
+- 18457eff06a1b964c9208093f378f93ec2e86922: M14B Django password validators.
+- 3497afedc41b090895422b0f1bda7119ec6d8d08: M14C session-only API/CSRF.
+- fb471b619b569b7647bcff1cab590539ae9f6d33: M14F Career exception disclosure.
+Checkpoint/backlog metadata is committed separately after these source commits;
+use git --work-tree=F:\ALFRED_DEV\m13c rev-parse HEAD for the actual current HEAD.
+
+Last completed task: bounded M14F Career API unexpected-error handling. Confirmed
+raw exception disclosure in recruiter intake, job-page parsing and projection.
+All three now reuse _career_error_response: public message plus opaque error_id,
+preserving detail/error fields and prior 400/500 status contracts. Logs contain
+only error_id and exception class, with no raw message/traceback/document/URL.
+Intentional outcome ValidationError messages remain; inspected controlled raises.
+No projection arithmetic, ownership, parsed evidence or success payload changed.
+Five new endpoint/log/anonymous regression tests reproduced four failures before
+fix; final Career integration 31 passed / 0 failures/skips / 32.505 s. Included
+recruiter/evidence, confidence, income signals, adaptive outcomes and pinned HTTP.
+Source files: apps/career/views.py, tests/test_career_api_errors.py.
+Logs: F:\ALFRED_DEV\isolated-tests\m14f-red.log and m14f-green.log.
+
+Earlier gates in this session: M14B 30 passed / 0 final failures/skips; M14C
+36 auth/profile/family + 8 synthetic acceptance = 44 passed / 0 final failures/
+skips, plus 1 real Chrome login/dashboard workflow passed / 0 skips. These are
+separate focused gates with overlapping coverage, not a new full-suite total.
+Initial browser fixture failure was fixed by changing only its identity-similar
+synthetic password; rerun PASS. No production validator weakened. All initial
+red/error logs retained. Other modified code: alfred_ai/settings.py,
+tests/test_password_security.py, tests/test_api_session_security.py,
+tests/user_acceptance_scenario.py. Backlog updated for completed bounded phases.
+
+All tests use synthetic config/signing key, in-memory SQLite/locmem, training off;
+Chrome uses isolated temporary SQLite/media and synthetic account. No live
+private configuration, credentials, records or runtime database entered models.
+Existing application credentials remain unchanged. No DB migration, source
+promotion, live deployment, live private-data write, backup deletion or paid
+provider action. Live root checkout remains a9d096ea55839269fe6fce14d4f11ea2cbf05336;
+both M13C/D remain applied as previously verified. Prior 718 backend / 19 Chrome
+baseline not repeated; do not label focused gates as a comprehensive rerun.
+
+Graphify AST-only/no-cluster updates PASS: M14B 7523 nodes/19565 edges,
+M14C 7534/19580, M14F 7546/19605. No semantic/API extraction. Whitespace and
+staged reviews PASS. No new application dependencies or runtime templates.
+Security implementation and regression review used hosted Codex. Local Ollama
+Codex generated a documentation draft from verified counts in an empty isolated
+directory, without file tools or private records. Draft reviewed and reused for
+M14B/C milestone wording; its then-in-progress M14F note is superseded here.
+Local draft/log: F:\ALFRED_DEV\isolated-tests\local-checkpoint-summary.*.
+Reference framework contracts: https://docs.djangoproject.com/en/6.0/topics/auth/passwords/
+and https://www.django-rest-framework.org/api-guide/authentication/.
+
+NEXT PRIORITY: M14G explicit opt-in and permissions for new family financial
+sharing, using hosted Codex. Relevant code now checked: FamilyAccountLink all
+three sharing flags default True; invite creation omits sharing choices and the
+invite API ignores request sharing flags; accepted financial scope honors the
+stored share_financial_summary. Existing tests assert automatic sharing and
+exclusion when the flag is manually disabled. Next implement the smallest
+complete opt-in flow with ownership/accepted-link/consent regressions. Preserve
+existing grants and historical data; any migration is development/test only,
+never apply to live DB without separate authorization. Inspect only relevant
+family model/service/views/serializer/UI and tests. Do not redo whole audits.
+Remaining M14D throttles, M14E caps, other API error paths, other HTTP callers,
+M14H privacy, remaining money domains and tax work stay open. Completed inferred-
+loan fixes stay preserved; T09 Travel telemetry remains behind these P0s.
+
+Exact next command after Python-environment preflight:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File F:\ALFRED_DEV\isolated-tests\run-development-tests.ps1 -Labels tests.test_family_account_links
+This tested local runner selects F:\ALFRED_DEV\m13c, explicit synthetic config,
+in-memory SQLite, locmem, isolated registry and disabled training/browser mode.
+Read current family tests/flows, write the focused opt-in regression, then rerun
+this command. Do not repeat this baseline without relevant changes or a concern.
+
+Next-command runner verification: existing family-link baseline 7 passed / 0
+failures/skips / 11.787 s, exit 0. No family source changed yet. Log:
+F:\ALFRED_DEV\isolated-tests\next-family-baseline.log. Do not count this
+overlapping gate as a new complete backend run.
+
+## Latest development checkpoint - M14G COMPLETE - 2026-10-07
+
+Actual worktree: F:\ALFRED_DEV\m13c.
+Branch: codex/expense-bank-money-m13d-20261006.
+Validated M14G SOURCE commit: b1ba243364b5a844f19afd55811a70c5b442f94e.
+Parent: 909ab5a6d312ed7fe581333f8303ce82cf52ead0.
+Checkpoint/backlog metadata is committed separately; read git rev-parse HEAD
+with the explicit development worktree for the final current HEAD.
+Current task: M14G per-owner explicit opt-in for family financial summaries.
+Status COMPLETE in development; not deployed and not applied to private data.
+
+New financial sharing defaults OFF for both participants. Creating or accepting
+an invitation never grants financial access, including injected permission flags.
+Accepted-link PATCH /api/family/account-links/<id>/financial-sharing/ requires
+only share_financial_summary as a JSON boolean and authenticated session/CSRF.
+Each account controls its own summary only; share_financial_summary stores the
+creator's grant, linked_user_share_financial_summary stores the member's grant.
+Snapshot share_financial_summary is the requesting user's own grant;
+receives_financial_summary is the other participant's grant. Unrelated, pending,
+expired, revoked and missing links cannot grant access. No transitive grants.
+Settings UI offers an explicit confirmation naming disclosed financial fields,
+plus immediate stop-sharing, separate from disconnecting. Admin UI cannot edit
+owners, relationship status or either grant, or create links on others' behalf.
+
+Financial queries/aggregate totals/members exclude accounts without that owner's
+grant. Nested financial summaries also honor profile sharing: disabled identity
+and location fields are redacted. Profile/dependent defaults remain unchanged.
+Revocation invalidates both participants' caches; relationship disconnect clears
+both grants. A financial-consent revision prevents reuse of pre-M14G cached
+summaries. Financial writes invalidate authorized recipients' cached summaries,
+including asymmetric sharing with dependent sharing disabled.
+
+Migration: family.0004_financial_sharing_opt_in, depends only on family.0003.
+Historical True has no consent provenance. Forward clears both financial grants
+on every existing link; connected accounts stay connected and must choose again.
+IDs, owners, statuses, invite hashes/hints, timestamps, dependent/profile flags
+and all relationships are preserved. Synthetic migration reconciliation verified
+4 links across accepted/pending/revoked/expired, 2 users and 1 dependent.
+Forward, rollback and replay PASS; isolated plan applies only family.0004.
+Rollback clears grants, including subsequent opt-ins, before dropping the new
+field. It intentionally does not restore ambiguous historical True values.
+Old code/schema can default new links to sharing True: keep family linking and
+sharing unavailable during any reversal; do not restart unsafe old sharing flows.
+No live migration is authorized. Future live promotion requires a fresh verified
+consistent backup, disposable rehearsal, reviewed plan and explicit approval.
+
+Regressions first: original 18-test family gate failed 16 assertions/subtests,
+zero errors; initial full family fix passed 18. Review found profile metadata
+leakage inside opted-in financial summaries; new regression failed and fix passed.
+Final family/migration gate: 22 passed, 0 failures/skips, 36.803 s (20 family,
+2 migration tests). Relevant integration gate: 61 passed, 0 failures/skips,
+77.694 s across family/migration/session/password/auth/profile/data-reset/
+synthetic acceptance. It preceded the final nested-profile guard, which the
+final family gate covers. Settings live-HTTP/static contract: 1 passed / 6.273 s.
+Final real Chrome settings + recipient Family workflow: 1 passed, no skips,
+21.422 s; cancellation, directional opt-in, refresh persistence, revoke and
+recipient financial display verified using synthetic accounts only. Earlier
+Chrome passed too; do not count repeated workflow runs as distinct workflows.
+Backend gates overlap; no new full-suite total. Prior 718/19 baseline not repeated.
+Initial migration harness error used a historical User instance in a current
+model service; corrected test lookup, then integration and migration gates passed.
+All red/failure evidence retained in F:\ALFRED_DEV\isolated-tests\m14g-*.log.
+Chrome artifacts/summaries in m14g-browser-final. No private records in prompts.
+
+Source changed: alfred_ai/middleware.py; apps/family/models.py, services.py,
+serializers.py, views.py, urls.py, admin.py; family/migrations/0004; settings.js;
+templates/settings/account.html; tests/test_family_account_links.py,
+test_family_consent_migration.py, test_user_data_browser.py.
+makemigrations family --check --dry-run PASS (no drift, no generated files).
+node --check settings.js and staged whitespace review PASS. Graphify final
+AST/no-cluster update PASS: 7585 nodes, 19715 edges; no semantic/provider calls.
+All backend and Chrome storage/config are synthetic isolated test environments,
+with training disabled. Live checkout remains a9d096ea55839269fe6fce14d4f11ea2cbf05336;
+no live DB access/write, source promotion, credential change or backup deletion.
+Pre-existing restoration document remains untracked, untouched and unstaged.
+
+Next action after this committed milestone and preserved checkpoint: inspect
+existing inferred-loan verification/exclusion and its focused tests, without
+repeating completed financial work. If already protected, select the next
+verified unresolved security/financial item. Hosted Codex for sensitive changes.
+
+Post-M14G next-task assessment (source committed and checkpoint preserved first):
+M12A inferred-loan financial protection is ALREADY IMPLEMENTED in the actual
+current development source. EMI guesses are verification_status=estimated;
+canonical liability and recurring EMI predicates require is_confirmed. API
+verification fields are read-only, confirmation defaults False and requires
+reviewed terms; setting status alone cannot confirm an estimate. Existing
+loan-verification tests cover repeated detection, API exclusion, explicit terms,
+status bypass, ownership, payment acceptance and evidence provenance. Prior
+real-Chrome estimate-confirmation test remains present. These files are unchanged
+since the validated a9d096e baseline. No loan implementation or repeat test gate
+was needed; do not report these inspected tests as newly executed.
+
+NEXT PRIORITY: remaining M14F family-growth API exception disclosure, hosted
+Codex. Actual apps/family/views.py still returns str(e) on unexpected exceptions;
+Career's bounded error hardening is already complete and must not be repeated.
+Trace existing safe error helpers/callers, add a focused response/log redaction
+regression, then implement the smallest complete boundary. M14D throttles,
+M14E upload caps, M14H retention and other verified backlog items remain open.
+No additional high-risk implementation started after M14G.
+
+EXACT NEXT COMMAND (absolute development source path):
+rg -n 'family_growth|except Exception|str\(e\)' F:\ALFRED_DEV\m13c\apps\family\views.py
+For subsequent Django regressions, first obtain the configured interpreter,
+then use the existing isolated run-development-tests.ps1 runner with relevant
+labels. Never load or migrate F:\ALFRED\restored-runtime\db.sqlite3 in development.
+Development remains ACTIVE. M14G is source-validated, not a live rollout.
+
+## 2026-10-07 - M14H Family Growth error hardening (development only)
+
+User milestone M14H is COMPLETE. This names the Family Growth error slice of
+backlog M14F; the older M14H raw-document-retention issue remains open.
+Implementation commit: 391bad5def84dab31611923ffce0fe6e08aa4230.
+Development checkout: F:\ALFRED_DEV\m13c.
+Branch: codex/expense-bank-money-m13d-20261006. Source started at ea0747d.
+
+Fixed endpoint: GET /api/family/growth/. Unexpected baseline, ORM, cache,
+projection, and reference failures preserve HTTP 500 with a fixed safe message
+and an opaque error_id. Shared safe_error_response extracts the already-tested
+Career policy: ERROR-level logs contain only exception class/reference and
+structured error_id/exception_type; no exception body, chain, stack, request
+body or financial payload. Career's three existing callers retain their API
+status/message/field contracts. No financial arithmetic or consent changes.
+Family public reference evidence excludes notes and last_refresh_error,
+including nested proof/freshness output. New cache revision bypasses pre-fix
+materialized payloads containing diagnostic text. Stored evidence is unmodified.
+Expected controlled validation, 400/403/404/405, session-only auth, CSRF,
+participant scoping and M14G ownership/opt-in/revocation remain enforced.
+No migration, dependency, runtime configuration or UI source change.
+
+Files: alfred_ai/services/api_errors.py; apps/family/views.py;
+apps/career/views.py; tests/test_family_api_errors.py;
+tests/test_career_api_errors.py; tests/test_user_data_browser.py.
+
+Regressions first: 9 new Family tests reproduced 10 failing assertions/subtests,
+0 errors in 7.831 s. Initial focused Family/Career gate: 14 passed, 0 failures,
+11.285 s. Final affected integration gate: 62 passed, 0 failures/skips,
+76.357 s across Family errors/links, Career errors/recruiter/projection,
+session/CSRF and auth pages; includes strengthened root/Django log assertions.
+Gates overlap; do not add them as distinct backend tests. No full suite rerun.
+Final real Chrome gate: 2 passed, 0 failures/skips, 37.744 s; driver-backed
+summary true. Safe failure display/recovery plus owner sharing opt-in and
+revocation verified using synthetic accounts only. Initial Chrome recovery
+assertion timed out because CSS uppercases the label; assertion now casefolds
+displayed text. Failed run evidence preserved, not claimed as a passing gate.
+No production UI correction was required. Actual screenshots and text captures
+are under m14h-browser-final\user-data (summary's artifact inventory is empty).
+Backend/red/Chrome logs: F:\ALFRED_DEV\isolated-tests\m14h-*.log.
+Final Chrome summary: m14h-browser-final\browser_regression_summary.json.
+
+All backend/browser storage and credentials are synthetic isolated fixtures;
+auto-training disabled, providers mocked. Source/staged whitespace review PASS.
+Final graphify AST/no-cluster update PASS: 7608 nodes, 19787 edges; no semantic
+provider/API calls. Prior 718 backend/19 Chrome baseline was not repeated.
+Live checkout remains a9d096ea55839269fe6fce14d4f11ea2cbf05336. Live private DB
+was not opened, written or migrated; source not promoted. Backup/recovery assets
+preserved. Pre-existing untracked restoration document remains untouched.
+No credential changes or external paid services. Development remains ACTIVE.
+
+Current task: preserve this validated checkpoint and select the next verified
+unresolved P0 security item. M14D throttles, M14E upload caps, other HTTP/error
+paths, raw-document retention, token re-encryption and remaining monetary
+fields stay open until targeted checks establish completion. Do not repeat
+M13C/D, M14G, completed Career fixes or inferred-loan protection.
+
+Post-M14H assessment (validated source committed and checkpoint preserved first):
+NEXT PRIORITY: M14D scoped Family invitation creation/acceptance throttling,
+hosted Codex. Current FamilyAccountLinkListCreateView/AcceptView have no throttle;
+REST_FRAMEWORK has no DEFAULT_THROTTLE_CLASSES/RATES; configured middleware and
+Family services contain no rate-limit guard. This is a verified unresolved P0,
+not a rerun of completed auth/password/CSRF work. Preserve read-only snapshots,
+sharing revocation and participant scoping; bound invite generation and invalid
+code attempts, with isolated 429/retry/account-isolation/CSRF regressions first.
+Do not claim a global authentication brute-force fix from this bounded slice.
+No throttle implementation or tests added in the M14H commit.
+T09 telemetry remains deferred behind open P0 issues. Historical Docker
+classification remains deferred recovery housekeeping, not a development block.
+M14G consent migration remains source-only, not applied to the live database.
+
+EXACT NEXT COMMAND:
+rg -n 'FamilyAccountLink(ListCreate|Accept)View|THROTTLE|throttle_classes' F:\ALFRED_DEV\m13c\apps\family\views.py F:\ALFRED_DEV\m13c\alfred_ai\settings.py
+Then add scoped throttle regressions before the guard. Get the configured Python
+environment before using the existing isolated run-development-tests.ps1 runner
+with Family/session test labels. Never load the live private DB for development.
+The implementation SHA above identifies validated source; the later checkpoint
+commit contains only this file and ALFRED_DEEP_REVIEW_BACKLOG.md. Use git rev-parse
+HEAD for the current checkpoint SHA; do not confuse it with the live source HEAD.
+
+## 2026-10-07 - M14D Family invitation abuse protection (development only)
+
+M14D Family invitation creation/acceptance is COMPLETE.
+Implementation commit: 56b50cf944042cd728e53167e86657b363e2443a.
+Development checkout/branch: F:\ALFRED_DEV\m13c,
+codex/expense-bank-money-m13d-20261006; started at 65e4908.
+
+Only POST /api/family/account-links/ and /api/family/account-links/accept/
+are throttled, after authentication/permissions/CSRF and before services/parser
+access. Separate scopes key authenticated account PK, never headers/IP/target.
+Creation has no target parameter; repeated/changed payload targets cannot evade
+the account quota. Defaults: 5 creation attempts/3600 seconds; 10 acceptance
+attempts/600 seconds. Each positive limit/window is configurable via the four
+ALFRED_FAMILY_INVITE_{CREATE,ACCEPT}_{LIMIT,WINDOW_SECONDS} environment names.
+All admitted attempts count, including invalid/malformed/failed operations.
+
+Existing default LocMemCache and native diskcache.DjangoCache/DRF read-modify-
+write throttles are not treated as strict shared quotas. Reuse installed
+pinned diskcache.Cache with one transact() reservation, non-evicting separate
+persistent store and rolling timestamp histories. Location defaults to
+ALFRED_DATA_DIR/artifacts/security/family-invites; can override with
+ALFRED_FAMILY_INVITE_THROTTLE_DIR. One local host, same local-disk directory for
+all processes; not network filesystems or cross-host deployment. Never reuse
+or clear ordinary cache/protection state interchangeably. Active quotas survive
+ordinary cache.clear() and process restart; expired history removed lazily.
+Store contains account IDs, scope names and timestamps, no codes or finances.
+Local privileged filesystem/clock changes and multi-account attacks are outside
+these per-account guarantees; no global login or general network-DoS claim.
+
+Quota exhaustion returns 429 plus Retry-After, without invitation creation,
+acceptance, expiration/revocation updates, cache invalidation or permission
+changes. Storage/invalid-config failures fail closed with safe 503/reference.
+Unexpected invitation service failures use the existing class/reference-only
+ERROR logging and safe 500 responses. No request bodies or raw exception strings
+logged. Complete invalid/expired/revoked/consumed/self/duplicate invitation codes
+share one controlled 400 response, avoiding invitation-state enumeration; blank
+or malformed codes keep safe format guidance. Input aliases remain supported,
+non-dictionary/non-string/overlong code input returns controlled 400.
+Ownership, accepted links, one-time codes, CSRF, consent/revocation and financial
+sharing defaults are preserved. Reads and unrelated endpoints are not limited.
+
+Changed files: alfred_ai/settings.py; apps/family/throttles.py, views.py,
+services.py; docs/FAMILY_INVITATION_THROTTLING.md;
+tests/test_family_invitation_throttling.py, test_family_invitation_atomic.py,
+test_family_account_links.py, test_family_api_errors.py,
+test_user_data_browser.py. Existing test fixtures now isolate limiter stores;
+two older API message assertions use the uniform response, preserving statuses.
+No model/ownership-field changes, Django migration or new dependency.
+
+Regressions first: 11 API tests exposed missing limits/state-enumeration and
+malformed-input failures: 8 failures, 2 errors, 16.683 s. Evidence retained.
+Focused final-new-tests gate: 16 passed, 0 failures/skips, 23.254 s.
+Strengthened process concurrency with a four-process synchronization barrier;
+final affected integration gate covers that change: 69 passed, 0 failures/skips,
+86.217 s (new API/atomic, family links/error, session/CSRF/auth, Career errors).
+Twelve simultaneous threads and forty reservations across four simultaneous
+spawned processes each admit exactly the configured three attempts; reopened
+instances retain the quota and other users/scopes retain independent capacity.
+Backend gates overlap; do not add totals. No comprehensive backend rerun.
+Chrome: 2 real-driver workflows passed, 0 failures/skips, 29.266 s; generated
+codes, safe creation/acceptance 429 UI feedback, no throttled writes, valid
+acceptance at retry expiry, plus existing opt-in/cancel/revoke/privacy workflow.
+Driver-backed summary true. Artifacts under m14d-browser/user-data; all synthetic.
+All logs/summaries retained under F:\ALFRED_DEV\isolated-tests\m14d-*.
+Source and staged whitespace review PASS; graphify AST/no-cluster update PASS:
+7654 nodes, 19919 edges. No semantic/API extraction. Test storage, passwords and
+financial fixtures synthetic; providers offline/mocked and training disabled.
+
+No live private DB read/write/migration, source promotion, credential changes,
+paid external service or backup deletion. Live source remains at prior a9d096e
+baseline. Recovery assets preserved. Pre-existing restoration document remains
+untracked/untouched. Documented defaults apply only when this tested source is
+separately promoted; no live rollout occurred. Development remains ACTIVE.
+
+Current task: preserve M14D validated source/checkpoint, then inspect the next
+unresolved P0 upload/privacy/error boundary. Do not repeat M14G/M14H, Decimal
+migrations or inferred-loan protection. Broad global throttling, M14E caps,
+other HTTP/error paths, raw-document retention and token re-encryption remain
+open pending scoped checks; Travel T09 stays behind unresolved P0s.
+
+## 2026-10-07 - Final M14D review and independent P0 follow-up
+
+M14D implementation: 56b50cf944042cd728e53167e86657b363e2443a.
+M14D configuration hardening: 7fc264fd0292f1e2486747b444645e7a6701d364.
+Follow-up shared cleanup diagnostics: 63d0728dc5c48f38b4625dc1bf419a4fc7daedb8.
+These are independent validated source commits. The f38791d checkpoint preserved
+M14D before the next scoped P0 was implemented; this later metadata commit
+records the final actual state. Current HEAD can be obtained with git rev-parse.
+
+Final review reproduced invalid-directory fail-open: diskcache creates a new
+temporary cache when given None. New regression received 201 instead of required
+503 (one test, one failure, 1.477 s). Guard now rejects missing/relative directories
+before opening the store, alongside nonpositive limits/windows. Defaults remain
+absolute under the runtime data directory. Operator document updated. Final
+M14D API + synchronized thread/process gate: 16 passed, 0 failures/skips,
+24.703 s, including guarded None/relative paths. Original 69 integration and
+2 Chrome gates preceded this validation-only path guard; nominal configuration,
+public messages, valid invitation behavior and UI remain unchanged. No repeat
+full audit or full suite. Logs: m14d-path-red.log, m14d-final-focused.log.
+
+NEXT P0 ADDRESSED in independent commit 63d0728: shared source-upload cleanup
+failure metadata stored raw exception strings and exposed them through upload
+serializers. The shared producer used by nine call sites across statement,
+loan/closure, investment, Career, vehicle and credit document flows now stores
+only a fixed safe error and opaque reference; ERROR logs contain class/reference
+without evaluating exception text. safe_error_details shares the existing API
+policy; safe_error_response keeps all existing response/status/field contracts.
+Failed deletion still leaves the file, model reference and extracted payload
+intact, with deleted=False and an explicit error marker. Retention defaults and
+successful deletion behavior are unchanged; no historical records rewritten.
+
+Files changed in follow-up: alfred_ai/services/api_errors.py, upload_privacy.py;
+tests/test_upload_privacy_retention.py. Regressions first: 5 upload privacy tests,
+2 failures, 3.697 s; evidence retained. Final affected gate: 47 passed,
+0 failures/skips, 40.257 s across cleanup/retry integrity, Family Growth, Career
+errors and invitation API/atomic checks. Includes real API reading of new safe
+metadata and an exception whose __str__ must never be evaluated. This gate
+precedes the final directory guard; the final 16 cover that additional change.
+Backend gates overlap, never add totals or claim a new complete-suite baseline.
+No additional browser gate needed for the shared diagnostic producer; existing
+M14D driver-backed workflows remain recorded. Logs m14f-cleanup-{red,integration}.
+Final source/staged whitespace review PASS; final graphify AST/no-cluster PASS:
+7661 nodes, 19933 edges. No semantic/provider call or new dependency.
+
+Hybrid use: hosted Codex for security design/implementation/privacy regressions;
+local Ollama Codex (alfred-routine:latest, read-only, empty isolated working dir)
+completed an operator-summary draft from static non-sensitive configuration facts.
+Draft reviewed against docs/FAMILY_INVITATION_THROTTLING.md. Initial Windows .cmd
+multiline argument lost fact lines; corrected stdin-file invocation completed
+successfully. Outputs/logs retained in m14d-local-doc-* outside the source tree.
+No private data/credentials/runtime databases supplied to either documentation
+run or hosted model. Model metadata fallback warnings did not prevent completion;
+no global tooling/credential configuration changed.
+
+NEXT PRIORITY: M14E shared upload-size/resource caps, hosted Codex. Confirmed
+ExpenseStatementImportView checks missing file/PDF suffix, then calls the parser
+without an application size check. No configured custom FILE_UPLOAD_HANDLERS or
+file/body limits found in settings. Before implementing, verify native transport
+and multipart behavior so memory-spool thresholds are not mistaken for hard
+upload limits; bound parsing/temp-file work, reject oversize input before model
+writes, and use isolated boundary/rejection/cleanup/auth tests. Retain existing
+source files and ownership; never test against private documents. Historical
+stored exception metadata still needs separate public filtering/review, without
+rewriting live records. Other API errors, HTTP callers, raw-retention policy,
+token re-encryption, remaining money domains and global abuse limits stay open.
+T09 Travel remains behind unresolved P0s. Docker classification stays deferred
+recovery housekeeping and is not a development blocker.
+
+EXACT NEXT COMMAND:
+rg -n 'class ExpenseStatementImportView|statement_file|FILE_UPLOAD|DATA_UPLOAD' F:\ALFRED_DEV\m13c\apps\expenses\views.py F:\ALFRED_DEV\m13c\alfred_ai\settings.py
+Obtain the configured Python environment before each toolchain invocation, then
+run new focused cases through the existing isolated development-test runner.
+
+Live DB UNCHANGED: no private DB access/write/migration. No live source promotion,
+backup deletion, credential changes or paid external calls. All database/media/
+limiter fixtures were synthetic and isolated. Backups and restoration assets
+preserved; pre-existing restoration document remains untracked and untouched.
+Development ACTIVE; M14D COMPLETE, next scoped source task M14E above.
+
+## 2026-10-08 - M14E shared upload/resource protection COMPLETE (development only)
+
+Resume from this entry. Development branch codex/expense-bank-money-m13d-20261006
+in F:\ALFRED_DEV\m13c. Validated implementation commit:
+8cecd65748d333f7487bf008a835854a4ac10e50
+Parent checkpoint 3bcab836381e5b39744da8a25db083e47399eaf1. A following metadata
+commit records this entry/readiness/backlog; use actual Git HEAD, not the parent.
+Live source independently rechecked with Git -C in the LIVE checkout:
+a9d096ea55839269fe6fce14d4f11ea2cbf05336. Source not promoted; no live database
+access/write/migration. Public app was already running at 127.0.0.1:8000 and
+returned HTTP 200 when the user requested it. No restart was needed. Opening
+the default browser with Start-Process was policy rejected; user received link.
+No private browser session, credentials, documents or financial records read.
+
+M14E implementation:
+- Shared multipart middleware/handler counts actual framed body and decoded file
+  bytes before disk writes; independent of Content-Length and memory thresholds.
+- Defaults: file 25 MiB, request 32 MiB including multipart overhead, 4 files,
+  1000 fields, 256 KiB form data. All files spool to disk in 64 KiB chunks.
+  Positive-integer configuration, file <= request; invalid config fails closed.
+- Windows native Waitress transport uses matching cap (inclusive via +1 for its
+  >= comparison), including chunked bodies; 16 connections / 4 task threads.
+  Its chunked cap counts framing; unframed WSGI without valid length isn't
+  imported. Tests separately exercise unknown/understated framed streams.
+- Upload/retry extraction streams to the existing local/frozen-worker dispatch;
+  no whole-file parent RAM copy, cloud call or new framework/dependency.
+  Shared 90s extraction deadline; actual Windows Job Object 1 GiB process/job
+  commit-memory limit, OCR children inherit job and die with timed-out worker.
+  Worker config is explicitly non-sensitive; no local.env/application/DB init.
+- PDF 500 pages / 50000 objects (including sparse recovery IDs), 64 MiB decoded
+  streams, 20M input/rendered pixels; DOCX/ODT 256 members / 64 MiB actual
+  streamed expansion without path extraction; text/CSV 2 MiB / 50000 lines;
+  recovered statement text bounded before transaction grouping; result JSON 4MiB.
+  Existing PDF/OCR/damaged-file recovery and review behavior remain available.
+  There is no existing Excel workbook statement importer; bank endpoint remains
+  PDF-only. CSV text-document compatibility tested; CSV/XLSX bank rejection kept.
+- Free temporary disk reserve 128 MiB + request budget, safe 503 on unavailability;
+  size/processing/count limits 413, malformed forms/archive 400. New unexpected
+  diagnostics use existing class/reference-only safe helper. No raw bodies logged.
+  Completed/incomplete Django spools and bounded worker/OCR temp directories close
+  after success/rejection. Existing source retention and cleanup redaction kept.
+- Write transaction starts only after heavy extraction succeeds; no SQLite
+  IMMEDIATE writer held during OCR. Failed post-extraction writes roll back.
+  Recruiter profile creation moved after successful parsing. APIException
+  resource failures bypass loan review fallback and Career generic error wrapper.
+- Statement fingerprints, reference signatures, deduplication, transfer/balance
+  logic unchanged; no monetary model/migration or ownership changes.
+
+Protected paths: expenses import-statement; loans import-pdf and payoff evidence;
+investments import-pdf; Career resume/recruiter attachments; credit report upload;
+Mobility bike document/service uploads and multipart serializer paths. Manual
+review retries and background statement retries use the same extraction budget.
+POSIX memory code exists but Windows-native behavior is verified; POSIX tree
+termination and a new frozen-package smoke test are NOT claimed as passed.
+See docs/UPLOAD_RESOURCE_LIMITS.md and M14_SECURITY_RELEASE_READINESS.md.
+
+Modified source: alfred_ai/upload_config.py; services/upload_limits.py,
+bounded_parser.py, document_extraction.py, document_review.py, native_web.py,
+ocr_process.py, pdf_recovery.py; settings.py; Career resume/job services + views;
+Expense statement_import/lifecycle; Credit parser; Investment portfolio service;
+Loan PDF/closure parsers + views; Mobility document AI. Tests: test_upload_limits.py
+and 2 UserDataBrowserTests workflows. Operator docs: UPLOAD_RESOURCE_LIMITS.md.
+Only explicit source/docs/tests staged; private assets/migrations staged = 0;
+secret-marker and source/staged whitespace scans PASS. Existing untracked
+WINDOWS_RESTORATION_VERIFIED_20261006.md preserved and unstaged.
+
+Final validation on this implementation:
+- 31 focused M14E methods passed (30-method focused gate 34.592s, extra rollback
+  case 2.802s), included in final combined gate below. Actual stream chunks,
+  exact boundaries, unknown/inaccurate lengths, multi-file aggregate/body/fields,
+  formats, disk failures, temp cleanup, safe logs, auth/CSRF, parser error/timeout,
+  PDF/archive/image/text/output bounds, actual Windows memory allocation refusal,
+  real native HTTP chunked cap, no added writer during extraction, post-write
+  rollback, and rejection without import mutations covered with synthetic data.
+- FINAL combined affected/security gate: 198 passed, 0 failed/skipped, 243.503s.
+  Includes upload/import/financial identity/statement columns/uploader persistence,
+  document recovery/retry/integrity, Career/credit/Mobility/native boundaries,
+  Family consent/invitation thread/process atomicity/growth errors, passwords,
+  session/CSRF, Career HTTPS/SSRF and upload-cleanup redaction.
+- FINAL Chrome gate: 3 passed, 0 skipped, 55.666s; driver_backed_success=true.
+  Document rejection feedback -> valid resume; real synthetic PDF import/reimport
+  verifies unchanged fingerprint/reference/amount rows + balances; existing
+  login/statement/vehicle/dashboard workflow. Synthetic isolated SQLite/media.
+- Django system checks PASS; isolated makemigrations --check --dry-run reports
+  No changes detected (no file generated); graphify AST/no-cluster PASS:
+  7760 nodes, 20264 edges. No semantic/provider call or complete-suite rerun.
+
+Evidence: F:\ALFRED_DEV\isolated-tests\m14e-release-gate.log;
+m14e-release-chrome.log + m14e-release-chrome/browser_regression_summary.json
+and synthetic captures; m14e-migration-drift.log; m14e-final-graphify.log.
+Earlier gates overlap; do not add totals or replace historical 718/19 baseline.
+Initial red 8 methods: 12 failures/2 errors (oversize/400/raw exception); retained
+m14e-red.log. First Chrome 3: 2 off-screen click errors before upload; fixed
+scrolling, retained failed artifacts. Intermediate security gate 97 had 1 Windows
+connection-abort in test that sent an already rejected Content-Length body;
+changed header rejection proof to receive 413 before sending body, retained
+chunked actual-byte proof. Subsequent 97, 196 and final 198 gates pass. Earlier
+123 affected and 25/29/30 focused gates pass; repeated only after relevant code
+changes. No unresolved test failures; previous failed-run evidence retained.
+
+Hybrid: hosted Codex implemented all security/resource design and regression work.
+Local Ollama Codex documentation-only attempt used static non-sensitive facts,
+empty read-only directory, no repository/private input; service unavailable and
+CLI retried network. Owned stalled Codex process stopped, draft exit -1; NOT a
+successful local-model result. Hosted operator docs completed. Logs/prompt kept
+outside source. Check local Ollama before the next routine-model task; no model,
+credential or live runtime configuration changed to repair it in this milestone.
+
+NEXT PRIORITY: hosted M14F loan upload diagnostic production + public historical
+filtering. Verified current loan fallback embeds str(e) in summary/payload and
+operational logs; LoanPDFParser prints it; LoanImportDocumentSerializer exposes
+extracted_payload. Preserve usable review uploads, ownership, successful imports
+and inferred-loan confirmation; never rewrite historical live data. Do not repeat
+M14D/G/H, Career HTTP/password/session security, cleanup producer or Decimal work.
+Other HTTP callers, raw retention, token re-encryption and global abuse limits
+remain unresolved. Broad security release NOT READY; no deployment authorized.
+Travel T09 stays behind these P0 issues. Docker classification is deferred
+housekeeping; backups, recovery DBs/repos/VHDX and archives remain preserved.
+
+EXACT NEXT COMMAND (source inspection only):
+rg -n 'str\(e\)|Error parsing loan PDF|LoanImportDocumentSerializer' F:\ALFRED_DEV\m13c\apps\loans\views.py F:\ALFRED_DEV\m13c\apps\loans\services\loan_pdf_parser.py F:\ALFRED_DEV\m13c\apps\loans\serializers.py
+Obtain the configured Python environment before each Python invocation; keep
+future tests under isolated synthetic configuration. Development ACTIVE.
+
+## 2026-10-11 — M14F loan diagnostic protection COMPLETE (development only)
+
+Resume from this entry. Development checkout F:\ALFRED_DEV\m13c, branch
+codex/expense-bank-money-m13d-20261006. Starting checkpoint:
+a9d06a0b6450ce6b5914df5da85398edcb799869.
+M14F implementation and validated application HEAD:
+895ce13ee86bf5fddbd1332f5326389b7a3b7c5c.
+The following evidence-only commit contains this checkpoint/readiness/hold plan;
+read actual current HEAD with git rev-parse HEAD. Its exact final HEAD and full
+promotion range are frozen outside Git in isolated-tests/m14-promotion-manifest.json.
+Stable source rechecked through Git only remains
+a9d096ea55839269fe6fce14d4f11ea2cbf05336. No live source promotion or private DB
+read/write/migration; no private documents, credentials or backups were used.
+The pre-existing untracked restoration document remains untouched and unstaged.
+
+Scoped inspection confirmed the remaining Loan fallback str(e), parser print,
+unfiltered import/closure payloads, nested settlement notes, review artifacts and
+operational-log responses. Read AGENTS, the latest checkpoint/readiness/backlog,
+used the existing scoped graph query, traced parser/serializer callers and reused
+safe_error_details/safe_error_response. No broad audit or completed milestone redo.
+
+M14F behavior:
+- Loan import parser failures retain the reviewable-upload HTTP 201 contract,
+  success=false, failed status, fixed safe error/code and opaque correlation ID.
+  Persistence failures are logged 500s, not mistaken for parser review outcomes.
+  Payoff operational errors are safe 500s; validation/resource/404/202/200 statuses
+  remain. Other existing direct Loan error responses now use the same safe helper.
+- Parser exceptions propagate to the appropriate API boundary; no exception text,
+  nested cause, traceback, uploaded bytes, OCR text or private amount is formatted
+  into diagnostics/logs. ERROR logs retain class/reference and parser/persistence
+  stage. New failure records/operational events contain only safe error metadata.
+- Import/closure serializers regenerate safe status messages and allowlist public
+  diagnostics. Historical arbitrary errors/warnings/parser output, OCR snippets,
+  raw notes, unknown nested keys and settlement diagnostics cannot be returned.
+  Review/resolve/retry and operational-log responses use the same boundary.
+  Loan/financial cache revisions invalidate older serialized watchlist content.
+- New parsers keep extracted source evidence in the existing private extracted-text
+  field and structured business fields, without text copies in diagnostic payloads.
+  Loan cleanup metadata is filtered before persistence/response, excluding paths
+  and filenames. Shared cleanup defaults and other domains are unchanged.
+- Historical forensic records remain unchanged; no migration/rewrite/dependency.
+  Normal owned Loan fields, monetary values, document links, statuses, business
+  corrections and structured settlement components remain. Public raw loan OCR
+  review artifacts are intentionally omitted; retained local files/manual review
+  remain usable. Source retention policy, financial calculations, ownership,
+  deduplication and inferred-loan confirmation rules are preserved.
+
+Validation:
+- 19 focused M14F tests passed, 0 failures/skips, 15.078s; final focused gate after
+  cleanup-metadata producer filtering: 36 passed, 0 failures/skips, 19.551s,
+  including all 19 M14F plus shared cleanup/retry integrity. Exceptions containing
+  synthetic paths/loan IDs/amounts/OCR/tokens/stack fragments and uploaded bytes,
+  unprintable/nested errors, actual parser-stage failures, image/payoff failures,
+  historical serializer/API filtering, cleanup, successful import/dedup/payoff,
+  HTTP statuses, owner scoping/authentication/CSRF covered.
+- Affected backend: 192 passed, 0 failures/skips, 112.330s (before final producer
+  filtering; final 36 and final combined gate cover that small change).
+- M14F Chrome: 4 passed, 0 skipped, 51.461s, driver_backed_success=true: safe
+  historical/current errors then real PDF import/reimport; loan/closure manual
+  correction; existing inferred-loan confirmation. All fixtures synthetic.
+- FINAL combined backend: 297 passed, 0 failures/skips, 243.888s. One actual gate includes the final M14F
+  source, all 31 M14E regressions, Loan/serializer/import compatibility, password,
+  session/CSRF/auth, Career disclosure/HTTPS transport/uploads, Family opt-in and
+  Growth errors, invitation synchronized thread/process quotas, cleanup/retries,
+  statement fingerprints/columns/uploader compatibility, and both family.0004
+  forward/rollback/replay migration-rehearsal methods. Do not add earlier counts.
+- FINAL combined Chrome: 10 passed, 0 failures/skips, 113.447s;
+  driver_backed_success=true. All four Loan workflows above plus Family
+  invitation throttling/expiry, opt-in/revocation, Growth safe-error recovery,
+  upload limit/valid resume, real PDF statement reimport fingerprint/reference/
+  amount/balance preservation, and login/statement/vehicle/dashboard workflow.
+- System check PASS; isolated makemigrations --check --dry-run: No changes
+  detected. No M14F migration created/applied. Source comparison adds only the
+  already-tested family.0004 migration relative to stable; live migration table
+  was not read. Graphify AST/no-cluster PASS: 7804 nodes / 20474 edges, no API cost.
+- First focused run: 17 run, one erroneous pagination assertion, corrected.
+  First Chrome run: off-screen click and wrong in-memory harness caused failure;
+  switched to existing run_browser_regressions.py/browser_test_settings. Next
+  Chrome run relied on an operational-log filename now deliberately hidden;
+  expectation now verifies the actual saved closure on the Loans page. Corrected
+  gates pass; failed logs/screenshots/proof summaries remain preserved.
+
+Evidence under F:\ALFRED_DEV\isolated-tests: m14f-focused-final.log,
+m14f-final-focused.log, m14f-affected.log, m14f-chrome-verified.log and
+m14f-chrome-final/browser_regression_summary.json, m14-final-backend.log,
+m14-final-chrome.log and m14-final-chrome/browser_regression_summary.json,
+m14f-system-check.log, m14f-drift-check.log, m14f-graphify-complete.log.
+No full repository suite, frozen-package gate or real-account acceptance claimed.
+
+Release scope: the user's latest note identifies M14F as the remaining verified
+blocker. The existing readiness report separately retains unverified HTTP callers,
+raw-retention policy, token fallback re-encryption and global abuse protection.
+A clarification was requested while the combined gate continued. Until explicitly
+resolved/deferred, retain those reported entries; a passing regression gate does
+not establish their safety. Broad M14 RELEASE READY remains NO, and M14 DEVELOPMENT
+is not marked COMPLETE. M15 has not begun. Do not reopen completed M14D/E/G/H or
+M13C/D and do not run a broad audit to resolve this scope question.
+
+Promotion is prepared only in M14_CONTROLLED_PROMOTION_PLAN.md: exact source
+range, final HEAD manifest, family.0004 OFF-consent impact, fresh verified encrypted
+backup, disposable rehearsal, rollback, smoke tests and real-account acceptance.
+No live action is authorized by this plan. Originals/backups/recovery assets and
+financial balances remain preserved. All automated data/media/limiter stores are
+synthetic and isolated. Git identity was absent; the implementation commit used
+the established previous-commit identity via command-scoped -c only, without
+editing global/local configuration.
+
+NEXT ACTION: combined M14 regression integration PASS; resolve the retained release
+scope before M14 readiness/PASS, promotion authorization or M15 work.
+EXACT NEXT COMMAND:
+Get-Content -LiteralPath F:\ALFRED_DEV\m13c\artifacts\audit\M14_SECURITY_RELEASE_READINESS.md
+
+## M14 retained blocker resolution: HTTP - 2026-10-11
+
+Continued from 97c06fa. Authoritative four reported issue groups classified in
+M14_RETAINED_BLOCKER_DISPOSITIONS.md; no broad audit or completed milestone redo.
+Remaining Investment/Verified Intelligence direct GET adapters now reuse the
+existing pinned, bounded public HTTPS transport, with typed text/RSS/HTML caps.
+Safe provider failure observations replace raw exception persistence/logging.
+Six synthetic regressions first reproduced the gap; related gate: 41 passed,
+0 failures/skips, 11.585 seconds (m14-http-after.log). No live modification,
+dependency, migration or monetary calculation change. Source commit is the commit
+containing this checkpoint; exact SHA is recorded in the next checkpoint.
+Next: transactional verified EmailConnection token rotation, then abuse limits.
+
+## M14 retained blocker resolution: token rotation - 2026-10-11
+
+HTTP commit: 7bb5086ac1046382f4abb84fc0e6c1ad647304b7.
+Implemented the count-only dry-run / explicitly applied atomic email-token
+rotation command and operator recovery/key-retirement procedure. Existing
+fallback reads remain. Primary-only re-read verification, invalid-token rollback,
+conflict detection, mixed-key/legacy/idempotence/timestamp tests passed:
+7 focused (0.041 s), 18 integration (11.529 s), zero failures/skips.
+No live token/key mutation, schema migration or dependency. Source commit is the
+commit containing this checkpoint. Next: reuse atomic invitation reservation
+pattern for login and authenticated expensive-endpoint abuse protection.
+
+## M14 retained blocker resolution: abuse protection - 2026-10-11
+
+Token source commit: 64d21f37607b1a765c0ea7ca746216c3cb014c69.
+Login/signup/account/global API and expensive-operation protection now reuses the
+invitation atomic rolling-window pattern through a shared helper, with the
+existing invitation wrapper and independent persistent scopes preserved.
+Safe 429/Retry-After precedes view writes; invalid/unavailable store fails 503;
+HMAC identities, no forwarding-header trust, safe reference/class logging.
+No auth/CSRF bypass, dependency, migration, live mutation or money changes.
+Focused 12 passed (12.335 s); related 55 passed (79.462 s); Chrome 2 passed
+(16.940 s), zero failures/skips and driver-backed success true. Fixture-only
+failures were corrected (scoped mock, complete URLconf, navigation wait/helper).
+Source commit is the commit containing this checkpoint. Final combined gate and
+retention deferral evidence/config verification still precede M14 completion.
+
+## M14 retention disposition verified - 2026-10-11
+
+Abuse implementation: cf799d46c17d7241acc4cfb33c8b5ef2fc9d8f60.
+Raw local-vault/Travel telemetry retention is explicitly deferred with all seven
+required fields in M14_RETAINED_BLOCKER_DISPOSITIONS.md. Native private-media
+ownership/traversal checks and retaining active review evidence pass (3 new
+methods, in the 55-test related gate; corrected fixture recheck 5 passed).
+Native release config/check/migration-drift proof PASS in synthetic directories,
+including DEBUG=false, private media, deletion option, session/CSRF and limits.
+No historical evidence deleted, no cleanup migration/job created/applied, no
+live source/database/config/token/key/backups touched. M14 completion now waits
+for one new combined backend/Chrome gate on the complete source candidate.
+
+## M14 DEVELOPMENT COMPLETE / release candidate frozen - 2026-10-11
+
+Source candidate: 495a184c7a44bfe169978f8e0c018f8a286fb208.
+Resolved separately: HTTP 7bb5086ac1046382f4abb84fc0e6c1ad647304b7;
+token rotation 64d21f37607b1a765c0ea7ca746216c3cb014c69;
+abuse limits cf799d46c17d7241acc4cfb33c8b5ef2fc9d8f60.
+Raw local-vault/Travel T09 retention explicitly deferred with rationale, owner,
+mitigations and required evidence in M14_RETAINED_BLOCKER_DISPOSITIONS.md.
+Consent-reset source already resolved; private promotion remains unauthorized.
+
+Actual updated gate on candidate 495a184: 356 backend passed, 0 failures/skips,
+354.594 s; 12 Chrome passed, 0 failures/skips, 138.356 s (runner 148.546 s),
+driver_backed_success=true. All old 19 M14F/31 M14E methods and both family.0004
+forward/rollback/replay methods included. No overlapping totals added.
+Native config/check/drift PASS; no changes detected. Graph AST-only update PASS
+7892 nodes / 20678 edges. No new migration/dependency. Only family.0004 differs
+from stable source; no live migration table or private DB access.
+Evidence: m14-blockers-combined-backend.log, m14-blockers-combined-browser.log,
+m14-blockers-chrome/browser_regression_summary.json,
+m14-native-config-proof-final.log, m14-blockers-final-graph.log, scoped logs.
+Initial synthetic fixture failures corrected/preserved; zero unresolved failure.
+
+M14 DEVELOPMENT = COMPLETE. M14 RELEASE READY = YES. Freeze the evidence-only
+commit containing this checkpoint on release/m14-20261011, and write exact HEAD /
+full source range to isolated-tests/m14-promotion-manifest.json. Application/test
+source is identical to the validated candidate. Promotion plan includes source,
+DB/config/media backups, disposable consent/token rehearsals, OFF-consent impact,
+primary-only token verification, config checks, rollback/smoke/real acceptance.
+No live source/database/config/key/token/backups modified; stable Git-only HEAD
+remains a9d096ea55839269fe6fce14d4f11ea2cbf05336. No promotion authorized/performed.
+Existing untracked docs/WINDOWS_RESTORATION_VERIFIED_20261006.md remains untouched.
+
+M15 DEVELOPMENT READY = YES. Next create F:/ALFRED_DEV/m15 on separate branch
+codex/m15-persistent-memory-20261011 from frozen release HEAD and implement only
+verified local structured memory/provenance/sensitivity, Ollama embedding,
+semantic new-session retrieval/owner isolation, append-only encrypted event,
+restart/restore/retrieve. Cloud reasoning optional/privacy-gated; no cloud sync
+or broad autonomous learning. Never mix M15 commits into frozen M14.
+No full repository/installer/live-provider/real-account acceptance claimed.
+
+NEXT ACTION: start the isolated M15 vertical slice; live M14 awaits authorization.
+EXACT NEXT COMMAND:
+git -C F:/ALFRED_DEV/m13c worktree add -b codex/m15-persistent-memory-20261011 F:/ALFRED_DEV/m15 release/m14-20261011
+
+
+## Archived installed working-copy notes (preserved before M14 switch)
+
+
+## Controlled M13C + M13D LIVE completion - 2026-10-07
+
+This supersedes earlier private-DB-not-migrated and authorization-pending entries.
+The user explicitly authorized this controlled live operation. Live source is
+F:\ALFRED\alfred_ai, HEAD a9d096ea55839269fe6fce14d4f11ea2cbf05336. It was safely
+fast-forwarded from 5687a82ecb43702e90822f19e958b164dfe4cfdd. Original local changes
+and conflicting untracked documents were preserved outside Git before promotion.
+No new product source changes, deployment commit, release or push were made.
+
+Live DB F:\ALFRED\restored-runtime\db.sqlite3 has exactly the two authorized
+migrations applied: investments.0004_investment_money_decimal and
+expenses.0005_expense_bank_money_decimal. Dependencies were already applied;
+full plan afterward is empty. Native runtime writers were gracefully stopped,
+process/lock checks passed, and the fresh backup was independently reverified
+before application. Runtime secrets/media/models were preserved unchanged.
+
+Protected pre-migration backup:
+F:\ALFRED_RECOVERY\m13cd-private-rehearsal-20261006\fresh-pre-migration-backup.sqlite3
+SHA256 29b06e610ea008b1d5cb042a21b7e50bf9ee2ef95f11a1083ee957ce5c8ffcb0.
+It matched the live DB/WAL/SHM capture before application and remains intact.
+All 66 original SQLite tables passed independent schema/counts/bidirectional
+SQL EXCEPT/integrity/foreign-key checks. Original backup and proof are unchanged.
+
+Operation evidence: F:\ALFRED_RECOVERY\m13cd-live-migration-20261007.
+Post-migration-before-restart.sqlite3 SHA256:
+971228fd90387e4947d42d3e3a0f3aff12e97b7440ac7878c1a4e92cefeaf4ed.
+Post-final-running.sqlite3 consistent snapshot SHA256:
+02e42ebd7d0d0a55d097191d51489919f7b56c35d268e4b664f67a653630c267.
+Detailed before/after source-file hashes, snapshots and private totals are in
+live-migration-result.json and final-operation-result.json outside Git.
+
+Pre-restart reconciliation passed across existing tables and intended conversion snapshots, with zero financial, ownership, reference, fingerprint or foreign-key differences. Detailed private record counts remain in protected local evidence.
+Only the two intended migration-state entries were added. Exact resulting schema
+matches the successful private-copy rehearsal. Database integrity passes.
+
+The initial post-apply harness stopped on cached executor state after successful
+application. Failure log/snapshot are retained. A fresh executor confirmed both
+migrations recorded with no pending plan; resumed reconciliation passed without
+reapplying either migration. No unexplained data mismatch or rollback occurred.
+Checkout CRLF/LF differences were verified as line endings only; exact tested
+migration file bytes and Git blobs were checked before application. Git index
+stat refresh confirmed no product source changes afterward.
+
+ALFRED restarted, gracefully stopped, and restarted again to verify persistence.
+It is running at http://127.0.0.1:8000/. Both actual queued startup worker probes
+completed. Final native readiness is 5/5: DB, cache, worker, scheduler and local
+security ready. All four health endpoints HTTP 200; DB/cache/ML runtime/startup
+checks ok. No pending/scheduled jobs or interrupted claims at final check; a
+consistent native queue backup passes integrity. All 69 post-migration tables
+were compared across restart with zero business-table changes. Startup added
+expected snapshot-model content types (3) and permissions (12); one existing
+account login timestamp and session records changed as authentication activity.
+All other user fields and credentials are unchanged. Private config/media/model
+file hashes remain identical; all referenced media are present. Read-only Decimal ORM/serialization checks passed; Loan/Travel/document data remained unchanged.
+
+Prior validated source tests remain 718 backend passed / 19 disabled-browser
+skips / 737 run; serial Chrome 19 passed / no skips. Completed engineering suites
+were not repeated. Live manual page acceptance remains PENDING: browser automation
+has no Chrome or in-app browser surface. An operator sign-in question was sent;
+UI review has not been confirmed. A login timestamp change does not establish
+visual finance/Travel/document acceptance. Do not claim it passed.
+
+Rollback required: NO. Protected verified backup, exact reverse rehearsal,
+private runtime config/local source preservation, consistent post snapshots and
+failure evidence remain available. Keep every recovery asset. Live DB changed
+only through the authorized conversion and recorded normal runtime/auth metadata.
+
+Exact next task: complete existing-account Finance/Expenses/BankAccounts/
+Investments/Loans/Travel and uploaded document/media UI acceptance at the live URL.
+Then classify preserved historical Docker data before unrelated engineering.
+Read LIVE_MIGRATION_REPORT.md and final-operation-result.json in the private
+operation evidence directory. Do not restart M13C/D work or completed audits;
+do not delete backups. Preserve source HEAD a9d096ea55839269fe6fce14d4f11ea2cbf05336
+for the deployed state; this continuation record is a local documentation update.
+
+## Current post-migration recovery status - 2026-10-07
+
+This section supersedes earlier pre-M13C continuation text. Live source remains
+HEAD a9d096ea55839269fe6fce14d4f11ea2cbf05336. Both investments.0004 and
+expenses.0005 Decimal migrations remain APPLIED LIVE. No migration, engineering
+implementation, financial-record write or cleanup occurred during acceptance.
+
+Read-only consistent snapshot SHA256:
+02e42ebd7d0d0a55d097191d51489919f7b56c35d268e4b664f67a653630c267,
+identical to the prior verified post-migration snapshot. Integrity PASS,
+foreign-key violations 0, 69 total tables (68 application tables plus
+sqlite_sequence). All 24 scoped financial/Travel/document tables unchanged:
+Financial registers, statement identities, transfer legs and monthly groups reconcile with zero mismatches or duplicate fingerprints. Saved Travel and referenced media remain locally readable.
+Private config/media/model hashes unchanged. Protected pre-migration backup
+and Desktop encrypted recovery archive retain verified hashes. All preserved.
+
+Native readiness 5/5 PASS, four health endpoints HTTP 200, worker/scheduler
+healthy, no interrupted claims/queued/scheduled jobs. ALFRED remains running
+at http://127.0.0.1:8000/ without an acceptance-phase restart. Actual local
+configured Codex and hosted Codex neutral-response smoke PASS. Finance/migration
+routing HOSTED and README routing LOCAL. Ollama uses its existing installation;
+no private data included in coding prompts and persistent execution policy unchanged.
+
+Historical Docker classification COMPLETE for the verified inventory. Sole
+historical VHDX is Docker bootstrap Linux data; no reachable ALFRED/database/
+PostgreSQL/volume payload identified. The initially UNKNOWN inode 12 is empty
+ext4 orphan bookkeeping, confirmed by superblock and all 35 blocks. Restored
+copy REGENERABLE; identical pristine backup RECOVERED and retained. Each is
+100663296 bytes (96 MiB), combined standalone storage 192 MiB. Wider recovery
+archive and rollback SQLite remain REQUIRED. Docker/WSL unnecessary for current
+native ALFRED or its verified recovery. No install, writable original mount or
+deletion. Detailed HISTORICAL_DOCKER_CLASSIFICATION.md is in private evidence.
+
+Every real-account screen and console/network acceptance item remains PENDING:
+no connected browser surface is available. Storage readability does not prove
+UI acceptance. Checklist: docs/POST_MIGRATION_UI_ACCEPTANCE_20261007.md in live
+checkout. Report only statuses and sanitized blockers, keeping credentials,
+financial figures, screenshots and document contents local. Operator checklist
+completion request sent; no verification yet received. Recovery closure PENDING.
+
+Evidence: F:\ALFRED_RECOVERY\post-migration-acceptance-20261007,
+RECOVERY_CLOSURE_REPORT.md, closure-readonly-checks.json, source-verification.json,
+hybrid-smoke-result.json and offline ext4 evidence. Initial checker used application
+table count against the historical total including sqlite_sequence; fixed count
+convention, no data/schema mismatch. First script/log/snapshot preserved.
+
+IMPORTANT CURRENT development HEAD: 6001a4ece2ab37ffba956625cba7b16c59fa5cac
+already contains the completed focused M14A Career HTTP fix. It was not promoted;
+live remains a9d096e. Do not repeat M14A, M13C/D or completed broad audits.
+Prior live baseline: backend 718 passed / 19 disabled-browser skips; Chrome 19
+passed. Completed suites not rerun. The existing development 17-test M14A gate
+is prior evidence. No high-risk modification began during recovery acceptance.
+
+Exact next action: operator completes the ten local read-only UI checks, compares
+figures locally and reports only PASS/FAIL/PENDING plus sanitized blockers.
+After acceptance, next provisional engineering task from CURRENT development
+checkpoint is M14B signup/password-change password-validator enforcement,
+using hosted Codex. If already enforced, advance to M14C/D as recorded.
+Keep every backup and recovery asset. No cleanup is authorized.
+
+## Latest development pointer - 2026-10-07
+
+User instruction supersedes recovery acceptance as a development gate: recovery
+is provisionally closed and development is ACTIVE. Unverified operator screens
+remain unclaimed; retained Docker/recovery cleanup is deferred housekeeping.
+Do not repeat M13C/D, completed Career HTTP work or the broad backend audit.
+
+Actual development worktree: F:\ALFRED_DEV\m13c.
+Branch: codex/expense-bank-money-m13d-20261006.
+Current development HEAD: 909ab5a6d312ed7fe581333f8303ce82cf52ead0
+(checkpoint/backlog metadata commit).
+Last validated source HEAD: fb471b619b569b7647bcff1cab590539ae9f6d33.
+Latest authoritative task details are in that worktree's
+artifacts/audit/CODEX_CONTINUATION_STATE.md and ALFRED_DEEP_REVIEW_BACKLOG.md.
+
+Completed hosted-Codex security source milestones:
+- 18457eff06a1b964c9208093f378f93ec2e86922: M14B standard password validators;
+  30 focused backend tests passed, existing-account login retained.
+- 3497afedc41b090895422b0f1bda7119ec6d8d08: M14C session-only API authentication
+  and CSRF; 36 auth/profile/family plus 8 synthetic acceptance tests passed;
+  1 isolated actual Chrome login/dashboard workflow passed. Synthetic fixture
+  password updated to comply with validation, without weakening policy.
+- fb471b619b569b7647bcff1cab590539ae9f6d33: bounded M14F Career recruiter/job/
+  projection safe errors and opaque error IDs, class-only logs; 31 Career
+  integration tests passed. Other API error paths/upload caps remain pending.
+Final failures/skips zero for these focused gates. Counts overlap and are not
+an aggregate full-suite total. Historical 718 backend / 19 Chrome not rerun.
+Graphify AST updates passed. Local Ollama Codex supplied a documentation draft
+using test metadata only, with no private files or credentials in the prompt.
+
+No live source promotion, DB migration/write, runtime credential change, paid
+service action or recovery deletion occurred. Live application HEAD remains
+a9d096ea55839269fe6fce14d4f11ea2cbf05336. All recovery assets preserved.
+Development tracked files are clean; pre-existing untracked restoration doc
+was retained and not staged. This live checkpoint pointer is documentation only.
+
+NEXT PRIORITY: hosted-Codex M14G explicit opt-in for new family financial sharing.
+Verified model flags default True and invite API ignores sharing choices; actual
+financial scope honors stored flag. Inspect existing relevant flow/UI, add opt-in
+regression, preserve existing grants/history, implement minimal complete change.
+Any migration stays development/test only, not applied to the live private DB.
+Existing family-link baseline and isolated resume runner verified: 7 tests pass.
+
+Exact next command after Python-environment preflight and relevant test change:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File F:\ALFRED_DEV\isolated-tests\run-development-tests.ps1 -Labels tests.test_family_account_links
+Runner selects development worktree, explicit synthetic config, in-memory SQLite,
+locmem and disabled training. Do not repeat baseline without relevant changes.

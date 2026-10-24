@@ -11,6 +11,7 @@ import time
 import zipfile
 
 from django.conf import settings
+from alfred_private_storage import private_directory
 
 from .ocr_process import hidden_process_options, ocr_command
 from .upload_limits import DEFAULTS, UploadFormatError, UploadLimitExceeded, UploadProtectionUnavailable, check_document_resources, check_text_budget, limit, upload_deadline
@@ -33,7 +34,7 @@ def run_bounded_parser(kind, raw_bytes, filename, **options):
     if timeout <= 0:
         raise UploadLimitExceeded()
     with tempfile.TemporaryDirectory(prefix="alfred-parser-", dir=settings.FILE_UPLOAD_TEMP_DIR) as directory:
-        root = Path(directory)
+        root = private_directory(Path(directory))
         source = BytesIO(raw_bytes) if isinstance(raw_bytes, bytes) else raw_bytes
         position = source.tell()
         total = 0

@@ -1,12 +1,18 @@
 from datetime import timedelta
+from decimal import Decimal
+from collections.abc import Mapping
+from math import isfinite
 
 from django.utils import timezone
 from rest_framework import serializers
+from apps.expenses.money import NumericMoneySerializerField, money_float
 
 from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto
 
 
 class BikeProfileSerializer(serializers.ModelSerializer):
+    estimated_market_value = NumericMoneySerializerField(required=False)
+    monthly_income_support = NumericMoneySerializerField(required=False)
     verification_status_label = serializers.CharField(source="get_verification_status_display", read_only=True)
     vehicle_type_label = serializers.CharField(source="get_vehicle_type_display", read_only=True)
     usage_pattern_label = serializers.CharField(source="get_usage_pattern_display", read_only=True)
@@ -63,6 +69,7 @@ class BikeProfileSerializer(serializers.ModelSerializer):
 
 
 class BikeServiceRecordSerializer(serializers.ModelSerializer):
+    cost = NumericMoneySerializerField(required=False)
     service_type_label = serializers.CharField(source="get_service_type_display", read_only=True)
     source_mode_label = serializers.CharField(source="get_source_mode_display", read_only=True)
     bike_profile_name = serializers.CharField(source="bike_profile.display_name", read_only=True)
@@ -114,6 +121,7 @@ class BikeServiceRecordSerializer(serializers.ModelSerializer):
 
 
 class FuelRefillLogSerializer(serializers.ModelSerializer):
+    total_cost = NumericMoneySerializerField(required=False)
     bike_profile_name = serializers.CharField(source="bike_profile.display_name", read_only=True)
     bike_profile = serializers.PrimaryKeyRelatedField(queryset=BikeProfile.objects.all(), allow_null=True, required=False)
     actual_mileage_kmpl = serializers.SerializerMethodField()
@@ -149,12 +157,12 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
     def get_actual_mileage_kmpl(self, obj):
         if not obj.fuel_liters or not obj.trip_meter_km:
             return 0
-        return round((obj.trip_meter_km or 0) / max(obj.fuel_liters, 0.01), 2)
+        return round(obj.trip_meter_km / obj.fuel_liters, 2)
 
     def get_fuel_price_per_liter(self, obj):
         if not obj.fuel_liters:
             return 0
-        return round((obj.total_cost or 0) / max(obj.fuel_liters, 0.01), 2)
+        return money_float(Decimal(str(obj.total_cost or 0)) / Decimal(str(obj.fuel_liters)))
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -163,6 +171,10 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
         odometer_km = attrs.get("odometer_km", getattr(self.instance, "odometer_km", None))
         trip_meter_km = attrs.get("trip_meter_km", getattr(self.instance, "trip_meter_km", 0))
         fuel_liters = attrs.get("fuel_liters", getattr(self.instance, "fuel_liters", 0))
+
+        for field, value in (("trip_meter_km", trip_meter_km), ("fuel_liters", fuel_liters)):
+            if value is None or not isfinite(value):
+                raise serializers.ValidationError({field: "Measurement must be finite."})
 
         if request is not None and bike_profile and bike_profile.user_id != request.user.id:
             raise serializers.ValidationError({"bike_profile": "You can only use your own saved vehicle profiles."})
@@ -174,10 +186,18 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"trip_meter_km": "Trip value cannot be negative."})
         if fuel_liters is None or fuel_liters <= 0:
             raise serializers.ValidationError({"fuel_liters": "Fuel liters must be greater than zero."})
+        total_cost = attrs.get("total_cost", getattr(self.instance, "total_cost", 0))
+        if not isfinite(trip_meter_km / fuel_liters) or not isfinite(float(Decimal(str(total_cost)) / Decimal(str(fuel_liters)))):
+            raise serializers.ValidationError({"fuel_liters": "The entered measurements produce a result outside the supported numeric range."})
         return attrs
 
     def to_internal_value(self, data):
+        if not isinstance(data, Mapping):
+            return super().to_internal_value(data)
         normalized = data.copy()
+        for field in ("trip_meter_km", "fuel_liters"):
+            if isinstance(normalized.get(field), bool):
+                raise serializers.ValidationError({field: "Measurement must be numeric, not a boolean."})
         for field in ("bike_profile", "odometer_km", "trip_meter_km", "fuel_liters", "total_cost", "station_name", "notes"):
             if normalized.get(field) == "":
                 normalized[field] = None if field == "odometer_km" else (0 if field in {"trip_meter_km", "fuel_liters", "total_cost"} else "")
@@ -185,6 +205,7 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
 
 
 class TravelPlanSerializer(serializers.ModelSerializer):
+    budget = NumericMoneySerializerField(required=False)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     transport_mode_label = serializers.CharField(source="get_transport_mode_display", read_only=True)
     duration_days = serializers.IntegerField(read_only=True)
@@ -248,6 +269,7 @@ class TravelPlanSerializer(serializers.ModelSerializer):
 
 
 class TripLogSerializer(serializers.ModelSerializer):
+    spend_amount = NumericMoneySerializerField(required=False)
     travel_plan_title = serializers.CharField(source="travel_plan.title", read_only=True)
 
     class Meta:
@@ -285,6 +307,7 @@ class TripLogSerializer(serializers.ModelSerializer):
 
 
 class TripPhotoSerializer(serializers.ModelSerializer):
+    image = serializers.ImageField()
     travel_plan_title = serializers.CharField(source="travel_plan.title", read_only=True, default="Unassigned")
     trip_log_title = serializers.CharField(source="trip_log.title", read_only=True)
     photo_url = serializers.SerializerMethodField()
@@ -343,10 +366,15 @@ class TripPhotoSerializer(serializers.ModelSerializer):
         if (latitude is None) != (longitude is None):
             raise serializers.ValidationError("Provide both latitude and longitude together.")
 
+        if latitude is not None and (not isfinite(latitude) or not isfinite(longitude)
+                                     or not -90 <= latitude <= 90 or not -180 <= longitude <= 180):
+            raise serializers.ValidationError("Provide finite latitude (-90 to 90) and longitude (-180 to 180).")
+
         return attrs
 
 
 class BikeIssueReportSerializer(serializers.ModelSerializer):
+    projected_cost = NumericMoneySerializerField(read_only=True)
     system_label = serializers.CharField(source="get_system_display", read_only=True)
     severity_label = serializers.CharField(source="get_severity_display", read_only=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
@@ -358,7 +386,7 @@ class BikeIssueReportSerializer(serializers.ModelSerializer):
     travel_plan = serializers.PrimaryKeyRelatedField(queryset=TravelPlan.objects.all(), allow_null=True, required=False)
     odometer_km = serializers.IntegerField(allow_null=True, required=False)
     next_action_at = serializers.DateTimeField(allow_null=True, required=False)
-    actual_cost = serializers.FloatField(allow_null=True, required=False)
+    actual_cost = NumericMoneySerializerField(allow_null=True, required=False)
 
     class Meta:
         model = BikeIssueReport
@@ -436,6 +464,7 @@ class BikeIssueReportSerializer(serializers.ModelSerializer):
 
 
 class BikeDocumentSerializer(serializers.ModelSerializer):
+    premium_amount = NumericMoneySerializerField(required=False)
     document_type_label = serializers.CharField(source="get_document_type_display", read_only=True)
     verification_status_label = serializers.CharField(source="get_verification_status_display", read_only=True)
     parser_status_label = serializers.CharField(source="get_parser_status_display", read_only=True)
@@ -500,6 +529,9 @@ class BikeDocumentSerializer(serializers.ModelSerializer):
         return obj.document_file.url
 
     def validate(self, attrs):
+        receipt = (getattr(self.instance, "extracted_payload", None) or {}).get("service_import_receipt")
+        if receipt and ("document_file" in attrs or ("bike_profile" in attrs and attrs["bike_profile"] != self.instance.bike_profile)):
+            raise serializers.ValidationError("Imported invoice source and vehicle links cannot be replaced. Upload a separate document or use document review corrections.")
         request = self.context.get("request")
         issue_date = attrs.get("issue_date", getattr(self.instance, "issue_date", None))
         expiry_date = attrs.get("expiry_date", getattr(self.instance, "expiry_date", None))
@@ -513,7 +545,9 @@ class BikeDocumentSerializer(serializers.ModelSerializer):
         return attrs
 
     def to_internal_value(self, data):
-        normalized = data.copy()
+        if not isinstance(data, Mapping):
+            return super().to_internal_value(data)
+        normalized = dict(data.items())
         for field in ("issue_date", "expiry_date", "document_number", "issuer", "vehicle_number", "notes"):
             if normalized.get(field) == "":
                 normalized[field] = None if field in {"issue_date", "expiry_date"} else ""

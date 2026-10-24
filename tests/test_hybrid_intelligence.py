@@ -130,7 +130,8 @@ class HybridIntelligenceTests(TestCase):
             invite_code_hint='SYN',expires_at=timezone.now()+timedelta(days=1),share_financial_summary=False)
         self.local.reason.return_value='Synthetic hypothesis: a fabricated balance of 999999.'
         result=self.answer('finance',scope='finance')
-        facts=result['sources'][0]['data']; self.assertEqual(facts['liquid_cash'],1234)
+        facts=result['sources'][0]['data']; self.assertIsNone(facts['liquid_cash'])
+        self.assertEqual(facts['amounts']['liquid_cash']['evidence_status'],'unavailable')
         self.assertIn('metric_states',facts); self.assertFalse(result['financial_authority'])
         self.assertEqual(BankAccount.objects.get(user=self.alice).current_balance,1234)
         self.assertNotIn('9000',str(self.local.reason.call_args))

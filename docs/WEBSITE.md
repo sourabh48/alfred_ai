@@ -1,5 +1,7 @@
 # Website and search visibility
 
+**Scope — 2026-10-15:** GitHub master is source-synchronized at 3932f391. GitHub Pages publishes documentation only; a successful Pages deployment does not prove backend/browser/native CI or a cloud-hosted ALFRED runtime. Search Console ownership/indexing and actual current search visibility remain unverified. Product capability/acceptance claims should follow the [matrix](PROJECT_STATUS.md), without model-accuracy or live-provider claims.
+
 Product website: https://sourabh48.github.io/alfred_ai/
 
 Installation guide: https://sourabh48.github.io/alfred_ai/guide/

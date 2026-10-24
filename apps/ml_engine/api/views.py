@@ -59,9 +59,13 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
 
     def get(self, request):
         from apps.loans.models import LoanClosureDocument
+        from apps.expenses.services.statement_evidence import choices
+        from apps.ml_engine.services.canonical_evidence import choices as financial_choices
         intelligence = {} if request.query_params.get('assistant_status') == '1' else dict(build_financial_intelligence(request.user))
         intelligence['assistant_documents']=[{'id':identity,'label':f'Verified loan closure #{identity}'} for identity in
             LoanClosureDocument.objects.filter(loan__user=request.user,verification_status='verified').order_by('-id').values_list('id',flat=True)[:20]]
+        intelligence['assistant_statement_records']=choices(request.user)
+        intelligence['assistant_financial_records']=financial_choices(request.user)
         if request.query_params.get('assistant_status') == '1':
             import time
             try:
@@ -72,16 +76,45 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
         return Response(intelligence)
 
     def post(self,request):
-        data=self.payload(('query','scope','document_id','cloud_consent','query_sensitivity'))
-        return Response(hybrid_answer(memory_store(),request.user,data.get('query'),scope=data.get('scope','general'),
-            document_id=data.get('document_id'),cloud_consent=data.get('cloud_consent',False),
-            query_sensitivity=data.get('query_sensitivity','sensitive')))
-
-
-class SelfImproveAPI(APIView):
-    def get(self, request):
-        from apps.ml_engine.self_improve.advanced_engine import self_improve_engine
-        result = self_improve_engine.run_full_analysis()
+        data=self.payload(('query','scope','document_id','transaction_id','record_type','record_id','selected_documents','source_catalog','selected_records','cloud_consent','query_sensitivity',
+                           'conversation_id','conversation_revision','request_id'))
+        document_question=data.get('scope')=='financial_document'
+        if document_question:
+            from .conversations import current_session
+            current_session(request)
+            if data.get('conversation_id') is not None: raise ValueError('Document-question persistence is not supported.')
+        store = None if document_question else memory_store()
+        identity = data.get('conversation_id')
+        history_fields = {'conversation_id','conversation_revision','request_id'}
+        if identity is None and history_fields & set(data): raise ValueError()
+        if identity is not None:
+            from .conversations import current_session
+            from ..services.conversation_history import ConversationHistory, ConversationPermission
+            if data.get('cloud_consent', False) is not False: raise ConversationPermission()
+            current_session(request)
+            history = ConversationHistory(store)
+            question = dict(query=data.get('query'), scope=data.get('scope','general'), document_id=data.get('document_id'))
+            if 'transaction_id' in data: question['transaction_id']=data['transaction_id']
+            for key in ('record_type','record_id','selected_documents','source_catalog'):
+                if key in data: question[key]=data[key]
+            generation, saved = history.prepare(request.user, identity, data.get('conversation_revision'), data.get('request_id'), question)
+            if saved:
+                record = history.get(request.user, identity)
+                current_session(request)
+                return Response({**saved, 'historical':True, 'conversation':{'id':identity, 'revision':record['revision']}})
+        try:
+            result = hybrid_answer(store,request.user,data.get('query'),scope=data.get('scope','general'),
+                document_id=data.get('document_id'),transaction_id=data.get('transaction_id'),record_type=data.get('record_type'),record_id=data.get('record_id'),
+                selected_documents=data.get('selected_documents'),source_catalog=data.get('source_catalog'),selected_records=data.get('selected_records'),cloud_consent=data.get('cloud_consent',False),
+                query_sensitivity=data.get('query_sensitivity','sensitive'))
+        finally:
+            if document_question: current_session(request)
+        if identity is not None:
+            current_session(request)
+            revision = data.get('conversation_revision')
+            if result['provider']!='local_evidence':
+                revision = history.append(request.user, identity, revision, data.get('request_id'), question, result, generation)
+            result = {**result, 'conversation':{'id':identity, 'revision':revision}, 'conversation_saved':result['provider']!='local_evidence'}
         return Response(result)
 
 

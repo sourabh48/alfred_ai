@@ -1,0 +1,132 @@
+from copy import deepcopy
+from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from rest_framework.test import APIClient
+
+from apps.expenses.models import BankAccount, Expense, StatementUpload
+from apps.expenses.serializers import ExpenseSerializer
+
+
+class ExpenseCorrectionTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="correction-owner")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.account = BankAccount.objects.create(user=self.user, account_number="CORRECTION1", current_balance="80.00")
+        self.upload = StatementUpload.objects.create(user=self.user, bank_account=self.account, file_name="synthetic.pdf")
+        self.context = {"request": SimpleNamespace(user=self.user)}
+        predictor = patch("apps.expenses.services.transaction_intelligence.alfred_engine.predict_emotional_spend", return_value={"confidence": .1, "is_emotional": False})
+        predictor.start()
+        self.addCleanup(predictor.stop)
+        serializer = ExpenseSerializer(data={
+            "amount": "2.675", "closing_balance": "10.005", "bank_account": self.account.pk,
+            "source": "bank_statement", "transaction_date": "2026-09-01",
+            "classification": "expense", "category": "health", "payment_mode": "BANK",
+            "merchant": "Owner corrected merchant", "description": "Owner corrected description",
+            "raw_description": "UPI SAMPLE MERCHANT", "external_reference": "OWNER-REF",
+            "counterparty": "Owner counterparty", "company_name": "Owner company",
+        }, context=self.context)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.row = serializer.save(user=self.user, statement_upload=self.upload)
+
+    def test_partial_correction_preserves_omitted_owner_values_and_identity(self):
+        fields = ("classification", "category", "payment_mode", "merchant", "description", "raw_description",
+                  "external_reference", "counterparty", "company_name", "transaction_fingerprint", "transaction_identity")
+        before = {field: deepcopy(getattr(self.row, field)) for field in fields}
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"amount": "2.68"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.row.refresh_from_db()
+        self.assertEqual({field: getattr(self.row, field) for field in fields}, before)
+        self.assertEqual(self.row.amount, Decimal("2.68"))
+
+    def test_editable_description_does_not_replace_import_text_or_fingerprint(self):
+        before = self.row.transaction_fingerprint
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"description": "New owner note", "merchant": "New owner merchant"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.row.refresh_from_db()
+        self.assertEqual(self.row.description, "New owner note")
+        self.assertEqual(self.row.merchant, "New owner merchant")
+        self.assertEqual(self.row.raw_description, "UPI SAMPLE MERCHANT")
+        self.assertEqual(self.row.transaction_fingerprint, before)
+
+    def test_correction_can_explicitly_clear_optional_owner_labels(self):
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"merchant": "", "counterparty": "", "company_name": ""}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.row.refresh_from_db()
+        self.assertEqual((self.row.merchant, self.row.counterparty, self.row.company_name), ("", "", ""))
+
+    def test_import_cannot_be_relinked_or_relabelled_and_rejections_are_atomic(self):
+        second = BankAccount.objects.create(user=self.user, account_number="CORRECTION2", current_balance="45.00")
+        for payload in ({"bank_account": second.pk}, {"bank_account": None}, {"source": "manual"}):
+            with self.subTest(payload=payload):
+                response = self.client.patch(f"/api/expenses/{self.row.pk}/", {**payload, "amount": "500.00"}, format="json")
+                self.assertEqual(response.status_code, 400)
+                self.row.refresh_from_db()
+                self.assertEqual((self.row.bank_account_id, self.row.statement_upload_id, self.row.source, self.row.amount),
+                                 (self.account.pk, self.upload.pk, "bank_statement", Decimal("2.68")))
+        second.refresh_from_db()
+        self.assertEqual(second.current_balance, Decimal("45.00"))
+
+    def test_import_accepts_same_parent_and_source_and_manual_entry_can_move(self):
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"bank_account": self.account.pk, "source": "bank_statement", "category": "food"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        manual = Expense.objects.create(user=self.user, amount="4.00")
+        response = self.client.patch(f"/api/expenses/{manual.pk}/", {"bank_account": self.account.pk}, format="json")
+        self.assertEqual(response.status_code, 200)
+        manual.refresh_from_db()
+        self.assertEqual(manual.bank_account_id, self.account.pk)
+
+    def test_foreign_owner_cannot_edit_or_supply_an_account(self):
+        other = get_user_model().objects.create_user(username="correction-other")
+        account = BankAccount.objects.create(user=other, account_number="FOREIGN")
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"bank_account": account.pk}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.client.force_authenticate(other)
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"amount": "1.00"}, format="json")
+        self.assertEqual(response.status_code, 404)
+
+    def test_unrelated_and_unchanged_balance_corrections_keep_account_snapshot(self):
+        for payload in ({"category": "food"}, {"amount": "3.335"}, {"closing_balance": "10.01"}, {"closing_balance": None}):
+            with self.subTest(payload=payload):
+                response = self.client.patch(f"/api/expenses/{self.row.pk}/", payload, format="json")
+                self.assertEqual(response.status_code, 200)
+                self.account.refresh_from_db()
+                self.assertEqual(self.account.current_balance, Decimal("80.00"))
+                self.assertIsNone(self.account.last_synced_at)
+
+    def test_historical_balance_correction_does_not_replace_newer_account_snapshot(self):
+        Expense.objects.create(user=self.user, bank_account=self.account, amount="1.00", closing_balance="70.00", transaction_date="2026-09-02")
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"closing_balance": "15.005"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.row.refresh_from_db()
+        self.account.refresh_from_db()
+        self.assertEqual(self.row.closing_balance, Decimal("15.01"))
+        self.assertEqual(self.account.current_balance, Decimal("80.00"))
+
+    def test_latest_explicit_balance_correction_syncs_exact_cents_and_zero(self):
+        for raw, expected in (("99.995", "100.00"), ("0", "0.00")):
+            with self.subTest(raw=raw):
+                response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"closing_balance": raw}, format="json")
+                self.assertEqual(response.status_code, 200)
+                self.row.refresh_from_db()
+                self.account.refresh_from_db()
+                self.assertEqual((self.row.closing_balance, self.account.current_balance), (Decimal(expected), Decimal(expected)))
+
+    def test_same_day_later_transaction_keeps_balance_authority(self):
+        Expense.objects.create(user=self.user, bank_account=self.account, amount="1.00", closing_balance="70.00", transaction_date=self.row.transaction_date)
+        response = self.client.patch(f"/api/expenses/{self.row.pk}/", {"closing_balance": "15.00"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.account.refresh_from_db()
+        self.assertEqual(self.account.current_balance, Decimal("80.00"))
+
+    def test_failed_explicit_balance_posting_rolls_back_correction(self):
+        with patch("apps.expenses.views.sync_account_balance", side_effect=ValueError("synthetic posting failure")):
+            with self.assertRaises(ValueError):
+                self.client.patch(f"/api/expenses/{self.row.pk}/", {"closing_balance": "20.00"}, format="json")
+        self.row.refresh_from_db()
+        self.account.refresh_from_db()
+        self.assertEqual((self.row.closing_balance, self.account.current_balance), (Decimal("10.01"), Decimal("80.00")))

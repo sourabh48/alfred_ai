@@ -20,8 +20,12 @@ from apps.mobility.models import BikeDocument
 class UploadPrivacyRetentionTests(TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
+        throttles = self.enterContext(tempfile.TemporaryDirectory(prefix="alfred-upload-privacy-throttles-"))
+        from alfred_private_storage import private_directory
+        private_directory(throttles)
         self.override = override_settings(
             MEDIA_ROOT=self.tempdir.name,
+            ALFRED_ABUSE_THROTTLE_DIR=throttles,
             ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=True,
         )
         self.override.enable()

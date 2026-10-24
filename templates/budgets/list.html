@@ -59,6 +59,7 @@
         <div class="surface-card h-100">
             <h2 class="page-section-title">Forward View</h2>
             <p class="page-section-copy mb-3">Planning estimate from recent living costs, with income and fixed bills held constant. Remaining income is before investments, card payments and unrecorded bills. This is not a trained-model prediction.</p>
+            <div id="budgetForecastEvidence" class="small muted mb-3"></div>
             <canvas id="budgetForecastChart" height="150"></canvas>
             <div class="mt-4 data-stack" id="budgetAffordabilityPanel"></div>
         </div>
@@ -69,7 +70,7 @@
     <div class="col-xl-7">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Category Pressure</h2>
-            <p class="page-section-copy mb-3">Suggested limits versus actual spend across the categories ALFRED is tracking.</p>
+            <p class="page-section-copy mb-3">Suggested limits versus recorded living spend. Category weights and city adjustments are planning assumptions, not verified local prices. Limits reconcile to the plan when allocation weights are available.</p>
             <div class="table-responsive">
                 <table class="table table-alfred align-middle mb-0 metric-table">
                     <thead>
@@ -89,7 +90,7 @@
     <div class="col-xl-5">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Budget Recommendations</h2>
-            <p class="page-section-copy mb-3">Budget moves generated from income, debt load, and live spending patterns.</p>
+            <p class="page-section-copy mb-3">Guidance uses recorded income, fixed obligations and spending. A daily plan limit does not confirm affordability; allow separately for savings and unrecorded bills.</p>
             <ul class="insight-list mb-4" id="budgetSuggestionList"></ul>
             <div>
                 <h3 class="h6 fw-bold mb-3">Daily Budget Guide</h3>

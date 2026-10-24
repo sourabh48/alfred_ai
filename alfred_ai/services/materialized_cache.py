@@ -54,7 +54,7 @@ MATERIALIZED_PAYLOAD_REGISTRY = (
         "ttl_seconds": 45,
     },
     {
-        "namespace": "financial-baseline",
+        "namespace": "financial-baseline-display-v1",
         "path": "internal canonical baseline service",
         "owner": "expenses",
         "ttl_seconds": 45,

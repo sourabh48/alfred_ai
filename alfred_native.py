@@ -20,6 +20,7 @@ import urllib.error
 import urllib.request
 import uuid
 import webbrowser
+from alfred_private_storage import private_directory
 
 
 FROZEN = getattr(sys, "frozen", False)
@@ -35,9 +36,9 @@ def data_directory(value=None):
 
 
 def runtime_directory(data):
+    private_directory(data)
     path = data / "artifacts" / "native"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return private_directory(path)
 
 
 def write_json(path, payload):
@@ -94,10 +95,10 @@ def spawn(command, data, *extra):
 
 def configure(data):
     """Run before importing Django, the project, or any task module."""
-    data.mkdir(parents=True, exist_ok=True)
+    private_directory(data)
     runtime_directory(data)
     config = data / "config"
-    config.mkdir(exist_ok=True)
+    private_directory(config)
     # Choose the backend before importing any alfred_ai module: its package
     # initializer otherwise starts Celery before native settings are selected.
     os.environ.update({
@@ -349,8 +350,12 @@ def stop(data):
         while time.monotonic() < deadline:
             current = read_state(data)
             if current.get("status") == "stopped":
-                print("ALFRED stopped. Your data and queued jobs are saved.")
-                return 0
+                try:
+                    with InstanceLock(data), InstanceLock(data, "worker.lock"):
+                        print("ALFRED stopped. Your data and queued jobs are saved.")
+                        return 0
+                except OSError:
+                    pass  # Status can be published just before the writer releases its lock.
             time.sleep(0.5)
         print("Shutdown requested. ALFRED will stop after its current jobs finish.")
         return 1

@@ -1,4 +1,5 @@
 from io import BytesIO
+from decimal import Decimal
 from unittest.mock import patch
 
 import fitz
@@ -1486,7 +1487,7 @@ class DocumentReviewAndRetryTests(TestCase):
         self.assertEqual(record.service_center, "Jagadamba Automobiles")
         self.assertEqual(str(record.service_date), "2026-03-31")
         self.assertEqual(record.odometer_km, 26021)
-        self.assertAlmostEqual(record.cost, 2432.92)
+        self.assertEqual(record.cost, Decimal('2432.92'))
         self.assertIn("brake inspection", record.extracted_work_summary.lower())
         self.assertEqual(record.parsed_payload["service_payload"]["parts_items"][0]["description"], "Brake Pad Kit")
         self.assertEqual(record.parsed_payload["service_payload"]["labour_items"][0]["description"], "Periodic Service Labour")

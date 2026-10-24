@@ -19,6 +19,8 @@ import sqlite3
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from alfred_private_storage import private_directory, protect
 TARGETS = [("investments", "0004_investment_money_decimal"), ("expenses", "0005_expense_bank_money_decimal")]
 REGISTERS = {
     "investments_investment": ("Investment", "investment", ("invested_amount", "monthly_sip", "current_value")),
@@ -127,9 +129,9 @@ def main():
     if output == source.parent or source.parent in output.parents or output == ROOT or ROOT in output.parents:
         raise ValueError("Output must be outside the source runtime and repository.")
     output.mkdir(parents=True, exist_ok=False)
+    private_directory(output)
     captured = source_hashes(source)
-    shadow = output / "source-shadow"
-    shadow.mkdir()
+    shadow = private_directory(output / "source-shadow")
     for name in captured:
         shutil.copy2(source.parent / name, shadow / name)
     assert captured == source_hashes(source), "Source changed during capture; retain evidence and retry a fresh capture"
@@ -137,14 +139,13 @@ def main():
     original_rows, original_fk = read_database(shadow / source.name)
     backup = output / "fresh-pre-migration-backup.sqlite3"
     copy_database(shadow / source.name, backup)
+    protect(backup)
     before, backup_fk = read_database(backup)
     assert database_digests(before) == database_digests(original_rows) and backup_fk == original_fk, "Fresh backup failed logical reconciliation"
-    runtime = output / "rehearsal-runtime"
-    runtime.mkdir()
+    runtime = private_directory(output / "rehearsal-runtime")
     rehearsal = runtime / "db.sqlite3"
     copy_database(backup, rehearsal)
     os.environ.update(ALFRED_LOCAL_RUNTIME="true", ALFRED_AUTO_TRAIN_ON_STARTUP="false", ALFRED_DATA_DIR=str(runtime), DATABASE_URL="sqlite:///" + rehearsal.as_posix(), CACHE_BACKEND="django.core.cache.backends.locmem.LocMemCache", CACHE_LOCATION="money-rehearsal", DJANGO_SECRET_KEY="disposable-rehearsal-key-only", DJANGO_SETTINGS_MODULE="alfred_ai.settings")
-    sys.path.insert(0, str(ROOT))
     import django
     django.setup()
     from django.db import connection

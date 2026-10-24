@@ -1,5 +1,7 @@
 # M15 hybrid intelligence
 
+**Current scope — 2026-10-15:** Ollama-first conversation/evidence UI and controlled finance source cards are deployed at 3932f391. General chat history is not persisted; owned memories, six canonical finance metrics, Travel preferences and verified closure projections are the grounding scope. Missing currency is labelled unrecorded; unsupported numeric/currency prose is suppressed. Broader document/cross-module tools need a scoped follow-up. OpenAI remains disabled. [Matrix](PROJECT_STATUS.md).
+
 Development only, synthetic acceptance; no live M14 deployment or private uploads.
 
 The existing Insights endpoint now accepts POST questions alongside its unchanged

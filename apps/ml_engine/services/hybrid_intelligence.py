@@ -1,5 +1,6 @@
 """Ollama-first Insights reasoning; read-only sources, explicit public cloud fallback."""
 import json
+from datetime import date
 import re
 import time
 from unicodedata import category
@@ -44,18 +45,62 @@ class OllamaReasoner(OllamaEmbeddings):
         return message['content']
 
 
-def source_context(user,scope,document_id=None):
+def _iso_date(value):
+    if not isinstance(value,str): return None
+    try: parsed=date.fromisoformat(value).isoformat()
+    except ValueError: return None
+    return value if value==parsed else None
+
+
+def _statement_period(data):
+    start,end=(_iso_date(data.get(key)) for key in ('statement_start','statement_end'))
+    original=tuple(_iso_date(data.get(key)) for key in ('original_statement_start','original_statement_end'))
+    recorded=_iso_date(data.get('transaction_date'))
+    if (not start or not end or start>end or original!=(start,end)
+            or recorded is None or not start<=recorded<=end):
+        return None
+    return f'{start} through {end} (inclusive)'
+
+
+def _transaction_direction(data):
+    labels={'debit':'Debit (money out of this account)','credit':'Credit (money into this account)'}
+    direction=data.get('direction')
+    if not isinstance(direction,str) or direction not in labels or data.get('original_direction')!=direction:
+        return None
+    transfer=(' Recorded category: Transfer. This label does not establish a matched transfer or its other account.'
+        if data.get('category')=='transfer' else ' Transfer linkage is not established.')
+    return labels[direction]+'.'+transfer+' Reversal status is not established; direction alone does not prove income, spending or a refund.'
+
+
+def source_context(user,scope,document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None):
     if scope=='general': return []
+    if scope=='financial_document':
+        from .canonical_evidence import document_record_sources
+        return document_record_sources(user,record_type,document_id,selected_records,source_catalog)
+    if scope=='financial_records':
+        from .canonical_evidence import record_source
+        return [record_source(user,record_type,record_id,selected_documents=selected_documents,source_catalog=source_catalog)]
+    if scope=='bank_statements':
+        from apps.expenses.services.statement_evidence import evidence
+        record=evidence(user,transaction_id)
+        original=record['original'] if isinstance(record['original'],dict) else {}
+        data={**record['statement'], 'transaction_date':record['current']['transaction_date'],
+            'original_transaction_date':_iso_date(original.get('transaction_date')),
+            'original_direction':original.get('direction') if original.get('direction') in ('debit','credit') else None,
+            'original_statement_start':_iso_date(original.get('statement_start')),
+            'original_statement_end':_iso_date(original.get('statement_end')),
+            'verification':record['verification'], 'original_status':record['original_status'],
+            'limitations':record['limitations'], 'amounts':{}}
+        if record['verification']=='owner_confirmed':
+            data.update({key:record['current'][key] for key in ('direction','category','classification')})
+            data['amounts']={key:{'amount':record['current'][key], 'currency':None,
+                'currency_status':'not_recorded', 'evidence_status':'unavailable' if record['current'][key] is None else 'owner_confirmed'} for key in ('amount','closing_balance')}
+        return [{'ref':f"bank-statement-{record['statement']['document_id']}-transaction-{record['transaction_id']}",
+            'classification':'owner_confirmed_statement_record' if record['verification']=='owner_confirmed' else 'unverified_statement_record',
+            'url':record['citation_url'], 'verified_at':record['verified_at'], 'revision':record['revision'], 'data':data}]
     if scope=='finance':
-        from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
-        baseline=resolve_canonical_financial_baseline(user)
-        keys=('monthly_income','liquid_cash','recurring_emi_burden','total_assets','total_liabilities','net_worth')
-        data={key:baseline[key] for key in keys}
-        data['metric_states']={key:baseline['metric_states'][key] for key in keys}
-        data['amounts']={key:{'amount':baseline.get('decimal_amounts',{}).get(key) if data['metric_states'][key]['status']!='unavailable' else None,
-            'currency':None,'currency_status':'not_recorded','evidence_status':data['metric_states'][key]['status']} for key in keys}
-        return [{'ref':'canonical-finance','classification':'canonical_financial_baseline','url':'/expenses/',
-            'data':data}]
+        from .canonical_evidence import baseline_source
+        return [baseline_source(user)|{'ref':'canonical-finance','classification':'canonical_financial_baseline'}]
     if scope=='travel':
         from apps.mobility.models import TravelPreferenceProfile
         profile=TravelPreferenceProfile.objects.filter(user=user).first()
@@ -68,10 +113,27 @@ def source_context(user,scope,document_id=None):
     if LoanClosureDocument.objects.filter(loan_id=document.loan_id,verification_status='verified').exclude(
             closure_amount=document.closure_amount,closure_date=document.closure_date).exists():
         raise MemoryConflict('Verified closure evidence conflicts. Review the loan documents before asking again.')
-    return [{'ref':f'loan-closure-{document.pk}','classification':'verified_document_evidence','url':'/loans/',
+    from apps.expenses.services.statement_evidence import file_reference
+    from .canonical_evidence import _digest
+    from django.urls import reverse
+    status,fingerprint,download=file_reference(document.uploaded_file)
+    if document.uploaded_file and status!='available':
+        raise MemoryConflict('Retained closure source is unavailable; review the evidence before asking again.')
+    revision=_digest(dict(id=document.pk,loan=document.loan_id,owner=document.loan.user_id,
+        amount=str(document.closure_amount),date=document.closure_date,updated=document.updated_at,
+        verification=document.verification_status,file=fingerprint,file_name=document.uploaded_file.name))
+    return [{'ref':f'loan-closure-{document.pk}','classification':'verified_document_evidence',
+        'record_type':'loan_closure','record_id':document.pk,'revision':revision,
+        'as_of':document.closure_date.isoformat() if document.closure_date else None,
+        'source_file_status':status if document.uploaded_file else 'not_retained',
+        'source_download_url':download,
+        'url':reverse('loan_closure_evidence',kwargs={'document_id':document.pk}),
         'data':{'closure_amount':loan_money_float(document.closure_amount),
             'amounts':{'closure_amount':{'amount':format(loan_money(document.closure_amount),'.2f'),
-                'currency':None,'currency_status':'not_recorded','evidence_status':'verified'}},
+                'currency':None,'currency_status':'not_recorded','evidence_status':'verified',
+                'record_type':'loan_closure','record_id':document.pk,'revision':revision,
+                'as_of':document.closure_date.isoformat() if document.closure_date else None,
+                'provenance':'loans.LoanClosureDocument.closure_amount; recorded verification status'}},
             'closure_date':document.closure_date.isoformat() if document.closure_date else None}}]
 
 
@@ -81,7 +143,7 @@ def present_answer(result,scope,query=''):
     for source in result.get('sources',[]): claims=claims.replace(str(source['ref']),'')
     currency=any(category(char)=='Sc' for char in claims) or re.search(r'\b(?:INR|USD|EUR|GBP|JPY|AUD|CAD|CNY|CHF|dollars?|rupees?|euros?|pounds?|yen)\b',claims,re.I)
     intent=claims+' '+(query if scope=='general' else '')
-    financial=scope in ('finance','documents') or re.search(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',intent,re.I)
+    financial=scope in ('finance','documents','bank_statements','financial_records','financial_document') or re.search(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',intent,re.I)
     numbers=re.search(r'\d',claims)
     withheld=bool((currency and (numbers or financial)) or (financial and numbers))
     if withheld:
@@ -90,20 +152,96 @@ def present_answer(result,scope,query=''):
     return result
 
 
-def hybrid_answer(store,user,query,*,scope='general',document_id=None,cloud_consent=False,query_sensitivity='sensitive',local=None):
+def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None,cloud_consent=False,query_sensitivity='sensitive',local=None):
+    from .canonical_evidence import KINDS, supported_question, requested_record_field
     owner=_owner(user)
-    if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents')
+    if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents','bank_statements','financial_records','financial_document')
             or type(cloud_consent) is not bool or query_sensitivity not in ('public','personal','sensitive')
-            or (scope=='documents' and (type(document_id) is not int or document_id<1))
-            or (scope!='documents' and document_id is not None)):
+            or (scope in ('documents','financial_document') and (type(document_id) is not int or document_id<1))
+            or (scope not in ('documents','financial_document') and document_id is not None)
+            or (scope=='bank_statements' and (type(transaction_id) is not int or transaction_id<1))
+            or (scope!='bank_statements' and transaction_id is not None)
+            or (scope=='financial_records' and (record_type not in KINDS or type(record_id) is not int or record_id<1))
+            or (scope not in ('financial_records','financial_document') and (record_type is not None or record_id is not None or selected_documents is not None or source_catalog is not None))
+            or (scope=='financial_document' and (record_type not in ('expense','loan','investment') or record_id is not None or selected_documents is not None))
+            or (scope!='financial_document' and selected_records is not None)):
         raise ValueError('Choose a bounded question and an owned supported source.')
-    tools=source_context(user,scope,document_id)
+    if scope in ('bank_statements','financial_records','financial_document') and cloud_consent:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied('Private financial evidence is local only.')
+    tools=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
+    def revalidate():
+        from django.http import Http404
+        try: fresh=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
+        except Http404 as exc: raise MemoryConflict('Canonical source became inaccessible during inference.') from exc
+        if fresh!=tools: raise MemoryConflict('Canonical source changed during inference.')
+    field=requested_record_field(query,kind='expense' if scope=='bank_statements' else record_type) if scope in ('bank_statements','financial_records','financial_document') else None
+    period_query=requested_record_field(query,kind='expense')=='statement_period' or bool(
+        re.search(r'\bstatements?\b',query,re.I) and re.search(r'\bperiods?\b|\bdate range\b|\bstart and end\b',query,re.I))
+    direction_query=requested_record_field(query,kind='expense') in ('direction','transfer_status') or bool(
+        re.search(r'\b(?:directions?|debits?|credits?|transfers?|reversals?|reversed|refunds?)\b',query,re.I)
+        and re.search(r'\b(?:this|selected|transactions?|records?)\b',query,re.I))
+    metadata_field=field in ('transaction_date','category','classification','statement_period','direction','transfer_status')
+    field_values=[]
+    if metadata_field:
+        from apps.expenses.models import Expense
+        choices={'category':dict(Expense.CATEGORY_CHOICES),'classification':dict(Expense.CLASSIFICATION_CHOICES)}
+        for source in tools:
+            data=source['data']; value=data.get(field)
+            if field=='transaction_date': value=_iso_date(value)
+            elif field=='statement_period': value=_statement_period(data)
+            elif field in ('direction','transfer_status'):
+                value=_transaction_direction(data) if field=='direction' or data.get('category')=='transfer' else None
+            else: value=choices[field].get(value) if isinstance(value,str) else None
+            if (value is None or source['classification'] not in ('owner_confirmed_statement_record','owner_reviewed_document_record')
+                    or data.get('verification') not in ('owner_confirmed','owner_confirmed_document_fields')
+                    or data.get('original_status')!='retained_import_snapshot'
+                    or (field=='transaction_date' and _iso_date(data.get('original_transaction_date')) is None)):
+                field_values=[]; break
+            field_values.append((source['ref'],value))
+    if field=='statement_period' and (any(type(source['data'].get('document_id')) is not int or source['data']['document_id']<1 for source in tools)
+            or len({(source['data']['document_id'],value) for source,(_,value) in zip(tools,field_values)})!=1):
+        field_values=[]
+    missing_field=field and not metadata_field and any(tool['data'].get('amounts',{}).get(field,{}).get('amount') is None for tool in tools)
+    if ((period_query and field!='statement_period') or (direction_query and field not in ('direction','transfer_status')) or (metadata_field and not field_values)
+            or (scope in ('financial_records','financial_document','bank_statements') and (missing_field
+                or not supported_question(query,kind='expense' if scope=='bank_statements' else record_type)))
+            or (scope in ('financial_records','financial_document','finance') and any(not tool['available'] for tool in tools))):
+        return {'answer':('The statement period is unavailable. Choose one owner-reviewed statement with complete, consistent start and end dates. Missing, conflicting or ambiguous periods cannot be established from transaction or upload dates.' if period_query else
+                'This transaction request is not established by the selected evidence. A reviewed debit/credit must agree with its retained direction. A recorded Transfer category does not establish a paired transfer or another account. No reviewed reversal linkage is recorded; descriptions and amount signs are not proof.' if direction_query else
+                'This request is not established by available compatible evidence. Ask “Explain this record” to inspect recorded values and limitations. Forecasts, currency conversions, unknown-currency totals and unsupported questions are unavailable.'),
+            'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
+            'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}
+    if scope=='bank_statements' and tools[0]['data']['verification']!='owner_confirmed':
+        return {'answer':'This record is not currently supported by owner-confirmed source evidence. The source may be unreviewed, missing, incomplete or conflicting. Open the private citation and review it before asking again.',
+            'provider':'local_evidence','classification':'evidence_unavailable','financial_authority':False,
+            'grounding':'insufficient_evidence','sources':tools,'narrative_withheld':False,'context_omitted':0}
+    if field_values:
+        revalidate()
+        label={'transaction_date':'transaction dates','category':'transaction categories','classification':'transaction classifications','statement_period':'statement periods','direction':'transaction directions','transfer_status':'transfer labels and directions'}[field]
+        prefix='' if field in ('transaction_date','statement_period') else f'{field}: '
+        grounding={'transaction_date':'owner_confirmed_transaction_date','statement_period':'owner_confirmed_statement_period',
+            'direction':'owner_confirmed_transaction_direction','transfer_status':'owner_confirmed_transaction_direction'}.get(field,'owner_confirmed_transaction_classification')
+        return {'answer':f'Current recorded {label} (owner-confirmed; not independent bank authentication):\n'+
+                '\n'.join(f'{reference}: {prefix}{value}' for reference,value in field_values),
+            'provider':'local_evidence','classification':'owner_recorded_fact','financial_authority':False,
+            'grounding':grounding,
+            'sources':tools,'narrative_withheld':False,'context_omitted':0,
+            'memory_retrieval_available':None}
     retrieval_error=None
-    try: memories=store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
+    try: memories=[] if scope=='financial_document' else store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
     except EmbeddingUnavailable as exc:
         memories=[]
         retrieval_error=safe_error_details(exc,'Saved-memory retrieval is unavailable; this answer has no saved-memory grounding.',logger_name=__name__)
-    payload={'query':query,'sources':tools.copy()}; included=[]
+    # Filenames and private citation URLs are UI metadata, never model instructions.
+    model_tools=tools if scope not in ('bank_statements','financial_records','financial_document','finance','documents') else [{
+        'ref':source['ref'],'classification':source['classification'],
+        'data':{key:value for key,value in source['data'].items() if key in
+            ('transaction_date','statement_start','statement_end','verification','direction','category','classification',
+             'record_type','record_id','applicable_date','start_date','status','missed_payments','last_payment_date','last_applied_payment_date','closure_date')}
+            |{'amounts':{key:{field:value[field] for field in ('amount','currency','currency_status','evidence_status')}
+                for key,value in source['data']['amounts'].items()}}} for source in tools]
+    payload={'query':query,'sources':model_tools.copy()}; included=[]
     if len(json.dumps(payload,ensure_ascii=False,allow_nan=False).encode())>4096: raise ValueError('Select smaller local source context.')
     for item in memories:
         source={'ref':item['id'],'classification':'owner_verified_statement','data':item['content']}
@@ -116,13 +254,14 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,cloud_cons
         if not cloud_consent or query_sensitivity!='public' or scope!='general': raise
         return present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
             daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD),scope,query)
-    with store._transaction() as db:
-        store._expire(db,owner)
-        live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
-        if any(item['id'] not in live for item in included): raise MemoryConflict('Answer context changed during inference.')
-    if source_context(user,scope,document_id)!=tools: raise MemoryConflict('Canonical source changed during inference.')
+    if scope!='financial_document':
+        with store._transaction() as db:
+            store._expire(db,owner)
+            live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
+            if any(item['id'] not in live for item in included): raise MemoryConflict('Answer context changed during inference.')
+    revalidate()
     return present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
-        'memory_retrieval_available':retrieval_error is None,'retrieval_error':retrieval_error,
+        'memory_retrieval_available':None if scope=='financial_document' else retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
             'url':f"/settings/#memory-{item['id']}",'verified_at':item['verified_at'],
             'score':item['score']} for item in included]+tools,'context_omitted':len(memories)-len(included)},scope,query)

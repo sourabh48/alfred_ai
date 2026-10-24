@@ -1,5 +1,71 @@
 # Travel provider policy and architecture
 
+## Request telemetry retention
+
+Post-audit development only; this policy has not been deployed. It deletes only
+expired `TravelProviderRequest` telemetry. Saved plans, research evidence, cached
+provider results, financial records, owners and provider lease/backoff state remain.
+
+| Setting | Default | Allowed |
+| --- | --- | --- |
+| `TRAVEL_PROVIDER_REQUEST_RETENTION_DAYS` | 7 | 1–3650 days, non-network logs |
+| `TRAVEL_PROVIDER_NETWORK_RETENTION_DAYS` | 90 | 1–3650 days, network attempts |
+| `TRAVEL_PROVIDER_CLEANUP_BATCH_SIZE` | 1000 | 1–10000 rows per run |
+
+The current UTC billing month and at least the previous day of network attempts
+remain even with shorter retention, preserving existing minute/hour/day/month
+quotas. Active in-progress attempts are deferred while their provider lease is
+valid; expired abandoned attempts can age out. Old completed attempts can expire
+while a provider is busy. Cleanup is deterministic and restart-safe, oldest first.
+The result reports remaining/deferred counts; a partial batch does not claim that
+all expired rows have gone. Both source Celery beat and native Huey run it every
+15 minutes. Configuration errors fail before deletion.
+
+In an explicitly configured disposable runtime:
+
+```powershell
+& $python manage.py cleanup_travel_requests
+& $python manage.py cleanup_travel_requests --apply
+```
+
+The first command only previews safe counts. `--apply` deletes one bounded batch;
+repeat as needed. Production maintenance remains separately authorized. No command
+deletes or rewrites backups. Historical backups may retain expired telemetry.
+Full SQLite recovery checks include that table; post-start financial comparison
+excludes only this operational table.
+
+## Selective research refresh
+
+Post-audit development only. A specific follow-up such as **Refresh weather** or
+**Show cheaper hotels** scopes the research job to that category. The scope comes
+from the current message, not accumulated interests, and is not saved as a user
+preference. **Recheck Trip** still explicitly refreshes the whole trip. Existing
+provider quotas, backoff, shared leases, parameter validation and request limits
+apply to every network attempt, including forced refreshes.
+
+Unrelated providers use only their existing parameter/version/partition cache.
+Fresh results retain their original timestamps and become RECENTLY_VERIFIED;
+expired results remain CACHED with UNKNOWN confidence. A missing matching cache
+entry is unavailable (`refresh_not_requested`), not a fresh network result. Changed
+dates or route parameters cannot reuse an incompatible cache entry. Public web
+research remains bounded to three topics; the latest requested topic has priority.
+
+Rechecks reuse the saved destination, including explicitly selected coordinates,
+without discovering new destinations first. A changed pending scope gets a new
+revision, so an older job cannot overwrite the newer request. Edited itinerary
+days and budget allowances survive background rechecks.
+
+Date changes invalidate forecasts, offers, transport availability, permit/search
+leads and selected price snapshots on both candidate cards and the itinerary.
+Independent route/place evidence remains available with its actual expiry. The
+previous research banner is marked **Recheck needed**; it cannot claim a current
+forecast for the new dates. Historical evidence rows are retained. Plan/session
+updates roll back together if invalidation fails. These changes do not activate a
+provider, create a booking, alter canonical financial records or migrate a schema.
+Current validation and release limitations are in [Project Status](PROJECT_STATUS.md).
+
+**Provider status — 2026-10-15:** Code/fixture success is separate from configured and real-live-tested. No new provider credentials/calls were used in this audit. Open-Meteo current published free limits and Brave/Duffel/OpenAI pricing/retention are in the [current register](ALFRED_EXTERNAL_INTEGRATIONS.md); ORS account quotas and all contract-specific limits remain unverified. Keep old dated limits below as historical guidance. Never treat wiki/POIs/link-outs as booking or road-legality evidence.
+
 Policy review: 29 September 2026. ALFRED remains a local/LAN application. The
 planner sends public place/date/route search parameters, not conversations,
 vehicle registrations, private history or photographs, to providers. Put secrets

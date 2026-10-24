@@ -138,6 +138,14 @@ class ExpenseSerializer(serializers.ModelSerializer):
         user = getattr(self.context.get("request"), "user", None)
         if value is not None and (not user or value.user_id != user.pk):
             raise serializers.ValidationError("Choose one of your own bank accounts.")
+        if (self.instance is not None and self.instance.statement_upload_id
+                and getattr(value, "pk", None) != self.instance.bank_account_id):
+            raise serializers.ValidationError("An imported transaction must keep its original bank account.")
+        return value
+
+    def validate_source(self, value):
+        if self.instance is not None and self.instance.statement_upload_id and value != self.instance.source:
+            raise serializers.ValidationError("An imported transaction must keep its original source.")
         return value
 
     def validate_amount(self, value):

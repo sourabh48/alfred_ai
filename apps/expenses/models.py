@@ -183,6 +183,16 @@ class Expense(models.Model):
         return f"{self.user.username} | {self.classification} | {self.category} | {self.amount}"
 
 
+class StatementTransactionEvidence(models.Model):
+    expense = models.OneToOneField(Expense, on_delete=models.CASCADE, related_name="statement_evidence")
+    statement_upload = models.ForeignKey(StatementUpload, on_delete=models.CASCADE, related_name="transaction_evidence")
+    source_values = models.JSONField(default=dict, blank=True)
+    reviewed_revision = models.CharField(max_length=64, blank=True)
+    review_generation = models.PositiveBigIntegerField(default=0)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class ExpenseMoneySnapshot(models.Model):
     expense = models.ForeignKey(Expense, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
     original_expense_id = models.PositiveBigIntegerField(unique=True)

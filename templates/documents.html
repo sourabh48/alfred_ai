@@ -21,6 +21,37 @@
 
 <section class="soft-grid four-up mb-4" id="documentCenterCards"></section>
 
+<section class="surface-card mb-4" aria-labelledby="documentSourcesTitle" data-live-refresh-hold="true">
+    <h2 id="documentSourcesTitle" class="page-section-title">Review financial document sources</h2>
+    <p>Browse your bank, loan and investment files, then review their linked records. Only current owner-reviewed structured fields can ground local answers. Other documents and full-document Q&amp;A are unsupported. Confirmation does not authenticate a bank or broker, and no currency is inferred.</p>
+    <label class="form-label" for="documentSourcesKind">Document type</label>
+    <select id="documentSourcesKind" class="form-select mb-2">
+        <option value="expense">Bank statements</option><option value="loan">Loan imports</option><option value="investment">Investment imports</option>
+    </select>
+    <form id="documentSourcesFilters" method="post" autocomplete="off" class="mb-3">
+        {% csrf_token %}
+        <div class="row g-2">
+            <div class="col-md-6"><label class="form-label" for="documentSourcesName">Document name contains</label>
+                <input id="documentSourcesName" type="search" class="form-control" maxlength="128" aria-describedby="documentSourcesFilterHelp"></div>
+            <div class="col-md-3"><label class="form-label" for="documentSourcesFrom">Uploaded from (UTC)</label>
+                <input id="documentSourcesFrom" type="date" class="form-control" aria-describedby="documentSourcesFilterHelp"></div>
+            <div class="col-md-3"><label class="form-label" for="documentSourcesTo">Uploaded through (UTC)</label>
+                <input id="documentSourcesTo" type="date" class="form-control" aria-describedby="documentSourcesFilterHelp"></div>
+        </div>
+        <p id="documentSourcesFilterHelp" class="small my-2">Dates include the whole UTC day. Search matches displayed filenames, not document contents or storage paths. Apply filters to the document list before opening reviewed records. Filters stay on this page only; narrow the date range if the bounded catalog is too large.</p>
+        <div class="list-actions"><button id="documentSourcesApply" type="submit" class="btn btn-outline-primary">Apply filters</button>
+            <button id="documentSourcesClear" type="button" class="btn btn-outline-secondary">Clear filters</button></div>
+    </form>
+    <div class="list-actions mb-2">
+        <button type="button" id="documentSourcesRefresh" class="btn btn-outline-primary">Refresh sources</button>
+        <button type="button" id="documentSourcesDocuments" class="btn btn-outline-secondary" disabled>Back to documents</button>
+        <button type="button" id="documentSourcesPrevious" class="btn btn-outline-secondary" disabled>Previous page</button>
+        <button type="button" id="documentSourcesNext" class="btn btn-outline-secondary" disabled>Next page</button>
+    </div>
+    <p id="documentSourcesStatus" role="status" aria-live="polite"></p>
+    <div id="documentSourcesItems" class="data-stack" aria-busy="false"></div>
+</section>
+
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
@@ -263,5 +294,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/documents.js?v=2.4"></script>
+<script src="/static/js/documents.js?v=2.5"></script>
 {% endblock %}

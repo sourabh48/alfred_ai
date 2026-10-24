@@ -289,7 +289,11 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(env("ALFRED_MEDIA_ROOT", default=str(BASE_DIR / "media")))
+STORAGES = {
+    "default": {"BACKEND": "alfred_ai.storage.PrivateFileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 
 
 # ---------------------------------------------------------
@@ -335,7 +339,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("ALFRED_UPLOAD_FORM_BYTES", default=256 * 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 0
 FILE_UPLOAD_HANDLERS = [
     "alfred_ai.services.upload_limits.BoundedUploadHandler",
-    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+    "alfred_ai.services.upload_limits.PrivateTemporaryUploadHandler",
 ]
 
 
@@ -404,7 +408,15 @@ _require_production(
     "Production mode cannot enable CELERY_TASK_ALWAYS_EAGER.",
 )
 
+TRAVEL_PROVIDER_REQUEST_RETENTION_DAYS = env.int('TRAVEL_PROVIDER_REQUEST_RETENTION_DAYS', default=7)
+TRAVEL_PROVIDER_NETWORK_RETENTION_DAYS = env.int('TRAVEL_PROVIDER_NETWORK_RETENTION_DAYS', default=90)
+TRAVEL_PROVIDER_CLEANUP_BATCH_SIZE = env.int('TRAVEL_PROVIDER_CLEANUP_BATCH_SIZE', default=1000)
+
 CELERY_BEAT_SCHEDULE = {
+    "travel-request-cleanup": {
+        "task": "apps.mobility.tasks.cleanup_travel_request_history",
+        "schedule": timedelta(minutes=15),
+    },
     "travel-research-recovery": {
         "task": "apps.mobility.tasks.resume_travel_research",
         "schedule": timedelta(minutes=2),
@@ -450,6 +462,7 @@ ALFRED_FAMILY_LINK_CODE_TTL_HOURS = env.int("ALFRED_FAMILY_LINK_CODE_TTL_HOURS",
 ALFRED_MEMORY_DIR = str(Path(os.environ.get('ALFRED_DATA_DIR') or BASE_DIR) / 'artifacts' / 'private-memory-v2')
 ALFRED_MEMORY_SYNC_MOCK_DIR = env('ALFRED_MEMORY_SYNC_MOCK_DIR', default='')
 ALFRED_MEMORY_SYNC_PROVIDER = env('ALFRED_MEMORY_SYNC_PROVIDER', default='')
+# Retained neutral activation flag; it cannot reactivate the removed AWS provider.
 ALFRED_MEMORY_CLOUD_AUTHORIZED = env.bool('ALFRED_MEMORY_CLOUD_AUTHORIZED', default=False)
 ALFRED_MEMORY_MOCK_REASONING = env.bool('ALFRED_MEMORY_MOCK_REASONING', default=False)
 ALFRED_MEMORY_REASONING_DAILY_TOKENS = env.int('ALFRED_MEMORY_REASONING_DAILY_TOKENS', default=4096)
@@ -458,6 +471,9 @@ ALFRED_MEMORY_OPENAI_AUTHORIZED = env.bool('ALFRED_MEMORY_OPENAI_AUTHORIZED', de
 ALFRED_MEMORY_OPENAI_PRICING_DATE = env('ALFRED_MEMORY_OPENAI_PRICING_DATE', default='')
 ALFRED_MEMORY_OLLAMA_MODEL = env('ALFRED_MEMORY_OLLAMA_MODEL', default='qwen3.5:4b')
 ALFRED_MEMORY_RELEVANCE_MIN_SCORE = env.float('ALFRED_MEMORY_RELEVANCE_MIN_SCORE', default=0.20)
+ALFRED_SYNTHETIC_QUALITY_ENABLED = env.bool('ALFRED_SYNTHETIC_QUALITY_ENABLED', default=False)
+# Current-profile recovery/retention approval is separate from an owner's opt-in.
+ALFRED_CONVERSATION_HISTORY_AUTHORIZED = env.bool('ALFRED_CONVERSATION_HISTORY_AUTHORIZED', default=False)
 
 
 # ---------------------------------------------------------

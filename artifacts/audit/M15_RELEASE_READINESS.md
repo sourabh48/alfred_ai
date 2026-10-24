@@ -1,5 +1,13 @@
 # M15 hybrid intelligence development acceptance
 
+## Current deployed status — 2026-10-15
+
+M15 was explicitly promoted and source-synchronized at 3932f391aa4eed7b3200ad3b034f7991435e01e4. Local independent restoration passed. External HDD/key/device-loss verification was waived for that M15 deployment and remains UNVERIFIED; future releases do not inherit it. Real OpenAI/cloud stay OFF. Normal-account, provider, clean-PC/installer and broader product acceptance remain incomplete. Current 8000 health was not observed; no audit service action was taken.
+
+Use [current audit](ALFRED_WHOLE_PROJECT_AUDIT_20261015.md) and [acceptance](../../docs/ALFRED_END_TO_END_ACCEPTANCE.md). Candidate-era NOT READY statements below are historical, not the final authorized promotion outcome.
+
+## Historical candidate readiness records
+
 ## Current consolidated M15 candidate - 2026-10-14
 
 All completed M15 hybrid, memory, security and UI milestones are incorporated in

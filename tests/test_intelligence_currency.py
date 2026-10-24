@@ -42,7 +42,8 @@ class IntelligenceCurrencyTests(TestCase):
     def test_missing_financial_evidence_does_not_become_an_authoritative_zero(self):
         self.local.reason.return_value='You earn INR 900000 every month.'
         result=self.answer('finance')
-        self.assertNotIn('900000',result['answer'])
+        self.assertNotIn('900000',result['answer']); self.assertEqual(result['provider'],'local_evidence')
+        self.local.reason.assert_not_called()
         amount=result['sources'][0]['data']['amounts']['monthly_income']
         self.assertIsNone(amount['amount'])
         self.assertEqual(amount['evidence_status'],'unavailable')

@@ -29,6 +29,7 @@ class MoneyRehearsalTests(TransactionTestCase):
                 targets = [
                     ("expenses", "0004_statementupload_extracted_payload_and_more") if node[0] == "expenses"
                     else ("investments", "0003_rename_investmenti_user_id_a9ad33_idx_investments_user_id_cbfa4c_idx_and_more") if node[0] == "investments"
+                    else ("mobility", "0012_travel_bus_mode") if node[0] == "mobility"
                     else node for node in executor.loader.graph.leaf_nodes()
                 ]
                 executor.migrate(targets)
@@ -50,6 +51,10 @@ class MoneyRehearsalTests(TransactionTestCase):
             self.assertTrue(result["unedited_rollback_exact"])
             self.assertEqual(result["reconciliation"]["identity"]["reference_signature_mismatches"], 0)
             self.assertEqual(file_hash(source), before)
+            from alfred_private_storage import verify_private
+            self.assertTrue(verify_private(output))
+            self.assertTrue(verify_private(output / "rehearsal-runtime"))
+            self.assertTrue(verify_private(output / "fresh-pre-migration-backup.sqlite3"))
             # A retained evidence directory must never be reused or overwritten.
             with patch("sys.argv", ["rehearse", "--source", str(source), "--output-dir", str(output)]), self.assertRaises(FileExistsError):
                 main()

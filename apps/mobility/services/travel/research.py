@@ -6,7 +6,7 @@ from math import ceil
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from ..travel_catalog import CITIES, lookup
+from ..travel_catalog import CITIES, lookup, approximate_road_km
 from ..travel_discovery import budget_for, history_for, value, candidates_for
 from .cache import query, query_with_fallback
 from .discovery import rank_places
@@ -21,6 +21,7 @@ from .providers.accommodation import DuffelAccommodation
 from .providers.transport import DuffelFlights, IndianRailProvider
 from .providers.web import WikivoyageDestinations, WikivoyageSearch, BraveSearch, SearXNGSearch
 from .links import external_links
+from .presentation import age_saved_facts
 
 
 def discover_destinations(user, state, preliminary):
@@ -93,18 +94,27 @@ def research_candidates(user, state, preliminary):
     return options
 
 
-def weather_result(destination, state, *, force=False):
+def weather_result(destination, state, *, force=False, cache_only=False):
     start, end = value(state,"available_start_date"), value(state,"available_end_date")
     if not start or not end:
         return ProviderResult("open_meteo","weather",error="dates_required")
     if not timezone.localdate() <= date.fromisoformat(start) <= date.fromisoformat(end) <= timezone.localdate()+timedelta(days=15):
         return ProviderResult("open_meteo","weather",error="outside_forecast_window")
-    return query(OpenMeteoWeather(),{"latitude":destination["lat"],"longitude":destination["lon"],"start_date":start,"end_date":end},force=force)
+    return query(OpenMeteoWeather(),{"latitude":destination["lat"],"longitude":destination["lon"],"start_date":start,"end_date":end},force=force,cache_only=cache_only)
 
 
 def enrich_candidate(user, state, destination):
-    d = deepcopy(destination)
+    d = age_saved_facts({"candidates": [destination]})["candidates"][0]
+    if destination.get("weather_proposals"):
+        d["score"] += 8  # Replace the previous weather penalty when reusing a saved candidate.
     force = value(state,"force_refresh",False)
+    refresh_categories = value(state,"refresh_categories",[])
+    def cached_only(category):
+        needed = category in refresh_categories or (category == "geocoding" and "routing" in refresh_categories)
+        return bool(refresh_categories) and not needed
+    def fetch(provider, parameters):
+        return query(provider, parameters, force=force and not cached_only(provider.category),
+                     cache_only=cached_only(provider.category))
     results = []
     for key in ("geocoding_result","discovery_result"):
         if d.get(key):
@@ -115,7 +125,7 @@ def enrich_candidate(user, state, destination):
     coords = d.get("lat") is not None and d.get("lon") is not None
     origin = CITIES.get(str(value(state,"origin","")).casefold())
     if not origin and value(state,"origin"):
-        geocoded = query(OpenMeteoGeocoding(),{"name":value(state,"origin")},force=force)
+        geocoded = fetch(OpenMeteoGeocoding(),{"name":value(state,"origin")})
         results.append(geocoded)
         matches = geocoded.payload.get("locations",[])
         if len(matches) == 1:
@@ -124,18 +134,23 @@ def enrich_candidate(user, state, destination):
             d["issues"].append("Starting city is ambiguous; include region/country before routing.")
     if coords and origin:
         d["origin_location"] = {"name":value(state,"origin"),"lat":origin[0],"lon":origin[1]}
-        route = query(OpenRouteService(),{"start":[origin[1],origin[0]],"end":[d["lon"],d["lat"]],
+        km = approximate_road_km(value(state,"origin"), d, origin)
+        d.update(distance_km=km, travel_hours=round(km/45+km/180*.3, 1),
+                 distance_basis="Estimated one-way road distance from town centres; not a verified route.")
+        route = fetch(OpenRouteService(),{"start":[origin[1],origin[0]],"end":[d["lon"],d["lat"]],
             "mode":value(state,"transport_mode","mixed"),"avoid_expressways":value(state,"avoid_expressways",False),
-            "avoid_tolls":value(state,"avoid_tolls",False),"preference":value(state,"route_preference","recommended")},force=force)
+            "avoid_tolls":value(state,"avoid_tolls",False),"preference":value(state,"route_preference","recommended")})
         attach("route_result",route)
         if route.success:
             selected = route.payload["routes"][0]
             d.update(distance_km=selected["distance_km"],travel_hours=selected["duration_hours"],
                 distance_basis="Provider-calculated route; duration is a model estimate, closures and motorcycle legality unverified.")
     else:
+        d.pop("origin_location", None)
+        d.update(distance_km=None, travel_hours=None, distance_basis="No verified route or distance for the current trip settings.")
         attach("route_result",ProviderResult("openrouteservice","routing",error="unambiguous_origin_and_destination_coordinates_required"))
     try:
-        weather = weather_result(d,state,force=force) if coords else ProviderResult("open_meteo","weather",error="destination_coordinates_required")
+        weather = weather_result(d,state,force=force and not cached_only("weather"),cache_only=cached_only("weather")) if coords else ProviderResult("open_meteo","weather",error="destination_coordinates_required")
     except Exception:
         # An adapter fault must not discard the saved plan or other research.
         weather = ProviderResult("open_meteo","weather",error="weather_unavailable")
@@ -143,13 +158,14 @@ def enrich_candidate(user, state, destination):
     d["weather"] = {**weather.payload,"summary":weather.payload.get("summary","Current weather for these dates is unverified. Recheck nearer departure."),
                     "confidence":weather.confidence,"freshness":weather.freshness}
     d["weather_proposals"] = replan_proposals(weather)
+    d["factors"]["Weather"] = "Unknown"
     if d["weather_proposals"]:
         d["score"] -= 8
         d["factors"]["Weather"] = "Weather risks; review proposed changes"
     categories = ["attraction","camping","fuel","hospital","service"]
     if value(state,"find_restaurants"):
         categories.append("restaurant")
-    places = query(OverpassPlaces(),{"latitude":d["lat"],"longitude":d["lon"],"categories":categories},force=force) if coords else ProviderResult("overpass","places",error="destination_coordinates_required")
+    places = fetch(OverpassPlaces(),{"latitude":d["lat"],"longitude":d["lon"],"categories":categories}) if coords else ProviderResult("overpass","places",error="destination_coordinates_required")
     routes = d.get("route_result",{}).get("payload",{}).get("routes",[])
     route_points = (routes[0] if routes else {}).get("geometry",{}).get("coordinates",[])
     if places.success:
@@ -161,14 +177,14 @@ def enrich_candidate(user, state, destination):
     attach("permit_result",PermitProvider().lookup(value(state,"permit_place",d["name"]),start_date=value(state,"available_start_date")))
     start,end = value(state,"available_start_date"),value(state,"available_end_date")
     people = value(state,"number_of_travelers",1)
-    hotel = query(DuffelAccommodation(),{"latitude":d["lat"],"longitude":d["lon"],"check_in":start,"check_out":end,"adults":people,"rooms":ceil(people/2)},force=force) if coords and start and end and start < end else ProviderResult("duffel","hotels",error="overnight_dates_and_destination_required")
+    hotel = fetch(DuffelAccommodation(),{"latitude":d["lat"],"longitude":d["lon"],"check_in":start,"check_out":end,"adults":people,"rooms":ceil(people/2)}) if coords and start and end and start < end else ProviderResult("duffel","hotels",error="overnight_dates_and_destination_required")
     attach("hotels_result",hotel)
     flight = ProviderResult("duffel","flights",error="origin_and_destination_airport_codes_and_dates_required")
     if value(state,"origin_airport") and value(state,"destination_airport") and start:
-        flight = query(DuffelFlights(),{"origin":value(state,"origin_airport"),"destination":value(state,"destination_airport"),
-            "departure_date":start,"return_date":end,"adults":people},force=force)
+        flight = fetch(DuffelFlights(),{"origin":value(state,"origin_airport"),"destination":value(state,"destination_airport"),
+            "departure_date":start,"return_date":end,"adults":people})
     attach("flights_result",flight)
-    attach("trains_result",query(IndianRailProvider(),{"origin":value(state,"origin"),"destination":d["name"],"date":start},force=force))
+    attach("trains_result",fetch(IndianRailProvider(),{"origin":value(state,"origin"),"destination":d["name"],"date":start}))
     attach("buses_result",ProviderResult("operator_links","buses",error="live_bus_inventory_not_configured",payload={"options":[],"availability":"UNKNOWN"}))
     # Search bounded, contextual topics; raw messages, budgets and history never leave.
     topics = ["closures"]
@@ -176,12 +192,16 @@ def enrich_candidate(user, state, destination):
     for topic in ("permits","hotels","trains","flights","buses","camping","attractions","fuel","tolls"):
         if topic in requested_topics and topic not in topics:
             topics.append(topic)
+    if refresh_categories:
+        topics.sort(key=lambda topic: topic not in refresh_categories)
     d["web_research"] = []
     for topic in topics[:3]:
         searched = query_with_fallback([BraveSearch(),SearXNGSearch(),WikivoyageSearch()],
             {"destination":value(state,"permit_place",d["name"]) if topic == "permits" else d["name"],
              "origin":value(state,"origin") if topic in {"closures","routing","trains","flights","buses"} else "",
-             "topic":topic,"date":start,"mode":value(state,"transport_mode","mixed")},force=force)
+             "topic":topic,"date":start,"mode":value(state,"transport_mode","mixed")},
+            force=force and (not refresh_categories or topic in refresh_categories or (topic == "closures" and "routing" in refresh_categories)),
+            cache_only=bool(refresh_categories) and topic not in refresh_categories and not (topic == "closures" and "routing" in refresh_categories))
         d["web_research"].append(searched.as_dict())
         results.append(searched)
     d["external_links"] = external_links(state,d)

@@ -1,5 +1,14 @@
 # Chat-first Travel Planner
 
+M16 development update: bounded provider-request retention, source/native cleanup
+and category-specific refresh/date invalidation are implemented in the isolated
+worktree. Current validation is in [Project Status](PROJECT_STATUS.md); a new full
+integrated/package acceptance remains pending. See [retention policy](TRAVEL_PROVIDERS.md#request-telemetry-retention)
+and [selective refresh](TRAVEL_PROVIDERS.md#selective-research-refresh).
+The dated deployed M15 scope below is unchanged.
+
+**Current integrated scope — 2026-10-15:** Structured Travel conversation/preferences, saved plans, source freshness, estimates, day edits and map geometry are in deployed M15 source. General LLM trip reasoning, broad candidate/show-more pools, true alternate/scenic routes, verified bike legality and road-network detours remain partial. Photos are not video/social publication. Hotels/flights are disabled without approved provider access; rail/bus/permit links are not live inventory. T09/M16 development progress is recorded above; it has not been deployed. [Feature matrix](PROJECT_STATUS.md), [provider register](ALFRED_EXTERNAL_INTEGRATIONS.md).
+
 Alfred now starts travel planning from dates, a budget, duration or a craving.
 Open **Travel Planner** and try:
 
@@ -28,7 +37,9 @@ the destination, dates and itinerary are established.
 - Background research with database progress, bounded source requests, cached
   public findings, duplicate-worker leases and restart recovery.
 - Recheck Trip and automatic stale-evidence refresh when reopening a saved trip
-  within 15 days of departure. Rechecks preserve itinerary edits.
+  within 15 days of departure. Rechecks preserve itinerary edits. In M16 development,
+  narrow follow-ups reuse unrelated caches; date edits invalidate dated offers and
+  forecasts before rebuilding, without erasing independent route/place evidence.
 - Settings → Travel Preferences: edit/accept/remove preferences, choose Mostly
   New/Balanced/Mostly Familiar, turn learning on/off, reset learned signals.
   Explicit preferences survive a learned-preference reset. Inferred signals

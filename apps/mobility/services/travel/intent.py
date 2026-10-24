@@ -42,6 +42,19 @@ def validate_preference(key, val):
     return val
 
 
+def research_categories(text):
+    categories = {category for terms, category in [
+        (r"\b(?:weather|forecasts?|rain)\b", "weather"), (r"hotel|stay", "hotels"),
+        (r"flight|fly", "flights"), (r"train|rail", "trains"), (r"\bbus(?:es)?\b", "buses"),
+        (r"permit|permission|\bopen\b|closure", "permits"),
+        (r"discover|unexplored|camp|hidden|restaurant", "places"),
+        (r"route|expressway|toll|scenic", "routing"),
+    ] if re.search(terms, text.casefold())}
+    if "availability" in text.casefold() and not categories & {"hotels", "flights", "trains", "buses"}:
+        categories.add("hotels")
+    return categories
+
+
 def augment(state, text):
     lower = text.casefold().strip()
     def put(key, val):
@@ -91,14 +104,7 @@ def augment(state, text):
     if airports:
         put("origin_airport", airports[1])
         put("destination_airport", airports[2])
-    categories = set(value(state,"research_categories",[]))
-    for terms, category in [(r"weather|forecast|rain", "weather"), (r"hotel|stay|availability", "hotels"),
-                            (r"flight|fly", "flights"), (r"train|rail", "trains"), (r"\bbus\b", "buses"),
-                            (r"permit|permission|\bopen\b|closure", "permits"),
-                            (r"discover|unexplored|camp|hidden|restaurant", "places"),
-                            (r"route|expressway|toll", "routing")]:
-        if re.search(terms, lower):
-            categories.add(category)
+    categories = set(value(state,"research_categories",[])) | research_categories(text)
     if categories:
         put("research_categories", sorted(categories))
     return state

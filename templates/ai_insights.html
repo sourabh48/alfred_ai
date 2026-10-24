@@ -17,9 +17,29 @@
         </div>
         <button id="intelligenceNew" class="btn btn-outline-secondary btn-sm" type="button">New conversation</button>
     </div>
+    <details id="conversationHistoryPanel" class="conversation-evidence mb-3">
+        <summary>Private conversation history · <span id="conversationHistoryStatus">Checking local policy</span></summary>
+        <p class="small mt-2">Off unless you opt in. Saved transcripts are encrypted on this device and never synchronized or sent to cloud reasoning. They are AI hypotheses, separate from verified memories. New answers use current sources, not old transcripts.</p>
+        <p class="small">The key depends on this Windows profile; device-loss recovery is not verified. Deletion clears current history, but older backups may retain copies. Changing a source or memory does not rewrite saved conversations.</p>
+        <form id="conversationHistoryForm" data-live-refresh-hold="true">
+            <label for="conversationHistoryDays" class="form-label">Maximum age from conversation creation</label>
+            <input id="conversationHistoryDays" type="number" class="form-control mb-2" min="1" max="30" step="1" value="7" required disabled>
+            <label class="d-block mb-2"><input id="conversationHistoryConsent" type="checkbox" required disabled> I choose local history and this retention period, and understand the recovery and backup limits above.</label>
+            <button class="btn btn-outline-primary btn-sm" type="submit" disabled>Save history choice</button>
+        </form>
+        <div class="d-flex flex-wrap gap-2 my-3">
+            <button id="conversationHistoryDisable" class="btn btn-outline-secondary btn-sm" type="button" disabled>Disable and clear history</button>
+            <button id="conversationHistoryClear" class="btn btn-outline-danger btn-sm" type="button" disabled>Clear all conversations</button>
+        </div>
+        <p id="conversationHistoryFeedback" class="small" role="status" aria-live="polite"></p>
+        <label for="conversationHistoryTitle" class="form-label">Title for the next saved conversation</label>
+        <input id="conversationHistoryTitle" class="form-control mb-2" maxlength="128" autocomplete="off" placeholder="Private conversation" disabled>
+        <ul id="conversationHistoryList" class="list-unstyled" aria-label="Your saved conversations"></ul>
+    </details>
+    <p id="conversationHistoryCurrent" class="small text-muted" role="status">Page-only conversation</p>
     <div id="intelligenceEmpty" class="conversation-empty"><h3>What would you like to understand?</h3>
         <p>Ask about a saved memory, your financial snapshot or your Travel preferences.</p>
-        <p class="small">This conversation stays on this page. Save only facts you have checked.</p></div>
+        <p class="small">This conversation stays on this page unless you explicitly enable private history. Save only facts you have checked.</p></div>
     <div id="intelligenceAnswers" role="log" aria-live="polite" aria-label="Current conversation" class="conversation-messages"></div>
     <form id="intelligenceForm" class="conversation-composer" data-live-refresh-hold="true">
         <label for="intelligenceQuery" class="form-label">Your question</label>
@@ -29,14 +49,45 @@
         <select id="intelligenceScope" class="form-select mb-2">
             <option value="general">Verified memories</option><option value="finance">My financial snapshot</option>
             <option value="travel">My Travel preferences</option><option value="documents">Verified loan closure evidence</option>
+            <option value="bank_statements">My bank-statement records</option>
+            <option value="financial_records">My canonical financial records</option>
+            <option value="financial_document">Reviewed records from one document</option>
         </select>
         </div><div id="intelligenceDocumentField" class="d-none mb-2"><label for="intelligenceDocument" class="form-label">Verified evidence</label>
-            <select id="intelligenceDocument" class="form-select" disabled required></select></div></div>
+            <select id="intelligenceDocument" class="form-select" disabled required></select></div>
+        <div id="intelligenceStatementField" class="d-none mb-2"><label for="intelligenceStatement" class="form-label">Source transaction</label>
+            <select id="intelligenceStatement" class="form-select" disabled required></select>
+            <p class="small">Choose a record, then open its citation to check and confirm it. Parser success alone is not verification. No currency is inferred. Ask “Show statement period” for its reviewed statement's inclusive start and end dates.</p></div>
+        <div id="intelligenceFinancialField" class="d-none mb-2"><label for="intelligenceFinancial" class="form-label">Owned financial record</label>
+            <select id="intelligenceFinancial" class="form-select" disabled required></select>
+            <p class="small">Ask “Explain this record”, “Show my loan status” or “Review recorded values”. Other questions may be unsupported. Recorded values are not independent authentication; budget approval and live market prices are not established. Currency-limited totals remain unavailable.</p></div></div>
+        <div id="intelligenceFinancialDocumentField" class="d-none mb-2">
+            <p id="intelligenceFinancialDocumentContext" class="small">Choose an owned import in Documents, then explicitly select reviewed records. Questions are page-only; no totals or arbitrary PDF/OCR questions.</p>
+            <p class="small">Ask “What is my current value?” for investments, “What is the principal?” for loans or “Show closing balance” for bank records. Every selected record must have that current reviewed field; otherwise ALFRED abstains. Amounts stay separate and currency is not inferred.</p>
+            <p class="small">“What is the transaction date?” returns each selected bank record's current owner-reviewed ISO date, with its private source. These are transaction dates, not document-upload dates; no model or cloud is used. “What is the recorded category?” and “Show classification” return the selected bank records' current reviewed labels with the same source safeguards.</p>
+            <p class="small">Ask “What period does this statement cover?” for the selected statement's inclusive start and end dates. Its current reviewed dates must agree with the retained source. ALFRED does not combine different statements or infer a period from transaction or upload dates.</p>
+            <p class="small">“What is the transaction direction?” reports reviewed debit/credit only when it agrees with the retained source. “Is this transaction a transfer?” reports a reviewed Transfer label, not a matched transfer or its other account. Descriptions, amount signs and incoming credits do not establish refunds or reversals; ALFRED abstains when that evidence is missing.</p>
+            <a class="btn btn-outline-primary btn-sm" href="/documents/#documentSourcesTitle">Choose a financial document</a>
+        </div>
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
             This question is public. Allow approved cloud fallback for this question if Ollama fails.</label>
-        <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions are not saved automatically.</p>
+        <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
         <div class="conversation-actions"><button class="btn btn-primary" type="submit">Ask ALFRED</button>
             <span class="small text-muted">Enter for a new line · Ctrl/⌘ + Enter to send</span></div>
+        <fieldset id="intelligenceSources" class="conversation-evidence mt-3 d-none" aria-describedby="intelligenceSourcesHelp">
+            <legend id="intelligenceSourcesTitle" class="h6">Choose financial source documents</legend>
+            <p id="intelligenceSourcesHelp" class="small">Browse every linked source. Select one to five reviewed files across pages. Only selected revisions will be used; other files are not silently included. Owner confirmation is not independent authentication.</p>
+            <p id="intelligenceSourcesStatus" class="small" role="status" aria-live="polite"></p>
+            <ul id="intelligenceSourceItems" class="list-unstyled" aria-label="Source documents on this page"></ul>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <button id="intelligenceSourcesPrevious" type="button" class="btn btn-outline-secondary btn-sm">Previous sources</button>
+                <button id="intelligenceSourcesNext" type="button" class="btn btn-outline-secondary btn-sm">Next sources</button>
+                <button id="intelligenceSourcesRefresh" type="button" class="btn btn-outline-secondary btn-sm">Refresh source list</button>
+                <button id="intelligenceSourcesReset" type="button" class="btn btn-outline-secondary btn-sm">Clear selection</button>
+            </div>
+            <p class="small mb-1">Selected across all pages</p>
+            <ul id="intelligenceSourcesSelected" class="list-unstyled small" aria-label="Selected source documents"></ul>
+        </fieldset>
     </form>
     <p id="intelligenceFeedback" role="status" aria-live="polite" class="mt-2"></p>
     <button id="intelligenceRetry" class="btn btn-outline-primary" type="button" hidden>Retry question</button>
@@ -125,5 +176,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1"></script>
-<script src="/static/js/intelligence.js?v=2"></script>
+<script src="/static/js/intelligence.js?v=11"></script>
 {% endblock %}

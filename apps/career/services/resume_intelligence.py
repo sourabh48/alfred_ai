@@ -15,6 +15,12 @@ from alfred_ai.services import extract_document_text
 from alfred_ai.services.upload_limits import document_source, upload_deadline
 from pypdf import PdfReader
 
+
+def extract_skill_terms(text, catalog):
+    normalized = " ".join(text.casefold().split())
+    return [skill.title() for skill in sorted(catalog)
+            if re.search(r"(?<!\w)" + re.escape(skill) + r"(?!\w)", normalized)][:20]
+
 try:
     import pdfplumber
 except Exception:  # pragma: no cover - optional runtime dependency
@@ -389,12 +395,7 @@ class ResumeIntelligenceService:
         return adjusted
 
     def _extract_skills(self, text: str) -> list[str]:
-        lowered = text.lower()
-        found = []
-        for skill in sorted(SKILL_CATALOG):
-            if skill in lowered:
-                found.append(skill.title())
-        return found[:20]
+        return extract_skill_terms(text, SKILL_CATALOG)
 
     def _extract_role(self, text: str) -> str:
         lines = [line.strip() for line in text.splitlines() if line.strip()]

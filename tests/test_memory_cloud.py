@@ -14,21 +14,22 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command, CommandError
 from django.test import TestCase, override_settings
 
-from apps.ml_engine.services.memory_cloud import S3MemoryProvider, signed_headers, validate_profile, synchronizer
+from apps.ml_engine.services.memory_cloud import synchronizer, configured_provider
 from apps.ml_engine.services.memory_sync import MemorySynchronizer, SyncConflict, SyncUnavailable
 from apps.ml_engine.services.persistent_memory import MemoryStore, _owner
-from tests.memory_s3_fixture import PROFILE, SignedS3Fixture
+from tests.memory_s3_fixture import PROFILE, SignedS3Fixture, LegacyS3FixtureProvider as S3MemoryProvider, signed_headers, validate_profile
 from tests.test_persistent_memory import SyntheticEmbeddings
 
 
 class MemoryCloudTests(TestCase):
+    """Historical wire-only contract; this adapter is absent from application runtime."""
     def setUp(self):
         self.root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-s3-synthetic-')))
         self.alice=get_user_model().objects.create_user(username='synthetic-s3-alice')
         self.bob=get_user_model().objects.create_user(username='synthetic-s3-bob')
         self.store=MemoryStore(self.root/'one',embedder=SyntheticEmbeddings()); self.owner=_owner(self.alice)
         self.wire=SignedS3Fixture(self.root/'wire.sqlite3')
-        self.enterContext(patch('apps.ml_engine.services.memory_cloud.request',side_effect=self.wire.request))
+        self.enterContext(patch('tests.memory_s3_fixture.request',side_effect=self.wire.request))
         self.provider=S3MemoryProvider(self.owner,PROFILE); self.sync=MemorySynchronizer(self.store,self.provider)
         self.sync.configure(self.alice,enabled=True,consent=True)
 
@@ -167,14 +168,33 @@ class MemoryCloudTests(TestCase):
             db.execute('DELETE FROM objects')
         self.assertEqual(self.store.restore_owner(self.alice),1)
 
-    def test_masked_provisioning_encrypts_credentials_without_enabling_contact(self):
+    def test_aws_provisioning_and_historical_opt_in_are_disabled_without_mutation(self):
         self.sync.configure(self.alice,enabled=False)
-        with override_settings(ALFRED_MEMORY_DIR=str(self.store.directory)),patch('apps.ml_engine.management.commands.configure_memory_cloud.sys.stdin.isatty',return_value=True),patch('apps.ml_engine.management.commands.configure_memory_cloud.getpass',side_effect=[PROFILE['access_key'],PROFILE['secret_key'],'']):
-            output=StringIO(); call_command('configure_memory_cloud',user=self.alice.pk,bucket=PROFILE['bucket'],region=PROFILE['region'],account=PROFILE['account'],stdout=output)
-        self.assertNotIn(PROFILE['secret_key'],output.getvalue()); self.assertNotIn(PROFILE['secret_key'].encode(),(self.store.directory/'verified.sqlite3').read_bytes())
         with self.store._transaction() as db:
-            state=self.store._sync_state(db,self.owner); self.assertFalse(state['enabled']); self.assertEqual(state['cloud'],PROFILE)
-        with override_settings(ALFRED_MEMORY_SYNC_PROVIDER='s3',ALFRED_MEMORY_CLOUD_AUTHORIZED=True):
-            sync=synchronizer(self.store,self.alice); sync.configure(self.alice,enabled=True,consent=True); self.save(); self.assertEqual(sync.run(self.alice),'uploaded')
-        with patch('apps.ml_engine.management.commands.configure_memory_cloud.sys.stdin.isatty',return_value=False),self.assertRaises(CommandError):
+            state=self.store._sync_state(db,self.owner); state['cloud']=PROFILE
+            self.store._write_sync_state(db,self.owner,state)
+        before=(self.store.directory/'verified.sqlite3').read_bytes()
+        with patch('getpass.getpass',side_effect=AssertionError('No credential prompt')),self.assertRaises(CommandError):
             call_command('configure_memory_cloud',user=self.alice.pk,bucket=PROFILE['bucket'],region=PROFILE['region'],account=PROFILE['account'],stdout=StringIO())
+        with override_settings(ALFRED_MEMORY_SYNC_PROVIDER='s3',ALFRED_MEMORY_CLOUD_AUTHORIZED=True,
+                               ALFRED_MEMORY_SYNC_MOCK_DIR=str(self.root/'mock')):
+            self.assertEqual(configured_provider(),'')
+            with self.assertRaises(SyncUnavailable): synchronizer(self.store,self.alice)
+        self.assertEqual((self.store.directory/'verified.sqlite3').read_bytes(),before)
+        self.assertEqual(self.wire.calls,0)
+
+    def test_runtime_has_no_aws_transport_and_api_reports_disabled(self):
+        from apps.ml_engine.services import memory_cloud
+        self.assertFalse(hasattr(memory_cloud,'S3MemoryProvider'))
+        with override_settings(ALFRED_MEMORY_DIR=str(self.store.directory),ALFRED_MEMORY_SYNC_PROVIDER='s3',
+                               ALFRED_MEMORY_CLOUD_AUTHORIZED=True), \
+             patch('alfred_ai.services.public_http.request',side_effect=AssertionError('No external request')):
+            self.client.force_login(self.alice)
+            response=self.client.get('/api/ai/memories/sync/')
+            self.assertEqual(response.status_code,200)
+            self.assertEqual(response.json()['provider'],'disabled')
+            self.assertFalse(response.json()['available'])
+            self.assertEqual(self.client.post('/api/ai/memories/sync/',{'action':'sync'},content_type='application/json').status_code,503)
+            output=StringIO();call_command('sync_private_memory',stdout=output)
+            self.assertIn('disabled',output.getvalue())
+        self.assertEqual(self.wire.calls,0)

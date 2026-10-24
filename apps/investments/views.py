@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, DecimalException, localcontext
 
 from django.db.models import Count, Max
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
@@ -86,7 +86,7 @@ class InvestmentGrowthView(APIView):
 
     def get(self, request):
         as_of = timezone.localdate()
-        revision = f"{_investment_revision(request.user)}:growth-v2:{as_of:%Y-%m}"
+        revision = f"{_investment_revision(request.user)}:growth-v3:{as_of:%Y-%m}"
         payload = materialize_payload(
             namespace="investments-growth",
             user_id=request.user.id,
@@ -110,6 +110,9 @@ def _investment_summary_payload(user) -> dict:
     weighted_return = (
         sum(item.current_value * Decimal(str(item.annual_return_rate)) for item in investments) / total_value if total_value else 0.0
     )
+    with localcontext() as context:
+        context.prec = max(28, Decimal(str(weighted_return)).adjusted() + 4)
+        annual_return = float(round(weighted_return, 2))
     gain_loss = total_value - total_invested
     analysis = portfolio_intelligence_service.analyze_portfolio_risk(user)
     market_context = portfolio_intelligence_service.get_market_trends_and_suggestions(user)
@@ -122,7 +125,7 @@ def _investment_summary_payload(user) -> dict:
             "total_value": investment_total_float(total_value),
             "total_invested": investment_total_float(total_invested),
             "monthly_sip": investment_total_float(total_sip),
-            "annual_return": float(round(weighted_return, 2)),
+            "annual_return": annual_return,
             "gain_loss": investment_total_float(gain_loss),
             "risk": _portfolio_risk(investments),
             "positions": len(investments),
@@ -180,20 +183,29 @@ def _investment_growth_payload(user, *, as_of: date | None = None) -> dict:
         target_year = today.year + ((today.month - 1 + month_index) // 12)
         target_month = ((today.month - 1 + month_index) % 12) + 1
         labels.append(date(target_year, target_month, 1).strftime("%b %Y"))
-        projected_value = Decimal("0")
-        for item in investments:
-            projected_value += _project_position_money(
-                current_value=item.current_value,
-                monthly_sip=item.monthly_sip,
-                annual_return_rate=item.annual_return_rate,
-                months=month_index,
-            )
-        values.append(investment_total_float(projected_value))
+
+    unavailable_reason = ""
+    try:
+        for month_index in months_elapsed:
+            projected_value = Decimal("0")
+            for item in investments:
+                projected_value += _project_position_money(
+                    current_value=item.current_value,
+                    monthly_sip=item.monthly_sip,
+                    annual_return_rate=item.annual_return_rate,
+                    months=month_index,
+                )
+            values.append(investment_total_float(projected_value))
+    except (ValueError, DecimalException, OverflowError):
+        values = []
+        unavailable_reason = "Projection unavailable: a recorded return or forecast is outside the supported numeric range. Review your entered return assumptions; recorded holdings are unchanged."
 
     return {
         "labels": labels,
         "values": values,
         "months_elapsed": months_elapsed,
+        "available": not unavailable_reason,
+        "unavailable_reason": unavailable_reason,
         "assumptions": {
             "month_zero": "recorded_current_value",
             "contribution_timing": "beginning_of_month",
@@ -235,6 +247,8 @@ def _project_position_money(*, current_value, monthly_sip, annual_return_rate, m
     """
     value = investment_money(current_value)
     monthly_rate = Decimal(str(annual_return_rate or 0)) / Decimal("1200")
+    if not monthly_rate.is_finite():
+        raise ValueError("Return rate must be finite.")
     contribution = investment_money(monthly_sip)
     for _ in range(months):
         value = (value + contribution) * (1 + monthly_rate)
@@ -290,6 +304,8 @@ def import_investment_pdf(request):
         )
         if linked_investments:
             document.linked_investments.set(linked_investments)
+            from .services.document_evidence import capture_import
+            capture_import(document, linked_investments, extraction=(parsed.get('payload') or {}).get('investments') or [])
         record_parser_learning(
             user=request.user,
             scope="investment_document",

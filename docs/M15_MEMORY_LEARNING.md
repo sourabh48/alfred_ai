@@ -1,5 +1,7 @@
 # M15 local memory review pipeline
 
+**Integrated status — 2026-10-15:** Candidate/review/provenance/conflict/feedback/evaluation code is included in deployed M15. Synthetic quality evaluation does not certify genuine model accuracy or broad autonomous learning. Hypotheses never become canonical financial facts; corrections/deletion retain owner boundaries. [Matrix](PROJECT_STATUS.md) and [acceptance](ALFRED_END_TO_END_ACCEPTANCE.md).
+
 2026-10-11, isolated M15 source only. No deployment or financial-record change.
 
 `/api/ai/memories/learning/` uses the existing session, CSRF, owner, abuse and

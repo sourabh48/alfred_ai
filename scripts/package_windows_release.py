@@ -6,12 +6,39 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def source_identity(repo=ROOT):
+    def git(*args):
+        return subprocess.check_output(['git',*args],cwd=repo,text=True).strip()
+    commit,tree=git('rev-parse','HEAD'),git('rev-parse','HEAD^{tree}')
+    if not all(re.fullmatch('[0-9a-f]{40}',value) for value in (commit,tree)) or git('status','--porcelain'):
+        raise RuntimeError('Packaging requires an exact clean source checkout.')
+    return dict(schema=1,source_commit=commit,source_tree=tree,source_dirty=False)
+
+
+def write_build_provenance(bundle,source,repo=ROOT):
+    if source_identity(repo)!=source:
+        raise RuntimeError('Source changed during the frozen build.')
+    (bundle/'build-provenance.json').write_text(json.dumps(source,indent=2),encoding='utf-8')
+
+
+def verify_build_provenance(bundle,repo=ROOT):
+    try: source=json.loads((bundle/'build-provenance.json').read_text(encoding='utf-8'))
+    except (OSError,ValueError):
+        raise RuntimeError('Missing or invalid frozen source provenance.') from None
+    expected=source_identity(repo)
+    if (type(source) is not dict or source!=expected
+            or any(type(source[key]) is not type(value) for key,value in expected.items())):
+        raise RuntimeError('Frozen source provenance does not match this clean checkout.')
+    return source
 
 
 def digest(path):
@@ -38,7 +65,7 @@ def write_acceptance_kit(bundle, output):
 
 def inspect_bundle(bundle):
     required = ("ALFRED.exe", "ALFRED Launcher.exe", "Start ALFRED.cmd", "Stop ALFRED.cmd",
-                "READ ME.txt", "NOTICE.txt", "project-identity.json",
+                "READ ME.txt", "NOTICE.txt", "project-identity.json", "build-provenance.json",
                 "_internal/python312.dll", "_internal/base_library.zip",
                 "_internal/static/alfred.ico", "_internal/guide/index.html",
                 "_internal/guide/images/04-tray.svg",
@@ -56,6 +83,7 @@ def inspect_bundle(bundle):
             missing.append(pattern)
     if missing:
         raise RuntimeError(f"Incomplete standalone bundle: {missing}")
+    verify_build_provenance(bundle)
     files = []
     for path in sorted(bundle.rglob("*")):
         if path.is_symlink() or path.is_junction():
@@ -98,6 +126,7 @@ def main():
     if bundle == output or bundle in output.parents:
         parser.error("output must be outside the bundle")
     files = inspect_bundle(bundle)
+    source = verify_build_provenance(bundle)
     output.mkdir(parents=True, exist_ok=True)
     archive = output / "ALFRED-Windows-x64.zip"
     installer = output / "ALFRED-Setup.exe"
@@ -115,10 +144,13 @@ def main():
             raise RuntimeError(f"ZIP verification failed: {bad}")
     temporary.replace(archive)
     write_acceptance_kit(bundle, output)
+    if verify_build_provenance(bundle)!=source:
+        raise RuntimeError('Source changed during Windows distribution assembly.')
     manifest = {
         "project": json.loads((bundle / "project-identity.json").read_text(encoding="utf-8")),
-        "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-        "source_dirty": bool(subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT, text=True).strip()),
+        "source_commit": source['source_commit'], "source_tree": source['source_tree'],
+        "source_dirty": source['source_dirty'],
+        "build_provenance_sha256": digest(bundle/'build-provenance.json'),
         "notice_sha256": digest(bundle / "NOTICE.txt"),
         "created_at": datetime.now(timezone.utc).isoformat(), "platform": "Windows x64",
         "requires_system_python": False, "files_checked": len(files),

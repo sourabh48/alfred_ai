@@ -1,5 +1,7 @@
 # Docker setup status
 
+**Scope — 2026-10-15:** Docker remains an optional runtime profile. Native M15 source is deployed at 3932f391; Docker presence/configuration is not proof that the current private database uses PostgreSQL or that a fresh full-cycle Docker gate passed. This audit performed no Docker/service operations. [Current architecture](ARCHITECTURE.md).
+
 Checked 17 September 2026 after the host restarted.
 
 Docker is optional for ALFRED. The [native Windows application](NATIVE_WINDOWS.md)

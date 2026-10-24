@@ -1,5 +1,23 @@
 # M15 encrypted cloud adapter pre-connection record
 
+**2026-10-15 architecture decision: AWS IS DECOMMISSIONED.** Do not execute the
+historical provisioning/IAM/activation steps below. Post-audit development removes
+the AWS provider from application runtime, disables its provisioning command
+before any credential prompt, and ignores historical AWS activation flags/profile
+data. Existing encrypted profiles and recovery assets are preserved. The legacy
+wire adapter exists only in tests with a transport that refuses network access.
+The neutral encrypted journal, snapshots, tombstones, queues and checkpoints remain.
+Production M15 code is unchanged and real cloud remains OFF.
+
+Cloudflare R2 is the selected **implementation candidate**, not an approved
+account or active adapter. See the [non-AWS contract evaluation](ALFRED_EXTERNAL_INTEGRATIONS.md#non-aws-intelligence-storage-decision).
+Private provider/account activation, permissions and portable recovery need
+separate acceptance and authorization.
+
+## Historical M15 evidence — superseded activation instructions
+
+**Current pre-connection status — 2026-10-15:** Adapter source is deployed within 3932f391; no real AWS account/region/bucket acceptance is recorded and cloud stays OFF. Endpoint validation is AWS-specific, not arbitrary S3-compatible/Drive/Azure support. Initial synthetic results below are dated evidence. Portable key/checkpoint recovery remains pending; the historical M15 HDD waiver does not authorize private cloud use. [Provider register](ALFRED_EXTERNAL_INTEGRATIONS.md).
+
 2026-10-11. Initial development provider: Amazon S3, configurable through the
 existing provider-neutral synchronization protocol. No real account is connected,
 no credentials have been supplied and no private/paid request has been made.

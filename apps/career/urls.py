@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import CareerJobMatchView, CareerJobOutcomeView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, career_dashboard, career_projection
+from .views import CareerJobMatchView, CareerJobOutcomeView, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, career_dashboard, career_projection
 
 urlpatterns = [
     path("", CareerProfileView.as_view()),
@@ -11,4 +11,5 @@ urlpatterns = [
     path("recruiter-match/", CareerRecruiterMatchView.as_view(), name="career_recruiter_match"),
     path("job-match/", CareerJobMatchView.as_view(), name="career_job_match"),
     path("job-analyses/<int:pk>/outcome/", CareerJobOutcomeView.as_view(), name="career_job_outcome"),
+    path("job-analyses/", CareerOpportunityListView.as_view(), name="career_opportunities"),
 ]

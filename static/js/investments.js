@@ -100,7 +100,15 @@ function renderGrowthChart(data) {
     const canvas = document.getElementById("growthChart");
     if (growthChart) {
         growthChart.destroy();
+        growthChart = null;
     }
+
+    const status = document.getElementById("investmentGrowthStatus");
+    const unavailable = data.available === false;
+    status.textContent = unavailable ? data.unavailable_reason : "";
+    status.hidden = !unavailable;
+    canvas.hidden = unavailable;
+    if (unavailable) return;
 
     growthChart = new Chart(canvas, {
         type: "line",

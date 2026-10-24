@@ -111,7 +111,7 @@ class MemoryLearningTests(TestCase):
         self.assertEqual(self.store.restore_owner(self.alice),1)
 
     def test_evaluation_measures_ranking_misses_and_no_match_without_retaining_queries(self):
-        def embedding(text):
+        def embedding(text, *, deadline=None):
             return ([1.0,0.0] if 'mountain' in text else [0.0,1.0]),'synthetic-quality-model'
         with patch.object(self.embedder,'embed',side_effect=embedding):
             mountain=self.store.save_verified(self.alice,{'statement':'mountain'}, {'source':'synthetic'},verified=True)
@@ -123,7 +123,7 @@ class MemoryLearningTests(TestCase):
         self.assertEqual(result['recall_at_3'],1); self.assertEqual(result['mean_reciprocal_rank'],0.75)
         self.assertEqual(result['top_1_accuracy'],0.5); self.assertEqual(result['false_positive_rate'],1)
         self.assertEqual(result['abstention_rate'],0)
-        with patch.object(self.store,'retrieve',return_value=[{'id':coast}]):
+        with patch.object(self.store,'retrieve',return_value=[{'id':coast,'score':1.0}]):
             missed=self.learning.evaluate(self.alice,[{'query':'mountain','expected_id':mountain}])
         self.assertEqual(missed['recall_at_3'],0); self.assertEqual(missed['mean_reciprocal_rank'],0)
         self.assertIsNone(missed['false_positive_rate'])

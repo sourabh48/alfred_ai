@@ -26,15 +26,19 @@ document.addEventListener("DOMContentLoaded", () => {
     Alfred.enableLiveRefresh("loans-live", loadLoanPage, { rootId: "loanPlannerRoot" });
 });
 
-function loadLoanPage() {
-    Alfred.setPageBusy("loanPlannerRoot", true, { label: "Loading loan workspace" });
+function loadLoanPage({ live = false } = {}) {
+    if (!live) Alfred.setPageBusy("loanPlannerRoot", true, { label: "Loading loan workspace" });
     return Alfred.fetchJSON("/api/loans/summary/")
-        .then(renderLoanSummary)
-        .then(() => Alfred.clearPageAlert("loanPlannerRoot"))
+        .then(payload => {
+            // Interaction can begin after the background request was sent.
+            if (live && Alfred.shouldPauseLiveRefresh(document.getElementById("loanPlannerRoot"))) return;
+            renderLoanSummary(payload);
+            Alfred.clearPageAlert("loanPlannerRoot");
+        })
         .catch(error => {
             Alfred.upsertPageAlert("loanPlannerRoot", error.message, "danger");
         })
-        .finally(() => Alfred.setPageBusy("loanPlannerRoot", false));
+        .finally(() => { if (!live) Alfred.setPageBusy("loanPlannerRoot", false); });
 }
 
 function renderLoanSummary(payload) {

@@ -1,5 +1,7 @@
 # Sample-user data acceptance audit
 
+**Historical scenario / current status — 2026-10-15:** The September scenario below remains a synthetic reproducible finance case. Current deployed source is 3932f391; fresh audit financial/family/hybrid/session/currency/tax scope passed 86 tests. This is not new normal-account acceptance or a claim that all real documents/models/providers work. See [current acceptance](ALFRED_END_TO_END_ACCEPTANCE.md).
+
 Date: 16 September 2026. Code baseline: `a20435e`, plus the current working tree.
 
 ## Decision

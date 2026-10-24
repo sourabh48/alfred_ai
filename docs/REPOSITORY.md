@@ -1,5 +1,7 @@
 # Repository map and cleanup
 
+**Current repository state — 2026-10-15:** Deployed/GitHub master is 3932f391. Isolated audit documentation and unfinished M20 work must not be confused with production source. Protected operator edits in main are preserved; no audit push or live source update is authorized. Use [master matrix](PROJECT_STATUS.md) and [roadmap](PROJECT_STATUS.md); the earlier cleanup below is historical and does not prove all experimental code is safe.
+
 | Location | Purpose |
 | --- | --- |
 | `alfred_native.py`, `alfred_launcher.py`, `alfred_tray.py` | Windows server, launcher and notification icon |

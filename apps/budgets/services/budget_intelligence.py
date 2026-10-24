@@ -7,10 +7,13 @@ from __future__ import annotations
 import calendar
 from collections import defaultdict
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, List
 from django.utils import timezone
 
 from apps.budgets.models import Budget
+from apps.budgets.money import allocate_budget
+from apps.expenses.money import money_float
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.expenses.services.cashflow_treatment import variable_spend_rows
@@ -147,13 +150,15 @@ class BudgetIntelligenceService:
             direction="debit",
         )
         rows = list(variable_spend_rows(expenses, monthly_housing=user.rent_or_emi))
-        month_spending = float(sum(amount for _, amount in rows))
+        month_spending = sum((amount for _, amount in rows), Decimal("0"))
 
         # Get monthly budget from the canonical baseline so EMI burden is not double counted.
-        monthly_budget = float(baseline.get("disposable_cash_flow", 0) or 0)
+        disposable = Decimal(str(baseline.get("disposable_cash_flow", 0) or 0))
+        income_evidenced = baseline.get("metric_states", {}).get("monthly_income", {}).get("status", "unavailable") != "unavailable"
+        monthly_budget = disposable
         plan = current_budget_plan(user, today=today)
         if plan is not None:
-            monthly_budget = float(plan.inflation_adjusted)
+            monthly_budget = plan.inflation_adjusted
 
         remaining_budget = monthly_budget - month_spending
 
@@ -161,7 +166,7 @@ class BudgetIntelligenceService:
         safe_daily_spend = remaining_budget / days_remaining if days_remaining > 0 else 0
 
         # Get today's spending
-        today_spending = float(sum(amount for expense, amount in rows if expense.transaction_date == today))
+        today_spending = sum((amount for expense, amount in rows if expense.transaction_date == today), Decimal("0"))
 
         # Calculate average daily spending this month
         days_elapsed = (today - month_start).days + 1
@@ -170,53 +175,99 @@ class BudgetIntelligenceService:
         status = "GOOD"
         if safe_daily_spend < 0:
             status = "OVER_BUDGET"
-        elif today_spending > safe_daily_spend * 1.5:
+        elif today_spending > safe_daily_spend * Decimal("1.5"):
             status = "WARNING"
 
+        message = self._get_affordability_message(status, safe_daily_spend, today_spending)
+        available = plan is not None or income_evidenced
+        if not available:
+            status = "UNAVAILABLE"
+            message = "Add a current budget plan or income evidence before calculating a daily guide."
+        elif not income_evidenced:
+            status = "OVER_BUDGET" if remaining_budget < 0 else "PLAN_ONLY"
+            message = "This guide follows your saved plan only; income evidence is unavailable. It does not confirm affordability."
+        elif plan is not None and monthly_budget > max(Decimal("0"), disposable):
+            status = "OVER_BUDGET" if remaining_budget < 0 else "WARNING"
+            message = "Your plan exceeds recorded disposable cash flow. The daily guide follows the plan; check funding, savings and unrecorded bills separately."
+
         return {
-            "today_spending": round(today_spending, 2),
-            "safe_daily_spend": round(max(0, safe_daily_spend), 2),
-            "remaining_budget": round(remaining_budget, 2),
+            "today_spending": money_float(today_spending),
+            "safe_daily_spend": money_float(max(0, safe_daily_spend)) if available else None,
+            "remaining_budget": money_float(remaining_budget) if available else None,
             "days_remaining": days_remaining,
-            "avg_daily_spending": round(avg_daily_spending, 2),
+            "avg_daily_spending": money_float(avg_daily_spending),
             "status": status,
-            "message": self._get_affordability_message(status, safe_daily_spend, today_spending),
+            "message": message,
+            "basis": "saved_plan" if plan is not None else "canonical_disposable_cash_flow" if income_evidenced else "unavailable",
+            "income_evidenced": income_evidenced,
             "financial_baseline": baseline,
         }
 
     def forecast_finances(self, user, months_ahead: int = 6) -> Dict[str, any]:
-        """
-        Estimate the next N calendar months from recent recorded living costs.
-        """
-        # A transparent planning estimate based on observed living costs.
-        # Missing months are not observations of zero spending.
-        baseline = resolve_canonical_financial_baseline(user)
-        avg_expense = float(baseline.get("observed_average_monthly_variable_spend", 0) or 0)
-        has_history = baseline.get("metric_states", {}).get("observed_average_monthly_variable_spend", {}).get("status") != "unavailable"
-        trend = "held_constant" if has_history else "unknown"
-        monthly_income = float(baseline.get("monthly_income", 0) or 0)
-        fixed_obligations = float(baseline.get("fixed_obligations", 0) or 0)
-
-        forecasts = []
+        """A dated planning estimate, with observed errors rather than invented confidence."""
+        if type(months_ahead) is not int or not 1 <= months_ahead <= 24:
+            raise ValueError("Forecast horizon must be an integer from 1 to 24 months.")
         today = timezone.localdate()
-        for i in range(months_ahead):
-            predicted_expense = avg_expense
-            predicted_savings = monthly_income - predicted_expense - fixed_obligations
+        expenses = list(Expense.objects.filter(user=user, transaction_date__lte=today))
+        baseline = resolve_canonical_financial_baseline(user, expenses=expenses, reference_date=today)
+        monthly_income = Decimal(str(baseline.get("monthly_income", 0) or 0))
+        fixed_obligations = Decimal(str(baseline.get("fixed_obligations", 0) or 0))
+        income_known = baseline.get("metric_states", {}).get("monthly_income", {}).get("status", "unavailable") != "unavailable"
+        by_month = defaultdict(Decimal)
+        for expense, amount in variable_spend_rows(expenses, monthly_housing=user.rent_or_emi):
+            if expense.transaction_date < today.replace(day=1):
+                by_month[(expense.transaction_date.year, expense.transaction_date.month)] += amount
+        history = sorted(by_month.items())[-12:]
+        def average(values):
+            return (sum(values, Decimal("0")) / len(values)).quantize(Decimal(".01"), rounding=ROUND_HALF_UP)
+        recent = [amount for _, amount in history[-3:]]
+        avg_expense = average(recent) if recent else None
+        available = bool(recent) and income_known
+        forecasts = []
+        for i in range(months_ahead if available else 0):
+            predicted_savings = monthly_income - avg_expense - fixed_obligations
             month_index = today.year * 12 + today.month + i
             forecast_month = today.replace(year=month_index // 12, month=month_index % 12 + 1, day=1)
             forecasts.append({
                 "month": forecast_month.strftime("%B %Y"),
-                "predicted_expense": round(predicted_expense, 2),
-                "predicted_savings": round(predicted_savings, 2),
-                "cumulative_savings": round(predicted_savings * (i + 1), 2),
+                "month_key": forecast_month.strftime("%Y-%m"),
+                "predicted_expense": money_float(avg_expense),
+                "predicted_savings": money_float(predicted_savings),
+                "cumulative_savings": money_float(predicted_savings * (i + 1)),
             })
-
+        observations = [{"month": f"{year:04}-{month:02}", "living_spend": money_float(amount)} for (year, month), amount in history]
+        uncertainty = {"status": "UNAVAILABLE", "coverage_probability": None,
+                       "method": "At least three completed recorded months are needed for an observed range; no calibrated prediction interval is available."}
+        if len(recent) >= 3:
+            uncertainty.update(status="HISTORICAL_RANGE", expense_low=money_float(min(recent)), expense_high=money_float(max(recent)),
+                savings_low=money_float(monthly_income-fixed_obligations-max(recent)) if income_known else None,
+                savings_high=money_float(monthly_income-fixed_obligations-min(recent)) if income_known else None,
+                method="Range of the latest three completed recorded months; not a prediction interval or a bound on future spending.")
+        holdouts = []
+        errors = []
+        for index in range(3, len(history)):
+            predicted = average([amount for _, amount in history[index-3:index]])
+            actual = history[index][1]
+            errors.append(abs(actual-predicted))
+            holdouts.append({"month": observations[index]["month"], "training_through": observations[index-1]["month"],
+                             "predicted_expense": money_float(predicted), "actual_expense": money_float(actual)})
         return {
-            "current_monthly_expense_avg": round(avg_expense, 2),
-            "trend": trend,
-            "forecasts": forecasts if has_history and monthly_income > 0 else [],
-            "method": "Recent living-spend average; income and fixed costs held constant. Before investments and card settlements.",
-            "insights": self._generate_forecast_insights(forecasts, trend) if has_history and monthly_income > 0 else ["Add income and spending history before using a forecast."],
+            "as_of": today.isoformat(),
+            "status": "PLANNING_ESTIMATE" if available else "UNAVAILABLE",
+            "current_monthly_expense_avg": money_float(avg_expense) if recent else None,
+            "trend": "held_constant" if recent else "unknown",
+            "forecasts": forecasts,
+            "method": "Average of up to three completed recorded living-spend months; income and fixed costs held constant. Future and current partial months excluded.",
+            "observations": observations,
+            "uncertainty": uncertainty,
+            "backtest": {"status": "OBSERVED_ERROR" if errors else "UNAVAILABLE", "samples": len(errors),
+                         "mae": money_float(average(errors)) if errors else None, "holdouts": holdouts,
+                         "method": "Walk-forward one observed month ahead using only the preceding three observed months; sparse months are not filled with zero."},
+            "calibration_status": "NOT_CALIBRATED",
+            "assumptions": ["Recorded months may be incomplete; missing months are unknown, not zero.",
+                            "Before investments, card settlements and unrecorded bills; not a forecast of bank balances.",
+                            "Observed spending error does not validate future income or fixed-cost assumptions."],
+            "insights": self._generate_forecast_insights(forecasts, "held_constant") if available else ["Add income evidence and a completed recorded spending month before using a forecast."],
             "financial_baseline": baseline,
         }
 
@@ -242,10 +293,10 @@ class BudgetIntelligenceService:
 
         expenses = list(Expense.objects.filter(user=user, transaction_date__lte=timezone.localdate()))
         recent_months = sorted({(item.transaction_date.year, item.transaction_date.month) for item in expenses})[-3:]
-        category_totals = defaultdict(float)
+        category_totals = defaultdict(Decimal)
         for expense, amount in variable_spend_rows(expenses, monthly_housing=user.rent_or_emi):
             if (expense.transaction_date.year, expense.transaction_date.month) in recent_months:
-                category_totals[expense.category] += float(amount)
+                category_totals[expense.category] += amount
 
         for category, _ in Expense.CATEGORY_CHOICES:
             if category in ["income", "transfer", "loan", "credit_card", "investment"]:
@@ -256,19 +307,19 @@ class BudgetIntelligenceService:
                 continue
 
             # Blend historical data with ideal allocation
-            ideal_allocation = (disposable_income * self.CATEGORY_ALLOCATION.get(category, 5) / 100) * city_multiplier
+            ideal_allocation = (Decimal(str(disposable_income)) * self.CATEGORY_ALLOCATION.get(category, 5) / 100) * Decimal(str(city_multiplier))
 
             # Weight: 60% ideal, 40% historical
-            suggested_budget = (ideal_allocation * 0.6) + (historical_avg * 0.4) if historical_avg > 0 else ideal_allocation
+            suggested_budget = (ideal_allocation * Decimal("0.6")) + (historical_avg * Decimal("0.4")) if historical_avg > 0 else ideal_allocation
 
             category_budgets[category] = {
-                "suggested": round(suggested_budget, 2),
-                "historical_avg": round(historical_avg, 2),
+                "suggested": suggested_budget,
+                "historical_avg": money_float(historical_avg),
             }
 
-        total = sum(item["suggested"] for item in category_budgets.values())
-        for item in category_budgets.values():
-            item["suggested"] = round(item["suggested"] / total * disposable_income, 2) if total else 0
+        limits = allocate_budget(disposable_income, {key: item["suggested"] for key, item in category_budgets.items()})
+        for key, item in category_budgets.items():
+            item["suggested"] = money_float(limits[key])
         return category_budgets
 
     def _calculate_daily_expenditure(self, disposable_income: float) -> float:
@@ -324,16 +375,18 @@ class BudgetIntelligenceService:
         """Generate insights from financial forecasts."""
         insights = []
 
-        total_predicted_savings = sum(f["predicted_savings"] for f in forecasts)
+        total_predicted_savings = sum((Decimal(str(f["predicted_savings"])) for f in forecasts), Decimal("0"))
 
         if total_predicted_savings > 0:
             insights.append(
                 f"Estimated income left before investments and card payments: ₹{total_predicted_savings:,.0f} over {len(forecasts)} months."
             )
-        else:
+        elif total_predicted_savings < 0:
             insights.append(
                 f"⚠️ Current trajectory shows negative savings. Reduce discretionary spending."
             )
+        else:
+            insights.append("The estimate breaks even before investments, card payments and unrecorded bills.")
 
         if trend == "increasing":
             insights.append(

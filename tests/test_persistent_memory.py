@@ -6,17 +6,18 @@ import json
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 import sqlite3
+import time
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase, SimpleTestCase
 
 from apps.ml_engine.services.local_embeddings import OllamaEmbeddings, EmbeddingUnavailable, validate_vector
-from apps.ml_engine.services.persistent_memory import MemoryStore
+from apps.ml_engine.services.persistent_memory import MemoryStore, RETRIEVAL_PROTOCOLS, _specific_sources
 
 
 class SyntheticEmbeddings:
-    def embed(self, text):
+    def embed(self, text, *, deadline=None):
         return ([1, 0, 0] if any(term in text.lower() for term in ('mountain', 'hiking', 'peaks')) else [0, 1, 0]), 'synthetic-model-v1'
 
 
@@ -161,6 +162,67 @@ class PersistentMemoryTests(TestCase):
         with self.assertRaises(EmbeddingUnavailable):
             self.store.retrieve(self.alice, 'synthetic')
 
+    def test_experimental_statement_projection_preserves_canonical_content_and_owner_restore(self):
+        calls=[]
+        embedder=Mock(); embedder.embed.side_effect=lambda text,**kwargs: (calls.append(text) or [1,0,0],'synthetic-model-v1')
+        store=MemoryStore(self.directory,embedder=embedder,retrieval_protocol=RETRIEVAL_PROTOCOLS[1])
+        content={'statement':'Fictional blue pottery preference'}
+        identity=store.save_verified(self.alice,content,{'source':'Synthetic owner review'},verified=True)
+        self.assertEqual(calls[0],content['statement'])
+        self.assertEqual(store.list_memories(self.alice)[0]['content'],content)
+        self.assertEqual(store.retrieve(self.bob,'pottery',min_score=.45),[])
+        self.assertEqual(store.restore_owner(self.alice),1)
+        self.assertEqual(store.retrieve(self.alice,'pottery',min_score=.45)[0]['id'],identity)
+        with self.assertRaises(EmbeddingUnavailable): self.store.retrieval_profile(self.alice)
+        with self.assertRaises(EmbeddingUnavailable): self.store.retrieve(self.alice,'pottery')
+        structured={'amount':'42.50','verified':True}
+        store.save_verified(self.bob,structured,{'source':'Synthetic structured record'},verified=True)
+        self.assertEqual(json.loads(calls[-1]),structured)
+        for path in store.directory.iterdir():
+            if path.is_file(): self.assertNotIn(b'blue pottery',path.read_bytes())
+
+    def test_new_protocol_never_silently_rewrites_existing_index_or_duplicates(self):
+        from apps.ml_engine.services.memory_learning import MemoryLearning
+        identity=self.save(); before=self.store.list_memories(self.alice)
+        candidate=MemoryStore(self.directory,embedder=SyntheticEmbeddings(),retrieval_protocol=RETRIEVAL_PROTOCOLS[1])
+        with patch.object(candidate.embedder,'embed') as embed:
+            with self.assertRaises(EmbeddingUnavailable): candidate.retrieve(self.alice,'mountain')
+            embed.assert_not_called()
+        self.assertEqual(candidate.list_memories(self.alice),before)
+        revised=MemoryLearning(candidate).revise(self.alice,[identity],None,verified=True,reembed=True)
+        self.assertNotEqual(identity,revised)
+        self.assertEqual(candidate.list_memories(self.alice)[0]['content'],before[0]['content'])
+        self.assertEqual(candidate.retrieve(self.alice,'mountain')[0]['id'],revised)
+
+    def test_specificity_drops_partial_tail_matches_without_top_one_or_cosine_relabeling(self):
+        rows=[dict(id='a',content={'statement':'Fictional Tess enjoys beach walks'},score=.9),
+            dict(id='b',content={'statement':'Fictional Tess avoids beach walks'},score=.8),
+            dict(id='c',content={'statement':'Fictional Tess enjoys forest walks'},score=.7)]
+        result=_specific_sources('Where are beach walks preferred?',rows)
+        self.assertEqual([row['id'] for row in result],['a','b'])
+        self.assertEqual([row['score'] for row in result],[.9,.8])
+        self.assertEqual(_specific_sources('A wholly paraphrased request',rows),rows)
+        self.assertEqual(_specific_sources('beach forest',rows),rows)
+
+    def test_specificity_cannot_suppress_live_dense_fallback_with_low_or_deleted_lexical_match(self):
+        for removed in (False,True):
+            with self.subTest(removed=removed):
+                directory=self.enterContext(TemporaryDirectory(prefix='alfred-specificity-synthetic-'))
+                embedder=Mock()
+                vectors={'Fictional Sal ceramic glazing':[.2,.979795897,0],
+                    'Fictional Sal makes durable bowls':[.8,.6,0], 'ceramic glazing':[1,0,0]}
+                if removed: vectors['Fictional Sal ceramic glazing']=[.95,.3122498999,0]
+                embedder.embed.side_effect=lambda text,**kwargs:(vectors[text],'synthetic-specificity-v1')
+                store=MemoryStore(directory,embedder=embedder,retrieval_protocol=RETRIEVAL_PROTOCOLS[1])
+                low=store.save_verified(self.alice,{'statement':'Fictional Sal ceramic glazing'},{'source':'Synthetic low match'},verified=True)
+                high=store.save_verified(self.alice,{'statement':'Fictional Sal makes durable bowls'},{'source':'Synthetic paraphrase'},verified=True)
+                def during_query(text,**kwargs):
+                    if removed: store.delete_memory(self.alice,low)
+                    return vectors[text],'synthetic-specificity-v1'
+                embedder.embed.side_effect=during_query
+                result=store.retrieve(self.alice,'ceramic glazing',min_score=.45)
+                self.assertEqual([row['id'] for row in result],[high]); self.assertEqual(result[0]['score'],.8)
+
     def test_verified_content_and_provenance_are_snapshotted_before_embedding(self):
         content = {'preference': 'Quiet mountain travel'}
         provenance = {'source': 'synthetic verified source'}
@@ -190,6 +252,19 @@ class PersistentMemoryTests(TestCase):
 
 
 class LocalEmbeddingBoundaryTests(SimpleTestCase):
+    def test_shared_deadline_reaches_model_checks_and_embedding_request(self):
+        client=OllamaEmbeddings(); deadline=time.monotonic()+60
+        with patch.object(client,'_digest',return_value='a'*64) as digest,patch.object(client,'_request',return_value={'embeddings':[[1,0]]}) as request:
+            self.assertEqual(client.embed('synthetic query',deadline=deadline)[0],[1,0])
+        self.assertEqual(digest.call_count,2)
+        self.assertTrue(all(call.kwargs=={'deadline':deadline} for call in digest.call_args_list))
+        self.assertEqual(request.call_args.kwargs,{'deadline':deadline})
+
+    def test_expired_embedding_deadline_never_opens_connection(self):
+        with patch('apps.ml_engine.services.local_embeddings.HTTPConnection') as connect,self.assertRaises(EmbeddingUnavailable):
+            OllamaEmbeddings().embed('synthetic query',deadline=time.monotonic()-1)
+        connect.assert_not_called()
+
     def test_vectors_reject_empty_zero_nan_infinite_and_malformed_values(self):
         for value in ([], [0, 0], [float('nan')], [float('inf')], [True], ['synthetic'], [1] * 4097):
             with self.assertRaises(EmbeddingUnavailable):

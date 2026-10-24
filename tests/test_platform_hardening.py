@@ -74,10 +74,10 @@ class OutboundUrlSafetyTests(TestCase):
         "alfred_ai.services.url_safety.socket.getaddrinfo",
         return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))],
     )
-    @patch("apps.career.services.job_intelligence.requests.get")
+    @patch("apps.career.services.job_intelligence.public_http.request")
     def test_job_page_parser_allows_public_targets(self, requests_get, _getaddrinfo):
         response = Mock()
-        response.text = """
+        response.content = b"""
             <html>
                 <head><title>Backend Engineer</title></head>
                 <body>
@@ -85,7 +85,7 @@ class OutboundUrlSafetyTests(TestCase):
                 </body>
             </html>
         """
-        response.raise_for_status = Mock()
+        response.url = "https://example.com/jobs/backend-engineer"
         requests_get.return_value = response
 
         snapshot = job_intelligence.parse_job_page("https://example.com/jobs/backend-engineer")
@@ -113,7 +113,9 @@ class OutboundUrlSafetyTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("allowed", response.json()["detail"].lower())
+        self.assertEqual(response.json()["detail"], "Job page could not be parsed. Check the URL and try again.")
+        self.assertIn("error_id", response.json())
+        self.assertNotIn("127.0.0.1", response.content.decode())
 
 
 class ApiPaginationTests(TestCase):

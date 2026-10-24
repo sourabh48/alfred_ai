@@ -197,7 +197,9 @@ class PortfolioIntelligenceService:
         Scrape user's email for investment-related communications.
         Looks for broker statements, mutual fund updates, etc.
         """
-        from apps.integrations.services.email_integration import email_integration_service
+        from apps.integrations.services.email_integration import EmailIntegrationService
+
+        email_integration_service = EmailIntegrationService()
 
         email_config = email_config or {}
         try:

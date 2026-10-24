@@ -1,4 +1,5 @@
 from django.conf import settings
+from apps.expenses.money import ExpenseMoneyField
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -57,8 +58,8 @@ class BikeProfile(models.Model):
     tyre_rear_spec = models.CharField(max_length=40, blank=True)
     fuel_type = models.CharField(max_length=20, blank=True, default="petrol")
     usage_pattern = models.CharField(max_length=20, choices=USAGE_PATTERN_CHOICES, default="personal")
-    estimated_market_value = models.FloatField(default=0)
-    monthly_income_support = models.FloatField(default=0)
+    estimated_market_value = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
+    monthly_income_support = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
     catalog_key = models.CharField(max_length=80, blank=True)
     official_source_name = models.CharField(max_length=120, blank=True)
     official_source_url = models.URLField(blank=True)
@@ -102,7 +103,7 @@ class BikeServiceRecord(models.Model):
     service_date = models.DateField()
     odometer_km = models.PositiveIntegerField(default=0)
     service_type = models.CharField(max_length=20, choices=SERVICE_TYPE_CHOICES, default="routine")
-    cost = models.FloatField(default=0)
+    cost = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
     service_center = models.CharField(max_length=160, blank=True)
     next_service_date = models.DateField(null=True, blank=True)
     next_service_km = models.PositiveIntegerField(null=True, blank=True)
@@ -134,7 +135,7 @@ class FuelRefillLog(models.Model):
     odometer_km = models.PositiveIntegerField(null=True, blank=True)
     trip_meter_km = models.FloatField(default=0)
     fuel_liters = models.FloatField(default=0)
-    total_cost = models.FloatField(default=0)
+    total_cost = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
     is_full_tank = models.BooleanField(default=True)
     station_name = models.CharField(max_length=160, blank=True)
     notes = models.TextField(blank=True)
@@ -179,7 +180,7 @@ class TravelPlan(models.Model):
     destination = models.CharField(max_length=200, null=True, blank=True)
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
-    budget = models.FloatField(default=0)
+    budget = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
     transport_mode = models.CharField(max_length=20, choices=TRANSPORT_MODE_CHOICES, default="ride")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="planned")
     stay_details = models.CharField(max_length=200, blank=True)
@@ -354,7 +355,7 @@ class TripLog(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
     distance_km = models.FloatField(default=0)
-    spend_amount = models.FloatField(default=0)
+    spend_amount = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
     mood = models.CharField(max_length=80, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -436,8 +437,8 @@ class BikeIssueReport(models.Model):
     probable_cause = models.CharField(max_length=220, blank=True)
     suggested_action = models.TextField(blank=True)
     service_center_note = models.TextField(blank=True)
-    projected_cost = models.FloatField(default=0)
-    actual_cost = models.FloatField(null=True, blank=True)
+    projected_cost = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
+    actual_cost = ExpenseMoneyField(max_digits=14, decimal_places=2, null=True, blank=True)
     tags = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -486,7 +487,7 @@ class BikeDocument(models.Model):
     document_number = models.CharField(max_length=120, blank=True)
     issue_date = models.DateField(null=True, blank=True)
     expiry_date = models.DateField(null=True, blank=True)
-    premium_amount = models.FloatField(default=0)
+    premium_amount = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
     verification_status = models.CharField(max_length=20, choices=VERIFICATION_STATUS_CHOICES, default="incomplete")
     verification_notes = models.TextField(blank=True)
     document_file = models.FileField(upload_to="bike_documents/%Y/%m/", blank=True)
@@ -546,3 +547,25 @@ class BikeConditionSnapshot(models.Model):
 
     def __str__(self):
         return f"{self.bike_name} condition {self.overall_score}"
+
+
+class MobilityMoneySnapshot(models.Model):
+    source_model = models.CharField(max_length=40)
+    original_source_id = models.PositiveBigIntegerField()
+    original_parent_ids = models.JSONField(default=dict)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mobility_money_snapshots")
+    bike_profile = models.ForeignKey(BikeProfile, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    service_record = models.ForeignKey(BikeServiceRecord, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    fuel_refill = models.ForeignKey(FuelRefillLog, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    travel_plan = models.ForeignKey(TravelPlan, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    trip_log = models.ForeignKey(TripLog, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    issue_report = models.ForeignKey(BikeIssueReport, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    document = models.ForeignKey(BikeDocument, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")
+    source_values = models.JSONField()
+    normalized_values = models.JSONField()
+    policy = models.CharField(max_length=30, default="mobility-money-v1")
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["source_model", "original_source_id"], name="mobility_money_source_unique")]

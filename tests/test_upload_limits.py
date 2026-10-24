@@ -11,6 +11,7 @@ import sys
 from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.test.client import encode_multipart
@@ -27,7 +28,12 @@ class UploadHTTPTests(TestCase):
         self.client.force_login(self.user)
         directory = self.enterContext(TemporaryDirectory(prefix="alfred-upload-tests-"))
         self.directory = Path(directory)
-        self.enterContext(override_settings(MEDIA_ROOT=directory, FILE_UPLOAD_TEMP_DIR=directory))
+        from alfred_private_storage import private_directory
+        private_directory(self.directory)
+        throttles = self.enterContext(TemporaryDirectory(prefix="alfred-upload-throttles-"))
+        private_directory(throttles)
+        self.enterContext(override_settings(MEDIA_ROOT=directory, FILE_UPLOAD_TEMP_DIR=directory,
+                                           ALFRED_ABUSE_THROTTLE_DIR=throttles))
 
     def upload(self, size, **extra):
         return self.client.post("/api/career/resumes/upload/", {
@@ -127,6 +133,21 @@ class UploadHTTPTests(TestCase):
                 content_type="multipart/form-data; boundary=boundary", CONTENT_LENGTH=length)
             self.assertEqual(response.status_code, 400)
         self.assertEqual(CareerResume.objects.count(), 0)
+
+    def test_permission_denial_keeps_safe_403_on_bounded_multipart_request(self):
+        from alfred_ai.services.upload_limits import UploadProtectionMiddleware
+        request = RequestFactory().post("/project-details/career-outcomes/", {"analysis": "1"})
+        request._bounded_upload = True
+        response = UploadProtectionMiddleware(lambda request: None).process_exception(
+            request, PermissionDenied("SYNTHETIC-PRIVATE-PERMISSION-DETAIL"))
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(json.loads(response.content), {"detail": "You do not have permission to perform this action."})
+
+    @override_settings(ALFRED_EXPENSIVE_ACCOUNT_LIMIT=1)
+    def test_isolated_upload_fixture_keeps_actual_throttle_enforced(self):
+        self.assertEqual(self.upload(10).status_code, 201)
+        self.assertEqual(self.upload(10).status_code, 429)
+        self.assertEqual(CareerResume.objects.count(), 1)
 
     def test_unavailable_temporary_directory_has_safe_503_response(self):
         with patch("alfred_ai.services.upload_limits.shutil.disk_usage", side_effect=OSError("PRIVATE temporary path")):

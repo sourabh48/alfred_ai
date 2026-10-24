@@ -1,5 +1,7 @@
 # Human acceptance checks
 
+**Current checklist — 2026-10-15:** Use [end-to-end acceptance](ALFRED_END_TO_END_ACCEPTANCE.md) for the integrated M15 baseline and all modules. Normal existing-account sign-in and visual acceptance remain PENDING. Historical HTTP/synthetic Chrome PASS does not close them. Credentials are entered normally, never in chat; account recovery/reset needs explicit authorization. Live delete/reset and financial corrections need specific approval.
+
 Record the ALFRED executable SHA-256, Windows version, browser/version, date and
 the tester's observations. Use disposable test accounts and checked synthetic or
 anonymized documents. Automated browser/accessibility results do not replace

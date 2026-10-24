@@ -322,7 +322,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.record.service_center, "Jagadamba Automobiles")
         self.assertEqual(str(self.record.service_date), "2026-03-31")
         self.assertEqual(self.record.odometer_km, 26021)
-        self.assertAlmostEqual(self.record.cost, 2432.92)
+        self.assertEqual(self.record.cost, Decimal('2432.92'))
         self.assertEqual(
             self.record.parsed_payload["review_trace"]["accepted_corrections"]["service_center"],
             "Jagadamba Automobiles",

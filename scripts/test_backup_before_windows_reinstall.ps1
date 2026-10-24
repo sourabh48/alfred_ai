@@ -24,6 +24,8 @@ with tempfile.TemporaryDirectory(prefix='alfred-private-backup-test-') as tempor
     (repo / 'scripts').mkdir(parents=True)
     script = repo / 'scripts/backup_before_windows_reinstall.ps1'
     shutil.copyfile(os.environ['ALFRED_BACKUP_TEST_SCRIPT'], script)
+    shutil.copyfile(Path(os.environ['ALFRED_BACKUP_TEST_SCRIPT']).resolve().parents[1] / 'alfred_private_storage.py',
+                    repo / 'alfred_private_storage.py')
     for name in ('config', 'media/uploads', 'ml_models/alfred/model_registry', 'artifacts/native/cache'):
         (repo / name).mkdir(parents=True)
     (repo / 'config/native.env').write_text('DJANGO_SECRET_KEY=synthetic-test-only\n')

@@ -1,7 +1,34 @@
 from rest_framework import serializers
+from apps.users.money import ProfileMoneySerializerField
+from apps.expenses.money import NumericMoneySerializerField
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 
+
+class CareerOpportunitySerializer(serializers.ModelSerializer):
+    outcome = serializers.SerializerMethodField()
+    salary_evidence = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CareerJobAnalysis
+        fields = ('id','company','job_title','location','job_url','updated_at','outcome','salary_evidence')
+
+    def get_outcome(self, obj):
+        payload = obj.extracted_payload if isinstance(obj.extracted_payload, dict) else {}
+        outcome = payload.get('opportunity_outcome')
+        fields = ('outcome','salary_min','salary_max','salary_currency','salary_period','decided_at',
+                  'source_url','location','notes','rejection_reason','verification')
+        return {key:outcome[key] for key in fields if key in outcome} if isinstance(outcome,dict) else {}
+
+    def get_salary_evidence(self, obj):
+        payload = obj.extracted_payload if isinstance(obj.extracted_payload, dict) else {}
+        snapshot = payload.get('job_snapshot')
+        fields = ('salary_min','salary_max','salary_currency','salary_period')
+        return {key:snapshot[key] for key in fields if key in snapshot} if isinstance(snapshot,dict) else {}
+
+
 class CareerProfileSerializer(serializers.ModelSerializer):
+    last_salary = NumericMoneySerializerField(required=False)
+
     class Meta:
         model = CareerProfile
         fields = "__all__"
@@ -55,6 +82,7 @@ class CareerResumeSerializer(serializers.ModelSerializer):
 
 
 class CareerJobAnalysisSerializer(serializers.ModelSerializer):
+    fit_score = serializers.FloatField(source="available_fit_score", read_only=True, allow_null=True)
     parser_status_label = serializers.CharField(source="get_parser_status_display", read_only=True)
 
     class Meta:
@@ -108,9 +136,9 @@ class CareerJobAnalysisSerializer(serializers.ModelSerializer):
 
 
 class CareerProjectionScenarioSerializer(serializers.Serializer):
-    monthly_income = serializers.FloatField(required=False, min_value=0)
-    variable_income = serializers.FloatField(required=False, min_value=0)
-    rent_or_emi = serializers.FloatField(required=False, min_value=0)
+    monthly_income = ProfileMoneySerializerField(required=False)
+    variable_income = ProfileMoneySerializerField(required=False)
+    rent_or_emi = ProfileMoneySerializerField(required=False)
     city = serializers.CharField(required=False, allow_blank=True, max_length=100)
     experience_years = serializers.FloatField(required=False, min_value=0)
     skills = serializers.ListField(

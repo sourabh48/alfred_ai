@@ -1,5 +1,7 @@
 # Install and use Alfred - Finance Assistant
 
+**Release/acceptance boundary — 2026-10-15:** M15 AI/UI source 3932f391 was deployed locally; packaged synthetic acceptance does not certify installation on a fresh PC. Preserve existing data/config/keys and use the existing launcher with its selected data directory. New-account initialization examples below are for new isolated installs, never a restored private installation. Separate-PC install/upgrade/uninstall, Windows sign-in and normal-account acceptance remain pending. See [acceptance plan](ALFRED_END_TO_END_ACCEPTANCE.md).
+
 **[Open this guide as a website](https://sourabh48.github.io/alfred_ai/guide/)** · A product of Life on our Trails
 
 [← Project overview](../README.md) · [Windows downloads](https://github.com/sourabh48/alfred_ai/releases/tag/v1.1.0-preview.1) · [Developer setup](DEVELOPMENT.md)

@@ -1,5 +1,13 @@
 # Windows reinstall checklist
 
+## Current gate — 2026-10-15
+
+Main source: F:/ALFRED/alfred_ai at 3932f391; data: F:/ALFRED/restored-runtime. M15 deployment/push completed. Local restoration passed; HDD copy is user reported and independent device-loss recovery is UNVERIFIED. Windows wipe is not authorized/certified by the M15-only waiver. Cancelled passphrase workflows remain cancelled.
+
+Use the newest actual manifest and [four recovery gates](ALFRED_END_TO_END_ACCEPTANCE.md); verify keys outside the old profile, authentic disposable restoration, financial/family ownership and durable coverage. Keep all backups. Current source checks use master, not the old native-hardening branch. Dated 17-DB/OneDrive paths/counts/prompts below are historical for their archive, not a new recovery plan.
+
+## Historical pre-reinstall checklist
+
 This checklist covers preparation before complete PC cleanup. `F:\ALFRED` is the actual checkout. The user reports uploading the prepared encrypted Desktop bundle to OneDrive; cloud recovery remains unverified. Follow `WINDOWS_ENCRYPTED_RECOVERY.md` and do not wipe until permanent source and the chosen retained backup pass verification. A pendrive or PRIVATE GitHub/LFS repository remains an alternative.
 
 ## Before reinstall

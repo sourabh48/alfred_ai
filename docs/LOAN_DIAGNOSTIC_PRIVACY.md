@@ -1,5 +1,7 @@
 # Loan diagnostic privacy (M14F)
 
+**Integrated status — 2026-10-15:** M14F safe current errors, logging/persistence and historical response filtering are in deployed 3932f391. Do not restart M14F because a dated development note reports no live promotion. Preserve safe categories/reference IDs and parser budgets; real document acceptance remains separate. [Matrix](PROJECT_STATUS.md).
+
 Loan import and payoff APIs use the existing class/reference-only error logger.
 Exception messages, causes, tracebacks, document bytes and OCR text are never
 formatted into their errors. Each failure has a random error reference that can

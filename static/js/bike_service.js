@@ -13,6 +13,7 @@ const bikeState = {
     catalogRequestKey: "",
     editingProfileId: null,
     catalogInteractionUntil: 0,
+    serverDate: null,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -39,6 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("bikeServiceImportForm").addEventListener("submit", submitBikeServiceImport);
     document.getElementById("bikeServiceRecordForm").addEventListener("submit", submitBikeServiceRecord);
     document.getElementById("bikeRefillForm").addEventListener("submit", submitBikeRefill);
+    const refillDate = document.getElementById("bikeRefillDate");
+    refillDate.addEventListener("input", () => { refillDate.dataset.edited = "true"; });
     document.getElementById("bikeIssueForm").addEventListener("submit", submitBikeIssue);
     document.getElementById("bikeDocumentForm").addEventListener("submit", submitBikeDocumentUpload);
     document.getElementById("bikeConditionForm").addEventListener("submit", submitBikeCondition);
@@ -54,6 +57,9 @@ document.addEventListener("DOMContentLoaded", () => {
 function loadBikeServiceDashboard(options = {}) {
     return Alfred.fetchJSON("/api/mobility/bike-service-dashboard/")
         .then(data => {
+            bikeState.serverDate = data.current_date || bikeState.serverDate;
+            const refillDate = document.getElementById("bikeRefillDate");
+            if (bikeState.serverDate && !refillDate.dataset.edited) refillDate.value = bikeState.serverDate;
             const selectedMake = document.getElementById("bikeCatalogMakeSelect")?.value || "";
             const catalogLocked = isBikeCatalogInteractionActive();
             const profileEditorLocked = isBikeProfileEditorDirty();
@@ -567,14 +573,14 @@ function renderBikeRefills(items) {
     Alfred.setHTMLIfChanged(target, items.length ? items.map(item => `
         <div class="mini-card timeline-card">
             <div class="d-flex justify-content-between gap-3 align-items-start">
-                <div>
+                <div style="min-width: 0; overflow-wrap: anywhere;">
                     <div class="fw-semibold">${Alfred.escapeHtml(item.bike_name)} <span class="muted small">${Alfred.formatDate(item.refill_date)}</span></div>
-                    <div class="muted small">${item.trip_meter_km ? `${Alfred.formatNumber(item.trip_meter_km, 1)} km` : "Trip value not saved"} | ${Alfred.formatNumber(item.fuel_liters || 0, 2)} L${item.odometer_km ? ` | ${Alfred.formatNumber(item.odometer_km, 0)} km odo` : ""}</div>
+                    <div class="muted small">${item.trip_meter_km ? `${Alfred.formatNumber(item.trip_meter_km, 1)} km` : "Trip value not saved"} | ${Alfred.escapeHtml(String(item.fuel_liters || 0))} L${item.odometer_km ? ` | ${Alfred.formatNumber(item.odometer_km, 0)} km odo` : ""}</div>
                     <div class="muted small">${item.actual_mileage_kmpl ? `${Alfred.formatNumber(item.actual_mileage_kmpl, 1)} kmpl` : "Mileage not derivable yet"}${item.fuel_price_per_liter ? ` | ${Alfred.formatCurrency(item.fuel_price_per_liter)} / L` : ""}</div>
                     <div class="muted small">${item.station_name ? Alfred.escapeHtml(item.station_name) : "Pump not saved"}${item.is_full_tank ? " | full tank" : " | partial refill"}</div>
                     ${item.notes ? `<div class="muted small mt-2">${Alfred.escapeHtml(item.notes)}</div>` : ""}
                 </div>
-                <div class="text-end">
+                <div class="text-end flex-shrink-0">
                     <strong>${Alfred.formatCurrency(item.total_cost || 0)}</strong>
                     <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeRefill(${item.id})">Delete</button></div>
                 </div>
@@ -662,7 +668,7 @@ function renderBikeServiceLogs(items) {
     Alfred.setHTMLIfChanged(target, items.length ? items.map(item => `
         <div class="mini-card timeline-card">
             <div class="d-flex justify-content-between gap-3">
-                <div>
+                <div style="min-width: 0; overflow-wrap: anywhere;">
                     <div class="fw-semibold">${Alfred.escapeHtml(item.bike_name)} <span class="muted small">${Alfred.escapeHtml(item.service_type_label)}</span></div>
                     <div class="muted small">${Alfred.formatDate(item.service_date)} | ${Alfred.formatNumber(item.odometer_km, 0)} km | ${Alfred.escapeHtml(item.service_center || "Service center not set")}</div>
                     <div class="muted small">${item.next_service_date ? `Next ${Alfred.formatDate(item.next_service_date)}` : "No next date"}${item.next_service_km ? ` | ${Alfred.formatNumber(item.next_service_km, 0)} km` : ""}</div>
@@ -670,7 +676,7 @@ function renderBikeServiceLogs(items) {
                     ${item.extracted_work_summary ? `<div class="muted small mt-2">${Alfred.escapeHtml(item.extracted_work_summary)}</div>` : ""}
                     ${item.notes ? `<div class="muted small mt-2">${Alfred.escapeHtml(item.notes)}</div>` : ""}
                 </div>
-                <div class="text-end">
+                <div class="text-end flex-shrink-0">
                     <strong>${Alfred.formatCurrency(item.cost || 0)}</strong>
                     <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeServiceRecord(${item.id})">Delete</button></div>
                 </div>
@@ -1512,7 +1518,9 @@ function formatMaybeDateTime(value) {
 
 function setBikeServiceDefaults() {
     document.getElementById("bikeServiceDate").value = todayLocal();
-    document.getElementById("bikeRefillDate").value = todayLocal();
+    const refillDate = document.getElementById("bikeRefillDate");
+    refillDate.value = bikeState.serverDate || todayLocal();
+    delete refillDate.dataset.edited;
     document.getElementById("bikeIssueReportedAt").value = currentDateTimeLocal();
     document.getElementById("bikeConditionCapturedAt").value = currentDateTimeLocal();
     document.getElementById("bikeRefillFullTank").value = "true";
@@ -1532,10 +1540,11 @@ function currentDateTimeLocal() {
 
 function summarizeBikeServiceImportBatch(results) {
     const summary = Alfred.summarizeUploadBatch(results, { itemLabel: "service file", successVerb: "imported" });
-    const createdLogs = summary.succeeded.filter(result => result.data?.service_record).length;
+    const createdLogs = summary.succeeded.filter(result => result.data?.service_record && !result.data?.duplicate).length;
+    const replayed = summary.succeeded.filter(result => result.data?.duplicate).length;
     return {
         ...summary,
-        message: createdLogs ? `${summary.message} ${createdLogs} service log${createdLogs === 1 ? "" : "s"} created.` : summary.message,
+        message: `${summary.message}${createdLogs ? ` ${createdLogs} service log${createdLogs === 1 ? "" : "s"} created.` : ""}${replayed ? ` ${replayed} already imported; existing logs preserved.` : ""}`,
     };
 }
 

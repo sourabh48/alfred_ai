@@ -1,5 +1,7 @@
 # Data Collection And Processing
 
+**Processing scope — 2026-10-15:** M15 encrypted memory is supplementary knowledge, never financial authority. Public-only OpenAI consent is not private-document export permission. Travel uses dedicated provider/research state in addition to VerifiedExternalInsight; Nominatim is not a universally enabled default. OCR/parser confidence and inferred metadata require review. See [provider register](ALFRED_EXTERNAL_INTEGRATIONS.md) for actual implemented/disabled/contract-dependent services.
+
 ## Purpose
 
 This document explains how ALFRED collects, validates, stores, and uses data across the application, with emphasis on proof-backed processing, server-side timestamps, and career-risk timing.

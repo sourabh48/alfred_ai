@@ -7,13 +7,14 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from alfred_ai.local_config import is_public_default_secret, load_local_environment, native_secret_file
+from alfred_private_storage import private_directory
 
 
 class LocalEnvironmentTests(TestCase):
     def test_process_then_local_then_legacy_precedence(self):
         with TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
-            root = Path(directory)
-            (root / "config").mkdir()
+            root = private_directory(Path(directory))
+            private_directory(root / "config")
             (root / "config" / "local.env").write_text(
                 "TRAVEL_WEB_ENABLED=false\nTRAVEL_ORS_API_KEY=local-fixture\n", encoding="utf-8")
             (root / ".env").write_text(
@@ -27,8 +28,8 @@ class LocalEnvironmentTests(TestCase):
 
     def test_reads_only_selected_runtime_and_accepts_missing_files(self):
         with TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
-            root = Path(directory)
-            (root / "config").mkdir()
+            root = private_directory(Path(directory))
+            private_directory(root / "config")
             (root / "config" / "local.env").write_text("TRAVEL_ORS_API_KEY=other-runtime\n", encoding="utf-8")
             load_local_environment(root / "isolated-runtime")
             self.assertNotIn("TRAVEL_ORS_API_KEY", os.environ)
@@ -36,8 +37,8 @@ class LocalEnvironmentTests(TestCase):
     def test_native_secret_file_retains_precedence(self):
         from alfred_native import configure
         with TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
-            root = Path(directory)
-            (root / "config").mkdir()
+            root = private_directory(Path(directory))
+            private_directory(root / "config")
             (root / "config" / "local.env").write_text(
                 "DJANGO_SECRET_KEY=local-fixture\nTRAVEL_ORS_API_KEY=local-provider-fixture\n", encoding="utf-8")
             native = root / "config" / "native.env"
@@ -71,7 +72,7 @@ class LocalEnvironmentTests(TestCase):
         import environ
 
         with TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
-            root = Path(directory)
+            root = private_directory(Path(directory))
             (root / "db.sqlite3").write_bytes(b"retained synthetic database")
             with self.assertRaisesRegex(RuntimeError, "previous DJANGO_SECRET_KEY"):
                 native_secret_file(root)

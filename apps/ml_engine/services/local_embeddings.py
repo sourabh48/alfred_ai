@@ -38,7 +38,7 @@ class OllamaEmbeddings:
                     left=deadline-time.monotonic()
                     if left<=0: raise EmbeddingUnavailable('Local inference deadline exceeded.')
                     sock=connection.sock or response.fp.raw._sock
-                    sock.settimeout(left)
+                    sock.settimeout(min(30,left))
                     chunk=response.read1(min(8192,256*1024+1-len(raw)))
                     if not chunk: break
                     raw.extend(chunk)
@@ -65,15 +65,18 @@ class OllamaEmbeddings:
             raise EmbeddingUnavailable('The local embedding model is unavailable.')
         return digest
 
-    def embed(self, text):
+    def embed(self, text, *, deadline=None):
         if not isinstance(text, str) or not text.strip() or len(text.encode('utf-8')) > 8192:
             raise ValueError('Enter a non-empty memory/query within 8192 bytes.')
-        before = self._digest()
-        result = self._request('POST', '/api/embed', {'model': self.model, 'input': text, 'truncate': False, 'keep_alive': '0'})
+        if deadline is not None and (isinstance(deadline,bool) or not isinstance(deadline,(int,float)) or not isfinite(deadline)):
+            raise ValueError('Choose a finite local processing deadline.')
+        budget={'deadline':deadline} if deadline is not None else {}
+        before = self._digest(**budget)
+        result = self._request('POST', '/api/embed', {'model': self.model, 'input': text, 'truncate': False, 'keep_alive': '0'},**budget)
         try:
             vector = validate_vector(result['embeddings'][0])
         except (KeyError, IndexError, TypeError):
             raise EmbeddingUnavailable('Local embedding response is invalid.') from None
-        if self._digest() != before:
+        if self._digest(**budget) != before:
             raise EmbeddingUnavailable('Local embedding model changed during processing.')
         return vector, f'{self.model}@{before}'

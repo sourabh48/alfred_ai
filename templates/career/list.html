@@ -215,6 +215,19 @@
                 <div id="careerRecruiterFeedback" class="d-none alert mb-0"></div>
             </form>
             <div class="mt-4" id="careerJobMatchPanel"></div>
+            <section class="mt-4" aria-labelledby="careerOutcomesTitle">
+                <h3 id="careerOutcomesTitle" class="h5">Your opportunity outcomes</h3>
+                <p class="small muted">Record your accepted or rejected decision and the salary evidence you reviewed. These are your reports, not independently verified employer decisions.</p>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="careerOutcomesReload">Reload saved opportunities</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="careerOutcomesPrevious" disabled>Previous</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="careerOutcomesNext" disabled>Next</button>
+                </div>
+                <label for="careerOutcomeAnalysis" class="form-label">Opportunity</label>
+                <select id="careerOutcomeAnalysis" class="form-select mb-3"><option value="">Choose an opportunity</option></select>
+                <div id="careerOutcomeListFeedback" class="d-none alert" role="status" aria-live="polite"></div>
+                <div id="careerOutcomeFormPanel"></div>
+            </section>
             <div class="mt-4" id="careerCompensationPanel"></div>
         </div>
     </div>

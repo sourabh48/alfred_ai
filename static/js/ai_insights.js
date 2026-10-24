@@ -6,7 +6,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     loadAIInsights();
-    Alfred.enableLiveRefresh("ai-insights-live", loadAIInsights, { rootId: "aiInsightsRoot" });
+    // Leave the hourly expensive-request budget available for owner actions.
+    Alfred.enableLiveRefresh("ai-insights-live", loadAIInsights, { rootId: "aiInsightsRoot", intervalMs: 300000 });
 });
 
 function loadAIInsights() {

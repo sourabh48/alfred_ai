@@ -6,6 +6,7 @@ from pathlib import Path
 import secrets
 
 import environ
+from alfred_private_storage import private_directory, verify_private
 
 # Fingerprint only: an exposed historical development key remains unsafe.
 PUBLIC_DEFAULT_SECRET_SHA256 = "65056bf67be3ed0122fdbdf34850a71d74805949e7caea67fae0fe63462cb086"
@@ -17,14 +18,17 @@ def load_local_environment(data_dir):
     # Explicit process variables still win; never read another runtime's files.
     for path in (root / "config" / "local.env", root / ".env"):
         if path.is_file():
+            if os.name == "nt" and not verify_private(path.absolute()):
+                raise PermissionError("Private configuration requires authorized permission repair.")
             environ.Env.read_env(path, overwrite=False)
 
 
 def native_secret_file(data_dir):
     """Persist a fresh signing key once; require a retained database's old key."""
     root = Path(data_dir)
+    private_directory(root)
     config = root / "config"
-    config.mkdir(parents=True, exist_ok=True)
+    private_directory(config)
     path = config / "native.env"
     if not path.exists():
         previous = os.environ.get("DJANGO_SECRET_KEY")

@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 
 from .models import User
+from apps.expenses.money import LIMIT
 
 
 class AlfredSignUpForm(UserCreationForm):
@@ -10,9 +11,9 @@ class AlfredSignUpForm(UserCreationForm):
     last_name = forms.CharField(required=False, max_length=150)
     city = forms.CharField(required=False, max_length=100)
     country = forms.CharField(required=False, max_length=100)
-    monthly_income = forms.FloatField(required=False, min_value=0)
-    variable_income = forms.FloatField(required=False, min_value=0)
-    rent_or_emi = forms.FloatField(required=False, min_value=0)
+    monthly_income = forms.DecimalField(required=False, min_value=0, max_value=LIMIT, max_digits=14, decimal_places=2)
+    variable_income = forms.DecimalField(required=False, min_value=0, max_value=LIMIT, max_digits=14, decimal_places=2)
+    rent_or_emi = forms.DecimalField(required=False, min_value=0, max_value=LIMIT, max_digits=14, decimal_places=2)
 
     class Meta(UserCreationForm.Meta):
         model = User

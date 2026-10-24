@@ -46,7 +46,7 @@ MATERIALIZED_ENDPOINT_TARGETS = (
 )
 
 INTERNAL_TARGET_NAMESPACES = (
-    "financial-baseline",
+    "financial-baseline-display-v1",
     "bike-service-dashboard",
     "bike-service-risk-snapshot",
 )
@@ -141,7 +141,7 @@ def run_materialized_cache_traffic_exercise(
             endpoint_results.append({**target, "status_codes": statuses})
 
         internal_callers = {
-            "financial-baseline": lambda: build_canonical_financial_baseline(user),
+            "financial-baseline-display-v1": lambda: build_canonical_financial_baseline(user),
             "bike-service-dashboard": lambda: bike_service_intelligence.build_dashboard(user),
             "bike-service-risk-snapshot": lambda: bike_service_intelligence.risk_snapshot(user),
         }

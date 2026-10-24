@@ -1,5 +1,7 @@
 # Family invitation abuse protection
 
+**Promotion reconciliation — 2026-10-15:** M14 invitation/session/CSRF/consent protections are incorporated in deployed M15 3932f391. The development-only slice note below is historical. family.0004 was applied during M14 deployment, resetting historical financial sharing OFF while preserving relationships. Normal-account invite/revoke/visibility acceptance is still pending. [Matrix](PROJECT_STATUS.md).
+
 Only authenticated POSTs to `/api/family/account-links/` and
 `/api/family/account-links/accept/` consume independent account quotas.
 Authentication and CSRF run first. Invalid, malformed and failed attempts count.
@@ -37,4 +39,4 @@ DoS or cross-account brute-force defense. No Django migration is required.
 
 Verification: isolated API tests plus simultaneous thread/process reservations;
 real Chrome checks throttling feedback, retry acceptance and financial opt-in.
-Development only: source promotion remains a separate controlled operation.
+The original slice was development-only. It is now incorporated in deployed M15; future source promotions remain separately controlled operations.

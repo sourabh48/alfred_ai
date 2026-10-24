@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Statement evidence · ALFRED{% endblock %}
+{% block content %}
+<header class="workspace-heading"><div class="workspace-badge">Private record evidence</div>
+    <h1>{{ evidence.statement.document_name }}</h1>
+    <p>Statement #{{ evidence.statement.document_id }} · Transaction #{{ evidence.transaction_id }} · {{ evidence.current.transaction_date }}</p>
+</header>
+<section class="surface-card" id="statementEvidence" data-record="{{ evidence.transaction_id }}">
+    <h2 class="page-section-title">Review the recorded transaction</h2>
+    <p id="statementEvidenceStatus" role="status">{{ evidence.verification }}</p>
+    <p>Statement period: {{ evidence.statement.statement_start|default:"Not recorded" }} to {{ evidence.statement.statement_end|default:"Not recorded" }}.</p>
+    {% if evidence.source_download_url %}<a href="{{ evidence.source_download_url }}" class="btn btn-outline-secondary mb-3">Open private source file</a>{% endif %}
+    <a href="/ai/insights/?scope=bank_statements&amp;transaction={{ evidence.transaction_id }}" class="btn btn-outline-primary mb-3">Ask ALFRED about this record</a>
+    <div class="table-responsive"><table class="table"><caption>Current records take precedence over the original parser snapshot. Currency was not recorded.</caption>
+        <thead><tr><th scope="col">Field</th><th scope="col">Current record</th><th scope="col">Original extraction</th></tr></thead>
+        <tbody>
+            <tr><th scope="row">Amount</th><td>{{ evidence.current.amount }}</td><td>{{ evidence.original.amount|default_if_none:"Not retained"|default:"Not retained" }}</td></tr>
+            <tr><th scope="row">Closing balance</th><td>{{ evidence.current.closing_balance|default_if_none:"Not recorded" }}</td><td>{{ evidence.original.closing_balance|default_if_none:"Not retained"|default:"Not retained" }}</td></tr>
+            <tr><th scope="row">Direction</th><td>{{ evidence.current.direction }}</td><td>{{ evidence.original.direction|default:"Not retained" }}</td></tr>
+            <tr><th scope="row">Date</th><td>{{ evidence.current.transaction_date }}</td><td>{{ evidence.original.transaction_date|default:"Not retained" }}</td></tr>
+            <tr><th scope="row">Category</th><td>{{ evidence.current.category }}</td><td>{{ evidence.original.category|default:"Not retained" }}</td></tr>
+            <tr><th scope="row">Classification</th><td>{{ evidence.current.classification }}</td><td>{{ evidence.original.classification|default:"Not retained" }}</td></tr>
+        </tbody>
+    </table></div>
+    <p>Original evidence: {{ evidence.original_status }}. Parsed or inferred values are not verified automatically. Correct records in <a href="/expenses/">Expenses</a> and document metadata in <a href="/documents/">Documents</a>, then reopen this review.</p>
+    <p>Confirmation records your check; it does not prove independent bank authentication. Edits, missing files or conflicting evidence require review again. No values, balances, fingerprints or memories are changed here.</p>
+    <form id="statementEvidenceForm" data-live-refresh-hold="true">{% csrf_token %}
+        <label class="d-block mb-3"><input id="statementEvidenceConfirm" type="checkbox" required {% if not evidence.review_allowed %}disabled{% endif %}> I checked this current transaction against this source document, including its date, direction and amount.</label>
+        <button class="btn btn-primary" type="submit" {% if not evidence.review_allowed %}disabled{% endif %}>Confirm source-backed record</button>
+        <button class="btn btn-outline-secondary" type="button" id="statementEvidenceRevoke" {% if not evidence.verified_at %}disabled{% endif %}>Withdraw confirmation</button>
+    </form>
+    <p id="statementEvidenceFeedback" role="status" aria-live="polite"></p>
+</section>
+{{ evidence.revision|json_script:"statementEvidenceRevision" }}
+{% endblock %}
+{% block extra_js %}<script src="/static/js/statement_evidence.js?v=3"></script>{% endblock %}

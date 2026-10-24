@@ -367,3 +367,16 @@ class LoanImportDocument(models.Model):
     def __str__(self):
         document_type = self.document_type or "other"
         return f"{self.user.username} | {document_type} | {self.file_name}"
+
+
+class LoanDocumentEvidence(models.Model):
+    document = models.ForeignKey(LoanImportDocument, on_delete=models.CASCADE, related_name="field_evidence")
+    loan = models.ForeignKey(Loan, null=True, on_delete=models.SET_NULL, related_name="document_evidence")
+    original_loan_id = models.PositiveBigIntegerField()
+    source_values = models.JSONField(default=dict)
+    reviewed_fields = models.JSONField(default=dict)
+    review_generation = models.PositiveBigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("document", "original_loan_id"), name="loan_source_record_once")]

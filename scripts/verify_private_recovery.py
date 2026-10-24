@@ -5,8 +5,12 @@ import json
 from pathlib import Path
 import shutil
 import sqlite3
+import sys
 from contextlib import closing
 from tempfile import TemporaryDirectory
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from alfred_private_storage import private_directory
 
 
 def checksum(path):
@@ -14,15 +18,15 @@ def checksum(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def check_sqlite(path, verified_paths):
+def check_sqlite(path, verified_paths, scratch_root=None):
     wal = Path(str(path) + '-wal')
     nonempty_wal = wal.exists() and wal.stat().st_size > 0
     if nonempty_wal and wal.resolve() not in verified_paths:
         raise ValueError('SQLite WAL is absent from the verified manifest.')
     # SQLite may rewrite shared-memory state even on a read-only connection.
     # Rebuild it in a disposable directory, preserving every retained byte.
-    with TemporaryDirectory(prefix='alfred-sqlite-check-') as temporary:
-        shadow = Path(temporary) / 'database.sqlite3'
+    with TemporaryDirectory(prefix='alfred-sqlite-check-', dir=scratch_root) as temporary:
+        shadow = private_directory(Path(temporary)) / 'database.sqlite3'
         shutil.copyfile(path, shadow)
         if nonempty_wal:
             shutil.copyfile(wal, Path(str(shadow) + '-wal'))
@@ -31,7 +35,7 @@ def check_sqlite(path, verified_paths):
                 raise ValueError('Private database integrity check failed.')
 
 
-def verify(directory, check_originals=False, source_head=None, expected_source_head=None):
+def verify(directory, check_originals=False, source_head=None, expected_source_head=None, scratch_root=None):
     root = Path(directory).resolve()
     manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8-sig'))
     records = manifest.get('files', [])
@@ -72,10 +76,10 @@ def verify(directory, check_originals=False, source_head=None, expected_source_h
     for record in records:
         target = (root / record['backup_path']).resolve()
         if record.get('sqlite_snapshot') or target.suffix.lower() in {'.sqlite3', '.sqlite', '.db'}:
-            check_sqlite(target, verified_paths)
+            check_sqlite(target, verified_paths, scratch_root)
             databases += 1
             if check_originals:
-                check_sqlite(Path(record['original_path']).resolve(), original_paths)
+                check_sqlite(Path(record['original_path']).resolve(), original_paths, scratch_root)
     if expected_source_head:
         internal = json.loads((root / 'backup-manifest.json').read_text(encoding='utf-8-sig'))
         if internal.get('source_git_head') != expected_source_head:

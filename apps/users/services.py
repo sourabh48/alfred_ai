@@ -10,8 +10,8 @@ from django.db.models import Q
 
 from alfred_ai.services.materialized_cache import invalidate_user_materialized_payloads
 from apps.behavioral.models import BehavioralSignal
-from apps.budgets.models import Budget
-from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, CareerResumeLearningMemory
+from apps.budgets.models import Budget, BudgetMoneySnapshot
+from apps.career.models import CareerJobAnalysis, CareerProfile, CareerProfileMoneySnapshot, CareerResume, CareerResumeLearningMemory
 from apps.expenses.models import BankAccount, BankAccountMoneySnapshot, Expense, ExpenseMoneySnapshot, StatementUpload
 from apps.family.models import Dependent, FamilyAccountLink
 from apps.integrations.models import CreditReportUpload, CreditScore, EmailConnection, VerifiedExternalInsight
@@ -25,6 +25,7 @@ from apps.mobility.models import (
     BikeProfile,
     BikeServiceRecord,
     FuelRefillLog,
+    MobilityMoneySnapshot,
     TravelPlan,
     TravelPlanningSession,
     TravelPreferenceProfile,
@@ -34,6 +35,7 @@ from apps.mobility.models import (
 from apps.relationship.models import RelationshipProfile
 from apps.reports.models import ChatGPTImport, GeneratedReport, OperationalLog, SystemTicket
 from apps.risk.models import RiskSignal
+from .models import UserMoneySnapshot
 
 
 logger = logging.getLogger(__name__)
@@ -139,6 +141,7 @@ def clear_user_fed_data(user) -> dict:
         CareerJobAnalysis.objects.filter(user=user).delete()
         career_resume_qs.delete()
         CareerResumeLearningMemory.objects.filter(user=user).delete()
+        CareerProfileMoneySnapshot.objects.filter(user=user).delete()
         CareerProfile.objects.filter(user=user).delete()
 
         ExpenseMoneySnapshot.objects.filter(user=user).delete()
@@ -159,6 +162,7 @@ def clear_user_fed_data(user) -> dict:
         investment_doc_qs.delete()
         Investment.objects.filter(user=user).delete()
 
+        MobilityMoneySnapshot.objects.filter(user=user).delete()
         BikeIssueReport.objects.filter(user=user).delete()
         BikeServiceRecord.objects.filter(user=user).delete()
         FuelRefillLog.objects.filter(user=user).delete()
@@ -177,6 +181,7 @@ def clear_user_fed_data(user) -> dict:
         VerifiedExternalInsight.objects.filter(user=user).delete()
 
         BehavioralSignal.objects.filter(user=user).delete()
+        BudgetMoneySnapshot.objects.filter(user=user).delete()
         Budget.objects.filter(user=user).delete()
         Dependent.objects.filter(user=user).delete()
         family_link_qs.delete()
@@ -189,6 +194,7 @@ def clear_user_fed_data(user) -> dict:
         SystemTicket.objects.filter(user=user).delete()
         OperationalLog.objects.filter(user=user).delete()
 
+        UserMoneySnapshot.objects.filter(user=user).delete()
         user.monthly_income = 0
         user.variable_income = 0
         user.rent_or_emi = 0

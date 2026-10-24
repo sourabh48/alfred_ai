@@ -12,6 +12,7 @@ from apps.ml_engine.services.memory_sync import SyncConflict, MemorySynchronizer
 from apps.ml_engine.services.memory_reasoning import ReasoningBudgetExceeded, reason_with_memory, reasoning_provider, configure_reasoning, real_reasoning_authorized
 from apps.ml_engine.services.memory_learning import MemoryLearning
 from apps.ml_engine.services.memory_cloud import synchronizer, configured_provider
+from apps.ml_engine.services.conversation_history import ConversationConflict, ConversationPermission
 
 
 def memory_store():
@@ -31,7 +32,16 @@ class MemoryAPI(APIView):
         return response
 
     def handle_exception(self, exc):
+        from apps.ml_engine.services.canonical_evidence import SourceSelectionConflict
+        if isinstance(exc, SourceSelectionConflict):
+            response=safe_error_response(exc,'Selected financial sources changed, are unavailable or duplicate one another. Refresh the source list and review your selection.',logger_name=__name__,status_code=409)
+            response.data['code']='financial_sources_changed'
+            return response
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        if isinstance(exc, ConversationConflict):
+            return safe_error_response(exc, 'Conversation changed, expired or was cleared. Reopen it and review your draft before retrying.', logger_name=__name__, status_code=409)
+        if isinstance(exc, ConversationPermission):
+            return safe_error_response(exc, 'Private conversation history is not permitted. Check your session and local-only consent.', logger_name=__name__, status_code=403)
         if isinstance(exc, EmbeddingUnavailable):
             response = safe_error_response(exc, 'Local model is unavailable. Your draft is preserved; retry when Ollama is ready.', logger_name=__name__, status_code=503)
             response.data['code'] = 'local_model_unavailable'
@@ -115,9 +125,7 @@ class MemoryRetrieveAPI(MemoryAPI):
 class MemorySyncAPI(MemoryAPI):
     def get(self,request):
         store=memory_store(); kind=configured_provider()
-        from apps.ml_engine.services.persistent_memory import _owner
-        with store._transaction() as db: state=store._sync_state(db,_owner(request.user))
-        available=(kind=='mock' and bool(settings.ALFRED_MEMORY_SYNC_MOCK_DIR)) or (kind=='s3' and settings.ALFRED_MEMORY_CLOUD_AUTHORIZED and bool(state.get('cloud')))
+        available=kind=='mock' and bool(settings.ALFRED_MEMORY_SYNC_MOCK_DIR)
         return Response({'provider':kind or 'disabled','available':bool(available),
             'status':MemorySynchronizer(store,None).status(request.user)})
 
@@ -169,18 +177,40 @@ class MemoryReasoningAPI(MemoryAPI):
 
 class MemoryLearningAPI(MemoryAPI):
     def get(self,request):
-        return Response({'candidates':MemoryLearning(memory_store()).candidates(request.user)})
+        from ..services.retrieval_quality import configuration
+        return Response({'candidates':MemoryLearning(memory_store()).candidates(request.user),
+            'evaluation_min_score':settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE,
+            'comparison':dict(configuration(), enabled=settings.ALFRED_SYNTHETIC_QUALITY_ENABLED)})
 
     def post(self,request):
-        data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases','min_score'))
+        data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases','min_score','baseline_model','candidate_model','suite','baseline_protocol','candidate_protocol'))
         allowed={'extract':{'action','text','provenance','sensitivity'},'verify':{'action','id','verified','content'},
             'correct':{'action','id','content','verified'},'consolidate':{'action','ids','content','verified'},
-            'reembed':{'action','id','verified'},'evaluate':{'action','cases','min_score'}}
+            'reembed':{'action','id','verified'},'evaluate':{'action','cases','min_score'},
+            'compare':{'action','baseline_model','candidate_model','suite','baseline_protocol','candidate_protocol'}}
         action=data.get('action')
         if not isinstance(action,str) or action not in allowed or set(data)-allowed[action]: raise ValueError()
+        if action=='compare':
+            from rest_framework.exceptions import PermissionDenied
+            from ..services.retrieval_quality import compare
+            from .conversations import current_session
+            if not settings.ALFRED_SYNTHETIC_QUALITY_ENABLED: raise PermissionDenied('Synthetic model comparison is disabled by the operator.')
+            try:
+                options={key:data[key] for key in ('suite','baseline_protocol','candidate_protocol') if key in data}
+                result=compare(data.get('baseline_model'), data.get('candidate_model'),**options)
+            finally:
+                current_session(request)
+            return Response(result)
         learning=MemoryLearning(memory_store()); user=request.user
         if action=='extract': return Response({'candidate_ids':learning.extract(user,data.get('text'),data.get('provenance'),sensitivity=data.get('sensitivity','sensitive'))},status=201)
         if action=='verify': return Response({'id':learning.verify(user,data.get('id'),verified=data.get('verified',False),content=data.get('content'))})
-        if action=='evaluate': return Response(learning.evaluate(user,data.get('cases'),min_score=data.get('min_score')))
+        if action=='evaluate':
+            from .conversations import current_session
+            try:
+                result=learning.evaluate(user,data.get('cases'),min_score=data.get('min_score'))
+            finally:
+                # Failed runs must not let SAVE_EVERY_REQUEST renew an expired session.
+                current_session(request)
+            return Response(result)
         identities=data.get('ids') if action=='consolidate' else [data.get('id')]
         return Response({'id':learning.revise(user,identities,data.get('content'),verified=data.get('verified',False),reembed=action=='reembed')})

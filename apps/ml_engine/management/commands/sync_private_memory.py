@@ -22,7 +22,7 @@ class Command(BaseCommand):
         seconds=options['seconds']
         if not 0<seconds<=5: raise CommandError('Synchronization deadline must be between zero and five seconds.')
         counts={'processed':0,'failed':0,'conflicts':0}
-        if not configured_provider() or (configured_provider()=='s3' and not settings.ALFRED_MEMORY_CLOUD_AUTHORIZED) or not (Path(settings.ALFRED_MEMORY_DIR)/'verified.sqlite3').exists():
+        if not configured_provider() or not (Path(settings.ALFRED_MEMORY_DIR)/'verified.sqlite3').exists():
             self.stdout.write('Memory synchronization disabled; no provider contact.')
             return
         deadline=time.monotonic()+seconds

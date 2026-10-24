@@ -1,10 +1,22 @@
 # Production Readiness
 
+**Local development update — 2026-10-16:** Frozen 4aa7ac7 has local technical,
+same-host packaged/repeat-build and synthetic M21 PASS. It has not replaced
+production 3932f391. Real-account, installer/clean-PC, independently recoverable
+off-device materials and remote CI/protection remain unverified; production
+promotion/ACL repair require new approval. See [authoritative status](PROJECT_STATUS.md).
+
+**Scope correction — 2026-10-15:** ALFRED's selected production installation is local Windows-native Waitress/Huey/SQLite, with deployed source 3932f391. The PostgreSQL/Redis/HTTPS/Celery proof contract below applies to an optional public/server profile; it is not a mandatory replacement for the approved loopback runtime. No public/cloud deployment decision has been made. M15 deployment passed dated gates, while normal-account/clean-PC/device-loss acceptance and present service health remain open. Use [current acceptance](ALFRED_END_TO_END_ACCEPTANCE.md); never invoke live probes or data writes merely to satisfy a documentation checkbox.
+
 ALFRED is now being treated as a local or LAN-hosted application by default. For that path, follow [Local Hosting](LOCAL_HOSTING.md).
 
 This document still defines the stricter public-production readiness gates. ALFRED should not be exposed to the public internet until environment-backed checks are green. The application has core Django flows, cache materialization, browser regression wiring, Celery schedules, and supervised-model lifecycle checks, but public-production maturity still depends on deployment proof.
 
 ## Current State
+
+The percentages below are legacy dashboard/proof estimates, not audited completion
+or approval criteria. Native Huey/durable-queue scheduling is the selected local
+runtime; the following Celery items describe the optional server profile.
 
 - Large-data hardening is at 90% in Project Details after deterministic staging traffic exercised all 21 materialized cache namespaces.
 - Browser/UI regression coverage is implemented, but full UI maturity remains gated on repeated no-skip local Chrome or Edge and CI Chrome summaries.
@@ -103,4 +115,4 @@ Run the deployment probe only after the production web process can load settings
 | Production cache traffic proof | Shared-cache telemetry covers every registered materialized namespace under deployed traffic | `python scripts/exercise_materialized_cache_traffic.py --allow-live-external` then readiness probe |
 | Browser CI proof | GitHub browser-regression job writes CI Chrome summary with zero skipped Selenium tests | `artifacts/browser/browser_regression_summary.ci-chrome.json` |
 
-The local Docker Compose file proves the dependency shape and is the preferred local hosting path. It does not close public-production security or public-production runtime proof by itself.
+The local Docker Compose file describes the optional server dependency shape. The selected local installation is Windows-native; neither profile closes public-production runtime/security acceptance merely by existing in source.

@@ -1,5 +1,18 @@
 # ALFRED on Windows
 
+Latest development acceptance, 2026-10-16: source/package candidate 4aa7ac7 passed
+local native, browser, repeat-build and M21 rollback checks; it is not deployed.
+See [package evidence](WINDOWS_PACKAGE.md) and [current status](PROJECT_STATUS.md).
+Production source remains 3932f391. A current read-only check could not reach
+port 8000; no service action or private DB access was attempted. The audit poll
+below is historical and does not establish present availability.
+
+Final audit poll: /health/live/ 200, /health/native/ 404 on a runserver listener;
+no audit runtime action. Verify actual data/worker/native identity before assuming
+the documented native launcher currently owns port 8000.
+
+**Current runtime baseline — 2026-10-15:** Source 3932f391 is deployed in F:/ALFRED/alfred_ai; selected private runtime is F:/ALFRED/restored-runtime/db.sqlite3. Preserve operator config/keys/media/queues. Historical native/package gates passed, but this audit did not observe service health on 8000 and did not restart it. Real-account, sign-in, separate-PC and installer acceptance remain open. [Acceptance plan](ALFRED_END_TO_END_ACCEPTANCE.md).
+
 See the [standalone package guide](WINDOWS_PACKAGE.md),
 [acceptance continuation](ACCEPTANCE_20260925.md) and
 [18 September verification report](NATIVE_HARDENING_VERIFICATION.md)
@@ -90,6 +103,45 @@ The installer contains code, libraries, OCR engine assets and static files.
 It excludes your database, uploads, learned models, local settings and secrets.
 Uninstalling the application retains the separate data folder.
 
+## Private storage permission repair
+
+Post-audit development refuses an existing data/configuration directory that
+grants access beyond its owner and SYSTEM. It creates new private directories
+before writing keys, databases, queues, caches or recovery payloads. Existing
+installations need a separately approved repair; no runtime startup silently
+changes their ACLs. Use an explicit writable data directory outside the source
+checkout for a fresh installation.
+
+From the reviewed development checkout, first select the actual runtime and a
+new retained plan path outside it. The plan contains original permissions and
+private filenames, so its directory is protected and must remain private:
+
+```powershell
+& $python alfred_private_storage.py $dataDirectory --plan $retainedPermissionPlan
+$planHash = (Get-FileHash -LiteralPath $retainedPermissionPlan -Algorithm SHA256).Hash.ToLowerInvariant()
+```
+
+This command is a dry run: it inspects the target and records a rollback plan.
+Obtain explicit repair authorization, verify a current backup, stop all writers
+using the documented launcher, and review the selected Windows owner. Only then:
+
+```powershell
+& $python alfred_private_storage.py $dataDirectory --plan $retainedPermissionPlan --expected-sha256 $planHash --apply --authorization-reference $approvalReference --quiesced
+```
+
+Every target and original ACL must still match the retained plan before repair.
+Only the Windows owner and SYSTEM retain access; the owner-run launcher, server,
+worker and scheduler use that same identity. A distinct service identity requires
+a separately reviewed permission policy, not a broad Users grant. No file
+contents, encryption keys or financial records are changed. On interruption,
+retain the plan and inspect the partially protected tree before retrying.
+
+An authorized permission rollback uses the same pinned plan with `--rollback`
+instead of `--apply`, after writers stop. It refuses a changed file inventory,
+size or modification time; it never blindly restores ACLs over new writes.
+Restoring the old broad ACL may reintroduce the original privacy issue. This is
+local permission repair, not a portable-key or device-loss recovery test.
+
 ## Background processing
 
 On Windows, the running supervisor owns an ALFRED notification-area icon.
@@ -158,13 +210,19 @@ It uses synthetic records in disposable folders, never the live account.
 .\.venv\Scripts\python.exe manage.py test --noinput
 .\.venv\Scripts\python.exe -m PyInstaller packaging/ALFRED.spec --noconfirm
 .\.venv\Scripts\python.exe scripts/verify_native_runtime.py --executable dist/ALFRED/ALFRED.exe --browser
-& 'F:\ALFRED-tools\InnoSetup\ISCC.exe' packaging/ALFRED.iss
+.\.venv\Scripts\python.exe scripts/package_windows_release.py --bundle dist/ALFRED --output artifacts/windows-release --iscc F:/ALFRED-tools/InnoSetup/ISCC.exe
 ```
 
 Build tools are listed in `requirements-build.txt`. Inno Setup 6.7.3 builds the
 installer. `artifacts/ops/native_huey_verification.json` and
 `native_exe_verification.json` record integration results. The executable is
 built for Windows x64; validation on a clean second PC remains a separate check.
+
+Frozen bundles contain `build-provenance.json` with their exact Git commit and
+tree. Build start/end and distribution assembly require a clean matching
+checkout. Keep that source checked out through assembly and choose a fresh output
+directory; the package helper rejects older bundles and existing release outputs.
+Later checkpoints do not change the embedded source record.
 
 The existing Docker/Celery configuration is retained as an optional alternative.
 

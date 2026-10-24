@@ -14,6 +14,7 @@ from .upload_limits import parser_budget
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services import job_intelligence, resume_intelligence
 from apps.expenses.models import StatementUpload
+from apps.expenses.money import money_float
 from apps.expenses.services.statement_lifecycle import delete_statement_upload, queue_statement_retry, retry_statement_upload
 from apps.integrations.models import CreditReportUpload, CreditScore
 from apps.integrations.services.credit_report_parser import credit_report_parser
@@ -899,6 +900,9 @@ def _retry_statement_document(user, document_id: int) -> dict:
 
 def _retry_loan_document(user, document_id: int) -> dict:
     document = LoanImportDocument.objects.prefetch_related("linked_loans").get(user=user, pk=document_id)
+    from apps.loans.services.document_evidence import capture_import
+    from copy import deepcopy
+    capture_import(document, list(document.linked_loans.all()))
     unavailable = _retry_source_unavailable(document, "uploaded_file", _serialize_loan)
     if unavailable is not None:
         return unavailable
@@ -912,6 +916,7 @@ def _retry_loan_document(user, document_id: int) -> dict:
     finally:
         document.uploaded_file.close()
 
+    original_extraction = deepcopy(parsed.get('loans') or [])
     accepted = _saved_corrections(payload, ("document_type", "lender", "loan_type", "loan_account_number"))
     if accepted.get("document_type"):
         parsed["document_type"] = accepted["document_type"]
@@ -950,6 +955,7 @@ def _retry_loan_document(user, document_id: int) -> dict:
         document.summary = f"{linked_count} loan record(s) are now linked to this document after retry."
         document.save(update_fields=["document_type", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary"])
         document.linked_loans.add(*created_loans)
+        capture_import(document, created_loans, extraction=original_extraction)
     else:
         document.summary = document.summary or "Retry completed, but Alfred still needs review to map structured loan rows."
         document.save(update_fields=["document_type", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary"])
@@ -1112,6 +1118,9 @@ def _retry_loan_closure_document(user, document_id: int) -> dict:
 
 def _retry_investment_document(user, document_id: int) -> dict:
     document = InvestmentImportDocument.objects.prefetch_related("linked_investments").get(user=user, pk=document_id)
+    from apps.investments.services.document_evidence import capture_import
+    from copy import deepcopy
+    capture_import(document, list(document.linked_investments.all()))
     unavailable = _retry_source_unavailable(document, "uploaded_file", _serialize_investment)
     if unavailable is not None:
         return unavailable
@@ -1125,6 +1134,7 @@ def _retry_investment_document(user, document_id: int) -> dict:
     finally:
         document.uploaded_file.close()
 
+    original_extraction = deepcopy(parsed.get('investments') or [])
     accepted = _saved_corrections(payload, ("broker_name", "asset_name", "asset_type", "account_number", "invested_amount", "current_value"))
     if accepted.get("broker_name"):
         parsed["broker"] = accepted["broker_name"]
@@ -1161,6 +1171,7 @@ def _retry_investment_document(user, document_id: int) -> dict:
     document.save(update_fields=["broker_name", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary", "updated_at"])
     if created_investments:
         document.linked_investments.add(*created_investments)
+        capture_import(document, created_investments, extraction=original_extraction)
     record_parser_learning(
         user=user,
         scope="investment_document",
@@ -2555,7 +2566,7 @@ def _vehicle_document_parse_fields(document: BikeDocument, payload: dict | None,
             "service_advisor_name": service_data.get("service_advisor_name") or service_data.get("advisor_name", ""),
             "service_advisor_contact": service_data.get("service_advisor_contact") or service_data.get("advisor_contact", ""),
             "service_center_name": service_data.get("service_center", "") or source.get("service_center_name", ""),
-            "total_customer_amount": service_data.get("total_customer_amount") or service_data.get("cost") or document.premium_amount or 0,
+            "total_customer_amount": service_data.get("total_customer_amount") or service_data.get("cost") or money_float(document.premium_amount),
         }.items()
         if value not in ("", None, [], {})
     }
@@ -2618,6 +2629,8 @@ def _apply_statement_correction(user, document_id: int, corrections: dict) -> di
 @transaction.atomic
 def _apply_loan_correction(user, document_id: int, corrections: dict) -> dict:
     document = LoanImportDocument.objects.get(user=user, pk=document_id)
+    from apps.loans.services.document_evidence import capture_import
+    capture_import(document, list(document.linked_loans.all()))
     payload = dict(document.extracted_payload or {})
     accepted = dict(payload.get("accepted_corrections") or {})
     accepted.update(corrections)
@@ -2727,6 +2740,9 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
         if field in corrections and corrections[field] in (None, ""):
             raise ValueError("Investment currency corrections require a finite amount.")
     document = InvestmentImportDocument.objects.prefetch_related("linked_investments").get(user=user, pk=document_id)
+    from apps.investments.services.document_evidence import capture_import
+    from apps.investments.models import InvestmentDocumentEvidence
+    capture_import(document, list(document.linked_investments.all()))
     payload = dict(document.extracted_payload or {})
     accepted = dict(payload.get("accepted_corrections") or {})
     accepted.update(corrections)
@@ -2775,6 +2791,8 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
 
     updated_primary = _upsert_retry_investments(user, [primary_item] if primary_item.get("asset_name") else [])
     linked = [*updated_primary, *[item for item in previous_investments if item != previous_primary and item not in updated_primary]]
+    original_values = InvestmentDocumentEvidence.objects.filter(document=document, investment=previous_primary).first() if previous_primary else None
+    capture_import(document, updated_primary, originals={item.pk:original_values.source_values for item in updated_primary} if original_values else None)
     document.extracted_payload = payload
     document.parse_confidence = max(document.parse_confidence, 0.8 if linked else 0.63)
     document.parser_status = "parsed" if linked else "needs_review"
@@ -2993,7 +3011,19 @@ def _recruiter_parser_state(snapshot, *, attachment_present: bool = False) -> tu
 
 
 def _apply_recruiter_analysis_update(analysis: CareerJobAnalysis, snapshot, *, resume_payload: dict, keep_evidence: bool = True) -> None:
-    fit = job_intelligence.compare_resume_to_job(resume_payload, snapshot)
+    payload = dict(analysis.extracted_payload or {})
+    if isinstance(payload.get("resume_payload"), dict):
+        resume_payload = payload["resume_payload"]
+        sources = (payload.get("fit") or {}).get("sources") or []
+        resume_source = sources[0] if sources else {"kind": "saved_fields", "label": "Captured resume/profile fields; original record identity unavailable"}
+    else:
+        resume = CareerResume.objects.filter(user_id=analysis.user_id).order_by("-updated_at", "-id").first()
+        profile = CareerProfile.objects.filter(user_id=analysis.user_id).first() if resume is None else None
+        resume_source = {"kind": "resume_upload" if resume else "manual_profile",
+                         "record_id": resume.pk if resume else (profile.pk if profile else None),
+                         "label": resume.file_name if resume else "Manual career profile",
+                         "parser_status": resume.parser_status if resume else "user_declared"}
+    fit = job_intelligence.compare_resume_to_job(resume_payload, snapshot, resume_source=resume_source)
     compensation = job_intelligence.compensation_benchmark(
         role=snapshot.title or resume_payload.get("role") or "analyst",
         location=snapshot.location or "",
@@ -3002,7 +3032,6 @@ def _apply_recruiter_analysis_update(analysis: CareerJobAnalysis, snapshot, *, r
         openings_evidence=None,
         current_income_annual=0.0,
     )
-    payload = dict(analysis.extracted_payload or {})
     payload["source_kind"] = snapshot.source_kind
     payload["job_url"] = snapshot.job_url
     payload["apply_url"] = snapshot.apply_url
@@ -3029,10 +3058,10 @@ def _apply_recruiter_analysis_update(analysis: CareerJobAnalysis, snapshot, *, r
     analysis.company = snapshot.company[:180]
     analysis.job_title = snapshot.title[:180]
     analysis.location = snapshot.location[:180]
-    analysis.fit_score = fit["fit_score"]
+    analysis.fit_score = fit["fit_score"] if fit["fit_score"] is not None else 0
     analysis.strengths = "\n".join(fit["strengths"])
     analysis.gaps = "\n".join(fit["gaps"])
-    analysis.summary = f"Recruiter intake fit score {fit['fit_score']}/100 for {snapshot.title or 'this role'} at {snapshot.company or analysis.source_name}."
+    analysis.summary = (f"Rule-based fit score {fit['fit_score']}/100; not a hiring probability." if fit["fit_score"] is not None else "Fit unavailable: review incomplete or ambiguous resume/JD evidence.")
     analysis.extracted_payload = payload
     analysis.extracted_text = snapshot.description or analysis.extracted_text
     if not keep_evidence:

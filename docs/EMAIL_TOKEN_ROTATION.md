@@ -1,5 +1,7 @@
 # Local email token rotation
 
+**Operation boundary — 2026-10-15:** Verified fallback re-encryption tooling is present; live token re-encryption/old-key removal was not performed or authorized. Keep both decryptable key paths until separately approved backup/atomic apply/re-read verification. The unrouted legacy Gmail helper writes plaintext token JSON and must not be used for onboarding. [Provider register](ALFRED_EXTERNAL_INTEGRATIONS.md).
+
 EmailConnection OAuth access and refresh tokens are encrypted at rest with the
 primary DJANGO_SECRET_KEY; DJANGO_SECRET_KEY_FALLBACKS permit temporary old-key
 reads. Signing-key rotation alone does not rewrite existing encrypted tokens.

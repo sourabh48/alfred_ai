@@ -3,6 +3,7 @@ from contextvars import ContextVar
 from contextlib import ExitStack
 from io import BytesIO
 from functools import wraps
+from pathlib import Path
 import os
 import shutil
 import tempfile
@@ -10,8 +11,10 @@ import time
 import zipfile
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured, RequestDataTooBig, TooManyFieldsSent, TooManyFilesSent
-from django.core.files.uploadhandler import FileUploadHandler
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied, RequestDataTooBig, TooManyFieldsSent, TooManyFilesSent
+from django.core.files.uploadhandler import FileUploadHandler, TemporaryFileUploadHandler
+from django.core.files.uploadedfile import UploadedFile, TemporaryUploadedFile
+from django.core.files import temp as django_tempfile
 from django.http import JsonResponse
 from django.http.multipartparser import MultiPartParser, MultiPartParserError
 from django.db import transaction
@@ -19,6 +22,7 @@ from rest_framework.exceptions import APIException
 
 from .api_errors import safe_error_details
 from alfred_ai.upload_config import UPLOAD_LIMIT_DEFAULTS as DEFAULTS
+from alfred_private_storage import protect, private_directory, PrivateStorageUnavailable
 
 
 upload_deadline = ContextVar("upload_deadline", default=None)
@@ -123,6 +127,41 @@ class BoundedUploadHandler(FileUploadHandler):
 
     def file_complete(self, file_size):
         return None
+
+
+class PrivateTemporaryUploadedFile(TemporaryUploadedFile):
+    def __init__(self, name, content_type, size, charset, content_type_extra):
+        self._private_directory = tempfile.TemporaryDirectory(prefix='alfred-upload-', dir=settings.FILE_UPLOAD_TEMP_DIR)
+        stream = None
+        try:
+            root = private_directory(Path(self._private_directory.name))
+            stream = django_tempfile.NamedTemporaryFile(suffix='.upload' + os.path.splitext(name)[1], dir=root)
+            UploadedFile.__init__(self, stream, name, content_type, size, charset, content_type_extra)
+        except BaseException:
+            if stream is not None:
+                stream.close()
+            self._private_directory.cleanup()
+            raise
+
+    def close(self):
+        try:
+            super().close()
+        finally:
+            self._private_directory.cleanup()
+
+
+class PrivateTemporaryUploadHandler(TemporaryFileUploadHandler):
+    def new_file(self, *args, **kwargs):
+        FileUploadHandler.new_file(self, *args, **kwargs)
+        try:
+            self.file = PrivateTemporaryUploadedFile(self.file_name, self.content_type, 0,
+                                                    self.charset, self.content_type_extra)
+            protect(Path(self.file.temporary_file_path()))
+        except (OSError, ValueError, PrivateStorageUnavailable) as exc:
+            safe_error_details(exc, UploadStorageUnavailable.default_detail, logger_name=__name__)
+            if hasattr(self, 'file'):
+                self.file.close()
+            raise UploadStorageUnavailable() from None
 
 
 def read_upload_bytes(upload):
@@ -274,6 +313,8 @@ class UploadProtectionMiddleware:
 
     def process_exception(self, request, exception):
         if getattr(request, "_bounded_upload", False):
+            if isinstance(exception, PermissionDenied):
+                return JsonResponse({"detail": "You do not have permission to perform this action."}, status=403)
             if isinstance(exception, (UploadLimitExceeded, UploadStorageUnavailable, UploadProtectionUnavailable, UploadFormatError)):
                 return JsonResponse({"detail": exception.default_detail}, status=exception.status_code)
             if isinstance(exception, OSError):

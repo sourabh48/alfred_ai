@@ -1,0 +1,240 @@
+> **Historical record, closed 2026-10-17.** The only active status, roadmap and resume instructions are [../../docs/PROJECT_STATUS.md](../../docs/PROJECT_STATUS.md). Preserve this dated evidence; do not execute obsolete next-step instructions.
+
+# M20/M21 implementation checkpoint
+
+## Verified local candidate — 2026-10-16
+
+Frozen branch `release/post-audit-runtime-20261016` pins
+`4aa7ac70fa27c1410e695470af5c3987235244b1`. Exact-source 797 backend / 40 Chrome /
+34 source-native-Ollama PASS, zero failures/skips; fresh portable package 35 native
+checks including seven Chrome PASS. Actual M21 in
+`F:/ALFRED_DEV/post-audit-rehearsal-4aa7ac7/rehearsal.json` PASS: local restore,
+reconciliation, exact promotion, restart, worker crash and source rollback with
+nine browser checks before and after rollback. Child failure FAIL is deliberate,
+its rollback PASS; parent PASS. Earlier failed 874639f evidence is retained.
+
+Technical decision PASS, production promotion BLOCKED and unauthorized:
+`artifacts/release-gates/post-audit-quiescence-20261016/release.json`.
+All fixture backup/operator evidence is scoped to its disposable target. No live
+backup, custom external-path coverage, production ACL repair, real-account,
+device-loss/key, clean-PC/installer or remote CI/protection acceptance is inferred.
+No new waiver, provider access, key rotation, production mutation or GitHub push.
+
+M19 second assembly matched all 10,322 file paths/bytes, using the same SDK with
+no installation. Portable ZIP entry hashes/sizes passed. Full paths, executable
+hashes and safe resume commands are in CODEX_CONTINUATION_STATE.md and
+docs/WINDOWS_PACKAGE.md. Documentation-only successors do not replace frozen4aa
+for package/source identity checks. PROJECT_STATUS.md is the active overview;
+following sections preserve earlier checkpoints.
+
+## Earlier local correction — 2026-10-16
+
+See PROJECT_STATUS.md for the active overview. Newer exact 874639f clean-SDK gates
+passed 792 backend / 40 Chrome / 34 source-native/Ollama checks, zero final skips
+or failures. Its actual M21 promotion, nine browser checks and restart passed,
+but worker-crash source rollback blocked on PID-only `native_writer_running`.
+The failed sandbox and all archives remain at
+`F:/ALFRED_DEV/post-audit-rehearsal-874639f`; this is not a rollback PASS.
+
+This checkpoint corrects recovery exclusion to use authoritative native OS locks
+plus SQLite reservations, and makes stop wait for lock release after stopped
+status. Live/reused unrelated PIDs do not authorize or block backup. Real native
+and SQLite writers still block; no writer is forcibly stopped. Reproductions and
+66 focused PASS results are recorded in CODEX_CONTINUATION_STATE.md. The
+intermediate 100-test result overlaps and must not be summed. The new committed
+candidate requires fresh full/M21/package gates; earlier b162c8f PASS is historical.
+No production, provider, database, ACL or GitHub mutation is authorized.
+
+## Post-audit integration — 2026-10-15
+
+Latest local source proof is b162c8fb2c43b357e840c3a298d06ffa4bed3251 in
+F:/ALFRED_DEV/post-audit. 753 backend / 37 Chrome / 34 source-native/Ollama PASS,
+zero skips/failures. Full actual M21 PASS: independent encrypted local restore,
+typed finance/family reconciliation, exact FF, nine Chrome checks, restart/memory,
+worker crash and source rollback. Parent proof is
+artifacts/release-gates/post-audit-critical-b162c8f/release.json; disposable proof
+F:/ALFRED_DEV/post-audit-rehearsal-b162c8f/rehearsal.json. Deliberate worker failure
+retains a FAIL child receipt and PASS rollback; do not flatten or erase it.
+Technical readiness PASS, operational promotion BLOCKED/unauthorized. No new
+package/installer/separate-PC/account/device-loss/remote CI acceptance is inferred.
+The older implementation matrix below is historical. PROJECT_STATUS.md remains
+the authoritative active overview. Newer M16 retention source d66ce99 passed 156
+focused tests/system/drift and pinned source/privacy plus nine targeted tests.
+Its full combined gates remain NOT_RUN; b162c8f is still the exact full critical
+candidate. M16 selective refresh/date invalidation now passed 196 targeted backend
+and five Chrome checks/system/drift; exact current source pin and NOT_RUN full-gate
+scope are in artifacts/release-gates/post-audit-m16-selective/release.json.
+M17 unsupported-path cleanup also passed 114 focused backend tests/system/drift;
+scope is artifacts/release-gates/post-audit-m17-cleanup/release.json. M18 clean
+dependency reproducibility/M19 package are next. Full release results do not
+transfer to newer source and source-native tests are not frozen executable proof.
+
+Active work is now F:/ALFRED_DEV/post-audit on fix/post-audit-critical-20261015.
+The original 0052410 history is retained. P0-D ignored-file collision and JSON
+credential failures were reproduced and fixed. 70 focused tests PASS, zero skips;
+13 overlapping privacy/NOT_RUN tests PASS. Fixtures protect synthetic storage
+before writes; backup verification keeps both optional scratch roots and private
+ACLs. Standard backend coverage now includes the money/media/storage regressions.
+See docs/PROJECT_STATUS.md for receipts and the authoritative current task.
+The earlier evidence below remains historical; a full pinned gate and actual M21
+native rehearsal have not yet been completed. No production or remote action.
+
+Branch: feature/m20-release-gates. Base: 3932f391aa4eed7b3200ad3b034f7991435e01e4.
+Current HEAD: use `git rev-parse HEAD`; exact verified commit is recorded externally
+after each commit to avoid a self-referential SHA.
+
+M15 production and GitHub master remain at the base. Production operator changes,
+private data, configuration, service and backups are outside this worktree.
+
+## Existing meaning and prerequisites
+
+M20 is the existing CI/governance milestone (master triggers, backend/native/browser/
+drift/privacy gates, branch protection and actual CI evidence). M21 is release and
+clean-PC/build/upgrade/reboot/reinstall/accessibility acceptance. The requested
+automation extends these meanings, not substitutes synthetic checks for human or
+separate-machine acceptance. M16-19 are separate open backlog items, not declared
+prerequisites; they remain open. No dependency pruning or Travel changes here.
+
+## Implementation matrix
+
+| Feature | Exists | Missing | Implementation | Test | Status |
+| --- | --- | --- | --- | --- | --- |
+| Pinned Git/source/dependency/migration inventory | Manual release receipts | Reusable gate | scripts/release_gate.py | tests/test_release_gate.py | 12 focused tests PASS |
+| Deterministic decisions and scoped waivers | Manual reports | Machine report, fail closed | release_gate.py | Missing/failed/waived gates | Included in 12 PASS |
+| Backend/browser/native regression runners | Django, run_browser_regressions, verify_native_runtime | Isolation/orchestration/CI triggers | release_validation.py reuses house runners | Runner/privacy suite included in 20 PASS | Implemented; actual combined runs pending |
+| Financial snapshot/reconciliation | Old rehearsal patterns | Typed BLOB/Decimal/ownership-preserving wrapper | release_recovery.py, full SQLite integrity/FK and typed row/schema digests | Included in 40 PASS | Synthetic PASS; production NOT_RUN |
+| Local backup/file/SQLite verification | backup_before_windows_reinstall, verify_private_recovery | Explicit single-runtime encrypted wrapper | release_recovery.py; native locks/API and private scratch verifier | WAL, busy writer, missing/corrupt/key/path/restore failures | Included in 40 PASS |
+| Privacy/source scan | Manual Git history review, package inspector | Reusable redacted scan | Pinned source/history checks, redacted logs, stripped child env | History secrets/private paths/unsafe log tests | Included in 20 PASS |
+| Controlled promotion | native start/stop, manual FF and rollback | Pinned approval/resumable rehearsal | release_promotion.py; dry run default | Included in 65 focused PASS | Implemented; actual rehearsal pending |
+| M21 failure/rollback acceptance | Native synthetic/recovery house drill | Release engine rehearsal | release_acceptance.py; new disposable Git/runtime only | Proof boundaries covered in 65 PASS | Actual native rehearsal NOT_RUN |
+| Remote CI / branch protection | One PR/manual workflow | Actual remote evidence/protection | Master trigger and engine backend integration proposed locally | Local review; publication NOT authorized | NOT_RUN remotely |
+| Real-account / separate-PC / installer | Existing acceptance docs/kit | Actual human/device evidence | Keep human checklist | Not inferable locally | PENDING |
+
+## Restrictions and recovery
+
+M15 external-recovery waiver is historical, release-specific and not inherited.
+HDD copy is user reported; device-loss recovery remains unverified. No key dialogs,
+plaintext key export, backup deletion, real cloud/OpenAI calls or production changes.
+New worktree has no private local.env or database. Its PyCharm module is not mapped;
+use the existing verified project Python 3.12 SDK without installing dependencies.
+
+## Resume
+
+Last verified unit: 12 unittest tests PASS (21.545s), zero failures/skips, using
+F:/ALFRED/alfred_ai/.venv/Scripts/python.exe -B -m unittest tests.test_release_gate
+from this worktree. This covers exact pins, dirty/advanced/diverged candidates,
+dependency/migration declarations, explicit incomplete gates and waiver isolation.
+Files: scripts/release_gate.py, tests/test_release_gate.py, this checkpoint.
+
+Second unit: 20 focused tests PASS (42.399s), zero failures/skips. Prior 12 are
+included, not added. Changed files: release_gate.py, release_validation.py,
+test_release_gate.py, test_release_validation.py, browser-regression.yml,
+docs/RELEASE_GATES.md and this checkpoint. Requested command scope has its own
+exit result: preflight may return 0 while the explicit overall release remains
+BLOCKED; status/full readiness still fails closed. Targeted tests do not fill the
+full backend gate. First committed foundation: f8bba80e461a5bb4a99a8b9f3c0452be20ed82e0.
+
+Next implement recovery gates and promotion rehearsal. Run actual pinned preflight
+after this unit is committed, then the selected validation gate. GitHub Actions
+read-only evidence is external: isolated-tests/m20-baseline-remote-ci-detail-20261015.json.
+It identifies the successful M15 run as GitHub Pages, not backend/native/browser CI.
+No M20 remote workflow execution/protection evidence exists until separately
+authorized publication/settings work. Keep those gates NOT_RUN.
+
+## Third unit - recovery and source integration
+
+Actual combined focused run: 40 tests PASS, 72.030s, zero failures/skips:
+tests.test_release_gate, tests.test_release_validation, tests.test_release_recovery,
+tests.test_private_recovery_verifier. Earlier 12/20/9/15 runs overlap and are not
+added. New default-layout backup reads an existing key, quiesces through house
+locks/SQLite barriers, snapshots committed WAL data, encrypts bounded chunks and
+authenticates a manifest, then restores/verifies in a separate process. Only its
+new temporary capture is cleaned after verified success; archives, protected
+verification copies and all pre-existing backup material are preserved.
+
+The real b8bf493 pinned preflight rejected two known public fixture identifiers.
+Its failed receipt is retained under artifacts/release-gates/m20-foundation-b8bf493.
+The classifier now pins reviewed public fixture value hashes AND paths. A new
+regression proves those exact examples pass and changed credentials still block.
+That regression passed in the actual combined 40-test run. Re-run the real pinned
+preflight after this corrected unit is committed; do not erase the old failure.
+
+Files changed: release_gate.py, release_validation.py, release_recovery.py,
+verify_private_recovery.py (optional private scratch directory only), three
+test_release_*.py modules, docs/RELEASE_GATES.md and this checkpoint. Remote Git
+checks are read-only and reject unknown/diverged remote heads without pushing.
+
+Four recovery statuses remain independent. Synthetic local restore PASS is never
+off-device or portable-key proof. No real recovery key was read or exported.
+M20-H promotion and M21 end-to-end/failure/rollback rehearsal remain NOT_RUN.
+Next safe action: corrected pinned preflight + targeted isolated Django run, then
+implement dry-run/approval/promotion state and M21 disposable acceptance.
+
+## Fourth unit - approval and promotion state
+
+Current branch remains feature/m20-release-gates; parent verified commit is
+0fef33d2d082b01a64dcc09265d0ca7f64dbb23b. Its actual pinned preflight PASS includes
+read-only production operator hashes and remote ancestry. Its isolated Django
+targeted run passed 40 tests, zero skips/failures, with configuration/drift PASS.
+Evidence: artifacts/release-gates/m20-recovery-0fef33d/release.json.
+
+Fourth unit combined focused run: 56 tests PASS, 97.241s, zero failures/skips.
+Modules: test_release_gate, test_release_validation, test_release_recovery,
+test_private_recovery_verifier, test_release_promotion. Earlier runs overlap.
+The first 31-test attempt had one incorrect interruption fixture; its expected
+target binding was added and cross-target rejection is separately covered.
+
+Files: scripts/release_gate.py, scripts/release_validation.py,
+scripts/release_promotion.py, tests/test_release_gate.py,
+tests/test_release_promotion.py, docs/RELEASE_GATES.md and this checkpoint.
+Dry-run default, expiring exact evidence-bound approval, ordinary fast-forward,
+quiesced encrypted backup, operator preservation, typed data reconciliation,
+interruption blocking and authorized source-only rollback are implemented.
+Real Git/crypto/SQLite are exercised; native actions are explicit test doubles.
+Financial writes are preserved and prevent automatic data rollback. Actual native,
+Chrome, M21 end-to-end and packaged acceptance are still NOT_RUN for this unit.
+
+Next: finish operator evidence/waiver interface and actual disposable native
+M21 rehearsal, then run the pinned combined gate. No production changes or push.
+Safe focused resume (configured project SDK, from this worktree):
+python -B -m unittest tests.test_release_gate tests.test_release_validation tests.test_release_recovery tests.test_private_recovery_verifier tests.test_release_promotion
+
+## Fifth unit - M21 orchestration and operator evidence
+
+Combined focused run: 65 tests PASS, 148.265s, zero failures/skips, adding
+test_release_acceptance to the previous five modules. Package/source guard suite:
+11 tests PASS, 20.015s; follow-up retry/evidence-identity tests: 2 PASS, 3.512s.
+These runs overlap and are not added. Local workflow YAML/master/read-only/job
+contract PASS; this is not remote CI. Parent source is de9ba15debc7869143bb3e6835e1c4514fa79b8b.
+
+Added release-scoped operational attestations and explicit waivers, PENDING-only
+approval requests, post-deployment human completion, immutable run logs/history,
+same-runtime backup binding, and the existing package inspector/runner adapter.
+Login timestamp changes are expected; user income, ownership, consent, Decimal
+values, financial fingerprints and schema remain covered in reconciliation.
+Private tracked-path findings are redacted even in the source inventory.
+
+M21 orchestration creates a private new source clone/runtime and synthetic protected
+key, reuses only the engine's matching successful native fixture, and performs
+actual startup, Chrome navigation, encrypted restore, ordinary fast-forward,
+restart/retrieval, own-worker crash and source rollback. This code is implemented;
+its actual end-to-end run has not happened at this checkpoint. No production
+authorization is generated or inherited. The baseline fixture and all backups
+are preserved. Local restore never proves device-loss recovery.
+
+Changed files: release_gate.py, release_validation.py, release_recovery.py,
+release_promotion.py, new release_acceptance.py and test_release_acceptance.py,
+test_release_gate.py, test_release_promotion.py, test_release_validation.py,
+browser-regression.yml, RELEASE_GATES.md, RELEASE_HUMAN_ACCEPTANCE.md, this file.
+No Django migration, dependency, application model/view/UI or production file changed.
+
+Configured project SDK has no PyInstaller; documented F:/ALFRED-tools/InnoSetup
+is absent. Fresh package/installer acceptance is NOT_RUN, not reused from M15.
+Read-only production HTTP health was not observed on port 8000 during development;
+no production process was stopped/restarted and no runtime was modified to fix it.
+
+Next safe commands after committing this unit (use the configured SDK): pinned
+preflight, then validate --profile full --with-ollama, then rehearse using a new
+private disposable directory outside this checkout. Actual receipts go under
+artifacts/release-gates/<unique-release-id>; never repin an existing output.
+External latest-verified-commit.json records exact HEAD after each commit.

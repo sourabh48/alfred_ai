@@ -1,9 +1,13 @@
 from datetime import timedelta
 from datetime import date as date_cls
+import hashlib
+import json
 
-from django.db.models import Count, Max
+from django.db import OperationalError, transaction
+from django.db.models import Count, F, Max, Q
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -13,6 +17,8 @@ from rest_framework.views import APIView
 from alfred_ai.pagination import OptionalPageNumberPagination
 from alfred_ai.services import record_parser_learning
 from alfred_ai.services.materialized_cache import materialize_payload
+from apps.expenses.money import money_float
+from apps.expenses.services.financial_intelligence import _numeric_currency_payload
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.reports.services import operational_logging_service
 from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto
@@ -452,6 +458,25 @@ class BikeConditionSnapshotDetailView(RetrieveUpdateDestroyAPIView):
         bike_service_intelligence.hydrate_condition(snapshot, self.request.user)
 
 
+class _ServiceImportConflict(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "service_import_conflict"
+
+
+def _service_import_receipt(upload, parsed, profile):
+    upload.seek(0)
+    digest = hashlib.sha256(upload.read()).hexdigest()
+    upload.seek(0)
+    fields = parsed.fields or {}
+    identity = [fields.get("issuer"), fields.get("document_number") or fields.get("invoice_number"),
+                fields.get("vehicle_number") or profile.vehicle_number, parsed.service_payload.get("service_date")]
+    identity = ["".join(str(value or "").casefold().split()) for value in identity]
+    identity[2] = "".join(char for char in identity[2] if char.isalnum())
+    # shortcut: incomplete invoice identifiers support byte replays only; expand after reviewed layout evidence.
+    return {"version": 1, "source_sha256": digest,
+            "invoice_identity": hashlib.sha256(json.dumps(identity).encode()).hexdigest() if all(identity) else ""}
+
+
 class BikeServiceImportView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -504,88 +529,120 @@ class BikeServiceImportView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        upload.seek(0)
-        document = BikeDocument.objects.create(
-            user=request.user,
-            bike_profile=bike_profile,
-            bike_name=bike_profile.display_name,
-            vehicle_number=parsed.fields.get("vehicle_number") or bike_profile.vehicle_number,
-            document_type="invoice",
-            issuer=parsed.fields.get("issuer", ""),
-            document_number=parsed.fields.get("document_number", ""),
-            issue_date=_parse_optional_date(service_payload.get("service_date")),
-            premium_amount=service_payload.get("cost") or 0,
-            document_file=upload,
-            document_title=parsed.title,
-            parser_status=parsed.parser_status,
-            parse_confidence=parsed.confidence,
-            parser_notes=" ".join(filter(None, [parsed.parser_notes, *relevance["reasons"]])).strip(),
-            source_text=parsed.source_text,
-            extracted_payload=build_document_payload(parsed, relevance),
-            notes=request.data.get("notes", ""),
-        )
-        bike_service_intelligence.hydrate_document(document)
+        service_serializer = BikeServiceRecordSerializer(data={
+            **service_payload, "bike_profile": bike_profile.pk, "bike_name": bike_profile.display_name,
+            "vehicle_number": parsed.fields.get("vehicle_number") or bike_profile.vehicle_number,
+            "service_date": service_payload.get("service_date") or timezone.localdate().isoformat(),
+            "odometer_km": service_payload.get("odometer_km") or 0,
+            "next_service_km": service_payload.get("next_service_km") or None,
+            "next_service_date": service_payload.get("next_service_date") or None,
+            "cost": service_payload.get("cost") or 0,
+            "notes": request.data.get("notes", ""),
+            "source_mode": "bill_import" if parsed.document_type == "invoice" else "work_note",
+        }, context={"request": request})
+        service_serializer.is_valid(raise_exception=True)
+        receipt = _service_import_receipt(upload, parsed, bike_profile)
+        try:
+            return self._persist_import(request, bike_profile, upload, parsed, relevance, service_serializer, receipt)
+        except OperationalError as error:
+            if "locked" in str(error).lower() or "busy" in str(error).lower():
+                raise _ServiceImportConflict("Another document operation is in progress. Retry this upload.") from error
+            raise
 
-        service_record = BikeServiceRecord.objects.create(
-            user=request.user,
-            bike_profile=bike_profile,
-            bike_name=bike_profile.display_name,
-            vehicle_number=parsed.fields.get("vehicle_number") or bike_profile.vehicle_number,
-            service_date=_parse_optional_date(service_payload.get("service_date")) or timezone.localdate(),
-            odometer_km=service_payload.get("odometer_km") or 0,
-            service_type=service_payload.get("service_type", "routine"),
-            cost=service_payload.get("cost") or 0,
-            service_center=service_payload.get("service_center", ""),
-            next_service_date=_parse_optional_date(service_payload.get("next_service_date")),
-            next_service_km=service_payload.get("next_service_km") or None,
-            notes=request.data.get("notes", ""),
-            source_mode="bill_import" if parsed.document_type == "invoice" else "work_note",
-            source_document=document,
-            source_document_name=upload.name,
-            extracted_work_summary=service_payload.get("extracted_work_summary", ""),
-            parsed_payload=build_service_record_payload(
-                parsed,
-                service_payload,
-                document=document,
-                document_payload=document.extracted_payload,
-            ),
-        )
-        record_parser_learning(
-            user=request.user,
-            scope="vehicle_document",
-            filename=upload.name,
-            detected_type="invoice",
-            text=parsed.source_text,
-            field_names=[*list((document.extracted_payload or {}).keys()), *list((service_record.parsed_payload or {}).keys())],
-            parser_status=parsed.parser_status,
-            confidence=parsed.confidence,
-        )
-        if document.parser_status != "parsed":
-            operational_logging_service.log(
-                user=request.user,
-                module="mobility",
-                category="document",
-                scope="vehicle_document",
-                event_type="service_document_review_import",
-                severity="warning",
-                document_id=document.id,
-                file_name=upload.name,
-                message="Service bill was imported, but parser confidence stayed below the trusted threshold.",
-                payload={"parse_confidence": document.parse_confidence, "parser_notes": document.parser_notes},
-            )
-        raw_file_retention = purge_uploaded_file_after_extraction(
-            document,
-            "document_file",
-            reason="vehicle_service_document_extraction_complete",
-        )
-        return Response(
-            {
-                "document": BikeDocumentSerializer(document, context={"request": request}).data,
-                "service_record": BikeServiceRecordSerializer(service_record, context={"request": request}).data,
-                "raw_file_retention": raw_file_retention,
-            },
-            status=status.HTTP_201_CREATED,
-        )
+    def _persist_import(self, request, bike_profile, upload, parsed, relevance, service_serializer, receipt):
+        service_payload = parsed.service_payload
+        document = None
+        try:
+            with transaction.atomic():
+                # A no-op write serializes imports on SQLite as well as databases with row locks.
+                claimed = BikeProfile.objects.filter(pk=bike_profile.pk, user=request.user, updated_at=bike_profile.updated_at).update(updated_at=F("updated_at"))
+                if not claimed:
+                    raise _ServiceImportConflict("The selected vehicle changed. Reload it before importing.")
+                match = Q(extracted_payload__service_import_receipt__source_sha256=receipt["source_sha256"])
+                if receipt["invoice_identity"]:
+                    match |= Q(extracted_payload__service_import_receipt__invoice_identity=receipt["invoice_identity"])
+                existing = BikeDocument.objects.filter(match, user=request.user, bike_profile=bike_profile).order_by("id").first()
+                if existing is None and receipt["invoice_identity"]:
+                    legacy = BikeDocument.objects.filter(user=request.user, bike_profile=bike_profile,
+                        document_type="invoice", document_number=parsed.fields.get("document_number") or parsed.fields.get("invoice_number"),
+                        issuer__iexact=parsed.fields.get("issuer"), issue_date=_parse_optional_date(service_payload.get("service_date")))
+                    if legacy.exists():
+                        raise _ServiceImportConflict("An invoice with these recorded identifiers already exists. Review its source before posting another log.")
+                if existing is not None:
+                    saved = (existing.extracted_payload or {}).get("service_import_receipt", {})
+                    if saved.get("source_sha256") != receipt["source_sha256"]:
+                        raise _ServiceImportConflict("This invoice identity is already stored with different source bytes. Review the existing document before posting another log.")
+                    records = list(existing.imported_service_records.filter(user=request.user, bike_profile=bike_profile)[:2])
+                    if len(records) != 1:
+                        raise _ServiceImportConflict("The stored invoice needs review before another service log can be posted.")
+                    return self._import_response(request, existing, records[0], (existing.extracted_payload or {}).get("raw_file_retention", {}), duplicate=True)
+                upload.seek(0)
+                document = BikeDocument.objects.create(
+                    user=request.user,
+                    bike_profile=bike_profile,
+                    bike_name=bike_profile.display_name,
+                    vehicle_number=parsed.fields.get("vehicle_number") or bike_profile.vehicle_number,
+                    document_type="invoice",
+                    issuer=parsed.fields.get("issuer", ""),
+                    document_number=parsed.fields.get("document_number", ""),
+                    issue_date=_parse_optional_date(service_payload.get("service_date")),
+                    premium_amount=service_serializer.validated_data.get("cost", 0),
+                    document_file=upload,
+                    document_title=parsed.title,
+                    parser_status=parsed.parser_status,
+                    parse_confidence=parsed.confidence,
+                    parser_notes=" ".join(filter(None, [parsed.parser_notes, *relevance["reasons"]])).strip(),
+                    source_text=parsed.source_text,
+                    extracted_payload=merge_nested_payload(build_document_payload(parsed, relevance), {"service_import_receipt": receipt}),
+                    notes=request.data.get("notes", ""),
+                )
+                bike_service_intelligence.hydrate_document(document)
+
+                service_record = service_serializer.save(
+                    user=request.user, source_document=document, source_document_name=upload.name,
+                    parsed_payload=build_service_record_payload(parsed, service_payload, document=document, document_payload=document.extracted_payload),
+                )
+                record_parser_learning(
+                    user=request.user,
+                    scope="vehicle_document",
+                    filename=upload.name,
+                    detected_type="invoice",
+                    text=parsed.source_text,
+                    field_names=[*list((document.extracted_payload or {}).keys()), *list((service_record.parsed_payload or {}).keys())],
+                    parser_status=parsed.parser_status,
+                    confidence=parsed.confidence,
+                )
+                if document.parser_status != "parsed":
+                    operational_logging_service.log(
+                        user=request.user,
+                        module="mobility",
+                        category="document",
+                        scope="vehicle_document",
+                        event_type="service_document_review_import",
+                        severity="warning",
+                        document_id=document.id,
+                        file_name=upload.name,
+                        message="Service bill was imported, but parser confidence stayed below the trusted threshold.",
+                        payload={"parse_confidence": document.parse_confidence, "parser_notes": document.parser_notes},
+                    )
+                raw_file_retention = purge_uploaded_file_after_extraction(
+                    document,
+                    "document_file",
+                    reason="vehicle_service_document_extraction_complete",
+                )
+                return self._import_response(request, document, service_record, raw_file_retention, duplicate=False)
+        except Exception:
+            if document is not None and document.document_file:
+                document.document_file.delete(save=False)
+            raise
+
+    def _import_response(self, request, document, service_record, retention, *, duplicate):
+        return Response({
+            "document": BikeDocumentSerializer(document, context={"request": request}).data,
+            "service_record": BikeServiceRecordSerializer(service_record, context={"request": request}).data,
+            "raw_file_retention": retention,
+            "duplicate": duplicate,
+        }, status=status.HTTP_200_OK if duplicate else status.HTTP_201_CREATED)
 
 
 class TravelPlanListCreateView(ListCreateAPIView):
@@ -614,23 +671,34 @@ class TravelPlanDetailView(RetrieveUpdateDestroyAPIView):
         ).select_related("vehicle_profile")
 
 
+    @transaction.atomic
     def perform_update(self, serializer):
         from .services.travel_discovery import fact
         from .models import TravelPlanningSession
         original = serializer.instance
         core = ("destination", "start_date", "end_date", "budget", "transport_mode", "vehicle_profile")
         changed = any(key in serializer.validated_data and getattr(original,key) != serializer.validated_data[key] for key in core)
+        timing_changed = any(key in serializer.validated_data and getattr(original,key) != serializer.validated_data[key]
+                             for key in ("start_date", "end_date"))
         plan = serializer.save()
         session = TravelPlanningSession.objects.filter(plan=plan, user=self.request.user).first()
         if session:
             if changed:
                 for key, val in {"selected_destination":plan.destination, "available_start_date":str(plan.start_date) if plan.start_date else None,
                                  "available_end_date":str(plan.end_date) if plan.end_date else None, "trip_duration":plan.duration_days or None,
-                                 "budget":plan.budget, "transport_mode":plan.transport_mode, "vehicle_profile":plan.vehicle_profile_id}.items():
+                                 "budget":money_float(plan.budget), "transport_mode":plan.transport_mode, "vehicle_profile":plan.vehicle_profile_id}.items():
                     if val is None:
                         session.state.pop(key,None)
                     else:
                         session.state[key] = fact(val,"plan_details",True)
+                if timing_changed:
+                    from .services.travel.presentation import invalidate_trip_dates
+                    from .services.travel_discovery import budget_for
+                    from .services.travel.links import external_links
+                    session.candidates = [invalidate_trip_dates(c) for c in session.candidates]
+                    for candidate in session.candidates:
+                        candidate["budget"] = budget_for(session.state, candidate)
+                        candidate["external_links"] = external_links(session.state, candidate)
                 session.revision += 1
                 session.itinerary = {}
                 session.status = "destination_selected" if plan.destination else "discovery"
@@ -732,7 +800,7 @@ class MobilityDashboardView(APIView):
             user_id=request.user.id,
             revision=revision,
             ttl_seconds=45,
-            builder=lambda: self._build_payload(request),
+            builder=lambda: _numeric_currency_payload(self._build_payload(request)),
         )
         return Response(payload)
 
@@ -864,9 +932,9 @@ class BikeServiceDashboardView(APIView):
             user_id=request.user.id,
             revision=revision,
             ttl_seconds=45,
-            builder=lambda: self._build_payload(request),
+            builder=lambda: _numeric_currency_payload(self._build_payload(request)),
         )
-        return Response(payload)
+        return Response({**payload, "current_date": timezone.localdate().isoformat()})
 
     def _build_payload(self, request):
         intelligence = bike_service_intelligence.build_dashboard(request.user)

@@ -23,15 +23,39 @@
     <button id="memoryRefreshButton" class="btn btn-outline-secondary mb-3" type="button">Refresh Memories</button>
     <form id="memoryEvaluationForm" class="mb-3" data-live-refresh-hold="true">
         <h3 class="h5">Check Memory Retrieval</h3>
-        <p>Test a question against a memory you have verified, or choose that no memory should match. Results measure retrieval, not whether an answer is true. Questions and results are not saved.</p>
+        <p>Test up to twenty questions against current owner-confirmed memories. Choose every relevant memory, or no expected match. Relevant statements may conflict; this check never resolves contradictions or verifies financial facts. Questions and results stay on this page and are not saved, trained on or sent to cloud reasoning.</p>
         <label for="memoryEvaluationQuery" class="form-label">Test question</label>
         <textarea id="memoryEvaluationQuery" class="form-control mb-2" rows="2" maxlength="8192" required autocomplete="off"></textarea>
-        <label for="memoryEvaluationExpected" class="form-label">Expected match</label>
-        <select id="memoryEvaluationExpected" class="form-select mb-2"><option value="">No memory should match</option></select>
+        <label for="memoryEvaluationExpected" class="form-label">Expected relevant memories</label>
+        <select id="memoryEvaluationExpected" class="form-select mb-2" multiple size="4" required aria-describedby="memoryEvaluationHelp"><option value="" selected>No memory should match</option></select>
+        <p id="memoryEvaluationHelp" class="small">Select multiple matches with Ctrl/⌘ or your device's selection controls. A run reads at most three results per question, sharing a 60-second local processing budget. All questions together must fit 8192 UTF-8 bytes. Corrections, expiry and deletion invalidate old source IDs; review rather than replace them automatically.</p>
+        <label for="memoryEvaluationThreshold" class="form-label">Minimum cosine relevance (not a probability)</label>
+        <input id="memoryEvaluationThreshold" class="form-control mb-2" type="number" min="-1" max="1" step="any" required>
         <button class="btn btn-outline-primary" type="submit">Check Retrieval</button>
+        <button id="memoryEvaluationAdd" class="btn btn-outline-secondary" type="button">Add question to run</button>
+        <button id="memoryEvaluationClear" class="btn btn-outline-secondary" type="button">Clear questions and results</button>
+        <p class="small mt-2">A filled editor is included when you run the check. Added questions are kept below until you remove or clear them.</p>
+        <p id="memoryEvaluationFeedback" role="status" aria-live="polite" class="small"></p>
+        <ol id="memoryEvaluationCases" class="data-stack my-3" aria-label="Questions in this evaluation"></ol>
         <p id="memoryEvaluationResult" role="status" aria-live="polite" class="mt-2"></p>
+        <ol id="memoryEvaluationDetails" class="data-stack" aria-label="Per-question retrieval results"></ol>
+        <p class="small">Precision counts relevant returned references; recall counts expected references found. Abstention is measured on no-match questions. Citation checks confirm current ownership and record identity, not the truth of a claim. Results describe this run only; rerun after source changes.</p>
     </form>
     <button id="memoryResetButton" class="btn btn-outline-danger" type="button">Reset My Memories</button>
+    <section class="mt-4" aria-labelledby="memoryComparisonTitle">
+        <h3 class="h5" id="memoryComparisonTitle">Compare local embedding models</h3>
+        <p>Two versioned fictional cohorts test relevance, corrections, conflicting references, no-match questions and privacy guards. No private memory is read or trained on. Passing means eligible for review, never automatic model activation or proven general accuracy.</p>
+        <p id="memoryComparisonPolicy" class="small"></p>
+        <form id="memoryComparisonForm" data-live-refresh-hold="true">
+            <label for="memoryComparisonBaseline" class="form-label">Baseline local model</label>
+            <select id="memoryComparisonBaseline" class="form-select mb-2" disabled required></select>
+            <label for="memoryComparisonCandidate" class="form-label">Candidate local model</label>
+            <select id="memoryComparisonCandidate" class="form-select mb-2" disabled required></select>
+            <button class="btn btn-outline-primary" type="submit" disabled>Run fictional cohort comparison</button>
+        </form>
+        <p id="memoryComparisonStatus" role="status" aria-live="polite"></p>
+        <div id="memoryComparisonResults" class="data-stack" aria-label="Model comparison results"></div>
+    </section>
     <h3 class="h5 mt-4">Encrypted Memory Synchronization</h3>
     <p id="memorySyncStatus" role="status" aria-live="polite">Checking local synchronization status.</p>
     <p id="memorySyncDetails" class="small text-muted"></p>

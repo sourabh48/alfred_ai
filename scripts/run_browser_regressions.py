@@ -15,11 +15,15 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from scripts.release_validation import environment
 DEFAULT_TEST_LABELS = ("tests.test_document_review_browser", "tests.test_user_data_browser", "tests.test_travel_planner_browser")
 SUMMARY_FILENAME = "browser_regression_summary.json"
 
@@ -61,7 +65,7 @@ def main() -> int:
         artifact_dir = REPO_ROOT / artifact_dir
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
-    env = os.environ.copy()
+    env = environment(artifact_dir / ("runtime-" + uuid.uuid4().hex))
     env["ALFRED_RUN_BROWSER_TESTS"] = "true"
     env["ALFRED_BROWSER_ARTIFACT_DIR"] = str(artifact_dir)
     if args.browser:

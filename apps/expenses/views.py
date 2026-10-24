@@ -1,11 +1,14 @@
 from collections import defaultdict
+import csv
 from datetime import date
 from decimal import Decimal
+from io import StringIO
 import logging
 import sys
 
 from django.db import transaction
 from django.db.models import Q
+from django.http import StreamingHttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
@@ -310,6 +313,37 @@ class ExpenseListCreateView(ListCreateAPIView):
         sync_account_balance(expense.bank_account, expense.closing_balance)
 
 
+class ExpenseExportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        columns = ("id", "transaction_date", "direction", "classification", "category", "amount",
+                   "closing_balance", "merchant", "description", "external_reference", "source",
+                   "bank_account_id", "statement_upload_id")
+        queryset = Expense.objects.filter(user=request.user).order_by("-transaction_date", "-id").values_list(*columns)
+
+        def rows():
+            with StringIO(newline="") as buffer:
+                writer = csv.writer(buffer)
+                writer.writerow(columns)
+                yield buffer.getvalue()
+                for values in queryset.iterator(chunk_size=2000):
+                    buffer.seek(0)
+                    buffer.truncate(0)
+                    # CSV quoting alone does not stop spreadsheet formula execution.
+                    writer.writerow([
+                        "'" + value if isinstance(value, str) and (
+                            value.lstrip().startswith(("=", "+", "-", "@")) or value.startswith(("\t", "\r", "\n"))
+                        ) else value for value in values
+                    ])
+                    yield buffer.getvalue()
+
+        response = StreamingHttpResponse(rows(), content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="alfred-expenses.csv"'
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
 class ExpenseDetailView(RetrieveUpdateDestroyAPIView):
     serializer_class = ExpenseSerializer
     permission_classes = [IsAuthenticated]
@@ -319,8 +353,18 @@ class ExpenseDetailView(RetrieveUpdateDestroyAPIView):
 
     @transaction.atomic
     def perform_update(self, serializer):
+        balance_changed = (
+            "closing_balance" in serializer.validated_data
+            and serializer.validated_data["closing_balance"] != serializer.instance.closing_balance
+        )
         expense = serializer.save()
-        sync_account_balance(expense.bank_account, expense.closing_balance)
+        if balance_changed and expense.bank_account_id:
+            latest_id = (
+                Expense.objects.filter(user=self.request.user, bank_account_id=expense.bank_account_id, closing_balance__isnull=False)
+                .order_by("-transaction_date", "-id").values_list("pk", flat=True).first()
+            )
+            if latest_id == expense.pk:
+                sync_account_balance(expense.bank_account, expense.closing_balance)
 
 
 class ExpenseTimelineView(APIView):
