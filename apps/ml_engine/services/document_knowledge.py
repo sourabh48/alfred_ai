@@ -1,19 +1,23 @@
-"""Bounded search of one explicitly selected retained extraction; no stored index or AI."""
+"""Bounded selected-document excerpt search; no persistent index or AI."""
 import re
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
+from hashlib import sha256
 
 from django.utils import timezone
 
 from apps.expenses.services.statement_evidence import document_name, file_reference
+from alfred_ai.services.bounded_parser import run_bounded_parser
+from alfred_ai.services.upload_limits import read_upload_bytes, UploadLimitExceeded, UploadFormatError, UploadProtectionUnavailable
 from .canonical_evidence import _discovery_catalog, _load_catalog, SourceSelectionConflict
 from .persistent_memory import _owner
 
 TEXT_BYTES = 256 * 1024
 PASSAGE_CHARS = 600
 RESULT_LIMIT = 6
-LIMITATION = ('These are unverified retained extraction excerpts, not current financial facts or answers. '
+LIMITATION = ('These are unverified extracted excerpts, not current financial facts or answers. '
     'Extraction can omit or misread text; review the original and current corrected records. '
-    'No authenticity, currency, completeness or confidence is inferred. No text is sent to a model or stored again.')
+    'No authenticity, currency, completeness or confidence is inferred. No text is sent to a model or added to persistent knowledge storage. '
+    'Bank PDFs use only the original text layer; scanned/image-only text is not searched.')
 
 
 def _terms(query):
@@ -45,7 +49,25 @@ def search_document(user, kind, document_id, *, query, catalog_token):
     source_file = document.original_file if kind == 'expense' else document.uploaded_file
     state, fingerprint, url = file_reference(source_file)
     text = getattr(document, 'extracted_text', '')
+    text_origin = 'original_text_layer' if kind == 'expense' else 'retained_extraction'
+    extraction_method = None
+    extraction_error = None
+    if kind == 'expense' and state == 'available' and document.parser_status in ('parsed', 'needs_review'):
+        try:
+            with source_file.open('rb') as stream:
+                raw = read_upload_bytes(stream)
+            if sha256(raw).hexdigest() != fingerprint:
+                raise SourceSelectionConflict()
+            parsed = run_bounded_parser('document_text_layer', raw, document_name(document))
+            text, extraction_method = parsed['text'], parsed['method']
+        except UploadLimitExceeded:
+            extraction_error = 'extraction_limit'
+        except SourceSelectionConflict:
+            raise
+        except (UploadFormatError, UploadProtectionUnavailable, OSError, ValueError):
+            extraction_error = 'extraction_unavailable'
     status = ('source_unavailable' if state != 'available' else
+        extraction_error if extraction_error else
         'extraction_unavailable' if document.parser_status not in ('parsed', 'needs_review') or not text.strip() else
         'extraction_limit' if len(text.encode()) > TEXT_BYTES else 'searched')
     matches = []
@@ -62,7 +84,8 @@ def search_document(user, kind, document_id, *, query, catalog_token):
                 index = bisect_left(spans, (start, -1))
                 if index < len(spans) and spans[index][1] <= end:
                     found += 1
-                index = bisect_left(spans, (max(start, last_end), -1))
+                # Include a keyword that crossed the previous excerpt's end.
+                index = max(index, bisect_right(spans, last_end, key=lambda span: span[1]))
                 fresh = fresh or index < len(spans) and spans[index][1] <= end
             if found == len(terms) and fresh:
                 matches.append(dict(start=start, end=end, excerpt=excerpt))
@@ -74,5 +97,6 @@ def search_document(user, kind, document_id, *, query, catalog_token):
         raise SourceSelectionConflict()
     return dict(status=status, kind=kind, document_id=document_id, document_name=document_name(document),
         source_fingerprint=fingerprint, source_url=url, extraction_revision=stamp['source']['record'],
+        text_origin=text_origin, extraction_method=extraction_method,
         checked_at=timezone.now().isoformat(), results=matches[:RESULT_LIMIT], more_matches=len(matches) > RESULT_LIMIT,
         result_limit=RESULT_LIMIT, full_text_qa=False, financial_authority=False, limitation=LIMITATION)

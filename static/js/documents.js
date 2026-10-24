@@ -109,7 +109,7 @@ function initDocumentKnowledge() {
     let selected=null, generation=0, controller=null;
     function reset(page=null) {
         generation++; controller?.abort(); controller=null;
-        selected=page?.level==='records' && ['loan','investment'].includes(page.kind) ? page : null;
+        selected=page?.level==='records' ? page : null;
         form.hidden=!selected; query.value=''; status.textContent=''; results.replaceChildren();
         results.setAttribute('aria-busy','false'); submit.disabled=false; query.disabled=false;
     }
@@ -117,7 +117,7 @@ function initDocumentKnowledge() {
         event.preventDefault(); if (!selected) return;
         controller?.abort(); const request=new AbortController(), ticket=++generation; controller=request;
         results.replaceChildren(); results.setAttribute('aria-busy','true'); submit.disabled=true; query.disabled=true; status.textContent='Searching selected extraction…';
-        const timer=setTimeout(() => request.abort(),15000);
+        const timer=setTimeout(() => request.abort(),30000);
         try {
             const page=selected;
             const answer=await Alfred.fetchJSON(`/api/ai/financial-documents/${page.kind}/${page.document_id}/search/`,{
@@ -129,7 +129,7 @@ function initDocumentKnowledge() {
             const warning=document.createElement('p'); warning.textContent=answer.limitation; results.append(warning);
             answer.results.forEach(hit => {
                 const card=document.createElement('article'); card.className='surface-card';
-                const label=document.createElement('p'); label.textContent=`Retained extraction, characters ${hit.start+1}–${hit.end}. Unverified source text.`;
+                const label=document.createElement('p'); label.textContent=`${answer.text_origin==='original_text_layer' ? 'Original PDF text layer' : 'Retained extraction'}, characters ${hit.start+1}–${hit.end}. Unverified source text.`;
                 const excerpt=document.createElement('p'); excerpt.className='text-break'; excerpt.style.whiteSpace='pre-wrap'; excerpt.textContent=hit.excerpt;
                 card.append(label,excerpt); results.append(card);
             });

@@ -2056,6 +2056,39 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(self.text('documentKnowledgeResults'),'')
 
+    def test_selected_bank_pdf_text_search_and_scanned_abstention(self):
+        from tests.test_document_knowledge import text_pdf, image_pdf
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.expenses.models import StatementUpload
+        owner=self.scenario['user']
+        document=StatementUpload.objects.create(user=owner, bank_account_id=self.scenario['account']['id'],
+            source='bank_statement',file_name='Synthetic searchable bank.pdf',parser_status='parsed',
+            original_file=SimpleUploadedFile('synthetic.pdf',text_pdf()))
+        before=list(Expense.objects.order_by('pk').values())
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,f'#documentSourcesItems button[data-document-id="{document.pk}"]'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{document.pk}"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentKnowledgeQuery').is_displayed())
+        query=self.browser.find_element(self.By.ID,'documentKnowledgeQuery'); query.send_keys('maintenance waiver')
+        self.memory_click('#documentKnowledgeForm button[type="submit"]')
+        self.wait.until(lambda _: '1 extraction excerpt' in self.text('documentKnowledgeStatus'))
+        self.assertIn('Original PDF text layer',self.text('documentKnowledgeResults'))
+        self.assertIn('Annual maintenance waiver applies.',self.text('documentKnowledgeResults'))
+        self.browser.execute_script("document.getElementById('documentKnowledgeForm').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('bank-text-layer-search-desktop')
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('documentKnowledgeForm').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('bank-text-layer-search-mobile')
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        document.original_file.save('scanned.pdf',SimpleUploadedFile('scanned.pdf',image_pdf()))
+        self.memory_click('#documentSourcesRefresh')
+        self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus') and query.is_displayed())
+        query.send_keys('maintenance waiver'); self.memory_click('#documentKnowledgeForm button[type="submit"]')
+        self.wait.until(lambda _: 'No searchable extraction' in self.text('documentKnowledgeStatus'))
+        self.assertNotIn('Annual maintenance waiver applies.',self.text('documentKnowledgeResults'))
+        self.assertEqual(list(Expense.objects.order_by('pk').values()),before)
+        document.refresh_from_db(); self.assertEqual(document.extracted_payload,{})
+
     def test_document_center_owned_source_discovery_review_pages_and_stale_refresh(self):
         from selenium.webdriver.support.ui import Select
         from django.core.files.uploadedfile import SimpleUploadedFile

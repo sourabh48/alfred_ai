@@ -6,9 +6,27 @@ from django.test import Client, TestCase
 
 from apps.investments.models import InvestmentImportDocument
 from apps.loans.models import LoanImportDocument
+from apps.expenses.models import StatementUpload
 from apps.ml_engine.services.canonical_evidence import document_record_page, SourceSelectionConflict
 from apps.ml_engine.services import document_knowledge as knowledge
 from tests import test_canonical_evidence as fixtures
+
+
+def text_pdf(text='Synthetic statement. Annual maintenance waiver applies.'):
+    import fitz
+    with fitz.open() as document:
+        page = document.new_page()
+        if text:
+            page.insert_text((50, 70), text)
+        return document.tobytes()
+
+
+def image_pdf():
+    import fitz
+    with fitz.open(stream=text_pdf(), filetype='pdf') as source, fitz.open() as document:
+        page = document.new_page()
+        page.insert_image(page.rect, pixmap=source[0].get_pixmap())
+        return document.tobytes()
 
 
 class DocumentKnowledgeTests(TestCase):
@@ -71,6 +89,13 @@ class DocumentKnowledgeTests(TestCase):
         self.assertEqual(self.search('load', token)['results'], [])
         self.assertEqual(len(self.search('CAFÉ STRASSE', token)['results']), 1)
 
+    def test_overlap_retains_new_keyword_crossing_previous_excerpt_end(self):
+        self.document.extracted_text = 'exit' + ' ' * 594 + 'exit'
+        self.document.save()
+        result = self.search('exit', self.page()['catalog_token'])
+        self.assertEqual(len(result['results']), 2)
+        self.assertTrue(all('exit' in hit['excerpt'] for hit in result['results']))
+
     def test_missing_failed_or_removed_extraction_abstains(self):
         for text, state in (('', 'parsed'), ('exit load', 'failed')):
             self.document.extracted_text = text; self.document.parser_status = state; self.document.save()
@@ -99,6 +124,9 @@ class DocumentKnowledgeTests(TestCase):
     def test_owner_and_mixed_owner_links_never_return_text(self):
         self.client.force_login(self.other)
         self.assertEqual(self.post().status_code, 404)
+        self.client.force_login(self.owner)
+        type(self.investment).objects.filter(pk=self.investment.pk).update(user=self.other)
+        self.assertEqual(self.post().status_code, 404)
 
     def test_only_selected_document_is_searched_and_tokens_cannot_cross_documents(self):
         other = InvestmentImportDocument.objects.create(user=self.owner, file_name='Another synthetic.pdf',
@@ -108,9 +136,6 @@ class DocumentKnowledgeTests(TestCase):
         token = document_record_page(self.owner, 'investment', other.pk)['catalog_token']
         self.assertEqual(self.post(catalog_token=token).status_code, 404)
         self.assertFalse((self.root/'unused-vault').exists())
-        self.client.force_login(self.owner)
-        type(self.investment).objects.filter(pk=self.investment.pk).update(user=self.other)
-        self.assertEqual(self.post().status_code, 404)
 
     def test_session_csrf_post_only_payload_and_no_store_contract(self):
         self.assertEqual(Client().post(self.url, {}, content_type='application/json').status_code, 403)
@@ -142,3 +167,65 @@ class DocumentKnowledgeTests(TestCase):
         result = knowledge.search_document(self.owner, 'loan', document.pk, query='rate reset', catalog_token=page['catalog_token'])
         self.assertEqual(len(result['results']), 1)
         self.assertFalse(result['financial_authority'])
+
+    def bank_document(self, raw=None):
+        return StatementUpload.objects.create(user=self.owner, bank_account=self.account, source='bank_statement',
+            file_name='Synthetic statement.pdf', parser_status='parsed',
+            original_file=SimpleUploadedFile('statement.pdf', text_pdf() if raw is None else raw))
+
+    def bank_search(self, document, query='maintenance waiver'):
+        page = document_record_page(self.owner, 'expense', document.pk)
+        return knowledge.search_document(self.owner, 'expense', document.pk, query=query, catalog_token=page['catalog_token'])
+
+    def test_bank_text_layer_worker_and_search_preserve_original_accounts_and_payload(self):
+        document = self.bank_document()
+        before = list(type(self.account).objects.values())
+        result = self.bank_search(document)
+        self.assertEqual(result['status'], 'searched')
+        self.assertEqual(result['text_origin'], 'original_text_layer')
+        self.assertEqual(result['extraction_method'], 'pymupdf_text_only')
+        self.assertIn('Annual maintenance waiver applies.', result['results'][0]['excerpt'])
+        self.assertEqual(list(type(self.account).objects.values()), before)
+        document.refresh_from_db()
+        self.assertEqual(document.extracted_payload, {})
+        with document.original_file.open('rb') as original:
+            from hashlib import sha256
+            self.assertEqual(sha256(original.read()).hexdigest(), result['source_fingerprint'])
+
+    def test_bank_image_only_or_malformed_source_does_not_invent_text_or_use_ocr(self):
+        for raw in (text_pdf(''), image_pdf(), b'%PDF malformed synthetic'):
+            result = self.bank_search(self.bank_document(raw))
+            self.assertEqual(result['status'], 'extraction_unavailable')
+            self.assertEqual(result['results'], [])
+            self.assertIn('scanned/image-only text is not searched', result['limitation'])
+
+    def test_bank_foreign_account_and_linked_record_are_rejected_before_parsing(self):
+        document = self.bank_document()
+        type(self.account).objects.filter(pk=self.account.pk).update(user=self.other)
+        with patch.object(knowledge, 'run_bounded_parser', side_effect=AssertionError('No foreign parsing')):
+            from django.http import Http404
+            with self.assertRaises(Http404): self.bank_search(document)
+
+    def test_bank_byte_race_and_worker_limits_fail_closed_without_partial_results(self):
+        document = self.bank_document()
+        with patch.object(knowledge, 'read_upload_bytes', return_value=b'changed bytes'), \
+                patch.object(knowledge, 'run_bounded_parser') as parser:
+            with self.assertRaises(SourceSelectionConflict): self.bank_search(document)
+            parser.assert_not_called()
+        with patch.object(knowledge, 'run_bounded_parser', side_effect=knowledge.UploadLimitExceeded()):
+            result = self.bank_search(document)
+            self.assertEqual(result['status'], 'extraction_limit'); self.assertEqual(result['results'], [])
+        with patch.object(knowledge, 'run_bounded_parser', side_effect=knowledge.UploadProtectionUnavailable()):
+            self.assertEqual(self.bank_search(document)['status'], 'extraction_unavailable')
+
+    def test_bank_selection_revision_and_after_worker_source_race_reject_stale_results(self):
+        document = self.bank_document()
+        page = document_record_page(self.owner, 'expense', document.pk)
+        document.original_file.save('replacement.pdf', SimpleUploadedFile('replacement.pdf', text_pdf('Replacement bank text.')))
+        with self.assertRaises(SourceSelectionConflict):
+            knowledge.search_document(self.owner, 'expense', document.pk, query='bank text', catalog_token=page['catalog_token'])
+        def changed(*args, **kwargs):
+            StatementUpload.objects.filter(pk=document.pk).update(file_name='Changed during parse.pdf')
+            return dict(text='Replacement bank text.', method='pymupdf_text_only')
+        with patch.object(knowledge, 'run_bounded_parser', side_effect=changed), self.assertRaises(SourceSelectionConflict):
+            self.bank_search(document, query='bank text')

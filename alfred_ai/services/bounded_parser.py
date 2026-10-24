@@ -134,6 +134,13 @@ def run_worker(directory):
         elif job["kind"] == "document":
             from .document_extraction import extract_document_text
             result = extract_document_text(raw_bytes, job["filename"], **job["options"])
+        elif job["kind"] == "document_text_layer":
+            from .document_extraction import _extract_pdf_with_fitz
+            if not raw_bytes.startswith(b"%PDF"):
+                raise UploadFormatError()
+            text = _extract_pdf_with_fitz(raw_bytes)
+            check_text_budget(text)
+            result = {"text": text, "method": "pymupdf_text_only"}
         elif job["kind"] == "credit_metadata":
             from io import BytesIO
             from pypdf import PdfReader
