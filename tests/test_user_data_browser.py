@@ -28,6 +28,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from selenium import webdriver
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.common.exceptions import StaleElementReferenceException
         cls.By = By
         cls.active_requests = 0
         cls.request_lock = threading.Lock()
@@ -47,7 +48,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         cls.addClassCleanup(tracker.stop)
         cls.browser = browser_support.DocumentReviewBrowserTests._create_driver(webdriver)
         cls.browser.set_window_size(1440, 1200)
-        cls.wait = WebDriverWait(cls.browser, 20)
+        cls.wait = WebDriverWait(cls.browser, 20, ignored_exceptions=(StaleElementReferenceException,))
 
     @classmethod
     def tearDownClass(cls):
@@ -70,6 +71,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.artifacts.mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
+        result = getattr(getattr(self, "_outcome", None), "result", None)
+        if result and any(test is self for test, _ in result.failures + result.errors):
+            browser_support.DocumentReviewBrowserTests._capture_browser_artifacts(self, self.browser)
         self.browser.get("about:blank")
         # Drain real live-server requests before TransactionTestCase flushes
         # users and sessions; navigation can abort a fetch while its server
@@ -152,18 +156,44 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             file_name='synthetic-<img src=x onerror="window.__matchXss=1">.txt', extracted_payload=RESUME)
         self.login(); self.browser.get(self.live_server_url + "/career/")
         self.wait.until(lambda _: "career" in self.browser.title.lower())
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "careerRoot").get_attribute("data-page-busy") == "false"
+            and self.text("careerSummaryCards"))
         field = self.browser.find_element(self.By.ID, "careerRecruiterText")
         field.send_keys(JD)
         count = CareerJobAnalysis.objects.filter(user=owner).count()
         self.memory_click('#careerRecruiterForm button[type="submit"]')
         self.wait.until(lambda _: CareerJobAnalysis.objects.filter(user=owner).count() == count + 1)
-        self.wait.until(lambda _: "Rule-based fit score 80" in self.text("careerJobMatchPanel"))
-        self.assertIn("React", self.text("careerJobMatchPanel"))
-        self.assertIn("not a hiring probability", self.text("careerJobMatchPanel"))
-        self.assertIn("No salary-bearing evidence", self.text("careerJobMatchPanel"))
+        # Live refresh replaces animated cards; assert one complete rendered snapshot.
+        def completed_panel(_):
+            text = self.text("careerJobMatchPanel")
+            return text if all(value in text for value in (
+                "Rule-based fit score 80", "React", "not a hiring probability", "No salary-bearing evidence")) else False
+        panel = self.wait.until(completed_panel)
+        self.assertIn("React", panel)
+        self.assertIn("not a hiring probability", panel)
+        self.assertIn("No salary-bearing evidence", panel)
+        self.browser.execute_async_script("""
+            const done=arguments[0], original=Alfred.fetchJSON;
+            Alfred.fetchJSON=(...args)=>original(...args).then(data=>new Promise(resolve=>{
+                window.__careerRelease=()=>resolve(data); done(true);
+            }));
+            try { window.__careerPending=loadCareerDashboard({live:true}); }
+            finally { Alfred.fetchJSON=original; }
+        """)
         self.memory_click('[data-fit-sources] summary')
-        self.assertIn(resume.file_name, self.text("careerJobMatchPanel"))
-        self.assertIn(JD, self.text("careerJobMatchPanel"))
+        self.wait.until(lambda _: resume.file_name in self.text("careerJobMatchPanel") and JD in self.text("careerJobMatchPanel"))
+        pending_result = self.browser.execute_async_script("""
+            const done=arguments[0], details=document.querySelector('[data-fit-sources]');
+            const before={open:details.open,paused:Alfred.shouldPauseLiveRefresh(document.getElementById('careerRoot'))};
+            window.__careerRelease();
+            window.__careerPending.then(()=>done({...before,connected:details.isConnected,afterOpen:details.open,
+                same:details===document.querySelector('[data-fit-sources]')}));
+        """)
+        self.assertEqual(pending_result, {'open':True,'paused':True,'connected':True,'afterOpen':True,'same':True},
+            "A pending live response replaced the comparison while its sources were open")
+        sources = self.wait.until(lambda _: text if JD in (text := self.text("careerJobMatchPanel")) else False)
+        self.assertIn(resume.file_name, sources)
+        self.assertIn(JD, sources)
         self.assertFalse(self.browser.execute_script("return !!window.__matchXss || !!document.querySelector('[data-fit-sources] img');"))
         contrast = """const e=document.querySelector(arguments[0]), s=getComputedStyle(e), t=getComputedStyle(arguments[1] ? e.querySelector(arguments[1]) : e);
             function light(c){const v=c.match(/[\\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2]}
@@ -615,6 +645,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('ui-d-investment-empty-filter')
         self.browser.get(self.live_server_url+'/mobility/')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerComposer').is_displayed())
+        self.wait.until(lambda _: self.text('plannerStyle'))
         self.memory_click('a[href="/ai/insights/?scope=travel#intelligencePanel"]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_attribute('value')=='travel')
 
@@ -2005,6 +2036,90 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local.reason.assert_not_called(); cloud.assert_not_called()
         self.assertEqual(resolve_canonical_financial_baseline(owner,fresh=True)['decimal_amounts'],before)
 
+    def test_selected_document_extraction_search_privacy_staleness_and_mobile(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.ml_engine.services.document_knowledge import LIMITATION
+        row,documents,service,local=self.financial_source_selection_fixture('investment')
+        document=documents[0]
+        document.extracted_text='Synthetic exit load applies for thirty days. <img src=x onerror="window.knowledgeLeak=true"> Original value 100.00.'
+        document.save()
+        before=list(type(row).objects.order_by('pk').values())
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: 'Documents' in self.text('documentSourcesStatus'))
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,f'#documentSourcesItems button[data-document-id="{document.pk}"]'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{document.pk}"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentKnowledgeQuery').is_displayed())
+        query=self.browser.find_element(self.By.ID,'documentKnowledgeQuery'); query.send_keys('exit load')
+        self.memory_click('#documentKnowledgeForm button[type="submit"]')
+        self.wait.until(lambda _: '1 extraction excerpt' in self.text('documentKnowledgeStatus'))
+        self.assertIn(document.extracted_text,self.text('documentKnowledgeResults'))
+        self.assertIn(LIMITATION,self.text('documentKnowledgeResults'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.knowledgeLeak)'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentKnowledgeResults img'))
+        link=self.browser.find_element(self.By.CSS_SELECTOR,'#documentKnowledgeResults a')
+        self.assertIn('/media/',link.get_attribute('href'))
+        self.assertFalse(self.browser.execute_script("return performance.getEntriesByType('resource').some(e => /[?&]query=/.test(e.name))"))
+        self.browser.execute_script("document.getElementById('documentKnowledgeForm').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('document-extraction-search-desktop')
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('documentKnowledgeForm').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('document-extraction-search-mobile')
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        query.clear(); query.send_keys('missing keywords')
+        self.memory_click('#documentKnowledgeForm button[type="submit"]')
+        self.wait.until(lambda _: 'does not prove' in self.text('documentKnowledgeStatus'))
+        self.assertNotIn(document.extracted_text,self.text('documentKnowledgeResults'))
+        document.extracted_text='Changed retained extraction'; document.save()
+        query.clear(); query.send_keys('exit load')
+        self.memory_click('#documentKnowledgeForm button[type="submit"]')
+        self.wait.until(lambda _: 'Selected extraction changed' in self.text('documentKnowledgeStatus'))
+        self.assertEqual(self.text('documentKnowledgeResults'),'')
+        self.assertEqual(query.get_property('value'),'exit load')
+        self.memory_click('#documentSourcesRefresh')
+        self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus') and self.browser.find_element(self.By.ID,'documentKnowledgeQuery').is_displayed())
+        self.assertEqual(query.get_property('value'),'')
+        self.memory_click('#documentSourcesDocuments')
+        self.wait.until(lambda _: 'Documents' in self.text('documentSourcesStatus'))
+        self.assertFalse(query.is_displayed())
+        self.assertEqual(list(type(row).objects.order_by('pk').values()),before)
+        local.reason.assert_not_called()
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('documentKnowledgeResults'),'')
+
+    def test_selected_bank_pdf_text_search_and_scanned_abstention(self):
+        from tests.test_document_knowledge import text_pdf, image_pdf
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.expenses.models import StatementUpload
+        owner=self.scenario['user']
+        document=StatementUpload.objects.create(user=owner, bank_account_id=self.scenario['account']['id'],
+            source='bank_statement',file_name='Synthetic searchable bank.pdf',parser_status='parsed',
+            original_file=SimpleUploadedFile('synthetic.pdf',text_pdf()))
+        before=list(Expense.objects.order_by('pk').values())
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,f'#documentSourcesItems button[data-document-id="{document.pk}"]'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{document.pk}"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentKnowledgeQuery').is_displayed())
+        query=self.browser.find_element(self.By.ID,'documentKnowledgeQuery'); query.send_keys('maintenance waiver')
+        self.memory_click('#documentKnowledgeForm button[type="submit"]')
+        self.wait.until(lambda _: '1 extraction excerpt' in self.text('documentKnowledgeStatus'))
+        self.assertIn('Original PDF text layer',self.text('documentKnowledgeResults'))
+        self.assertIn('Annual maintenance waiver applies.',self.text('documentKnowledgeResults'))
+        self.browser.execute_script("document.getElementById('documentKnowledgeForm').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('bank-text-layer-search-desktop')
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('documentKnowledgeForm').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('bank-text-layer-search-mobile')
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        document.original_file.save('scanned.pdf',SimpleUploadedFile('scanned.pdf',image_pdf()))
+        self.memory_click('#documentSourcesRefresh')
+        self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus') and query.is_displayed())
+        query.send_keys('maintenance waiver'); self.memory_click('#documentKnowledgeForm button[type="submit"]')
+        self.wait.until(lambda _: 'No searchable extraction' in self.text('documentKnowledgeStatus'))
+        self.assertNotIn('Annual maintenance waiver applies.',self.text('documentKnowledgeResults'))
+        self.assertEqual(list(Expense.objects.order_by('pk').values()),before)
+        document.refresh_from_db(); self.assertEqual(document.extracted_payload,{})
+
     def test_document_center_owned_source_discovery_review_pages_and_stale_refresh(self):
         from selenium.webdriver.support.ui import Select
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -3153,6 +3268,32 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('budgetDailyStatus').scrollIntoView({behavior:'instant',block:'center'});")
         self.capture("budget-no-income-mobile")
 
+    def test_expense_headings_and_summary_labels_remain_readable_in_both_themes(self):
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.login()
+        self.browser.get(self.live_server_url + '/expenses/')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#summaryCards [data-role="label"]')) == 5)
+        contrast = r"""function luminance(rgb) {
+            const v=rgb.match(/[\d.]+/g).slice(0,3).map(n=>{n=Number(n)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4});
+            return .2126*v[0]+.7152*v[1]+.0722*v[2];
+        }
+        return [...document.querySelectorAll('#expenseRoot .card-header h5, #summaryCards [data-role="label"]')].map(e=>{
+            const a=luminance(getComputedStyle(e).color), b=luminance(getComputedStyle(e.closest('.card-header, .card')).backgroundColor);
+            return {heading:e.textContent,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+        });"""
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+                {'width':width, 'height':1000, 'deviceScaleFactor':1, 'mobile':False})
+            self.assertEqual(self.browser.execute_script('return window.innerWidth'), width)
+            for theme in ('light', 'dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+                self.wait.until(lambda _: self.browser.execute_script(
+                    "return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                ratios = self.browser.execute_script(contrast)
+                self.assertGreaterEqual(len(ratios), 9)
+                self.assertTrue(all(item['ratio'] >= 4.5 for item in ratios), (width, theme, ratios))
+                self.capture(f'expense-headers-{width}-{theme}')
+
     def test_expense_form_preserves_import_identity_and_bank_cents(self):
         from decimal import Decimal
         from types import SimpleNamespace
@@ -3222,7 +3363,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         row = Expense.objects.create(user=user, amount="2.68", closing_balance="0.00", merchant="=1+1", description="Owner export note")
         other = get_user_model().objects.create_user(username="csv-download-other")
         foreign = Expense.objects.create(user=other, amount="999.99", merchant="FOREIGN-CSV-ONLY")
-        downloads = Path(self.enterContext(TemporaryDirectory(prefix="alfred-csv-download-")))
+        # Chrome can retain download-history handles until the class-owned browser quits.
+        downloads = Path(self.enterClassContext(TemporaryDirectory(prefix="alfred-csv-download-")))
         self.browser.execute_cdp_cmd("Page.setDownloadBehavior", {"behavior": "allow", "downloadPath": str(downloads)})
         self.addCleanup(self.browser.execute_cdp_cmd, "Page.setDownloadBehavior", {"behavior": "default"})
         self.login()

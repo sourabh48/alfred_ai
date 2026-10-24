@@ -77,6 +77,26 @@ class GlobalAbuseLimitTests(TestCase):
         self.assertEqual(response.status_code, 429)
         retry.assert_not_called()
 
+    def test_document_search_uses_existing_expensive_budget_before_parser_or_query(self):
+        self.client.force_login(self.user)
+        for kind in ('expense', 'loan', 'investment'):
+            with self.subTest(kind=kind), override_settings(ALFRED_API_ACCOUNT_LIMIT=100):
+                self.client.post('/api/loans/import-pdf/', {})
+                with patch('apps.ml_engine.services.document_knowledge.search_document') as search:
+                    response = self.client.post(f'/api/ai/financial-documents/{kind}/1/search/', '{}', content_type='application/json')
+                self.assertEqual(response.status_code, 429)
+                self.assertIn('Retry-After', response)
+                search.assert_not_called()
+
+    def test_document_discovery_does_not_consume_expensive_search_budget(self):
+        self.client.force_login(self.user)
+        with override_settings(ALFRED_API_ACCOUNT_LIMIT=100):
+            self.client.get('/api/ai/financial-documents/investment/')
+            with patch('apps.ml_engine.services.document_knowledge.search_document', return_value={'status': 'searched'}) as search:
+                response = self.client.post('/api/ai/financial-documents/investment/1/search/', '{}', content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+            search.assert_called_once()
+
     def test_anonymous_and_missing_csrf_never_mutate(self):
         self.assertEqual(self.client.post('/api/budgets/', {}).status_code, 403)
         csrf = Client(enforce_csrf_checks=True)

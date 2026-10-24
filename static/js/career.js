@@ -29,6 +29,10 @@ function loadCareerDashboard(options = {}) {
     Alfred.setPageBusy("careerRoot", true, { label: "Loading career intelligence" });
     return Alfred.fetchJSON(`/api/career/dashboard/${careerDashboardQueryString()}`)
         .then(data => {
+            // A response can arrive after the owner opens sources or starts editing.
+            if (options.live && Alfred.shouldPauseLiveRefresh(document.getElementById("careerRoot"))) {
+                return;
+            }
             const profile = data.profile || {};
             const projection = data.projection || {};
             careerSimulationBaseline = projection;

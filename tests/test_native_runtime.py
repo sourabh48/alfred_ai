@@ -5,16 +5,76 @@ import socket
 import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase, override_settings
 from alfred_ai.services.ocr_process import ocr_command
 from apps.integrations.models import _encrypt_token, _decrypt_token
 from alfred_native import InstanceLock, data_directory, parent_is_running, stop, write_json
 from alfred_ai.services.native_web import create_native_server
+from scripts.verify_native_runtime import runtime_dashboard
 
 
 class NativeRuntimeBoundaryTests(SimpleTestCase):
+    def test_dashboard_waits_for_one_explicit_quota_retry_within_existing_deadline(self):
+        summary = {'current_month_net': 33000}
+        success = Mock(status_code=200)
+        success.json.return_value = {'summary': summary}
+        session = Mock()
+        session.get.side_effect = [Mock(status_code=429, headers={'Retry-After': '2'}), success]
+        with patch('scripts.verify_native_runtime.time.sleep') as sleep, \
+                patch('scripts.verify_native_runtime.time.monotonic', side_effect=[100, 101, 103]):
+            self.assertEqual(runtime_dashboard(session, 'http://synthetic.invalid'), summary)
+        sleep.assert_called_once_with(2)
+        self.assertEqual([call.kwargs['timeout'] for call in session.get.call_args_list], [90, 87])
+        success.raise_for_status.assert_called_once()
+
+    def test_dashboard_rejects_unbounded_or_invalid_quota_waits(self):
+        for header in ('', '0', '-1', '61', '1.5', 'nan', 'tomorrow', '9' * 100):
+            with self.subTest(header=header), patch('scripts.verify_native_runtime.time.sleep') as sleep:
+                session = Mock()
+                session.get.return_value = Mock(status_code=429, headers={'Retry-After': header})
+                with self.assertRaises(AssertionError):
+                    runtime_dashboard(session, 'http://synthetic.invalid')
+                sleep.assert_not_called()
+                session.get.assert_called_once()
+
+    def test_dashboard_keeps_http_and_response_contract_failures_visible(self):
+        from requests.exceptions import HTTPError
+        for code in (403, 500, 503):
+            with self.subTest(code=code), patch('scripts.verify_native_runtime.time.sleep') as sleep:
+                session = Mock()
+                response = session.get.return_value = Mock(status_code=code)
+                response.raise_for_status.side_effect = HTTPError('synthetic HTTP failure')
+                with self.assertRaises(HTTPError):
+                    runtime_dashboard(session, 'http://synthetic.invalid')
+                sleep.assert_not_called()
+                response.json.assert_not_called()
+        session = Mock()
+        session.get.return_value.status_code = 200
+        session.get.return_value.json.return_value = {'detail': 'unexpected response'}
+        with self.assertRaises(AssertionError):
+            runtime_dashboard(session, 'http://synthetic.invalid')
+
+    def test_dashboard_does_not_hide_persistent_throttling_or_exhausted_deadline(self):
+        from requests.exceptions import HTTPError
+        session = Mock()
+        limited = Mock(status_code=429, headers={'Retry-After': '1'})
+        limited.raise_for_status.side_effect = HTTPError('synthetic repeated quota')
+        session.get.return_value = limited
+        with patch('scripts.verify_native_runtime.time.sleep'), self.assertRaises(HTTPError):
+            runtime_dashboard(session, 'http://synthetic.invalid')
+        self.assertEqual(session.get.call_count, 2)
+        with patch('scripts.verify_native_runtime.time.monotonic', side_effect=[100, 190]), \
+                patch('scripts.verify_native_runtime.time.sleep') as sleep, self.assertRaises(AssertionError):
+            runtime_dashboard(session, 'http://synthetic.invalid')
+        sleep.assert_not_called()
+        session.reset_mock()
+        with patch('scripts.verify_native_runtime.time.monotonic', side_effect=[100, 101, 191]), \
+                patch('scripts.verify_native_runtime.time.sleep'), self.assertRaises(AssertionError):
+            runtime_dashboard(session, 'http://synthetic.invalid')
+        session.get.assert_called_once()
+
     def test_runtime_status_write_survives_a_brief_windows_reader_lock(self):
         with TemporaryDirectory(prefix='alfred-status-synthetic-') as directory:
             path=Path(directory)/'runtime.json'; path.write_text('{"status":"stopping"}',encoding='utf-8')

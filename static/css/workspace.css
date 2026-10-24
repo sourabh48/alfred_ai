@@ -15,6 +15,7 @@ h1, h2, h3, h4, h5, h6, .metric-value, .alfred-brand strong { font-family: inher
 .btn { min-height: 42px; }
 .form-control, .form-select { border-color: #bdcadb; }
 .text-muted, .small.text-muted { color: var(--alfred-muted) !important; }
+#summaryCards .text-warning { color: #805007 !important; }
 .workspace-heading { margin-bottom: 1.5rem; }
 .workspace-heading h1 { font-size: clamp(1.6rem, 3vw, 2.25rem); letter-spacing: -.035em; margin: .4rem 0; }
 .workspace-heading p { color: var(--alfred-muted); max-width: 64ch; margin: 0; }
@@ -60,6 +61,10 @@ html[data-theme="dark"] .text-dark { color: #e5edf8 !important; }
 html[data-theme="dark"] .text-success { color: #8de2b9 !important; }
 html[data-theme="dark"] .text-danger { color: #ffb8c1 !important; }
 html[data-theme="dark"] .bg-light { background: #203751 !important; color: #e5edf8 !important; }
+html[data-theme="dark"] .card-header.bg-white { background: var(--alfred-surface-strong) !important; }
+html[data-theme="dark"] #summaryCards .text-primary { color: #a8caff !important; }
+html[data-theme="dark"] #summaryCards .text-secondary { color: var(--alfred-muted) !important; }
+html[data-theme="dark"] #summaryCards .text-warning { color: #ffe1a2 !important; }
 html[data-theme="dark"] .form-control::file-selector-button { background: #294977 !important; color: #fff !important; }
 html[data-theme="dark"] .detail-item { background: #203751; color: #e5edf8; }
 .table-alfred th { font-size: .8rem; color: var(--alfred-muted); }
@@ -73,7 +78,8 @@ html[data-theme="dark"] .form-control, html[data-theme="dark"] .form-select, htm
 html[data-theme="dark"] a { color: #a8caff; }
 html[data-theme="dark"] .alfred-nav-list .nav-link { color: #ceddf2; }
 html[data-theme="dark"] .alfred-nav-list .nav-link.active { background: #294977; color: #fff; }
-html[data-theme="dark"] .btn-primary { color: #fff; }
+html[data-theme="dark"] .btn-primary, html[data-theme="dark"] .btn-secondary { color: #fff; }
+html[data-theme="dark"] .btn-soft-primary { color: #a8caff; }
 html[data-theme="dark"] .btn-outline-primary, html[data-theme="dark"] .btn-outline-secondary { color: #a8caff; border-color: #789cc8; }
 html[data-theme="dark"] .btn-outline-danger { color: #ffb8c1; border-color: #dc7890; }
 html[data-theme="dark"] .workspace-badge[data-state="ready"] { background: #184535; color: #c0f4d9; }

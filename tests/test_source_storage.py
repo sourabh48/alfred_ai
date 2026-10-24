@@ -29,14 +29,14 @@ class SourceStorageTests(TestCase):
         for kind in ('upload', 'document', 'statement'):
             with self.subTest(kind=kind), TemporaryDirectory() as directory, \
                     override_settings(FILE_UPLOAD_TEMP_DIR=directory), patch('tempfile.tempdir', directory):
-                root = Path(directory)
+                root = Path(directory).resolve()
                 replace_acl(root, f'D:P(A;;FA;;;{current_sid()})(A;;FA;;;SY)(A;;FR;;;AU)')
                 observed = []
                 original_open = io.open
                 original_os_open = os.open
                 def observe(path):
                     if isinstance(path, (str, os.PathLike)):
-                        path = Path(path)
+                        path = Path(path).resolve()
                         if path.is_relative_to(root):
                             observed.append(verify_private(path if path.is_dir() else path.parent))
                 def opening(path, mode='r', *args, **kwargs):

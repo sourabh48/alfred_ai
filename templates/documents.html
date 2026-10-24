@@ -50,6 +50,15 @@
     </div>
     <p id="documentSourcesStatus" role="status" aria-live="polite"></p>
     <div id="documentSourcesItems" class="data-stack" aria-busy="false"></div>
+    <form id="documentKnowledgeForm" method="post" autocomplete="off" class="mt-3" hidden>
+        {% csrf_token %}
+        <label class="form-label" for="documentKnowledgeQuery">Find keywords in this selected document</label>
+        <input id="documentKnowledgeQuery" type="search" class="form-control" maxlength="128" required aria-describedby="documentKnowledgeHelp">
+        <p id="documentKnowledgeHelp" class="small mt-2">Search only the selected bank PDF's original text layer or the selected loan/investment's retained extraction. Scanned bank text is unsupported. Use one to eight whole keywords, each at least two characters. Excerpts may contain extraction errors or old values; current corrected records take precedence. Nothing is sent to AI or retained again.</p>
+        <button class="btn btn-outline-primary" type="submit">Search selected extraction</button>
+        <p id="documentKnowledgeStatus" role="status" aria-live="polite" class="mt-2"></p>
+        <div id="documentKnowledgeResults" class="data-stack" aria-busy="false"></div>
+    </form>
 </section>
 
 <section class="row g-4 mb-4">
@@ -294,5 +303,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/documents.js?v=2.5"></script>
+<script src="/static/js/documents.js?v=2.7"></script>
 {% endblock %}

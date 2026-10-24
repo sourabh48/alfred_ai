@@ -70,6 +70,10 @@ skipped browser run. Summaries, screenshots, HTML and supported browser logs go
 to `artifacts/browser`, including `browser_regression_summary.json` and a labeled
 summary. `--artifact-dir` or `ALFRED_BROWSER_ARTIFACT_DIR` can select another folder.
 The CI workflow is `.github/workflows/browser-regression.yml`.
+The complete browser suite runs on Windows with real user-bound encryption and
+zero skips. Linux runs portable browser workflows and `tests.test_memory_platform`
+to verify unsupported private storage fails closed; it has no plaintext fallback.
+Linux results do not establish private-memory acceptance.
 
 ## Native runtime and recovery
 

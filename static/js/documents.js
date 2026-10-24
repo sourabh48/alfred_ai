@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initDocumentSources() {
+    const knowledge=initDocumentKnowledge();
     const kind=document.getElementById('documentSourcesKind'), items=document.getElementById('documentSourcesItems'), status=document.getElementById('documentSourcesStatus');
     const refresh=document.getElementById('documentSourcesRefresh'), documents=document.getElementById('documentSourcesDocuments');
     const previous=document.getElementById('documentSourcesPrevious'), next=document.getElementById('documentSourcesNext');
@@ -34,6 +35,7 @@ function initDocumentSources() {
     function reset(selected=null) { documentId=selected; cursors=[null]; index=0; nextCursor=null; return load(); }
     async function load() {
         if (!active) return;
+        knowledge.reset();
         controller?.abort(); const request=new AbortController(), ticket=++generation; controller=request;
         items.replaceChildren(); items.setAttribute('aria-busy','true'); status.textContent='Checking your document sources…';
         [kind,refresh,documents,previous,next,...filterControls].forEach(control => { control.disabled=true; });
@@ -47,6 +49,7 @@ function initDocumentSources() {
             if (!active || ticket!==generation) return;
             cursors[index]=page.page_cursor; nextCursor=page.next_cursor;
             status.textContent=`${page.level==='documents' ? 'Documents'+(filtered ? ' · filters applied' : '') : page.document_name+' · linked records'} · Page ${index+1} · ${page.count} supported entries · checked ${page.checked_at}. Full-document Q&A is unsupported.`;
+            knowledge.reset(page);
             if (!page.items.length) items.textContent=filtered ? 'No documents match these filters. No answer or verified fact can be inferred from this list.' : 'No supported linked sources. No answer or verified fact can be inferred from this list.';
             if (page.level==='records' && page.count) link(items,'Ask about selected reviewed records',`/ai/insights/?scope=financial_document&record_type=${page.kind}&document_id=${page.document_id}`);
             page.items.forEach(item => {
@@ -89,6 +92,7 @@ function initDocumentSources() {
     next.addEventListener('click',() => { if (nextCursor) { cursors[++index]=nextCursor; load(); } });
     previous.addEventListener('click',() => { if (index>0) { index--; load(); } });
     window.addEventListener('pagehide',() => {
+        knowledge.reset();
         active=false; generation++; controller?.abort(); controller=null; documentId=null; cursors=[null]; index=0; nextCursor=null;
         filterForm.reset(); appliedFilters={name:'',date_from:'',date_to:''};
         items.replaceChildren(); status.textContent=''; items.setAttribute('aria-busy','false');
@@ -96,6 +100,55 @@ function initDocumentSources() {
     });
     window.addEventListener('pageshow',event => { if (event.persisted) { active=true; reset(); } });
     load();
+}
+
+function initDocumentKnowledge() {
+    const form=document.getElementById('documentKnowledgeForm'), query=document.getElementById('documentKnowledgeQuery');
+    const status=document.getElementById('documentKnowledgeStatus'), results=document.getElementById('documentKnowledgeResults');
+    const submit=form.querySelector('button[type="submit"]');
+    let selected=null, generation=0, controller=null;
+    function reset(page=null) {
+        generation++; controller?.abort(); controller=null;
+        selected=page?.level==='records' ? page : null;
+        form.hidden=!selected; query.value=''; status.textContent=''; results.replaceChildren();
+        results.setAttribute('aria-busy','false'); submit.disabled=false; query.disabled=false;
+    }
+    form.addEventListener('submit',async event => {
+        event.preventDefault(); if (!selected) return;
+        controller?.abort(); const request=new AbortController(), ticket=++generation; controller=request;
+        results.replaceChildren(); results.setAttribute('aria-busy','true'); submit.disabled=true; query.disabled=true; status.textContent='Searching selected extraction…';
+        const timer=setTimeout(() => request.abort(),30000);
+        try {
+            const page=selected;
+            const answer=await Alfred.fetchJSON(`/api/ai/financial-documents/${page.kind}/${page.document_id}/search/`,{
+                method:'POST',signal:request.signal,body:JSON.stringify({query:query.value.trim(),catalog_token:page.catalog_token})});
+            if (ticket!==generation) return;
+            const states={source_unavailable:'The original source is unavailable. Refresh sources before retrying.',
+                extraction_unavailable:'No searchable extraction is retained for this document.',extraction_limit:'This extraction exceeds the bounded search limit.'};
+            status.textContent=states[answer.status] || (answer.results.length ? `${answer.results.length} extraction excerpt${answer.results.length===1 ? '' : 's'} from ${answer.document_name}${answer.more_matches ? '; more matches exist — narrow your keywords' : ''}.` : 'No matching excerpt. This does not prove the information is absent from the original.');
+            const warning=document.createElement('p'); warning.textContent=answer.limitation; results.append(warning);
+            answer.results.forEach(hit => {
+                const card=document.createElement('article'); card.className='surface-card';
+                const label=document.createElement('p'); label.textContent=`${answer.text_origin==='original_text_layer' ? 'Original PDF text layer' : 'Retained extraction'}, characters ${hit.start+1}–${hit.end}. Unverified source text.`;
+                const excerpt=document.createElement('p'); excerpt.className='text-break'; excerpt.style.whiteSpace='pre-wrap'; excerpt.textContent=hit.excerpt;
+                card.append(label,excerpt); results.append(card);
+            });
+            if (answer.source_url) {
+                const url=new URL(answer.source_url,location.origin);
+                if (url.origin===location.origin && url.pathname.startsWith('/media/')) {
+                    const link=document.createElement('a'); link.href=url.pathname; link.textContent='Review selected original file'; results.append(link);
+                }
+            }
+        } catch (error) {
+            if (ticket!==generation) return;
+            results.replaceChildren(); status.textContent=error.status===409 ? 'Selected extraction changed. Refresh sources and repeat your search.' : error.status===400 ? 'Use one to eight keywords of at least two characters. Refresh sources if the selection expired.' : 'Search unavailable. Your keywords are preserved; check your session and source before retrying.';
+            if ([401,403].includes(error.status)) window.dispatchEvent(new Event('pagehide'));
+        } finally {
+            clearTimeout(timer);
+            if (ticket===generation) { controller=null; submit.disabled=false; query.disabled=false; results.setAttribute('aria-busy','false'); }
+        }
+    });
+    return {reset};
 }
 
 const reviewQueueState = new Map();
