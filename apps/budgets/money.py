@@ -1,5 +1,5 @@
 """Budget register amounts; currency metadata is not recorded by this schema."""
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_DOWN, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from apps.expenses.money import ExpenseMoneyField, NumericMoneySerializerField, expense_money
@@ -7,6 +7,22 @@ from rest_framework import serializers
 
 FIELDS = ("base_budget", "inflation_adjusted", "spent")
 MESSAGE = "Enter a finite non-negative amount within the supported range."
+
+
+def allocate_budget(total, weights):
+    """Apportion virtual category limits in cents, with stable remainder ties."""
+    cent = Decimal("0.01")
+    total = max(Decimal("0"), Decimal(str(total))).quantize(cent, rounding=ROUND_HALF_UP)
+    weights = {key: Decimal(str(value)) for key, value in weights.items()}
+    if any(not value.is_finite() or value < 0 for value in weights.values()):
+        raise ValueError("Budget weights must be finite and non-negative.")
+    weight_sum = sum(weights.values(), Decimal("0"))
+    shares = {key: total * value / weight_sum if weight_sum else Decimal("0") for key, value in weights.items()}
+    limits = {key: value.quantize(cent, rounding=ROUND_DOWN) for key, value in shares.items()}
+    remainder = int((total - sum(limits.values(), Decimal("0"))) / cent) if weight_sum else 0
+    for key in sorted(shares, key=lambda key: (-(shares[key] - limits[key]), key))[:remainder]:
+        limits[key] += cent
+    return limits
 
 
 def budget_money(value):

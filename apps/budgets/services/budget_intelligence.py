@@ -7,10 +7,13 @@ from __future__ import annotations
 import calendar
 from collections import defaultdict
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, List
 from django.utils import timezone
 
 from apps.budgets.models import Budget
+from apps.budgets.money import allocate_budget
+from apps.expenses.money import money_float
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.expenses.services.cashflow_treatment import variable_spend_rows
@@ -147,13 +150,15 @@ class BudgetIntelligenceService:
             direction="debit",
         )
         rows = list(variable_spend_rows(expenses, monthly_housing=user.rent_or_emi))
-        month_spending = float(sum(amount for _, amount in rows))
+        month_spending = sum((amount for _, amount in rows), Decimal("0"))
 
         # Get monthly budget from the canonical baseline so EMI burden is not double counted.
-        monthly_budget = float(baseline.get("disposable_cash_flow", 0) or 0)
+        disposable = Decimal(str(baseline.get("disposable_cash_flow", 0) or 0))
+        income_evidenced = baseline.get("metric_states", {}).get("monthly_income", {}).get("status", "unavailable") != "unavailable"
+        monthly_budget = disposable
         plan = current_budget_plan(user, today=today)
         if plan is not None:
-            monthly_budget = float(plan.inflation_adjusted)
+            monthly_budget = plan.inflation_adjusted
 
         remaining_budget = monthly_budget - month_spending
 
@@ -161,7 +166,7 @@ class BudgetIntelligenceService:
         safe_daily_spend = remaining_budget / days_remaining if days_remaining > 0 else 0
 
         # Get today's spending
-        today_spending = float(sum(amount for expense, amount in rows if expense.transaction_date == today))
+        today_spending = sum((amount for expense, amount in rows if expense.transaction_date == today), Decimal("0"))
 
         # Calculate average daily spending this month
         days_elapsed = (today - month_start).days + 1
@@ -170,17 +175,31 @@ class BudgetIntelligenceService:
         status = "GOOD"
         if safe_daily_spend < 0:
             status = "OVER_BUDGET"
-        elif today_spending > safe_daily_spend * 1.5:
+        elif today_spending > safe_daily_spend * Decimal("1.5"):
             status = "WARNING"
 
+        message = self._get_affordability_message(status, safe_daily_spend, today_spending)
+        available = plan is not None or income_evidenced
+        if not available:
+            status = "UNAVAILABLE"
+            message = "Add a current budget plan or income evidence before calculating a daily guide."
+        elif not income_evidenced:
+            status = "OVER_BUDGET" if remaining_budget < 0 else "PLAN_ONLY"
+            message = "This guide follows your saved plan only; income evidence is unavailable. It does not confirm affordability."
+        elif plan is not None and monthly_budget > max(Decimal("0"), disposable):
+            status = "OVER_BUDGET" if remaining_budget < 0 else "WARNING"
+            message = "Your plan exceeds recorded disposable cash flow. The daily guide follows the plan; check funding, savings and unrecorded bills separately."
+
         return {
-            "today_spending": round(today_spending, 2),
-            "safe_daily_spend": round(max(0, safe_daily_spend), 2),
-            "remaining_budget": round(remaining_budget, 2),
+            "today_spending": money_float(today_spending),
+            "safe_daily_spend": money_float(max(0, safe_daily_spend)) if available else None,
+            "remaining_budget": money_float(remaining_budget) if available else None,
             "days_remaining": days_remaining,
-            "avg_daily_spending": round(avg_daily_spending, 2),
+            "avg_daily_spending": money_float(avg_daily_spending),
             "status": status,
-            "message": self._get_affordability_message(status, safe_daily_spend, today_spending),
+            "message": message,
+            "basis": "saved_plan" if plan is not None else "canonical_disposable_cash_flow" if income_evidenced else "unavailable",
+            "income_evidenced": income_evidenced,
             "financial_baseline": baseline,
         }
 
@@ -242,10 +261,10 @@ class BudgetIntelligenceService:
 
         expenses = list(Expense.objects.filter(user=user, transaction_date__lte=timezone.localdate()))
         recent_months = sorted({(item.transaction_date.year, item.transaction_date.month) for item in expenses})[-3:]
-        category_totals = defaultdict(float)
+        category_totals = defaultdict(Decimal)
         for expense, amount in variable_spend_rows(expenses, monthly_housing=user.rent_or_emi):
             if (expense.transaction_date.year, expense.transaction_date.month) in recent_months:
-                category_totals[expense.category] += float(amount)
+                category_totals[expense.category] += amount
 
         for category, _ in Expense.CATEGORY_CHOICES:
             if category in ["income", "transfer", "loan", "credit_card", "investment"]:
@@ -256,19 +275,19 @@ class BudgetIntelligenceService:
                 continue
 
             # Blend historical data with ideal allocation
-            ideal_allocation = (disposable_income * self.CATEGORY_ALLOCATION.get(category, 5) / 100) * city_multiplier
+            ideal_allocation = (Decimal(str(disposable_income)) * self.CATEGORY_ALLOCATION.get(category, 5) / 100) * Decimal(str(city_multiplier))
 
             # Weight: 60% ideal, 40% historical
-            suggested_budget = (ideal_allocation * 0.6) + (historical_avg * 0.4) if historical_avg > 0 else ideal_allocation
+            suggested_budget = (ideal_allocation * Decimal("0.6")) + (historical_avg * Decimal("0.4")) if historical_avg > 0 else ideal_allocation
 
             category_budgets[category] = {
-                "suggested": round(suggested_budget, 2),
-                "historical_avg": round(historical_avg, 2),
+                "suggested": suggested_budget,
+                "historical_avg": money_float(historical_avg),
             }
 
-        total = sum(item["suggested"] for item in category_budgets.values())
-        for item in category_budgets.values():
-            item["suggested"] = round(item["suggested"] / total * disposable_income, 2) if total else 0
+        limits = allocate_budget(disposable_income, {key: item["suggested"] for key, item in category_budgets.items()})
+        for key, item in category_budgets.items():
+            item["suggested"] = money_float(limits[key])
         return category_budgets
 
     def _calculate_daily_expenditure(self, disposable_income: float) -> float:

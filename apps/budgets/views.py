@@ -14,6 +14,7 @@ from apps.expenses.money import money_float
 from apps.expenses.services.cashflow_treatment import variable_spend_rows
 
 from .models import Budget
+from .money import allocate_budget
 from .serializers import BudgetSerializer
 
 
@@ -75,7 +76,7 @@ def _budget_dashboard_revision(user) -> str:
     return "|".join(
         str(value or "")
         for value in (
-            "budget-dashboard-v3",
+            "budget-dashboard-v4",
             today.strftime("%Y-%m-%d"),
             budget_meta["count"],
             budget_meta["max_id"],
@@ -108,33 +109,35 @@ def _build_budget_dashboard_payload(request) -> dict:
     for expense, amount in variable_spend_rows(monthly_expenses, monthly_housing=request.user.rent_or_emi):
         spent_by_category[expense.category] += amount
 
-    try:
-        suggestions = budget_intelligence_service.suggest_budget(request.user) or {}
-        daily_affordability = budget_intelligence_service.calculate_daily_affordability(request.user)
-        forecast = budget_intelligence_service.forecast_finances(request.user, months_ahead=3)
-    except Exception:
-        suggestions = {}
-        daily_affordability = {}
-        forecast = {}
+    unavailable_sections = []
+    def guidance(name, method, **kwargs):
+        try:
+            return method(request.user, **kwargs) or {}
+        except Exception:
+            unavailable_sections.append(name)
+            return {}
+    suggestions = guidance("suggestions", budget_intelligence_service.suggest_budget)
+    daily_affordability = guidance("daily guide", budget_intelligence_service.calculate_daily_affordability)
+    forecast = guidance("forecast", budget_intelligence_service.forecast_finances, months_ahead=3)
+    baseline = suggestions.get("financial_baseline") or daily_affordability.get("financial_baseline") or forecast.get("financial_baseline") or {}
 
-    plan_limit = Decimal(str(active_plan.inflation_adjusted if active_plan else suggestions.get("disposable_income", 0) or 0))
+    plan_limit = max(Decimal("0"), Decimal(str(active_plan.inflation_adjusted if active_plan else suggestions.get("disposable_income", 0) or 0)))
     total_spent = sum(spent_by_category.values(), Decimal("0"))
     total_remaining = plan_limit - total_spent
 
     category_labels = dict(Expense.CATEGORY_CHOICES)
     category_suggestions = suggestions.get("category_budgets", {})
-    suggested_total = sum((Decimal(str(item.get("suggested", 0) or 0)) for item in category_suggestions.values()), Decimal("0"))
     categories = set(category_suggestions.keys()) | set(spent_by_category.keys())
     hidden_categories = {"income", "transfer", "loan", "credit_card", "investment"}
+    limits = allocate_budget(plan_limit, {key: item.get("suggested", 0) or 0 for key, item in category_suggestions.items() if key not in hidden_categories})
     budget_data = []
     for category in categories:
         if category in hidden_categories:
             continue
-        suggested_limit = Decimal(str(category_suggestions.get(category, {}).get("suggested", 0) or 0))
-        suggested_limit = suggested_limit / suggested_total * plan_limit if suggested_total else Decimal("0")
+        suggested_limit = limits.get(category, Decimal("0"))
         historical_avg = category_suggestions.get(category, {}).get("historical_avg", 0) or 0
         spent = spent_by_category.get(category, Decimal("0"))
-        percent_used = round((spent / suggested_limit * 100) if suggested_limit > 0 else 0, 1)
+        percent_used = round(spent / suggested_limit * 100, 1) if suggested_limit > 0 else None
         status = "good"
         if suggested_limit and spent > suggested_limit:
             status = "over"
@@ -148,7 +151,7 @@ def _build_budget_dashboard_payload(request) -> dict:
                 "limit": money_float(suggested_limit),
                 "spent": money_float(spent),
                 "remaining": money_float(suggested_limit - spent),
-                "percent_used": float(percent_used),
+                "percent_used": float(percent_used) if percent_used is not None else None,
                 "historical_avg": money_float(historical_avg),
                 "status": status,
             }
@@ -172,9 +175,9 @@ def _build_budget_dashboard_payload(request) -> dict:
             "total_budget": money_float(plan_limit),
             "total_spent": money_float(total_spent),
             "total_remaining": money_float(total_remaining),
-            "percent_used": float(round((total_spent / plan_limit * 100) if plan_limit > 0 else 0, 1)),
-            "fixed_obligations": round(float(suggestions.get("fixed_obligations", 0) or 0), 2),
-            "disposable_income": round(float(suggestions.get("disposable_income", 0) or 0), 2),
+            "percent_used": float(round(total_spent / plan_limit * 100, 1)) if plan_limit > 0 else None,
+            "fixed_obligations": money_float(baseline.get("fixed_obligations", 0)),
+            "disposable_income": money_float(baseline.get("disposable_cash_flow", 0)),
             "tracked_categories": len(budget_data),
         },
         "plan": {
@@ -189,5 +192,6 @@ def _build_budget_dashboard_payload(request) -> dict:
         "daily_affordability": daily_affordability,
         "ai_suggestions": suggestions.get("recommendations", []),
         "forecast": forecast.get("forecasts", []),
-        "financial_baseline": suggestions.get("financial_baseline") or daily_affordability.get("financial_baseline") or forecast.get("financial_baseline") or {},
+        "financial_baseline": baseline,
+        "unavailable_sections": unavailable_sections,
     }

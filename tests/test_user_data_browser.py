@@ -2996,6 +2996,70 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.querySelector(arguments[0]).scrollIntoView({behavior:'instant',block:'center'});",selector)
         self.capture("travel-places-unavailable-mobile")
 
+    def test_budget_plan_reconciles_and_distinguishes_unknown_affordability(self):
+        from decimal import Decimal
+        from apps.budgets.models import Budget
+        from apps.expenses.models import BankAccount
+        from apps.loans.models import Loan
+        from apps.investments.models import Investment
+        models = (Expense, BankAccount, Loan, Investment)
+        before = [list(model.objects.values()) for model in models]
+        owner = self.scenario["user"]
+        foreign = get_user_model().objects.create_user("synthetic_budget_empty", password=PASSWORD)
+        self.login(); self.browser.get(self.live_server_url + "/budgets/")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "budgetBase").get_attribute("value"))
+        field = self.browser.find_element(self.By.ID, "budgetBase"); field.clear(); field.send_keys("7.77")
+        self.browser.execute_async_script("loadBudgetDashboard({live:true}).then(arguments[0]);")
+        self.assertEqual(field.get_attribute("value"), "7.77")
+        count = Budget.objects.filter(user=owner).count()
+        for name, value in (("budgetBase","100000.01"),("budgetInflation","100000.01"),("budgetSpent","999.99")):
+            field=self.browser.find_element(self.By.ID,name); field.clear(); field.send_keys(value)
+        self.memory_click('#budgetPlanForm button[type="submit"]')
+        self.wait.until(lambda _: Budget.objects.filter(user=owner).count()==count+1)
+        self.wait.until(lambda _: "exceeds recorded disposable" in self.text("budgetDailyStatus"))
+        row=Budget.objects.filter(user=owner).latest("id")
+        self.assertEqual((row.inflation_adjusted,row.spent),(Decimal("100000.01"),Decimal("999.99")))
+        self.client.force_login(owner)
+        data=self.client.get("/api/budgets/dashboard/").json()
+        self.assertEqual(sum(Decimal(str(r["limit"])) for r in data["budgets"]),Decimal("100000.01"))
+        self.assertNotEqual(data["summary"]["total_spent"],999.99)
+        contrast = """const e=document.querySelector('#budgetSuggestionList li'),s=getComputedStyle(e);
+            function light(c){const v=c.match(/[\\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2]}
+            const a=light(s.color),b=light(s.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);"""
+        self.assertGreaterEqual(self.browser.execute_script(contrast),4.5)
+        self.browser.execute_script("document.getElementById('budgetDailyStatus').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("budget-plan-affordability-desktop")
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,"budgetInflation").get_attribute("value")=="100000.01")
+        for name in ("budgetBase","budgetInflation","budgetSpent"):
+            field=self.browser.find_element(self.By.ID,name); field.clear(); field.send_keys("0")
+        self.memory_click('#budgetPlanForm button[type="submit"]')
+        self.wait.until(lambda _: "No positive budget for utilization" in self.text("budgetSummaryCards"))
+        self.assertIn("OVER_BUDGET",self.text("budgetDailyStatus"))
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('budgetSummaryCards').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("budget-zero-plan-mobile")
+        self.browser.set_window_size(1440,1200)
+        self.browser.get(self.live_server_url + "/login/")
+        for name, value in (("username",foreign.username),("password",PASSWORD)):
+            field=self.browser.find_element(self.By.NAME,name); field.clear(); field.send_keys(value)
+        self.memory_click('form.row.g-3 button[type="submit"]')
+        try:
+            self.wait.until(lambda _: "/login/" not in self.browser.current_url)
+        except Exception:
+            self.capture("budget-second-login-failure")
+            raise
+        self.assertIn(foreign.username,self.browser.find_element(self.By.TAG_NAME,"body").text)
+        self.browser.get(self.live_server_url + "/budgets/")
+        self.wait.until(lambda _: "UNAVAILABLE" in self.text("budgetDailyStatus"))
+        self.assertIn("Unavailable",self.text("budgetSummaryCards"))
+        self.assertGreaterEqual(self.browser.execute_script(contrast),4.5)
+        self.assertFalse(Budget.objects.filter(user=foreign).exists())
+        self.assertEqual(before,[list(model.objects.values()) for model in models])
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('budgetDailyStatus').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture("budget-no-income-mobile")
+
     def test_expense_form_preserves_import_identity_and_bank_cents(self):
         from decimal import Decimal
         from types import SimpleNamespace

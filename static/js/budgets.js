@@ -22,9 +22,13 @@ function loadBudgetDashboard(options = {}) {
             renderBudgetSuggestions(data.ai_suggestions || []);
             renderBudgetHistory(data.budget_history || []);
             if (!options.live) {
-                hydrateBudgetForm(data.plan);
+                hydrateBudgetForm(data.plan, data.summary.month);
             }
-            Alfred.clearPageAlert("budgetRoot");
+            if (data.unavailable_sections?.length) {
+                Alfred.upsertPageAlert("budgetRoot", `Some guidance is unavailable: ${data.unavailable_sections.join(", ")}. Your saved budget is preserved.`, "warning");
+            } else {
+                Alfred.clearPageAlert("budgetRoot");
+            }
         })
         .catch(error => {
             Alfred.upsertPageAlert("budgetRoot", error.message, "danger");
@@ -40,9 +44,9 @@ function renderBudgetHero(summary, plan) {
 function renderBudgetSummary(summary, affordability) {
     const cards = [
         { title: "Flexible Budget", value: Alfred.formatCurrency(summary.total_budget), copy: summary.month },
-        { title: "Living Spend", value: Alfred.formatCurrency(summary.total_spent), copy: `${Alfred.formatPercent(summary.percent_used)} of flexible budget used` },
+        { title: "Living Spend", value: Alfred.formatCurrency(summary.total_spent), copy: summary.percent_used == null ? "No positive budget for utilization" : `${Alfred.formatPercent(summary.percent_used)} of flexible budget used` },
         { title: "Housing + Loan EMIs", value: Alfred.formatCurrency(summary.fixed_obligations), copy: "Reserved separately from flexible spending" },
-        { title: "Daily Budget Guide", value: Alfred.formatCurrency(affordability.safe_daily_spend), copy: `${affordability.days_remaining || 0} days left, including today` },
+        { title: "Daily Budget Guide", value: affordability.safe_daily_spend == null ? "Unavailable" : Alfred.formatCurrency(affordability.safe_daily_spend), copy: `${affordability.days_remaining || 0} days left, including today` },
     ];
 
     document.getElementById("budgetSummaryCards").innerHTML = cards.map(card => `
@@ -92,7 +96,7 @@ function renderBudgetForecast(items) {
 function renderBudgetAffordability(affordability) {
     const panel = document.getElementById("budgetAffordabilityPanel");
     panel.innerHTML = [
-        ["Remaining Budget", Alfred.formatCurrency(affordability.remaining_budget)],
+        ["Remaining Budget", affordability.remaining_budget == null ? "Unavailable" : Alfred.formatCurrency(affordability.remaining_budget)],
         ["Days Remaining", Alfred.formatNumber(affordability.days_remaining, 0)],
         ["Today's Spend", Alfred.formatCurrency(affordability.today_spending)],
         ["Average Daily Spend", Alfred.formatCurrency(affordability.avg_daily_spending)],
@@ -107,6 +111,8 @@ function renderBudgetAffordability(affordability) {
         GOOD: "status-stable",
         WARNING: "status-guarded",
         OVER_BUDGET: "status-high",
+        PLAN_ONLY: "status-guarded",
+        UNAVAILABLE: "status-guarded",
     };
     document.getElementById("budgetDailyStatus").innerHTML = `
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -132,7 +138,7 @@ function renderBudgetCategories(items) {
             <td class="text-end">${Alfred.formatCurrency(item.limit)}</td>
             <td class="text-end">${Alfred.formatCurrency(item.spent)}</td>
             <td class="text-end ${item.remaining < 0 ? "text-danger" : ""}">${Alfred.formatCurrency(item.remaining)}</td>
-            <td class="text-end"><span class="status-pill ${categoryTone(item.status)}">${Alfred.formatPercent(item.percent_used)}</span></td>
+            <td class="text-end"><span class="status-pill ${categoryTone(item.status)}">${item.percent_used == null ? "—" : Alfred.formatPercent(item.percent_used)}</span></td>
         </tr>
     `).join("");
 }
@@ -140,11 +146,11 @@ function renderBudgetCategories(items) {
 function renderBudgetSuggestions(items) {
     const target = document.getElementById("budgetSuggestionList");
     if (!items.length) {
-        target.innerHTML = `<li class="insight-item">Budget recommendations will appear once income and transaction patterns are available.</li>`;
+        target.innerHTML = `<li class="insight-item surface-card">Budget recommendations will appear once income and transaction patterns are available.</li>`;
         return;
     }
 
-    target.innerHTML = items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+    target.innerHTML = items.map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join("");
 }
 
 function renderBudgetHistory(items) {
@@ -167,8 +173,9 @@ function renderBudgetHistory(items) {
     `).join("");
 }
 
-function hydrateBudgetForm(plan) {
+function hydrateBudgetForm(plan, month) {
     if (!plan) {
+        document.getElementById("budgetPlanForm").month.value = month;
         return;
     }
 
@@ -183,9 +190,10 @@ function submitBudgetPlan(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const payload = Object.fromEntries(new FormData(form).entries());
-    payload.base_budget = Number(payload.base_budget);
-    payload.inflation_adjusted = Number(payload.inflation_adjusted);
-    payload.spent = Number(payload.spent || 0);
+    const button = form.querySelector('button[type="submit"]');
+    if (button.disabled) return;
+    payload.spent = payload.spent || "0";
+    button.disabled = true;
 
     Alfred.fetchJSON("/api/budgets/", {
         method: "POST",
@@ -197,7 +205,8 @@ function submitBudgetPlan(event) {
             setBudgetMonthDefault();
             loadBudgetDashboard();
         })
-        .catch(error => showBudgetFeedback(error.message, "danger"));
+        .catch(error => showBudgetFeedback(error.message, "danger"))
+        .finally(() => { button.disabled = false; });
 }
 
 function showBudgetFeedback(message, tone) {
