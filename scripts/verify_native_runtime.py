@@ -21,6 +21,24 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
+def runtime_dashboard(session, base):
+    deadline = time.monotonic() + 90
+    response = session.get(base + "/api/expenses/dashboard/", timeout=90)
+    if response.status_code == 429:
+        delay = response.headers.get("Retry-After", "")
+        assert delay.isascii() and delay.isdecimal() and 0 < int(delay) <= 60, "Invalid native quota retry interval"
+        assert int(delay) < deadline - time.monotonic(), "Native quota wait exceeds the request deadline"
+        print(f"Synthetic native quota wait: {int(delay)} seconds", flush=True)
+        time.sleep(int(delay))
+        remaining = deadline - time.monotonic()
+        assert remaining > 0, "Native quota wait exhausted the request deadline"
+        response = session.get(base + "/api/expenses/dashboard/", timeout=remaining)
+    response.raise_for_status()
+    payload = response.json()
+    assert isinstance(payload, dict) and isinstance(payload.get("summary"), dict), "Native dashboard requires a summary object"
+    return payload["summary"]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--executable", type=Path)
@@ -112,9 +130,7 @@ def main():
                 assert result.status_code == 302, result.content[:1000]
 
         scenario = seed_acceptance_user(HttpClient())
-        dashboard = session.get(base + "/api/expenses/dashboard/", timeout=90)
-        dashboard.raise_for_status()
-        summary = dashboard.json()["summary"]
+        summary = runtime_dashboard(session, base)
         expected = {"current_month_income": 80000, "current_month_expense": 30000,
                     "current_month_loans": 10000, "current_month_outflow": 47000,
                     "current_month_net": 33000, "current_month_review_required": 60000}
@@ -316,7 +332,7 @@ def main():
         assert persisted["probe_id"] == run + "-persist"
         assert read_state(data)["instance"] != state["instance"]
         # The same signed-in browser session and all entered data survive restart.
-        restored_summary = session.get(base + "/api/expenses/dashboard/", timeout=90).json()["summary"]
+        restored_summary = runtime_dashboard(session, base)
         assert all(restored_summary[key] == summary[key] for key in expected)
         assert session.get(file_url, timeout=10).content == owner.content
         passed("queued_job_and_account_persist_after_restart")
@@ -347,9 +363,8 @@ def main():
         assert result.returncode == 0, result.stderr
         restore_base = f"http://127.0.0.1:{read_state(restored)['port']}"
         try:
-            restored_response = session.get(restore_base + "/api/expenses/dashboard/", timeout=90)
-            restored_response.raise_for_status()
-            assert all(restored_response.json()["summary"][key] == summary[key] for key in expected)
+            restored_summary = runtime_dashboard(session, restore_base)
+            assert all(restored_summary[key] == summary[key] for key in expected)
             assert session.get(restore_base + upload.original_file.url, timeout=10).content == owner.content
             passed("backup_restore_http_data_and_upload")
             if args.memory:
