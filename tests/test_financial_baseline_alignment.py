@@ -21,6 +21,19 @@ from apps.risk.services.risk_intelligence import risk_intelligence
 
 
 class FinancialBaselineAlignmentTests(TestCase):
+    def test_travel_capacity_does_not_spend_cash_already_needed_for_living_costs(self):
+        from apps.mobility.services.travel_advisor import travel_advisor
+        before = (list(Expense.objects.values()), list(Investment.objects.values()), list(Loan.objects.values()))
+        for savings, expected, tier in ((-7000, 0, 'budget'), (0, 0, 'budget'),
+                (60000, 60000, 'semi-budget to comfortable')):
+            with self.subTest(savings=savings), patch(
+                    'apps.expenses.services.financial_intelligence.resolve_canonical_financial_baseline',
+                    return_value=dict(disposable_cash_flow=100000, savings_capacity=savings, debt_burden_ratio=20)):
+                advice = travel_advisor._stay_advice(self.user, per_day_budget=12000, duration_days=3)
+                self.assertEqual(advice['affordability_basis']['monthly_trip_capacity'], expected)
+                self.assertEqual(advice['tier'], tier)
+        self.assertEqual((list(Expense.objects.values()), list(Investment.objects.values()), list(Loan.objects.values())), before)
+
     def setUp(self):
         cache.clear()
         recommendation_engine.user_profiles.clear()

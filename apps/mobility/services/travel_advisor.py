@@ -121,7 +121,7 @@ class TravelAdvisorService:
         disposable_cash_flow = float(baseline.get("disposable_cash_flow", 0) or 0)
         savings_capacity = float(baseline.get("savings_capacity", 0) or 0)
         debt_burden_ratio = float(baseline.get("debt_burden_ratio", 0) or 0)
-        monthly_trip_capacity = savings_capacity if savings_capacity > 0 else disposable_cash_flow
+        monthly_trip_capacity = max(savings_capacity, 0)
         room_cap = round(min(max(per_day_budget * 0.42, 900), 4500), 2) if per_day_budget else 1500
         if monthly_trip_capacity >= 60000 and debt_burden_ratio <= 35 and room_cap >= 2500:
             tier = "semi-budget to comfortable"
