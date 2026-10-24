@@ -260,6 +260,24 @@ def send_message(session_id, user, text):
     text = str(text).strip()
     if not text or len(text) > 2000:
         raise ValidationError("Send a message of 1–2,000 characters.")
+    if text.casefold() in {"show more destinations", "previous destinations"}:
+        from .travel_research import TERMINAL
+        TravelMessage.objects.create(session=session, role="user", text=text)
+        if session.research_runs.filter(revision=session.revision).exclude(status__in=TERMINAL).exists():
+            say(session, "Your current research is still queued or running. Wait before changing batches.")
+            return session
+        pool = value(session.state, "_destination_pool", [])
+        previous = text.casefold().startswith("previous")
+        current_offset = value(session.state, "_destination_offset", 0)
+        offset = max(0, current_offset-3) if previous else current_offset+3
+        if value(session.state, "selected_destination") or offset == current_offset or not 0 <= offset < len(pool):
+            say(session, "No further destination batch is available. Change your trip preferences to start a new search.")
+            return session
+        session.revision += 1
+        session.save(update_fields=["revision", "updated_at"])
+        queue_research(session, batch_offset=offset)
+        say(session, "The requested batch is saved and queued. Selection is unchanged; availability and access still need verification.")
+        return session
     old_state = deepcopy(session.state)
     session.state, notes = extract(session.state, text)
     if value(session.state,"requested_destination") != value(old_state,"requested_destination") and value(session.state,"requested_destination"):
@@ -292,6 +310,8 @@ def send_message(session_id, user, text):
     TravelMessage.objects.create(session=session, role="user", text=text)
     lower = text.lower()
     if session.state != old_state:
+        session.state.pop("_destination_pool", None)
+        session.state.pop("_destination_offset", None)
         session.revision += 1
     for key in ([] if session.itinerary else value(session.state, "preferred_trip_style", [])):
         if key not in value(old_state, "preferred_trip_style", []):

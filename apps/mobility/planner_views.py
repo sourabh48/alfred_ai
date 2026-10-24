@@ -53,7 +53,13 @@ def session_payload(session):
                 source["confidence"] = "UNKNOWN"
                 if source["data_type"] == "weather":
                     itinerary["weather"] = {"summary":"This forecast is stale. Recheck Trip before relying on it.","confidence":"UNKNOWN"}
-    return age_saved_facts({"id": session.id, "title": session.title, "state": session.state, "status": session.status,
+    offset = value(session.state, "_destination_offset", 0)
+    pool_count = len(value(session.state, "_destination_pool", []))
+    return age_saved_facts({"id": session.id, "title": session.title,
+            "state": {key: val for key, val in session.state.items() if not key.startswith("_destination_")}, "status": session.status,
+            "destination_pool": {"total": pool_count, "offset": offset,
+                "has_previous": offset > 0 and not value(session.state, "selected_destination"),
+                "has_more": offset+3 < pool_count and not value(session.state, "selected_destination")},
             "map_config":map_configuration(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),
@@ -123,6 +129,8 @@ class TravelSessionDetail(APIView):
             learn(request.user, "destination:"+chosen["name"], False, "Rejected recommendation", .5)
             avoided = value(session.state, "must_avoid", [])
             session.state["must_avoid"] = fact(list(dict.fromkeys(avoided+[chosen["name"]])))
+            session.state.pop("_destination_pool", None)
+            session.state.pop("_destination_offset", None)
             session.revision += 1
             session.save()
             queue_research(session)

@@ -3444,6 +3444,62 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertFalse(profile.media_learning_enabled)
         self.assertEqual(before, list(Expense.objects.filter(user=owner).values()))
 
+    def test_travel_candidate_batches_reopen_compare_and_explicit_selection(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import fact, value
+        from apps.mobility.services.travel_research import queue_research, run_research
+        from tests.test_travel_candidate_pool import synthetic_pool
+        from tests.test_travel_planner import weather_fixture
+        owner = self.scenario['user']
+        self.enterContext(patch('apps.mobility.services.travel_research.dispatch'))
+        self.enterContext(patch('apps.mobility.services.travel.providers.base.request', side_effect=AssertionError('Synthetic providers only')))
+        self.enterContext(patch('apps.mobility.services.travel.research.weather_result', side_effect=weather_fixture))
+        self.enterContext(patch('apps.mobility.services.travel.research.research_candidates',
+            side_effect=lambda user,state,preliminary: synthetic_pool(user,state)))
+        session = new_session(owner)
+        session.state = {key:fact(val) for key,val in dict(origin='Bengaluru',trip_duration=3,
+            available_start_date=str(timezone.localdate()+timedelta(days=2)),
+            available_end_date=str(timezone.localdate()+timedelta(days=4)),budget=15000,transport_mode='ride').items()}
+        session.save()
+        self.assertEqual(run_research(queue_research(session).pk)['status'], 'ready')
+        self.login(); self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        cards = lambda: [e.get_attribute('data-destination') for e in self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerCandidates article')]
+        self.wait.until(lambda _: '1–3 of 20' in self.text('plannerCandidatePages'))
+        first = cards(); self.assertEqual(len(first),3)
+        self.assertFalse(self.browser.find_element(self.By.ID,'plannerPreviousCandidates').is_enabled())
+        self.memory_click('#plannerMoreCandidates')
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerMoreCandidates').is_enabled())
+        run = self.wait.until(lambda _: session.research_runs.filter(status='queued').first())
+        session.refresh_from_db()
+        self.assertEqual(run.status,'queued'); self.assertIsNone(value(session.state,'selected_destination'))
+        self.assertEqual(run_research(run.pk)['status'], 'ready')
+        self.wait.until(lambda _: '4–6 of 20' in self.text('plannerCandidatePages'))
+        second = cards(); self.assertFalse(set(first) & set(second))
+        self.memory_click('#plannerCompare')
+        self.wait.until(lambda _: all(name in self.text('plannerComparison') for name in second))
+        self.assertNotIn(first[0],self.text('plannerComparison'))
+        self.browser.execute_script("document.getElementById('plannerCandidatePages').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('travel-candidate-batch-desktop')
+        self.browser.refresh()
+        self.wait.until(lambda _: '4–6 of 20' in self.text('plannerCandidatePages'))
+        self.assertEqual(cards(),second)
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.browser.execute_script("document.getElementById('plannerCandidatePages').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        self.capture('travel-candidate-batch-390px')
+        self.memory_click('#plannerPreviousCandidates')
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerPreviousCandidates').is_enabled())
+        run = self.wait.until(lambda _: session.research_runs.filter(status='queued').first())
+        self.assertEqual(run_research(run.pk)['status'],'ready')
+        self.wait.until(lambda _: '1–3 of 20' in self.text('plannerCandidatePages'))
+        self.assertEqual(cards(),first)
+        self.memory_click('#plannerCandidates article:first-child [data-planner-message]')
+        self.wait.until(lambda _: not self.text('plannerCandidatePages'))
+        session.refresh_from_db(); self.assertEqual(value(session.state,'selected_destination'),first[0])
+
     def test_travel_places_provenance_stale_and_unavailable_are_explicit(self):
         from copy import deepcopy
         from datetime import timedelta
