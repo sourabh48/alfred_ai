@@ -170,9 +170,28 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn("React", panel)
         self.assertIn("not a hiring probability", panel)
         self.assertIn("No salary-bearing evidence", panel)
+        self.browser.execute_async_script("""
+            const done=arguments[0], original=Alfred.fetchJSON;
+            Alfred.fetchJSON=(...args)=>original(...args).then(data=>new Promise(resolve=>{
+                window.__careerRelease=()=>resolve(data); done(true);
+            }));
+            try { window.__careerPending=loadCareerDashboard({live:true}); }
+            finally { Alfred.fetchJSON=original; }
+        """)
         self.memory_click('[data-fit-sources] summary')
-        self.assertIn(resume.file_name, self.text("careerJobMatchPanel"))
-        self.assertIn(JD, self.text("careerJobMatchPanel"))
+        self.wait.until(lambda _: resume.file_name in self.text("careerJobMatchPanel") and JD in self.text("careerJobMatchPanel"))
+        pending_result = self.browser.execute_async_script("""
+            const done=arguments[0], details=document.querySelector('[data-fit-sources]');
+            const before={open:details.open,paused:Alfred.shouldPauseLiveRefresh(document.getElementById('careerRoot'))};
+            window.__careerRelease();
+            window.__careerPending.then(()=>done({...before,connected:details.isConnected,afterOpen:details.open,
+                same:details===document.querySelector('[data-fit-sources]')}));
+        """)
+        self.assertEqual(pending_result, {'open':True,'paused':True,'connected':True,'afterOpen':True,'same':True},
+            "A pending live response replaced the comparison while its sources were open")
+        sources = self.wait.until(lambda _: text if JD in (text := self.text("careerJobMatchPanel")) else False)
+        self.assertIn(resume.file_name, sources)
+        self.assertIn(JD, sources)
         self.assertFalse(self.browser.execute_script("return !!window.__matchXss || !!document.querySelector('[data-fit-sources] img');"))
         contrast = """const e=document.querySelector(arguments[0]), s=getComputedStyle(e), t=getComputedStyle(arguments[1] ? e.querySelector(arguments[1]) : e);
             function light(c){const v=c.match(/[\\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2]}
@@ -624,6 +643,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('ui-d-investment-empty-filter')
         self.browser.get(self.live_server_url+'/mobility/')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerComposer').is_displayed())
+        self.wait.until(lambda _: self.text('plannerStyle'))
         self.memory_click('a[href="/ai/insights/?scope=travel#intelligencePanel"]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_attribute('value')=='travel')
 

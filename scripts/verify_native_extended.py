@@ -105,18 +105,23 @@ def verify_extended(base, session, scenario, data, passed, *, user_count=12, wri
                                              "passed": max(overflow["scroll"], overflow["body"]) <= width + 1})
                 if width in (390, 1440):
                     browser.execute_script(axe_path.read_text(encoding="utf-8"))
-                    result = browser.execute_async_script("""
-                        const done = arguments[arguments.length - 1];
-                        axe.run(document, {runOnly: {type:'tag', values:['wcag2a','wcag2aa','wcag21aa']}})
-                          .then(r => done({violations:r.violations.map(v => ({
-                            id:v.id, impact:v.impact, description:v.description,
-                            nodes:v.nodes.map(n => ({target:n.target, summary:n.failureSummary}))
-                          })), incomplete:r.incomplete.map(v=>v.id)}))
-                          .catch(e => done({error:String(e)}));
-                    """)
-                    assert not result.get("error"), result
-                    findings["accessibility"].append({"page": page, "width": width, **result})
-                    browser.save_screenshot(str(data / f"{page}-{width}.png"))
+                    for theme in ("light", "dark"):
+                        browser.execute_script("document.documentElement.dataset.theme=arguments[0]", theme)
+                        wait.until(lambda driver: driver.execute_script(
+                            "return document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity)"
+                            ".every(a => a.playState === 'finished' || a.playState === 'idle');"))
+                        result = browser.execute_async_script("""
+                            const done = arguments[arguments.length - 1];
+                            axe.run(document, {runOnly: {type:'tag', values:['wcag2a','wcag2aa','wcag21aa']}})
+                              .then(r => done({violations:r.violations.map(v => ({
+                                id:v.id, impact:v.impact, description:v.description,
+                                nodes:v.nodes.map(n => ({target:n.target, summary:n.failureSummary}))
+                              })), incomplete:r.incomplete.map(v=>v.id)}))
+                              .catch(e => done({error:String(e)}));
+                        """)
+                        assert not result.get("error"), result
+                        findings["accessibility"].append({"page": page, "width": width, "theme": theme, **result})
+                        browser.save_screenshot(str(data / f"{page}-{width}-{theme}.png"))
         # Actual keyboard focus can reach the main content without a pointer.
         browser.get(base + "/dashboard/")
         browser.execute_script("document.querySelector('.alfred-skip-link').focus();")
@@ -135,5 +140,5 @@ def verify_extended(base, session, scenario, data, passed, *, user_count=12, wri
     serious = [item for item in findings["accessibility"]
                if any(v["impact"] in ("serious", "critical") for v in item["violations"])]
     assert not serious, "Accessibility findings: see mobile-accessibility.json"
-    passed("automated_wcag_audit", {"pages": len(pages), "page_names": pages, "widths": [390, 1440], "serious_or_critical": 0,
+    passed("automated_wcag_audit", {"pages": len(pages), "page_names": pages, "widths": [390, 1440], "themes": ["light", "dark"], "serious_or_critical": 0,
                                    "scope": "Automated checks; manual screen-reader audit remains separate"})
