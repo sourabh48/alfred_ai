@@ -92,6 +92,9 @@ class MemoryStore:
                 CREATE TABLE IF NOT EXISTS conversations (
                     id TEXT PRIMARY KEY, owner TEXT NOT NULL, wrapped BLOB NOT NULL, record BLOB NOT NULL);
                 CREATE INDEX IF NOT EXISTS conversations_owner ON conversations(owner);
+                CREATE TABLE IF NOT EXISTS document_corpus (
+                    id TEXT PRIMARY KEY, owner TEXT NOT NULL, wrapped BLOB NOT NULL, record BLOB NOT NULL);
+                CREATE INDEX IF NOT EXISTS document_corpus_owner ON document_corpus(owner);
                 CREATE TABLE IF NOT EXISTS events (
                     sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE,
                     owner TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'save', ciphertext BLOB NOT NULL);
@@ -121,7 +124,7 @@ class MemoryStore:
     def _cipher(self, db):
         if not self.key_file.exists():
             if any(db.execute('SELECT EXISTS(SELECT 1 FROM '+table+')').fetchone()[0]
-                   for table in ('events', 'memory_keys', 'policies', 'memory_sync', 'conversations', 'conversation_policies')):
+                   for table in ('events', 'memory_keys', 'policies', 'memory_sync', 'conversations', 'conversation_policies', 'document_corpus')):
                 raise RuntimeError('Memory recovery key is missing; restore its protected backup.')
             protected = b'M15DPAPI1\0' + protect_key(Fernet.generate_key())
             descriptor = os.open(self.key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -249,6 +252,8 @@ class MemoryStore:
             encrypted = self._cipher(db).encrypt(json.dumps({'days': days}).encode())
             db.execute('INSERT INTO policies(owner,encrypted) VALUES(?,?) ON CONFLICT(owner) DO UPDATE SET encrypted=excluded.encrypted', (owner, encrypted))
             self._sync_dirty(db, owner)
+            from .document_corpus import DocumentCorpus
+            DocumentCorpus(self)._prune(db, owner)
             return self._expire(db, owner)
 
     def delete_memory(self, user, identity):
@@ -269,6 +274,8 @@ class MemoryStore:
                 return self._revoke(db, owner, identities)
             from .conversation_history import ConversationHistory
             ConversationHistory(self)._clear(db, owner, disable=True)
+            from .document_corpus import DocumentCorpus
+            DocumentCorpus(self)._clear(db, owner)
             db.execute('INSERT INTO owner_epochs(owner,epoch) VALUES(?,1) ON CONFLICT(owner) DO UPDATE SET epoch=epoch+1', (owner,))
             self._sync_dirty(db, owner)
             identities = [r[0] for r in db.execute('SELECT id FROM memory_keys WHERE owner=?', (owner,))]
@@ -282,6 +289,10 @@ class MemoryStore:
             history = ConversationHistory(self)
             for owner, in db.execute('SELECT DISTINCT owner FROM conversations').fetchall():
                 history._expire(db, owner)
+            from .document_corpus import DocumentCorpus
+            corpus = DocumentCorpus(self)
+            for owner, in db.execute('SELECT DISTINCT owner FROM document_corpus').fetchall():
+                corpus._prune(db, owner)
             return expired
 
     def save_verified(self, user, content, provenance, *, sensitivity='sensitive', verified=False, supersedes=(), candidate_id=None):

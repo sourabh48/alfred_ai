@@ -59,6 +59,30 @@
         <p id="documentKnowledgeStatus" role="status" aria-live="polite" class="mt-2"></p>
         <div id="documentKnowledgeResults" class="data-stack" aria-busy="false"></div>
     </form>
+    <fieldset id="documentCorpusIngest" class="mt-3" hidden>
+        <legend class="h6">Keep a private searchable copy</legend>
+        <p class="small">Explicitly store this extraction and its keyword index encrypted on this Windows user account. It remains unverified text and never changes financial records, verified memories, conversation history or cloud sync. A changed or unavailable source invalidates the copy. Full Memory or account reset removes these copies too.</p>
+        <label class="form-label" for="documentCorpusDays">Keep for days (1–30, or your shorter Memory retention)</label>
+        <input id="documentCorpusDays" type="number" class="form-control mb-2" min="1" max="30" step="1" value="7">
+        <label class="form-check-label"><input id="documentCorpusConsent" type="checkbox" class="form-check-input me-2">I consent to keeping this selected document text locally for this retention period.</label>
+        <button id="documentCorpusStore" type="button" class="btn btn-outline-primary mt-2" disabled>Store selected extraction privately</button>
+    </fieldset>
+</section>
+
+<section class="surface-card mb-4" aria-labelledby="documentCorpusTitle" data-live-refresh-hold="true">
+    <h2 id="documentCorpusTitle" class="page-section-title">Private document knowledge</h2>
+    <p>Search one to three explicitly selected encrypted copies with whole keywords. Excerpts link to your original files; current corrected financial records remain authoritative. This is document retrieval, not an inferred answer or independent verification.</p>
+    <button id="documentCorpusRefresh" type="button" class="btn btn-outline-primary mb-2">Show or refresh private knowledge</button>
+    <p id="documentCorpusLimits" class="small"></p>
+    <div id="documentCorpusList" class="data-stack mb-3" aria-busy="false"></div>
+    <form id="documentCorpusSearch" method="post" autocomplete="off">
+        {% csrf_token %}
+        <label class="form-label" for="documentCorpusQuery">Keywords in selected private documents</label>
+        <input id="documentCorpusQuery" type="search" class="form-control mb-2" maxlength="128" required>
+        <button type="submit" class="btn btn-outline-primary">Search selected private documents</button>
+    </form>
+    <p id="documentCorpusStatus" role="status" aria-live="polite" class="mt-2"></p>
+    <div id="documentCorpusResults" class="data-stack" aria-busy="false"></div>
 </section>
 
 <section class="row g-4 mb-4">
@@ -303,5 +327,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/documents.js?v=2.7"></script>
+<script src="/static/js/document_corpus.js?v=1"></script>
+<script src="/static/js/documents.js?v=2.8"></script>
 {% endblock %}

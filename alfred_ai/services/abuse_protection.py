@@ -50,7 +50,7 @@ class AbuseProtectionMiddleware(MiddlewareMixin):
                 budget('API-account', account, 'API_ACCOUNT')
                 budget('API-global', 'all', 'API_GLOBAL')
                 document_search = request.method == 'POST' and re.fullmatch(r'/api/ai/financial-documents/(?:expense|loan|investment)/[0-9]+/search/', path)
-                if (request.content_type == 'multipart/form-data' and request.FILES) or EXPENSIVE_PATH.search(path) or document_search or (path.startswith('/api/ai/memories/') and request.method == 'POST'):
+                if (request.content_type == 'multipart/form-data' and request.FILES) or EXPENSIVE_PATH.search(path) or document_search or path.startswith('/api/ai/document-corpus/') or (path.startswith('/api/ai/memories/') and request.method == 'POST'):
                     budget('EXPENSIVE-account', account, 'EXPENSIVE_ACCOUNT')
                     budget('EXPENSIVE-global', 'all', 'EXPENSIVE_GLOBAL')
             retry = reserve_attempts(settings.ALFRED_ABUSE_THROTTLE_DIR, buckets)

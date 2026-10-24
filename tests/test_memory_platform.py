@@ -47,6 +47,11 @@ class UnsupportedMemoryPlatformTests(TestCase):
                 "provenance": {"source": "synthetic"}, "verified": True}),
             ("post", "/api/ai/memories/retrieve/", {"query": "SYNTHETIC-PRIVATE-DATA"}),
             ("post", "/api/ai/memories/reset/", {"confirm": True}),
+            ("get", "/api/ai/document-corpus/", None),
+            ("post", "/api/ai/document-corpus/", {"kind": "investment", "document_id": 1,
+                "catalog_token": "synthetic", "consent": True, "days": 1}),
+            ("post", "/api/ai/document-corpus/search/", {"ids": ["a" * 32], "query": "SYNTHETIC-PRIVATE-DATA"}),
+            ("delete", "/api/ai/document-corpus/" + "a" * 32 + "/", {}),
         )
         for method, url, data in requests:
             with self.subTest(url=url, method=method):

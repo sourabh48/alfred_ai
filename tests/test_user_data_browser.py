@@ -2088,6 +2088,110 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(self.text('documentKnowledgeResults'),'')
 
+    def test_private_document_corpus_consent_reopen_citations_invalidation_and_reset(self):
+        from unittest.mock import Mock
+        from selenium.webdriver.support.ui import Select
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.investments.models import Investment, InvestmentImportDocument
+        from apps.ml_engine.services.document_corpus import DocumentCorpus
+        from apps.ml_engine.services.canonical_evidence import document_record_page
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-corpus-browser-')))
+        # Exercise ALFRED's private media view, not Django's public test-file handler.
+        self.enterContext(patch('django.test.testcases._MediaFilesHandler._should_handle',return_value=False))
+        self.enterContext(override_settings(MEDIA_ROOT=root/'media',ALFRED_MEMORY_DIR=root/'vault'))
+        embedder=Mock(embed=Mock(side_effect=AssertionError('No model for private corpus')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=embedder))
+        owner=self.scenario['user']
+        row=Investment.objects.create(user=owner,asset_type='equity',asset_name='Synthetic corpus holding',
+            invested_amount='100.01',current_value='120.05',monthly_sip='1.00')
+        quote='Synthetic exit load applies. <img src=x onerror="window.corpusLeak=true"> No guaranteed returns.'
+        document=InvestmentImportDocument.objects.create(user=owner,file_name='Synthetic corpus prospectus.pdf',
+            uploaded_file=SimpleUploadedFile('synthetic.pdf',b'%PDF synthetic corpus source'),parser_status='parsed',extracted_text=quote)
+        document.linked_investments.add(row)
+        before=list(Investment.objects.order_by('pk').values())
+        store=MemoryStore(root/'vault',embedder=SyntheticEmbeddings()); corpus=DocumentCorpus(store)
+        foreign=get_user_model().objects.create_user('synthetic-corpus-foreign')
+        other=InvestmentImportDocument.objects.create(user=foreign,file_name='Foreign private prospectus.pdf',
+            uploaded_file=SimpleUploadedFile('foreign.pdf',b'%PDF synthetic foreign source'),parser_status='parsed',extracted_text='FOREIGN-CORPUS-SECRET exit load')
+        foreign_id=corpus.ingest(foreign,'investment',other.pk,consent=True,days=1,
+            catalog_token=document_record_page(foreign,'investment',other.pk)['catalog_token'])['document']['id']
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentSourcesKind').is_enabled())
+        self.assertFalse(self.browser.execute_script("return performance.getEntriesByType('resource').some(e=>e.name.includes('/document-corpus/'))"))
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,f'#documentSourcesItems button[data-document-id="{document.pk}"]'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{document.pk}"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusConsent').is_displayed())
+        self.assertFalse(self.browser.find_element(self.By.ID,'documentCorpusStore').is_enabled())
+        self.memory_click('#documentCorpusConsent'); self.memory_click('#documentCorpusStore')
+        self.wait.until(lambda _: 'Encrypted copy stored' in self.text('documentCorpusStatus'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusList input:checked'))
+        self.browser.refresh(); self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
+        self.assertNotIn('Foreign private',self.text('documentCorpusList'))
+        self.memory_click('#documentCorpusList input')
+        query=self.browser.find_element(self.By.ID,'documentCorpusQuery'); query.send_keys('exit load')
+        self.memory_click('#documentCorpusSearch button')
+        self.wait.until(lambda _: '1 unverified excerpt' in self.text('documentCorpusStatus'))
+        self.assertIn(quote,self.text('documentCorpusResults'))
+        self.assertIn('Original SHA-256',self.text('documentCorpusResults'))
+        self.assertIn('Extracted characters 0',self.text('documentCorpusResults'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.corpusLeak)'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusResults img'))
+        link=self.browser.find_element(self.By.CSS_SELECTOR,'#documentCorpusResults a').get_attribute('href')
+        checked=self.browser.execute_async_script("fetch(arguments[0]).then(r=>arguments[1]({status:r.status,cache:r.headers.get('Cache-Control')}));",link)
+        self.assertEqual(checked,{'status':200,'cache':'private, no-store'})
+        rejected=self.browser.execute_async_script("Alfred.fetchJSON('/api/ai/document-corpus/search/',{method:'POST',body:JSON.stringify({ids:[arguments[0]],query:'exit load'})}).then(arguments[1]).catch(e=>arguments[1]({status:e.status}));",foreign_id)
+        self.assertEqual(rejected,{'status':409})
+        self.assertNotIn('FOREIGN-CORPUS-SECRET',self.browser.page_source)
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.capture('private-corpus-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertEqual(self.browser.execute_script('return innerWidth'),390)
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.wait.until(lambda _: self.browser.execute_script("return document.getElementById('documentCorpusResults').getBoundingClientRect().top<innerHeight;"))
+        self.capture('private-corpus-390px')
+        preserved=store.key_file.with_suffix('.preserved'); store.key_file.rename(preserved)
+        try:
+            self.memory_click('#documentCorpusSearch button')
+            self.wait.until(lambda _: 'unavailable' in self.text('documentCorpusStatus'))
+            self.assertEqual(self.text('documentCorpusResults'),'')
+            self.assertEqual(query.get_property('value'),'exit load')
+            self.assertFalse(store.key_file.exists())
+        finally:
+            preserved.rename(store.key_file)
+        document.extracted_text='Corrected extraction'; document.save()
+        self.memory_click('#documentCorpusSearch button')
+        self.wait.until(lambda _: 'sources changed' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.text('documentCorpusResults'),'')
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'No current private document copies' in self.text('documentCorpusList'))
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,f'#documentSourcesItems button[data-document-id="{document.pk}"]'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{document.pk}"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusConsent').is_displayed())
+        self.memory_click('#documentCorpusConsent'); self.memory_click('#documentCorpusStore')
+        self.wait.until(lambda _: 'Encrypted copy stored' in self.text('documentCorpusStatus'))
+        self.memory_click('#documentCorpusList button')
+        self.wait.until(lambda _: 'Private copy removed' in self.text('documentCorpusStatus'))
+        self.assertEqual(corpus.list(owner)['documents'],[])
+        self.memory_click('#documentCorpusStore')
+        self.wait.until(lambda _: 'Encrypted copy stored' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.memory_post('reset',{'confirm':True})['status'],200)
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'No current private document copies' in self.text('documentCorpusList'))
+        self.assertEqual(corpus.list(foreign)['documents'][0]['id'],foreign_id)
+        self.assertEqual(list(Investment.objects.order_by('pk').values()),before)
+        embedder.embed.assert_not_called()
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('documentCorpusResults'),''); self.assertEqual(self.text('documentCorpusList'),'')
+        self.assertEqual(query.get_property('value'),'')
+
     def test_selected_bank_pdf_text_search_and_scanned_abstention(self):
         from tests.test_document_knowledge import text_pdf, image_pdf
         from django.core.files.uploadedfile import SimpleUploadedFile

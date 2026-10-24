@@ -14,9 +14,10 @@ from .persistent_memory import _owner
 TEXT_BYTES = 256 * 1024
 PASSAGE_CHARS = 600
 RESULT_LIMIT = 6
-LIMITATION = ('These are unverified extracted excerpts, not current financial facts or answers. '
+EVIDENCE_LIMITATION = ('These are unverified extracted excerpts, not current financial facts or answers. '
     'Extraction can omit or misread text; review the original and current corrected records. '
-    'No authenticity, currency, completeness or confidence is inferred. No text is sent to a model or added to persistent knowledge storage. '
+    'No authenticity, currency, completeness or confidence is inferred. ')
+LIMITATION = (EVIDENCE_LIMITATION + 'No text is sent to a model or added to persistent knowledge storage. '
     'Bank PDFs use only the original text layer; scanned/image-only text is not searched.')
 
 
@@ -39,9 +40,9 @@ def _passages(text):
             break
 
 
-def search_document(user, kind, document_id, *, query, catalog_token):
+def document_text(user, kind, document_id, *, catalog_token):
+    """Read an explicitly selected source; callers must revalidate after using it."""
     _owner(user)
-    terms = _terms(query)
     if type(document_id) is not int or document_id < 1:
         raise ValueError('Choose one document from the current source list.')
     document, _, stamp, _ = _discovery_catalog(user, kind, document_id)
@@ -70,33 +71,45 @@ def search_document(user, kind, document_id, *, query, catalog_token):
         extraction_error if extraction_error else
         'extraction_unavailable' if document.parser_status not in ('parsed', 'needs_review') or not text.strip() else
         'extraction_limit' if len(text.encode()) > TEXT_BYTES else 'searched')
+    return dict(status=status, kind=kind, document_id=document_id, document_name=document_name(document),
+        source_fingerprint=fingerprint, source_url=url, extraction_revision=stamp['source']['record'],
+        text_origin=text_origin, extraction_method=extraction_method), text, stamp
+
+
+def matching_passages(text, terms, positions=None):
     matches = []
-    if status == 'searched':
+    if positions is None:
         positions = {term: [] for term in terms}
         for match in re.finditer(r'\w+', text):
             term = match.group().casefold()
             if term in positions:
                 positions[term].append((match.start(), match.end()))
-        last_end = -1
-        for start, end, excerpt in _passages(text):
-            found = 0; fresh = False
-            for spans in positions.values():
-                index = bisect_left(spans, (start, -1))
-                if index < len(spans) and spans[index][1] <= end:
-                    found += 1
-                # Include a keyword that crossed the previous excerpt's end.
-                index = max(index, bisect_right(spans, last_end, key=lambda span: span[1]))
-                fresh = fresh or index < len(spans) and spans[index][1] <= end
-            if found == len(terms) and fresh:
-                matches.append(dict(start=start, end=end, excerpt=excerpt))
-                last_end = end
-                if len(matches) > RESULT_LIMIT:
-                    break
+    last_end = -1
+    for start, end, excerpt in _passages(text):
+        found = 0; fresh = False
+        for term in terms:
+            spans = positions.get(term, [])
+            index = bisect_left(spans, start, key=lambda span: span[0])
+            if index < len(spans) and spans[index][1] <= end:
+                found += 1
+            # Include a keyword that crossed the previous excerpt's end.
+            index = max(index, bisect_right(spans, last_end, key=lambda span: span[1]))
+            fresh = fresh or index < len(spans) and spans[index][1] <= end
+        if found == len(terms) and fresh:
+            matches.append(dict(start=start, end=end, excerpt=excerpt))
+            last_end = end
+            if len(matches) > RESULT_LIMIT:
+                break
+    return matches
+
+
+def search_document(user, kind, document_id, *, query, catalog_token):
+    terms = _terms(query)
+    metadata, text, stamp = document_text(user, kind, document_id, catalog_token=catalog_token)
+    matches = matching_passages(text, terms) if metadata['status'] == 'searched' else []
     # Recheck file, extraction, owner, links and source revision after searching.
     if _discovery_catalog(user, kind, document_id)[2] != stamp:
         raise SourceSelectionConflict()
-    return dict(status=status, kind=kind, document_id=document_id, document_name=document_name(document),
-        source_fingerprint=fingerprint, source_url=url, extraction_revision=stamp['source']['record'],
-        text_origin=text_origin, extraction_method=extraction_method,
+    return dict(metadata,
         checked_at=timezone.now().isoformat(), results=matches[:RESULT_LIMIT], more_matches=len(matches) > RESULT_LIMIT,
         result_limit=RESULT_LIMIT, full_text_qa=False, financial_authority=False, limitation=LIMITATION)
