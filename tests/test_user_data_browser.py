@@ -3268,6 +3268,32 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('budgetDailyStatus').scrollIntoView({behavior:'instant',block:'center'});")
         self.capture("budget-no-income-mobile")
 
+    def test_expense_headings_and_summary_labels_remain_readable_in_both_themes(self):
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.login()
+        self.browser.get(self.live_server_url + '/expenses/')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#summaryCards [data-role="label"]')) == 5)
+        contrast = r"""function luminance(rgb) {
+            const v=rgb.match(/[\d.]+/g).slice(0,3).map(n=>{n=Number(n)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4});
+            return .2126*v[0]+.7152*v[1]+.0722*v[2];
+        }
+        return [...document.querySelectorAll('#expenseRoot .card-header h5, #summaryCards [data-role="label"]')].map(e=>{
+            const a=luminance(getComputedStyle(e).color), b=luminance(getComputedStyle(e.closest('.card-header, .card')).backgroundColor);
+            return {heading:e.textContent,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+        });"""
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+                {'width':width, 'height':1000, 'deviceScaleFactor':1, 'mobile':False})
+            self.assertEqual(self.browser.execute_script('return window.innerWidth'), width)
+            for theme in ('light', 'dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+                self.wait.until(lambda _: self.browser.execute_script(
+                    "return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                ratios = self.browser.execute_script(contrast)
+                self.assertGreaterEqual(len(ratios), 9)
+                self.assertTrue(all(item['ratio'] >= 4.5 for item in ratios), (width, theme, ratios))
+                self.capture(f'expense-headers-{width}-{theme}')
+
     def test_expense_form_preserves_import_identity_and_bank_cents(self):
         from decimal import Decimal
         from types import SimpleNamespace
@@ -3337,7 +3363,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         row = Expense.objects.create(user=user, amount="2.68", closing_balance="0.00", merchant="=1+1", description="Owner export note")
         other = get_user_model().objects.create_user(username="csv-download-other")
         foreign = Expense.objects.create(user=other, amount="999.99", merchant="FOREIGN-CSV-ONLY")
-        downloads = Path(self.enterContext(TemporaryDirectory(prefix="alfred-csv-download-")))
+        # Chrome can retain download-history handles until the class-owned browser quits.
+        downloads = Path(self.enterClassContext(TemporaryDirectory(prefix="alfred-csv-download-")))
         self.browser.execute_cdp_cmd("Page.setDownloadBehavior", {"behavior": "allow", "downloadPath": str(downloads)})
         self.addCleanup(self.browser.execute_cdp_cmd, "Page.setDownloadBehavior", {"behavior": "default"})
         self.login()
