@@ -717,8 +717,8 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         element.clear()
         element.send_keys(value)
 
-    def _capture_browser_artifacts(self):
-        driver = getattr(self, "selenium", None)
+    def _capture_browser_artifacts(self, driver=None):
+        driver = driver or getattr(self, "selenium", None)
         if not driver:
             return
 

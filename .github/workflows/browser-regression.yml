@@ -15,6 +15,9 @@ on:
       - "tests/test_user_data_browser.py"
       - "tests/user_acceptance_scenario.py"
       - "tests/test_browser_regression_runner.py"
+      - "tests/test_memory_platform.py"
+      - "tests/test_source_storage.py"
+      - "tests/test_travel_planner_browser.py"
       - "tests/test_live_ui_contracts.py"
       - "scripts/run_browser_regressions.py"
       - "scripts/verify_native*.py"
@@ -89,7 +92,8 @@ jobs:
           if-no-files-found: warn
 
   selenium:
-    runs-on: ubuntu-latest
+    # The complete suite exercises real DPAPI encryption; private-memory tests remain required.
+    runs-on: windows-latest
     timeout-minutes: 30
 
     steps:
@@ -105,6 +109,7 @@ jobs:
         uses: browser-actions/setup-chrome@v1
 
       - name: Prepare browser artifact directory
+        shell: bash
         run: |
           mkdir -p artifacts/browser
           python - <<'PY'
@@ -130,11 +135,6 @@ jobs:
           )
           PY
 
-      - name: Install browser system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y portaudio19-dev
-
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
@@ -147,6 +147,7 @@ jobs:
         run: python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome
 
       - name: Validate CI browser proof summary
+        shell: bash
         run: |
           python - <<'PY'
           import json
@@ -182,3 +183,45 @@ jobs:
           name: browser-regression-artifacts
           path: artifacts/browser
           if-no-files-found: error
+
+  linux-secure-failure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: browser-actions/setup-chrome@v1
+      - name: Install browser system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y portaudio19-dev
+          python -m pip install -r requirements.txt
+      - name: Verify unsupported private storage fails closed on Linux
+        env:
+          ALFRED_LOCAL_RUNTIME: "true"
+          ALFRED_AUTO_TRAIN_ON_STARTUP: "false"
+          ALFRED_DATA_DIR: ${{ runner.temp }}/alfred-linux-secure-failure
+          ALFRED_LOCAL_ENV_FILE: ${{ runner.temp }}/alfred-linux-secure-failure/absent.env
+          ALFRED_REGISTRY_PATH: ${{ runner.temp }}/alfred-linux-secure-failure/registry
+          DATABASE_URL: sqlite:///${{ runner.temp }}/alfred-linux-secure-failure/db.sqlite3
+        run: |
+          python -c "import os; assert os.name == 'posix'"
+          python manage.py test tests.test_memory_platform --noinput
+      - name: Portable browser acceptance (private-memory acceptance runs on Windows)
+        run: >-
+          python scripts/run_browser_regressions.py
+          tests.test_document_review_browser tests.test_travel_planner_browser
+          tests.test_user_data_browser.UserDataBrowserTests.test_career_matching_cites_saved_sources_and_abstains_without_requirements
+          tests.test_user_data_browser.UserDataBrowserTests.test_investment_field_review_correction_revocation_and_stale_source
+          tests.test_user_data_browser.UserDataBrowserTests.test_statement_real_pdf_reimport_preserves_fingerprints_and_balance
+          --browser Chrome --require-browser --proof-label ci-linux-portable
+      - name: Upload Linux portable browser proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-portable-browser-artifacts
+          path: artifacts/browser/
+          if-no-files-found: warn

@@ -387,6 +387,14 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn("ci-setup.json", workflow)
         self.assertIn("Install browser system dependencies", workflow)
         self.assertIn("portaudio19-dev", workflow)
+        windows_job = workflow.split("\n  selenium:\n", 1)[1].split("\n  linux-secure-failure:", 1)[0]
+        self.assertIn("runs-on: windows-latest", windows_job)
+        self.assertIn("run_browser_regressions.py --browser Chrome --require-browser", windows_job)
+        self.assertNotIn("--exclude", windows_job)
+        linux_job = workflow.split("\n  linux-secure-failure:\n", 1)[1]
+        self.assertIn("runs-on: ubuntu-latest", linux_job)
+        self.assertIn("manage.py test tests.test_memory_platform", linux_job)
+        self.assertIn("--require-browser --proof-label ci-linux-portable", linux_job)
         self.assertIn("Validate CI browser proof summary", workflow)
         self.assertIn("artifacts/browser/browser_regression_summary.ci-chrome.json", workflow)
         self.assertIn("github.get(\"enabled\") is True", workflow)

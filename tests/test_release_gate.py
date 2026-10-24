@@ -12,7 +12,7 @@ class ReleaseRepositoryFixture:
     def setUp(self):
         self.temporary = TemporaryDirectory(prefix="alfred-release-synthetic-")
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.repo = self.root / "source"
         self.repo.mkdir()
         self.git("init", "-q")

@@ -28,6 +28,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from selenium import webdriver
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.common.exceptions import StaleElementReferenceException
         cls.By = By
         cls.active_requests = 0
         cls.request_lock = threading.Lock()
@@ -47,7 +48,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         cls.addClassCleanup(tracker.stop)
         cls.browser = browser_support.DocumentReviewBrowserTests._create_driver(webdriver)
         cls.browser.set_window_size(1440, 1200)
-        cls.wait = WebDriverWait(cls.browser, 20)
+        cls.wait = WebDriverWait(cls.browser, 20, ignored_exceptions=(StaleElementReferenceException,))
 
     @classmethod
     def tearDownClass(cls):
@@ -70,6 +71,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.artifacts.mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
+        result = getattr(getattr(self, "_outcome", None), "result", None)
+        if result and any(test is self for test, _ in result.failures + result.errors):
+            browser_support.DocumentReviewBrowserTests._capture_browser_artifacts(self, self.browser)
         self.browser.get("about:blank")
         # Drain real live-server requests before TransactionTestCase flushes
         # users and sessions; navigation can abort a fetch while its server
@@ -157,10 +161,15 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         count = CareerJobAnalysis.objects.filter(user=owner).count()
         self.memory_click('#careerRecruiterForm button[type="submit"]')
         self.wait.until(lambda _: CareerJobAnalysis.objects.filter(user=owner).count() == count + 1)
-        self.wait.until(lambda _: "Rule-based fit score 80" in self.text("careerJobMatchPanel"))
-        self.assertIn("React", self.text("careerJobMatchPanel"))
-        self.assertIn("not a hiring probability", self.text("careerJobMatchPanel"))
-        self.assertIn("No salary-bearing evidence", self.text("careerJobMatchPanel"))
+        # Live refresh replaces animated cards; assert one complete rendered snapshot.
+        def completed_panel(_):
+            text = self.text("careerJobMatchPanel")
+            return text if all(value in text for value in (
+                "Rule-based fit score 80", "React", "not a hiring probability", "No salary-bearing evidence")) else False
+        panel = self.wait.until(completed_panel)
+        self.assertIn("React", panel)
+        self.assertIn("not a hiring probability", panel)
+        self.assertIn("No salary-bearing evidence", panel)
         self.memory_click('[data-fit-sources] summary')
         self.assertIn(resume.file_name, self.text("careerJobMatchPanel"))
         self.assertIn(JD, self.text("careerJobMatchPanel"))
