@@ -52,6 +52,7 @@ class UnsupportedMemoryPlatformTests(TestCase):
                 "catalog_token": "synthetic", "consent": True, "days": 1}),
             ("post", "/api/ai/document-corpus/search/", {"ids": ["a" * 32], "query": "SYNTHETIC-PRIVATE-DATA"}),
             ("delete", "/api/ai/document-corpus/" + "a" * 32 + "/", {}),
+            ("get", "/api/ai/document-corpus/" + "a" * 32 + "/original/", None),
         )
         for method, url, data in requests:
             with self.subTest(url=url, method=method):
@@ -71,4 +72,15 @@ class UnsupportedMemoryPlatformTests(TestCase):
         self.assertEqual(client.get("/api/ai/memories/").status_code, 403)
         client.force_login(self.owner)
         self.assertEqual(client.post("/api/ai/memories/reset/", {"confirm": True}, content_type="application/json").status_code, 403)
+        self.assertFalse(self.vault.exists())
+
+    def test_document_upload_refuses_unsupported_vault_before_extraction(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_login(self.owner)
+        with patch('apps.ml_engine.services.document_corpus.run_bounded_parser') as parser:
+            response = self.client.post('/api/ai/document-corpus/upload/',
+                dict(file=SimpleUploadedFile('synthetic.pdf',b'%PDF synthetic'),consent='true',days='1'))
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response['Cache-Control'], 'no-store, private')
+        parser.assert_not_called()
         self.assertFalse(self.vault.exists())

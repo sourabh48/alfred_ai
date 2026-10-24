@@ -2088,6 +2088,77 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(self.text('documentKnowledgeResults'),'')
 
+    def test_general_private_document_upload_pdf_text_and_owner_originals(self):
+        from unittest.mock import Mock
+        from tests.test_document_knowledge import text_pdf
+        from apps.ml_engine.services.document_corpus import DocumentCorpus
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-general-corpus-browser-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=root/'vault'))
+        embedder=Mock(embed=Mock(side_effect=AssertionError('No corpus inference')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=embedder))
+        quote='Synthetic local policy. <img src=x onerror="window.generalCorpusLeak=true"> Review before relying.'
+        text_file=root/'Synthetic local notes.txt'; text_file.write_text(quote,encoding='utf-8')
+        pdf_file=root/'Synthetic general guide.pdf'; pdf_file.write_bytes(text_pdf())
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusFile').is_enabled())
+        self.browser.find_element(self.By.ID,'documentCorpusFile').send_keys(str(text_file))
+        self.memory_click('#documentCorpusUpload button')
+        self.assertFalse(self.browser.execute_script("return performance.getEntriesByType('resource').some(e=>e.name.includes('/document-corpus/upload/'))"))
+        self.memory_click('#documentCorpusUploadConsent'); self.memory_click('#documentCorpusUpload button')
+        self.wait.until(lambda _: 'Original and searchable extraction stored encrypted' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'documentCorpusFile').get_property('value'),'')
+        self.assertFalse(self.browser.find_element(self.By.ID,'documentCorpusUploadConsent').is_selected())
+        corpus=DocumentCorpus(MemoryStore(root/'vault',embedder=SyntheticEmbeddings())); owner=self.scenario['user']
+        source=corpus.list(owner)['documents'][0]
+        original=self.browser.execute_async_script("fetch(arguments[0]).then(async r=>arguments[1]({status:r.status,text:await r.text(),cache:r.headers.get('Cache-Control'),type:r.headers.get('Content-Type'),disposition:r.headers.get('Content-Disposition'),sniff:r.headers.get('X-Content-Type-Options')}));",source['source_url'])
+        self.assertEqual(original['status'],200); self.assertEqual(original['text'],quote)
+        self.assertEqual(original['cache'],'no-store, private'); self.assertIn('attachment;',original['disposition'])
+        self.assertIn('text/plain',original['type']); self.assertEqual(original['sniff'],'nosniff')
+        self.memory_click('#documentCorpusList input')
+        query=self.browser.find_element(self.By.ID,'documentCorpusQuery'); query.send_keys('local policy')
+        self.memory_click('#documentCorpusSearch button')
+        self.wait.until(lambda _: '1 unverified excerpt' in self.text('documentCorpusStatus'))
+        self.assertIn(quote,self.text('documentCorpusResults'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.generalCorpusLeak)'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusResults img'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.capture('general-private-corpus-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        contrast=r'''const e=document.querySelector('#documentCorpusSearch button');
+            function light(c){const v=c.match(/[\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2]}
+            let p=e,bg; do {bg=getComputedStyle(p).backgroundColor;p=p.parentElement;}while(p && (bg==='rgba(0, 0, 0, 0)' || bg==='transparent'));
+            const a=light(getComputedStyle(e).color),b=light(bg);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);'''
+        for theme in ('dark','light'):
+            self.browser.execute_script("document.documentElement.dataset.theme=arguments[0]; document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});",theme)
+            self.wait.until(lambda _: self.browser.execute_script(contrast)>=4.5)
+            self.assertEqual(self.browser.execute_script('return innerWidth'),390)
+            self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+            self.assertTrue(self.browser.execute_script("const e=document.querySelector('#documentCorpusResults article p');return e.scrollWidth<=e.clientWidth;"))
+            self.capture('general-private-corpus-'+theme+'-390px')
+        self.browser.refresh(); self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
+        self.assertIn('Synthetic local notes.txt',self.text('documentCorpusList'))
+        self.browser.find_element(self.By.ID,'documentCorpusFile').send_keys(str(pdf_file))
+        self.memory_click('#documentCorpusUploadConsent'); self.memory_click('#documentCorpusUpload button')
+        self.wait.until(lambda _: 'Original and searchable extraction stored encrypted' in self.text('documentCorpusStatus'))
+        for check in self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusList input'):
+            self.memory_click(f'#documentCorpusList input[value="{check.get_property("value")}"]')
+        query=self.browser.find_element(self.By.ID,'documentCorpusQuery'); query.send_keys('maintenance waiver')
+        self.memory_click('#documentCorpusSearch button')
+        self.wait.until(lambda _: '1 unverified excerpt' in self.text('documentCorpusStatus'))
+        self.assertIn('Annual maintenance waiver applies.',self.text('documentCorpusResults'))
+        self.assertIn('uploaded pdf text layer',self.text('documentCorpusResults'))
+        pdf=next(item for item in corpus.list(owner)['documents'] if item['original_format']=='pdf')
+        self.memory_click(f'#documentCorpusList article:has(input[value="{pdf["id"]}"]) button')
+        self.wait.until(lambda _: 'Private copy removed' in self.text('documentCorpusStatus'))
+        status=self.browser.execute_async_script('fetch(arguments[0]).then(r=>arguments[1](r.status));',pdf['source_url'])
+        self.assertEqual(status,404); self.assertEqual(len(corpus.list(owner)['documents']),1)
+        embedder.embed.assert_not_called()
+
     def test_private_document_corpus_consent_reopen_citations_invalidation_and_reset(self):
         from unittest.mock import Mock
         from selenium.webdriver.support.ui import Select

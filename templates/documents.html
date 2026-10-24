@@ -72,6 +72,19 @@
 <section class="surface-card mb-4" aria-labelledby="documentCorpusTitle" data-live-refresh-hold="true">
     <h2 id="documentCorpusTitle" class="page-section-title">Private document knowledge</h2>
     <p>Search one to three explicitly selected encrypted copies with whole keywords. Excerpts link to your original files; current corrected financial records remain authoritative. This is document retrieval, not an inferred answer or independent verification.</p>
+    <form id="documentCorpusUpload" method="post" enctype="multipart/form-data" class="mb-3" autocomplete="off">
+        {% csrf_token %}
+        <fieldset>
+            <legend class="h6">Add another private document</legend>
+            <p class="small">PDF text layers or UTF-8 .txt files, at most 512 KiB original and 256 KiB extracted text, within the index/storage limits below. No OCR or model is used. The original and searchable copy are retained together, encrypted for this Windows user, and removed together on deletion, expiry or reset. Uploading never creates financial records or verifies the text.</p>
+            <label for="documentCorpusFile" class="form-label">Private PDF or text file</label>
+            <input id="documentCorpusFile" name="file" type="file" class="form-control mb-2" accept=".pdf,.txt,application/pdf,text/plain" required>
+            <label for="documentCorpusUploadDays" class="form-label">Keep for days (1–30, or your shorter Memory retention)</label>
+            <input id="documentCorpusUploadDays" name="days" type="number" min="1" max="30" value="7" step="1" class="form-control mb-2" required>
+            <label class="form-check-label"><input id="documentCorpusUploadConsent" name="consent" type="checkbox" value="true" class="form-check-input me-2" required>I consent to storing this original and extracted text locally for this retention period.</label>
+            <button type="submit" class="btn btn-outline-primary mt-2">Store private document</button>
+        </fieldset>
+    </form>
     <button id="documentCorpusRefresh" type="button" class="btn btn-outline-primary mb-2">Show or refresh private knowledge</button>
     <p id="documentCorpusLimits" class="small"></p>
     <div id="documentCorpusList" class="data-stack mb-3" aria-busy="false"></div>
@@ -327,6 +340,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/document_corpus.js?v=1"></script>
+<script src="/static/js/document_corpus.js?v=2"></script>
 <script src="/static/js/documents.js?v=2.8"></script>
 {% endblock %}

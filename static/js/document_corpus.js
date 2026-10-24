@@ -5,13 +5,15 @@ function initDocumentCorpus(getSelected) {
     const form=document.getElementById('documentCorpusSearch'), query=document.getElementById('documentCorpusQuery');
     const listing=document.getElementById('documentCorpusList'), results=document.getElementById('documentCorpusResults');
     const status=document.getElementById('documentCorpusStatus'), limits=document.getElementById('documentCorpusLimits');
+    const uploadForm=document.getElementById('documentCorpusUpload'), uploadFile=document.getElementById('documentCorpusFile');
+    const uploadConsent=document.getElementById('documentCorpusUploadConsent');
     let active=true, busy=false, generation=0, controller=null, expiryTimer=null;
     function clearResults() { clearTimeout(expiryTimer); expiryTimer=null; results.replaceChildren(); }
     function node(tag, text, className='') {
         const element=document.createElement(tag); element.textContent=text; element.className=className; return element;
     }
     function controls() {
-        [ingest,consent,days,refresh,query,...form.querySelectorAll('button'),...listing.querySelectorAll('input,button')]
+        [ingest,consent,days,refresh,query,...uploadForm.elements,...form.querySelectorAll('button'),...listing.querySelectorAll('input,button')]
             .forEach(control => { control.disabled=!active || busy; });
         ingest.disabled=!active || busy || !getSelected() || !consent.checked;
         listing.setAttribute('aria-busy',String(busy)); results.setAttribute('aria-busy',String(busy));
@@ -20,7 +22,7 @@ function initDocumentCorpus(getSelected) {
     function original(parent, source) {
         if (!source.source_url) return;
         const url=new URL(source.source_url,location.origin);
-        if (url.origin!==location.origin || !url.pathname.startsWith('/media/')) return;
+        if (url.origin!==location.origin || !(url.pathname.startsWith('/media/') || /^\/api\/ai\/document-corpus\/[a-f0-9]{32}\/original\/$/.test(url.pathname))) return;
         const link=node('a','Review original file'); link.href=url.pathname; parent.append(link);
     }
     function renderList(data) {
@@ -30,6 +32,8 @@ function initDocumentCorpus(getSelected) {
         limits.textContent=`Up to ${data.maximum_documents} copies, ${data.maximum_selected} selected per search, `+
             `${data.maximum_text_bytes/1024} KiB of text and ${data.maximum_index_tokens} indexed words per document, `+
             `${data.maximum_linked_records} linked records per source, ${data.maximum_owner_bytes/1048576} MiB encrypted storage per owner. `+
+            `General PDF/text uploads are at most ${data.maximum_upload_bytes/1024} KiB including the original. `+
+            `The combined original, text and index record is limited to ${data.maximum_record_bytes/1048576} MiB before encryption. `+
             `Retention is at most ${data.maximum_retention_days} days and follows any shorter Memory retention policy. `+
             'Remove retained copies before rolling back to an older app version. Protected backups have their own retention.';
         data.documents.forEach(source => {
@@ -58,7 +62,7 @@ function initDocumentCorpus(getSelected) {
     function renderResults(data) {
         data.results.forEach(hit=>{
             const card=node('article','','surface-card'); card.append(node('h3',hit.document_name,'h6'));
-            const quote=node('p',hit.excerpt); quote.style.whiteSpace='pre-wrap'; card.append(quote);
+            const quote=node('p',hit.excerpt,'text-break'); quote.style.whiteSpace='pre-wrap'; card.append(quote);
             card.append(node('p',`Extracted characters ${hit.start}–${hit.end} (end excluded). Original SHA-256: ${hit.source_fingerprint}`,'small text-break'));
             card.append(node('p',`${hit.text_origin.replaceAll('_',' ')} · source checked ${data.checked_at} · copy expires ${hit.expires_at}`,'small text-break'));
             original(card,hit); results.append(card);
@@ -85,6 +89,7 @@ function initDocumentCorpus(getSelected) {
             if (ticket!==generation) return;
             clearResults();
             status.textContent=error.status===409 ? 'Private sources changed, expired or were cleared. Refresh and re-ingest the selected original.' :
+                error.status===413 ? 'The document exceeds a processing or storage limit. Choose a smaller file.' :
                 error.status===400 ? 'Check explicit consent, retention, keywords, selected documents and storage limits. Your query is preserved.' :
                 'Encrypted document knowledge is unavailable. Existing vault data is preserved. Refresh and check your session before retrying.';
             if ([401,403].includes(error.status)) window.dispatchEvent(new Event('pagehide'));
@@ -94,6 +99,19 @@ function initDocumentCorpus(getSelected) {
         }
     }
     refresh.addEventListener('click',()=>perform(async signal=>({listing:await Alfred.fetchJSON(base,{signal}),message:'Private knowledge list refreshed; sources and expiry checked.'})));
+    uploadFile.addEventListener('change',()=>{uploadConsent.checked=false;});
+    uploadForm.addEventListener('submit',event=>{
+        event.preventDefault();
+        if (!uploadForm.reportValidity() || !uploadConsent.checked) return;
+        const data=new FormData(uploadForm);
+        data.delete('csrfmiddlewaretoken');
+        perform(async signal=>{
+            const saved=await Alfred.fetchJSON(base+'upload/',{method:'POST',body:data,signal});
+            if (!saved.stored) return {message:'No copy stored: no searchable text layer or supported text was found. Scanned PDFs require a separate reviewed extraction.'};
+            uploadForm.reset();
+            return {listing:await Alfred.fetchJSON(base,{signal}),message:'Original and searchable extraction stored encrypted. Explicitly select the private document below.'};
+        });
+    });
     consent.addEventListener('change',controls);
     ingest.addEventListener('click',()=>{
         const selected=getSelected();
@@ -118,6 +136,7 @@ function initDocumentCorpus(getSelected) {
     }
     window.addEventListener('pagehide',()=>{
         active=false; selectionChanged(); listing.replaceChildren(); query.value=''; limits.textContent='';
+        uploadForm.reset();
     });
     window.addEventListener('pageshow',event=>{if(event.persisted){active=true;controls();}});
     document.addEventListener('visibilitychange',()=>{if(document.hidden) selectionChanged();});

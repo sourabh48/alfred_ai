@@ -1,5 +1,5 @@
 """Synthetic encrypted document lifecycle; no provider, financial mutation or production data."""
-from datetime import timedelta
+from datetime import datetime, timedelta
 import json
 from unittest.mock import Mock, patch
 
@@ -279,3 +279,121 @@ class DocumentCorpusTests(TestCase):
         self.assertEqual(self.corpus.list(self.other)['documents'][0]['id'], foreign)
         self.other.delete()
         self.assertEqual(self.count(), 0)
+
+    def test_general_utf8_upload_retains_encrypted_original_and_exact_search_citations(self):
+        from base64 import b64encode
+        from hashlib import sha256
+        from apps.expenses.models import Expense
+        from apps.loans.models import Loan
+        before = [list(model.objects.values()) for model in (Expense, Loan, type(self.investment))]
+        raw = b'\xef\xbb\xbfSYNTHETIC-UPLOAD-SECRET. Exit load caf\xc3\xa9 Stra\xc3\x9fe. <script>untrusted()</script>'
+        result = self.corpus.upload(self.owner, SimpleUploadedFile('Synthetic notes.txt', raw), consent=True, days=7)
+        source = result['document']; identity = source['id']
+        self.assertEqual(source['source_fingerprint'], sha256(raw).hexdigest())
+        found = self.search([identity], 'CAFÉ STRASSE')['results'][0]
+        text = raw.decode('utf-8-sig')
+        self.assertEqual(found['excerpt'], text[found['start']:found['end']])
+        self.assertEqual(self.corpus.original(self.owner, identity)[1], raw)
+        response = self.client.get(source['source_url'])
+        try:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(b''.join(response.streaming_content), raw)
+            self.assertEqual(response['Cache-Control'], 'no-store, private')
+            self.assertEqual(response['X-Content-Type-Options'], 'nosniff')
+            self.assertIn('attachment;', response['Content-Disposition'])
+            self.assertEqual(response['Content-Type'], 'text/plain; charset=utf-8')
+        finally: response.close()
+        database = self.store.database.read_bytes()
+        self.assertNotIn(raw, database); self.assertNotIn(b64encode(raw), database)
+        self.assertNotIn(b'Synthetic notes', database)
+        self.assertEqual([list(model.objects.values()) for model in (Expense, Loan, type(self.investment))], before)
+        with self.store._transaction() as db:
+            for table in ('memories', 'events', 'conversations', 'memory_sync'):
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0], 0)
+        self.embedder.embed.assert_not_called()
+
+    def test_general_pdf_uses_bounded_text_only_extraction_and_scans_abstain(self):
+        import fitz
+        from tests.test_document_knowledge import text_pdf, image_pdf
+        raw = text_pdf()
+        source = self.corpus.upload(self.owner, SimpleUploadedFile('Synthetic general.pdf', raw), consent=True, days=1)['document']
+        found = self.search([source['id']], 'maintenance waiver')['results'][0]
+        self.assertEqual(found['text_origin'], 'uploaded_pdf_text_layer')
+        self.assertIn('Annual maintenance waiver applies.', found['excerpt'])
+        self.assertEqual(self.corpus.original(self.owner, source['id'])[1], raw)
+        with fitz.open(stream=image_pdf(), filetype='pdf') as raster:
+            scanned_bytes = raster.tobytes(deflate=True)
+        self.assertLess(len(scanned_bytes), corpus.MAX_UPLOAD_BYTES)
+        scanned = self.corpus.upload(self.owner, SimpleUploadedFile('Synthetic scan.pdf', scanned_bytes), consent=True, days=1)
+        self.assertFalse(scanned['stored']); self.assertEqual(self.count(), 1)
+
+    def test_general_upload_validates_consent_encoding_format_and_size_without_storage(self):
+        from alfred_ai.services.upload_limits import UploadLimitExceeded
+        for name,raw,changes in (('notes.txt',b'Exit load',{'consent':False}),
+                ('notes.txt',b'Exit load',{'days':31}), ('notes.txt',b'\xff\xfe',{}),
+                ('notes.txt',b'Private\0binary',{}), ('notes.html',b'<p>Untrusted</p>',{}),
+                ('x'*157+'.txt',b'Private text',{})):
+            with self.subTest(name=name,changes=changes), self.assertRaises(ValueError):
+                self.corpus.upload(self.owner, SimpleUploadedFile(name,raw), **(dict(consent=True,days=1)|changes))
+        for raw in (b'x'*(corpus.MAX_UPLOAD_BYTES+1), b'x'*(corpus.TEXT_BYTES+1)):
+            with self.assertRaises(UploadLimitExceeded):
+                self.corpus.upload(self.owner, SimpleUploadedFile('notes.txt',raw), consent=True, days=1)
+        self.assertFalse(self.corpus.upload(self.owner, SimpleUploadedFile('empty.txt',b' \n'), consent=True, days=1)['stored'])
+        with self.assertRaises(ValueError):
+            self.corpus.upload(self.owner, SimpleUploadedFile(None,b'Private text'), consent=True, days=1)
+        self.assertEqual(self.count(), 0)
+
+    def test_general_original_is_owner_scoped_expiry_and_deletion_remove_original_too(self):
+        source = self.corpus.upload(self.owner, SimpleUploadedFile('notes.txt',b'Exit load'), consent=True, days=1)['document']
+        with self.assertRaises(Http404): self.corpus.original(self.other, source['id'])
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(source['source_url']).status_code, 404)
+        self.client.force_login(self.owner)
+        with patch.object(corpus.timezone, 'now', return_value=timezone.now()+timedelta(days=2)):
+            with self.assertRaises(Http404): self.corpus.original(self.owner, source['id'])
+        self.assertEqual(self.client.get(source['source_url']).status_code, 404)
+        self.assertEqual(self.count(), 0)
+        source = self.corpus.upload(self.owner, SimpleUploadedFile('notes.txt',b'Exit load'), consent=True, days=1)['document']
+        self.corpus.delete(self.owner, source['id'])
+        with self.assertRaises(Http404): self.corpus.original(self.owner, source['id'])
+        self.assertEqual(self.count(), 0)
+        source = self.corpus.upload(self.owner, SimpleUploadedFile('notes.txt',b'Exit load'), consent=True, days=30)['document']
+        self.store.set_retention(self.owner, 1)
+        listed = self.corpus.list(self.owner)['documents'][0]
+        self.assertLessEqual(datetime.fromisoformat(listed['expires_at']), timezone.now()+timedelta(days=1))
+        self.store.reset_owner(self.owner); self.store.restore_owner(self.owner)
+        with self.assertRaises(Http404): self.corpus.original(self.owner, source['id'])
+
+    def test_general_original_tampering_is_preserved_and_reset_during_extraction_is_rejected(self):
+        source = self.corpus.upload(self.owner, SimpleUploadedFile('notes.txt',b'Exit load'), consent=True, days=1)['document']
+        with self.store._transaction() as db:
+            wrapped, ciphertext = db.execute('SELECT wrapped,record FROM document_corpus WHERE id=?', (source['id'],)).fetchone()
+            cipher = Fernet(self.store._cipher(db).decrypt(wrapped))
+            record = json.loads(cipher.decrypt(ciphertext)); record['original'] = 'eA=='
+            db.execute('UPDATE document_corpus SET record=? WHERE id=?', (cipher.encrypt(json.dumps(record).encode()), source['id']))
+        with self.assertRaises(RuntimeError): self.corpus.original(self.owner, source['id'])
+        self.assertEqual(self.count(), 1)
+        self.corpus.delete(self.owner, source['id'])
+        def reset(*args):
+            self.store.reset_owner(self.owner)
+            return dict(text='Exit load', method='synthetic_bounded_parser')
+        with patch.object(corpus, 'run_bounded_parser', side_effect=reset), self.assertRaises(MemoryConflict):
+            self.corpus.upload(self.owner, SimpleUploadedFile('notes.pdf',b'%PDF synthetic'), consent=True, days=1)
+        self.assertEqual(self.count(), 0)
+
+    def test_general_upload_api_rejects_bad_fields_and_requires_session_and_csrf(self):
+        url = self.url+'upload/'
+        def data(): return dict(file=SimpleUploadedFile('notes.txt',b'Exit load'), consent='true', days='7')
+        self.assertEqual(Client().post(url,data()).status_code, 403)
+        client = Client(enforce_csrf_checks=True); client.force_login(self.owner)
+        self.assertEqual(client.post(url,data()).status_code, 403)
+        client.get('/documents/'); token = client.cookies['csrftoken'].value
+        for changes in ({'consent':'yes'}, {'days':'1.0'}, {'days':'01x'}, {'days':['1','2']},
+                {'days':SimpleUploadedFile('days.txt',b'1')}, {'file':'not-a-file'}, {'other':'private'},
+                {'file':[SimpleUploadedFile('a.txt',b'One'),SimpleUploadedFile('b.txt',b'Two')]}):
+            with self.subTest(keys=list(changes)):
+                self.assertEqual(client.post(url,data()|changes, HTTP_X_CSRFTOKEN=token).status_code, 400)
+        response = client.post(url,data(), HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertIn('no-store', response['Cache-Control'])
+        self.assertEqual(self.count(), 1)

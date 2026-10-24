@@ -102,7 +102,8 @@ class GlobalAbuseLimitTests(TestCase):
         with override_settings(ALFRED_API_ACCOUNT_LIMIT=100):
             self.client.post('/api/loans/import-pdf/', {})
             with patch('apps.ml_engine.api.document_corpus.memory_store') as store:
-                for method, path in (('get',''), ('post',''), ('post','search/'), ('delete','a'*32+'/')):
+                for method, path in (('get',''), ('post',''), ('post','search/'), ('post','upload/'),
+                        ('get','a'*32+'/original/'), ('delete','a'*32+'/')):
                     with self.subTest(method=method, path=path):
                         response = getattr(self.client, method)('/api/ai/document-corpus/'+path,
                             data={}, content_type='application/json')
