@@ -285,8 +285,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     async function refreshControls() {
         const ticket = generation;
-        const [insights, reasoning, history] = await Promise.all([Alfred.fetchJSON("/api/ai/personal-insights/?assistant_status=1"), Alfred.fetchJSON("/api/ai/memories/reason/"), Alfred.fetchJSON("/api/ai/conversations/")]);
+        cloudAvailable = false; consent.checked = false; consent.disabled = true;
+        // Cloud policy status must not gate independent owner-only source browsing.
+        const [insights, history, policy] = await Promise.all([
+            Alfred.fetchJSON("/api/ai/personal-insights/?assistant_status=1"),
+            Alfred.fetchJSON("/api/ai/conversations/"),
+            Alfred.fetchJSON("/api/ai/memories/reason/").then(data => ({data}), error => ({error}))
+        ]);
         if (!active || ticket !== generation) return;
+        if (policy.error && [401,403].includes(policy.error.status)) {
+            forgetPrivatePage(); feedback.textContent = "Session or policy permission is no longer available. Sign in or reload before continuing."; return;
+        }
+        const reasoning = policy.data;
         applyHistory(history);
         documentChoice.replaceChildren(new Option("Choose verified evidence", ""));
         (insights.assistant_documents || []).forEach(item => documentChoice.append(new Option(item.label, item.id)));
@@ -316,11 +326,12 @@ document.addEventListener("DOMContentLoaded", () => {
             financialChoice.append(new Option(`${kind} record #${record.record_id}`, selectedFinancial));
         }
         if ([...financialChoice.options].some(option => option.value === selectedFinancial)) financialChoice.value = selectedFinancial;
-        cloudAvailable = reasoning.provider_available && reasoning.policy.enabled;
+        cloudAvailable = Boolean(reasoning?.provider_available && reasoning.policy.enabled);
         setLocalStatus(insights.local_model_status === "available" ? "Ollama available" : "Ollama unavailable", insights.local_model_status === "available" ? "ready" : "unavailable");
-        document.getElementById("intelligenceCloudStatus").textContent = !reasoning.real_provider_enabled
+        document.getElementById("intelligenceCloudStatus").textContent = !reasoning ? "Cloud policy unavailable · cloud disabled" : !reasoning.real_provider_enabled
             ? (cloudAvailable ? "Synthetic cloud testing · OpenAI disabled" : "OpenAI disabled")
             : (cloudAvailable ? "OpenAI · consent required per question" : "OpenAI · owner consent or configuration required");
+        if (policy.error) feedback.textContent = `${policy.error.message} Cloud is disabled. Reload to recheck its policy; local sources remain available.`;
         updateScope();
     }
     scope.addEventListener("change", updateScope);

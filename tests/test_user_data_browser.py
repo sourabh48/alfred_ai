@@ -1712,6 +1712,35 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             service.review(owner,document.pk,record.pk,revision=detail['revision'],fields=['current_value'],confirm=True)
         return document,records,service,local
 
+    def test_financial_source_discovery_survives_cloud_policy_outage_but_not_permission_loss(self):
+        import sqlite3
+        from rest_framework.exceptions import NotAuthenticated, PermissionDenied
+        from apps.ml_engine.api.memory import MemoryReasoningAPI
+
+        with patch.object(MemoryReasoningAPI, 'get', side_effect=sqlite3.OperationalError('synthetic-policy-storage-failure')):
+            row,documents,service,local=self.financial_source_selection_fixture('investment')
+            self.assertIn('Cloud policy unavailable',self.text('intelligenceCloudStatus'))
+            self.assertIn('Private memory is unavailable',self.text('intelligenceFeedback'))
+            consent=self.browser.find_element(self.By.ID,'intelligenceCloudConsent')
+            self.assertTrue(consent.get_property('disabled')); self.assertFalse(consent.is_selected())
+            self.memory_click('#intelligenceSourcesNext')
+            self.wait.until(lambda _: 'Page 2' in self.text('intelligenceSourcesStatus'))
+            links=self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceSourceItems a')
+            self.assertEqual(len(links),2)
+            self.assertTrue(all(f'/records/{row.pk}/' in link.get_attribute('href') for link in links))
+            self.assertFalse(self.browser.find_element(self.By.ID,'conversationHistoryConsent').is_enabled())
+            local.reason.assert_not_called()
+            self.capture('financial-source-policy-outage')
+
+        for error in (NotAuthenticated('synthetic-session-expired'),PermissionDenied('synthetic-policy-denied')):
+            with self.subTest(error=type(error).__name__), patch.object(MemoryReasoningAPI,'get',side_effect=error):
+                self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=investment&record_id={row.pk}')
+                self.wait.until(lambda _: 'Sign in or reload' in self.text('intelligenceFeedback'))
+                self.assertEqual(self.text('intelligenceSourceItems'),'')
+                self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceFinancial').find_elements(self.By.TAG_NAME,'option'),[])
+                self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').get_property('disabled'))
+                local.reason.assert_not_called()
+
     def test_financial_document_questions_explicit_records_pages_citations_and_privacy(self):
         from selenium.webdriver.support.ui import Select
         document,records,service,local=self.financial_document_question_fixture()

@@ -1,3 +1,5 @@
+from time import monotonic
+
 from apps.ml_engine.core.alfred_router import alfred_router
 from apps.ml_engine.runtime_control import build_runtime_status, grant_training_consent, revoke_training_consent
 from apps.ml_engine.training.orchestrator import run_training_cycle, training_health_snapshot
@@ -67,9 +69,8 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
         intelligence['assistant_statement_records']=choices(request.user)
         intelligence['assistant_financial_records']=financial_choices(request.user)
         if request.query_params.get('assistant_status') == '1':
-            import time
             try:
-                OllamaReasoner()._digest(deadline=time.monotonic()+1)
+                OllamaReasoner()._digest(deadline=monotonic()+1)
                 intelligence['local_model_status'] = 'available'
             except EmbeddingUnavailable:
                 intelligence['local_model_status'] = 'unavailable'
