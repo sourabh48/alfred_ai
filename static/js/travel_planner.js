@@ -7,7 +7,7 @@ window.TravelPlanner = (() => {
     const state = {session: null, busy: false, timer: null, comparison: false, plans: []};
     const field = key => state.session?.state?.[key]?.value;
     function syncActionState() {
-        document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], [data-add-stop], [data-stop-index], #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button')
+        document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], [data-add-stop], [data-stop-index], #plannerCompareOrder, #plannerApplyOrder, #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button')
             .forEach(control => { control.disabled = state.busy || control.dataset.batchUnavailable === "true"; });
     }
     function alert(message) { $("plannerAlert").textContent = message; $("plannerAlert").hidden = !message; }
@@ -113,8 +113,11 @@ window.TravelPlanner = (() => {
     function stops() {
         const names = state.session.itinerary_stops || [];
         const supported = ["ride", "roadtrip"].includes(field("transport_mode"));
+        const proposal = state.session.stop_order_proposal;
         Alfred.setHTMLIfChanged("plannerStops", `<h2 class="h5">Ordered stops</h2><p class="small">Add up to five destinations shown in this conversation for your own motorcycle or car. Allow at least one night per stop plus a return day. Nights are shared evenly; changing the order rebuilds day edits and allowances. Routes, permits and stays need separate verification.</p>`+
             `<ol>${names.map((name,i)=>`<li class="mb-2"><strong>${esc(name)}</strong><div class="travel-actions"><button type="button" class="btn btn-sm btn-outline-secondary" data-stop-index="${i}" data-stop-move="-1" data-batch-unavailable="${i===0}" aria-label="Move ${esc(name)} earlier">Earlier</button><button type="button" class="btn btn-sm btn-outline-secondary" data-stop-index="${i}" data-stop-move="1" data-batch-unavailable="${i===names.length-1}" aria-label="Move ${esc(name)} later">Later</button><button type="button" class="btn btn-sm btn-outline-secondary" data-stop-index="${i}" data-stop-remove="true" aria-label="Remove ${esc(name)}">Remove</button></div></li>`).join("")}</ol>`+
+            (names.length >= 3 ? '<button type="button" id="plannerCompareOrder" class="btn btn-sm btn-outline-primary mb-3">Compare estimated stop order</button>' : '')+
+            (proposal ? `<div id="plannerOrderProposal" class="alert alert-info"><p>Current order: ~${esc(proposal.current_distance_km)} km. Suggested order: ~${esc(proposal.suggested_distance_km)} km.</p><p>${esc(proposal.stops.join(" \u2192 "))}</p><p>${esc(proposal.basis)}</p>${proposal.changed ? '<button type="button" id="plannerApplyOrder" class="btn btn-primary btn-sm">Apply order and rebuild draft</button>' : '<p>Your current order already has the shortest estimated distance; no change was made.</p>'}</div>` : '')+
             (supported ? `<div class="travel-actions">${state.session.candidates.map(d=>`<button type="button" class="btn btn-sm btn-outline-primary" data-add-stop="${esc(d.name)}" data-batch-unavailable="${names.includes(d.name) || names.length===5}">Add ${esc(d.name)} as stop</button>`).join("")}</div>` : `<p>Choose motorcycle or car travel to build a multi-stop draft.</p>`));
     }
     function comparison() {
@@ -163,6 +166,8 @@ window.TravelPlanner = (() => {
                 if (button.dataset.session) await open(Number(button.dataset.session));
                 if (button.dataset.openPlan) await create(Number(button.dataset.openPlan));
                 if (button.dataset.reject) await action({action:"reject",destination:button.dataset.reject});
+                if (button.id === "plannerCompareOrder") await action({action:"itinerary_order_preview",revision:state.session.revision});
+                if (button.id === "plannerApplyOrder") await action({action:"itinerary_stops",stops:state.session.stop_order_proposal.stops,revision:state.session.revision});
                 if (button.dataset.addStop || button.dataset.stopIndex !== undefined) {
                     const names = [...(state.session.itinerary_stops || [])];
                     if (button.dataset.addStop) names.push(button.dataset.addStop);

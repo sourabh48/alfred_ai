@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import date, timedelta
+from itertools import permutations
 import re
 from rest_framework.exceptions import ValidationError
 
@@ -8,6 +9,26 @@ from .travel_catalog import ACTIVITY_TAGS, CITIES, approximate_road_km
 from .travel.costs import calculate_budget
 from .travel.money import decimal_amount, rupees
 from .travel.providers.base import number
+
+
+def compare_stop_orders(state, stops):
+    current = build_multi_stop_itinerary(state, stops)
+    origin = value(state, "origin")
+    lat, lon = CITIES[origin.lower()]
+    points = [{"name": origin, "lat": lat, "lon": lon}, *stops]
+    distances = {(a, b): approximate_road_km(points[a]["name"], points[b],
+        coordinates=(points[a]["lat"], points[a]["lon"]))
+        for a in range(len(points)) for b in range(len(points)) if a != b}
+
+    def total(order):
+        route = (0, *order, 0)
+        return sum(distances[a, b] for a, b in zip(route, route[1:]))
+
+    original = tuple(range(1, len(points)))
+    best = min(permutations(original), key=total)  # At most 5! orders; ties retain the original order.
+    return {"stops": [points[i]["name"] for i in best], "current_distance_km": current["route"]["distance_km_total"],
+        "suggested_distance_km": total(best), "changed": best != original,
+        "basis": "Shortest town-centre distance allowance among these stop orders, not a verified fastest, cheapest or legal road route. Applying rebuilds days, nights and budget and removes day edits; no booking or financial record is changed."}
 
 
 def build_multi_stop_itinerary(state, stops):
@@ -43,7 +64,7 @@ def build_multi_stop_itinerary(state, stops):
     result["route"] = {"summary": " → ".join([origin, *[s["name"] for s in stops], origin]),
         "distance_km_total": sum(leg["distance_km"] for leg in legs), "distance_km_one_way": None,
         "hours_one_way": None, "confidence": "ESTIMATED", "legs": legs, "options": [],
-        "note": "Manual order, not optimized. Leg distances use straight-line distance × 1.35 rounded to 10 km (minimum 20 km), not road routing. Travel times, road legality, closures and motorcycle access are unverified."}
+        "note": "User-chosen stop order; road routing is not optimized or verified. Leg distances use straight-line distance × 1.35 rounded to 10 km (minimum 20 km), not road routing. Travel times, road legality, closures and motorcycle access are unverified."}
     # Single-destination evidence and quotes cannot establish a multi-stop route or booking.
     for key in ("route_result", "weather_result", "places_result", "permit_result", "hotels_result", "flights_result", "trains_result", "buses_result", "discovery_result", "map", "quality"):
         result[key] = {}

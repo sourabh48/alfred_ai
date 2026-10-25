@@ -11,7 +11,7 @@ from rest_framework.exceptions import ValidationError
 from apps.mobility.planner_views import session_payload
 from apps.mobility.services.travel_conversation import save_plan, send_message
 from apps.mobility.services.travel_discovery import fact, value
-from apps.mobility.services.travel_itinerary import build_multi_stop_itinerary
+from apps.mobility.services.travel_itinerary import build_multi_stop_itinerary, compare_stop_orders
 from apps.mobility.services.travel.money import rupees
 from apps.mobility.services.travel_research import queue_research, run_research
 from tests import test_travel_planner as fixtures
@@ -101,6 +101,9 @@ class TravelMultiStopTests(TestCase):
         for revision in (True, session.revision-1, str(session.revision)):
             self.assertEqual(self.set_stops(session, names[::-1], revision=revision).status_code, 409)
             self.assertEqual(session.itinerary, before)
+        for action in (None, [], {}, 1):
+            self.assertEqual(self.set_stops(session, names, action=action).status_code, 400)
+            self.assertEqual(session.itinerary, before)
         self.assertEqual(self.set_stops(session, []).status_code, 200)
         self.assertEqual(session.itinerary, {})
         self.assertIsNone(value(session.state, "selected_destination"))
@@ -115,6 +118,8 @@ class TravelMultiStopTests(TestCase):
         client.force_login(self.user)
         self.assertEqual(client.post(url, {"action": "itinerary_stops", "stops": names,
             "revision": session.revision}, content_type="application/json").status_code, 403)
+        self.assertEqual(client.post(url, {"action": "itinerary_order_preview", "revision": session.revision}, content_type="application/json").status_code, 403)
+        self.assertEqual(self.client.post(url, {"action": "itinerary_order_preview", "revision": session.revision}, content_type="application/json").status_code, 404)
 
     def test_missing_coordinates_unsupported_mode_and_too_short_window_abstain(self):
         session = self.researched()
@@ -221,4 +226,48 @@ class TravelMultiStopTests(TestCase):
         self.assertEqual(self.set_stops(session, names).status_code, 200)
         self.assertEqual([s["nights"] for s in session.itinerary["stops"]], [1]*5)
         self.assertEqual(len(session.itinerary["route"]["legs"]), 6)
+        proposal = compare_stop_orders(session.state, value(session.state, "_itinerary_stops"))
+        self.assertEqual(set(proposal["stops"]), set(names))
+        self.assertLessEqual(proposal["suggested_distance_km"], proposal["current_distance_km"])
         self.assertEqual(self.set_stops(session, names+[session.candidates[-1]["name"]]).status_code, 400)
+
+    def test_estimated_order_preview_needs_confirmation_and_never_changes_a_saved_trip(self):
+        session = self.researched()
+        for stop, name, lat, lon in zip(session.candidates, ("East point", "North point", "Northeast point"),
+                (12.972, 13.972, 13.972), (78.595, 77.595, 78.595)):
+            stop.update(name=name, lat=lat, lon=lon)
+        session.save()
+        names = [s["name"] for s in session.candidates]
+        self.assertEqual(self.set_stops(session, names).status_code, 200)
+        session = send_message(session.pk, self.user, "Make day 2 relaxed")
+        plan = save_plan(session)
+        session.refresh_from_db()
+        before = deepcopy(session.itinerary)
+        revision = session.revision
+        url = f"/api/mobility/planner/sessions/{session.pk}/"
+        response = self.client.post(url, {"action": "itinerary_order_preview", "revision": revision}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        proposal = response.json()["stop_order_proposal"]
+        self.assertTrue(proposal["changed"])
+        self.assertLess(proposal["suggested_distance_km"], proposal["current_distance_km"])
+        self.assertIn(proposal["stops"], [[names[0], names[2], names[1]], [names[1], names[2], names[0]]])
+        self.assertIn("not a verified", proposal["basis"])
+        session.refresh_from_db(); plan.refresh_from_db()
+        self.assertEqual(session.itinerary, before)
+        self.assertEqual(session.revision, revision)
+        self.assertEqual(plan.itinerary, before)
+        self.assertEqual(self.set_stops(session, proposal["stops"]).status_code, 200)
+        self.assertEqual(session.itinerary["route"]["distance_km_total"], proposal["suggested_distance_km"])
+        self.assertEqual(session.itinerary["edits"], [])
+        self.assertEqual(session.itinerary["route"]["confidence"], "ESTIMATED")
+        plan.refresh_from_db(); self.assertEqual(plan.itinerary, before)
+        self.assertEqual(self.client.post(url, {"action": "itinerary_order_preview", "revision": revision}, content_type="application/json").status_code, 409)
+        repeated = self.client.post(url, {"action": "itinerary_order_preview", "revision": session.revision}, content_type="application/json")
+        self.assertFalse(repeated.json()["stop_order_proposal"]["changed"])
+
+    def test_two_stop_equal_distance_keeps_the_current_order(self):
+        session, names = self.multi()
+        proposal = compare_stop_orders(session.state, value(session.state, "_itinerary_stops"))
+        self.assertFalse(proposal["changed"])
+        self.assertEqual(proposal["stops"], names)
+        self.assertEqual(proposal["current_distance_km"], proposal["suggested_distance_km"])

@@ -3624,6 +3624,59 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertNotIn('stops',session.itinerary)
         self.assertEqual(list(Expense.objects.filter(user=owner).values()),before)
 
+    def test_travel_estimated_order_preview_requires_confirmation_and_keeps_saved_trip(self):
+        from datetime import timedelta
+        from copy import deepcopy
+        from django.utils import timezone
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import fact, value
+        from tests.test_travel_candidate_pool import synthetic_pool
+        owner = self.scenario['user']
+        session = new_session(owner)
+        session.state = {k:fact(v) for k,v in dict(origin='Bengaluru',trip_duration=4,
+            available_start_date=str(timezone.localdate()+timedelta(days=2)),
+            available_end_date=str(timezone.localdate()+timedelta(days=5)),budget=15000,transport_mode='ride').items()}
+        session.candidates = synthetic_pool(owner, session.state)[:3]
+        for stop, name, lat, lon in zip(session.candidates, ('East point', 'North point', 'Northeast point'),
+                (12.972, 13.972, 13.972), (78.595, 77.595, 78.595)):
+            stop.update(name=name, lat=lat, lon=lon)
+        session.save()
+        self.login(); self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops [data-add-stop]')) == 3)
+        for index, name in enumerate(('East point', 'North point', 'Northeast point')):
+            self.memory_click(f'#plannerStops [data-add-stop="{name}"]')
+            self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops ol li')) == index+1)
+        self.memory_click('#plannerSave')
+        self.wait.until(lambda _: 'Travel Plan saved' in self.text('plannerAlert'))
+        session.refresh_from_db()
+        before = deepcopy(session.itinerary)
+        revision = session.revision
+        self.memory_click('#plannerCompareOrder')
+        self.wait.until(lambda _: 'not a verified' in self.text('plannerOrderProposal'))
+        self.assertIn('\u2192', self.text('plannerOrderProposal'))
+        session.refresh_from_db(); session.plan.refresh_from_db()
+        self.assertEqual(session.revision, revision)
+        self.assertEqual(session.itinerary, before)
+        self.assertEqual(session.plan.itinerary, before)
+        self.assertTrue(self.browser.find_element(self.By.ID,'plannerApplyOrder').is_displayed())
+        self.browser.execute_script("document.getElementById('plannerOrderProposal').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('travel-estimated-order-preview-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.browser.execute_script("document.getElementById('plannerOrderProposal').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        self.capture('travel-estimated-order-preview-390px')
+        self.memory_click('#plannerApplyOrder')
+        self.wait.until(lambda _: not self.browser.find_elements(self.By.ID,'plannerOrderProposal'))
+        session.refresh_from_db(); session.plan.refresh_from_db()
+        self.assertGreater(session.revision, revision)
+        self.assertLess(session.itinerary['route']['distance_km_total'], before['route']['distance_km_total'])
+        self.assertEqual(session.plan.itinerary, before)
+        self.assertEqual(session.itinerary['route']['confidence'], 'ESTIMATED')
+        self.memory_click('#plannerCompareOrder')
+        self.wait.until(lambda _: 'no change was made' in self.text('plannerOrderProposal'))
+        self.assertFalse(self.browser.find_elements(self.By.ID,'plannerApplyOrder'))
+
     def test_travel_places_provenance_stale_and_unavailable_are_explicit(self):
         from copy import deepcopy
         from datetime import timedelta
