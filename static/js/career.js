@@ -695,7 +695,15 @@ function submitCareerResume(event) {
 
 function submitCareerJobMatch(event) {
     event.preventDefault();
-    const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const form = event.currentTarget;
+    const select = document.getElementById("careerRecruiterResume");
+    if (form.dataset.submitting === "true" || select.disabled) return;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    payload.resume_id = select.value;
+    const button = form.querySelector("button[type='submit']");
+    button.disabled = true;
+    form.dataset.submitting = "true";
+    showCareerFeedback("careerJobFeedback", "Analyzing the job link against the selected resume…", "info");
     Alfred.fetchJSON("/api/career/job-match/", {
         method: "POST",
         body: JSON.stringify(payload),
@@ -705,7 +713,11 @@ function submitCareerJobMatch(event) {
             loadCareerDashboard();
             loadCareerOpportunities();
         })
-        .catch(error => showCareerFeedback("careerJobFeedback", error.message, "danger"));
+        .catch(error => showCareerFeedback("careerJobFeedback", error.message, "danger"))
+        .finally(() => {
+            delete form.dataset.submitting;
+            button.disabled = select.disabled;
+        });
 }
 
 function loadCareerResumeChoices() {
@@ -713,9 +725,11 @@ function loadCareerResumeChoices() {
     const select = form.elements.resume_id;
     const reload = document.getElementById("careerRecruiterResumeReload");
     const status = document.getElementById("careerRecruiterResumeStatus");
+    const jobForm = document.getElementById("careerJobMatchForm");
     const previous = select.value;
     select.disabled = reload.disabled = true;
     form.querySelector("button[type='submit']").disabled = true;
+    jobForm.querySelector("button[type='submit']").disabled = true;
     status.textContent = "Loading your saved resumes…";
     return Alfred.fetchJSON("/api/career/resumes/").then(data => {
         const resumes = Array.isArray(data) ? data : data.results;
@@ -726,13 +740,14 @@ function loadCareerResumeChoices() {
         }
         select.value = previous;
         select.disabled = false;
-        status.textContent = "Only your saved resumes are listed. Matching captures the selected fields; later edits do not rewrite earlier analyses.";
+        status.textContent = "Used for recruiter and job-link matching. Only your saved resumes are listed. Matching captures these fields; later edits do not rewrite earlier analyses.";
     }).catch(() => {
         select.replaceChildren(new Option("Resume list unavailable", previous));
         status.textContent = "Resume list unavailable. Reload to retry; your recruiter text and attachment are preserved.";
     }).finally(() => {
         reload.disabled = false;
         form.querySelector("button[type='submit']").disabled = select.disabled || form.dataset.submitting === "true";
+        jobForm.querySelector("button[type='submit']").disabled = select.disabled || jobForm.dataset.submitting === "true";
     });
 }
 

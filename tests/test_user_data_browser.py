@@ -350,9 +350,11 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(finance_before, [list(model.objects.values()) for model in financial_models])
 
     def test_manual_recruiter_resume_list_unavailable_preserves_inputs_and_recovers(self):
-        from apps.career.models import CareerResume
-        from tests.test_career_matching_acceptance import RESUME, offline_career
+        from apps.career.models import CareerJobAnalysis, CareerResume
+        from apps.career.services import job_intelligence
+        from tests.test_career_matching_acceptance import JD, RESUME, offline_career
         from rest_framework.exceptions import APIException
+        from selenium.webdriver.support.ui import Select
         offline_career(self)
         resume = CareerResume.objects.create(user=self.scenario["user"], parser_status="parsed",
             file_name="synthetic-selected.txt", extracted_payload=RESUME)
@@ -364,11 +366,23 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.memory_click("#careerRecruiterResumeReload")
             self.wait.until(lambda _: "Resume list unavailable" in self.text("careerRecruiterResumeStatus"))
         self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, '#careerRecruiterForm button[type="submit"]').is_enabled())
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, '#careerJobMatchForm button[type="submit"]').is_enabled())
         self.assertEqual(field.get_attribute("value"), "Synthetic retained recruiter text")
         self.memory_click("#careerRecruiterResumeReload")
         self.wait.until(lambda _: not self.browser.find_element(self.By.ID, "careerRecruiterResume").get_attribute("disabled"))
         self.assertIn(resume.file_name, self.browser.find_element(self.By.ID, "careerRecruiterResume").text)
         self.assertEqual(field.get_attribute("value"), "Synthetic retained recruiter text")
+        CareerResume.objects.create(user=self.scenario["user"], parser_status="needs_review",
+            file_name="newer-unrelated.txt", extracted_payload={"skills": ["Excel"]})
+        Select(self.browser.find_element(self.By.ID, "careerRecruiterResume")).select_by_value(str(resume.pk))
+        self.browser.find_element(self.By.CSS_SELECTOR, '#careerJobMatchForm [name="job_url"]').send_keys("https://example.org/synthetic-job")
+        with patch("apps.career.views.job_intelligence.parse_job_page", return_value=job_intelligence.parse_recruiter_message(JD)):
+            self.memory_click('#careerJobMatchForm button[type="submit"]')
+            self.wait.until(lambda _: "Job link analyzed" in self.text("careerJobFeedback"))
+        row = CareerJobAnalysis.objects.filter(user=self.scenario["user"]).latest("id")
+        self.assertEqual(row.extracted_payload["fit"]["sources"][0]["record_id"], resume.pk)
+        self.assertEqual(row.available_fit_score, 80)
+        self.wait.until(lambda _: "Rule-based fit score 80" in self.text("careerJobMatchPanel"))
 
     def test_career_decimal_salary_save_and_reload_preserves_experience(self):
         from decimal import Decimal
