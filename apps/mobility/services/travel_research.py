@@ -127,6 +127,8 @@ def run_research(run_id):
         from .travel.research import enrich_candidate, research_candidates
         from .travel.discovery import remember
         requested = value(run.request, "requested_destination") or value(run.request, "selected_destination")
+        if value(run.request, "_itinerary_stops"):
+            requested = None
         saved = [d for d in run.session.candidates if not requested or d["name"].casefold() == requested.casefold()]
         selected = value(run.request, "selected_location", {})
         if selected.get("lat") is not None and selected.get("lon") is not None:
@@ -205,7 +207,9 @@ def run_research(run_id):
                     remember(current.user, candidate, "shown")
                     for place in candidate.get("places_result", {}).get("payload", {}).get("places", []):
                         remember(current.user, place, "shown")
-                if current.itinerary:
+                if current.itinerary.get("stops"):
+                    current.itinerary["budget"]["recheck_note"] = "Destination research updated separately. Ordered legs, edited days and the multi-stop allowance are retained; no complete route or availability is verified."
+                elif current.itinerary:
                     selected = next((c for c in options if c["name"] == current.itinerary.get("destination")), None)
                     if selected:
                         current.itinerary["weather"] = selected["weather"]

@@ -680,10 +680,13 @@ class TravelPlanDetailView(RetrieveUpdateDestroyAPIView):
         changed = any(key in serializer.validated_data and getattr(original,key) != serializer.validated_data[key] for key in core)
         timing_changed = any(key in serializer.validated_data and getattr(original,key) != serializer.validated_data[key]
                              for key in ("start_date", "end_date"))
+        destination_changed = "destination" in serializer.validated_data and original.destination != serializer.validated_data["destination"]
         plan = serializer.save()
         session = TravelPlanningSession.objects.filter(plan=plan, user=self.request.user).first()
         if session:
             if changed:
+                if destination_changed:
+                    session.state.pop("_itinerary_stops", None)
                 for key, val in {"selected_destination":plan.destination, "available_start_date":str(plan.start_date) if plan.start_date else None,
                                  "available_end_date":str(plan.end_date) if plan.end_date else None, "trip_duration":plan.duration_days or None,
                                  "budget":money_float(plan.budget), "transport_mode":plan.transport_mode, "vehicle_profile":plan.vehicle_profile_id}.items():
@@ -696,6 +699,8 @@ class TravelPlanDetailView(RetrieveUpdateDestroyAPIView):
                     from .services.travel_discovery import budget_for
                     from .services.travel.links import external_links
                     session.candidates = [invalidate_trip_dates(c) for c in session.candidates]
+                    if session.state.get("_itinerary_stops"):
+                        session.state["_itinerary_stops"] = fact([invalidate_trip_dates(s) for s in session.state["_itinerary_stops"]["value"]])
                     for candidate in session.candidates:
                         candidate["budget"] = budget_for(session.state, candidate)
                         candidate["external_links"] = external_links(session.state, candidate)

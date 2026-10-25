@@ -7,7 +7,7 @@ from django.utils.dateparse import parse_datetime
 from .money import decimal_amount, quoted_amount, rupees
 
 
-def calculate_budget(state, destination, *, relaxed_days=0):
+def calculate_budget(state, destination, *, relaxed_days=0, route_distance_km=None):
     def value(key, default=None):
         return state.get(key, {}).get("value", default)
     days = max(1, min(int(value("trip_duration", 3)), 30))
@@ -16,7 +16,10 @@ def calculate_budget(state, destination, *, relaxed_days=0):
     mode = value("transport_mode", "mixed")
     riding = mode in {"ride", "roadtrip"}
     one_way = decimal_amount(destination.get("distance_km") or 250)
-    distance = one_way*2+days*25
+    route_distance = one_way*2 if route_distance_km is None else decimal_amount(route_distance_km)
+    if not 0 <= route_distance <= 1_000_000:
+        raise ValueError("Route distance is outside the planning bounds.")
+    distance = route_distance+days*25
     nightly = decimal_amount(destination.get("nightly", 1500))
     target = rupees(value("budget", 0) or 0)
     if value("budget_scope") == "per_person":
@@ -37,7 +40,8 @@ def calculate_budget(state, destination, *, relaxed_days=0):
                "Food": 650*days*people, "Activities": max(0, days-2-relaxed_days)*350*people,
                "Permits": 300*people, "Parking": 100*days if riding else 0,
                "Local Transport": 0 if riding else 350*days*people}
-    formulas = {"Fuel": f"({one_way} km × 2 + {days} × 25 local km) ÷ {mileage} km/l × INR {fuel_price}/l" if riding else "No fuel allowance for this mode",
+    distance_formula = f"{one_way} km × 2" if route_distance_km is None else f"{route_distance} km across ordered legs"
+    formulas = {"Fuel": f"({distance_formula} + {days} × 25 local km) ÷ {mileage} km/l × INR {fuel_price}/l" if riding else "No fuel allowance for this mode",
                 "Transport": f"max(1000, {one_way} km × {14 if mode == 'flight' else 6}) × {people} travellers; allowance only" if not riding else "Own vehicle",
                 "Stay": f"INR {nightly:g} × {nights} nights × {rooms} rooms",
                 "Food": f"INR 650 × {days} days × {people} travellers",
@@ -76,7 +80,9 @@ def calculate_budget(state, destination, *, relaxed_days=0):
         "INR estimates, not quotes or confirmed availability. Meals estimated at INR 650 per person/day.",
         f"Fuel: INR {fuel_price}/litre ({fuel_freshness}); mileage {mileage} km/l. Pillion, terrain, load and weather can change consumption.",
         "Round-trip route plus 25 local km/day; return routing may differ. Low/high ranges are planning allowances, not statistical confidence intervals."]
-    if not destination.get("distance_km"):
+    if route_distance_km is not None:
+        assumptions[-1] = "Sum of ordered leg estimates plus 25 local km/day. Distances are town-centre allowances, not verified road routes. Low/high ranges are not statistical confidence intervals."
+    elif not destination.get("distance_km"):
         assumptions.append("Distance unavailable: 250 km each way used solely for a provisional budget.")
     if not riding:
         assumptions.append("Transport allowance only; no train/flight fare or seat availability verified.")

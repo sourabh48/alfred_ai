@@ -4,8 +4,79 @@ import re
 from rest_framework.exceptions import ValidationError
 
 from .travel_discovery import budget_for, value
-from .travel_catalog import ACTIVITY_TAGS
+from .travel_catalog import ACTIVITY_TAGS, CITIES, approximate_road_km
+from .travel.costs import calculate_budget
 from .travel.money import decimal_amount, rupees
+from .travel.providers.base import number
+
+
+def build_multi_stop_itinerary(state, stops):
+    """Manual order and estimated legs; no single-stop quote certifies the journey."""
+    days = int(value(state, "trip_duration", 3))
+    if not 2 <= len(stops) <= 5 or not len(stops)+1 <= days <= 30:
+        raise ValidationError("Choose 2–5 stops and allow at least one night per stop plus a return day (maximum 30 days).")
+    if value(state, "transport_mode") not in {"ride", "roadtrip"}:
+        raise ValidationError("Multi-stop planning currently supports your own motorcycle or car; other transport needs verified connections.")
+    origin = value(state, "origin", "")
+    origin_point = CITIES.get(str(origin).lower())
+    if not origin_point:
+        raise ValidationError("The origin has no known coordinates. Keep your current plan and choose a supported starting city.")
+    points = [{"name": origin, "lat": origin_point[0], "lon": origin_point[1]}, *stops]
+    try:
+        for stop in stops:
+            number(stop.get("lat"), low=-90, high=90)
+            number(stop.get("lon"), low=-180, high=180)
+            number(stop.get("nightly", 1500), low=0, high=1_000_000)
+        legs = [{"from": a["name"], "to": b["name"], "distance_km": approximate_road_km(
+                    a["name"], b, coordinates=(a["lat"], a["lon"])), "confidence": "ESTIMATED"}
+                for a, b in zip(points, points[1:]+points[:1])]
+    except (TypeError, ValueError):
+        raise ValidationError("Stop coordinates or stay allowances are missing or invalid. Your existing plan is retained.")
+    nights = [(days-1)//len(stops) + (i < (days-1) % len(stops)) for i in range(len(stops))]
+    nightly = sum(decimal_amount(s.get("nightly", 1500))*n for s, n in zip(stops, nights))/decimal_amount(days-1)
+    budget = calculate_budget(state, {"nightly": nightly}, route_distance_km=sum(leg["distance_km"] for leg in legs))
+    result = build_itinerary(state, stops[0])
+    result["destination"] = " → ".join(s["name"] for s in stops)
+    result["summary"] = f"{days} days across {len(stops)} manually ordered stops; nights are shared as evenly as possible. Reordering rebuilds day edits and allowances."
+    result["stops"] = [{"name": s["name"], "nights": n, "sources": deepcopy(s.get("sources", []))} for s, n in zip(stops, nights)]
+    result["budget"] = budget
+    result["route"] = {"summary": " → ".join([origin, *[s["name"] for s in stops], origin]),
+        "distance_km_total": sum(leg["distance_km"] for leg in legs), "distance_km_one_way": None,
+        "hours_one_way": None, "confidence": "ESTIMATED", "legs": legs, "options": [],
+        "note": "Manual order, not optimized. Leg distances use straight-line distance × 1.35 rounded to 10 km (minimum 20 km), not road routing. Travel times, road legality, closures and motorcycle access are unverified."}
+    # Single-destination evidence and quotes cannot establish a multi-stop route or booking.
+    for key in ("route_result", "weather_result", "places_result", "permit_result", "hotels_result", "flights_result", "trains_result", "buses_result", "discovery_result", "map", "quality"):
+        result[key] = {}
+    for key in ("sources", "weather_proposals", "mode_comparison", "web_research", "external_links"):
+        result[key] = []
+    result["weather"] = {"summary": "Weather, booking and permit evidence must be checked separately for every stop and travel date.", "confidence": "UNKNOWN"}
+    result["days"] = []
+    for stop, count, leg in zip(stops, nights, legs):
+        part_state = {**state, "trip_duration": {"value": count+1}}
+        for index, day in enumerate(build_itinerary(part_state, stop)["days"][:-1]):
+            day["items"] = [item for item in day["items"] if item["type"] not in {"travel", "break"}]
+            day["title"] = f"{'Arrive in' if index == 0 else 'Explore'} {stop['name']}"
+            if index == 0:
+                day["items"].insert(0, {"title": f"{leg['from']} → {leg['to']}", "priority": "Must Do", "period": "Travel in daylight; take regular rest breaks",
+                    "duration": f"~{leg['distance_km']} km allowance; duration and legal route unverified", "type": "travel", "cost": 0})
+            result["days"].append(day)
+    last = legs[-1]
+    result["days"].append({"title": "Return home", "pace": "balanced", "stay": "Home",
+        "meals": "Allow regular meal and hydration breaks.", "items": [{"title": f"{last['from']} → {origin}",
+        "priority": "Must Do", "period": "Travel in daylight; take regular rest breaks", "duration": f"~{last['distance_km']} km allowance; duration and legal route unverified", "type": "travel", "cost": 0}]})
+    start = value(state, "available_start_date")
+    for index, day in enumerate(result["days"]):
+        day.update(day=index+1, date=(date.fromisoformat(start)+timedelta(days=index)).isoformat() if start else None,
+            estimated_cost=budget["expected"]//days+(budget["expected"] % days if index == days-1 else 0))
+    paid = [item for day in result["days"] for item in day["items"] if item.get("cost")]
+    for index, item in enumerate(paid):
+        item["cost"] = budget["categories"]["Activities"]//len(paid)+(budget["categories"]["Activities"] % len(paid) if index == len(paid)-1 else 0)
+    result["checks"] = ["Verify a legal route, weather, permits and accommodation separately at every stop; no availability is confirmed.",
+        "Sunrise/sunset times and safe viewpoints remain unverified; travel in daylight and allow rest breaks."]
+    result["checks"].extend(f"{s['name']}: {issue}" for s in stops for issue in s.get("issues", []))
+    if any(leg["distance_km"] > value(state, "maximum_daily_driving", 300) for leg in legs):
+        result["checks"].append("At least one estimated leg exceeds your daily distance preference. Add a stop or shorten the journey before committing.")
+    return result
 
 
 def build_itinerary(state, destination):

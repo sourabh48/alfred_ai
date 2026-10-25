@@ -3565,6 +3565,65 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: not self.text('plannerCandidatePages'))
         session.refresh_from_db(); self.assertEqual(value(session.state,'selected_destination'),first[0])
 
+    def test_travel_ordered_stops_reorder_day_edit_save_reopen_and_narrow_screen(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import fact, value
+        from apps.mobility.services.travel_research import queue_research, run_research
+        from tests.test_travel_candidate_pool import synthetic_pool
+        from tests.test_travel_planner import weather_fixture
+        owner = self.scenario['user']
+        before = list(Expense.objects.filter(user=owner).values())
+        self.enterContext(patch('apps.mobility.services.travel_research.dispatch'))
+        self.enterContext(patch('apps.mobility.services.travel.providers.base.request', side_effect=AssertionError('Synthetic providers only')))
+        self.enterContext(patch('apps.mobility.services.travel.research.weather_result', side_effect=weather_fixture))
+        self.enterContext(patch('apps.mobility.services.travel.research.research_candidates', side_effect=lambda user,state,preliminary: synthetic_pool(user,state)))
+        session = new_session(owner)
+        session.state = {k:fact(v) for k,v in dict(origin='Bengaluru',trip_duration=4,
+            available_start_date=str(timezone.localdate()+timedelta(days=2)),
+            available_end_date=str(timezone.localdate()+timedelta(days=5)),budget=15000,transport_mode='ride').items()}
+        session.save()
+        self.assertEqual(run_research(queue_research(session).pk)['status'], 'ready')
+        session.refresh_from_db()
+        names = [d['name'] for d in session.candidates[:2]]
+        self.login(); self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops [data-add-stop]')) == 3)
+        for name in names:
+            self.memory_click(f'#plannerStops [data-add-stop="{name}"]')
+            self.wait.until(lambda _: name in ' '.join(e.text for e in self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops ol li')))
+        self.wait.until(lambda _: 'manually ordered stops' in self.text('plannerItinerary'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerItinerary [data-day]')), 4)
+        self.assertIn('not optimized', self.text('plannerItinerary'))
+        self.memory_click('#plannerStops [data-stop-index="1"][data-stop-move="-1"]')
+        self.wait.until(lambda _: names[1] in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li').text)
+        self.browser.find_element(self.By.ID,'plannerInput').send_keys('Make day 2 relaxed')
+        self.memory_click('#plannerSend')
+        self.wait.until(lambda _: 'A relaxed day' in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerItinerary [data-day="2"]').text)
+        session.refresh_from_db()
+        self.assertEqual(value(session.state,'_itinerary_stops')[0]['name'],names[1])
+        self.assertEqual(session.itinerary['days'][1]['pace'],'relaxed')
+        self.assertEqual(sum(d['estimated_cost'] for d in session.itinerary['days']),session.itinerary['budget']['expected'])
+        self.browser.execute_script("document.getElementById('plannerStops').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('travel-ordered-stops-desktop')
+        self.memory_click('#plannerSave')
+        self.wait.until(lambda _: 'Travel Plan saved' in self.text('plannerAlert'))
+        session.refresh_from_db(); session.plan.refresh_from_db()
+        self.assertEqual(session.plan.itinerary,session.itinerary)
+        self.browser.refresh()
+        self.wait.until(lambda _: names[1] in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li').text)
+        self.assertIn('A relaxed day',self.browser.find_element(self.By.CSS_SELECTOR,'#plannerItinerary [data-day="2"]').text)
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.browser.execute_script("document.getElementById('plannerStops').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        self.capture('travel-ordered-stops-390px')
+        self.memory_click('#plannerStops [data-stop-index="1"][data-stop-remove]')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops ol li')) == 1)
+        session.refresh_from_db()
+        self.assertNotIn('stops',session.itinerary)
+        self.assertEqual(list(Expense.objects.filter(user=owner).values()),before)
+
     def test_travel_places_provenance_stale_and_unavailable_are_explicit(self):
         from copy import deepcopy
         from datetime import timedelta
