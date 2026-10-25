@@ -1,12 +1,12 @@
 # ALFRED execution state
 
-Updated: 2026-10-26, Asia/Calcutta. Current command explicitly authorized `next`.
+Updated: 2026-10-26T03:02:57.6129084+05:30, Asia/Calcutta. Current command explicitly authorized `next`.
 
 ## Current task
 
 - **INV-02 / SCOPE-01 — account-safe investment PDF imports and source receipts.**
-- Phase A; original capability remains IMPLEMENTED_NOT_ACCEPTED. No broad broker-layout or real-account accuracy claim.
-- Weighted progress: **90%**. Recovery/gap 10; implementation/integration 45;
+- Status: COMPLETE / SCOPE-01. Phase A; original capability remains IMPLEMENTED_NOT_ACCEPTED. No broad broker-layout or real-account accuracy claim.
+- Weighted progress: **100%** for the completed bounded slice; not full INV-02 or release acceptance. Recovery/gap 10; implementation/integration 45;
   backend/Chrome/privacy/money acceptance 25; documentation/checkpoint 10; commit/push/relevant CI 10.
 - Fixed initial upsert and line deduplication to include account identity;
   receipt matching requires the exact account and abstains for malformed/missing evidence. Correction preserves explicit blank institutions and holding identity.
@@ -14,9 +14,9 @@ Updated: 2026-10-26, Asia/Calcutta. Current command explicitly authorized `next`
   owner/session/CSRF, corrections/retries and file protection. Do not hold SQLite
   write locks during OCR or invent a new transaction mechanism.
 - Done: synthetic PDF regressions, minimal account matching and actual Chrome
-  uploads/reimport, correction/source review, privacy/money tests. Next: clean-source/history privacy, commit/push and exact-head PR CI observation; never claim global CI green from local acceptance.
+  uploads/reimport, correction/source review, privacy/money tests. Source/history privacy PASS (zero findings); source commit 8907f2840cd8ced230d33e8a405460cedc0a16a1 pushed; its CI 40235878420 observed IN_PROGRESS. No global CI green claim.
 - Baseline **75/143 (52.4%)**; extensions **0/13**. No status promotion without full criteria.
-- READY_FOR_NEXT: NO until this bounded slice is validated and checkpointed.
+- READY_FOR_NEXT: YES. Await `next`; `continue` reports this slice complete and does not switch tasks. Remaining full INV-02 broker/layout/OCR and real-account evidence is unaccepted.
 
 ## Recovery and PR gates
 
@@ -54,7 +54,7 @@ Intelligence Hub and dormant Git transport remain unchanged and disabled remotel
 
 `Set-Location F:\ALFRED_DEV\post-audit; git status -sb; Get-Content docs/EXECUTION_STATE.md -Encoding UTF8`
 
-`continue` resumes this slice only; `status` is read-only. After completion stop
+`continue` reports READY_FOR_NEXT for this completed slice; `status` is read-only. Stop
 and wait for another `next`; do not select INV-05 automatically.
 
 ## Accepted scope receipts
@@ -71,3 +71,9 @@ and wait for another `next`; do not select INV-05 automatically.
 - Postcommit privacy/source boundary: SDK artifacts/resume-4789784/verify-boundary.py artifacts/inv02-ec68073/boundary ec680730d65d65702bc6c4aaa62f38ece1b8f73e. Run before normal development push; no artifacts/database/secret files staged.
 - No migrations. Rollback is a reviewed normal development revert of this scope; do not rewrite data or merge unknown legacy accounts. No rollback executed.
 - After publication, record exact refs, PR/run IDs and source/receipt hashes in artifacts/inv02-ec68073/boundary/checkpoint.json. Resolve this file's commit with git log -1 --format=%H -- docs/EXECUTION_STATE.md; a document cannot embed its own SHA.
+
+## Handoff
+
+- Remaining selected capability: INV-02 independent representative broker/layout/OCR acceptance; inspect approved evidence availability on the next explicit command. Do not repeat account-scope regressions or silently mark full INV-02 verified. If a genuine corpus approval blocker is established, record/defer it before selecting INV-05 from Phase A.
+- This final evidence-only documentation checkpoint changes no accepted executable/test source. Current-head PR CI must still pass before merging; earlier Travel failure, independent review, protection access and Pages authorization remain separate gates.
+- Final refs/CI/receipt hashes are saved in artifacts/inv02-ec68073/boundary/checkpoint.json. The published checkpoint must be clean and normally pushed; no master merge or deployment.
