@@ -116,6 +116,49 @@ class CareerMatchingOwnerAcceptanceTests(TestCase):
         self.client.force_login(self.foreign)
         self.assertNotIn(str(stored.pk), [str(item["id"]) for item in self.client.get("/api/career/job-analyses/").json()["results"]])
 
+    def test_explicit_older_resume_is_used_by_text_and_url_intake(self):
+        CareerResume.objects.create(user=self.owner, file_name="newer-unrelated.txt",
+            parser_status="parsed", extracted_payload={"skills": ["Excel"]})
+        for path, data in (
+            ("recruiter-match", {"message_text": JD}),
+            ("job-match", {"job_url": "https://example.org/synthetic-job"}),
+        ):
+            with self.subTest(path=path), patch("apps.career.views.job_intelligence.parse_job_page",
+                    return_value=job_intelligence.parse_recruiter_message(JD)):
+                response = self.client.post(f"/api/career/{path}/",
+                    {**data, "resume_id": self.resume.pk}, content_type="application/json")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["fit"]["sources"][0]["record_id"], self.resume.pk)
+                self.assertEqual(response.json()["fit"]["fit_score"], 80)
+
+    def test_recruiter_attachment_evidence_survives_retry_and_correction(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        response = self.client.post("/api/career/recruiter-match/", {
+            "message_text": "Please review the attached opportunity.",
+            "resume_id": self.resume.pk,
+            "attachment": SimpleUploadedFile("synthetic-jd.txt", JD.encode(), content_type="text/plain"),
+        })
+        self.assertEqual(response.status_code, 200)
+        row = CareerJobAnalysis.objects.get(pk=response.json()["analysis"]["id"])
+        original_source = row.extracted_payload["fit"]["sources"][0]
+        self.assertEqual(row.available_fit_score, 80)
+        self.resume.extracted_payload = {"skills": ["NEW-UNRELATED"]}
+        self.resume.save()
+        correction = self.client.post("/api/documents/review-queue/resolve/", {
+            "scope": "recruiter_document", "id": row.pk,
+            "corrections": {"company": "Corrected Synthetic Employer"},
+        }, content_type="application/json")
+        self.assertEqual(correction.status_code, 200)
+        response = self.client.post("/api/documents/review-queue/retry/",
+            {"scope": "recruiter_document", "id": row.pk}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        row.refresh_from_db()
+        self.assertEqual(row.company, "Corrected Synthetic Employer")
+        self.assertEqual(row.available_fit_score, 80)
+        self.assertEqual(row.extracted_payload["fit"]["sources"][0], original_source)
+        self.assertIn("React", row.extracted_payload["job_snapshot"]["required_skills"])
+        self.assertIn("React", row.extracted_payload["intake_combined_text"])
+
     def test_url_and_text_match_share_grounding_and_abstention(self):
         snapshot = job_intelligence.parse_recruiter_message("Synthetic role without skill or experience requirements")
         with patch("apps.career.views.job_intelligence.parse_job_page", return_value=snapshot):
@@ -143,8 +186,43 @@ class CareerMatchingOwnerAcceptanceTests(TestCase):
         protected = Client(enforce_csrf_checks=True); protected.force_login(self.owner)
         self.assertEqual(protected.post("/api/career/recruiter-match/", {"message_text": JD}).status_code, 403)
         self.resume.parser_status = "needs_review"; self.resume.save()
-        response = self.client.post("/api/career/recruiter-match/", {"message_text": JD, "resume_id": 999999, "user": self.foreign.pk}, content_type="application/json")
+        response = self.client.post("/api/career/recruiter-match/", {"message_text": JD, "resume_id": self.resume.pk, "user": self.foreign.pk}, content_type="application/json")
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.json()["analysis"]["fit_score"])
         self.assertTrue(CareerJobAnalysis.objects.filter(user=self.owner).exists())
         self.assertFalse(CareerJobAnalysis.objects.filter(user=self.foreign).exists())
+
+    def test_resume_selection_rejects_foreign_missing_and_malformed_before_parsing(self):
+        foreign = CareerResume.objects.get(user=self.foreign)
+        before = CareerJobAnalysis.objects.count()
+        with patch("apps.career.views.job_intelligence.parse_recruiter_message") as recruiter, \
+                patch("apps.career.views.job_intelligence.parse_job_page") as job:
+            for path, data in (("recruiter-match", {"message_text": JD}),
+                    ("job-match", {"job_url": "https://example.org/synthetic-job"})):
+                for value, expected in ((foreign.pk, 404), (999999, 404), (-1, 400),
+                        (True, 400), ([], 400), ({"id": self.resume.pk}, 400), (2**64, 400)):
+                    with self.subTest(path=path, value=value):
+                        response = self.client.post(f"/api/career/{path}/",
+                            {**data, "resume_id": value}, content_type="application/json")
+                        self.assertEqual(response.status_code, expected)
+                        self.assertNotIn("SYNTHETIC-FOREIGN", str(response.content))
+            recruiter.assert_not_called()
+            job.assert_not_called()
+        self.assertEqual(CareerJobAnalysis.objects.count(), before)
+        resumes = self.client.get("/api/career/resumes/").json()
+        self.assertEqual([item["id"] for item in resumes], [self.resume.pk])
+
+    def test_recruiter_correction_and_retry_cannot_access_another_owners_analysis(self):
+        response = self.client.post("/api/career/recruiter-match/", {"message_text": JD})
+        row = CareerJobAnalysis.objects.get(pk=response.json()["analysis"]["id"])
+        before = row.extracted_payload
+        self.client.force_login(self.foreign)
+        for action in ("resolve", "retry"):
+            response = self.client.post(f"/api/documents/review-queue/{action}/", {
+                "scope": "recruiter_document", "id": row.pk,
+                "corrections": {"company": "FOREIGN-WRITE"},
+            }, content_type="application/json")
+            self.assertEqual(response.status_code, 404)
+            self.assertNotIn(self.resume.file_name, str(response.content))
+        row.refresh_from_db()
+        self.assertEqual(row.extracted_payload, before)

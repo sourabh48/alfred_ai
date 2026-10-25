@@ -1,8 +1,9 @@
 from datetime import timedelta
 
 from django.db.models import Count, Max
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -41,6 +42,15 @@ def _get_profile(user):
         },
     )
     return profile
+
+
+def _selected_resume(request):
+    resumes = CareerResume.objects.filter(user=request.user)
+    resume_id = request.data.get("resume_id")
+    if resume_id in (None, ""):
+        return resumes.order_by("-created_at", "-id").first()
+    resume_id = serializers.IntegerField(min_value=1, max_value=2**63 - 1).run_validation(resume_id)
+    return get_object_or_404(resumes, pk=resume_id)
 
 
 def _resume_payload_from_profile(profile) -> dict:
@@ -431,6 +441,7 @@ class CareerRecruiterMatchView(APIView):
         if not message_text and attachment is None:
             return Response({"detail": "Paste recruiter mail text or upload a JD attachment first."}, status=status.HTTP_400_BAD_REQUEST)
 
+        latest_resume = _selected_resume(request)
         try:
             snapshot = job_intelligence.parse_recruiter_message(
                 message_text,
@@ -443,7 +454,6 @@ class CareerRecruiterMatchView(APIView):
             return _career_error_response(exc, "Recruiter intake could not be parsed. Check the text or attachment and try again.")
 
         profile = _get_profile(request.user)
-        latest_resume = CareerResume.objects.filter(user=request.user).order_by("-created_at", "-id").first()
         resume_payload = latest_resume.extracted_payload if latest_resume else _resume_payload_from_profile(profile)
         macro = verified_intelligence.macro_context()
         income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)
@@ -568,8 +578,8 @@ class CareerJobMatchView(APIView):
         if not job_url:
             return Response({"detail": "Paste a job URL first."}, status=status.HTTP_400_BAD_REQUEST)
 
+        latest_resume = _selected_resume(request)
         profile = _get_profile(request.user)
-        latest_resume = CareerResume.objects.filter(user=request.user).order_by("-created_at", "-id").first()
         resume_payload = latest_resume.extracted_payload if latest_resume else _resume_payload_from_profile(profile)
         macro = verified_intelligence.macro_context()
         income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)

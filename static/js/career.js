@@ -13,6 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("careerResumeForm").addEventListener("submit", submitCareerResume);
     document.getElementById("careerJobMatchForm").addEventListener("submit", submitCareerJobMatch);
     document.getElementById("careerRecruiterForm").addEventListener("submit", submitCareerRecruiterLead);
+    document.getElementById("careerRecruiterResumeReload").addEventListener("click", loadCareerResumeChoices);
+    loadCareerResumeChoices();
     document.getElementById("careerSimulationForm").addEventListener("submit", submitCareerSimulation);
     document.getElementById("careerOpeningCountryFilter")?.addEventListener("change", updateCareerOpeningFilters);
     document.getElementById("careerOpeningStateFilter")?.addEventListener("change", updateCareerOpeningFilters);
@@ -419,7 +421,7 @@ function renderJobMatchPanel(analysis) {
                 <div>
                     <div class="fw-semibold">${Alfred.escapeHtml(analysis.job_title || "Job role")} <span class="muted small">${Alfred.escapeHtml(analysis.company || analysis.source_name || "")}</span></div>
                     <div class="muted small">${Alfred.escapeHtml(analysis.location || "Location not detected")}</div>
-                    <div class="muted small mt-1">Source ${Alfred.escapeHtml(payload.job_snapshot?.source_kind || "job_page")}</div>
+                    <div class="muted small mt-1">Source ${Alfred.escapeHtml(payload.job_snapshot?.source_kind || "job_page")} | ${Alfred.escapeHtml(analysis.source_document_name || "Saved job source")}</div>
                     <div class="muted small mt-2">${Alfred.escapeHtml(analysis.summary || "")}</div>
                     <div class="muted small mt-2"><strong>Matched listed terms${fit.sources?.length ? " [1, 2]" : ""}:</strong> ${fit.matched_skills?.length ? Alfred.escapeHtml(fit.matched_skills.join(", ")) : "No overlap established."}</div>
                     <div class="muted small mt-2"><strong>Not listed in saved skills${fit.sources?.length ? " [1, 2]" : ""}:</strong> ${fit.missing_skills?.length ? Alfred.escapeHtml(fit.missing_skills.join(", ")) : "No additional term extracted; this does not confirm full coverage."}</div>
@@ -679,6 +681,7 @@ function submitCareerResume(event) {
             const summary = summarizeCareerResumeBatch(results);
             if (summary.succeeded.length) {
                 form.reset();
+                loadCareerResumeChoices();
                 loadCareerDashboard();
             }
             showCareerFeedback("careerResumeFeedback", summary.message, summary.tone);
@@ -705,26 +708,66 @@ function submitCareerJobMatch(event) {
         .catch(error => showCareerFeedback("careerJobFeedback", error.message, "danger"));
 }
 
+function loadCareerResumeChoices() {
+    const form = document.getElementById("careerRecruiterForm");
+    const select = form.elements.resume_id;
+    const reload = document.getElementById("careerRecruiterResumeReload");
+    const status = document.getElementById("careerRecruiterResumeStatus");
+    const previous = select.value;
+    select.disabled = reload.disabled = true;
+    form.querySelector("button[type='submit']").disabled = true;
+    status.textContent = "Loading your saved resumes…";
+    return Alfred.fetchJSON("/api/career/resumes/").then(data => {
+        const resumes = Array.isArray(data) ? data : data.results;
+        select.replaceChildren(new Option("Latest saved resume (manual profile if none)", ""));
+        resumes.forEach(resume => select.add(new Option(`${resume.file_name} — ${resume.parser_status_label}`, resume.id)));
+        if (previous && !resumes.some(resume => String(resume.id) === previous)) {
+            select.add(new Option("Previously selected resume unavailable; choose another", previous));
+        }
+        select.value = previous;
+        select.disabled = false;
+        status.textContent = "Only your saved resumes are listed. Matching captures the selected fields; later edits do not rewrite earlier analyses.";
+    }).catch(() => {
+        select.replaceChildren(new Option("Resume list unavailable", previous));
+        status.textContent = "Resume list unavailable. Reload to retry; your recruiter text and attachment are preserved.";
+    }).finally(() => {
+        reload.disabled = false;
+        form.querySelector("button[type='submit']").disabled = select.disabled || form.dataset.submitting === "true";
+    });
+}
+
 function submitCareerRecruiterLead(event) {
     event.preventDefault();
     const form = event.currentTarget;
+    if (form.dataset.submitting === "true" || form.elements.resume_id.disabled) return;
     const textValue = form.elements.message_text?.value?.trim() || "";
     const attachment = form.elements.attachment?.files?.[0];
     if (!textValue && !attachment) {
         showCareerFeedback("careerRecruiterFeedback", "Paste recruiter mail text or choose a JD attachment first.", "warning");
         return;
     }
+    const selected = form.elements.resume_id.value;
+    const body = new FormData(form);
+    const button = form.querySelector("button[type='submit']");
+    button.disabled = true;
+    form.dataset.submitting = "true";
+    showCareerFeedback("careerRecruiterFeedback", "Analyzing the selected resume and recruiter evidence…", "info");
     Alfred.fetchJSON("/api/career/recruiter-match/", {
         method: "POST",
-        body: new FormData(form),
+        body,
     })
         .then(() => {
             form.reset();
+            form.elements.resume_id.value = selected;
             showCareerFeedback("careerRecruiterFeedback", "Recruiter lead analyzed.", "success");
             loadCareerDashboard();
             loadCareerOpportunities();
         })
-        .catch(error => showCareerFeedback("careerRecruiterFeedback", error.message, "danger"));
+        .catch(error => showCareerFeedback("careerRecruiterFeedback", error.message, "danger"))
+        .finally(() => {
+            delete form.dataset.submitting;
+            button.disabled = form.elements.resume_id.disabled;
+        });
 }
 
 function hydrateSimulationForm(profile, projection) {

@@ -202,6 +202,14 @@
             <form id="careerRecruiterForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-12">
+                        <label class="form-label" for="careerRecruiterResume">Resume to compare</label>
+                        <select id="careerRecruiterResume" name="resume_id" class="form-select" aria-describedby="careerRecruiterResumeStatus" disabled>
+                            <option value="">Latest saved resume (manual profile if none)</option>
+                        </select>
+                        <div id="careerRecruiterResumeStatus" class="small muted mt-1" role="status">Loading your saved resumes…</div>
+                        <button id="careerRecruiterResumeReload" class="btn btn-link btn-sm px-0" type="button">Reload resumes</button>
+                    </div>
+                    <div class="col-12">
                         <label class="form-label" for="careerRecruiterText">Recruiter Mail / JD Text</label>
                         <textarea id="careerRecruiterText" name="message_text" rows="4" class="form-control" placeholder="Paste recruiter email text or JD notes here."></textarea>
                     </div>
@@ -210,10 +218,10 @@
                         <input id="careerRecruiterFile" name="attachment" type="file" class="form-control" accept=".pdf,.doc,.docx,.txt,.html,.htm,.rtf,.odt,application/pdf,text/plain,text/html">
                     </div>
                     <div class="col-md-4 d-flex align-items-end">
-                        <button class="btn btn-outline-primary w-100" type="submit">Analyze Recruiter Lead</button>
+                        <button class="btn btn-outline-primary w-100" type="submit" disabled>Analyze Recruiter Lead</button>
                     </div>
                 </div>
-                <div id="careerRecruiterFeedback" class="d-none alert mb-0"></div>
+                <div id="careerRecruiterFeedback" class="d-none alert mb-0" role="status" aria-live="polite"></div>
             </form>
             <div class="mt-4" id="careerJobMatchPanel"></div>
             <section class="mt-4" aria-labelledby="careerOutcomesTitle">

@@ -259,6 +259,117 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('budgetForecastEvidence').scrollIntoView({behavior:'instant',block:'start'});")
         self.capture("cashflow-forecast-unavailable-mobile")
 
+    def test_manual_recruiter_selected_resume_attachment_retry_and_correction(self):
+        from django.utils import timezone
+        from apps.career.models import CareerJobAnalysis, CareerResume
+        from tests.test_career_matching_acceptance import JD, RESUME, offline_career
+        from rest_framework.exceptions import APIException
+        from selenium.webdriver.support.ui import Select
+        from apps.expenses.models import BankAccount
+        from apps.investments.models import Investment
+        from apps.loans.models import Loan
+        offline_career(self)
+        owner = self.scenario["user"]
+        resume = CareerResume.objects.create(user=owner, parser_status="parsed",
+            file_name='synthetic-<img src=x onerror="window.__recruiterXss=1">.txt', extracted_payload=RESUME)
+        CareerResume.objects.create(user=owner, parser_status="needs_review",
+            file_name="newer-unrelated.txt", extracted_payload={"skills": ["Excel"]})
+        foreign = get_user_model().objects.create_user(username="recruiter-foreign")
+        CareerResume.objects.create(user=foreign, parser_status="parsed",
+            file_name="FOREIGN-PRIVATE-RESUME.txt", extracted_payload={"skills": ["SECRET"]})
+        financial_models = (Expense, BankAccount, Investment, Loan)
+        finance_before = [list(model.objects.values()) for model in financial_models]
+        directory = Path(self.enterContext(TemporaryDirectory(prefix="alfred-recruiter-browser-")))
+        attachment = directory / "synthetic-jd.txt"
+        attachment.write_text(JD, encoding="utf-8")
+        self.login(); self.browser.get(self.live_server_url + "/career/")
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, "careerRecruiterResume").get_attribute("disabled"))
+        select = Select(self.browser.find_element(self.By.ID, "careerRecruiterResume"))
+        self.assertNotIn("FOREIGN-PRIVATE", " ".join(item.text for item in select.options))
+        select.select_by_value(str(resume.pk))
+        message = self.browser.find_element(self.By.ID, "careerRecruiterText")
+        message.send_keys("Please review the attached opportunity.")
+        self.browser.find_element(self.By.ID, "careerRecruiterFile").send_keys(str(attachment))
+        count = CareerJobAnalysis.objects.filter(user=owner).count()
+        unavailable = APIException("Synthetic local parser unavailable; retry the retained inputs.")
+        unavailable.status_code = 503
+        with patch("apps.career.views.job_intelligence.parse_recruiter_message", side_effect=unavailable):
+            self.memory_click('#careerRecruiterForm button[type="submit"]')
+            self.wait.until(lambda _: "Synthetic local parser unavailable" in self.text("careerRecruiterFeedback"))
+        self.assertEqual(message.get_attribute("value"), "Please review the attached opportunity.")
+        self.assertIn(attachment.name, self.browser.find_element(self.By.ID, "careerRecruiterFile").get_attribute("value"))
+        self.assertEqual(CareerJobAnalysis.objects.filter(user=owner).count(), count)
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, '#careerRecruiterForm button[type="submit"]').is_enabled())
+        self.memory_click('#careerRecruiterForm button[type="submit"]')
+        self.wait.until(lambda _: "Rule-based fit score 80" in self.text("careerJobMatchPanel"))
+        self.assertEqual(CareerJobAnalysis.objects.filter(user=owner).count(), count + 1)
+        row = CareerJobAnalysis.objects.filter(user=owner).latest("id")
+        captured_source = row.extracted_payload["fit"]["sources"][0]
+        self.assertEqual(captured_source["record_id"], resume.pk)
+        self.assertEqual(self.browser.find_element(self.By.ID, "careerRecruiterResume").get_attribute("value"), str(resume.pk))
+        self.memory_click('[data-fit-sources] summary')
+        panel = self.text("careerJobMatchPanel")
+        self.assertIn(resume.file_name, panel)
+        self.assertIn(attachment.name, panel)
+        self.assertIn("React", panel)
+        self.assertIn("not a hiring probability", panel)
+        self.assertFalse(self.browser.execute_script("return Boolean(window.__recruiterXss)"))
+        self.capture("manual-recruiter-selected-sources-desktop")
+        self.browser.set_window_size(390, 844)
+        self.browser.execute_script("document.getElementById('careerRecruiterResume').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth + 1"))
+        self.capture("manual-recruiter-selected-resume-narrow")
+        self.browser.set_window_size(1440, 1200)
+
+        # Synthetic needs-review state exercises the same Document Center controls used after weak extraction.
+        CareerJobAnalysis.objects.filter(pk=row.pk).update(parser_status="needs_review")
+        resume.extracted_payload = {"skills": ["NEW-UNRELATED"]}; resume.save()
+        self.browser.get(self.live_server_url + "/documents/")
+        form_id = f"review-form-recruiter_document-{row.pk}"
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, form_id))
+        self.memory_click(f'[onclick="retryReviewItem(\'recruiter_document\', {row.pk})"]')
+        self.wait.until(lambda _: CareerJobAnalysis.objects.get(pk=row.pk).extracted_payload.get("background_retry", {}).get("retry_count") == 1)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "documentCenterRoot").get_attribute("data-page-busy") != "true")
+        row.refresh_from_db()
+        self.assertEqual(row.available_fit_score, 80)
+        self.assertEqual(row.extracted_payload["fit"]["sources"][0], captured_source)
+        CareerJobAnalysis.objects.filter(pk=row.pk).update(parser_status="needs_review", updated_at=timezone.now())
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, form_id))
+        self.memory_click(f'details[data-review-key="recruiter_document:{row.pk}"] > summary')
+        field = self.browser.find_element(self.By.CSS_SELECTOR, f'#{form_id} [name="company"]')
+        field.clear(); field.send_keys("Corrected Synthetic Employer")
+        self.memory_click(f'#{form_id} button[type="submit"]')
+        self.wait.until(lambda _: CareerJobAnalysis.objects.get(pk=row.pk).company == "Corrected Synthetic Employer")
+        row.refresh_from_db()
+        self.assertEqual(row.extracted_payload["fit"]["sources"][0], captured_source)
+        self.assertIn("React", row.extracted_payload["job_snapshot"]["required_skills"])
+        self.capture("manual-recruiter-corrected-document")
+        self.browser.get(self.live_server_url + "/career/")
+        self.wait.until(lambda _: "Corrected Synthetic Employer" in self.text("careerJobMatchPanel"))
+        self.assertEqual(finance_before, [list(model.objects.values()) for model in financial_models])
+
+    def test_manual_recruiter_resume_list_unavailable_preserves_inputs_and_recovers(self):
+        from apps.career.models import CareerResume
+        from tests.test_career_matching_acceptance import RESUME, offline_career
+        from rest_framework.exceptions import APIException
+        offline_career(self)
+        resume = CareerResume.objects.create(user=self.scenario["user"], parser_status="parsed",
+            file_name="synthetic-selected.txt", extracted_payload=RESUME)
+        self.login(); self.browser.get(self.live_server_url + "/career/")
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, "careerRecruiterResume").get_attribute("disabled"))
+        field = self.browser.find_element(self.By.ID, "careerRecruiterText")
+        field.send_keys("Synthetic retained recruiter text")
+        with patch("apps.career.views.CareerResumeListView.get", side_effect=APIException("Synthetic list unavailable")):
+            self.memory_click("#careerRecruiterResumeReload")
+            self.wait.until(lambda _: "Resume list unavailable" in self.text("careerRecruiterResumeStatus"))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, '#careerRecruiterForm button[type="submit"]').is_enabled())
+        self.assertEqual(field.get_attribute("value"), "Synthetic retained recruiter text")
+        self.memory_click("#careerRecruiterResumeReload")
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, "careerRecruiterResume").get_attribute("disabled"))
+        self.assertIn(resume.file_name, self.browser.find_element(self.By.ID, "careerRecruiterResume").text)
+        self.assertEqual(field.get_attribute("value"), "Synthetic retained recruiter text")
+
     def test_career_decimal_salary_save_and_reload_preserves_experience(self):
         from decimal import Decimal
         from apps.career.models import CareerProfile
