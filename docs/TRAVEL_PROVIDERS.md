@@ -160,6 +160,48 @@ multi-stop itinerary. Distinct geometries do not establish distinct legal roads;
 motorcycle legality, closures, traffic, scenic quality and corridor stops remain
 unverified. Local synthetic acceptance does not establish live-provider coverage.
 
+## Motorcycle restriction references
+
+The Travel route panel can retain an owner's reviewed **public reference** for
+one exact route and trip context. This is a local manual workflow: no provider is
+activated and no page is fetched, scraped or authenticated. It accepts only
+HTTPS `.gov.in`/`.nic.in` links, a road/segment, a supporting quotation and either
+`PROHIBITED` or `CONDITIONAL`. The owner must explicitly attest that the quote
+applies to the displayed route, motorcycle mode and dates. Permission for the
+whole route is unsupported. The host policy is deliberately limited to Indian
+government reference domains; matching a host is not independent authentication.
+
+| Status | Meaning |
+| --- | --- |
+| VERIFIED | A consistent current reference was reviewed by this owner for this route/context. It is not independently verified law or whole-route clearance. |
+| UNKNOWN | No matching reviewed evidence, withdrawal, conflicting claims, changed context or an invalid receipt. |
+| STALE | The retained review expired; the quote is historical and supplies no current restriction conclusion. |
+| UNAVAILABLE | Current routing/identity is absent, expired or unsupported, so the reference cannot establish a current route conclusion. |
+
+`motorcycle_legal` always remains `UNKNOWN`. A car route, absence of a prohibition,
+highway avoidance or a manually reviewed reference never establishes motorcycle
+permission. No live closures, scenic quality, authority authenticity or future
+travel clearance is certified. Refresh before relying on a dated display;
+statuses are revalidated on every session read and submission.
+
+The existing owned planner-session POST accepts `action=restriction_review`,
+`revision`, `candidate_index`, `route_id`, `restriction`, `road`, `quote`,
+`source_url`, `checked_at`, `expires_at` and `reviewed=true`. Check/expiry must
+be timezone-aware, current and at most 24 hours apart; times normalize to UTC
+before receipt hashing. Quotes are limited to 1,200 characters, road labels to
+160, URLs to 1,000, retained rows to 20 per route/context and 100 per session.
+Unknown fields, clearance claims, changed routes, active research, unreviewed or
+expired references are rejected. Failed submissions retain the input draft.
+
+`action=restriction_withdraw` takes the current `revision` and an owned
+`evidence_id`. It withdraws the review while retaining its quotation/source and
+records a timestamped conversation event. Corrections require a new review;
+receipt mismatches are not promoted. References in `TravelResearchEvidence` stay
+session/owner-scoped, including when another session has identical geometry.
+Route geometry/profile/constraints and trip inputs/dates are bound into the
+receipt scope. Reads and reviews never mutate canonical finance, itinerary days
+or saved-plan allowances. Existing account/session cascades remain unchanged.
+
 Public Nominatim was not enabled: its generated-application policy requires an
 informed operator decision; it also requires identifying requests, attribution,
 caching, no autocomplete and at most one request/second for the entire app.

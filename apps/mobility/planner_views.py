@@ -12,11 +12,12 @@ from rest_framework.views import APIView
 
 from .models import BikeProfile, TravelFeedback, TravelPlan, TravelPlanningSession, TripPhoto
 from .serializers import TravelPlanSerializer
-from .services.travel_conversation import STYLE_WORDS, new_session, save_plan, send_message
+from .services.travel_conversation import STYLE_WORDS, new_session, save_plan, say, send_message
 from apps.expenses.money import money_float
 from .services.travel_discovery import budget_for, fact, learn, profile_for, value
 from .services.travel_research import STAGES, TERMINAL, evidence_payload, queue_research
 from .services.travel.presentation import age_saved_facts
+from .services.travel.restrictions import KIND, record_restriction, restriction_context
 from .services.travel.mapping import map_configuration, map_features
 from .services.travel.cache import usage_summary
 from .services.travel.discovery import remember, place_key
@@ -57,7 +58,7 @@ def session_payload(session):
                     itinerary["weather"] = {"summary":"This forecast is stale. Recheck Trip before relying on it.","confidence":"UNKNOWN"}
     offset = value(session.state, "_destination_offset", 0)
     pool_count = len(value(session.state, "_destination_pool", []))
-    return age_saved_facts({"id": session.id, "title": session.title,
+    payload = age_saved_facts({"id": session.id, "title": session.title,
             "state": {key: val for key, val in session.state.items() if not key.startswith(("_destination_", "_itinerary_"))}, "status": session.status,
             "itinerary_stops": [s["name"] for s in value(session.state, "_itinerary_stops", [])],
             "destination_pool": {"total": pool_count, "offset": offset,
@@ -74,6 +75,7 @@ def session_payload(session):
                           "sources_checked": 0 if outdated else run.sources_checked, "candidate_count": run.candidate_count,
                           "created_at": run.created_at, "completed_at": None if outdated else run.completed_at,
                           "evidence": [] if outdated else [evidence_payload(e) for e in run.evidence.all()]} if run else None)})
+    return restriction_context(session, payload)
 
 
 class TravelSessionList(APIView):
@@ -113,6 +115,24 @@ class TravelSessionDetail(APIView):
         action = request.data.get("action", "message")
         if action == "message":
             session = send_message(pk, request.user, request.data.get("text", ""))
+        elif action in ("restriction_review", "restriction_withdraw"):
+            if type(request.data.get("revision")) is not int or request.data["revision"] != session.revision:
+                return Response({"detail": "This trip changed. Reload before reviewing a route restriction."}, status=409)
+            data = {k: v for k, v in request.data.items() if k not in ("action", "revision")}
+            if action == "restriction_review":
+                evidence = record_restriction(session, data)
+                say(session, f"Saved your reviewed restriction reference #{evidence.pk}. Source authenticity and whole-route motorcycle legality remain unverified.")
+            else:
+                if set(data) != {"evidence_id"} or type(data["evidence_id"]) is not int or data["evidence_id"] < 1:
+                    raise ValidationError({"detail": "Choose one of this conversation's reviewed references."})
+                from .models import TravelResearchEvidence
+                evidence = get_object_or_404(TravelResearchEvidence, pk=data["evidence_id"], research__session=session,
+                    data_type=KIND, provider="owner_reviewed_reference")
+                evidence.status = "withdrawn"
+                evidence.save(update_fields=["status"])
+                say(session, f"Withdrew your review of restriction reference #{evidence.pk}; the historical quotation and source are retained.")
+            session.revision += 1
+            session.save(update_fields=["revision", "updated_at"])
         elif action == "route_choice":
             if type(request.data.get("revision")) is not int or request.data["revision"] != session.revision:
                 return Response({"detail": "This trip changed. Reload it before choosing a route."}, status=409)

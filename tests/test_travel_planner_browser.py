@@ -90,6 +90,130 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
 
     def text(self, ident): return self.browser.find_element(self.By.ID,ident).text
 
+    def test_motorcycle_restriction_review_status_retry_conflict_withdrawal_and_expiry(self):
+        from copy import deepcopy
+        from django.http import JsonResponse
+        from apps.mobility.models import TravelResearchSession
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import candidates_for, fact
+        from apps.mobility.services.travel_itinerary import build_itinerary
+        from apps.mobility.services.travel.mapping import map_features
+        from apps.mobility.services.travel.restrictions import _identity
+        from apps.expenses.models import BankAccount, Expense
+        from apps.investments.models import Investment
+        from apps.loans.models import Loan
+        from tests.test_travel_route_choices import route_fixture
+        from selenium.webdriver.support.ui import Select
+        import json
+
+        Expense.objects.create(user=self.user, description="Synthetic untouched financial record", amount="123.45", transaction_date=timezone.localdate())
+        financial_before = [list(model.objects.values()) for model in (BankAccount, Expense, Investment, Loan)]
+        session = new_session(self.user)
+        session.state.update({k: fact(v) for k, v in {"origin":"Bengaluru", "transport_mode":"ride", "trip_duration":3, "budget":15000,
+            "available_start_date":str(timezone.localdate()+timedelta(days=2)), "available_end_date":str(timezone.localdate()+timedelta(days=4))}.items()})
+        candidate = candidates_for(self.user, session.state)[0]
+        candidate.update(route_result=route_fixture().as_dict(), distance_km=80, travel_hours=2)
+        route_id = candidate["route_result"]["payload"]["routes"][0]["route_id"]
+        candidate["selected_route_id"] = route_id
+        candidate["map"] = map_features(candidate)
+        session.candidates = [candidate]; session.itinerary = build_itinerary(session.state, candidate); session.save()
+        run = TravelResearchSession.objects.create(session=session, status="ready")
+        before_itinerary = deepcopy(session.itinerary)
+        self.browser.get(self.live_server_url+f"/mobility/?session={session.pk}")
+        parent = ".travel-route-choices"
+        proof = f'[data-restriction-route="{route_id}"]'
+        form = proof+" form"
+        def open_routes():
+            self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, parent))
+            if not self.browser.find_element(self.By.CSS_SELECTOR, parent).get_attribute("open"):
+                self.click(parent+" > summary")
+        def open_form():
+            open_routes()
+            detail = self.browser.find_element(self.By.CSS_SELECTOR, proof+" > details")
+            if not detail.get_attribute("open"): self.click(proof+" > details > summary")
+        def settled():
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID, "plannerSend").is_enabled())
+        def status(expected):
+            settled(); open_routes()
+            self.wait.until(lambda _: "Restriction reference: "+expected in self.browser.find_element(self.By.CSS_SELECTOR, proof).text)
+        def fill(source, claim="PROHIBITED", quote="Synthetic fixture only: motorcycles prohibited. <script>window.restrictionXss=1</script>"):
+            open_form()
+            for name, text in (("road", "Synthetic road <img src=x>"), ("source_url", source), ("quote", quote)):
+                element = self.browser.find_element(self.By.CSS_SELECTOR, form+f' [name="{name}"]')
+                element.clear(); element.send_keys(text)
+            Select(self.browser.find_element(self.By.CSS_SELECTOR, form+' [name="restriction"]')).select_by_value(claim)
+            self.browser.execute_script("for (const [name, minutes] of [['checked_at',-5],['expires_at',60]]) { const d=new Date(Date.now()+minutes*60000); arguments[0].elements[name].value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); }", self.browser.find_element(self.By.CSS_SELECTOR, form))
+            checkbox = self.browser.find_element(self.By.CSS_SELECTOR, form+' [name="reviewed"]')
+            if not checkbox.is_selected(): self.click(form+' [name="reviewed"]')
+
+        status("UNKNOWN")
+        fill("https://morth.nic.in.evil.example/synthetic")
+        self.click(form+' button[type="submit"]')
+        self.wait.until(lambda _: bool(self.text("plannerAlert")))
+        self.assertIn("public government reference", self.text("plannerAlert"))
+        self.assertFalse(run.evidence.exists())
+        self.assertIn("evil.example", self.browser.find_element(self.By.CSS_SELECTOR, form+' [name="source_url"]').get_attribute("value"))
+        fill("https://morth.nic.in/synthetic-fixture-not-a-real-notice")
+        original = BaseHandler.get_response
+        entered, release = threading.Event(), threading.Event()
+        failed = []
+        def unavailable(handler, request):
+            if (not failed and request.method == "POST" and "/planner/sessions/" in request.path
+                    and json.loads(request.body).get("action") == "restriction_review"):
+                failed.append(True); entered.set(); release.wait(timeout=10)
+                return JsonResponse({"detail":"Restriction review temporarily unavailable; retry."}, status=503)
+            return original(handler, request)
+        with patch.object(BaseHandler, "get_response", unavailable):
+            try:
+                self.click(form+' button[type="submit"]')
+                self.wait.until(lambda _: entered.is_set())
+                self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, form+' [name="quote"]').is_enabled())
+            finally: release.set()
+            self.wait.until(lambda _: "temporarily unavailable" in self.text("plannerAlert"))
+            settled()
+            self.assertIn("<script>", self.browser.find_element(self.By.CSS_SELECTOR, form+' [name="quote"]').get_attribute("value"))
+            self.click(form+' button[type="submit"]')
+            self.wait.until(lambda _: "Saved your reviewed restriction" in self.text("plannerMessages"))
+        status("VERIFIED")
+        self.assertIn("your reviewed reference", self.browser.find_element(self.By.CSS_SELECTOR, proof).text)
+        self.assertIn("not independent source authentication", self.browser.find_element(self.By.CSS_SELECTOR, proof).text)
+        self.assertIsNone(self.browser.execute_script("return window.restrictionXss"))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR, proof+' a').get_attribute("href"), "https://morth.nic.in/synthetic-fixture-not-a-real-notice")
+        self.browser.save_screenshot(str(self.artifacts/"restriction-reviewed-desktop.png"))
+        self.browser.refresh(); status("VERIFIED")
+        fill("https://morth.nic.in/synthetic-conditional", "CONDITIONAL", "Synthetic fixture only: motorcycles require a time-limited permit.")
+        self.click(form+' button[type="submit"]')
+        self.wait.until(lambda _: run.evidence.count() == 2)
+        status("UNKNOWN")
+        self.assertIn("references conflict", self.browser.find_element(self.By.CSS_SELECTOR, proof).text)
+        last = run.evidence.order_by("-pk").first()
+        self.click(f'[data-restriction-withdraw="{last.pk}"]')
+        self.wait.until(lambda _: "Withdrew your review" in self.text("plannerMessages"))
+        status("VERIFIED")
+        first = run.evidence.order_by("pk").first()
+        first.retrieved_at = timezone.now()-timedelta(hours=2)
+        first.verified_at = first.retrieved_at+timedelta(minutes=1)
+        first.valid_until = timezone.now()-timedelta(hours=1)
+        first.response_hash = _identity(first.finding, first.source_url, first.retrieved_at, first.valid_until)
+        first.save()
+        self.browser.refresh(); status("STALE")
+        self.browser.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", {"width":390,"height":844,"deviceScaleFactor":1,"mobile":False})
+        self.browser.execute_script("arguments[0].scrollIntoView({block:'center',behavior:'instant'});", self.browser.find_element(self.By.CSS_SELECTOR, proof))
+        self.browser.save_screenshot(str(self.artifacts/"restriction-stale-narrow.png"))
+        self.assertLessEqual(self.browser.execute_script("return document.documentElement.scrollWidth"), 390)
+        session.refresh_from_db()
+        session.candidates[0]["route_result"]["expires_at"] = (timezone.now()-timedelta(seconds=1)).isoformat()
+        session.save(update_fields=["candidates"])
+        self.browser.refresh(); status("UNAVAILABLE"); open_form()
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, form+' [name="quote"]').is_enabled())
+        session.refresh_from_db(); self.assertEqual(session.itinerary, before_itinerary)
+        self.assertEqual(run.evidence.count(), 2)
+        session.candidates[0]["route_result"]["payload"]["routes"] = []
+        session.save(update_fields=["candidates"])
+        self.browser.refresh()
+        self.wait.until(lambda _: "Restriction reference: UNAVAILABLE. No current route identity" in self.text("plannerCandidates"))
+        self.assertEqual([list(model.objects.values()) for model in (BankAccount, Expense, Investment, Loan)], financial_before)
+
     def test_route_comparison_choice_rebuild_retry_expiry_and_reopen(self):
         from apps.mobility.models import TravelPlanningSession
         from apps.mobility.services.travel.providers.routing import OpenRouteService
