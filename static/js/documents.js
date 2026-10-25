@@ -110,8 +110,9 @@ function initDocumentKnowledge() {
     const corpus=initDocumentCorpus(()=>selected);
     function reset(page=null) {
         generation++; controller?.abort(); controller=null;
+        const hadSelection=selected!==null;
         selected=page?.level==='records' ? page : null;
-        corpus.selectionChanged();
+        if (hadSelection || selected!==null) corpus.selectionChanged();
         form.hidden=!selected; query.value=''; status.textContent=''; results.replaceChildren();
         document.getElementById('documentCorpusIngest').hidden=!selected;
         results.setAttribute('aria-busy','false'); submit.disabled=false; query.disabled=false;

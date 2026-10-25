@@ -2193,6 +2193,71 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(question.get_property('value'),'')
 
+    def test_initial_catalog_response_does_not_cancel_independent_private_vault_requests(self):
+        from threading import Event
+        from selenium.webdriver.support.ui import Select
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.investments.models import Investment, InvestmentImportDocument
+        from apps.ml_engine.api.document_corpus import DocumentCorpusAPI, DocumentCorpusUploadAPI
+        from apps.ml_engine.api.financial_evidence import DocumentRecordPageAPI
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-catalog-vault-race-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=root/'vault'))
+        text_file = root/'Synthetic race policy.txt'; text_file.write_text('Synthetic private evidence only.',encoding='utf-8')
+        row = Investment.objects.create(user=self.scenario['user'],asset_type='equity',asset_name='Synthetic context only',
+            invested_amount='1.00',current_value='1.00')
+        document = InvestmentImportDocument.objects.create(user=self.scenario['user'],file_name='Synthetic context.pdf',
+            uploaded_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC-CONTEXT'),parser_status='parsed')
+        document.linked_investments.add(row)
+        catalog_ready, vault_ready, release_catalog, release_vault = (Event() for _ in range(4))
+        original_catalog, original_list, original_upload = DocumentRecordPageAPI.get, DocumentCorpusAPI.get, DocumentCorpusUploadAPI.post
+        def catalog_response(view, *args, **kwargs):
+            response = original_catalog(view,*args,**kwargs)
+            catalog_ready.set(); release_catalog.wait(20)
+            return response
+        def vault_response(original):
+            def delayed(view, *args, **kwargs):
+                response = original(view,*args,**kwargs)
+                vault_ready.set(); release_vault.wait(20)
+                return response
+            return delayed
+        self.enterContext(patch.object(DocumentRecordPageAPI,'get',catalog_response))
+        self.enterContext(patch.object(DocumentCorpusAPI,'get',vault_response(original_list)))
+        self.enterContext(patch.object(DocumentCorpusUploadAPI,'post',vault_response(original_upload)))
+        self.addCleanup(release_catalog.set); self.addCleanup(release_vault.set)
+        self.login()
+        for mode in ('list','upload'):
+            with self.subTest(mode=mode):
+                for gate in (catalog_ready,vault_ready,release_catalog,release_vault): gate.clear()
+                try:
+                    self.browser.get(self.live_server_url+'/documents/')
+                    self.wait.until(lambda _: catalog_ready.is_set())
+                    self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
+                    if mode == 'list':
+                        self.memory_click('#documentCorpusRefresh')
+                    else:
+                        self.browser.find_element(self.By.ID,'documentCorpusFile').send_keys(str(text_file))
+                        self.memory_click('#documentCorpusUploadConsent'); self.memory_click('#documentCorpusUpload button')
+                    self.wait.until(lambda _: vault_ready.is_set())
+                    release_catalog.set()
+                    self.wait.until(lambda _: 'Documents' in self.text('documentSourcesStatus'))
+                    self.assertIn('Checking private document knowledge', self.text('documentCorpusStatus'))
+                    self.assertFalse(self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
+                    release_vault.set()
+                    expected = 'list refreshed' if mode == 'list' else 'Original and searchable extraction stored encrypted'
+                    self.wait.until(lambda _: expected in self.text('documentCorpusStatus'))
+                    if mode == 'upload': self.assertIn(text_file.name,self.text('documentCorpusList'))
+                finally:
+                    release_catalog.set(); release_vault.set()
+                    self.wait.until(lambda _: self.active_requests == 0)
+        self.memory_click('#documentCorpusList input')
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        source = f'#documentSourcesItems button[data-document-id="{document.pk}"]'
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,source))
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,'#documentCorpusList input').is_selected())
+        self.memory_click(source)
+        self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'#documentCorpusList input').is_selected())
+
     def test_general_private_document_upload_pdf_text_and_owner_originals(self):
         from unittest.mock import Mock
         from tests.test_document_knowledge import text_pdf
