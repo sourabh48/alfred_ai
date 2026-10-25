@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 READY/open; INV-02 source 8907f28 pushed, exact-head run 40235878420 IN_PROGRESS at checkpoint. Recovery ec68073 run 40233186981 passed Windows native/Selenium and Linux secure-failure but failed portable Travel at test_travel_planner_browser.py:391 (day-2 text empty). Independent reviews 0, protection GET 403, Pages authorization absent. No merge/publication or global green claim; resolve latest checkpoint HEAD/CI before any merge.
+PR/CI: PR #16 READY/open, unmerged. Recovery HEAD 7807d36 exact-head run 40236052781 PASS on Windows native, Selenium and Linux; older Travel failure does not persist and its assertion/source remain unchanged. SCOPE-02 changes require fresh pushed-head CI. Independent reviews 0, protection GET 403, Pages authorization absent. No merge/publication or protection bypass.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->

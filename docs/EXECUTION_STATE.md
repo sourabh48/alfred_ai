@@ -1,79 +1,46 @@
 # ALFRED execution state
 
-Updated: 2026-10-26T03:02:57.6129084+05:30, Asia/Calcutta. Current command explicitly authorized `next`.
+Updated: 2026-10-26T03:58:45.0224998+05:30 (Asia/Calcutta). Command: explicit `next`, INV-02/SCOPE-02 only.
 
 ## Current task
 
-- **INV-02 / SCOPE-01 — account-safe investment PDF imports and source receipts.**
-- Status: COMPLETE / SCOPE-01. Phase A; original capability remains IMPLEMENTED_NOT_ACCEPTED. No broad broker-layout or real-account accuracy claim.
-- Weighted progress: **100%** for the completed bounded slice; not full INV-02 or release acceptance. Recovery/gap 10; implementation/integration 45;
-  backend/Chrome/privacy/money acceptance 25; documentation/checkpoint 10; commit/push/relevant CI 10.
-- Fixed initial upsert and line deduplication to include account identity;
-  receipt matching requires the exact account and abstains for malformed/missing evidence. Correction preserves explicit blank institutions and holding identity.
-- Preserve existing bounded extraction, deferred upload transaction, Decimal helpers,
-  owner/session/CSRF, corrections/retries and file protection. Do not hold SQLite
-  write locks during OCR or invent a new transaction mechanism.
-- Done: synthetic PDF regressions, minimal account matching and actual Chrome
-  uploads/reimport, correction/source review, privacy/money tests. Source/history privacy PASS (zero findings); source commit 8907f2840cd8ced230d33e8a405460cedc0a16a1 pushed; its CI 40235878420 observed IN_PROGRESS. No global CI green claim.
-- Baseline **75/143 (52.4%)**; extensions **0/13**. No status promotion without full criteria.
-- READY_FOR_NEXT: YES. Await `next`; `continue` reports this slice complete and does not switch tasks. Remaining full INV-02 broker/layout/OCR and real-account evidence is unaccepted.
+- **INV-02/SCOPE-02 — representative synthetic broker-style PDF extraction and correction acceptance.**
+- Status: IN_PROGRESS, **90%**: recovery/gap 10 + implementation/integration 45 + acceptance 25 + documentation 10. Commit/push/CI 10 remain pending.
+- BOOTSTRAP-01 and INV-02/SCOPE-01 remain COMPLETE/100%. No accepted task restarted. Baseline **75/143 (52.4%)**; extensions **0/13**; full INV-02 remains IMPLEMENTED_NOT_ACCEPTED.
+- Implemented: labelled pipe/tab/whitespace table columns, account-aware identities, raw Decimal money, footer reconciliation, duplicate conflict/row/text bounds, source-review reasons in UI. Units/prices/metadata are not position values. OCR-selected output requires review even when damaged headers disappear; unused OCR diagnostics do not relabel selected digital text. Account labels require word boundaries and cannot cross lines.
+- Existing SCOPE-01 upsert, receipts, owner/session/CSRF, correction/retry and deferred upload transaction remain shared. No migrations, currency/valuation policy, new dependency or provider activation.
+- Synthetic scope: dated Groww-style fund table and Zerodha-style symbol table, not authenticated broker statements or real accounts. OCR provenance/confidence safety uses mocked extractor output, not OCR accuracy evidence. Missing/uncertain or currency-labelled tables are review-only. Sparse/OCR browser latency and generalized positional/scanned layouts remain unaccepted.
 
-## Recovery and PR gates
+## Recovery / PR gates
 
-- Branch `development/alfred-integrated`; local/remote recovery HEAD
-  `ec680730d65d65702bc6c4aaa62f38ece1b8f73e`; clean before this task.
-- Master `c47fed95f919859aa62f1875512e3cb8452f2d48` unchanged.
-- PR #16 READY/open at recovery SHA. Run `40233186981` IN_PROGRESS at recovery;
-  independent reviews **0**; protection GET **403 Resource not accessible by integration**;
-  Pages publishing authorization **absent**. Both Windows jobs subsequently PASS; Linux secure-failure PASS, portable Travel failed (`test_travel_planner_browser.py:391`, day-2 text empty). No merge, publication or protection bypass; no unrelated Travel fix attempted.
-- Latest source/CI/refs and receipt hashes: `artifacts/inv02-ec68073/`.
-- BOOTSTRAP-01 remains **COMPLETE / 100%**, source CI `40230734330` PASS on
-  `b2528c7`; accepted source and GitHub merge-ref trees matched. Its documentation,
-  original 143-ID inventory, 13-story ledger and artifacts remain intact.
-- No production, real financial data, currency/FX, credentials, paid provider,
-  private-history/Git sync, privileged runtime, backup or frozen-release operations.
+- Branch `development/alfred-integrated`; recovery local/upstream `7807d3653e5aad23e235a40294af783ec2de2633`, initially clean. Master `c47fed95f919859aa62f1875512e3cb8452f2d48` unchanged.
+- PR #16 READY/open, no merge. Recovery exact-head run **40236052781 PASS**: native-windows 121297815393; Selenium 121297815492; Linux 121297815613. The older Travel failure does not persist, so no Travel source/assertion was changed.
+- Independent reviews **0**; protection GET **403 Resource not accessible by integration**; Pages publishing authorization **absent**. Passing source CI does not clear these gates. Inspect fresh exact-head CI after the development push.
+- No production, real financial data, backup/frozen release, Pages, master merge, secret/provider activation, privileged runtime or private-history/Git-sync operation.
 
-## Evidence and validation
+## Evidence / exact next action
 
-- Configured SDK: `F:/ALFRED/alfred_ai/.venv/Scripts/python.exe`; obtain PyCharm
-  environment before each Python/Graphify invocation.
-- Accepted backend command: SDK `artifacts/ci-repair-ac05515/run.py inv02-final-accepted manage.py test tests.test_investment_import_acceptance tests.test_investment_money tests.test_document_retry_integrity tests.test_investment_evidence tests.test_investment_grounding tests.test_document_review_and_retry --noinput`.
-- Browser: existing required Chrome runner; new actual-PDF workflow plus affected
-  investment correction and field-source review tests. Detailed receipts stay in artifacts.
-- Red receipt `artifacts/ci-repair-ac05515/inv02-red.json`: 3 assertion failures exposed account overwrite/retry effects; one fixture passed bytes instead of a stream and was corrected. Ownership/CSRF passed; receipt-write failure already rolls back via existing middleware. Minimal account keys are now in dedup, persistence and receipt matching; UI masks account suffixes. Final acceptance now PASS; earlier red/48-case/intermediate receipts overlap the final 84 and are not additional totals.
+- Configured SDK `F:/ALFRED/alfred_ai/.venv/Scripts/python.exe`; obtain PyCharm environment before each Python/Graphify invocation.
+- Final affected parser/import tests **19 PASS**, zero skips: `artifacts/ci-repair-ac05515/inv02-scope02-layout-final.json` / `.log` (13 layout + 6 SCOPE-01 compatibility). Final remaining money/evidence/grounding/retry 78 PASS, zero skips: `artifacts/ci-repair-ac05515/inv02-scope02-related-final.json`. Total 97 distinct backend cases; do not repeat them unnecessarily.
+- Earlier 95-test receipt PASS predates the final account-boundary/OCR safeguard; do not call it final-source acceptance. Earlier red/intermediate receipts are retained and overlap, not extra totals.
+- Actual Chrome 3-test run PASS, zero skips: `artifacts/inv02-scope02-7807d36/browser-final.log`; summary under `browser-final/`. Final Axe PASS: 4 audits, zero violations, desktop/mobile light/dark; incomplete contrast/manual screen-reader unverified. Pinned existing Axe harness `artifacts/inv02-scope02-7807d36/axe_acceptance.py` via the isolated runner; its one browser flow overlaps, not an additional unique workflow.
+- Browser failure artifacts under `artifacts/inv02-scope02-7807d36/browser/`: sparse metadata triggered OCR and exceeded the unchanged assertion wait; a draft correction test clicked outside the unobscured viewport. Final fixtures contain normal date/type/reference/prepared-for metadata; the test scrolls for a real click and uses existing offline provider fixtures. No deadline or assertion relaxed; sparse/OCR latency is not newly accepted.
+- Initial backend findings: trailing empty table cells were dropped; unused OCR attempts mistaken for selected OCR; test used nonexistent `document.file`; account regex matched folio inside portfolio; selected damaged OCR fell back to guessed numbers. Fixes and regression receipts retained under `artifacts/ci-repair-ac05515/inv02-scope02-*`.
+- Axe found/fixed an actual scrollable import-history focus defect; named region/tabindex and real PageDown focus/scroll are tested without suppression. Final proof receipt `artifacts/ci-repair-ac05515/inv02-scope02-axe-final-proof.json`, one workflow overlaps Chrome. Sparse/OCR browser latency remains unaccepted.
+- Final actual keyboard regression waits for all 3 import rows before sending keys; the earlier count in the database preceded asynchronous list rendering. Final four-theme/viewport Axe proof PASS, zero violations; relevant desktop/390px import captures inspected. Metadata 10 PASS, generated 143-ID/13-story views current.
+- Next: commit, perform clean-source privacy/publication; update tracker/queue/generated views; verify Graphify AST; commit validated task-owned files; run pinned clean-source/history privacy boundary and normal development push. Inspect new exact-head CI; do not merge.
 
-## Preserved interruption
+## Preserved acceptance / interrupted work
 
-TRAVEL-09 stays deferred, incomplete/untested at its prior 15%. Exact provider
-hunks are in `docs/recovery/TRAVEL09_DEFERRED.patch` (SHA256
-`b187bcba512209e5b98d32880311240cfe3ac4b53ec44547411cc5eb648340b1`), with original
-local receipts under `artifacts/bootstrap-5af834c/`. Do not apply unless selected.
-Intelligence Hub and dormant Git transport remain unchanged and disabled remotely.
+- SCOPE-01 source `8907f2840cd8ced230d33e8a405460cedc0a16a1`, checkpoint `7807d3653e5aad23e235a40294af783ec2de2633`: 84 backend, 3 Chrome, 4 Axe (overlapping workflow), zero source/history privacy findings. Receipts `artifacts/inv02-ec68073/` and `artifacts/ci-repair-ac05515/inv02-final-accepted.json`. Preserve unknown-account legacy rows for owner reconciliation.
+- BOOTSTRAP-01 100%, source CI 40230734330 PASS; 143 original IDs and 13-story ledger preserved.
+- TRAVEL-09 remains deferred/incomplete/untested at its prior 15%; patch `docs/recovery/TRAVEL09_DEFERRED.patch`, SHA256 `b187bcba512209e5b98d32880311240cfe3ac4b53ec44547411cc5eb648340b1`. Do not apply without task selection. Hub encrypted packs/checkpoints and dormant Git adapter preserved; remote sync OFF.
 
-## Resume
+## Files / rollback / resume
 
-`Set-Location F:\ALFRED_DEV\post-audit; git status -sb; Get-Content docs/EXECUTION_STATE.md -Encoding UTF8`
-
-`continue` reports READY_FOR_NEXT for this completed slice; `status` is read-only. Stop
-and wait for another `next`; do not select INV-05 automatically.
-
-## Accepted scope receipts
-
-- 84 backend PASS, zero skips: artifacts/ci-repair-ac05515/inv02-final-accepted.json.
-- 3 Chrome PASS, zero skips: artifacts/inv02-ec68073/browser-accepted/browser_regression_summary.json.
-- 4 focused Axe audits, zero violations: artifacts/inv02-ec68073/accessibility.json; artifacts/ci-repair-ac05515/inv02-axe-accepted.json. Overlaps one Chrome workflow; incomplete contrast/manual screen-reader is not verified.
-- Earlier parallel browser timeout artifacts retained; UI processing stayed active. Serial acceptance passed unchanged deadlines/assertions. Initial fixture error and account-identity defects are documented in PROJECT_STATUS.
-- Full INV-02 remains unaccepted pending independent broker/layout/OCR and real-account evidence. Unknown-account legacy rows remain separate for owner reconciliation.
-
-## Publication checkpoint
-
-- Task-owned files, alphabetically: README.md; alfred_ai/services/document_review.py; apps/investments/services/document_evidence.py; apps/investments/services/portfolio_intelligence.py; docs/EXECUTION_STATE.md; docs/PROJECT_STATUS.md; scripts/release_validation.py; static/js/investments.js; tests/test_investment_grounding.py; tests/test_investment_import_acceptance.py; tests/test_user_data_browser.py.
-- Postcommit privacy/source boundary: SDK artifacts/resume-4789784/verify-boundary.py artifacts/inv02-ec68073/boundary ec680730d65d65702bc6c4aaa62f38ece1b8f73e. Run before normal development push; no artifacts/database/secret files staged.
-- No migrations. Rollback is a reviewed normal development revert of this scope; do not rewrite data or merge unknown legacy accounts. No rollback executed.
-- After publication, record exact refs, PR/run IDs and source/receipt hashes in artifacts/inv02-ec68073/boundary/checkpoint.json. Resolve this file's commit with git log -1 --format=%H -- docs/EXECUTION_STATE.md; a document cannot embed its own SHA.
-
-## Handoff
-
-- Remaining selected capability: INV-02 independent representative broker/layout/OCR acceptance; inspect approved evidence availability on the next explicit command. Do not repeat account-scope regressions or silently mark full INV-02 verified. If a genuine corpus approval blocker is established, record/defer it before selecting INV-05 from Phase A.
-- This final evidence-only documentation checkpoint changes no accepted executable/test source. Current-head PR CI must still pass before merging; earlier Travel failure, independent review, protection access and Pages authorization remain separate gates.
-- Final refs/CI/receipt hashes are saved in artifacts/inv02-ec68073/boundary/checkpoint.json. The published checkpoint must be clean and normally pushed; no master merge or deployment.
+- Task-owned files alphabetically: README.md; apps/investments/services/portfolio_intelligence.py; docs/ALFRED_2_0_REQUIREMENTS.md; docs/EXECUTION_QUEUE.md; docs/EXECUTION_STATE.md; docs/PROJECT_STATUS.md; scripts/project_execution.py; scripts/release_validation.py; static/js/investments.js; templates/investments/list.html; tests/test_document_review_browser.py; tests/test_investment_layout_acceptance.py; tests/test_user_data_browser.py.
+- Full merged files saved. Rollback is a reviewed normal source revert; no schema/data rewrite or destructive reset. No rollback executed.
+- Before push: SDK `artifacts/resume-4789784/verify-boundary.py artifacts/inv02-scope02-7807d36/boundary 7807d3653e5aad23e235a40294af783ec2de2633` (requires clean committed tree).
+- Resolve this checkpoint's actual SHA with `git log -1 --format=%H -- docs/EXECUTION_STATE.md`; it cannot embed its own hash. Record refs, CI and source/receipt hashes in `artifacts/inv02-scope02-7807d36/boundary/checkpoint.json`.
+- Resume: `Set-Location F:\ALFRED_DEV\post-audit; git status -sb; Get-Content docs/EXECUTION_STATE.md -Encoding UTF8`.
+- READY_FOR_NEXT: NO. `continue` resumes this task; stop at the durable accepted/blocked checkpoint. Once complete, another explicit `next` may select INV-05; full INV-02 is evidence-blocked, not verified. Never automatically start another module.

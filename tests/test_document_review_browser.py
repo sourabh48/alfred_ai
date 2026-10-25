@@ -482,6 +482,38 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self.selenium.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'});", closure_row)
         self._capture_browser_artifacts()
 
+    def test_uncertain_investment_table_upload_requires_owned_source_correction(self):
+        from scripts.exercise_materialized_cache_traffic import _offline_fixture_patches
+        from tests.test_investment_layout_acceptance import GROWW_TABLE, table_pdf
+
+        self.enterContext(_offline_fixture_patches())
+        directory = Path(self.enterContext(tempfile.TemporaryDirectory(prefix='alfred-table-review-')))
+        pdf = directory / 'synthetic-uncertain-table.pdf'
+        pdf.write_bytes(table_pdf(GROWW_TABLE.replace('110.20', '11O.20')))
+        self._login_browser()
+        self.selenium.get(self.live_server_url + '/investments/')
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, 'investmentPdfFiles')))
+        self.selenium.find_element(self.By.ID, 'investmentPdfFiles').send_keys(str(pdf))
+        upload = self.selenium.find_element(self.By.ID, 'uploadInvestmentPdfBtn')
+        self.selenium.execute_script("arguments[0].scrollIntoView({block:'center',behavior:'instant'})", upload)
+        self.wait.until(self.EC.element_to_be_clickable((self.By.ID, 'uploadInvestmentPdfBtn'))).click()
+        self.wait.until(lambda _: InvestmentImportDocument.objects.filter(user=self.user, file_name=pdf.name).exists())
+        document = InvestmentImportDocument.objects.get(user=self.user, file_name=pdf.name)
+        self.assertEqual(document.parser_status, 'needs_review')
+        self.assertFalse(document.linked_investments.exists())
+        self.wait.until(lambda _: 'Uncertain table amounts' in self.selenium.find_element(self.By.ID, 'investmentImportList').text)
+        self._save_family_correction_in_browser('investment_document', document, {
+            'asset_name': 'Synthetic Alpha Fund', 'asset_type': 'mutual_fund',
+            'account_number': 'SYNTH-A', 'invested_amount': '100.25', 'current_value': '110.20',
+        })
+        row = document.linked_investments.get()
+        self.assertEqual(row.current_value, Decimal('110.20'))
+        self.assertEqual(row.account_number, 'SYNTH-A')
+        self.assertIn('11O.20', document.extracted_text)
+        self.selenium.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: 'Synthetic Alpha Fund' in self.selenium.find_element(self.By.ID, 'investmentPositionsBody').text)
+        self._capture_browser_artifacts()
+
     def test_investment_review_rounds_money_and_preserves_source_evidence(self):
         document = InvestmentImportDocument.objects.create(
             user=self.user, file_name="checked-investment.pdf", parser_status="needs_review",

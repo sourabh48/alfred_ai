@@ -356,6 +356,7 @@ function renderInvestmentImports(items) {
                     <div class="fw-semibold">${Alfred.escapeHtml(item.broker_name || "Portfolio import")}</div>
                     <div class="muted small">${Alfred.escapeHtml(parserLabel)} | ${(Number(item.parse_confidence || 0) * 100).toFixed(0)}% confidence</div>
                     <div class="muted small">${Alfred.escapeHtml(item.summary || `${linkedCount} holdings linked`)}</div>
+                    ${item.extracted_payload?.layout_review ? `<div class="muted small">Source extraction: ${Alfred.escapeHtml(item.extracted_payload.layout_review.reason || "Review the source table.")}${item.extracted_payload.review_queue_resolved ? " Owner corrections applied; source extraction is unchanged." : ""}</div>` : ""}
                 </div>
             </div>
         `;

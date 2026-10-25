@@ -94,6 +94,16 @@ explainable buy/hold/avoid research. Backtests/walk-forward/provenance precede
 performance claims. Ideas are separate from holdings. No automatic orders/brokerage,
 guaranteed returns or invented market facts; paid feeds/credentials remain gated.
 
+INV-02 acceptance separates synthetic representative layout checks from authenticated
+broker/real-account acceptance. Labelled cost/current-value columns must not be
+confused with units, prices, identifiers or totals. Preserve account identity,
+original files/raw amounts, correction lineage and Decimal reconciliation. Missing,
+conflicting, truncated or unsupported evidence requires review without partial
+financial writes. OCR table candidates require source review; retain the selected
+extraction method and confidence diagnostics without claiming measured accuracy.
+Do not infer currency or broker authenticity. A synthetic layout receipt alone
+does not complete broad broker/OCR or real-account acceptance.
+
 Wealth adapts read-only institution/asset snapshots and strictly post-snapshot
 events only where reconciliation supports them; includes emergency funds,
 obligations/goals, career-income scenarios, reserve-aware sizing, look-through,

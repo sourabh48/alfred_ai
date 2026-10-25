@@ -3640,6 +3640,51 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
         self.capture('investment-pdf-accounts-390px')
 
+    def test_investment_broker_style_tables_reimport_and_reopen_with_source_notes(self):
+        from decimal import Decimal
+        from apps.investments.models import Investment, InvestmentImportDocument
+        from tests.test_investment_layout_acceptance import GROWW_TABLE, ZERODHA_TABLE, table_pdf
+
+        owner = self.scenario['user']
+        directory = Path(self.enterContext(TemporaryDirectory(prefix='alfred-table-acceptance-')))
+        self.login()
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'investmentPdfFiles'))
+        for name, text, copies in (('synthetic-groww.pdf', GROWW_TABLE, 2), ('synthetic-zerodha.pdf', ZERODHA_TABLE, 1)):
+            pdf = directory / name
+            pdf.write_bytes(table_pdf(text))
+            for count in range(1, copies + 1):
+                self.browser.find_element(self.By.ID, 'investmentPdfFiles').send_keys(str(pdf))
+                self.memory_click('#uploadInvestmentPdfBtn')
+                self.wait.until(lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=name).count() == count)
+                self.wait.until(lambda _: '2 investment record(s)' in self.text('investmentImportStatus'))
+                self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'uploadInvestmentPdfBtn').is_enabled())
+            document = InvestmentImportDocument.objects.filter(user=owner, file_name=name).latest('pk')
+            self.assertEqual(document.parser_status, 'parsed')
+            self.assertEqual(document.field_evidence.count(), 2)
+        fund_rows = Investment.objects.filter(user=owner, institution='Groww', account_number='SYNTH-A')
+        self.assertEqual(fund_rows.count(), 2)
+        self.assertEqual(sum((r.current_value for r in fund_rows), Decimal(0)), Decimal('330.60'))
+        self.assertEqual(list(Investment.objects.filter(user=owner, asset_name='SYNTHA').order_by('account_number').values_list('current_value', flat=True)), [Decimal('3.08')] * 2)
+        self.wait.until(lambda _: 'currency is not inferred' in self.text('investmentImportList'))
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#investmentImportList .data-row')) == 3)
+        self.assertNotIn('999.125', self.text('investmentPositionsBody'))
+        from selenium.webdriver.common.keys import Keys
+        imports = self.browser.find_element(self.By.ID, 'investmentImportList')
+        imports.send_keys(Keys.PAGE_DOWN)
+        self.assertEqual(self.browser.execute_script('return document.activeElement.id'), 'investmentImportList')
+        self.wait.until(lambda _: self.browser.execute_script('return arguments[0].scrollTop', imports) > 0)
+        self.assertGreater(self.browser.execute_script('return arguments[0].scrollTop', imports), 0)
+        self.capture('investment-tables-desktop')
+        self.browser.refresh()
+        self.wait.until(lambda _: 'synthetic-groww.pdf' in self.text('investmentImportList'))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+            {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.browser.execute_script("document.getElementById('investmentImportList').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('investment-tables-390px')
+
     def test_investment_projection_starts_with_recorded_value_on_real_page(self):
         self.login()
         self.browser.get(self.live_server_url + "/investments/")

@@ -22,7 +22,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | ---: | --- | --- | --- | --- | --- | --- | --- |
 | 1 | A | LOAN-07 — Loan forecasting and cross-module liabilities | IMPLEMENTED_NOT_ACCEPTED | P2 / L | FIN-07 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: FIN-07 |
 | 2 | A | LOAN-08 — Broad real-document/lender acceptance | IMPLEMENTED_NOT_ACCEPTED | P2 / L | DOC-02 | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: independent lender/document acceptance corpus |
-| 3 | A | INV-02 — Investment PDF imports and corrections | IMPLEMENTED_NOT_ACCEPTED | P2 / M | DOC-02, DOC-04, FIN-14 | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 3 | A | INV-02 — Investment PDF imports and corrections | IMPLEMENTED_NOT_ACCEPTED | P2 / L | DOC-02, DOC-04, FIN-14 | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: broader broker/layout/OCR and authorized real-account corpus; bounded receipts in EXECUTION_STATE |
 | 4 | A | INV-05 — AMFI/Yahoo market evidence and historical performance | IMPLEMENTED_NOT_ACCEPTED | P2 / M | INV-01 | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
 | 5 | A | AI-10 — Persistent general conversation history | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: private-history activation remains off |
 | 6 | A | AI-14 — Background learning pipeline | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: eligible consented training and reviewed outcomes |
@@ -89,7 +89,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 67 | D | SYNC-02 — Non-AWS encrypted object adapter (AWS withdrawn) | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
 | 68 | D | SYNC-11 — Full application/cloud backup | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
 
-**Next eligible after BOOTSTRAP-01 and explicit `next`: INV-02.**
+**Next eligible after BOOTSTRAP-01 and explicit `next`: INV-05.**
 
 ## Accepted baseline — excluded from execution
 

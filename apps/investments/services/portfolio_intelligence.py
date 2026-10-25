@@ -135,14 +135,26 @@ class PortfolioIntelligenceService:
         full_text = extracted.text or ""
         broker = self._detect_broker(full_text)
 
-        if "ZERODHA" in broker.upper():
-            parsed_investments = self._parse_zerodha_statement(full_text)
-        elif "GROWW" in broker.upper():
-            parsed_investments = self._parse_groww_statement(full_text)
-        else:
-            parsed_investments = self._parse_generic_statement(full_text, broker=broker)
+        parsed_investments, layout_review = self._parse_holdings_table(full_text, broker=broker)
+        # OCR diagnostics can be present even when digital text won; use the selected method.
+        if any(token in extracted.method.lower() for token in ("ocr", "tesseract")):
+            parsed_investments = []
+            layout_review = {"status": "needs_review", "reason": "OCR table amounts and account identity require source review before import."}
+        if layout_review and len(full_text) >= 30000:
+            parsed_investments = []
+            layout_review = {"status": "needs_review", "reason": "Extraction reached its text bound; review the complete source before import."}
+        if layout_review is None:
+            if "ZERODHA" in broker.upper():
+                parsed_investments = self._parse_zerodha_statement(full_text)
+            elif "GROWW" in broker.upper():
+                parsed_investments = self._parse_groww_statement(full_text)
+            else:
+                parsed_investments = self._parse_generic_statement(full_text, broker=broker)
 
         account_number = self._extract_account_hint(full_text)
+        if layout_review is not None:
+            accounts = {item["account_number"] for item in parsed_investments}
+            account_number = next(iter(accounts)) if len(accounts) == 1 else ""
         field_names = sorted(
             {
                 *[key for item in parsed_investments for key, value in item.items() if value not in ("", None, 0)],
@@ -168,6 +180,8 @@ class PortfolioIntelligenceService:
             parser_status = "failed"
 
         notes = [*extracted.notes, *learning_notes]
+        if layout_review:
+            notes.append(layout_review["reason"])
         summary = (
             f"{len(parsed_investments)} investment position(s) were extracted from the {broker} document."
             if parsed_investments
@@ -188,6 +202,7 @@ class PortfolioIntelligenceService:
                 "raw_notes": notes[:8],
                 "raw_text_excerpt": " ".join(full_text.split())[:600],
                 "extraction_review": extracted.review_payload,
+                "layout_review": layout_review,
                 "investments": parsed_investments,
             },
         }
@@ -1045,6 +1060,96 @@ class PortfolioIntelligenceService:
         )
         return investment, created
 
+    def _parse_holdings_table(self, text: str, *, broker: str):
+        """Read labelled money columns; an unsafe table must not fall back to positional guesses."""
+        # shortcut: labelled text tables only; expand positional layouts after representative corpus review.
+        aliases = {
+            "asset_name": {"symbol", "security", "fund name", "scheme name", "asset name"},
+            "invested_amount": {"invested amount", "invested value", "cost value", "investment amount"},
+            "current_value": {"current value", "market value", "current amount"},
+            "account_number": {"account", "account number", "folio", "folio number", "demat account"},
+        }
+        columns = None
+        header_labels = None
+        holdings = {}
+        source_rows = {}
+        total = None
+        account = ""
+        conflicting_account = False
+        fund_table = False
+
+        def review(reason):
+            return [], {"status": "needs_review", "reason": reason}
+
+        def amount(value):
+            # Currency/units/OCR substitutions are never inferred from a numeric-looking cell.
+            if not re.fullmatch(r"(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?", value):
+                raise ValueError("Uncertain monetary cell")
+            return investment_money(value.replace(",", ""))
+
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            cells = [cell.strip() for cell in re.split(r"\s*\|\s*|\t+| {2,}", line.strip())]
+            labels = [" ".join(cell.lower().split()) for cell in cells]
+            is_header = any(label in aliases["asset_name"] for label in labels)
+            if is_header:
+                indices = {name: [i for i, label in enumerate(labels) if label in choices]
+                           for name, choices in aliases.items()}
+                if any(len(indices[name]) != 1 for name in ("asset_name", "invested_amount", "current_value")) or len(indices["account_number"]) > 1:
+                    return review("Table money columns are missing or ambiguous; review the original document.")
+                if any(re.search(r"\b(?:currency|denomination|ccy)\b", label) for label in labels):
+                    return review("Currency-labelled tables require an approved denomination policy and source review.")
+                mapped = {name: values[0] for name, values in indices.items() if values}
+                if conflicting_account:
+                    return review("Conflicting account headings require source review.")
+                if columns is not None and labels != header_labels:
+                    return review("Conflicting table headers require source review.")
+                columns, width = mapped, len(cells)
+                header_labels = labels
+                fund_table = "fund name" in labels or "scheme name" in labels
+                continue
+            if columns is None:
+                hint = self._extract_account_hint(line)
+                if hint:
+                    if account and account != hint:
+                        conflicting_account = True
+                    account = hint
+                continue
+            if len(cells) != width or total is not None:
+                return review("Incomplete table rows or trailing content require source review.")
+            name = cells[columns["asset_name"]]
+            try:
+                invested = amount(cells[columns["invested_amount"]])
+                current = amount(cells[columns["current_value"]])
+            except ValueError:
+                return review("Uncertain table amounts require source review; no holdings were imported.")
+            if name.lower() in {"total", "grand total"}:
+                total = (invested, current)
+                continue
+            row_account = cells[columns["account_number"]] if "account_number" in columns else account
+            if not re.fullmatch(r"[A-Za-z0-9-]{6,24}", row_account) or not name or len(name) > 120:
+                return review("Missing or unsupported holding/account identity requires source review.")
+            item = {"asset_name": name, "asset_type": "mutual_fund" if fund_table else self._guess_asset_type(name),
+                    "institution": "" if broker == "Generic" else broker, "account_number": row_account,
+                    "invested_amount": cells[columns["invested_amount"]].replace(",", ""),
+                    "current_value": cells[columns["current_value"]].replace(",", ""), "annual_return_rate": 0}
+            key = (name, row_account)
+            if key in source_rows and source_rows[key] != cells:
+                return review("Conflicting duplicate holdings require source review.")
+            holdings[key] = item
+            source_rows[key] = cells
+            if len(holdings) > 30:
+                return review("Table exceeds the 30-position import bound; review without partial import.")
+        if columns is None:
+            return None, None
+        if not holdings:
+            return review("No complete holdings were found in the table.")
+        if total is not None and total != tuple(sum((amount(item[field]) for item in holdings.values()), start=investment_money(0))
+                                                for field in ("invested_amount", "current_value")):
+            return review("Table totals do not reconcile with the holdings; source review is required.")
+        return list(holdings.values()), {"status": "parsed", "reason": "Labelled table amounts and account identity extracted; currency is not inferred."}
+
     def _parse_line_items(self, text: str, *, institution: str) -> List[Dict]:
         investments: List[Dict] = []
         seen = set()
@@ -1107,7 +1212,7 @@ class PortfolioIntelligenceService:
         return "equity"
 
     def _extract_account_hint(self, text: str) -> str:
-        match = re.search(r"(?:folio|account|demat)\s*(?:no|number|id)?\s*[:#-]?\s*([A-Z0-9-]{6,24})", text, re.IGNORECASE)
+        match = re.search(r"\b(?:folio|account|demat)\b[ \t]*(?:no\.?|number|id)?[ \t]*[:#-]?[ \t]*([A-Z0-9-]{6,24})\b", text, re.IGNORECASE)
         return (match.group(1) if match else "").strip()
 
     def _calculate_portfolio_risk_score(self, asset_breakdown: Dict, total_value: float) -> float:
