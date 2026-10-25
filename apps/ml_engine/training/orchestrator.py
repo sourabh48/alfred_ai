@@ -49,7 +49,7 @@ TRAINING_SPECS = [
         label="Expense forecaster",
         refresh_hours=12,
         minimum_samples=28,
-        fallback_mode="expense forecasts fall back to recent average and trend heuristics",
+        fallback_mode="next-debit estimates use the recent median of valid amounts when the learned artifact is unavailable or rejected; this is not a cash-flow forecast",
         sample_counter=lambda: Expense.objects.count(),
         trainer_path="apps.ml_engine.training.train_expense_lstm.train_expense_lstm",
         description="Predicts each user's next debit spending transaction, with chronological holdout and a recent-median baseline; this is not a daily cash-flow model.",
@@ -256,6 +256,30 @@ def training_health_snapshot() -> dict:
     }
 
 
+def serving_readiness_snapshot() -> dict:
+    """Public registry gates, not artifact execution or evidence of accuracy."""
+    models={item['model_key']:item for item in training_health_snapshot()['models']}
+    reasons={
+        'trained':'Registry gates passed; the inference adapter still validates the artifact before use.',
+        'trained_stale':'Freshness gates block learned inference.',
+        'trained_low_confidence':'Quality, confidence or artifact-presence gates block learned inference.',
+        'blocked':'The last training attempt failed; learned inference is blocked.',
+        'data_limited':'Recorded training evidence is below the required sample thresholds.',
+        'heuristic_fallback':'No eligible learned model is recorded.',
+        'planned':'No serving model is implemented for this planned capability.',
+    }
+    result=[]
+    for spec in TRAINING_SPECS:
+        item=models.get(spec.key,{})
+        level=item.get('maturity_level')
+        eligible=item.get('inference_ready') is True and level=='trained'
+        result.append(dict(key=spec.key,name=spec.label,registry_eligible=eligible,
+            status='registry_eligible' if eligible else 'fallback' if level in reasons else 'unavailable',
+            reason=reasons.get(level,'No registry-readiness evidence is available.'),fallback=spec.fallback_mode))
+    return dict(checked_at=timezone.now().isoformat(),models=result,
+        scope='Registry gates only. Eligibility does not prove that an artifact can execute, predictive accuracy, or calibrated confidence. Adapters revalidate before inference; deterministic fallbacks are estimates, not verified facts.')
+
+
 def _model_maturity_payload(state: AdaptiveModelState, spec: TrainingSpec | None) -> dict:
     minimum_samples = int(getattr(spec, "minimum_samples", 0) or 0)
     data_gap = max(minimum_samples - int(state.sample_count or 0), 0)
@@ -282,7 +306,7 @@ def _model_maturity_payload(state: AdaptiveModelState, spec: TrainingSpec | None
     if state.status == "skipped" and data_gap == 0:
         blockers.append("Training was skipped because the data spread, environment, or implementation is not ready.")
     if state.status == "ready" and not state.is_fresh:
-        blockers.append("Model artifact exists but its freshness window has elapsed.")
+        blockers.append("The model's recorded freshness is unavailable, future-dated or expired.")
     if state.status == "ready":
         blockers.extend(validation_blockers(state.model_key, state.sample_count, state.quality_score, state.confidence_estimate))
         if not state.artifact_path or not resolve_artifact_path(state.artifact_path).is_file():

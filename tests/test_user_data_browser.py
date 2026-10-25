@@ -772,6 +772,47 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('privateMemoryPanel').scrollIntoView({block:'start',behavior:'instant'})")
         self.capture('ui-b-memory-search-review-revocation')
 
+    def test_model_readiness_registry_fallback_privacy_refresh_and_unavailable(self):
+        from datetime import timedelta
+        from unittest.mock import Mock
+        from django.utils import timezone
+        from apps.ml_engine.models import AdaptiveModelState
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-readiness-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner',return_value=Mock()))
+        artifact=root/'SYNTHETIC-PRIVATE-ARTIFACT.pkl'; artifact.write_bytes(b'not a serving model')
+        state=AdaptiveModelState.objects.update_or_create(model_key='expense_forecaster',defaults=dict(
+            display_name='SYNTHETIC-PRIVATE-DISPLAY',status='ready',sample_count=80,quality_score=80,
+            confidence_estimate=80,artifact_path=str(artifact),notes='SYNTHETIC-PRIVATE-NOTE',
+            next_refresh_due_at=timezone.now()+timedelta(hours=12)))[0]
+        with patch('apps.ml_engine.api.views.run_training_cycle') as train, patch('joblib.load') as load:
+            self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
+            self.memory_click('#modelReadinessPanel summary')
+            self.wait.until(lambda _: 'Registry checked' in self.text('modelReadinessStatus'))
+            text=self.text('modelReadinessItems')
+            self.assertIn('Expense forecaster · Registry eligible',text)
+            self.assertIn('Fallback:',text); self.assertIn('recent median',text)
+            self.assertIn('does not prove',self.text('modelReadinessScope'))
+            self.assertNotIn('SYNTHETIC-PRIVATE',text); self.assertNotIn(str(root),text)
+            self.assertEqual(self.browser.find_elements(self.By.CSS_SELECTOR,'[data-ml-runtime-action]'),[])
+            self.capture('model-readiness-desktop')
+            state.next_refresh_due_at=timezone.now()-timedelta(seconds=1); state.save()
+            self.memory_click('#modelReadinessRefresh')
+            self.wait.until(lambda _: 'Expense forecaster · Fallback' in self.text('modelReadinessItems'))
+            self.assertIn('Freshness gates block',self.text('modelReadinessItems'))
+            self.browser.set_window_size(390,844)
+            self.browser.execute_script("document.getElementById('modelReadinessPanel').scrollIntoView({behavior:'instant',block:'start'})")
+            self.capture('model-readiness-390px')
+            self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+            with patch('apps.ml_engine.api.views.serving_readiness_snapshot',side_effect=RuntimeError('SYNTHETIC-PRIVATE-DIAGNOSTIC')):
+                self.memory_click('#modelReadinessRefresh')
+                self.wait.until(lambda _: 'Readiness is unknown' in self.text('modelReadinessStatus'))
+            self.assertEqual(self.text('modelReadinessItems'),'')
+            self.assertNotIn('SYNTHETIC-PRIVATE',self.text('modelReadinessStatus'))
+            train.assert_not_called(); load.assert_not_called()
+
     def test_assistant_responsive_keyboard_retry_and_new_conversation(self):
         from unittest.mock import Mock
         from selenium.webdriver.common.keys import Keys

@@ -35,6 +35,35 @@ document.addEventListener("DOMContentLoaded", () => {
     let active = true, generation = 0, cloudAvailable = false, pending = false;
     let historyPolicy = null, conversation = null, requestToken = null, historyBlocked = false;
     let sourceRequest = 0, picker = null;
+    const modelPanel=document.getElementById('modelReadinessPanel'), modelItems=document.getElementById('modelReadinessItems');
+    const modelStatus=document.getElementById('modelReadinessStatus'), modelRefresh=document.getElementById('modelReadinessRefresh');
+    let modelPending=false, modelLoaded=false;
+    async function refreshModelReadiness() {
+        if (!active || modelPending) return;
+        const ticket=generation;
+        modelPending=true; modelRefresh.disabled=true; modelItems.replaceChildren();
+        document.getElementById('modelReadinessScope').textContent='';
+        modelStatus.textContent='Checking local registry gates…'; modelPanel.setAttribute('aria-busy','true');
+        try {
+            const data=await Alfred.fetchJSON('/api/ai/runtime-status/?serving_readiness=1');
+            if (!active || ticket!==generation) return;
+            for (const item of data.models) {
+                const row=document.createElement('li'); row.className='mb-3';
+                const title=document.createElement('strong'); title.textContent=`${item.name} · ${item.registry_eligible ? 'Registry eligible' : item.status==='fallback' ? 'Fallback' : 'Unavailable'}`;
+                const reason=document.createElement('p'); reason.className='mb-1'; reason.textContent=item.reason;
+                const fallback=document.createElement('p'); fallback.className='small mb-0'; fallback.textContent=`Fallback: ${item.fallback}`;
+                row.append(title,reason,fallback); modelItems.append(row);
+            }
+            document.getElementById('modelReadinessScope').textContent=data.scope;
+            modelStatus.textContent=`Registry checked ${new Date(data.checked_at).toLocaleString()}. Recheck to see current gates.`; modelLoaded=true;
+        } catch(error) {
+            if (!active || ticket!==generation) return;
+            if ([401,403].includes(error.status)) forgetPrivatePage();
+            modelStatus.textContent=`${error.message} Readiness is unknown; no model was activated.`;
+        } finally { modelPending=false; modelRefresh.disabled=!active; modelPanel.setAttribute('aria-busy','false'); }
+    }
+    modelPanel.addEventListener('toggle',()=>{if(modelPanel.open && !modelLoaded) refreshModelReadiness();});
+    modelRefresh.addEventListener('click',refreshModelReadiness);
     function resetSources() {
         sourceRequest++; picker = null; sourcePanel.classList.add("d-none");
         sourceItems.replaceChildren(); sourceSelected.replaceChildren(); sourceStatus.textContent = "";
@@ -171,6 +200,8 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("intelligenceFinancialDocumentContext").textContent = "";
         historyList.replaceChildren(); historyTitle.value = ""; historyConsent.checked = false; historyDays.value = "7";
         query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false;
+        modelItems.replaceChildren(); modelLoaded=false; modelRefresh.disabled=true;
+        document.getElementById('modelReadinessScope').textContent=''; modelStatus.textContent='Reopen to check current registry gates.';
         feedback.textContent = ""; historyFeedback.textContent = ""; retry.hidden = true;
         document.getElementById("conversationHistoryStatus").textContent = "Checking local policy";
         updateHistoryControls(); consent.disabled = true;
@@ -516,6 +547,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     window.addEventListener("pageshow", event => {
         active = true;
-        if (event.persisted) refreshControls().catch(error => { if (active) feedback.textContent = error.message; });
+        if (event.persisted) {
+            modelRefresh.disabled=modelPending;
+            if (modelPanel.open) refreshModelReadiness();
+            refreshControls().catch(error => { if (active) feedback.textContent = error.message; });
+        }
     });
 });

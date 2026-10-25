@@ -35,10 +35,10 @@ def validation_blockers(model_key, sample_count, quality_score, confidence_estim
     minimum = MINIMUM_VALIDATION_SAMPLES.get(model_key, 40)
     if int(sample_count or 0) < minimum:
         blockers.append(f"Needs at least {minimum} samples for validation; a small pilot fit is not inference readiness.")
-    if not math.isfinite(float(quality_score or 0)) or float(quality_score or 0) < 50:
-        blockers.append("Holdout quality must reach 50/100 before inference is ready.")
-    if not math.isfinite(float(confidence_estimate or 0)) or float(confidence_estimate or 0) < 55:
-        blockers.append("Confidence must reach 55/100 before inference is ready.")
+    if not math.isfinite(float(quality_score or 0)) or not 50 <= float(quality_score or 0) <= 100:
+        blockers.append("Holdout quality must be within 50–100/100 before inference is ready.")
+    if not math.isfinite(float(confidence_estimate or 0)) or not 55 <= float(confidence_estimate or 0) <= 100:
+        blockers.append("Confidence must be within 55–100/100 before inference is ready.")
     if model_key in PROXY_TARGET_NOTES:
         blockers.append(PROXY_TARGET_NOTES[model_key])
     return blockers
