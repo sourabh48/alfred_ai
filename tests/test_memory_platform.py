@@ -42,6 +42,8 @@ class UnsupportedMemoryPlatformTests(TestCase):
         marker.write_bytes(b"SYNTHETIC-PRIVATE-DATA")
         self.client.force_login(self.owner)
         requests = (
+            ("get", "/api/investments/review-alerts/", None),
+            ("post", "/api/investments/review-alerts/", {"action":"configure","revision":0,"enabled":True,"days":30,"consent":True}),
             ("get", "/api/ai/memories/", None),
             ("post", "/api/ai/memories/", {"content": {"text": "SYNTHETIC-PRIVATE-DATA"},
                 "provenance": {"source": "synthetic"}, "verified": True}),

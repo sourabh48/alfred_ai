@@ -3186,6 +3186,46 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('balanceSheetPanel').scrollIntoView({behavior: 'instant', block: 'center'});")
         self.capture("vehicle-value-and-running-costs")
 
+    def test_investment_local_review_reminders_consent_reopen_lifecycle_and_privacy(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.investments.models import Investment
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-review-alert-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        holding=Investment.objects.create(user=self.scenario['user'],asset_type='equity',asset_name='Synthetic <img src=x onerror="window.reminderLeak=true">',current_value='123.45')
+        Investment.objects.filter(pk=holding.pk).update(updated_at=timezone.now()-timedelta(days=40))
+        self.login(); self.browser.get(self.live_server_url+'/investments/')
+        self.wait.until(lambda _: 'Reminders off' in self.text('investmentReviewStatus'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'investmentReviewEnabled').is_selected())
+        self.assertFalse(self.browser.find_element(self.By.ID,'investmentReviewCheck').is_enabled())
+        self.memory_click('#investmentReviewEnabled'); self.memory_click('#investmentReviewForm button[type="submit"]')
+        self.wait.until(lambda _: 'Reminders on' in self.text('investmentReviewStatus'))
+        self.memory_click('#investmentReviewCheck')
+        self.wait.until(lambda _: '· unread ·' in self.text('investmentReviewItems'))
+        self.assertIn('This does not verify its price',self.text('investmentReviewItems'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.reminderLeak)'))
+        self.assertIn(f'/investment/{holding.pk}/',self.browser.find_element(self.By.CSS_SELECTOR,'#investmentReviewItems a').get_attribute('href'))
+        self.browser.refresh(); self.wait.until(lambda _: '· unread ·' in self.text('investmentReviewItems'))
+        self.memory_click('#investmentReviewItems button')
+        self.wait.until(lambda _: '· read ·' in self.text('investmentReviewItems'))
+        self.memory_click('#investmentReviewItems button')
+        self.wait.until(lambda _: '· dismissed ·' in self.text('investmentReviewItems'))
+        self.memory_click('#investmentReviewCheck')
+        self.wait.until(lambda _: 'dismissed' in self.text('investmentReviewItems'))
+        self.capture('investment-review-reminders-desktop')
+        holding.save(update_fields=['updated_at'])
+        self.browser.refresh(); self.wait.until(lambda _: '· resolved ·' in self.text('investmentReviewItems'))
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('investmentReviewTitle').scrollIntoView({behavior:'instant',block:'start'})")
+        self.capture('investment-review-reminders-390px')
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        self.memory_click('#investmentReviewEnabled'); self.memory_click('#investmentReviewForm button[type="submit"]')
+        self.wait.until(lambda _: 'Reminders off' in self.text('investmentReviewStatus'))
+        self.assertEqual(self.text('investmentReviewItems'),'')
+        holding.refresh_from_db(); self.assertEqual(str(holding.current_value),'123.45')
+
     def test_investment_projection_starts_with_recorded_value_on_real_page(self):
         self.login()
         self.browser.get(self.live_server_url + "/investments/")

@@ -276,6 +276,9 @@ class MemoryStore:
             ConversationHistory(self)._clear(db, owner, disable=True)
             from .document_corpus import DocumentCorpus
             DocumentCorpus(self)._clear(db, owner)
+            state=self._sync_state(db,owner)
+            if state.pop('investment_record_review',None) is not None:
+                self._write_sync_state(db,owner,state)
             db.execute('INSERT INTO owner_epochs(owner,epoch) VALUES(?,1) ON CONFLICT(owner) DO UPDATE SET epoch=epoch+1', (owner,))
             self._sync_dirty(db, owner)
             identities = [r[0] for r in db.execute('SELECT id FROM memory_keys WHERE owner=?', (owner,))]
@@ -293,6 +296,13 @@ class MemoryStore:
             corpus = DocumentCorpus(self)
             for owner, in db.execute('SELECT DISTINCT owner FROM document_corpus').fetchall():
                 corpus._prune(db, owner)
+            from apps.investments.services.review_alerts import expire_review_alerts
+            for owner, in db.execute('SELECT owner FROM memory_sync').fetchall():
+                state=self._sync_state(db,owner)
+                policy=state.get('investment_record_review')
+                if policy is not None and expire_review_alerts(policy,datetime.now(timezone.utc)):
+                    policy['revision']+=1
+                    self._write_sync_state(db,owner,state)
             return expired
 
     def save_verified(self, user, content, provenance, *, sensitivity='sensitive', verified=False, supersedes=(), candidate_id=None):
