@@ -1,8 +1,69 @@
 # ALFRED Project Status
 
-**Only active overview, feature matrix, roadmap and continuation checkpoint. Updated 2026-10-25.**
+**Canonical original 143-capability inventory and acceptance evidence. Updated 2026-10-26.**
 
-## Resume here
+## Current execution
+
+Read [EXECUTION_STATE](EXECUTION_STATE.md) for the current task, refs, evidence and
+exact resume command. [Requirements](ALFRED_2_0_REQUIREMENTS.md) own product intent;
+[EXECUTION_QUEUE](EXECUTION_QUEUE.md) owns deterministic selection. `continue`
+resumes BOOTSTRAP-01 only; `next` selects a new task after completion or explicit
+deferral; `status` is read-only. No automatic feature switching.
+
+- **PR/CI:** PR #16 READY/unmerged; source 5af834c run 40215059904 passed backend/Selenium/Linux but failed native Axe at knowledgeHubPacks. Named-region repair passed 22 native checks, full automated Axe and two Chrome workflows locally; new-head CI pending commit/push. Review absent, protection 403, Pages approval absent; no merge/publication.
+- **Current task:** BOOTSTRAP-01 — accessible Hub region and permanent execution documentation. Interrupted TRAVEL-09 provider edits are safely parked, untested and deferred; see EXECUTION_STATE. Do not activate Hub Git sync.
+
+<!-- BEGIN STATUS DASHBOARD -->
+**Baseline: 75/143 (52.4%) verified.**
+
+IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
+
+PR/CI: PR #16 READY/unmerged; source 5af834c run 40215059904 passed backend/Selenium/Linux but failed native Axe at knowledgeHubPacks. Named-region repair passed 22 native checks, full automated Axe and two Chrome workflows locally; new-head CI pending commit/push. Review absent, protection 403, Pages approval absent; no merge/publication.
+
+Extensions: **0/13 accepted**; separate source-bound story ledger.
+
+| Module | Verified | Total | Verified % | Unaccepted | Partial | Missing | Approval | External |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| FIN | 11 | 17 | 64.7 | 0 | 4 | 2 | 0 | 0 |
+| LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
+| INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
+| DOC | 7 | 9 | 77.8 | 0 | 2 | 0 | 0 | 0 |
+| AI | 11 | 18 | 61.1 | 3 | 2 | 2 | 0 | 0 |
+| CAREER | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
+| TRAVEL | 10 | 23 | 43.5 | 2 | 5 | 3 | 0 | 3 |
+| FAMILY | 4 | 7 | 57.1 | 3 | 0 | 0 | 0 | 0 |
+| BIKE | 2 | 6 | 33.3 | 2 | 2 | 0 | 0 | 0 |
+| COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
+| OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
+| SYNC | 7 | 11 | 63.6 | 0 | 0 | 2 | 2 | 0 |
+| RUNTIME | 6 | 16 | 37.5 | 7 | 1 | 0 | 2 | 0 |
+<!-- END STATUS DASHBOARD -->
+
+## Separate 2.0 acceptance ledger
+
+Only these explicit enhancement stories contribute to the separate extension
+metric. Definitions/dependencies are in the requirements; shared work counts once.
+Change a status to ACCEPTED only with source-bound backend/UI/privacy evidence.
+
+<!-- BEGIN EXTENSION ACCEPTANCE -->
+| Extension | Status | Evidence |
+| --- | --- | --- |
+| CAREER2-001 | UNACCEPTED | No full-story acceptance recorded. |
+| CAREER2-002 | UNACCEPTED | No full-story acceptance recorded. |
+| TRAVEL2-001 | UNACCEPTED | No full-story acceptance recorded. |
+| TRAVEL2-002 | UNACCEPTED | No full-story acceptance recorded. |
+| TRAVEL2-003 | UNACCEPTED | No full-story acceptance recorded. |
+| TRAVEL2-004 | UNACCEPTED | No full-story acceptance recorded. |
+| TRAVEL2-005 | UNACCEPTED | No full-story acceptance recorded. |
+| INVEST2-001 | UNACCEPTED | No full-story acceptance recorded. |
+| INVEST2-002 | UNACCEPTED | No full-story acceptance recorded. |
+| WEALTH2-001 | UNACCEPTED | No full-story acceptance recorded. |
+| WEALTH2-002 | UNACCEPTED | No full-story acceptance recorded. |
+| WEALTH2-003 | UNACCEPTED | No full-story acceptance recorded. |
+| WEALTH2-004 | UNACCEPTED | No full-story acceptance recorded. |
+<!-- END EXTENSION ACCEPTANCE -->
+
+## Historical checkpoints (newest first)
 
 - **INTELLIGENCE HUB / LOCAL ACCEPTANCE — 2026-10-25:** HEAD = this checkpoint commit, base `f1fe646f56e3b8ce6b01a0f8cc14de940b4ebf28`, branch `development/alfred-integrated`. Recovery: clean/pushed source and previous receipt hashes matched. PR #16 READY/unmerged; prior source `f1fe646`, run `40211272570`: Linux/native-Windows/Selenium PASS. Independent reviews absent, protection read 403, Pages publishing unapproved. No merge, permission bypass, deployment or publication. New-head remote CI is recorded separately in `artifacts/intelligence-hub-f1fe646/boundary/checkpoint.json` after push; prior-source green is not new-source CI.
   DONE: Settings/Memory now includes an Intelligence Hub using existing `MemoryLearning`, `MemoryStore`, DPAPI wrapping, protected owner sync keys, retention, transactions and native lifecycle hooks. Existing encrypted candidates retain deduplication, evidence, unverified confidence and expiry; a coalesced encrypted learning revision/checkpoint survives interruption without authorizing uploads. Separately encrypted packs require local opt-in, explicit public source selection, bounded privacy/instruction screening and human confirmation of the exact content digest. Source fingerprints, citations, expiry, version parents and transaction checks reject stale/foreign/changed/conflicting promotions. They are supplementary reviewed data only: no automatic verified-memory import, training, model/registry changes, code execution or financial writes. A no-ORM-write lifecycle regression passes. Account reset clears local packs/consent; generation checks refuse old remote resurrection. Existing document/candidate/memory privacy remains intact.

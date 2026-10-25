@@ -1,0 +1,56 @@
+diff --git a/apps/mobility/services/travel/providers/places.py b/apps/mobility/services/travel/providers/places.py
+index ad118d0..b4c493e 100644
+--- a/apps/mobility/services/travel/providers/places.py
++++ b/apps/mobility/services/travel/providers/places.py
+@@ -13,7 +13,7 @@ class OverpassPlaces(Provider):
+     attribution = "© OpenStreetMap contributors, ODbL; opening/access tags may be outdated"
+     ttl = timedelta(days=7)
+     min_interval = 1
+-    allowed_parameters = {"latitude", "longitude", "radius_m", "categories"}
++    allowed_parameters = {"latitude", "longitude", "radius_m", "categories", "centres"}
+     filters = {"attraction": 'tourism~"attraction|viewpoint|museum"', "camping": 'tourism="camp_site"',
+                "fuel": 'amenity="fuel"', "hospital": 'amenity="hospital"', "restaurant": 'amenity="restaurant"',
+                "service": 'shop~"motorcycle_repair|car_repair"', "permit_office": 'office="forestry"'}
+@@ -35,13 +35,15 @@ class OverpassPlaces(Provider):
+         return ""
+
+     def fetch(self, p):
+-        lat = number(p["latitude"], low=-90, high=90)
+-        lon = number(p["longitude"], low=-180, high=180)
++        centres = p.get('centres', [[p.get('latitude'), p.get('longitude')]])
++        if not isinstance(centres, list) or not 1 <= len(centres) <= 3 or any(not isinstance(c, list) or len(c) != 2 for c in centres):
++            raise ProviderError('unsupported_corridor_samples')
++        centres = [(number(c[0], low=-90, high=90), number(c[1], low=-180, high=180)) for c in centres]
+         radius = int(number(p.get("radius_m", 15000), low=100, high=25000))
+         categories = sorted(set(p.get("categories", ["attraction", "camping", "fuel", "hospital", "service"])))
+         if not categories or any(c not in self.filters for c in categories):
+             raise ProviderError("unsupported_poi_category")
+-        clauses = "".join(f"nwr[{self.filters[c]}](around:{radius},{lat},{lon});" for c in categories)
++        clauses = "".join(f"nwr[{self.filters[c]}](around:{radius},{lat},{lon});" for lat, lon in centres for c in categories)
+         query = f"[out:json][timeout:12][maxsize:16777216];({clauses});out center 100;"
+         return request_json("POST", os.environ["TRAVEL_OVERPASS_URL"], data={"data": query},
+             headers={"User-Agent": "ALFRED-travel/1.2 (+https://github.com/sourabh48/alfred_ai)"})
+diff --git a/apps/mobility/services/travel/providers/routing.py b/apps/mobility/services/travel/providers/routing.py
+index a571d96..8982f9b 100644
+--- a/apps/mobility/services/travel/providers/routing.py
++++ b/apps/mobility/services/travel/providers/routing.py
+@@ -21,7 +21,7 @@ class OpenRouteService(Provider):
+     attribution = "© openrouteservice by HeiGIT, CC BY-SA 4.0 | Data © OpenStreetMap contributors"
+     ttl = timedelta(days=5)
+     version = 3  # Route identities and alternative requests need separate cache entries.
+-    allowed_parameters = {"start", "end", "mode", "avoid_expressways", "avoid_tolls", "preference", "alternatives"}
++    allowed_parameters = {"start", "end", "mode", "avoid_expressways", "avoid_tolls", "preference", "alternatives", "via"}
+
+     def unavailable_reason(self):
+         return "" if os.getenv("TRAVEL_ORS_API_KEY") else "missing_TRAVEL_ORS_API_KEY"
+@@ -32,6 +32,10 @@ class OpenRouteService(Provider):
+             raise ProviderError("transport_profile_unsupported")
+         profile = "foot-walking" if mode == "walking" else "driving-car"
+         coordinates = [_coordinate(point) for point in (p["start"],p["end"])]
++        if "via" in p:
++            if not isinstance(p['via'], list) or len(p['via']) != 1 or p.get('alternatives'):
++                raise ProviderError('unsupported_route_waypoint')
++            coordinates.insert(1, _coordinate(p['via'][0]))
+         avoid = []
+         if p.get("avoid_expressways") and profile == "driving-car":
+             avoid.append("highways")

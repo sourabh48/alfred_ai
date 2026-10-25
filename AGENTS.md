@@ -1,5 +1,29 @@
 # Local Hosting Guidance
 
+## Codex execution protocol
+
+- Start with `docs/EXECUTION_STATE.md`, `git status -sb` and actual HEAD. Read
+  relevant `docs/ALFRED_2_0_REQUIREMENTS.md` and queued task scope before editing.
+- `continue`: resume the current incomplete step; if finished, report
+  READY_FOR_NEXT and stop. Never select another task automatically.
+- `next`: finish/checkpoint or explicitly defer the current task, then select one
+  eligible task from `docs/EXECUTION_QUEUE.md`; stop when completed or blocked.
+- `status`: read-only Git/PR/task/baseline/extensions/blocker report; no mutations.
+- Follow phases IMPLEMENTED_NOT_ACCEPTED → PARTIALLY_IMPLEMENTED → BLOCKED
+  (approval/external) → NOT_IMPLEMENTED, module-by-module. Skip only actual
+  blockers; document later-phase prerequisite exceptions. Do not repeat verified work.
+- PROJECT_STATUS owns exactly 143 original IDs and evidence; requirements own
+  intent, the queue owns selection, EXECUTION_STATE owns the compact checkpoint.
+  New 2.0 stories have a separate ledger. Never inflate verification from source presence.
+- Persist weighted progress/evidence/refs/dirty work/next command after milestones
+  and before interruption. Preserve uncertain/uncommitted work and staging choices.
+- Run `scripts/project_execution.py --check` with the configured SDK after tracker
+  changes; use `--write` only for its generated views. Do not regenerate unrelated docs.
+- No production, Pages/protection change, unapproved merge, private history/upload,
+  paid/new credentials, currency/valuation change, privileged runtime change,
+  destructive operation or security/AI weakening without explicit approval.
+  Private knowledge Git sync stays disabled. Source acceptance is not release approval.
+
 - ALFRED is a local or LAN-hosted application in this repository.
 - Do not add cloud deployment wiring, cloud credentials, or cloud-specific
   runtime templates without an explicit new decision.
