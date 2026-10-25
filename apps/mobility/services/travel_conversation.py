@@ -16,7 +16,7 @@ from apps.expenses.money import money_float
 from apps.mobility.models import BikeProfile, TravelMessage, TravelPlan, TravelPlanningSession
 from .travel_catalog import ALIASES, CITIES, DESTINATIONS, lookup
 from .travel_discovery import budget_for, candidates_for, fact, learn, profile_for, value
-from .travel_itinerary import build_itinerary, edit_itinerary
+from .travel_itinerary import build_itinerary, build_multi_stop_itinerary, edit_itinerary
 from .travel_research import queue_research
 
 STYLE_WORDS = {
@@ -219,7 +219,7 @@ def vehicle_state(session):
     if bike:
         from .travel.bike import bike_context
         context = bike_context(bike, end_date=value(session.state, "available_end_date"),
-                               distance_km=(session.itinerary.get("route", {}).get("distance_km_one_way") or 0)*2)
+                               distance_km=session.itinerary.get("route", {}).get("distance_km_total") or (session.itinerary.get("route", {}).get("distance_km_one_way") or 0)*2)
         session.state["vehicle_condition"] = fact(context, "vehicle_records", True)
         for field in ("fuel_price_per_litre", "fuel_price_date"):
             if context.get(field) is not None:
@@ -260,11 +260,33 @@ def send_message(session_id, user, text):
     text = str(text).strip()
     if not text or len(text) > 2000:
         raise ValidationError("Send a message of 1–2,000 characters.")
+    if text.casefold() in {"show more destinations", "previous destinations"}:
+        from .travel_research import TERMINAL
+        TravelMessage.objects.create(session=session, role="user", text=text)
+        if session.research_runs.filter(revision=session.revision).exclude(status__in=TERMINAL).exists():
+            say(session, "Your current research is still queued or running. Wait before changing batches.")
+            return session
+        pool = value(session.state, "_destination_pool", [])
+        previous = text.casefold().startswith("previous")
+        current_offset = value(session.state, "_destination_offset", 0)
+        offset = max(0, current_offset-3) if previous else current_offset+3
+        if (value(session.state, "selected_destination") and not value(session.state, "_itinerary_stops")) or offset == current_offset or not 0 <= offset < len(pool):
+            say(session, "No further destination batch is available. Change your trip preferences to start a new search.")
+            return session
+        session.revision += 1
+        session.save(update_fields=["revision", "updated_at"])
+        queue_research(session, batch_offset=offset)
+        say(session, "The requested batch is saved and queued. Selection is unchanged; availability and access still need verification.")
+        return session
     old_state = deepcopy(session.state)
     session.state, notes = extract(session.state, text)
+    for stop in value(session.state, "_itinerary_stops", []):
+        if any(str(term).casefold() in stop["name"].casefold() for term in value(session.state, "must_avoid", [])):
+            raise ValidationError("Remove the destination from your ordered stops before excluding it from the trip.")
     if value(session.state,"requested_destination") != value(old_state,"requested_destination") and value(session.state,"requested_destination"):
         if value(session.state,"selected_destination") != value(session.state,"requested_destination"):
             session.itinerary = {}
+            session.state.pop("_itinerary_stops", None)
             session.state.pop("selected_destination",None)
             session.state.pop("selected_location",None)
     timing_changed = any(value(session.state,k) != value(old_state,k) for k in ("available_start_date", "available_end_date", "trip_duration"))
@@ -278,21 +300,35 @@ def send_message(session_id, user, text):
         if session.itinerary:
             old_itinerary = invalidate_trip_dates(session.itinerary)
             selected = next((c for c in session.candidates if c["name"] == value(session.state, "selected_destination")), None)
-            session.itinerary = build_itinerary(session.state, selected) if selected else old_itinerary
-            if len(old_itinerary["days"]) == len(session.itinerary["days"]):
+            stops = value(session.state, "_itinerary_stops", [])
+            if stops:
+                stops = [invalidate_trip_dates(s) for s in stops]
+                session.state["_itinerary_stops"] = fact(stops)
+            if len(stops) > 1:
+                session.itinerary = build_multi_stop_itinerary(session.state, stops)
+            else:
+                session.itinerary = build_itinerary(session.state, stops[0] if stops else selected) if selected or stops else old_itinerary
+            price_inputs = ("origin", "transport_mode", "number_of_travelers", "budget", "budget_scope", "budget_type", "vehicle_mileage", "fuel_price_per_litre")
+            if len(old_itinerary["days"]) == len(session.itinerary["days"]) and all(value(old_state, k) == value(session.state, k) for k in price_inputs):
                 start = value(session.state, "available_start_date")
                 for index, day in enumerate(old_itinerary["days"]):
                     day["date"] = str(date.fromisoformat(start) + timedelta(days=index)) if start else None
                 session.itinerary["days"] = old_itinerary["days"]
                 session.itinerary["budget"] = old_itinerary["budget"]
                 session.itinerary["edits"] = old_itinerary["edits"]
-            if not selected:
+            if not selected and not stops:
                 session.itinerary.setdefault("checks", []).append("Dates changed; rebuild and review the duration and budget before saving.")
                 session.itinerary["external_links"] = external_links(session.state, {"name": session.itinerary.get("destination")})
     TravelMessage.objects.create(session=session, role="user", text=text)
     lower = text.lower()
     if session.state != old_state:
+        session.state.pop("_destination_pool", None)
+        session.state.pop("_destination_offset", None)
         session.revision += 1
+        stops = value(session.state, "_itinerary_stops", [])
+        if stops and not timing_changed:
+            # Changed travel inputs must not leave an old multi-stop price or activity plan.
+            session.itinerary = build_multi_stop_itinerary(session.state, stops) if len(stops) > 1 else build_itinerary(session.state, stops[0])
     for key in ([] if session.itinerary else value(session.state, "preferred_trip_style", [])):
         if key not in value(old_state, "preferred_trip_style", []):
             learn(user, key, True, "Explicit statement: "+text[:160], 1, True)
@@ -378,6 +414,7 @@ def send_message(session_id, user, text):
         session.save()
         return session
     if choice:
+        session.state.pop("_itinerary_stops", None)
         from .travel.discovery import remember
         remember(user,choice,"accepted")
         session.state["selected_destination"] = fact(choice["name"])
@@ -392,11 +429,12 @@ def send_message(session_id, user, text):
             + (f"target ₹{value(session.state, 'budget'):,.0f}. " if value(session.state, "budget") else "with your chosen budget style. ")
             + "Shall I build the full itinerary?", ["Build itinerary", "Compare again", "Adjust budget", "Change dates"])
     elif lower in {"build itinerary", "build the itinerary"}:
+        stops = value(session.state, "_itinerary_stops", [])
         selected = next((c for c in session.candidates if c["name"] == value(session.state, "selected_destination")), None)
-        if not selected:
+        if not selected and not stops:
             say(session, "Choose a destination first, then I'll build one detailed itinerary.")
         else:
-            session.itinerary = build_itinerary(session.state, selected)
+            session.itinerary = build_multi_stop_itinerary(session.state, stops) if len(stops) > 1 else build_itinerary(session.state, stops[0] if stops else selected)
             session.status = "ready"
             say(session, "Your flexible itinerary is ready. Review the day-by-day plan, budget and verification notes. Tell me what to change.",
                 ["Make day 2 relaxed", "Reduce the budget", "Add one waterfall"])

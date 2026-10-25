@@ -259,6 +259,131 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('budgetForecastEvidence').scrollIntoView({behavior:'instant',block:'start'});")
         self.capture("cashflow-forecast-unavailable-mobile")
 
+    def test_manual_recruiter_selected_resume_attachment_retry_and_correction(self):
+        from django.utils import timezone
+        from apps.career.models import CareerJobAnalysis, CareerResume
+        from tests.test_career_matching_acceptance import JD, RESUME, offline_career
+        from rest_framework.exceptions import APIException
+        from selenium.webdriver.support.ui import Select
+        from apps.expenses.models import BankAccount
+        from apps.investments.models import Investment
+        from apps.loans.models import Loan
+        offline_career(self)
+        owner = self.scenario["user"]
+        resume = CareerResume.objects.create(user=owner, parser_status="parsed",
+            file_name='synthetic-<img src=x onerror="window.__recruiterXss=1">.txt', extracted_payload=RESUME)
+        CareerResume.objects.create(user=owner, parser_status="needs_review",
+            file_name="newer-unrelated.txt", extracted_payload={"skills": ["Excel"]})
+        foreign = get_user_model().objects.create_user(username="recruiter-foreign")
+        CareerResume.objects.create(user=foreign, parser_status="parsed",
+            file_name="FOREIGN-PRIVATE-RESUME.txt", extracted_payload={"skills": ["SECRET"]})
+        financial_models = (Expense, BankAccount, Investment, Loan)
+        finance_before = [list(model.objects.values()) for model in financial_models]
+        directory = Path(self.enterContext(TemporaryDirectory(prefix="alfred-recruiter-browser-")))
+        attachment = directory / "synthetic-jd.txt"
+        attachment.write_text(JD, encoding="utf-8")
+        self.login(); self.browser.get(self.live_server_url + "/career/")
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, "careerRecruiterResume").get_attribute("disabled"))
+        select = Select(self.browser.find_element(self.By.ID, "careerRecruiterResume"))
+        self.assertNotIn("FOREIGN-PRIVATE", " ".join(item.text for item in select.options))
+        select.select_by_value(str(resume.pk))
+        message = self.browser.find_element(self.By.ID, "careerRecruiterText")
+        message.send_keys("Please review the attached opportunity.")
+        self.browser.find_element(self.By.ID, "careerRecruiterFile").send_keys(str(attachment))
+        count = CareerJobAnalysis.objects.filter(user=owner).count()
+        unavailable = APIException("Synthetic local parser unavailable; retry the retained inputs.")
+        unavailable.status_code = 503
+        with patch("apps.career.views.job_intelligence.parse_recruiter_message", side_effect=unavailable):
+            self.memory_click('#careerRecruiterForm button[type="submit"]')
+            self.wait.until(lambda _: "Synthetic local parser unavailable" in self.text("careerRecruiterFeedback"))
+        self.assertEqual(message.get_attribute("value"), "Please review the attached opportunity.")
+        self.assertIn(attachment.name, self.browser.find_element(self.By.ID, "careerRecruiterFile").get_attribute("value"))
+        self.assertEqual(CareerJobAnalysis.objects.filter(user=owner).count(), count)
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, '#careerRecruiterForm button[type="submit"]').is_enabled())
+        self.memory_click('#careerRecruiterForm button[type="submit"]')
+        self.wait.until(lambda _: "Rule-based fit score 80" in self.text("careerJobMatchPanel"))
+        self.assertEqual(CareerJobAnalysis.objects.filter(user=owner).count(), count + 1)
+        row = CareerJobAnalysis.objects.filter(user=owner).latest("id")
+        captured_source = row.extracted_payload["fit"]["sources"][0]
+        self.assertEqual(captured_source["record_id"], resume.pk)
+        self.assertEqual(self.browser.find_element(self.By.ID, "careerRecruiterResume").get_attribute("value"), str(resume.pk))
+        self.memory_click('[data-fit-sources] summary')
+        panel = self.text("careerJobMatchPanel")
+        self.assertIn(resume.file_name, panel)
+        self.assertIn(attachment.name, panel)
+        self.assertIn("React", panel)
+        self.assertIn("not a hiring probability", panel)
+        self.assertFalse(self.browser.execute_script("return Boolean(window.__recruiterXss)"))
+        self.capture("manual-recruiter-selected-sources-desktop")
+        self.browser.set_window_size(390, 844)
+        self.browser.execute_script("document.getElementById('careerRecruiterResume').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth + 1"))
+        self.capture("manual-recruiter-selected-resume-narrow")
+        self.browser.set_window_size(1440, 1200)
+
+        # Synthetic needs-review state exercises the same Document Center controls used after weak extraction.
+        CareerJobAnalysis.objects.filter(pk=row.pk).update(parser_status="needs_review")
+        resume.extracted_payload = {"skills": ["NEW-UNRELATED"]}; resume.save()
+        self.browser.get(self.live_server_url + "/documents/")
+        form_id = f"review-form-recruiter_document-{row.pk}"
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, form_id))
+        self.memory_click(f'[onclick="retryReviewItem(\'recruiter_document\', {row.pk})"]')
+        self.wait.until(lambda _: CareerJobAnalysis.objects.get(pk=row.pk).extracted_payload.get("background_retry", {}).get("retry_count") == 1)
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "documentCenterRoot").get_attribute("data-page-busy") != "true")
+        row.refresh_from_db()
+        self.assertEqual(row.available_fit_score, 80)
+        self.assertEqual(row.extracted_payload["fit"]["sources"][0], captured_source)
+        CareerJobAnalysis.objects.filter(pk=row.pk).update(parser_status="needs_review", updated_at=timezone.now())
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, form_id))
+        self.memory_click(f'details[data-review-key="recruiter_document:{row.pk}"] > summary')
+        field = self.browser.find_element(self.By.CSS_SELECTOR, f'#{form_id} [name="company"]')
+        field.clear(); field.send_keys("Corrected Synthetic Employer")
+        self.memory_click(f'#{form_id} button[type="submit"]')
+        self.wait.until(lambda _: CareerJobAnalysis.objects.get(pk=row.pk).company == "Corrected Synthetic Employer")
+        row.refresh_from_db()
+        self.assertEqual(row.extracted_payload["fit"]["sources"][0], captured_source)
+        self.assertIn("React", row.extracted_payload["job_snapshot"]["required_skills"])
+        self.capture("manual-recruiter-corrected-document")
+        self.browser.get(self.live_server_url + "/career/")
+        self.wait.until(lambda _: "Corrected Synthetic Employer" in self.text("careerJobMatchPanel"))
+        self.assertEqual(finance_before, [list(model.objects.values()) for model in financial_models])
+
+    def test_manual_recruiter_resume_list_unavailable_preserves_inputs_and_recovers(self):
+        from apps.career.models import CareerJobAnalysis, CareerResume
+        from apps.career.services import job_intelligence
+        from tests.test_career_matching_acceptance import JD, RESUME, offline_career
+        from rest_framework.exceptions import APIException
+        from selenium.webdriver.support.ui import Select
+        offline_career(self)
+        resume = CareerResume.objects.create(user=self.scenario["user"], parser_status="parsed",
+            file_name="synthetic-selected.txt", extracted_payload=RESUME)
+        self.login(); self.browser.get(self.live_server_url + "/career/")
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, "careerRecruiterResume").get_attribute("disabled"))
+        field = self.browser.find_element(self.By.ID, "careerRecruiterText")
+        field.send_keys("Synthetic retained recruiter text")
+        with patch("apps.career.views.CareerResumeListView.get", side_effect=APIException("Synthetic list unavailable")):
+            self.memory_click("#careerRecruiterResumeReload")
+            self.wait.until(lambda _: "Resume list unavailable" in self.text("careerRecruiterResumeStatus"))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, '#careerRecruiterForm button[type="submit"]').is_enabled())
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, '#careerJobMatchForm button[type="submit"]').is_enabled())
+        self.assertEqual(field.get_attribute("value"), "Synthetic retained recruiter text")
+        self.memory_click("#careerRecruiterResumeReload")
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, "careerRecruiterResume").get_attribute("disabled"))
+        self.assertIn(resume.file_name, self.browser.find_element(self.By.ID, "careerRecruiterResume").text)
+        self.assertEqual(field.get_attribute("value"), "Synthetic retained recruiter text")
+        CareerResume.objects.create(user=self.scenario["user"], parser_status="needs_review",
+            file_name="newer-unrelated.txt", extracted_payload={"skills": ["Excel"]})
+        Select(self.browser.find_element(self.By.ID, "careerRecruiterResume")).select_by_value(str(resume.pk))
+        self.browser.find_element(self.By.CSS_SELECTOR, '#careerJobMatchForm [name="job_url"]').send_keys("https://example.org/synthetic-job")
+        with patch("apps.career.views.job_intelligence.parse_job_page", return_value=job_intelligence.parse_recruiter_message(JD)):
+            self.memory_click('#careerJobMatchForm button[type="submit"]')
+            self.wait.until(lambda _: "Job link analyzed" in self.text("careerJobFeedback"))
+        row = CareerJobAnalysis.objects.filter(user=self.scenario["user"]).latest("id")
+        self.assertEqual(row.extracted_payload["fit"]["sources"][0]["record_id"], resume.pk)
+        self.assertEqual(row.available_fit_score, 80)
+        self.wait.until(lambda _: "Rule-based fit score 80" in self.text("careerJobMatchPanel"))
+
     def test_career_decimal_salary_save_and_reload_preserves_experience(self):
         from decimal import Decimal
         from apps.career.models import CareerProfile
@@ -336,6 +461,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.ID,'memoryEvaluationQuery').get_property('value'),'')
 
     def test_reviewed_synthetic_model_comparison_verdict_metrics_outage_and_mobile(self):
+        # This tests rendered synthetic reports; current-source eligibility is tested separately.
+        from apps.ml_engine.services.retrieval_holdout import RAW
+        self.enterContext(patch('apps.ml_engine.services.retrieval_holdout.cohort',return_value=json.loads(RAW)))
         from selenium.webdriver.support.ui import Select
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
         from apps.ml_engine.services.retrieval_quality import compare, MODELS
@@ -769,6 +897,47 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('privateMemoryPanel').scrollIntoView({block:'start',behavior:'instant'})")
         self.capture('ui-b-memory-search-review-revocation')
 
+    def test_model_readiness_registry_fallback_privacy_refresh_and_unavailable(self):
+        from datetime import timedelta
+        from unittest.mock import Mock
+        from django.utils import timezone
+        from apps.ml_engine.models import AdaptiveModelState
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-readiness-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner',return_value=Mock()))
+        artifact=root/'SYNTHETIC-PRIVATE-ARTIFACT.pkl'; artifact.write_bytes(b'not a serving model')
+        state=AdaptiveModelState.objects.update_or_create(model_key='expense_forecaster',defaults=dict(
+            display_name='SYNTHETIC-PRIVATE-DISPLAY',status='ready',sample_count=80,quality_score=80,
+            confidence_estimate=80,artifact_path=str(artifact),notes='SYNTHETIC-PRIVATE-NOTE',
+            next_refresh_due_at=timezone.now()+timedelta(hours=12)))[0]
+        with patch('apps.ml_engine.api.views.run_training_cycle') as train, patch('joblib.load') as load:
+            self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
+            self.memory_click('#modelReadinessPanel summary')
+            self.wait.until(lambda _: 'Registry checked' in self.text('modelReadinessStatus'))
+            text=self.text('modelReadinessItems')
+            self.assertIn('Expense forecaster · Registry eligible',text)
+            self.assertIn('Fallback:',text); self.assertIn('recent median',text)
+            self.assertIn('does not prove',self.text('modelReadinessScope'))
+            self.assertNotIn('SYNTHETIC-PRIVATE',text); self.assertNotIn(str(root),text)
+            self.assertEqual(self.browser.find_elements(self.By.CSS_SELECTOR,'[data-ml-runtime-action]'),[])
+            self.capture('model-readiness-desktop')
+            state.next_refresh_due_at=timezone.now()-timedelta(seconds=1); state.save()
+            self.memory_click('#modelReadinessRefresh')
+            self.wait.until(lambda _: 'Expense forecaster · Fallback' in self.text('modelReadinessItems'))
+            self.assertIn('Freshness gates block',self.text('modelReadinessItems'))
+            self.browser.set_window_size(390,844)
+            self.browser.execute_script("document.getElementById('modelReadinessPanel').scrollIntoView({behavior:'instant',block:'start'})")
+            self.capture('model-readiness-390px')
+            self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+            with patch('apps.ml_engine.api.views.serving_readiness_snapshot',side_effect=RuntimeError('SYNTHETIC-PRIVATE-DIAGNOSTIC')):
+                self.memory_click('#modelReadinessRefresh')
+                self.wait.until(lambda _: 'Readiness is unknown' in self.text('modelReadinessStatus'))
+            self.assertEqual(self.text('modelReadinessItems'),'')
+            self.assertNotIn('SYNTHETIC-PRIVATE',self.text('modelReadinessStatus'))
+            train.assert_not_called(); load.assert_not_called()
+
     def test_assistant_responsive_keyboard_retry_and_new_conversation(self):
         from unittest.mock import Mock
         from selenium.webdriver.common.keys import Keys
@@ -958,19 +1127,20 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def test_login_limit_shows_feedback_then_recovers_after_window(self):
         from datetime import timedelta
         from django.utils import timezone
-        from selenium.webdriver.support import expected_conditions as EC
         now = timezone.now()
         with override_settings(ALFRED_LOGIN_ACCOUNT_LIMIT=1), patch('django.utils.timezone.now', return_value=now):
             self.browser.get(self.live_server_url + '/login/')
             self.browser.find_element(self.By.NAME, 'username').send_keys('acceptance_demo')
             self.browser.find_element(self.By.NAME, 'password').send_keys('synthetic-wrong-password')
             self.browser.find_element(self.By.CSS_SELECTOR, 'button[type="submit"]').click()
-            self.wait.until(EC.text_to_be_present_in_element((self.By.TAG_NAME, 'body'), 'Invalid username or password'))
+            self.wait.until(lambda _: self.browser.execute_script(
+                'return document.body && document.body.innerText.includes(arguments[0])', 'Invalid username or password'))
             self.browser.get(self.live_server_url + '/login/')
             self.browser.find_element(self.By.NAME, 'username').send_keys('acceptance_demo')
             self.browser.find_element(self.By.NAME, 'password').send_keys(PASSWORD)
             self.browser.find_element(self.By.CSS_SELECTOR, 'button[type="submit"]').click()
-            self.wait.until(EC.text_to_be_present_in_element((self.By.TAG_NAME, 'body'), 'Too many requests'))
+            self.wait.until(lambda _: self.browser.execute_script(
+                'return document.body && document.body.innerText.includes(arguments[0])', 'Too many requests'))
             self.capture('m14-login-limit-feedback')
         with patch('django.utils.timezone.now', return_value=now + timedelta(seconds=601)):
             self.login()
@@ -1708,6 +1878,35 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             service.review(owner,document.pk,record.pk,revision=detail['revision'],fields=['current_value'],confirm=True)
         return document,records,service,local
 
+    def test_financial_source_discovery_survives_cloud_policy_outage_but_not_permission_loss(self):
+        import sqlite3
+        from rest_framework.exceptions import NotAuthenticated, PermissionDenied
+        from apps.ml_engine.api.memory import MemoryReasoningAPI
+
+        with patch.object(MemoryReasoningAPI, 'get', side_effect=sqlite3.OperationalError('synthetic-policy-storage-failure')):
+            row,documents,service,local=self.financial_source_selection_fixture('investment')
+            self.assertIn('Cloud policy unavailable',self.text('intelligenceCloudStatus'))
+            self.assertIn('Private memory is unavailable',self.text('intelligenceFeedback'))
+            consent=self.browser.find_element(self.By.ID,'intelligenceCloudConsent')
+            self.assertTrue(consent.get_property('disabled')); self.assertFalse(consent.is_selected())
+            self.memory_click('#intelligenceSourcesNext')
+            self.wait.until(lambda _: 'Page 2' in self.text('intelligenceSourcesStatus'))
+            links=self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceSourceItems a')
+            self.assertEqual(len(links),2)
+            self.assertTrue(all(f'/records/{row.pk}/' in link.get_attribute('href') for link in links))
+            self.assertFalse(self.browser.find_element(self.By.ID,'conversationHistoryConsent').is_enabled())
+            local.reason.assert_not_called()
+            self.capture('financial-source-policy-outage')
+
+        for error in (NotAuthenticated('synthetic-session-expired'),PermissionDenied('synthetic-policy-denied')):
+            with self.subTest(error=type(error).__name__), patch.object(MemoryReasoningAPI,'get',side_effect=error):
+                self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=investment&record_id={row.pk}')
+                self.wait.until(lambda _: 'Sign in or reload' in self.text('intelligenceFeedback'))
+                self.assertEqual(self.text('intelligenceSourceItems'),'')
+                self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceFinancial').find_elements(self.By.TAG_NAME,'option'),[])
+                self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').get_property('disabled'))
+                local.reason.assert_not_called()
+
     def test_financial_document_questions_explicit_records_pages_citations_and_privacy(self):
         from selenium.webdriver.support.ui import Select
         document,records,service,local=self.financial_document_question_fixture()
@@ -2086,6 +2285,350 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local.reason.assert_not_called()
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(self.text('documentKnowledgeResults'),'')
+
+    def test_document_hub_idle_refresh_preserves_request_budget(self):
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: 'Documents' in self.text('documentSourcesStatus') and self.active_requests==0)
+        count="return performance.getEntriesByType('resource').filter(e=>e.name.includes('/api/expenses/uploads/')).length;"
+        before=self.browser.execute_script(count)
+        self.assertGreaterEqual(before,1)
+        self.browser.execute_async_script('setTimeout(arguments[0],12000);')
+        self.assertEqual(self.browser.execute_script(count),before)
+        status=self.browser.execute_async_script("fetch('/api/ai/financial-documents/expense/').then(r=>arguments[0](r.status));")
+        self.assertEqual(status,200)
+
+    def test_changed_retrieval_source_blocks_frozen_holdout_before_model(self):
+        from apps.ml_engine.services.retrieval_holdout import availability
+        from apps.ml_engine.services.retrieval_quality import MODELS
+        self.enterContext(override_settings(ALFRED_SYNTHETIC_QUALITY_ENABLED=True))
+        self.memory_evaluation_fixture()
+        self.assertFalse(availability())
+        option=self.browser.find_element(self.By.CSS_SELECTOR,'#memoryComparisonSuite option[value="held_out"]')
+        self.assertFalse(option.is_enabled())
+        self.assertIn('blocked: frozen policy unavailable',option.text)
+        with patch('apps.ml_engine.services.retrieval_quality.OllamaEmbeddings') as model:
+            result=self.memory_post('learning',dict(action='compare',baseline_model=MODELS[0],candidate_model=MODELS[1],suite='held_out'))
+        self.assertEqual(result['status'],400); model.assert_not_called()
+        self.assertNotIn('persistent_memory',str(result))
+
+    def test_private_document_questions_selection_conflict_abstention_and_stale_sources(self):
+        from unittest.mock import Mock
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.ml_engine.services.document_corpus import DocumentCorpus
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-document-question-browser-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=root/'vault'))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        local=Mock(select=Mock(return_value='{"state":"evidence","evidence":[0]}'))
+        self.enterContext(patch('apps.ml_engine.services.document_questions.DocumentQuestionReasoner',return_value=local))
+        corpus=DocumentCorpus(MemoryStore(root/'vault',embedder=SyntheticEmbeddings())); owner=self.scenario['user']
+        sources=[corpus.upload(owner,SimpleUploadedFile(name,text),consent=True,days=1)['document'] for name,text in (
+            ('Synthetic thirty-day policy.txt',b'Exit load applies for thirty days. <img src=x onerror="window.questionLeak=true">'),
+            ('Synthetic ninety-day policy.txt',b'Exit load applies for ninety days. No guaranteed returns.'))]
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusAsk').is_enabled())
+        query=self.browser.find_element(self.By.ID,'documentCorpusQuery'); query.send_keys('exit load')
+        question=self.browser.find_element(self.By.ID,'documentCorpusQuestion'); question.send_keys('For how long does the exit load apply?')
+        self.memory_click('#documentCorpusAsk')
+        self.assertIn('Explicitly select',self.text('documentCorpusStatus')); local.select.assert_not_called()
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
+        self.memory_click(f'#documentCorpusList input[value="{sources[0]["id"]}"]')
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'selected these exact unverified excerpts' in self.text('documentCorpusStatus'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.wait.until(lambda _: 'thirty days' in self.text('documentCorpusResults'))
+        self.assertIn('thirty days',self.text('documentCorpusResults'))
+        self.assertIn('Original SHA-256',self.text('documentCorpusResults'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.questionLeak)'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusResults img'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.capture('document-question-extractive-desktop')
+        query.clear(); query.send_keys('missing keywords')
+        self.assertEqual(self.text('documentCorpusResults'),'')
+        calls=local.select.call_count; self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'do not establish an answer' in self.text('documentCorpusStatus'))
+        self.assertEqual(local.select.call_count,calls)
+        query.clear(); query.send_keys('exit load')
+        self.memory_click(f'#documentCorpusList input[value="{sources[1]["id"]}"]')
+        local.select.return_value='{"state":"conflict","evidence":[0,1]}'
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'may conflict' in self.text('documentCorpusStatus'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.wait.until(lambda _: 'thirty days' in self.text('documentCorpusResults'))
+        self.assertIn('thirty days',self.text('documentCorpusResults')); self.assertIn('ninety days',self.text('documentCorpusResults'))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.browser.execute_script("document.getElementById('documentCorpusStatus').scrollIntoView({block:'start',behavior:'instant'});")
+        self.assertEqual(self.browser.execute_script('return innerWidth'),390)
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+        self.capture('document-question-conflict-390px')
+        local.select.return_value='{"state":"evidence","evidence":[999]}'
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'No answer was accepted' in self.text('documentCorpusStatus'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusResults article'))
+        self.assertNotIn('thirty days',self.text('documentCorpusResults'))
+        self.assertNotIn('ninety days',self.text('documentCorpusResults'))
+        def revoke(*args,**kwargs):
+            corpus.delete(owner,sources[0]['id'])
+            return '{"state":"conflict","evidence":[0,1]}'
+        local.select.side_effect=revoke
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'sources changed' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.text('documentCorpusResults'),'')
+        self.assertEqual(question.get_property('value'),'For how long does the exit load apply?')
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
+        local.select.side_effect=EmbeddingUnavailable('synthetic offline')
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'local model is unavailable' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.text('documentCorpusResults'),'')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(question.get_property('value'),'')
+
+    def test_initial_catalog_response_does_not_cancel_independent_private_vault_requests(self):
+        from threading import Event
+        from selenium.webdriver.support.ui import Select
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.investments.models import Investment, InvestmentImportDocument
+        from apps.ml_engine.api.document_corpus import DocumentCorpusAPI, DocumentCorpusUploadAPI
+        from apps.ml_engine.api.financial_evidence import DocumentRecordPageAPI
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-catalog-vault-race-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=root/'vault'))
+        text_file = root/'Synthetic race policy.txt'; text_file.write_text('Synthetic private evidence only.',encoding='utf-8')
+        row = Investment.objects.create(user=self.scenario['user'],asset_type='equity',asset_name='Synthetic context only',
+            invested_amount='1.00',current_value='1.00')
+        document = InvestmentImportDocument.objects.create(user=self.scenario['user'],file_name='Synthetic context.pdf',
+            uploaded_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC-CONTEXT'),parser_status='parsed')
+        document.linked_investments.add(row)
+        catalog_ready, vault_ready, release_catalog, release_vault = (Event() for _ in range(4))
+        original_catalog, original_list, original_upload = DocumentRecordPageAPI.get, DocumentCorpusAPI.get, DocumentCorpusUploadAPI.post
+        def catalog_response(view, *args, **kwargs):
+            response = original_catalog(view,*args,**kwargs)
+            catalog_ready.set(); release_catalog.wait(20)
+            return response
+        def vault_response(original):
+            def delayed(view, *args, **kwargs):
+                response = original(view,*args,**kwargs)
+                vault_ready.set(); release_vault.wait(20)
+                return response
+            return delayed
+        self.enterContext(patch.object(DocumentRecordPageAPI,'get',catalog_response))
+        self.enterContext(patch.object(DocumentCorpusAPI,'get',vault_response(original_list)))
+        self.enterContext(patch.object(DocumentCorpusUploadAPI,'post',vault_response(original_upload)))
+        self.addCleanup(release_catalog.set); self.addCleanup(release_vault.set)
+        self.login()
+        for mode in ('list','upload'):
+            with self.subTest(mode=mode):
+                for gate in (catalog_ready,vault_ready,release_catalog,release_vault): gate.clear()
+                try:
+                    self.browser.get(self.live_server_url+'/documents/')
+                    self.wait.until(lambda _: catalog_ready.is_set())
+                    self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
+                    if mode == 'list':
+                        self.memory_click('#documentCorpusRefresh')
+                    else:
+                        self.browser.find_element(self.By.ID,'documentCorpusFile').send_keys(str(text_file))
+                        self.memory_click('#documentCorpusUploadConsent'); self.memory_click('#documentCorpusUpload button')
+                    self.wait.until(lambda _: vault_ready.is_set())
+                    release_catalog.set()
+                    self.wait.until(lambda _: 'Documents' in self.text('documentSourcesStatus'))
+                    self.assertIn('Checking private document knowledge', self.text('documentCorpusStatus'))
+                    self.assertFalse(self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
+                    release_vault.set()
+                    expected = 'list refreshed' if mode == 'list' else 'Original and searchable extraction stored encrypted'
+                    self.wait.until(lambda _: expected in self.text('documentCorpusStatus'))
+                    if mode == 'upload': self.assertIn(text_file.name,self.text('documentCorpusList'))
+                finally:
+                    release_catalog.set(); release_vault.set()
+                    self.wait.until(lambda _: self.active_requests == 0)
+        self.memory_click('#documentCorpusList input')
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        source = f'#documentSourcesItems button[data-document-id="{document.pk}"]'
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,source))
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,'#documentCorpusList input').is_selected())
+        self.memory_click(source)
+        self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'#documentCorpusList input').is_selected())
+
+    def test_general_private_document_upload_pdf_text_and_owner_originals(self):
+        from unittest.mock import Mock
+        from tests.test_document_knowledge import text_pdf
+        from apps.ml_engine.services.document_corpus import DocumentCorpus
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-general-corpus-browser-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=root/'vault'))
+        embedder=Mock(embed=Mock(side_effect=AssertionError('No corpus inference')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=embedder))
+        quote='Synthetic local policy. <img src=x onerror="window.generalCorpusLeak=true"> Review before relying.'
+        text_file=root/'Synthetic local notes.txt'; text_file.write_text(quote,encoding='utf-8')
+        pdf_file=root/'Synthetic general guide.pdf'; pdf_file.write_bytes(text_pdf())
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusFile').is_enabled())
+        self.browser.find_element(self.By.ID,'documentCorpusFile').send_keys(str(text_file))
+        self.memory_click('#documentCorpusUpload button')
+        self.assertFalse(self.browser.execute_script("return performance.getEntriesByType('resource').some(e=>e.name.includes('/document-corpus/upload/'))"))
+        self.memory_click('#documentCorpusUploadConsent'); self.memory_click('#documentCorpusUpload button')
+        self.wait.until(lambda _: 'Original and searchable extraction stored encrypted' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'documentCorpusFile').get_property('value'),'')
+        self.assertFalse(self.browser.find_element(self.By.ID,'documentCorpusUploadConsent').is_selected())
+        corpus=DocumentCorpus(MemoryStore(root/'vault',embedder=SyntheticEmbeddings())); owner=self.scenario['user']
+        source=corpus.list(owner)['documents'][0]
+        original=self.browser.execute_async_script("fetch(arguments[0]).then(async r=>arguments[1]({status:r.status,text:await r.text(),cache:r.headers.get('Cache-Control'),type:r.headers.get('Content-Type'),disposition:r.headers.get('Content-Disposition'),sniff:r.headers.get('X-Content-Type-Options')}));",source['source_url'])
+        self.assertEqual(original['status'],200); self.assertEqual(original['text'],quote)
+        self.assertEqual(original['cache'],'no-store, private'); self.assertIn('attachment;',original['disposition'])
+        self.assertIn('text/plain',original['type']); self.assertEqual(original['sniff'],'nosniff')
+        self.memory_click('#documentCorpusList input')
+        query=self.browser.find_element(self.By.ID,'documentCorpusQuery'); query.send_keys('local policy')
+        self.memory_click('#documentCorpusSearch button')
+        self.wait.until(lambda _: '1 unverified excerpt' in self.text('documentCorpusStatus'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.wait.until(lambda _: quote in self.text('documentCorpusResults'))
+        self.assertIn(quote,self.text('documentCorpusResults'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.generalCorpusLeak)'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusResults img'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.capture('general-private-corpus-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        contrast=r'''const e=document.querySelector('#documentCorpusSearch button');
+            function light(c){const v=c.match(/[\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2]}
+            let p=e,bg; do {bg=getComputedStyle(p).backgroundColor;p=p.parentElement;}while(p && (bg==='rgba(0, 0, 0, 0)' || bg==='transparent'));
+            const a=light(getComputedStyle(e).color),b=light(bg);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);'''
+        for theme in ('dark','light'):
+            self.browser.execute_script("document.documentElement.dataset.theme=arguments[0]; document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});",theme)
+            self.wait.until(lambda _: self.browser.execute_script(contrast)>=4.5)
+            self.assertEqual(self.browser.execute_script('return innerWidth'),390)
+            self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+            self.assertTrue(self.browser.execute_script("const e=document.querySelector('#documentCorpusResults article p');return e.scrollWidth<=e.clientWidth;"))
+            self.capture('general-private-corpus-'+theme+'-390px')
+        self.browser.refresh(); self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
+        self.assertIn('Synthetic local notes.txt',self.text('documentCorpusList'))
+        self.browser.find_element(self.By.ID,'documentCorpusFile').send_keys(str(pdf_file))
+        self.memory_click('#documentCorpusUploadConsent'); self.memory_click('#documentCorpusUpload button')
+        self.wait.until(lambda _: 'Original and searchable extraction stored encrypted' in self.text('documentCorpusStatus'))
+        for check in self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusList input'):
+            self.memory_click(f'#documentCorpusList input[value="{check.get_property("value")}"]')
+        query=self.browser.find_element(self.By.ID,'documentCorpusQuery'); query.send_keys('maintenance waiver')
+        self.memory_click('#documentCorpusSearch button')
+        self.wait.until(lambda _: '1 unverified excerpt' in self.text('documentCorpusStatus'))
+        self.assertIn('Annual maintenance waiver applies.',self.text('documentCorpusResults'))
+        self.assertIn('uploaded pdf text layer',self.text('documentCorpusResults'))
+        pdf=next(item for item in corpus.list(owner)['documents'] if item['original_format']=='pdf')
+        self.memory_click(f'#documentCorpusList article:has(input[value="{pdf["id"]}"]) button')
+        self.wait.until(lambda _: 'Private copy removed' in self.text('documentCorpusStatus'))
+        status=self.browser.execute_async_script('fetch(arguments[0]).then(r=>arguments[1](r.status));',pdf['source_url'])
+        self.assertEqual(status,404); self.assertEqual(len(corpus.list(owner)['documents']),1)
+        embedder.embed.assert_not_called()
+
+    def test_private_document_corpus_consent_reopen_citations_invalidation_and_reset(self):
+        from unittest.mock import Mock
+        from selenium.webdriver.support.ui import Select
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.investments.models import Investment, InvestmentImportDocument
+        from apps.ml_engine.services.document_corpus import DocumentCorpus
+        from apps.ml_engine.services.canonical_evidence import document_record_page
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-corpus-browser-')))
+        # Exercise ALFRED's private media view, not Django's public test-file handler.
+        self.enterContext(patch('django.test.testcases._MediaFilesHandler._should_handle',return_value=False))
+        self.enterContext(override_settings(MEDIA_ROOT=root/'media',ALFRED_MEMORY_DIR=root/'vault'))
+        embedder=Mock(embed=Mock(side_effect=AssertionError('No model for private corpus')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=embedder))
+        owner=self.scenario['user']
+        row=Investment.objects.create(user=owner,asset_type='equity',asset_name='Synthetic corpus holding',
+            invested_amount='100.01',current_value='120.05',monthly_sip='1.00')
+        quote='Synthetic exit load applies. <img src=x onerror="window.corpusLeak=true"> No guaranteed returns.'
+        document=InvestmentImportDocument.objects.create(user=owner,file_name='Synthetic corpus prospectus.pdf',
+            uploaded_file=SimpleUploadedFile('synthetic.pdf',b'%PDF synthetic corpus source'),parser_status='parsed',extracted_text=quote)
+        document.linked_investments.add(row)
+        before=list(Investment.objects.order_by('pk').values())
+        store=MemoryStore(root/'vault',embedder=SyntheticEmbeddings()); corpus=DocumentCorpus(store)
+        foreign=get_user_model().objects.create_user('synthetic-corpus-foreign')
+        other=InvestmentImportDocument.objects.create(user=foreign,file_name='Foreign private prospectus.pdf',
+            uploaded_file=SimpleUploadedFile('foreign.pdf',b'%PDF synthetic foreign source'),parser_status='parsed',extracted_text='FOREIGN-CORPUS-SECRET exit load')
+        foreign_id=corpus.ingest(foreign,'investment',other.pk,consent=True,days=1,
+            catalog_token=document_record_page(foreign,'investment',other.pk)['catalog_token'])['document']['id']
+        self.login(); self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentSourcesKind').is_enabled())
+        self.assertFalse(self.browser.execute_script("return performance.getEntriesByType('resource').some(e=>e.name.includes('/document-corpus/'))"))
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,f'#documentSourcesItems button[data-document-id="{document.pk}"]'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{document.pk}"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusConsent').is_displayed())
+        self.assertFalse(self.browser.find_element(self.By.ID,'documentCorpusStore').is_enabled())
+        self.memory_click('#documentCorpusConsent'); self.memory_click('#documentCorpusStore')
+        self.wait.until(lambda _: 'Encrypted copy stored' in self.text('documentCorpusStatus'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusList input:checked'))
+        self.browser.refresh(); self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
+        self.assertNotIn('Foreign private',self.text('documentCorpusList'))
+        self.memory_click('#documentCorpusList input')
+        query=self.browser.find_element(self.By.ID,'documentCorpusQuery'); query.send_keys('exit load')
+        self.memory_click('#documentCorpusSearch button')
+        self.wait.until(lambda _: '1 unverified excerpt' in self.text('documentCorpusStatus'))
+        self.assertIn(quote,self.text('documentCorpusResults'))
+        self.assertIn('Original SHA-256',self.text('documentCorpusResults'))
+        self.assertIn('Extracted characters 0',self.text('documentCorpusResults'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.corpusLeak)'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusResults img'))
+        link=self.browser.find_element(self.By.CSS_SELECTOR,'#documentCorpusResults a').get_attribute('href')
+        checked=self.browser.execute_async_script("fetch(arguments[0]).then(r=>arguments[1]({status:r.status,cache:r.headers.get('Cache-Control')}));",link)
+        self.assertEqual(checked,{'status':200,'cache':'private, no-store'})
+        rejected=self.browser.execute_async_script("Alfred.fetchJSON('/api/ai/document-corpus/search/',{method:'POST',body:JSON.stringify({ids:[arguments[0]],query:'exit load'})}).then(arguments[1]).catch(e=>arguments[1]({status:e.status}));",foreign_id)
+        self.assertEqual(rejected,{'status':409})
+        self.assertNotIn('FOREIGN-CORPUS-SECRET',self.browser.page_source)
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.capture('private-corpus-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.assertEqual(self.browser.execute_script('return innerWidth'),390)
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'});")
+        self.wait.until(lambda _: self.browser.execute_script("return document.getElementById('documentCorpusResults').getBoundingClientRect().top<innerHeight;"))
+        self.capture('private-corpus-390px')
+        preserved=store.key_file.with_suffix('.preserved'); store.key_file.rename(preserved)
+        try:
+            self.memory_click('#documentCorpusSearch button')
+            self.wait.until(lambda _: 'unavailable' in self.text('documentCorpusStatus'))
+            self.assertEqual(self.text('documentCorpusResults'),'')
+            self.assertEqual(query.get_property('value'),'exit load')
+            self.assertFalse(store.key_file.exists())
+        finally:
+            preserved.rename(store.key_file)
+        document.extracted_text='Corrected extraction'; document.save()
+        self.memory_click('#documentCorpusSearch button')
+        self.wait.until(lambda _: 'sources changed' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.text('documentCorpusResults'),'')
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'No current private document copies' in self.text('documentCorpusList'))
+        Select(self.browser.find_element(self.By.ID,'documentSourcesKind')).select_by_value('investment')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,f'#documentSourcesItems button[data-document-id="{document.pk}"]'))
+        self.memory_click(f'#documentSourcesItems button[data-document-id="{document.pk}"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusConsent').is_displayed())
+        self.memory_click('#documentCorpusConsent'); self.memory_click('#documentCorpusStore')
+        self.wait.until(lambda _: 'Encrypted copy stored' in self.text('documentCorpusStatus'))
+        self.memory_click('#documentCorpusList button')
+        self.wait.until(lambda _: 'Private copy removed' in self.text('documentCorpusStatus'))
+        self.assertEqual(corpus.list(owner)['documents'],[])
+        self.memory_click('#documentCorpusStore')
+        self.wait.until(lambda _: 'Encrypted copy stored' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.memory_post('reset',{'confirm':True})['status'],200)
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'No current private document copies' in self.text('documentCorpusList'))
+        self.assertEqual(corpus.list(foreign)['documents'][0]['id'],foreign_id)
+        self.assertEqual(list(Investment.objects.order_by('pk').values()),before)
+        embedder.embed.assert_not_called()
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('documentCorpusResults'),''); self.assertEqual(self.text('documentCorpusList'),'')
+        self.assertEqual(query.get_property('value'),'')
 
     def test_selected_bank_pdf_text_search_and_scanned_abstention(self):
         from tests.test_document_knowledge import text_pdf, image_pdf
@@ -2809,6 +3352,46 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('balanceSheetPanel').scrollIntoView({behavior: 'instant', block: 'center'});")
         self.capture("vehicle-value-and-running-costs")
 
+    def test_investment_local_review_reminders_consent_reopen_lifecycle_and_privacy(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.investments.models import Investment
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-review-alert-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        holding=Investment.objects.create(user=self.scenario['user'],asset_type='equity',asset_name='Synthetic <img src=x onerror="window.reminderLeak=true">',current_value='123.45')
+        Investment.objects.filter(pk=holding.pk).update(updated_at=timezone.now()-timedelta(days=40))
+        self.login(); self.browser.get(self.live_server_url+'/investments/')
+        self.wait.until(lambda _: 'Reminders off' in self.text('investmentReviewStatus'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'investmentReviewEnabled').is_selected())
+        self.assertFalse(self.browser.find_element(self.By.ID,'investmentReviewCheck').is_enabled())
+        self.memory_click('#investmentReviewEnabled'); self.memory_click('#investmentReviewForm button[type="submit"]')
+        self.wait.until(lambda _: 'Reminders on' in self.text('investmentReviewStatus'))
+        self.memory_click('#investmentReviewCheck')
+        self.wait.until(lambda _: '· unread ·' in self.text('investmentReviewItems'))
+        self.assertIn('This does not verify its price',self.text('investmentReviewItems'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.reminderLeak)'))
+        self.assertIn(f'/investment/{holding.pk}/',self.browser.find_element(self.By.CSS_SELECTOR,'#investmentReviewItems a').get_attribute('href'))
+        self.browser.refresh(); self.wait.until(lambda _: '· unread ·' in self.text('investmentReviewItems'))
+        self.memory_click('#investmentReviewItems button')
+        self.wait.until(lambda _: '· read ·' in self.text('investmentReviewItems'))
+        self.memory_click('#investmentReviewItems button')
+        self.wait.until(lambda _: '· dismissed ·' in self.text('investmentReviewItems'))
+        self.memory_click('#investmentReviewCheck')
+        self.wait.until(lambda _: 'dismissed' in self.text('investmentReviewItems'))
+        self.capture('investment-review-reminders-desktop')
+        holding.save(update_fields=['updated_at'])
+        self.browser.refresh(); self.wait.until(lambda _: '· resolved ·' in self.text('investmentReviewItems'))
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('investmentReviewTitle').scrollIntoView({behavior:'instant',block:'start'})")
+        self.capture('investment-review-reminders-390px')
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        self.memory_click('#investmentReviewEnabled'); self.memory_click('#investmentReviewForm button[type="submit"]')
+        self.wait.until(lambda _: 'Reminders off' in self.text('investmentReviewStatus'))
+        self.assertEqual(self.text('investmentReviewItems'),'')
+        holding.refresh_from_db(); self.assertEqual(str(holding.current_value),'123.45')
+
     def test_investment_projection_starts_with_recorded_value_on_real_page(self):
         self.login()
         self.browser.get(self.live_server_url + "/investments/")
@@ -3160,6 +3743,174 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         profile = TravelPreferenceProfile.objects.get(user=owner)
         self.assertFalse(profile.media_learning_enabled)
         self.assertEqual(before, list(Expense.objects.filter(user=owner).values()))
+
+    def test_travel_candidate_batches_reopen_compare_and_explicit_selection(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import fact, value
+        from apps.mobility.services.travel_research import queue_research, run_research
+        from tests.test_travel_candidate_pool import synthetic_pool
+        from tests.test_travel_planner import weather_fixture
+        owner = self.scenario['user']
+        self.enterContext(patch('apps.mobility.services.travel_research.dispatch'))
+        self.enterContext(patch('apps.mobility.services.travel.providers.base.request', side_effect=AssertionError('Synthetic providers only')))
+        self.enterContext(patch('apps.mobility.services.travel.research.weather_result', side_effect=weather_fixture))
+        self.enterContext(patch('apps.mobility.services.travel.research.research_candidates',
+            side_effect=lambda user,state,preliminary: synthetic_pool(user,state)))
+        session = new_session(owner)
+        session.state = {key:fact(val) for key,val in dict(origin='Bengaluru',trip_duration=3,
+            available_start_date=str(timezone.localdate()+timedelta(days=2)),
+            available_end_date=str(timezone.localdate()+timedelta(days=4)),budget=15000,transport_mode='ride').items()}
+        session.save()
+        self.assertEqual(run_research(queue_research(session).pk)['status'], 'ready')
+        self.login(); self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        cards = lambda: [e.get_attribute('data-destination') for e in self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerCandidates article')]
+        self.wait.until(lambda _: '1–3 of 20' in self.text('plannerCandidatePages'))
+        first = cards(); self.assertEqual(len(first),3)
+        self.assertFalse(self.browser.find_element(self.By.ID,'plannerPreviousCandidates').is_enabled())
+        self.memory_click('#plannerMoreCandidates')
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerMoreCandidates').is_enabled())
+        run = self.wait.until(lambda _: session.research_runs.filter(status='queued').first())
+        session.refresh_from_db()
+        self.assertEqual(run.status,'queued'); self.assertIsNone(value(session.state,'selected_destination'))
+        self.assertEqual(run_research(run.pk)['status'], 'ready')
+        self.wait.until(lambda _: '4–6 of 20' in self.text('plannerCandidatePages'))
+        second = cards(); self.assertFalse(set(first) & set(second))
+        self.memory_click('#plannerCompare')
+        self.wait.until(lambda _: all(name in self.text('plannerComparison') for name in second))
+        self.assertNotIn(first[0],self.text('plannerComparison'))
+        self.browser.execute_script("document.getElementById('plannerCandidatePages').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('travel-candidate-batch-desktop')
+        self.browser.refresh()
+        self.wait.until(lambda _: '4–6 of 20' in self.text('plannerCandidatePages'))
+        self.assertEqual(cards(),second)
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.browser.execute_script("document.getElementById('plannerCandidatePages').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        self.capture('travel-candidate-batch-390px')
+        self.memory_click('#plannerPreviousCandidates')
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerPreviousCandidates').is_enabled())
+        run = self.wait.until(lambda _: session.research_runs.filter(status='queued').first())
+        self.assertEqual(run_research(run.pk)['status'],'ready')
+        self.wait.until(lambda _: '1–3 of 20' in self.text('plannerCandidatePages'))
+        self.assertEqual(cards(),first)
+        self.memory_click('#plannerCandidates article:first-child [data-planner-message]')
+        self.wait.until(lambda _: not self.text('plannerCandidatePages'))
+        session.refresh_from_db(); self.assertEqual(value(session.state,'selected_destination'),first[0])
+
+    def test_travel_ordered_stops_reorder_day_edit_save_reopen_and_narrow_screen(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import fact, value
+        from apps.mobility.services.travel_research import queue_research, run_research
+        from tests.test_travel_candidate_pool import synthetic_pool
+        from tests.test_travel_planner import weather_fixture
+        owner = self.scenario['user']
+        before = list(Expense.objects.filter(user=owner).values())
+        self.enterContext(patch('apps.mobility.services.travel_research.dispatch'))
+        self.enterContext(patch('apps.mobility.services.travel.providers.base.request', side_effect=AssertionError('Synthetic providers only')))
+        self.enterContext(patch('apps.mobility.services.travel.research.weather_result', side_effect=weather_fixture))
+        self.enterContext(patch('apps.mobility.services.travel.research.research_candidates', side_effect=lambda user,state,preliminary: synthetic_pool(user,state)))
+        session = new_session(owner)
+        session.state = {k:fact(v) for k,v in dict(origin='Bengaluru',trip_duration=4,
+            available_start_date=str(timezone.localdate()+timedelta(days=2)),
+            available_end_date=str(timezone.localdate()+timedelta(days=5)),budget=15000,transport_mode='ride').items()}
+        session.save()
+        self.assertEqual(run_research(queue_research(session).pk)['status'], 'ready')
+        session.refresh_from_db()
+        names = [d['name'] for d in session.candidates[:2]]
+        self.login(); self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops [data-add-stop]')) == 3)
+        for name in names:
+            self.memory_click(f'#plannerStops [data-add-stop="{name}"]')
+            self.wait.until(lambda _: name in ' '.join(e.text for e in self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops ol li')))
+        self.wait.until(lambda _: 'manually ordered stops' in self.text('plannerItinerary'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerItinerary [data-day]')), 4)
+        self.assertIn('not optimized', self.text('plannerItinerary'))
+        self.memory_click('#plannerStops [data-stop-index="1"][data-stop-move="-1"]')
+        self.wait.until(lambda _: names[1] in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li').text)
+        self.browser.find_element(self.By.ID,'plannerInput').send_keys('Make day 2 relaxed')
+        self.memory_click('#plannerSend')
+        self.wait.until(lambda _: 'A relaxed day' in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerItinerary [data-day="2"]').text)
+        session.refresh_from_db()
+        self.assertEqual(value(session.state,'_itinerary_stops')[0]['name'],names[1])
+        self.assertEqual(session.itinerary['days'][1]['pace'],'relaxed')
+        self.assertEqual(sum(d['estimated_cost'] for d in session.itinerary['days']),session.itinerary['budget']['expected'])
+        self.browser.execute_script("document.getElementById('plannerStops').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('travel-ordered-stops-desktop')
+        self.memory_click('#plannerSave')
+        self.wait.until(lambda _: 'Travel Plan saved' in self.text('plannerAlert'))
+        session.refresh_from_db(); session.plan.refresh_from_db()
+        self.assertEqual(session.plan.itinerary,session.itinerary)
+        self.browser.refresh()
+        self.wait.until(lambda _: names[1] in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li').text)
+        self.assertIn('A relaxed day',self.browser.find_element(self.By.CSS_SELECTOR,'#plannerItinerary [data-day="2"]').text)
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.browser.execute_script("document.getElementById('plannerStops').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        self.capture('travel-ordered-stops-390px')
+        self.memory_click('#plannerStops [data-stop-index="1"][data-stop-remove]')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops ol li')) == 1)
+        session.refresh_from_db()
+        self.assertNotIn('stops',session.itinerary)
+        self.assertEqual(list(Expense.objects.filter(user=owner).values()),before)
+
+    def test_travel_estimated_order_preview_requires_confirmation_and_keeps_saved_trip(self):
+        from datetime import timedelta
+        from copy import deepcopy
+        from django.utils import timezone
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import fact, value
+        from tests.test_travel_candidate_pool import synthetic_pool
+        owner = self.scenario['user']
+        session = new_session(owner)
+        session.state = {k:fact(v) for k,v in dict(origin='Bengaluru',trip_duration=4,
+            available_start_date=str(timezone.localdate()+timedelta(days=2)),
+            available_end_date=str(timezone.localdate()+timedelta(days=5)),budget=15000,transport_mode='ride').items()}
+        session.candidates = synthetic_pool(owner, session.state)[:3]
+        for stop, name, lat, lon in zip(session.candidates, ('East point', 'North point', 'Northeast point'),
+                (12.972, 13.972, 13.972), (78.595, 77.595, 78.595)):
+            stop.update(name=name, lat=lat, lon=lon)
+        session.save()
+        self.login(); self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops [data-add-stop]')) == 3)
+        for index, name in enumerate(('East point', 'North point', 'Northeast point')):
+            self.memory_click(f'#plannerStops [data-add-stop="{name}"]')
+            self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops ol li')) == index+1)
+        self.memory_click('#plannerSave')
+        self.wait.until(lambda _: 'Travel Plan saved' in self.text('plannerAlert'))
+        session.refresh_from_db()
+        before = deepcopy(session.itinerary)
+        revision = session.revision
+        self.memory_click('#plannerCompareOrder')
+        self.wait.until(lambda _: 'not a verified' in self.text('plannerOrderProposal'))
+        self.assertIn('\u2192', self.text('plannerOrderProposal'))
+        session.refresh_from_db(); session.plan.refresh_from_db()
+        self.assertEqual(session.revision, revision)
+        self.assertEqual(session.itinerary, before)
+        self.assertEqual(session.plan.itinerary, before)
+        self.assertTrue(self.browser.find_element(self.By.ID,'plannerApplyOrder').is_displayed())
+        self.browser.execute_script("document.getElementById('plannerOrderProposal').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('travel-estimated-order-preview-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.browser.execute_script("document.getElementById('plannerOrderProposal').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        self.capture('travel-estimated-order-preview-390px')
+        self.memory_click('#plannerApplyOrder')
+        self.wait.until(lambda _: not self.browser.find_elements(self.By.ID,'plannerOrderProposal'))
+        session.refresh_from_db(); session.plan.refresh_from_db()
+        self.assertGreater(session.revision, revision)
+        self.assertLess(session.itinerary['route']['distance_km_total'], before['route']['distance_km_total'])
+        self.assertEqual(session.plan.itinerary, before)
+        self.assertEqual(session.itinerary['route']['confidence'], 'ESTIMATED')
+        self.memory_click('#plannerCompareOrder')
+        self.wait.until(lambda _: 'no change was made' in self.text('plannerOrderProposal'))
+        self.assertFalse(self.browser.find_elements(self.By.ID,'plannerApplyOrder'))
 
     def test_travel_places_provenance_stale_and_unavailable_are_explicit(self):
         from copy import deepcopy

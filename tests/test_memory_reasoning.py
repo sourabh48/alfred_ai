@@ -25,6 +25,7 @@ class MemoryReasoningTests(TestCase):
         self.bob=get_user_model().objects.create_user(username='synthetic-reason-bob')
         self.store=MemoryStore(self.root/'vault',embedder=SyntheticEmbeddings()); self.owner=_owner(self.alice)
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(self.store.directory),ALFRED_MEMORY_MOCK_REASONING=False,
+            ALFRED_ABUSE_THROTTLE_DIR=str(self.root/'request-limits'),
             ALFRED_MEMORY_OPENAI_AUTHORIZED=True,ALFRED_MEMORY_OPENAI_PRICING_DATE=datetime.now(timezone.utc).date().isoformat()))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         self.http=self.enterContext(patch('apps.ml_engine.services.memory_reasoning.request',side_effect=self.response))

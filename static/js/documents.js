@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadDocumentCenter();
     initDocumentSources();
-    Alfred.enableLiveRefresh("documents-live", loadDocumentCenter, { rootId: "documentCenterRoot", interactionHoldMs: 4500 });
+    Alfred.enableLiveRefresh("documents-live", loadDocumentCenter, { rootId: "documentCenterRoot", interactionHoldMs: 4500, intervalMs: 30000 });
 });
 
 function initDocumentSources() {
@@ -107,10 +107,14 @@ function initDocumentKnowledge() {
     const status=document.getElementById('documentKnowledgeStatus'), results=document.getElementById('documentKnowledgeResults');
     const submit=form.querySelector('button[type="submit"]');
     let selected=null, generation=0, controller=null;
+    const corpus=initDocumentCorpus(()=>selected);
     function reset(page=null) {
         generation++; controller?.abort(); controller=null;
+        const hadSelection=selected!==null;
         selected=page?.level==='records' ? page : null;
+        if (hadSelection || selected!==null) corpus.selectionChanged();
         form.hidden=!selected; query.value=''; status.textContent=''; results.replaceChildren();
+        document.getElementById('documentCorpusIngest').hidden=!selected;
         results.setAttribute('aria-busy','false'); submit.disabled=false; query.disabled=false;
     }
     form.addEventListener('submit',async event => {

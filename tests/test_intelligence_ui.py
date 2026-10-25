@@ -25,12 +25,12 @@ class IntelligenceUITests(TestCase):
         self.root = root
 
     def test_status_is_bounded_local_only_and_does_not_build_financial_insights(self):
-        with patch('apps.ml_engine.api.views.OllamaReasoner') as model, patch('apps.ml_engine.api.views.build_financial_intelligence') as finance:
-            before = time.monotonic()
+        with patch('apps.ml_engine.api.views.OllamaReasoner') as model, patch('apps.ml_engine.api.views.build_financial_intelligence') as finance, \
+                patch('apps.ml_engine.api.views.monotonic', return_value=100.0):
             response = self.client.get('/api/ai/personal-insights/?assistant_status=1')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['local_model_status'], 'available')
-        self.assertLessEqual(model.return_value._digest.call_args.kwargs['deadline'], before+1.5)
+        model.return_value._digest.assert_called_once_with(deadline=101.0)
         finance.assert_not_called()
         self.assertIn('no-store', response['Cache-Control'])
 

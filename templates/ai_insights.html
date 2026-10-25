@@ -17,6 +17,14 @@
         </div>
         <button id="intelligenceNew" class="btn btn-outline-secondary btn-sm" type="button">New conversation</button>
     </div>
+    <details id="modelReadinessPanel" class="conversation-evidence mb-3">
+        <summary>Local model readiness</summary>
+        <p class="small mt-2">Adaptive-model registry gates are separate from Ollama connectivity. This view does not train or activate models, change providers, or prove predictive accuracy.</p>
+        <button id="modelReadinessRefresh" type="button" class="btn btn-outline-secondary btn-sm">Recheck readiness</button>
+        <p id="modelReadinessStatus" class="small mt-2" role="status" aria-live="polite">Open to check registry gates.</p>
+        <ul id="modelReadinessItems" class="list-unstyled"></ul>
+        <p id="modelReadinessScope" class="small"></p>
+    </details>
     <details id="conversationHistoryPanel" class="conversation-evidence mb-3">
         <summary>Private conversation history · <span id="conversationHistoryStatus">Checking local policy</span></summary>
         <p class="small mt-2">Off unless you opt in. Saved transcripts are encrypted on this device and never synchronized or sent to cloud reasoning. They are AI hypotheses, separate from verified memories. New answers use current sources, not old transcripts.</p>

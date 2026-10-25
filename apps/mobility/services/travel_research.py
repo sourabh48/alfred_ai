@@ -19,17 +19,19 @@ STAGES = {"queued": "Queued", "destinations": "Researching Destinations", "weath
           "recommendations": "Building Recommendations", "ready": "Ready", "failed": "Failed", "superseded": "Request updated"}
 
 
-def queue_research(session, deep=False, recheck=False, force=False, categories=None):
+def queue_research(session, deep=False, recheck=False, force=False, categories=None, batch_offset=None):
     request = deepcopy(session.state)
     # Refresh scope belongs to this job, never to the user's persistent preferences.
-    for key in ("force_refresh", "refresh_categories"):
+    for key in ("force_refresh", "refresh_categories", "destination_batch_offset"):
         request.pop(key, None)
+    if batch_offset is not None:
+        request["destination_batch_offset"] = fact(batch_offset, "requested_batch")
     if categories:
         request["refresh_categories"] = fact(sorted(categories), "requested_research")
     if force:
         request["force_refresh"] = fact(True, "explicit_refresh")
     active = session.research_runs.exclude(status__in=TERMINAL).filter(revision=session.revision).first()
-    if active and any(active.request.get(key) != request.get(key) for key in ("force_refresh", "refresh_categories")):
+    if active and any(active.request.get(key) != request.get(key) for key in ("force_refresh", "refresh_categories", "destination_batch_offset")):
         session.revision += 1
         session.save(update_fields=["revision"])
         active = None
@@ -125,15 +127,39 @@ def run_research(run_id):
         from .travel.research import enrich_candidate, research_candidates
         from .travel.discovery import remember
         requested = value(run.request, "requested_destination") or value(run.request, "selected_destination")
+        if value(run.request, "_itinerary_stops"):
+            requested = None
         saved = [d for d in run.session.candidates if not requested or d["name"].casefold() == requested.casefold()]
         selected = value(run.request, "selected_location", {})
         if selected.get("lat") is not None and selected.get("lon") is not None:
             saved = [d for d in saved if all(d.get(key) == selected[key] for key in ("lat", "lon"))]
         if run.recheck and saved:
             options = saved
+            pool = value(run.request, "_destination_pool", [])
+            offset = value(run.request, "_destination_offset", 0)
+        elif "destination_batch_offset" in run.request:
+            pool = value(run.request, "_destination_pool", [])[:20]
+            offset = value(run.request, "destination_batch_offset", 0)
+            allowed = {d["name"].casefold() for d in candidates_for(run.session.user, run.request, limit=20, destinations=pool)}
+            offset = sum(d["name"].casefold() in allowed for d in pool[:offset])
+            pool = [d for d in pool if d["name"].casefold() in allowed]
+            options = pool[offset:offset+3]
+            if not options:
+                offset = max(0, len(pool)-3)
+                options = pool[offset:offset+3]
         else:
             preliminary = candidates_for(run.session.user, run.request, limit=50)
-            options = research_candidates(run.session.user, run.request, preliminary)[:3]
+            pool = []
+            seen = set()
+            for candidate in research_candidates(run.session.user, run.request, preliminary):
+                key = candidate["name"].strip().casefold()
+                if key not in seen:
+                    pool.append(candidate)
+                    seen.add(key)
+                if len(pool) == 20:
+                    break
+            offset = 0
+            options = pool[:3]
         previous = {d["name"]: d for d in run.session.candidates}
         verified, changes, researched = 0, [], []
         for destination in options:
@@ -157,6 +183,8 @@ def run_research(run_id):
         summary = (f"Compared {len(options)} destinations; {verified} current weather forecast(s) available. " if verified else
                    "Preliminary suggestions are ready. I couldn't verify live weather for these dates. ")
         summary += "Road conditions, permits, entry fees and room availability remain unverified."
+        if "destination_batch_offset" in run.request and offset+len(options) >= len(pool):
+            summary += " No further eligible batch is available in this pool; change preferences for a new search."
         if run.recheck:
             summary = (" ".join(changes) if changes else "No meaningful change in the facts I could compare.") + " Unverified facts are still unknown; this is not an all-clear."
         with transaction.atomic():
@@ -166,6 +194,8 @@ def run_research(run_id):
                 status=status, completed_at=timezone.now(), lease_until=None, summary=summary, changes=changes, result=options,
                 candidate_count=len(options), sources_checked=run.evidence.exclude(retrieved_at=None).count())
             if status == "ready" and updated:
+                current.state["_destination_pool"] = fact(pool, "ranked_destination_pool", False)
+                current.state["_destination_offset"] = fact(offset, "requested_batch")
                 current.candidates = options[:3]
                 current.status = "ready" if current.itinerary else "researched"
                 if value(current.state,"requested_destination") and len(options) == 1 and not current.itinerary:
@@ -177,7 +207,9 @@ def run_research(run_id):
                     remember(current.user, candidate, "shown")
                     for place in candidate.get("places_result", {}).get("payload", {}).get("places", []):
                         remember(current.user, place, "shown")
-                if current.itinerary:
+                if current.itinerary.get("stops"):
+                    current.itinerary["budget"]["recheck_note"] = "Destination research updated separately. Ordered legs, edited days and the multi-stop allowance are retained; no complete route or availability is verified."
+                elif current.itinerary:
                     selected = next((c for c in options if c["name"] == current.itinerary.get("destination")), None)
                     if selected:
                         current.itinerary["weather"] = selected["weather"]

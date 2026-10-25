@@ -20,6 +20,7 @@ from .services.travel.mapping import map_configuration
 from .services.travel.cache import usage_summary
 from .services.travel.discovery import remember, place_key
 from .services.travel.intent import PROFILE_KEYS, validate_preference
+from .services.travel_itinerary import build_itinerary, build_multi_stop_itinerary, compare_stop_orders
 
 
 class PlannerWriteThrottle(UserRateThrottle):
@@ -53,7 +54,14 @@ def session_payload(session):
                 source["confidence"] = "UNKNOWN"
                 if source["data_type"] == "weather":
                     itinerary["weather"] = {"summary":"This forecast is stale. Recheck Trip before relying on it.","confidence":"UNKNOWN"}
-    return age_saved_facts({"id": session.id, "title": session.title, "state": session.state, "status": session.status,
+    offset = value(session.state, "_destination_offset", 0)
+    pool_count = len(value(session.state, "_destination_pool", []))
+    return age_saved_facts({"id": session.id, "title": session.title,
+            "state": {key: val for key, val in session.state.items() if not key.startswith(("_destination_", "_itinerary_"))}, "status": session.status,
+            "itinerary_stops": [s["name"] for s in value(session.state, "_itinerary_stops", [])],
+            "destination_pool": {"total": pool_count, "offset": offset,
+                "has_previous": offset > 0 and (not value(session.state, "selected_destination") or bool(value(session.state, "_itinerary_stops"))),
+                "has_more": offset+3 < pool_count and (not value(session.state, "selected_destination") or bool(value(session.state, "_itinerary_stops")))},
             "map_config":map_configuration(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),
@@ -104,6 +112,34 @@ class TravelSessionDetail(APIView):
         action = request.data.get("action", "message")
         if action == "message":
             session = send_message(pk, request.user, request.data.get("text", ""))
+        elif action in ("itinerary_stops", "itinerary_order_preview"):
+            revision = request.data.get("revision")
+            if type(revision) is not int or revision != session.revision:
+                return Response({"detail": "This trip changed. Reload it before editing stops."}, status=409)
+            if action == "itinerary_order_preview":
+                proposal = compare_stop_orders(session.state, value(session.state, "_itinerary_stops", []))
+                return Response({**session_payload(session), "stop_order_proposal": proposal})
+            names = request.data.get("stops")
+            if (not isinstance(names, list) or len(names) > 5 or any(not isinstance(n, str) or not 1 <= len(n) <= 180 for n in names)
+                    or len(set(names)) != len(names)):
+                raise ValidationError("Choose up to five distinct destinations in order.")
+            available = {s["name"]: s for s in value(session.state, "_itinerary_stops", [])+session.candidates}
+            if any(n not in available for n in names):
+                raise ValidationError("Add destinations shown in this conversation; arbitrary or other-account places are not accepted.")
+            stops = [deepcopy(available[n]) for n in names]
+            itinerary = (build_multi_stop_itinerary(session.state, stops) if len(stops) > 1 else
+                         build_itinerary(session.state, stops[0]) if stops else {})
+            session.state["_itinerary_stops"] = fact(stops)
+            session.state.pop("requested_destination", None)
+            session.state.pop("selected_location", None)
+            if stops:
+                session.state["selected_destination"] = fact(names[0])
+            else:
+                session.state.pop("selected_destination", None)
+            session.itinerary = itinerary
+            session.revision += 1
+            session.status = "ready" if stops else "researched"
+            session.save()
         elif action == "save":
             save_plan(session, draft=request.data.get("draft") is True)
         elif action == "vehicle":
@@ -113,8 +149,13 @@ class TravelSessionDetail(APIView):
             session.save()
             from .services.travel_conversation import vehicle_state
             vehicle_state(session)
+            stops = value(session.state, "_itinerary_stops", [])
+            if stops:
+                session.itinerary = build_multi_stop_itinerary(session.state, stops) if len(stops) > 1 else build_itinerary(session.state, stops[0])
             session.save()
         elif action == "reject":
+            if request.data.get("destination") in [s["name"] for s in value(session.state, "_itinerary_stops", [])]:
+                raise ValidationError("Remove this destination from your ordered stops before rejecting it.")
             chosen = next((c for c in session.candidates if c["name"] == request.data.get("destination")), None)
             if not chosen:
                 raise ValidationError("Choose one of this session's destinations.")
@@ -123,6 +164,8 @@ class TravelSessionDetail(APIView):
             learn(request.user, "destination:"+chosen["name"], False, "Rejected recommendation", .5)
             avoided = value(session.state, "must_avoid", [])
             session.state["must_avoid"] = fact(list(dict.fromkeys(avoided+[chosen["name"]])))
+            session.state.pop("_destination_pool", None)
+            session.state.pop("_destination_offset", None)
             session.revision += 1
             session.save()
             queue_research(session)

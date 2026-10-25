@@ -1463,8 +1463,8 @@ def _retry_recruiter_document(user, document_id: int) -> dict:
     analysis.save(update_fields=["extracted_payload", "updated_at"])
 
     combined_text = payload.get("intake_combined_text") or analysis.extracted_text or payload.get("intake_message_text") or ""
-    message_text = payload.get("intake_message_text") or combined_text
-    snapshot = job_intelligence.parse_recruiter_message(message_text or combined_text)
+    # Reparse the captured message AND attachment, not just the message header.
+    snapshot = job_intelligence.parse_recruiter_message(combined_text)
     for key, value in _saved_corrections(payload, ("job_title", "company", "location", "experience_years", "salary_min", "salary_max")).items():
         if key in {"experience_years", "salary_min", "salary_max"}:
             value = float(value)

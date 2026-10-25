@@ -97,6 +97,20 @@ class GlobalAbuseLimitTests(TestCase):
             self.assertEqual(response.status_code, 200)
             search.assert_called_once()
 
+    def test_private_corpus_requests_share_expensive_budget_before_vault_or_source_reads(self):
+        self.client.force_login(self.user)
+        with override_settings(ALFRED_API_ACCOUNT_LIMIT=100):
+            self.client.post('/api/loans/import-pdf/', {})
+            with patch('apps.ml_engine.api.document_corpus.memory_store') as store:
+                for method, path in (('get',''), ('post',''), ('post','search/'), ('post','question/'), ('post','upload/'),
+                        ('get','a'*32+'/original/'), ('delete','a'*32+'/')):
+                    with self.subTest(method=method, path=path):
+                        response = getattr(self.client, method)('/api/ai/document-corpus/'+path,
+                            data={}, content_type='application/json')
+                        self.assertEqual(response.status_code, 429)
+                        self.assertIn('Retry-After', response)
+                store.assert_not_called()
+
     def test_anonymous_and_missing_csrf_never_mutate(self):
         self.assertEqual(self.client.post('/api/budgets/', {}).status_code, 403)
         csrf = Client(enforce_csrf_checks=True)

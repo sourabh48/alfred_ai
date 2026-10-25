@@ -9,7 +9,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.shortcuts import render
 from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
@@ -360,6 +360,8 @@ def document_review_correction_api_view(request):
             document_id=int(payload.get("id") or 0),
             corrections=payload.get("corrections") or {},
         )
+    except ObjectDoesNotExist:
+        return JsonResponse({"error": "Document not found."}, status=404)
     except (ValueError, TypeError) as exc:
         if isinstance(locals().get("payload"), dict) and payload.get("scope") in {"loan_document", "loan_closure_document"}:
             from .services.api_errors import safe_error_details
@@ -379,6 +381,8 @@ def document_review_retry_api_view(request):
             scope=str(payload.get("scope") or ""),
             document_id=int(payload.get("id") or 0),
         )
+    except ObjectDoesNotExist:
+        return JsonResponse({"error": "Document not found."}, status=404)
     except Exception as exc:
         if payload.get("scope") not in {"loan_document", "loan_closure_document"}:
             raise

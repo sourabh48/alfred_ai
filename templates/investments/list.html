@@ -20,6 +20,19 @@
 
 <section class="soft-grid four-up mb-4" id="investmentSummaryCards"></section>
 
+<section class="surface-card mb-4" aria-labelledby="investmentReviewTitle">
+    <h2 id="investmentReviewTitle" class="page-section-title">Local record-review reminders</h2>
+    <p class="page-section-copy">Remind me when a holding's record has not been edited recently. An edit date does not verify its price, statement or market freshness.</p>
+    <form id="investmentReviewForm" class="row g-3 align-items-end">
+        <div class="col-md-5"><label class="form-check"><input id="investmentReviewEnabled" type="checkbox" class="form-check-input"> I opt in to encrypted local reminders</label></div>
+        <div class="col-md-3"><label for="investmentReviewDays" class="form-label">Review after</label><select id="investmentReviewDays" class="form-select"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select></div>
+        <div class="col-md-4 d-flex flex-wrap gap-2"><button class="btn btn-outline-primary" type="submit" disabled>Save choice</button><button id="investmentReviewCheck" class="btn btn-outline-secondary" type="button" disabled>Check records now</button></div>
+    </form>
+    <p class="small mt-3">Off by default. Turning off clears current reminders. Up to 20 holdings/reminders, retained locally for at most 90 days. Checks run on request; no email, background delivery, monetary thresholds or trades.</p>
+    <p id="investmentReviewStatus" role="status" aria-live="polite">Loading local reminder policy…</p>
+    <ul id="investmentReviewItems" class="list-unstyled"></ul>
+</section>
+
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">

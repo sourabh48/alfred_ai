@@ -16,9 +16,9 @@ from scripts import release_gate as release
 BACKEND = tuple("tests." + name for name in (
     "test_alfred_brain", "test_api_session_security", "test_auth_pages", "test_bank_statement_grounding", "test_bike_document_parser",
     "test_budget_money", "test_budget_money_migration", "test_canonical_evidence", "test_canonical_grounding", "test_closure_citations",
-    "test_career_api_errors", "test_career_job_http", "test_career_recruiter_and_evidence",
+    "test_career_api_errors", "test_career_job_http", "test_career_matching_acceptance", "test_career_recruiter_and_evidence",
     "test_career_resume_upload", "test_career_money", "test_conversation_history", "test_credit_report_upload", "test_document_center_and_statement_import",
-    "test_document_extraction", "test_document_grounding_acceptance", "test_document_knowledge", "test_document_retry_integrity",
+    "test_document_corpus", "test_document_extraction", "test_document_grounding_acceptance", "test_document_knowledge", "test_document_questions", "test_document_retry_integrity",
     "test_document_review_and_retry", "test_expense_corrections", "test_expense_export", "test_expense_money_identity", "test_expense_money_runtime", "test_experimental_retirement",
     "test_family_account_links", "test_family_api_errors", "test_family_consent_migration",
     "test_family_invitation_atomic", "test_family_invitation_throttling", "test_file_uploader_persistence",
@@ -29,13 +29,13 @@ BACKEND = tuple("tests." + name for name in (
     "test_loan_lifecycle_and_reports", "test_loan_money_field", "test_loan_money_runtime",
     "test_loan_related_money_runtime", "test_loan_verification", "test_loan_verification_api",
     "test_memory_checkpoint", "test_memory_cloud", "test_memory_learning", "test_memory_privacy", "test_memory_platform",
-    "test_memory_reasoning", "test_memory_evaluation", "test_memory_sync", "test_memory_sync_runtime", "test_native_launcher",
+    "test_memory_reasoning", "test_gemini_development", "test_investment_review_alerts", "test_serving_readiness", "test_memory_evaluation", "test_memory_sync", "test_memory_sync_runtime", "test_native_launcher", "test_retrieval_quality",
     "test_mobility_money", "test_native_observation", "test_native_runtime", "test_native_tray", "test_operational_hardening",
     "test_password_security", "test_persistent_memory", "test_profile_money_boundary",
     "test_private_storage", "test_source_storage", "test_private_media_profiles", "test_local_config",
     "test_platform_hardening.EmailConnectionTokenSecurityTests", "test_remaining_public_http",
     "test_retention_release_boundary", "test_statement_columns", "test_statement_evidence", "test_statement_evidence_migration", "test_token_rotation",
-    "test_travel_http", "test_travel_retention", "test_travel_refresh", "test_upload_limits", "test_upload_privacy_retention", "test_user_data_reset", "test_user_money",
+    "test_travel_http", "test_travel_retention", "test_travel_refresh", "test_travel_candidate_pool", "test_travel_multistop", "test_upload_limits", "test_upload_privacy_retention", "test_user_data_reset", "test_user_money",
     "test_release_gate", "test_release_validation", "test_release_recovery", "test_private_recovery_verifier",
     "test_release_promotion", "test_release_acceptance", "test_browser_regression_runner", "test_live_ui_contracts", "test_windows_build_provenance"))
 

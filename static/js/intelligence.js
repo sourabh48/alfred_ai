@@ -35,6 +35,35 @@ document.addEventListener("DOMContentLoaded", () => {
     let active = true, generation = 0, cloudAvailable = false, pending = false;
     let historyPolicy = null, conversation = null, requestToken = null, historyBlocked = false;
     let sourceRequest = 0, picker = null;
+    const modelPanel=document.getElementById('modelReadinessPanel'), modelItems=document.getElementById('modelReadinessItems');
+    const modelStatus=document.getElementById('modelReadinessStatus'), modelRefresh=document.getElementById('modelReadinessRefresh');
+    let modelPending=false, modelLoaded=false;
+    async function refreshModelReadiness() {
+        if (!active || modelPending) return;
+        const ticket=generation;
+        modelPending=true; modelRefresh.disabled=true; modelItems.replaceChildren();
+        document.getElementById('modelReadinessScope').textContent='';
+        modelStatus.textContent='Checking local registry gates…'; modelPanel.setAttribute('aria-busy','true');
+        try {
+            const data=await Alfred.fetchJSON('/api/ai/runtime-status/?serving_readiness=1');
+            if (!active || ticket!==generation) return;
+            for (const item of data.models) {
+                const row=document.createElement('li'); row.className='mb-3';
+                const title=document.createElement('strong'); title.textContent=`${item.name} · ${item.registry_eligible ? 'Registry eligible' : item.status==='fallback' ? 'Fallback' : 'Unavailable'}`;
+                const reason=document.createElement('p'); reason.className='mb-1'; reason.textContent=item.reason;
+                const fallback=document.createElement('p'); fallback.className='small mb-0'; fallback.textContent=`Fallback: ${item.fallback}`;
+                row.append(title,reason,fallback); modelItems.append(row);
+            }
+            document.getElementById('modelReadinessScope').textContent=data.scope;
+            modelStatus.textContent=`Registry checked ${new Date(data.checked_at).toLocaleString()}. Recheck to see current gates.`; modelLoaded=true;
+        } catch(error) {
+            if (!active || ticket!==generation) return;
+            if ([401,403].includes(error.status)) forgetPrivatePage();
+            modelStatus.textContent=`${error.message} Readiness is unknown; no model was activated.`;
+        } finally { modelPending=false; modelRefresh.disabled=!active; modelPanel.setAttribute('aria-busy','false'); }
+    }
+    modelPanel.addEventListener('toggle',()=>{if(modelPanel.open && !modelLoaded) refreshModelReadiness();});
+    modelRefresh.addEventListener('click',refreshModelReadiness);
     function resetSources() {
         sourceRequest++; picker = null; sourcePanel.classList.add("d-none");
         sourceItems.replaceChildren(); sourceSelected.replaceChildren(); sourceStatus.textContent = "";
@@ -171,6 +200,8 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("intelligenceFinancialDocumentContext").textContent = "";
         historyList.replaceChildren(); historyTitle.value = ""; historyConsent.checked = false; historyDays.value = "7";
         query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false;
+        modelItems.replaceChildren(); modelLoaded=false; modelRefresh.disabled=true;
+        document.getElementById('modelReadinessScope').textContent=''; modelStatus.textContent='Reopen to check current registry gates.';
         feedback.textContent = ""; historyFeedback.textContent = ""; retry.hidden = true;
         document.getElementById("conversationHistoryStatus").textContent = "Checking local policy";
         updateHistoryControls(); consent.disabled = true;
@@ -285,8 +316,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     async function refreshControls() {
         const ticket = generation;
-        const [insights, reasoning, history] = await Promise.all([Alfred.fetchJSON("/api/ai/personal-insights/?assistant_status=1"), Alfred.fetchJSON("/api/ai/memories/reason/"), Alfred.fetchJSON("/api/ai/conversations/")]);
+        cloudAvailable = false; consent.checked = false; consent.disabled = true;
+        // Cloud policy status must not gate independent owner-only source browsing.
+        const [insights, history, policy] = await Promise.all([
+            Alfred.fetchJSON("/api/ai/personal-insights/?assistant_status=1"),
+            Alfred.fetchJSON("/api/ai/conversations/"),
+            Alfred.fetchJSON("/api/ai/memories/reason/").then(data => ({data}), error => ({error}))
+        ]);
         if (!active || ticket !== generation) return;
+        if (policy.error && [401,403].includes(policy.error.status)) {
+            forgetPrivatePage(); feedback.textContent = "Session or policy permission is no longer available. Sign in or reload before continuing."; return;
+        }
+        const reasoning = policy.data;
         applyHistory(history);
         documentChoice.replaceChildren(new Option("Choose verified evidence", ""));
         (insights.assistant_documents || []).forEach(item => documentChoice.append(new Option(item.label, item.id)));
@@ -316,11 +357,12 @@ document.addEventListener("DOMContentLoaded", () => {
             financialChoice.append(new Option(`${kind} record #${record.record_id}`, selectedFinancial));
         }
         if ([...financialChoice.options].some(option => option.value === selectedFinancial)) financialChoice.value = selectedFinancial;
-        cloudAvailable = reasoning.provider_available && reasoning.policy.enabled;
+        cloudAvailable = Boolean(reasoning?.provider_available && reasoning.policy.enabled);
         setLocalStatus(insights.local_model_status === "available" ? "Ollama available" : "Ollama unavailable", insights.local_model_status === "available" ? "ready" : "unavailable");
-        document.getElementById("intelligenceCloudStatus").textContent = !reasoning.real_provider_enabled
+        document.getElementById("intelligenceCloudStatus").textContent = !reasoning ? "Cloud policy unavailable · cloud disabled" : !reasoning.real_provider_enabled
             ? (cloudAvailable ? "Synthetic cloud testing · OpenAI disabled" : "OpenAI disabled")
             : (cloudAvailable ? "OpenAI · consent required per question" : "OpenAI · owner consent or configuration required");
+        if (policy.error) feedback.textContent = `${policy.error.message} Cloud is disabled. Reload to recheck its policy; local sources remain available.`;
         updateScope();
     }
     scope.addEventListener("change", updateScope);
@@ -505,6 +547,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     window.addEventListener("pageshow", event => {
         active = true;
-        if (event.persisted) refreshControls().catch(error => { if (active) feedback.textContent = error.message; });
+        if (event.persisted) {
+            modelRefresh.disabled=modelPending;
+            if (modelPanel.open) refreshModelReadiness();
+            refreshControls().catch(error => { if (active) feedback.textContent = error.message; });
+        }
     });
 });

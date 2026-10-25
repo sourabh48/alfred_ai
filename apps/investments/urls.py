@@ -1,4 +1,5 @@
 from django.urls import path
+from .alert_views import InvestmentReviewAlertView
 from .views import (
     InvestmentAllocationView,
     InvestmentDetailView,
@@ -10,6 +11,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("review-alerts/", InvestmentReviewAlertView.as_view()),
     path("", InvestmentListCreateView.as_view()),
     path("summary/", InvestmentSummaryView.as_view()),
     path("import-uploads/", InvestmentImportDocumentListView.as_view()),

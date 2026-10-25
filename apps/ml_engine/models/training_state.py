@@ -41,7 +41,8 @@ class AdaptiveModelState(models.Model):
             return False
         if self.next_refresh_due_at is None:
             return False
-        return timezone.now() < self.next_refresh_due_at
+        now=timezone.now()
+        return (self.last_finished_at is None or self.last_finished_at<=now) and now<self.next_refresh_due_at
 
     @property
     def inference_ready(self) -> bool:

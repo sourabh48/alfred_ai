@@ -1,6 +1,7 @@
 """Payment/closure currency stays exact internally and numeric at API boundaries."""
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -27,7 +28,8 @@ class LoanRelatedMoneyRuntimeTests(TestCase):
         self.addCleanup(cache.clear)
         media = TemporaryDirectory()
         self.addCleanup(media.cleanup)
-        settings = override_settings(MEDIA_ROOT=media.name)
+        settings = override_settings(MEDIA_ROOT=media.name,
+            ALFRED_ABUSE_THROTTLE_DIR=str(Path(media.name) / "request-limits"))
         settings.enable()
         self.addCleanup(settings.disable)
         self.user = get_user_model().objects.create_user(username="related-money-owner")

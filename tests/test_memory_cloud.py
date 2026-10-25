@@ -25,6 +25,7 @@ class MemoryCloudTests(TestCase):
     """Historical wire-only contract; this adapter is absent from application runtime."""
     def setUp(self):
         self.root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-s3-synthetic-')))
+        self.enterContext(override_settings(ALFRED_ABUSE_THROTTLE_DIR=str(self.root/'request-limits')))
         self.alice=get_user_model().objects.create_user(username='synthetic-s3-alice')
         self.bob=get_user_model().objects.create_user(username='synthetic-s3-bob')
         self.store=MemoryStore(self.root/'one',embedder=SyntheticEmbeddings()); self.owner=_owner(self.alice)

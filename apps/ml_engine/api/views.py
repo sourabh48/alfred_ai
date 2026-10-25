@@ -1,6 +1,8 @@
+from time import monotonic
+
 from apps.ml_engine.core.alfred_router import alfred_router
 from apps.ml_engine.runtime_control import build_runtime_status, grant_training_consent, revoke_training_consent
-from apps.ml_engine.training.orchestrator import run_training_cycle, training_health_snapshot
+from apps.ml_engine.training.orchestrator import run_training_cycle, training_health_snapshot, serving_readiness_snapshot
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
 
 from rest_framework.views import APIView
@@ -67,9 +69,8 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
         intelligence['assistant_statement_records']=choices(request.user)
         intelligence['assistant_financial_records']=financial_choices(request.user)
         if request.query_params.get('assistant_status') == '1':
-            import time
             try:
-                OllamaReasoner()._digest(deadline=time.monotonic()+1)
+                OllamaReasoner()._digest(deadline=monotonic()+1)
                 intelligence['local_model_status'] = 'available'
             except EmbeddingUnavailable:
                 intelligence['local_model_status'] = 'unavailable'
@@ -122,6 +123,16 @@ class MLRuntimeStatusAPI(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if 'serving_readiness' in request.query_params:
+            if set(request.query_params)!={'serving_readiness'} or request.query_params.getlist('serving_readiness')!=['1']:
+                raise ValidationError('Use serving_readiness=1 without other parameters.')
+            try:
+                response=Response(serving_readiness_snapshot())
+            except Exception as exc:
+                from alfred_ai.services.api_errors import safe_error_response
+                response=safe_error_response(exc,'Local model readiness is unavailable. No training or provider changes were made.',logger_name=__name__,status_code=503)
+            response['Cache-Control']='no-store, private'
+            return response
         payload = build_runtime_status(request.user)
         payload["training_health"] = training_health_snapshot()
         return Response(payload)

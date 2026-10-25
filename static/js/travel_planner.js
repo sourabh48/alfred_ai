@@ -7,8 +7,8 @@ window.TravelPlanner = (() => {
     const state = {session: null, busy: false, timer: null, comparison: false, plans: []};
     const field = key => state.session?.state?.[key]?.value;
     function syncActionState() {
-        document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button')
-            .forEach(control => { control.disabled = state.busy; });
+        document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], [data-add-stop], [data-stop-index], #plannerCompareOrder, #plannerApplyOrder, #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button')
+            .forEach(control => { control.disabled = state.busy || control.dataset.batchUnavailable === "true"; });
     }
     function alert(message) { $("plannerAlert").textContent = message; $("plannerAlert").hidden = !message; }
     function link(url, title) {
@@ -93,7 +93,7 @@ window.TravelPlanner = (() => {
         $("plannerSave").hidden = !session.itinerary?.days?.length;
         $("plannerRecheck").hidden = !session.candidates?.length;
         $("plannerResults").hidden = !session.candidates.length;
-        candidates(); comparison(); itinerary();
+        candidates(); comparison(); itinerary(); stops();
         window.TravelResearchPanels.render(session);
         if (session.plan_id) populateDetails(session.plan_id);
         else $("planDetails").hidden = true;
@@ -102,7 +102,23 @@ window.TravelPlanner = (() => {
         schedulePoll();
     }
     function candidates() {
+        const pool = state.session.destination_pool;
+        const pending = state.session.research && !["ready", "failed", "superseded"].includes(state.session.research.status);
+        Alfred.setHTMLIfChanged("plannerCandidatePages", pool?.total && (!field("selected_destination") || state.session.itinerary_stops?.length) ?
+            `<p>Showing ${pool.offset+1}–${pool.offset+state.session.candidates.length} of ${pool.total} ranked candidates (at most 20). Research runs three at a time; source freshness and unknown availability remain separate.</p>`+
+            `<div class="travel-actions"><button id="plannerPreviousCandidates" type="button" class="btn btn-outline-primary" data-planner-message="Previous destinations" data-batch-unavailable="${!pool.has_previous || pending}">Previous destinations</button>`+
+            `<button id="plannerMoreCandidates" type="button" class="btn btn-outline-primary" data-planner-message="Show more destinations" data-batch-unavailable="${!pool.has_more || pending}">Show more destinations</button></div>` : "");
         Alfred.setHTMLIfChanged("plannerCandidates", state.session.candidates.map((d,i) => `<article class="travel-candidate" data-destination="${esc(d.name)}"><header><span class="travel-fit">Option ${i+1} / ${esc(d.fit)}</span><h3 class="mt-2 mb-0">${esc(d.name)}</h3><p class="small mt-2 mb-0">${esc(d.styles.slice(0,3).join(" · "))}</p></header><div class="travel-candidate-body"><dl><dt>Expected trip budget</dt><dd>${money(d.budget.expected)} · range ${money(d.budget.minimum)}–${money(d.budget.comfortable)}</dd><dt>Travel from ${esc(field("origin"))}</dt><dd>${d.distance_km ? `~${esc(d.distance_km)} km / ~${esc(d.travel_hours)} hours one way` : "Distance and travel time unverified"}<br><small>Estimate · includes no live traffic</small></dd><dt>Weather</dt><dd>${esc(d.weather.summary)}</dd></dl><strong>Why it fits</strong><ul>${d.why.map(w=>`<li>${esc(w)}</li>`).join("")}</ul><strong>Watch out</strong><p class="small">${esc(d.issues.join(" "))}</p><div class="travel-actions"><button type="button" class="btn btn-primary btn-sm" data-planner-message="Choose ${esc(d.name)}">Choose ${esc(d.name)}</button><button type="button" class="btn btn-outline-secondary btn-sm" data-reject="${esc(d.name)}">Not this time</button></div><details class="mt-3"><summary>Details · Why this recommendation?</summary><div class="small mt-2">${Object.entries(d.factors).map(([k,v])=>`<p><strong>${esc(k)}</strong>: ${esc(v)}</p>`).join("")}<p>Ranking uses budget, travel time, your stated preferences and recorded visits. Fit labels are guidance, not probabilities.</p></div></details><details class="mt-2"><summary>Sources</summary>${sourceMarkup(d.sources)}</details></div></article>`).join(""));
+    }
+    function stops() {
+        const names = state.session.itinerary_stops || [];
+        const supported = ["ride", "roadtrip"].includes(field("transport_mode"));
+        const proposal = state.session.stop_order_proposal;
+        Alfred.setHTMLIfChanged("plannerStops", `<h2 class="h5">Ordered stops</h2><p class="small">Add up to five destinations shown in this conversation for your own motorcycle or car. Allow at least one night per stop plus a return day. Nights are shared evenly; changing the order rebuilds day edits and allowances. Routes, permits and stays need separate verification.</p>`+
+            `<ol>${names.map((name,i)=>`<li class="mb-2"><strong>${esc(name)}</strong><div class="travel-actions"><button type="button" class="btn btn-sm btn-outline-secondary" data-stop-index="${i}" data-stop-move="-1" data-batch-unavailable="${i===0}" aria-label="Move ${esc(name)} earlier">Earlier</button><button type="button" class="btn btn-sm btn-outline-secondary" data-stop-index="${i}" data-stop-move="1" data-batch-unavailable="${i===names.length-1}" aria-label="Move ${esc(name)} later">Later</button><button type="button" class="btn btn-sm btn-outline-secondary" data-stop-index="${i}" data-stop-remove="true" aria-label="Remove ${esc(name)}">Remove</button></div></li>`).join("")}</ol>`+
+            (names.length >= 3 ? '<button type="button" id="plannerCompareOrder" class="btn btn-sm btn-outline-primary mb-3">Compare estimated stop order</button>' : '')+
+            (proposal ? `<div id="plannerOrderProposal" class="alert alert-info"><p>Current order: ~${esc(proposal.current_distance_km)} km. Suggested order: ~${esc(proposal.suggested_distance_km)} km.</p><p>${esc(proposal.stops.join(" \u2192 "))}</p><p>${esc(proposal.basis)}</p>${proposal.changed ? '<button type="button" id="plannerApplyOrder" class="btn btn-primary btn-sm">Apply order and rebuild draft</button>' : '<p>Your current order already has the shortest estimated distance; no change was made.</p>'}</div>` : '')+
+            (supported ? `<div class="travel-actions">${state.session.candidates.map(d=>`<button type="button" class="btn btn-sm btn-outline-primary" data-add-stop="${esc(d.name)}" data-batch-unavailable="${names.includes(d.name) || names.length===5}">Add ${esc(d.name)} as stop</button>`).join("")}</div>` : `<p>Choose motorcycle or car travel to build a multi-stop draft.</p>`));
     }
     function comparison() {
         $("plannerComparison").hidden = !state.comparison;
@@ -116,7 +132,8 @@ window.TravelPlanner = (() => {
         $("plannerItinerary").hidden = !it?.days?.length;
         if (!it?.days?.length) return;
         const b = it.budget;
-        Alfred.setHTMLIfChanged("plannerItinerary", `<div class="surface-card mb-3"><p class="metric-kicker">YOUR FLEXIBLE ITINERARY · PRELIMINARY</p><h2>${esc(it.destination)}</h2><p>${esc(it.summary)}</p><p><strong>Route:</strong> ${esc(it.route.summary)}</p><p class="small">${esc(it.route.note)}</p><p>${esc(it.weather.summary)}</p><div class="travel-budget-grid">${["minimum","expected","comfortable"].map(k=>`<div>${esc(k[0].toUpperCase()+k.slice(1))}<strong>${money(b[k])}</strong></div>`).join("")}</div>${b.over_budget ? `<p class="alert alert-warning">About ${money(b.over_budget)} over target. ${esc(b.adaptations.join(" · "))}</p>` : ""}<details><summary>Budget breakdown and assumptions</summary><table class="table"><tbody>${Object.entries(b.categories).map(([k,v])=>`<tr><th scope="row">${esc(k)}</th><td>${money(v)}</td></tr>`).join("")}</tbody></table><ul>${b.assumptions.map(a=>`<li>${esc(a)}</li>`).join("")}</ul></details></div><div class="travel-itinerary-days">${it.days.map(d=>`<article class="travel-day" data-day="${d.day}"><p class="travel-fit">DAY ${d.day} ${esc(d.date || "· dates flexible")}</p><h3 class="h5">${esc(d.title)}</h3><ul>${d.items.map(item=>`<li><span class="travel-priority">${esc(item.priority)} · ${esc(item.period)}</span><br><strong>${esc(item.title)}</strong><br><small>${esc(item.duration)}</small></li>`).join("")}</ul><p class="small"><strong>Stay:</strong> ${esc(d.stay)}<br><strong>Meals:</strong> ${esc(d.meals)}</p><strong>Day allowance: ${money(d.estimated_cost)}</strong></article>`).join("")}</div><div class="surface-card mt-3"><details><summary>Packing, vehicle and pre-trip checks</summary><ul>${it.packing.concat(it.checks).map(p=>`<li>${esc(p)}</li>`).join("")}</ul>${it.bike ? `<p>${esc(it.bike.profile)} · ${it.bike.nominal_range_km ? `Nominal profile range ~${esc(it.bike.nominal_range_km)} km` : "Range not available from your profile"}</p><p>${esc(it.bike.range_note)} ${esc(it.bike.notes)}</p>` : ""}<ul>${it.route.options.map(o=>`<li>${esc(o.name)}: ${esc(o.status)}</li>`).join("")}</ul></details><details class="mt-2"><summary>Research sources</summary>${sourceMarkup(it.sources)}</details></div>`);
+        const legs = it.route.legs ? `<details class="surface-card mb-3"><summary>Ordered leg estimates and stop evidence</summary><ul>${it.route.legs.map(l=>`<li>${esc(l.from)} → ${esc(l.to)}: ~${esc(l.distance_km)} km · estimate, not a verified road route</li>`).join("")}</ul>${it.stops.map(s=>`<details><summary>${esc(s.name)} · ${s.nights} night(s) · sources apply only to this stop</summary>${sourceMarkup(s.sources)}</details>`).join("")}${b.recheck_note ? `<p>${esc(b.recheck_note)}</p>` : ""}</details>` : "";
+        Alfred.setHTMLIfChanged("plannerItinerary", `<div class="surface-card mb-3"><p class="metric-kicker">YOUR FLEXIBLE ITINERARY · PRELIMINARY</p><h2>${esc(it.destination)}</h2><p>${esc(it.summary)}</p><p><strong>Route:</strong> ${esc(it.route.summary)}</p><p class="small">${esc(it.route.note)}</p><p>${esc(it.weather.summary)}</p><div class="travel-budget-grid">${["minimum","expected","comfortable"].map(k=>`<div>${esc(k[0].toUpperCase()+k.slice(1))}<strong>${money(b[k])}</strong></div>`).join("")}</div>${b.over_budget ? `<p class="alert alert-warning">About ${money(b.over_budget)} over target. ${esc(b.adaptations.join(" · "))}</p>` : ""}<details><summary>Budget breakdown and assumptions</summary><table class="table"><tbody>${Object.entries(b.categories).map(([k,v])=>`<tr><th scope="row">${esc(k)}</th><td>${money(v)}</td></tr>`).join("")}</tbody></table><ul>${b.assumptions.map(a=>`<li>${esc(a)}</li>`).join("")}</ul></details></div><div class="travel-itinerary-days">${it.days.map(d=>`<article class="travel-day" data-day="${d.day}"><p class="travel-fit">DAY ${d.day} ${esc(d.date || "· dates flexible")}</p><h3 class="h5">${esc(d.title)}</h3><ul>${d.items.map(item=>`<li><span class="travel-priority">${esc(item.priority)} · ${esc(item.period)}</span><br><strong>${esc(item.title)}</strong><br><small>${esc(item.duration)}</small></li>`).join("")}</ul><p class="small"><strong>Stay:</strong> ${esc(d.stay)}<br><strong>Meals:</strong> ${esc(d.meals)}</p><strong>Day allowance: ${money(d.estimated_cost)}</strong></article>`).join("")}</div><div class="surface-card mt-3"><details><summary>Packing, vehicle and pre-trip checks</summary><ul>${it.packing.concat(it.checks).map(p=>`<li>${esc(p)}</li>`).join("")}</ul>${it.bike ? `<p>${esc(it.bike.profile)} · ${it.bike.nominal_range_km ? `Nominal profile range ~${esc(it.bike.nominal_range_km)} km` : "Range not available from your profile"}</p><p>${esc(it.bike.range_note)} ${esc(it.bike.notes)}</p>` : ""}<ul>${it.route.options.map(o=>`<li>${esc(o.name)}: ${esc(o.status)}</li>`).join("")}</ul></details><details class="mt-2"><summary>Research sources</summary>${sourceMarkup(it.sources)}</details></div>${legs}`);
     }
     function populateDetails(planId) {
         const plan = state.plans.find(p=>p.id === planId);
@@ -149,6 +166,18 @@ window.TravelPlanner = (() => {
                 if (button.dataset.session) await open(Number(button.dataset.session));
                 if (button.dataset.openPlan) await create(Number(button.dataset.openPlan));
                 if (button.dataset.reject) await action({action:"reject",destination:button.dataset.reject});
+                if (button.id === "plannerCompareOrder") await action({action:"itinerary_order_preview",revision:state.session.revision});
+                if (button.id === "plannerApplyOrder") await action({action:"itinerary_stops",stops:state.session.stop_order_proposal.stops,revision:state.session.revision});
+                if (button.dataset.addStop || button.dataset.stopIndex !== undefined) {
+                    const names = [...(state.session.itinerary_stops || [])];
+                    if (button.dataset.addStop) names.push(button.dataset.addStop);
+                    else {
+                        const i = Number(button.dataset.stopIndex);
+                        if (button.dataset.stopRemove) names.splice(i, 1);
+                        else { const j = i + Number(button.dataset.stopMove); [names[i], names[j]] = [names[j], names[i]]; }
+                    }
+                    await action({action:"itinerary_stops",stops:names,revision:state.session.revision});
+                }
                 if (button.dataset.rating) {const tags=kind=>Array.from(document.querySelectorAll(`input[data-feedback-plan="${Number(button.dataset.plan)}"][data-feedback-kind="${kind}"]:checked`)).map(e=>e.value);await Alfred.fetchJSON(api+"feedback/",{method:"POST",body:JSON.stringify({plan_id:Number(button.dataset.plan),rating:button.dataset.rating,liked:tags("liked"),disliked:tags("disliked")})});await postTrip();}
                 if (button.dataset.media) {await Alfred.fetchJSON(api+"media-suggestions/",{method:"POST",body:JSON.stringify({plan_id:Number(button.dataset.plan),photo_id:Number(button.dataset.photo),action:button.dataset.media})});await postTrip();await loadMobilityDashboard();}
             } catch(err) { alert(err.message); }

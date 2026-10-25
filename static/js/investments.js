@@ -9,8 +9,62 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("investmentForm").addEventListener("submit", submitInvestmentForm);
     document.getElementById("uploadInvestmentPdfBtn").addEventListener("click", uploadInvestmentPdfs);
     loadInvestmentDashboard();
+    initInvestmentReviewAlerts();
     Alfred.enableLiveRefresh("investments-live", loadInvestmentDashboard, { rootId: "investmentRoot" });
 });
+
+function initInvestmentReviewAlerts() {
+    const form=document.getElementById('investmentReviewForm');
+    if (!form) return;
+    const enabled=document.getElementById('investmentReviewEnabled'), days=document.getElementById('investmentReviewDays');
+    const check=document.getElementById('investmentReviewCheck'), status=document.getElementById('investmentReviewStatus');
+    const list=document.getElementById('investmentReviewItems');
+    let policy=null, pending=false, active=true;
+    function controls() {
+        form.querySelector('button[type="submit"]').disabled=pending || !policy;
+        check.disabled=pending || !policy?.enabled;
+        enabled.disabled=pending || !policy; days.disabled=pending || !policy;
+        list.querySelectorAll('button').forEach(button=>{button.disabled=pending;});
+        form.setAttribute('aria-busy',String(pending));
+    }
+    function render(data) {
+        policy=data; enabled.checked=data.enabled; days.value=String(data.days); list.replaceChildren();
+        status.textContent=`${data.enabled ? 'Reminders on' : 'Reminders off'} · ${data.items.length} reminders · ${data.checked_at ? `last checked ${new Date(data.checked_at).toLocaleString()}` : 'not checked'}.`;
+        if (data.unassessed_records) status.textContent+=` ${data.unassessed_records} future-dated records could not be assessed.`;
+        for (const item of data.items) {
+            const row=document.createElement('li'); row.className='mb-3';
+            const text=document.createElement('p'); text.className='mb-1';
+            text.textContent=`${item.name} · ${item.status} · record last edited ${new Date(item.source_updated_at).toLocaleString()}. This does not verify its price.`;
+            const link=document.createElement('a'); link.href=item.url; link.textContent='Review owned record'; row.append(text,link);
+            if (['unread','read'].includes(item.status)) {
+                for (const [action,label] of [['read','Mark read'],['dismiss','Dismiss']]) {
+                    if (action==='read' && item.status==='read') continue;
+                    const button=document.createElement('button'); button.type='button'; button.className='btn btn-outline-secondary btn-sm ms-2';
+                    button.textContent=label; button.addEventListener('click',()=>perform({action,id:item.id})); row.append(button);
+                    button.setAttribute('aria-label',`${label}: ${item.name}`);
+                }
+            }
+            list.append(row);
+        }
+    }
+    async function perform(payload) {
+        if (pending || !active) return;
+        pending=true; controls();
+        try {
+            const data=await Alfred.fetchJSON('/api/investments/review-alerts/',payload ? {method:'POST',body:JSON.stringify({...payload,revision:policy.revision})} : {});
+            if (active) render(data);
+        } catch (error) {
+            if (!active) return;
+            status.textContent=`${error.message} Reload reminders before retrying; your form choice is preserved.`;
+            if ([401,403].includes(error.status)) { list.replaceChildren(); policy=null; enabled.checked=false; }
+        } finally { pending=false; if (active) controls(); }
+    }
+    form.addEventListener('submit',event=>{event.preventDefault();perform({action:'configure',enabled:enabled.checked,days:Number(days.value),consent:enabled.checked});});
+    check.addEventListener('click',()=>perform({action:'evaluate'}));
+    window.addEventListener('pagehide',()=>{active=false; policy=null; enabled.checked=false; list.replaceChildren(); controls();});
+    window.addEventListener('pageshow',event=>{if(event.persisted){active=true; perform();}});
+    perform();
+}
 
 function loadInvestmentDashboard() {
     return Promise.all([
