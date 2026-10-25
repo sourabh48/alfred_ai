@@ -1035,6 +1035,7 @@ class PortfolioIntelligenceService:
             user=user,
             asset_name=inv_data.get("asset_name", "Unknown"),
             institution=inv_data.get("institution", ""),
+            account_number=(inv_data.get("account_number") or "").strip(),
             defaults={
                 "asset_type": inv_data.get("asset_type", "equity"),
                 "invested_amount": investment_money(inv_data.get("invested_amount", 0)),
@@ -1063,7 +1064,7 @@ class PortfolioIntelligenceService:
                 current_value = numeric_values[-1]
             elif len(numeric_values) == 1:
                 current_value = numeric_values[0]
-            key = (asset_name.lower(), asset_type, round(current_value, 2), round(invested_amount, 2))
+            key = (asset_name.lower(), asset_type, self._extract_account_hint(normalized), round(current_value, 2), round(invested_amount, 2))
             if key in seen:
                 continue
             seen.add(key)

@@ -23,7 +23,8 @@ def capture_import(document, rows, *, extraction=None, originals=None):
         values = (originals or {}).get(row.pk, {})
         if extraction is not None:
             candidates = [item for item in extraction if isinstance(item, dict)
-                and item.get('asset_name') == row.asset_name and (item.get('institution') or '') == row.institution]
+                and item.get('asset_name') == row.asset_name and (item.get('institution') or '') == row.institution
+                and item.get('account_number', '') == row.account_number]
             if len(candidates) == 1:
                 values = {}
                 for field in FIELDS:

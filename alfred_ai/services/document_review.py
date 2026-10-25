@@ -2755,7 +2755,7 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
     previous_primary = next((item for item in previous_investments if (
         item.asset_name == primary_item.get("asset_name")
         and item.account_number == (primary_item.get("account_number") or "")
-        and item.institution == (primary_item.get("institution") or document.broker_name)
+        and item.institution == (primary_item.get("institution", document.broker_name) or "")
     )), None) if primary_item else (previous_investments[0] if previous_investments else None)
     if previous_primary:
         primary_item = {
@@ -2783,7 +2783,8 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
         document.broker_name = str(corrections["broker_name"]).strip()
         payload["broker_name"] = document.broker_name
         primary_item["institution"] = document.broker_name
-    if document.broker_name and not primary_item.get("institution"):
+    # An explicitly blank institution is unknown, not the parser's broker label.
+    if document.broker_name and "institution" not in primary_item:
         primary_item["institution"] = document.broker_name
     if primary_item:
         remaining_items = list(payload.get("investments") or [])[1:]

@@ -23,7 +23,7 @@ class InvestmentGroundingTests(TestCase):
             uploaded_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC-INVESTMENT'),parser_status='parsed',
             extracted_text='SYNTHETIC-NEVER-PROMPT-OR-CLOUD',extracted_payload={'originals':'SYNTHETIC-NEVER-PROMPT-OR-CLOUD'})
         self.document.linked_investments.add(self.investment)
-        raw=dict(asset_name=self.investment.asset_name,institution=self.investment.institution,
+        raw=dict(asset_name=self.investment.asset_name,institution=self.investment.institution,account_number=self.investment.account_number,
             current_value='1.23',invested_amount='2.34',monthly_sip='3.45')
         capture_import(self.document,[self.investment],extraction=[raw])
 

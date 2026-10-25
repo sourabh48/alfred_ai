@@ -322,6 +322,7 @@ function renderInvestmentPositions(items) {
             <td>
                 <div class="fw-semibold">${Alfred.escapeHtml(item.asset_name)}</div>
                 <div class="muted small">${Alfred.escapeHtml(item.asset_type.replaceAll("_", " "))} | ${Alfred.escapeHtml(item.institution || "Unspecified institution")}</div>
+                <div class="muted small">Account: ${Alfred.escapeHtml(item.account_number ? `…${item.account_number.slice(-4)}` : "not recorded")}</div>
             </td>
             <td class="text-end">${Alfred.formatCurrency(item.invested_amount)}</td>
             <td class="text-end">${Alfred.formatCurrency(item.current_value)}</td>

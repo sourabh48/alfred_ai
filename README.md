@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 READY/unmerged; exact source b2528c7 run 40230734330 PASS: Linux, native-Windows and Selenium. Named-region repair passed local/remote native and Axe gates; source/history privacy zero findings. Final evidence-only documentation checkpoint triggers separate current-head CI: resolve it before merge, with no claim it already passed. Review absent, protection 403, Pages approval absent; no merge/publication.
+PR/CI: PR #16 READY/open. Recovery source ec68073 run 40233186981: Windows native and Selenium PASS; Linux secure-failure PASS but portable Travel test failed at test_travel_planner_browser.py:391 (day-2 text empty). Independent reviews 0, protection GET 403, Pages authorization absent. No merge/publication. INV-02 development push needs its own exact-head CI; no global green claim.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->

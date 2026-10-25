@@ -3595,6 +3595,51 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('investmentReviewItems'),'')
         holding.refresh_from_db(); self.assertEqual(str(holding.current_value),'123.45')
 
+    def test_investment_pdf_upload_keeps_accounts_receipts_and_reimport_identity(self):
+        from decimal import Decimal
+        from apps.investments.models import Investment, InvestmentImportDocument
+        from tests.test_investment_import_acceptance import ASSET, portfolio_pdf
+
+        owner = self.scenario['user']
+        other = get_user_model().objects.create_user(username='synthetic-pdf-other')
+        foreign = Investment.objects.create(user=other, asset_type='cash', asset_name=ASSET,
+            account_number='SYNTH-A', current_value='42.00')
+        directory = Path(self.enterContext(TemporaryDirectory(prefix='alfred-pdf-acceptance-')))
+        pdf = directory / 'synthetic-multi-account.pdf'
+        pdf.write_bytes(portfolio_pdf([('SYNTH-A', '100.25', '110.20'), ('SYNTH-B', '100.25', '110.20')]))
+        self.login()
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'investmentPdfFiles'))
+        for count in (1, 2):
+            self.browser.find_element(self.By.ID, 'investmentPdfFiles').send_keys(str(pdf))
+            self.memory_click('#uploadInvestmentPdfBtn')
+            self.wait.until(lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=pdf.name).count() == count)
+            self.wait.until(lambda _: '2 investment record(s)' in self.text('investmentImportStatus'))
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'uploadInvestmentPdfBtn').is_enabled())
+            self.wait.until(lambda _: pdf.name in self.text('investmentImportList'))
+        rows = Investment.objects.filter(user=owner, asset_name=ASSET)
+        self.assertEqual(set(rows.values_list('account_number', flat=True)), {'SYNTH-A', 'SYNTH-B'})
+        self.assertEqual(rows.count(), 2)
+        self.wait.until(lambda _: '…TH-A' in self.text('investmentPositionsBody') and '…TH-B' in self.text('investmentPositionsBody'))
+        self.assertNotIn('SYNTH-A', self.text('investmentPositionsBody'))
+        self.assertEqual(sum((row.current_value for row in rows), Decimal('0')), Decimal('220.40'))
+        for document in InvestmentImportDocument.objects.filter(user=owner, file_name=pdf.name):
+            self.assertEqual(document.linked_investments.count(), 2)
+            self.assertEqual(document.field_evidence.count(), 2)
+            for proof in document.field_evidence.all():
+                self.assertEqual(Decimal(proof.source_values['current_value']), Decimal('110.20'))
+        foreign.refresh_from_db()
+        self.assertEqual(foreign.current_value, Decimal('42.00'))
+        self.capture('investment-pdf-accounts-desktop')
+        self.browser.refresh()
+        self.wait.until(lambda _: pdf.name in self.text('investmentImportList'))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+            {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.browser.execute_script("document.getElementById('investmentImportList').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('investment-pdf-accounts-390px')
+
     def test_investment_projection_starts_with_recorded_value_on_real_page(self):
         self.login()
         self.browser.get(self.live_server_url + "/investments/")
