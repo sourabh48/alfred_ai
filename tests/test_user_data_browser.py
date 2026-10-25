@@ -849,6 +849,105 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('a[href="/ai/insights/?scope=finance#intelligencePanel"]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_attribute('value')=='finance')
 
+    def test_intelligence_hub_pack_consent_review_citations_versions_and_invalidation(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-hub-ui-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_KNOWLEDGE_GIT_AUTHORIZED=False, ALFRED_KNOWLEDGE_GIT_REMOTE=''))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
+        store = MemoryStore(root/'vault'); owner = self.scenario['user']
+        source = store.save_verified(owner, {'statement': 'SYNTHETIC public hiking <b>reference</b>'}, {'source': 'synthetic reviewed guide'}, sensitivity='public', verified=True)
+        store.save_verified(owner, {'statement': 'SYNTHETIC PRIVATE MUST STAY OUT OF PACKS'}, {'source': 'synthetic private'}, verified=True)
+        self.login(); self.browser.get(self.live_server_url+'/settings/#knowledgeHub')
+        self.wait.until(lambda _: 'durable checkpoint' in self.text('knowledgeHubStatus'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'knowledgeHubSources').is_enabled())
+        self.memory_click('#knowledgeHubEnabled'); self.memory_click('#knowledgeHubPolicy button')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'knowledgeHubSources').is_enabled())
+        self.assertNotIn('PRIVATE MUST', self.text('knowledgeHubSources'))
+        Select(self.browser.find_element(self.By.ID, 'knowledgeHubSources')).select_by_value(source)
+        self.memory_click('#knowledgeHubDraft button')
+        self.wait.until(lambda _: 'DRAFT' in self.text('knowledgeHubPacks'))
+        self.assertEqual(self.browser.find_elements(self.By.CSS_SELECTOR, '#knowledgeHubPacks b'), [])
+        self.assertIn('/settings/#memory-'+source, self.browser.find_element(self.By.CSS_SELECTOR, '#knowledgeHubPacks a').get_attribute('href'))
+        self.memory_click('#knowledgeHubPacks article button.btn-outline-primary')
+        self.wait.until(lambda _: 'check its confirmation' in self.text('knowledgeHubFeedback'))
+        self.memory_click('#knowledgeHubPacks article input[type=checkbox]')
+        self.memory_click('#knowledgeHubPacks article button.btn-outline-primary')
+        self.wait.until(lambda _: 'PROMOTED' in self.text('knowledgeHubPacks'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'knowledgeHubSync').is_enabled())
+        self.assertFalse(self.browser.find_element(self.By.ID, 'knowledgeHubRemoteConsent').is_enabled())
+        self.capture('intelligence-hub-reviewed-desktop')
+        self.browser.set_window_size(390, 900)
+        self.memory_click('#knowledgeHubRefresh')
+        self.wait.until(lambda _: 'PROMOTED' in self.text('knowledgeHubPacks'))
+        self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth + 1'))
+        self.capture('intelligence-hub-reviewed-narrow')
+        self.browser.set_window_size(1440, 1200)
+        self.browser.refresh()
+        self.wait.until(lambda _: 'PROMOTED' in self.text('knowledgeHubPacks'))
+        store.delete_memory(owner, source)
+        self.memory_click('#knowledgeHubRefresh')
+        self.wait.until(lambda _: 'SOURCE_CHANGED' in self.text('knowledgeHubPacks'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, '#knowledgeHubPacks article button.btn-outline-primary').is_enabled())
+        self.memory_click('#knowledgeHubPacks article input[type=checkbox]')
+        self.memory_click('#knowledgeHubPacks article button.btn-outline-danger')
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, '#knowledgeHubPacks article button.btn-outline-danger').get_attribute('disabled'))
+        self.memory_click('#knowledgeHubCheckpoint')
+        self.wait.until(lambda _: 'Local review saved' in self.text('knowledgeHubFeedback'))
+        self.assertEqual(len(store.list_memories(owner)), 1)
+
+    def test_intelligence_hub_failed_draft_retains_selection_and_pagehide_clears_data(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.knowledge_hub import KnowledgeHub
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-hub-ui-failure-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_KNOWLEDGE_GIT_AUTHORIZED=False, ALFRED_KNOWLEDGE_GIT_REMOTE=''))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
+        store = MemoryStore(root/'vault'); owner = self.scenario['user']
+        source = store.save_verified(owner, {'statement': 'SYNTHETIC retained public selection'}, {'source': 'synthetic guide'}, sensitivity='public', verified=True)
+        KnowledgeHub(store).configure(owner, enabled=True, consent=True)
+        self.login(); self.browser.get(self.live_server_url+'/settings/#knowledgeHub')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'knowledgeHubSources').is_enabled())
+        Select(self.browser.find_element(self.By.ID, 'knowledgeHubSources')).select_by_value(source)
+        with patch.object(KnowledgeHub, 'draft', side_effect=RuntimeError('synthetic unavailable')):
+            self.memory_click('#knowledgeHubDraft button')
+            self.wait.until(lambda _: 'selection is retained' in self.text('knowledgeHubFeedback'))
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, '#knowledgeHubDraft button').is_enabled())
+        self.assertEqual(Select(self.browser.find_element(self.By.ID, 'knowledgeHubSources')).first_selected_option.get_attribute('value'), source)
+        self.memory_click('#knowledgeHubDraft button')
+        self.wait.until(lambda _: 'DRAFT' in self.text('knowledgeHubPacks'))
+        self.assertEqual(self.memory_post('hub', {'action': 'checkpoint'}, csrf=False)['status'], 403)
+        from apps.ml_engine.services.persistent_memory import _owner
+        from apps.ml_engine.services.memory_sync import encoded
+        from hashlib import sha256
+        from uuid import uuid4
+        hub = KnowledgeHub(store)
+        with store._transaction() as db:
+            record = dict(hub._records(db, _owner(owner))[0])
+            record.update(id=uuid4().hex, state='promoted', origin='remote')
+            record['lineage'] = record['id']
+            record['digest'] = sha256(encoded({k:v for k,v in record.items() if k not in ('digest','state','origin')})).hexdigest()
+            hub._write(db, _owner(owner), record, new=True)
+            state, policy = hub._state(db, _owner(owner))
+            policy.update(remote_consent=True, conflict=True, pending=True, head='1'*40, review_head='2'*40, review_digest='d'*64)
+            store._write_sync_state(db, _owner(owner), state)
+        self.memory_click('#knowledgeHubRefresh')
+        self.wait.until(lambda _: 'REMOTE_REVIEW_REQUIRED' in self.text('knowledgeHubPacks'))
+        self.memory_click('#knowledgeHubReconcile')
+        self.wait.until(lambda _: 'Review cached remote packs' in self.text('knowledgeHubFeedback'))
+        self.memory_click('#knowledgeHubReconcileReviewed'); self.memory_click('#knowledgeHubReconcile')
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, 'knowledgeHubReconcile').is_displayed())
+        self.assertEqual(len(store.list_memories(owner)), 1)
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('knowledgeHubPacks'), '')
+        self.assertEqual(self.text('knowledgeHubSources'), '')
+        self.assertFalse(self.browser.find_element(self.By.ID, 'knowledgeHubCheckpoint').is_enabled())
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: 'DRAFT' in self.text('knowledgeHubPacks'))
+        self.assertTrue(self.browser.find_element(self.By.ID, 'knowledgeHubRefresh').is_enabled())
+
     def test_memory_search_candidate_review_and_selected_revocation(self):
         from selenium.webdriver.support.ui import Select
         from apps.ml_engine.services.persistent_memory import MemoryStore

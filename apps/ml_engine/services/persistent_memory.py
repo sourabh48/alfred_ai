@@ -88,6 +88,9 @@ class MemoryStore:
                 CREATE TABLE IF NOT EXISTS owner_epochs (owner TEXT PRIMARY KEY, epoch INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS memory_sync (owner TEXT PRIMARY KEY, encrypted BLOB NOT NULL);
                 CREATE TABLE IF NOT EXISTS memory_candidates (id TEXT PRIMARY KEY, owner TEXT NOT NULL, record BLOB NOT NULL);
+                CREATE TABLE IF NOT EXISTS knowledge_packs (
+                    id TEXT PRIMARY KEY, owner TEXT NOT NULL, wrapped BLOB NOT NULL, record BLOB NOT NULL);
+                CREATE INDEX IF NOT EXISTS knowledge_packs_owner ON knowledge_packs(owner);
                 CREATE TABLE IF NOT EXISTS conversation_policies (owner TEXT PRIMARY KEY, encrypted BLOB NOT NULL);
                 CREATE TABLE IF NOT EXISTS conversations (
                     id TEXT PRIMARY KEY, owner TEXT NOT NULL, wrapped BLOB NOT NULL, record BLOB NOT NULL);
@@ -124,7 +127,7 @@ class MemoryStore:
     def _cipher(self, db):
         if not self.key_file.exists():
             if any(db.execute('SELECT EXISTS(SELECT 1 FROM '+table+')').fetchone()[0]
-                   for table in ('events', 'memory_keys', 'policies', 'memory_sync', 'conversations', 'conversation_policies', 'document_corpus')):
+                   for table in ('events', 'memory_keys', 'policies', 'memory_sync', 'conversations', 'conversation_policies', 'document_corpus', 'knowledge_packs')):
                 raise RuntimeError('Memory recovery key is missing; restore its protected backup.')
             protected = b'M15DPAPI1\0' + protect_key(Fernet.generate_key())
             descriptor = os.open(self.key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -179,10 +182,17 @@ class MemoryStore:
         db.execute('INSERT INTO memory_sync VALUES(?,?) ON CONFLICT(owner) DO UPDATE SET encrypted=excluded.encrypted', (owner, encrypted))
 
     def _sync_dirty(self, db, owner):
+        self._learning_dirty(db, owner)
         if db.execute('SELECT 1 FROM memory_sync WHERE owner=?', (owner,)).fetchone():
             state = self._sync_state(db, owner)
             state['pending'] = True
             self._write_sync_state(db, owner, state)
+
+    def _learning_dirty(self, db, owner):
+        """Coalesce local learning checkpoints without opting the owner into any upload."""
+        state = self._sync_state(db, owner)
+        state['learning_revision'] = state.get('learning_revision', 0) + 1
+        self._write_sync_state(db, owner, state)
 
     def _revoke(self, db, owner, identities, *, kind='delete'):
         if not identities:
@@ -195,6 +205,7 @@ class MemoryStore:
             db.execute('DELETE FROM memories WHERE id=? AND owner=?', (identity, owner))
             db.execute('DELETE FROM memory_keys WHERE id=? AND owner=?', (identity, owner))
             db.execute('DELETE FROM memory_candidates WHERE id=? AND owner=?', (identity, owner))
+        self._learning_dirty(db, owner)
         if published: self._sync_dirty(db, owner)
         return len(identities)
 
@@ -276,9 +287,11 @@ class MemoryStore:
             ConversationHistory(self)._clear(db, owner, disable=True)
             from .document_corpus import DocumentCorpus
             DocumentCorpus(self)._clear(db, owner)
+            db.execute('DELETE FROM knowledge_packs WHERE owner=?', (owner,))
             state=self._sync_state(db,owner)
-            if state.pop('investment_record_review',None) is not None:
-                self._write_sync_state(db,owner,state)
+            state['knowledge_hub'] = {'enabled': False, 'remote_consent': False}
+            state.pop('investment_record_review',None)
+            self._write_sync_state(db,owner,state)
             db.execute('INSERT INTO owner_epochs(owner,epoch) VALUES(?,1) ON CONFLICT(owner) DO UPDATE SET epoch=epoch+1', (owner,))
             self._sync_dirty(db, owner)
             identities = [r[0] for r in db.execute('SELECT id FROM memory_keys WHERE owner=?', (owner,))]
@@ -298,6 +311,8 @@ class MemoryStore:
                 corpus._prune(db, owner)
             from apps.investments.services.review_alerts import expire_review_alerts
             for owner, in db.execute('SELECT owner FROM memory_sync').fetchall():
+                from .knowledge_hub import KnowledgeHub
+                KnowledgeHub(self)._prune(db, owner)
                 state=self._sync_state(db,owner)
                 policy=state.get('investment_record_review')
                 if policy is not None and expire_review_alerts(policy,datetime.now(timezone.utc)):

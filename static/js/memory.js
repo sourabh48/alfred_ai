@@ -10,6 +10,92 @@ document.addEventListener("DOMContentLoaded", () => {
     const category = document.getElementById("memoryCategory");
     const selectedReset = document.getElementById("memorySelectedReset");
     const candidates = document.getElementById("memoryCandidates");
+    const hubPanel = document.getElementById("knowledgeHub"), hubPacks = document.getElementById("knowledgeHubPacks");
+    const hubStatus = document.getElementById("knowledgeHubStatus"), hubFeedback = document.getElementById("knowledgeHubFeedback");
+    const hubSources = document.getElementById("knowledgeHubSources"), hubParent = document.getElementById("knowledgeHubParent");
+    let hubGeneration = 0, hubSessionGeneration = 0, hubReadController = null, hubActionController = null, hubBusy = false;
+    async function hubRefresh() {
+        if (!active) return;
+        const ticket = ++hubGeneration;
+        hubReadController?.abort(); hubReadController = new AbortController();
+        const data = await Alfred.fetchJSON("/api/ai/memories/hub/", {signal: hubReadController.signal});
+        if (!active || ticket !== hubGeneration) return;
+        const selected = new Set([...hubSources.selectedOptions].map(option => option.value)), parent = hubParent.value;
+        hubStatus.textContent = `Local learning revision ${data.revision}; durable checkpoint ${data.checkpoint}. ${data.pending ? 'Reviewed updates queued' : 'No reviewed updates queued'}. Failures ${data.failures}${data.conflict ? '; conflict needs operator review; history retained' : ''}.`;
+        document.getElementById("knowledgeHubEnabled").checked = data.enabled;
+        document.getElementById("knowledgeHubRemoteConsent").checked = data.remote_consent;
+        hubSources.replaceChildren(); hubParent.replaceChildren(new Option("New pack", ""));
+        data.sources.forEach(source => { const option = new Option(`${source.statement} · ${source.source}`, source.id); option.selected = selected.has(source.id); hubSources.append(option); });
+        hubPacks.replaceChildren();
+        if (!data.packs.length) hubPacks.textContent = "No knowledge packs. Select public source memories to prepare a draft.";
+        data.packs.forEach(pack => {
+            const row = document.createElement("article"); row.className = "memory-card"; row.dataset.packId = pack.id;
+            const heading = document.createElement("h4"); heading.className = "h6"; heading.textContent = `Version ${pack.version} · ${pack.status}`;
+            const integrity = document.createElement("p"); integrity.className = "small text-break"; integrity.textContent = `Digest ${pack.digest} · expires ${pack.expires_at}`;
+            const entries = document.createElement("ul");
+            pack.entries.forEach(entry => {
+                const item = document.createElement("li"), citation = document.createElement("a");
+                item.textContent = `${entry.statement} · `; citation.textContent = entry.source; citation.href = entry.citation; item.append(citation); entries.append(item);
+            });
+            row.append(heading, integrity, entries);
+            if (pack.origin === "local") {
+                if (pack.state === "promoted") hubParent.append(new Option(`Version ${pack.version} · ${pack.id.slice(0, 8)}`, pack.id));
+                const label = document.createElement("label"), checked = document.createElement("input"); checked.type = "checkbox";
+                label.append(checked, " I reviewed the exact text, citations, privacy and supplementary-data limits.");
+                const promote = document.createElement("button"); promote.type = "button"; promote.className = "btn btn-outline-primary m-1"; promote.textContent = "Promote reviewed pack";
+                promote.disabled = hubBusy || !data.enabled || pack.status !== "DRAFT";
+                const withdraw = document.createElement("button"); withdraw.type = "button"; withdraw.className = "btn btn-outline-danger m-1"; withdraw.textContent = "Withdraw pack"; withdraw.disabled = hubBusy || pack.state === "withdrawn";
+                const review = action => {
+                    if (!checked.checked) { hubFeedback.textContent = "Review this pack and check its confirmation before continuing."; return; }
+                    hubPerform({action, id: pack.id, digest: pack.digest, reviewed: true});
+                };
+                promote.addEventListener("click", () => review("promote")); withdraw.addEventListener("click", () => review("withdraw"));
+                row.append(label, document.createElement("br"), promote, withdraw);
+            }
+            hubPacks.append(row);
+        });
+        if ([...hubParent.options].some(option => option.value === parent)) hubParent.value = parent;
+        hubPanel.querySelectorAll("#knowledgeHubPolicy input, #knowledgeHubPolicy button, #knowledgeHubCheckpoint").forEach(node => { node.disabled = hubBusy; });
+        hubPanel.querySelectorAll("#knowledgeHubDraft select, #knowledgeHubDraft button").forEach(node => { node.disabled = hubBusy || !data.enabled; });
+        hubPanel.querySelectorAll("#knowledgeHubRemotePolicy input, #knowledgeHubRemotePolicy button").forEach(node => { node.disabled = hubBusy || !data.enabled || !data.remote_available; });
+        document.getElementById("knowledgeHubSync").disabled = hubBusy || !data.remote_available || !data.remote_consent || !data.enabled;
+        document.getElementById("knowledgeHubRefresh").disabled = hubBusy;
+        const reconcile = document.getElementById("knowledgeHubReconcile");
+        reconcile.hidden = !data.conflict || !data.review_head || !data.review_digest;
+        document.getElementById("knowledgeHubReconcileLabel").hidden = reconcile.hidden;
+        document.getElementById("knowledgeHubReconcileReviewed").checked = false;
+        document.getElementById("knowledgeHubReconcileReviewed").disabled = hubBusy;
+        reconcile.disabled = hubBusy || reconcile.hidden || !data.enabled || !data.remote_consent;
+        reconcile.onclick = () => {
+            if (!document.getElementById("knowledgeHubReconcileReviewed").checked) { hubFeedback.textContent = "Review cached remote packs before reconciling."; return; }
+            hubPerform({action: "reconcile", head: data.review_head, digest: data.review_digest, reviewed: true});
+        };
+    }
+    async function hubPerform(payload) {
+        if (hubBusy || !active) return;
+        hubBusy = true; hubFeedback.textContent = "Saving reviewed local state…";
+        hubPanel.querySelectorAll("button,input,select").forEach(node => { node.disabled = true; });
+        const controller = new AbortController(); hubActionController = controller;
+        const sessionTicket = hubSessionGeneration;
+        try {
+            await Alfred.fetchJSON("/api/ai/memories/hub/", {method: "POST", body: JSON.stringify(payload), signal: controller.signal});
+            if (!active || sessionTicket !== hubSessionGeneration) return;
+            hubFeedback.textContent = payload.action === "draft" ? "Pack prepared. Review every statement before promotion." : "Local review saved. Remote uploads require separate authorization and consent.";
+        } catch (error) {
+            if (active && sessionTicket === hubSessionGeneration) { hubFeedback.textContent = `${error.message} Your selection is retained; refresh current sources before retrying.`; if ([401,403].includes(error.status)) window.dispatchEvent(new Event("pagehide")); }
+        } finally {
+            if (sessionTicket === hubSessionGeneration) {
+                hubBusy = false; hubActionController = null;
+                if (active) { document.getElementById("knowledgeHubRefresh").disabled = false; hubRefresh().catch(error => { if (active) hubStatus.textContent = error.message; }); }
+            }
+        }
+    }
+    document.getElementById("knowledgeHubPolicy").addEventListener("submit", event => { event.preventDefault(); hubPerform({action: "configure", enabled: document.getElementById("knowledgeHubEnabled").checked, consent: true}); });
+    document.getElementById("knowledgeHubDraft").addEventListener("submit", event => { event.preventDefault(); const ids = [...hubSources.selectedOptions].map(option => option.value); if (ids.length > 8) { hubFeedback.textContent = "Select at most eight sources."; return; } hubPerform({action: "draft", ids, ...(hubParent.value ? {parent: hubParent.value} : {})}); });
+    document.getElementById("knowledgeHubRemotePolicy").addEventListener("submit", event => { event.preventDefault(); hubPerform({action: "remote_consent", enabled: document.getElementById("knowledgeHubRemoteConsent").checked, consent: true}); });
+    document.getElementById("knowledgeHubCheckpoint").addEventListener("click", () => hubPerform({action: "checkpoint"}));
+    document.getElementById("knowledgeHubSync").addEventListener("click", () => hubPerform({action: "sync"}));
+    document.getElementById("knowledgeHubRefresh").addEventListener("click", () => { hubRefresh().catch(error => { if (active) hubStatus.textContent = error.message; }); });
     const evaluationCases = document.getElementById("memoryEvaluationCases");
     const evaluationDetails = document.getElementById("memoryEvaluationDetails");
     const evaluationFeedback = document.getElementById("memoryEvaluationFeedback");
@@ -284,6 +370,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if (/^#memory-[a-f0-9]{32}$/.test(location.hash)) document.getElementById(location.hash.slice(1))?.scrollIntoView({block:"center"});
         refreshPrivacy().catch(error => message(error.message));
+        hubRefresh().catch(error => { if (active) hubStatus.textContent = error.message; });
     }
     document.getElementById("memoryRetentionForm").addEventListener("submit", async event => {
         event.preventDefault();
@@ -434,6 +521,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     refresh().catch(error => message(error.message));
     window.addEventListener("pagehide", () => {
+        hubGeneration++; hubSessionGeneration++; hubReadController?.abort(); hubActionController?.abort(); hubBusy = false; hubActionController = null;
+        hubPacks.replaceChildren(); hubSources.replaceChildren(); hubParent.replaceChildren(); hubStatus.textContent = ""; hubFeedback.textContent = "";
+        document.getElementById("knowledgeHubEnabled").checked = false; document.getElementById("knowledgeHubRemoteConsent").checked = false;
+        hubPanel.querySelectorAll("button,input,select").forEach(node => { node.disabled = true; });
         active = false; generation++; list.replaceChildren(); candidates.replaceChildren(); feedback.textContent = ""; search.value = "";
         comparisonController?.abort(); comparisonController=null; comparisonEnabled=false; comparisonStatus.textContent=""; comparisonResults.replaceChildren(); baselineModel.replaceChildren(); candidateModel.replaceChildren(); document.getElementById("memoryComparisonPolicy").textContent="";
         comparisonConfig=null; comparisonSuite.replaceChildren(); candidateProtocol.replaceChildren();

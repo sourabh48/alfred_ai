@@ -53,6 +53,7 @@ class MemoryLearning:
                 key=Fernet.generate_key(); ciphertext=Fernet(key).encrypt(_json(record).encode())
                 db.execute('INSERT INTO memory_keys VALUES(?,?,?)',(identity,owner,master.encrypt(key)))
                 db.execute('INSERT INTO memory_candidates VALUES(?,?,?)',(identity,owner,ciphertext))
+                self.store._learning_dirty(db,owner)
                 existing[fingerprint]=identity; result.append(identity)
         return result
 
