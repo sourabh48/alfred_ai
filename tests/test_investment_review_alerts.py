@@ -29,7 +29,7 @@ class InvestmentReviewAlertTests(TestCase):
     def get(self):
         response=self.client.get(self.URL)
         self.assertEqual(response.status_code,200)
-        self.assertIn('no-store',response['Cache-Control'])
+        self.assertEqual(response['Cache-Control'],'no-store, private')
         return response.json()
 
     def post(self,action,**kwargs):
@@ -136,3 +136,13 @@ class InvestmentReviewAlertTests(TestCase):
         self.assertEqual((self.root/'vault'/'verified.sqlite3').read_bytes(),before)
         key.write_bytes(original); key.unlink()
         self.assertEqual(self.client.get(self.URL).status_code,503)
+
+    def test_unavailable_storage_preserves_shared_private_cache_contract(self):
+        from apps.ml_engine.services.memory_key import MemoryStorageUnavailable
+        with patch('apps.investments.alert_views.memory_store',side_effect=MemoryStorageUnavailable('synthetic-private-vault')):
+            for method, data in (('get',None),('post',{'action':'evaluate','revision':0})):
+                with self.subTest(method=method):
+                    response=getattr(self.client,method)(self.URL,data=data,content_type='application/json')
+                    self.assertEqual(response.status_code,503)
+                    self.assertEqual(response['Cache-Control'],'no-store, private')
+                    self.assertNotIn('synthetic-private-vault',response.content.decode())

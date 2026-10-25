@@ -1,13 +1,10 @@
 """Authenticated local reminders share the existing encrypted owner vault."""
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import never_cache
 from rest_framework.response import Response
 
 from apps.ml_engine.api.memory import MemoryAPI, memory_store
 from .services.review_alerts import RecordReviewAlerts
 
 
-@method_decorator(never_cache, name='dispatch')
 class InvestmentReviewAlertView(MemoryAPI):
     def get(self, request):
         if request.query_params:
