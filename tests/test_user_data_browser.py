@@ -2311,6 +2311,107 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(result['status'],400); model.assert_not_called()
         self.assertNotIn('persistent_memory',str(result))
 
+    def test_private_document_whole_extraction_context_limits_retry_and_invalidation(self):
+        from unittest.mock import Mock
+        from selenium.webdriver.support.ui import Select
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.expenses.models import BankAccount
+        from apps.investments.models import Investment
+        from apps.loans.models import Loan
+        from apps.ml_engine.services.document_corpus import DocumentCorpus
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-whole-context-browser-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=root/'vault'))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
+        local = Mock(select=Mock(return_value='{"state":"conflict","evidence":[0,1]}'))
+        self.enterContext(patch('apps.ml_engine.services.document_questions.DocumentQuestionReasoner', return_value=local))
+        corpus = DocumentCorpus(MemoryStore(root/'vault', embedder=SyntheticEmbeddings()))
+        owner = self.scenario['user']
+        text = 'Exit load applies for thirty days. ' + 'Administrative context only. ' * 24 + '\nException: the period is ninety days. <img src=x onerror="window.fullContextLeak=true">'
+        small = corpus.upload(owner, SimpleUploadedFile('Synthetic <img src=x>.txt', text.encode()), consent=True, days=1)['document']
+        large = corpus.upload(owner, SimpleUploadedFile('Synthetic long context.txt', b'Administrative text. ' * 300), consent=True, days=1)['document']
+        foreign = get_user_model().objects.create_user(username='whole-context-foreign')
+        corpus.upload(foreign, SimpleUploadedFile('FOREIGN-PRIVATE-CONTEXT.txt', b'Foreign private text.'), consent=True, days=1)
+        financial_models = (Expense, BankAccount, Investment, Loan)
+        before = [list(model.objects.values()) for model in financial_models]
+        self.login(); self.browser.get(self.live_server_url + '/documents/')
+        question = self.browser.find_element(self.By.ID, 'documentCorpusQuestion')
+        question.send_keys('For how long does the exit load apply?')
+        mode = self.browser.find_element(self.By.ID, 'documentCorpusContextMode')
+        Select(mode).select_by_value('full_extraction')
+        self.memory_click('#documentCorpusAsk')
+        self.assertIn('Explicitly select', self.text('documentCorpusStatus'))
+        local.select.assert_not_called()
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
+        self.assertNotIn('FOREIGN-PRIVATE', self.text('documentCorpusList'))
+        self.memory_click(f'#documentCorpusList input[value="{small["id"]}"]')
+        self.browser.execute_script("""
+            window.__wholeOriginalFetch=Alfred.fetchJSON;
+            Alfred.fetchJSON=(...args)=>window.__wholeOriginalFetch(...args).then(value=>
+                String(args[0]).endsWith('/question/') ? new Promise(resolve=>{
+                    window.__releaseWholeContext=()=>resolve(value);
+                }) : value);
+        """)
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: self.browser.execute_script('return Boolean(window.__releaseWholeContext)'))
+        self.assertFalse(mode.is_enabled())
+        self.browser.execute_script('Alfred.fetchJSON=window.__wholeOriginalFetch;window.__releaseWholeContext();')
+        self.wait.until(lambda _: 'may conflict' in self.text('documentCorpusStatus'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'})")
+        self.wait.until(lambda _: 'ninety days' in self.text('documentCorpusResults'))
+        self.assertIn('ninety days', self.text('documentCorpusResults'))
+        self.assertIn('All selected retained extracted text was supplied', self.text('documentCorpusResults'))
+        self.assertIn('Original SHA-256', self.text('documentCorpusResults'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, '#documentCorpusResults img'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.fullContextLeak)'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('whole-extraction-conflict-desktop')
+        self.browser.set_window_size(390, 844)
+        self.browser.execute_script("document.getElementById('documentCorpusContextMode').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth + 1'))
+        self.capture('whole-extraction-mode-narrow')
+        Select(mode).select_by_value('keywords')
+        self.assertEqual(self.text('documentCorpusResults'), '')
+        query = self.browser.find_element(self.By.ID, 'documentCorpusQuery'); query.send_keys('exit load')
+        local.select.return_value = '{"state":"evidence","evidence":[0]}'
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'selected these exact' in self.text('documentCorpusStatus'))
+        self.assertNotIn('ninety days', self.text('documentCorpusResults'))
+        Select(mode).select_by_value('full_extraction')
+        self.assertEqual(self.text('documentCorpusResults'), '')
+        self.memory_click(f'#documentCorpusList input[value="{small["id"]}"]')
+        self.memory_click(f'#documentCorpusList input[value="{large["id"]}"]')
+        calls = local.select.call_count
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'No partial context' in self.text('documentCorpusStatus'))
+        self.assertEqual(local.select.call_count, calls)
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, '#documentCorpusResults article'))
+        self.memory_click(f'#documentCorpusList input[value="{large["id"]}"]')
+        self.memory_click(f'#documentCorpusList input[value="{small["id"]}"]')
+        local.select.side_effect = EmbeddingUnavailable('Synthetic local outage')
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'local model is unavailable' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.text('documentCorpusResults'), '')
+        self.assertEqual(question.get_attribute('value'), 'For how long does the exit load apply?')
+        local.select.side_effect = None
+        local.select.return_value = '{"state":"conflict","evidence":[0,1]}'
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'may conflict' in self.text('documentCorpusStatus'))
+        def revoke(*args, **kwargs):
+            corpus.delete(owner, small['id'])
+            return '{"state":"conflict","evidence":[0,1]}'
+        local.select.side_effect = revoke
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'sources changed' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.text('documentCorpusResults'), '')
+        self.assertEqual(before, [list(model.objects.values()) for model in financial_models])
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(question.get_property('value'), '')
+        self.assertEqual(mode.get_property('value'), 'keywords')
+
     def test_private_document_questions_selection_conflict_abstention_and_stale_sources(self):
         from unittest.mock import Mock
         from django.core.files.uploadedfile import SimpleUploadedFile
