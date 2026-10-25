@@ -139,6 +139,27 @@ See [plans](https://account.heigit.org/info/plans),
 [routing options](https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/routing-options)
 and [FAQ](https://giscience.github.io/openrouteservice/frequently-asked-questions).
 
+For a current single-route result of at most 100 km, ALFRED also makes one
+separately cached, quota-accounted alternative request: at most three results,
+share factor 0.6 and weight factor 1.4. These are provider search parameters,
+not measured route overlap, scenic scores or guaranteed availability. See the
+official [request interface](https://github.com/GIScience/openrouteservice-py/blob/master/openrouteservice/directions.py)
+and [distance/count restrictions](https://openrouteservice.org/restrictions/).
+Longer, stale or unavailable results do not trigger the additional request.
+Failure retains the single-route result with an explicit unavailable comparison.
+Duplicate normalized geometries do not become additional options. Route cache v3
+separates this contract from older snapshots; no old evidence is deleted.
+
+Choose a displayed route explicitly before using it in a draft. Selection checks
+the owned session revision, route identity and source timestamps. An expired or
+changed result requires rechecking; a missing confirmed choice is not silently
+replaced. Selection recalculates allowances through the existing Decimal budget
+service and rebuilds that destination's draft days. Save explicitly afterwards.
+Home-to-destination geometries cannot be selected as inter-stop legs in a
+multi-stop itinerary. Distinct geometries do not establish distinct legal roads;
+motorcycle legality, closures, traffic, scenic quality and corridor stops remain
+unverified. Local synthetic acceptance does not establish live-provider coverage.
+
 Public Nominatim was not enabled: its generated-application policy requires an
 informed operator decision; it also requires identifying requests, attribution,
 caching, no autocomplete and at most one request/second for the entire app.

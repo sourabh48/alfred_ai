@@ -1,4 +1,6 @@
 from datetime import timedelta
+from hashlib import sha256
+import json
 import os
 
 from .base import Provider, ProviderError, number, request_json
@@ -18,8 +20,8 @@ class OpenRouteService(Provider):
     source_url = "https://openrouteservice.org/"
     attribution = "© openrouteservice by HeiGIT, CC BY-SA 4.0 | Data © OpenStreetMap contributors"
     ttl = timedelta(days=5)
-    version = 2  # Older cached geometries did not validate coordinate shape.
-    allowed_parameters = {"start", "end", "mode", "avoid_expressways", "avoid_tolls", "preference"}
+    version = 3  # Route identities and alternative requests need separate cache entries.
+    allowed_parameters = {"start", "end", "mode", "avoid_expressways", "avoid_tolls", "preference", "alternatives"}
 
     def unavailable_reason(self):
         return "" if os.getenv("TRAVEL_ORS_API_KEY") else "missing_TRAVEL_ORS_API_KEY"
@@ -40,6 +42,10 @@ class OpenRouteService(Provider):
             raise ProviderError("unsupported_route_preference")
         body = {"coordinates": coordinates, "preference": preference, "instructions": False,
                 "elevation": True, "extra_info": ["steepness", "surface", "waytype"]}
+        if type(p.get("alternatives", False)) is not bool:
+            raise ProviderError("unsupported_route_alternatives")
+        if p.get("alternatives"):
+            body["alternative_routes"] = {"target_count": 3, "share_factor": 0.6, "weight_factor": 1.4}
         if avoid:
             body["options"] = {"avoid_features": avoid}
         return request_json("POST", f"https://api.heigit.org/openrouteservice/v2/directions/{profile}/geojson",
@@ -63,4 +69,9 @@ class OpenRouteService(Provider):
                 "note": "Car routing is only a reference for motorcycles; verify vehicle legality and current closures. Highway avoidance is broader than expressway avoidance."})
         if not routes:
             raise ProviderError("no_route")
-        return {"routes": routes}
+        distinct = {}
+        for route in routes:
+            route["route_id"] = sha256(json.dumps(route, sort_keys=True, allow_nan=False).encode()).hexdigest()
+            geometry = json.dumps(route["geometry"], sort_keys=True)
+            distinct.setdefault(geometry, route)
+        return {"routes": list(distinct.values())}

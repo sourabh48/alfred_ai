@@ -87,7 +87,7 @@ window.TravelResearchPanels = (() => {
         if (layers) map.removeLayer(layers);
         try {
             layers = L.geoJSON(d.map || {type:"FeatureCollection",features:[]},{
-                style:f=>({color:f.properties?.freshness === "CACHED" ? "#946335" : "#206c65",weight:4}),
+                style:f=>({color:f.properties?.freshness === "CACHED" ? "#946335" : "#206c65",weight:f.properties?.selected ? 7 : 3,opacity:f.properties?.selected ? 1 : 0.6}),
                 pointToLayer:(f,latlng)=>L.circleMarker(latlng,{radius:7,color:"#206c65",fillOpacity:.8}),
                 onEachFeature:(f,layer)=>layer.bindPopup(`<strong>${esc(f.properties?.name)}</strong><br>${esc(f.properties?.kind)} · ${esc(f.properties?.freshness || "UNKNOWN")}<br>${link(f.properties?.source_url,"Source")}`)
             }).addTo(map);

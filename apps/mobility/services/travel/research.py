@@ -137,14 +137,37 @@ def enrich_candidate(user, state, destination):
         km = approximate_road_km(value(state,"origin"), d, origin)
         d.update(distance_km=km, travel_hours=round(km/45+km/180*.3, 1),
                  distance_basis="Estimated one-way road distance from town centres; not a verified route.")
-        route = fetch(OpenRouteService(),{"start":[origin[1],origin[0]],"end":[d["lon"],d["lat"]],
+        route_parameters = {"start":[origin[1],origin[0]],"end":[d["lon"],d["lat"]],
             "mode":value(state,"transport_mode","mixed"),"avoid_expressways":value(state,"avoid_expressways",False),
-            "avoid_tolls":value(state,"avoid_tolls",False),"preference":value(state,"route_preference","recommended")})
+            "avoid_tolls":value(state,"avoid_tolls",False),"preference":value(state,"route_preference","recommended")}
+        route = fetch(OpenRouteService(), route_parameters)
+        d["route_alternatives_note"] = "Alternative comparison unavailable; no additional route is established."
+        if route.success and not route.stale and route.payload["routes"][0]["distance_km"] <= 100:
+            alternatives = fetch(OpenRouteService(), {**route_parameters, "alternatives": True})
+            if alternatives.success and not alternatives.stale:
+                route = alternatives
+                d["route_alternatives_note"] = "Up to three distinct provider geometries; fewer may exist. Scenic quality, road access and current traffic are unverified."
+            else:
+                results.append(alternatives)
+                d["route_alternatives_note"] = "Alternative comparison unavailable; retaining the single-route result. Recheck before departure."
+        elif route.success:
+            d["route_alternatives_note"] = "Alternative comparison requires a current single-route result of at most 100 km; longer journeys retain the single route."
         attach("route_result",route)
         if route.success:
-            selected = route.payload["routes"][0]
-            d.update(distance_km=selected["distance_km"],travel_hours=selected["duration_hours"],
-                distance_basis="Provider-calculated route; duration is a model estimate, closures and motorcycle legality unverified.")
+            selected = next((r for r in route.payload["routes"] if r.get("route_id") == d.get("selected_route_id")), None)
+            if selected is None and not (d.get("route_choice_confirmed") or d.get("route_choice_required")):
+                selected = route.payload["routes"][0]
+            if selected is not None:
+                d["selected_route_id"] = selected.get("route_id")
+                d.update(distance_km=selected["distance_km"],travel_hours=selected["duration_hours"],
+                    distance_basis="Provider-calculated route; duration is a model estimate, closures and motorcycle legality unverified.")
+            else:
+                d.update(selected_route_id=None, route_choice_required=True, distance_km=None, travel_hours=None,
+                    distance_basis="The previous route choice is unavailable; choose again before relying on a travel allowance.")
+                d["route_alternatives_note"] += " The previous choice changed; choose again. No alternative was substituted."
+        elif d.get("route_choice_confirmed") or d.get("route_choice_required"):
+            d.update(selected_route_id=None, route_choice_required=True, distance_km=None, travel_hours=None,
+                distance_basis="The chosen route is unavailable. Recheck and choose again; no alternative was substituted.")
     else:
         d.pop("origin_location", None)
         d.update(distance_km=None, travel_hours=None, distance_basis="No verified route or distance for the current trip settings.")
@@ -167,7 +190,8 @@ def enrich_candidate(user, state, destination):
         categories.append("restaurant")
     places = fetch(OverpassPlaces(),{"latitude":d["lat"],"longitude":d["lon"],"categories":categories}) if coords else ProviderResult("overpass","places",error="destination_coordinates_required")
     routes = d.get("route_result",{}).get("payload",{}).get("routes",[])
-    route_points = (routes[0] if routes else {}).get("geometry",{}).get("coordinates",[])
+    route_points = next((r for r in routes if r.get("route_id") == d.get("selected_route_id")),
+        routes[0] if routes and not d.get("route_choice_required") else {}).get("geometry",{}).get("coordinates",[])
     if places.success:
         history = history_for(user)
         places.payload["places"] = rank_places(user,places.payload["places"],interests=value(state,"preferred_trip_style",[]),

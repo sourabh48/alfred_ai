@@ -216,7 +216,7 @@ def run_research(run_id):
                         current.itinerary["sources"] = selected["sources"]
                         for key in ("route_result", "weather_result", "places_result", "permit_result", "hotels_result", "flights_result", "trains_result", "buses_result", "discovery_result", "weather_proposals", "map", "quality", "mode_comparison", "web_research", "external_links"):
                             current.itinerary[key] = selected.get(key, {})
-                        current.itinerary["route"].update(distance_km_one_way=selected.get("distance_km"),hours_one_way=selected.get("travel_hours"),note=selected["distance_basis"])
+                        current.itinerary["route"].update(distance_km_one_way=selected.get("distance_km"),hours_one_way=selected.get("travel_hours"),note=selected["distance_basis"],selected_route_id=selected.get("selected_route_id"))
                         if current.itinerary.get("edits"):
                             current.itinerary["budget"]["recheck_note"] = "Research updated; your edited budget allowances were retained. Review changed route/prices before saving."
                         else:
