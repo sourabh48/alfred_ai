@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 READY/unmerged; accessibility/docs implementation 6068100 pushed, run 40230609047 IN_PROGRESS at checkpoint. Named-region repair passed 22 native checks, full automated Axe and two Chrome workflows locally; source/history privacy zero findings. Resolve latest HEAD/run after documentation checkpoint; no new-head CI PASS claimed. Review absent, protection 403, Pages approval absent; no merge/publication.
+PR/CI: PR #16 READY/unmerged; exact source b2528c7 run 40230734330 PASS: Linux, native-Windows and Selenium. Named-region repair passed local/remote native and Axe gates; source/history privacy zero findings. Final evidence-only documentation checkpoint triggers separate current-head CI: resolve it before merge, with no claim it already passed. Review absent, protection 403, Pages approval absent; no merge/publication.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->
