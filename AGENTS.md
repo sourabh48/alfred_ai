@@ -30,6 +30,21 @@
 - Keep runtime secrets in untracked local environment files such as
   `config/local.env`.
 
+## ALFRED — PR MERGE POLICY
+
+- Codex owns implementation, validation, CI repair, commits and development pushes.
+- Codex must NOT merge into master automatically.
+- After exact-head CI, required independent reviews, branch protections,
+  privacy/security and Pages implications are verified, report
+  `READY_TO_MERGE: YES`.
+- Otherwise report `READY_TO_MERGE: NO` with exact blockers.
+- Final PR merge is performed manually by the owner.
+- After a confirmed merge, `continue` synchronizes branches safely, updates
+  `README.md`, `docs/PROJECT_STATUS.md` and `docs/EXECUTION_STATE.md`, and preserves
+  current task state.
+- `next` alone starts the next feature.
+- Never confuse merging with production deployment authorization.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
