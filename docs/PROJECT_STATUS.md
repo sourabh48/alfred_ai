@@ -10,7 +10,7 @@ exact resume command. [Requirements](ALFRED_2_0_REQUIREMENTS.md) own product int
 resumes BOOTSTRAP-01 only; `next` selects a new task after completion or explicit
 deferral; `status` is read-only. No automatic feature switching.
 
-- **PR/CI:** PR #16 READY/unmerged; source 5af834c run 40215059904 passed backend/Selenium/Linux but failed native Axe at knowledgeHubPacks. Named-region repair passed 22 native checks, full automated Axe and two Chrome workflows locally; new-head CI pending commit/push. Review absent, protection 403, Pages approval absent; no merge/publication.
+- **PR/CI:** PR #16 READY/unmerged; accessibility/docs implementation 6068100 pushed, run 40230609047 IN_PROGRESS at checkpoint. Named-region repair passed 22 native checks, full automated Axe and two Chrome workflows locally; source/history privacy zero findings. Resolve latest HEAD/run after documentation checkpoint; no new-head CI PASS claimed. Review absent, protection 403, Pages approval absent; no merge/publication.
 - **Current task:** BOOTSTRAP-01 — accessible Hub region and permanent execution documentation. Interrupted TRAVEL-09 provider edits are safely parked, untested and deferred; see EXECUTION_STATE. Do not activate Hub Git sync.
 
 <!-- BEGIN STATUS DASHBOARD -->
@@ -18,7 +18,7 @@ deferral; `status` is read-only. No automatic feature switching.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 READY/unmerged; source 5af834c run 40215059904 passed backend/Selenium/Linux but failed native Axe at knowledgeHubPacks. Named-region repair passed 22 native checks, full automated Axe and two Chrome workflows locally; new-head CI pending commit/push. Review absent, protection 403, Pages approval absent; no merge/publication.
+PR/CI: PR #16 READY/unmerged; accessibility/docs implementation 6068100 pushed, run 40230609047 IN_PROGRESS at checkpoint. Named-region repair passed 22 native checks, full automated Axe and two Chrome workflows locally; source/history privacy zero findings. Resolve latest HEAD/run after documentation checkpoint; no new-head CI PASS claimed. Review absent, protection 403, Pages approval absent; no merge/publication.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 

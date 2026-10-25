@@ -1,11 +1,11 @@
 # ALFRED execution state
 
-Updated: 2026-10-26T01:53+05:30, Asia/Calcutta. Read this first; do not start another task on `continue`.
+Updated: 2026-10-26T01:56+05:30, Asia/Calcutta. Read this first; do not start another task on `continue`.
 
 ## Current task
 
 - **BOOTSTRAP-01 — repair PR #16 accessibility and establish durable execution docs.**
-- Status: AWAITING_PUBLICATION_CHECKS. Documentation/checkpoint complete; weighted **90%**.
+- Status: AWAITING_CI. Documentation/checkpoint complete; weighted **90%**.
 - Weights: recovery/gap 10; implementation/integration 45; tests/browser 25;
   requirements/status/queue/checkpoint 10; commit/push/relevant CI 10.
 - Completed: recovery/artifact analysis; named accessible region and computed-role
@@ -13,8 +13,9 @@ Updated: 2026-10-26T01:53+05:30, Asia/Calcutta. Read this first; do not start an
   143-ID inventory/phase queue/module dashboard and separate 13-story extension ledger.
 - Completed acceptance: 19 focused backend/documentation checks, two actual Chrome
   workflows and 22 native checks, including the unchanged full Axe gate, all PASS.
-- Remaining: clean-commit source/history privacy gate, normal development push and
-  exact-head CI. The last 10% is not awarded until the required checks pass.
+- Source/history privacy gate PASS with zero findings; implementation commit
+  `6068100493040d72b57c39e88f2ed6ba424a507a` normally pushed; working tree clean.
+- Remaining: exact-head CI. The last 10% is not awarded until required checks pass.
 - Baseline: **75/143 (52.4%)**. Extensions: **0/13 accepted**.
 - Next eligible task after bootstrap and explicit **`next`**: **INV-02 acceptance**.
   No feature task starts automatically. `continue` resumes only this task;
@@ -24,18 +25,23 @@ Updated: 2026-10-26T01:53+05:30, Asia/Calcutta. Read this first; do not start an
 
 - Branch: `development/alfred-integrated`.
 - Local/remote recovery HEAD: `5af834c0338f2bc845efb1e21369cd14feba2f0b`.
+- Last observed local/remote/PR source HEAD: `6068100493040d72b57c39e88f2ed6ba424a507a`.
+  This later documentation-only checkpoint records that observation, not its own SHA.
 - Master observed: `c47fed95f919859aa62f1875512e3cb8452f2d48`; PR #15 merged.
 - Checkpoint commit: resolve `git log -1 --format=%H -- docs/EXECUTION_STATE.md`;
   actual current local/remote refs must always be checked before edits. Exact
   post-push refs/evidence hashes are also stored in `artifacts/bootstrap-5af834c/`.
 - PR #16 READY/unmerged, no independent review, protection read 403,
   auto-merge off; Pages/master publication authorization absent. Do not bypass.
+- Source-head CI `40230609047` was IN_PROGRESS when this checkpoint was written.
+  A documentation push creates another run: resolve current HEAD, query its runs,
+  and require Linux, native-Windows and Selenium PASS before awarding final weight.
 - Source run `40215059904`: backend, Selenium and Linux passed; native Windows
   job `121234300430` failed Axe `aria-prohibited-attr` at `#knowledgeHubPacks`.
 - Artifact `12608365682` downloaded and inspected: named generic div lacks valid
   role, serious finding on Settings/390px/light. Add named region; no Axe suppression.
-- Current local tree: task-owned bootstrap files; no Travel provider diff remains.
-  Interrupted hunks are safely parked. Never stage uncertain content.
+- No Travel provider diff remains. Interrupted hunks are safely parked. No uncertain
+  content was staged; only the task-owned paths below were committed.
 - Task-owned files, alphabetically: `AGENTS.md`, `README.md`,
   `docs/ALFRED_2_0_REQUIREMENTS.md`, `docs/EXECUTION_QUEUE.md`,
   `docs/EXECUTION_STATE.md`, `docs/PROJECT_STATUS.md`,
@@ -71,6 +77,11 @@ Updated: 2026-10-26T01:53+05:30, Asia/Calcutta. Read this first; do not start an
   `artifacts/resume-4789784/verify-boundary.py artifacts/bootstrap-5af834c/boundary 5af834c0338f2bc845efb1e21369cd14feba2f0b`
   from a clean committed development tree before push. Its privacy/source receipts
   and the exact post-push refs/CI are recorded under that boundary directory.
+- Implementation commit boundary PASS: `boundary/source-checks.json` and
+  `boundary/privacy-manifest.json`, zero findings, baseline 75/143 unchanged.
+  Final documentation-only checkpoint receives its own clean-source privacy
+  receipt before push. `boundary/checkpoint.json` records actual final refs/run/hash
+  observations without claiming a document can embed its own commit SHA.
 - Python SDK: `F:/ALFRED/alfred_ai/.venv/Scripts/python.exe`; obtain configured
   PyCharm environment before each Python/Graphify invocation.
 - Native command: SDK `artifacts/ci-repair-ac05515/run.py bootstrap-native scripts/verify_native_runtime.py --browser --extended --port 8036`.
@@ -98,7 +109,7 @@ Intelligence Hub source and its dormant Git adapter remain preserved.
 
 `Set-Location F:\ALFRED_DEV\post-audit; git status -sb; git log -3 --oneline; Get-Content docs/EXECUTION_STATE.md -Encoding UTF8`
 
-Exact next action: check generated views and staged whitespace; commit the validated
-task-owned files, complete/pin privacy, push and record fresh PR CI. Do not rerun the
+Exact next action: resolve actual HEAD and inspect its PR #16 workflow/jobs; record
+Linux/native-Windows/Selenium results in the boundary checkpoint. Do not rerun the
 passing native/Chrome workflows. When CI is pending, do not count its weight or
 claim the bootstrap complete. Preserve independent-review/Pages blocks separately.
