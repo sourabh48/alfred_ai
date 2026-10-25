@@ -1,7 +1,8 @@
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import Client, SimpleTestCase, TestCase
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 from apps.career.models import CareerJobAnalysis, CareerResume
 from apps.career.serializers import CareerJobAnalysisSerializer
@@ -93,6 +94,8 @@ class CareerMatchingRulesTests(SimpleTestCase):
 
 class CareerMatchingOwnerAcceptanceTests(TestCase):
     def setUp(self):
+        limits = self.enterContext(TemporaryDirectory(prefix="alfred-career-match-limits-"))
+        self.enterContext(override_settings(ALFRED_ABUSE_THROTTLE_DIR=limits))
         offline_career(self)
         self.owner = get_user_model().objects.create_user("synthetic_match_owner")
         self.foreign = get_user_model().objects.create_user("synthetic_match_foreign")
@@ -211,6 +214,19 @@ class CareerMatchingOwnerAcceptanceTests(TestCase):
         self.assertEqual(CareerJobAnalysis.objects.count(), before)
         resumes = self.client.get("/api/career/resumes/").json()
         self.assertEqual([item["id"] for item in resumes], [self.resume.pk])
+
+    def test_recruiter_quota_remains_active_before_parsing_or_saving(self):
+        with override_settings(ALFRED_EXPENSIVE_ACCOUNT_LIMIT=1), patch(
+                "apps.career.views.job_intelligence.parse_recruiter_message",
+                wraps=job_intelligence.parse_recruiter_message) as parse:
+            first = self.client.post("/api/career/recruiter-match/", {"message_text": JD})
+            self.assertEqual(first.status_code, 200)
+            before = list(CareerJobAnalysis.objects.values())
+            rejected = self.client.post("/api/career/recruiter-match/", {"message_text": JD})
+            self.assertEqual(rejected.status_code, 429)
+            self.assertGreater(int(rejected["Retry-After"]), 0)
+            parse.assert_called_once()
+            self.assertEqual(list(CareerJobAnalysis.objects.values()), before)
 
     def test_recruiter_correction_and_retry_cannot_access_another_owners_analysis(self):
         response = self.client.post("/api/career/recruiter-match/", {"message_text": JD})
