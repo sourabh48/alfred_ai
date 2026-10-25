@@ -30,6 +30,9 @@ def _load_adapter(task):
 
 class AlfredRouter:
     def route(self, task, payload):
+        if task == "gemini-development-smoke":
+            from apps.ml_engine.services.gemini_development import smoke_test
+            return smoke_test(payload)
         canonical_task = TASK_ALIASES.get(task, task)
         adapter = _load_adapter(canonical_task)
         if adapter is None:
