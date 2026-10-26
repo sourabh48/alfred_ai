@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 READY/open, unmerged. Recovery HEAD 06873da exact-head run 40286766839 PASS: Windows native, Selenium, Linux. INV-05 changes require their own pushed-head CI; no transferred green claim. READY_TO_MERGE: NO — independent reviews 0, protection GET 403, Pages authorization absent. AGENTS requires manual owner merge. No merge/publication or protection bypass.
+PR/CI: PR #16 READY/open, unmerged. Accepted source 79a26ae exact-head run 40292154135 PASS: Windows native, Selenium, Linux. Ten accepted source hashes and three receipt hashes match; source/history privacy PASS, zero findings. This documentation-only closure requires its own PR checks before owner merge; no transferred green claim. READY_TO_MERGE: NO — independent reviews 0, protection GET 403, Pages authorization absent. AGENTS requires manual owner merge. No merge/publication or protection bypass.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->
