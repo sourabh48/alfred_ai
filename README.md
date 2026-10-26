@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 cumulative READY/open, source8f505a3 run40295889832 native/Linux PASS but Selenium CANCELLED; one targeted retry requested, cancellation is not acceptance. Accepted source79a26ae run40292154135 PASS preserved. Isolated policy/feature PRs use separate refs in CI_PIPELINE_STATE. READY_TO_MERGE: NO — current-head CI incomplete, reviews0, protection403/rules visibility unavailable, Pages authorization absent and cumulative-diff review outstanding. Conditional automatic section merges are authorized only after all gates; former manual-only policy is superseded. No merge/publication/protection bypass.
+PR/CI: PR18 READY/open atdaed068, exact-head run40325761619 PASS all3 jobs; bounded INV-05/SCOPE-02 closes100% with preserved receipts, full INV-05 unaccepted. Reviews0; protection/rules visibility and applicable review gates block automatic development merge. PR17 merged into developmentd5cc181, not master; PR16 remains open atd5cc181, run40324546766 SUCCESS; masterc47fed9 unchanged. CAREER-03 is the third reserved scoped candidate; separate refs preserve CI. Master cumulative review/Pages approval remain mandatory; no merge/publication bypass.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->
