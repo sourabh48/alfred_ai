@@ -113,8 +113,13 @@ actual observed dates/counts and peak-to-trough drawdown; observation-return
 volatility is not a daily forecast. Missing, conflicting, future or expired
 evidence must abstain even through an owner-summary cache hit. Show source quotes,
 dates and citations without revaluing recorded holdings or inferring currency.
-Synthetic transport acceptance does not establish live terms, quota, exchange
-timestamps, Yahoo symbol/bar alignment or real-account acceptance. No BETTER
+Yahoo bars must retain symbol/timestamp/close alignment, reject conflicting or
+missing latest observations, and use an actual dated 30-day baseline. Source age
+caps persisted expiry, refresh scheduling and owner-cache research availability;
+fetch time cannot renew an old observation. Legacy unprovenanced caches refresh
+once or abstain. Daily bars are observations, not verified exchange closes.
+Synthetic alignment acceptance does not establish live terms, quota, actual
+provider accuracy, exchange-closing timestamps or real-account acceptance. No BETTER
 adapter identity has been established; do not invent one or activate a provider.
 
 Wealth adapts read-only institution/asset snapshots and strictly post-snapshot

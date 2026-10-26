@@ -25,7 +25,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_financial_baseline_alignment", "test_global_abuse_limits", "test_hybrid_intelligence",
     "test_intelligence_currency", "test_intelligence_ui", "test_investment_and_relationship_advisory",
     "test_investment_evidence", "test_investment_evidence_migration", "test_investment_grounding", "test_financial_source_selection",
-    "test_investment_money", "test_investment_import_acceptance", "test_investment_layout_acceptance", "test_investment_market_acceptance", "test_loan_diagnostics", "test_loan_evidence", "test_loan_evidence_migration", "test_loan_grounding", "test_loan_payment_sources", "test_loan_foreclosure_money",
+    "test_investment_money", "test_investment_import_acceptance", "test_investment_layout_acceptance", "test_investment_market_acceptance", "test_yahoo_market_acceptance", "test_loan_diagnostics", "test_loan_evidence", "test_loan_evidence_migration", "test_loan_grounding", "test_loan_payment_sources", "test_loan_foreclosure_money",
     "test_loan_lifecycle_and_reports", "test_loan_money_field", "test_loan_money_runtime",
     "test_loan_related_money_runtime", "test_loan_verification", "test_loan_verification_api",
     "test_project_execution", "test_memory_checkpoint", "test_memory_cloud", "test_memory_learning", "test_knowledge_hub", "test_memory_privacy", "test_memory_platform",

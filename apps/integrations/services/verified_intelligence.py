@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone as datetime_timezone
+from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 import os
+from math import isfinite
 from pathlib import Path
 import re
 from statistics import mean
 from typing import Any
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, unquote
 
 import feedparser
 from alfred_ai.services import public_http
@@ -432,16 +434,65 @@ class VerifiedIntelligenceService:
         )
 
     def market_snapshot(self, stale_hours: int = 12, *, force: bool = False) -> InsightResult:
-        return self._use_or_refresh(
+        def fetch():
+            payload, summary, notes = self._fetch_market_snapshot()
+            self._market_observation_expiry(payload)
+            return payload, summary, notes
+
+        result = self._use_or_refresh(
             scope="market",
             cache_key="india-equity-volatility",
             title="India Market Snapshot",
             source_name="Yahoo Finance",
             source_url="https://finance.yahoo.com/quote/%5ENSEI/",
             ttl=timedelta(hours=stale_hours),
-            fetcher=self._fetch_market_snapshot,
+            fetcher=fetch,
             force=force,
         )
+        try:
+            expires = self._market_observation_expiry(result.payload)
+        except (ValueError, TypeError, KeyError, OverflowError):
+            if result.cached and not force and result.evidence.get("status") == "fresh":
+                return self.market_snapshot(stale_hours, force=True)
+            return InsightResult({}, {**result.evidence, "status": "stale" if result.evidence.get("status") == "stale" else "failed",
+                "summary": "Yahoo market observations unavailable: identity, dates or source coverage are missing, invalid or expired."}, result.cached)
+        if result.evidence.get("status") != "fresh":
+            return InsightResult({}, result.evidence, result.cached)
+        fetched_expiry = _parse_stale_after(result.evidence.get("stale_after"))
+        if fetched_expiry and expires < fetched_expiry:
+            # Do not shorten a concurrent replacement containing different observations.
+            checksum = hashlib.sha256(json.dumps(result.payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+            VerifiedExternalInsight.objects.filter(scope="market", cache_key="india-equity-volatility",
+                source_url=result.evidence["source_url"], checksum=checksum, is_active=True,
+                stale_after__gt=expires).update(stale_after=expires)
+        result.evidence = {**result.evidence, "stale_after": min(expires, fetched_expiry or expires).isoformat()}
+        return result
+
+    def _market_observation_expiry(self, payload: dict) -> datetime:
+        if not isinstance(payload, dict) or payload.get("market_schema_version") != 2:
+            raise ValueError("Market observation provenance is missing.")
+        now = timezone.now()
+        expiries = []
+        for key, symbol, price_key in (("nifty", "^NSEI", "nifty_close"), ("vix", "^INDIAVIX", "india_vix")):
+            observation = payload["market_observations"][key]
+            observed = datetime.fromisoformat(observation["observed_at"])
+            price = payload[price_key]
+            if (observation["symbol"] != symbol or timezone.is_naive(observed) or observed > now
+                    or observed + timedelta(days=7) <= now or isinstance(price, bool)
+                    or not isfinite(float(price)) or float(price) <= 0
+                    or type(observation.get("observation_count")) is not int or not 1 <= observation["observation_count"] <= 400):
+                raise ValueError("Market observation is invalid or expired.")
+            expiries.append(observed + timedelta(days=7))
+        baseline = datetime.fromisoformat(payload["market_observations"]["nifty"]["baseline_at"])
+        latest = datetime.fromisoformat(payload["market_observations"]["nifty"]["observed_at"])
+        rate = payload["one_month_return_pct"]
+        if (timezone.is_naive(baseline) or not timedelta(days=30) <= latest - baseline <= timedelta(days=37)
+                or isinstance(rate, bool) or not isfinite(float(rate))):
+            raise ValueError("Market lookback evidence is insufficient.")
+        volatility = payload.get("realized_volatility_pct")
+        if volatility is not None and (isinstance(volatility, bool) or not isfinite(float(volatility))):
+            raise ValueError("Market observation volatility is invalid.")
+        return min(expiries)
 
     def geocode_destination(self, destination: str, stale_days: int = 30, *, force: bool = False) -> InsightResult:
         slug = slugify(destination) or "destination"
@@ -1232,38 +1283,49 @@ class VerifiedIntelligenceService:
         nifty_history = self._fetch_yahoo_chart("%5ENSEI", range_value="3mo", interval="1d")
         vix_history = self._fetch_yahoo_chart("%5EINDIAVIX", range_value="1mo", interval="1d")
         close = nifty_history["close"]
-        if not close:
-            raise ValueError("NIFTY 50 history is unavailable.")
-
-        latest = float(close[-1])
-        month_ago = float(close[max(len(close) - 22, 0)])
-        month_return = round(((latest - month_ago) / month_ago) * 100, 2) if month_ago else 0
+        latest = close[-1]
+        observed = datetime.fromtimestamp(nifty_history["timestamp"][-1], datetime_timezone.utc)
+        candidates = [(stamp, value) for stamp, value in zip(nifty_history["timestamp"], close)
+                      if datetime.fromtimestamp(stamp, datetime_timezone.utc) <= observed - timedelta(days=30)]
+        if not candidates or observed - datetime.fromtimestamp(candidates[-1][0], datetime_timezone.utc) > timedelta(days=37):
+            raise ValueError("NIFTY 50 lacks a dated 30-day baseline.")
+        baseline_stamp, month_ago = candidates[-1]
+        month_return = float(round((latest / month_ago - 1) * 100, 2))
         pct_changes = []
         for idx in range(1, len(close)):
             previous = close[idx - 1]
             current = close[idx]
             if previous:
-                pct_changes.append((current - previous) / previous)
+                pct_changes.append(float((current - previous) / previous))
         tail = pct_changes[-20:]
-        if tail:
+        if len(tail) >= 2:
             avg = sum(tail) / len(tail)
             variance = sum((item - avg) ** 2 for item in tail) / len(tail)
             realized_vol = round((variance ** 0.5) * (252 ** 0.5) * 100, 2)
         else:
             realized_vol = None
         vix_close = vix_history["close"]
-        vix_latest = round(float(vix_close[-1]), 2) if vix_close else None
+        vix_latest = round(float(vix_close[-1]), 2)
+        vix_observed = datetime.fromtimestamp(vix_history["timestamp"][-1], datetime_timezone.utc)
 
         summary = (
-            f"NIFTY 50 closed near {latest:.2f} with a 1-month return of {month_return:.2f}%."
-            + (f" India VIX last close was {vix_latest:.2f}." if vix_latest is not None else "")
+            f"NIFTY 50 observed daily value {latest:.2f} at {observed.isoformat()}, "
+            f"30-day lookback return {month_return:.2f}% from {datetime.fromtimestamp(baseline_stamp, datetime_timezone.utc).date()}. "
+            f"India VIX observed value {vix_latest:.2f} at {vix_observed.isoformat()}. "
+            "Daily bars are source observations, not independently verified exchange closing prices."
         )
         return {
-            "nifty_close": round(latest, 2),
+            "nifty_close": float(round(latest, 2)),
             "one_month_return_pct": month_return,
             "realized_volatility_pct": realized_vol,
             "india_vix": vix_latest,
-        }, summary, "Market data is cached from Yahoo Finance and should be rechecked before high-stakes decisions."
+            "market_schema_version": 2,
+            "market_observations": {
+                "nifty": {"symbol": "^NSEI", "observed_at": observed.isoformat(), "observation_count": len(close),
+                    "baseline_at": datetime.fromtimestamp(baseline_stamp, datetime_timezone.utc).isoformat()},
+                "vix": {"symbol": "^INDIAVIX", "observed_at": vix_observed.isoformat(), "observation_count": len(vix_close)},
+            },
+        }, summary, "Yahoo observations expire within seven calendar days or the fetch TTL, whichever is earlier. Volatility uses observation returns on a 252-observation scale, not a forecast."
 
     def _fetch_yahoo_chart(self, symbol: str, range_value: str, interval: str) -> dict:
         response = public_http.request("GET",
@@ -1271,12 +1333,34 @@ class VerifiedIntelligenceService:
             params={"range": range_value, "interval": interval},
             headers={"User-Agent": self.USER_AGENT},
         )
-        data = response.json()
-        result = ((data.get("chart") or {}).get("result") or [{}])[0]
-        quote = (((result.get("indicators") or {}).get("quote") or [{}])[0]) or {}
-        close = [float(item) for item in quote.get("close", []) if item is not None]
-        timestamps = result.get("timestamp", [])
-        return {"close": close, "timestamp": timestamps}
+        try:
+            chart = response.json()["chart"]
+            if chart.get("error") or len(chart["result"]) != 1:
+                raise ValueError("Yahoo chart is unavailable.")
+            result = chart["result"][0]
+            if result["meta"]["symbol"] != unquote(symbol):
+                raise ValueError("Yahoo instrument identity mismatch.")
+            timestamps = result["timestamp"]
+            prices = result["indicators"]["quote"][0]["close"]
+            if not isinstance(timestamps, list) or not isinstance(prices, list) or not 1 <= len(timestamps) <= 400 or len(prices) != len(timestamps):
+                raise ValueError("Yahoo observation arrays are invalid.")
+            observations = {}
+            for stamp, raw in zip(timestamps, prices):
+                if type(stamp) is not int or stamp <= 0 or datetime.fromtimestamp(stamp, datetime_timezone.utc) > timezone.now():
+                    raise ValueError("Yahoo observation timestamp is invalid.")
+                value = None if raw is None else Decimal(str(raw))
+                if value is not None and (isinstance(raw, bool) or not value.is_finite() or value <= 0 or not isfinite(float(value))):
+                    raise ValueError("Yahoo observed price is invalid.")
+                if stamp in observations and observations[stamp] != value:
+                    raise ValueError("Yahoo observation conflicts with its duplicate.")
+                observations[stamp] = value
+            dates = sorted(observations)
+            if observations[dates[-1]] is None:
+                raise ValueError("Latest Yahoo daily value is missing.")
+            valid = [(stamp, observations[stamp]) for stamp in dates if observations[stamp] is not None]
+            return {"close": [value for _, value in valid], "timestamp": [stamp for stamp, _ in valid]}
+        except (KeyError, TypeError, AttributeError, IndexError, InvalidOperation, OverflowError, OSError) as exc:
+            raise ValueError("Yahoo chart evidence is malformed.") from exc
 
     def _fetch_geocode(self, destination: str) -> tuple[dict, str, str]:
         response = public_http.request("GET",

@@ -14,7 +14,7 @@ MODULE_ORDER = ('FIN', 'LOAN', 'INV', 'DOC', 'AI', 'CAREER', 'TRAVEL', 'FAMILY',
 GATES = {
     'LOAN-08': 'BLOCKED_EVIDENCE: independent lender/document acceptance corpus',
     'INV-02': 'BLOCKED_EVIDENCE: broader broker/layout/OCR and authorized real-account corpus; bounded receipts in EXECUTION_STATE',
-    'INV-05': 'READY_FOR_SCOPED_INSPECTION: SCOPE-01 AMFI receipts in EXECUTION_STATE; next Yahoo bar identity/timestamp/cache scope; live terms/access remain unaccepted',
+    'INV-05': 'BLOCKED_EVIDENCE: bounded AMFI/Yahoo receipts in EXECUTION_STATE; remaining live terms/quota, authorized provider and real-account evidence absent; full capability unaccepted',
     'AI-10': 'BLOCKED_APPROVAL: private-history activation remains off',
     'AI-14': 'BLOCKED_EVIDENCE: eligible consented training and reviewed outcomes',
     'AI-15': 'BLOCKED_EVIDENCE: genuine per-model held-out outcomes',

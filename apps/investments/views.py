@@ -55,7 +55,7 @@ class InvestmentSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        revision = f"{_investment_revision(request.user)}:market-v2:{timezone.localdate().isoformat()}"
+        revision = f"{_investment_revision(request.user)}:market-v3:{timezone.localdate().isoformat()}"
         payload = materialize_payload(
             namespace="investments-summary",
             user_id=request.user.id,

@@ -3759,6 +3759,72 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
         self.capture('investment-watchlist-source-390px')
 
+    def test_yahoo_market_observations_identity_expiry_and_recovery_on_investment_page(self):
+        from apps.integrations.services.verified_intelligence import VerifiedIntelligenceService, verified_intelligence
+        from apps.investments.models import Investment
+        from apps.investments.services.portfolio_intelligence import PortfolioIntelligenceService, portfolio_intelligence_service
+        from tests.test_yahoo_market_acceptance import SyntheticYahoo
+        from tests.test_investment_market_acceptance import SCHEME
+
+        transport = SyntheticYahoo()
+        self.enterContext(patch('apps.integrations.services.verified_intelligence.public_http.request', side_effect=transport))
+        self.enterContext(patch.object(verified_intelligence, 'market_snapshot',
+            side_effect=lambda *a, **kw: VerifiedIntelligenceService.market_snapshot(verified_intelligence, *a, **kw)))
+        self.enterContext(patch.object(portfolio_intelligence_service, 'build_short_horizon_watchlist',
+            side_effect=lambda owner: PortfolioIntelligenceService.build_short_horizon_watchlist(portfolio_intelligence_service, owner)))
+        before = list(Investment.objects.values())
+        self.login()
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: SCHEME in self.text('investmentWatchlistCards'))
+        evidence = self.text('investmentWatchlistEvidence')
+        self.assertIn(transport.end.isoformat(), evidence)
+        self.assertIn('30-day lookback', evidence)
+        self.assertIn('not independently verified exchange closing prices', evidence)
+        self.assertTrue(any('finance.yahoo.com' in link.get_attribute('href')
+            for link in self.browser.find_elements(self.By.CSS_SELECTOR, '#investmentWatchlistEvidence a')))
+        self.browser.execute_script("document.getElementById('investmentWatchlistEvidence').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('yahoo-market-observations-desktop')
+
+        transport.charts['^NSEI']['chart']['result'][0]['meta']['symbol'] = 'FOREIGN'
+        verified_intelligence.market_snapshot(force=True); cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'Recorded holdings are unchanged' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        self.assertNotIn(SCHEME, self.text('investmentWatchlistCards'))
+        self.assertEqual(list(Investment.objects.values()), before)
+
+        from datetime import timedelta
+        from django.utils import timezone
+        transport.charts = SyntheticYahoo(end=timezone.now() - timedelta(days=8)).charts
+        cache.clear(); verified_intelligence.market_snapshot(force=True); self.browser.refresh()
+        self.wait.until(lambda _: 'Recorded holdings are unchanged' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        transport.charts = SyntheticYahoo().charts
+        cache.clear(); verified_intelligence.market_snapshot(force=True); self.browser.refresh()
+        self.wait.until(lambda _: SCHEME in self.text('investmentWatchlistCards'))
+        self.assertEqual(list(Investment.objects.values()), before)
+        self.assertNotIn('PRIVATE', str(transport.calls))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+            {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.getElementById('investmentWatchlistEvidence').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('yahoo-market-observations-390px')
+        contrast = r"""function light(rgb) {
+            const v=rgb.match(/[\d.]+/g).slice(0,3).map(n=>{n=Number(n)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4});
+            return .2126*v[0]+.7152*v[1]+.0722*v[2];
+        }
+        return [...document.querySelectorAll('#investmentWatchlistEvidence .insight-item, #investmentWatchlistEvidence a, #investmentWatchlistAlgorithm .mini-card, #investmentWatchlistAlgorithm .muted, #investmentWatchlistAlgorithm .metric-caption')].map(e=>{
+            const a=light(getComputedStyle(e).color), b=light(getComputedStyle(e.closest('.insight-item, .mini-card')).backgroundColor);
+            return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+        });"""
+        for theme in ('light', 'dark'):
+            self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+            self.wait.until(lambda _: self.browser.execute_script(
+                "return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+            ratios = self.browser.execute_script(contrast)
+            self.assertGreaterEqual(len(ratios), 6)
+            self.assertTrue(all(ratio >= 4.5 for ratio in ratios), (theme, ratios))
+
     def test_investment_projection_starts_with_recorded_value_on_real_page(self):
         self.login()
         self.browser.get(self.live_server_url + "/investments/")
