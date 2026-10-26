@@ -40,7 +40,7 @@ def discover_destinations(user, state, preliminary):
         result = query(WikivoyageDestinations(),params,force=value(state,"force_refresh",False))
         if result.success and not result.payload.get("destinations") and interest:
             result = query(WikivoyageDestinations(),{**params,"interest":""},force=value(state,"force_refresh",False))
-    seeds = result.payload.get("destinations",[])
+    seeds = result.payload.get("destinations",[]) if result.success else []
     # Apply the existing transparent budget/time/preference/history ranking.
     options = candidates_for(user,state,limit=20,destinations=seeds,origin_coordinates=origin) if seeds else []
     if options:

@@ -19,8 +19,14 @@ remote run40389906654 is still in progress at task selection; it is not green.
   Receipts: artifacts/ci-repair-ac05515/travel-novelty-{red,unit1}.json. No schema,
   provider activation, private disclosure or money change. TRAVEL-02 remains
   IMPLEMENTED_NOT_ACCEPTED for its full scope; **75/143 verified, 0/13 extensions**.
-- NEXT TASK: reject unsuccessful dynamic-discovery payloads, then expose aged
-  discovery provenance in the existing Travel evidence UI. Use this worktree and
+- Unit2 COMPLETE (baseff6e8ea): unsuccessful provider payloads cannot become
+  dynamic destination evidence. The original offline candidates and static label
+  survive; valid cached guide leads remain explicitly cached, without claiming
+  access/availability. The failure was reproduced before the one-line fix;
+  **3 focused backend PASS, zero skips**, travel-fallback-{red,unit2}.json under
+  artifacts/ci-repair-ac05515. No extra provider calls or dependency changes.
+- NEXT TASK: expose aged discovery provenance in the existing Travel evidence UI.
+  Use this worktree and
   branch; no new PR, branch, master operation or live/operator-data check.
 - Resolve this checkpoint's commit with `git log -1 --format=%H -- docs/PROJECT_STATUS.md`.
 
