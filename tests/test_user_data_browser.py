@@ -156,6 +156,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         before = list(CareerProfile.objects.order_by("pk").values())
         self.login(); self.browser.get(self.live_server_url + "/career/")
         self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status]')) == 3)
+        self.wait.until(lambda _: 'Fresh feed evidence' in self.text('careerOpenings'))
         text = self.text('careerOpenings')
         self.assertIn('Fresh feed evidence', text)
         self.assertIn('Stale cached lead', text)
@@ -535,6 +536,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def test_memory_evaluation_score_bands_explain_high_score_false_matches(self):
         from selenium.webdriver.support.ui import Select
+        from selenium.webdriver.common.keys import Keys
         store, owner, identities = self.memory_evaluation_fixture()
         before = store.list_memories(owner)
         self.browser.find_element(self.By.ID, 'memoryEvaluationQuery').send_keys('mountain hiking')
@@ -553,6 +555,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: '100.0%' in self.text('memoryEvaluationScoreBands'))
         self.assertEqual(self.browser.find_element(self.By.ID, 'memoryEvaluationThreshold').get_property('value'), cutoff)
         self.assertEqual(store.list_memories(owner), before)
+        band = self.browser.find_element(self.By.ID, 'memoryEvaluationScoreBands')
+        self.assertEqual(band.get_attribute('role'), 'region')
+        self.assertEqual(band.get_attribute('tabindex'), '0')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=390,height=900,deviceScaleFactor=1,mobile=True))
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.browser.execute_script('arguments[0].focus()', band)
+        band.send_keys(Keys.ARROW_RIGHT)
+        self.wait.until(lambda _: self.browser.execute_script('return arguments[0].scrollLeft > 0', band))
         self.browser.execute_script("document.getElementById('memoryEvaluationScoreBands').scrollIntoView({block:'center',behavior:'instant'})")
         self.capture('memory-evaluation-score-diagnostics')
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")

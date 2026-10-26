@@ -4,14 +4,43 @@
 
 ## Active implementation checkpoint — 2026-10-27
 
-**Current command: MERGE EVERYTHING AND PUSH.** Latest combined preparation merges
+**Current command: MERGE EVERYTHING AND PUSH.** Combined source merges
 canonical development **6fc1e54** into the fully reconciled Yahoo/Discovery/Geography
 candidate **fc2a4d2**. All original source commits and the five Memory commits are
-retained; no executable merge conflict. Fresh combined tests/review are in progress.
-This is local preparation until mandatory integration gates pass; canonical remote
-development remains6fc1e54 and master remainsc47fed9. Owner explicitly closed
-PR16/18/19 without merging; do not create or reopen PRs automatically. Previous
-state/pipeline snapshots below are historical; this checkpoint owns current state.
+retained; merge source **81c2876** had no executable conflict. **402 affected backend
+tests PASS**, zero skips; **nine unique Chrome workflows accepted** across the
+eight passing batch cases and focused Career readiness repair. No assertions or
+timeouts were weakened: the fixture now waits for visible evidence, not just DOM
+presence. Receipts all-merge-backend.json, all-merge-browser.json and
+all-merge-browser-ready.json under artifacts/ci-repair-ac05515.
+
+Accessibility exposed a keyboard-inaccessible mobile Memory score table; its named
+region now takes keyboard focus and supports arrow-key scrolling. The extended
+Chrome workflow and all four desktop/390px light/dark Memory Axe audits PASS;
+the three other affected pages passed12 global Axe audits. An initial transient
+sidebar contrast diagnostic and the actual scrollability failure remain preserved;
+neutral-pointer sampling keeps global checks intact. Final16 scoped audits report
+zero violations; incomplete checks/manual screen-reader remain unverified. Receipt
+all-merge-accessibility-memory-final.json; data in
+artifacts/consolidation-20261026/all-accessibility-memory/accessibility.json.
+
+Separate-context in-host review of the combined source found no supported defects;
+it is not a human GitHub approval or an independent model claim. Authenticated
+development protection/rules inspection on2026-10-27 confirms an unprotected branch
+with no rulesets/effective required checks. This owner-directed development merge
+uses normal fast-forward/push, never a protection bypass. Remote CI is a separate
+pending lane, not reported green; full consolidated exact-head CI and all master
+review/publication gates remain required before any master merge.
+
+Owner closed PR16/18/19 without merging; do not create or reopen PRs automatically.
+All requested development scopes are present in this source, including upstream
+policy, INV-02, AMFI/Yahoo, both Career scopes and the latest Memory work. Final
+source/branch containment and push SHA are recorded after publication in
+artifacts/consolidation-20261026/all-merge-push.json. Source/history privacy must
+PASS at that exact HEAD. Original branches/worktrees/receipts remain preserved.
+Masterc47fed9 and frozen4aa7ac70 are unchanged; no production/Pages/provider/FX/
+private-history/cloud activation. Baseline75/143 and extensions0/13 remain unchanged.
+Previous state/pipeline snapshots below are historical; this checkpoint owns current state.
 
 Fast continuous development uses the existing post-audit worktree on
 development/alfred-integrated. Requested dfdeac0 is an older ancestor; recovery

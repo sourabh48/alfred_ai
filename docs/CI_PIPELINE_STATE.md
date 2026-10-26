@@ -1,5 +1,14 @@
 # Development CI and integration pipeline
 
+**2026-10-27 current state:** the owner closed all PRs and explicitly directed
+development consolidation/push. The combined source now contains fc2a4d2 and6fc1e54;
+402 backend tests, nine Chrome workflows and16 affected-page Axe audits passed
+with the documented targeted repairs. No PR is created/reopened. Authenticated
+development protection/effective rules are empty; no rule changed or bypassed.
+Remote CI remains separate and is not claimed green; master/publication gates
+remain mandatory. PROJECT_STATUS's active checkpoint and exact-head receipts own
+the latest merge/push state. The following2026-10-26 ledger is historical.
+
 Updated2026-10-26. The owner selected one canonical development branch and one
 integration PR. This ledger records delivery; PROJECT_STATUS owns143 original IDs,
 requirements own intent, the queue selects features, and EXECUTION_STATE owns coding.

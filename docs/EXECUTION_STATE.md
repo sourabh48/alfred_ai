@@ -1,5 +1,11 @@
 # ALFRED execution state
 
+**2026-10-27:** current command MERGE EVERYTHING AND PUSH. Current combined source
+contains both fc2a4d2 (Yahoo/Discovery/Geography) and6fc1e54 (latest Memory). Read only
+the active checkpoint in PROJECT_STATUS for current refs/tests/push/next action;
+the recovery ledger below predates this merge. PR16/18/19 are owner-closed; do not
+automatically create/reopen a PR. Master and frozen release remain unchanged.
+
 Updated 2026-10-26 (Asia/Calcutta). Explicit **sprint** consolidation command.
 
 ## Active task — blocked canonical consolidation, local preparation
