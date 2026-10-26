@@ -16,7 +16,7 @@ from scripts import release_gate as release
 BACKEND = tuple("tests." + name for name in (
     "test_alfred_brain", "test_api_session_security", "test_auth_pages", "test_bank_statement_grounding", "test_bike_document_parser",
     "test_budget_money", "test_budget_money_migration", "test_canonical_evidence", "test_canonical_grounding", "test_closure_citations",
-    "test_career_api_errors", "test_career_job_http", "test_career_matching_acceptance", "test_career_recruiter_and_evidence",
+    "test_career_api_errors", "test_career_job_http", "test_career_location_acceptance", "test_career_matching_acceptance", "test_career_recruiter_and_evidence",
     "test_career_resume_upload", "test_career_money", "test_conversation_history", "test_credit_report_upload", "test_document_center_and_statement_import",
     "test_document_corpus", "test_document_extraction", "test_document_full_context", "test_document_grounding_acceptance", "test_document_knowledge", "test_document_questions", "test_document_retry_integrity",
     "test_document_review_and_retry", "test_expense_corrections", "test_expense_export", "test_expense_money_identity", "test_expense_money_runtime", "test_experimental_retirement",

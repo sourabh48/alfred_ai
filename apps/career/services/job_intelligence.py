@@ -454,7 +454,7 @@ class JobIntelligenceService:
 
     def _normalize_opening(self, item: dict, *, role: str, skills: list[str], evidence: dict) -> dict:
         company = item.get("company") or item.get("company_name") or ""
-        location = item.get("location", "") or "Remote"
+        location = str(item.get("location") or "")
         location_meta = self._location_hierarchy(location)
         relevance = self._opening_relevance(role, skills, item)
         salary_signal = self._salary_signal_payload(item.get("salary", ""))
@@ -470,6 +470,7 @@ class JobIntelligenceService:
             "state": location_meta["state"],
             "city": location_meta["city"],
             "is_remote": location_meta["is_remote"],
+            "is_worldwide": bool(re.fullmatch(r"(?:remote[\s,/-]*)?(?:worldwide|global|anywhere)(?:[\s,/-]*remote)?", location.strip(), re.IGNORECASE)),
             "category": item.get("category", ""),
             "url": item.get("url", ""),
             "publication_date": item.get("publication_date", ""),
@@ -663,18 +664,16 @@ class JobIntelligenceService:
         if skill_hits:
             score += min(len(skill_hits) * 9, 27)
             reasons.append(f"Role tags align with {', '.join(skill_hits[:3])}.")
-        if "remote" in str(opening.get("location", "") or "").lower():
+        if self._location_hierarchy(opening.get("location", ""))["is_remote"]:
             score += 4
-            reasons.append("Remote eligibility is explicitly mentioned.")
+            reasons.append("Remote work is mentioned; check geographic eligibility.")
         return {"score": round(min(score, 99), 1), "reasons": reasons[:3]}
 
     def _opening_matches_location(self, opening: dict, *, country: str = "", state: str = "") -> bool:
         normalized_country = self._normalize_country(country)
         normalized_state = str(state or "").strip().lower()
         if normalized_country and normalized_country != "Remote":
-            if opening.get("is_remote") and not normalized_state:
-                return True
-            if self._normalize_country(opening.get("country", "")) != normalized_country:
+            if not opening.get("is_worldwide") and self._normalize_country(opening.get("country", "")) != normalized_country:
                 return False
         if normalized_country == "Remote":
             return bool(opening.get("is_remote"))
@@ -685,6 +684,9 @@ class JobIntelligenceService:
 
     def _opening_filter_metadata(self, openings: list[dict]) -> dict:
         countries = sorted({item.get("country", "") for item in openings if item.get("country")})
+        if any(item.get("is_remote") for item in openings) and "Remote" not in countries:
+            countries.append("Remote")
+            countries.sort()
         states_by_country: dict[str, list[str]] = {}
         for country in countries:
             states = sorted({item.get("state", "") for item in openings if item.get("country") == country and item.get("state")})
@@ -700,34 +702,48 @@ class JobIntelligenceService:
         normalized = raw.lower()
         if not raw:
             return {"country": "", "state": "", "city": "", "is_remote": False}
-        if any(token in normalized for token in ("remote", "worldwide", "global", "anywhere")):
-            return {"country": "Remote", "state": "", "city": "", "is_remote": True}
-        parts = [item.strip() for item in re.split(r"[,/|]", raw) if item.strip()]
+        is_remote = bool(re.search(r"\b(remote|worldwide|global|anywhere)\b", normalized)) and not bool(re.search(r"\b(?:not|non|no)[ -]+remote\b", normalized))
+        parts = [re.sub(r"\b(?:remote|only)\b", "", item, flags=re.IGNORECASE).strip()
+                 for item in re.split(r"[,/|()·-]", raw) if item.strip()]
         city = ""
         state = ""
         country = ""
+        countries = set()
+        states = set()
         for part in parts:
             lowered = part.lower()
-            if lowered in COUNTRY_ALIASES:
+            if lowered in COUNTRY_ALIASES and COUNTRY_ALIASES[lowered] != "Remote":
                 country = COUNTRY_ALIASES[lowered]
+                countries.add(country)
                 continue
             if lowered in STATE_TO_COUNTRY:
                 state = part.title()
+                states.add(state)
                 country = country or STATE_TO_COUNTRY[lowered]
+                countries.add(STATE_TO_COUNTRY[lowered])
                 continue
             if lowered in CITY_TO_STATE_COUNTRY:
                 city = part.title()
                 mapped_state, mapped_country = CITY_TO_STATE_COUNTRY[lowered]
+                states.add(mapped_state)
                 state = state or mapped_state
                 country = country or mapped_country
+                countries.add(mapped_country)
         if not city:
             for city_name, (mapped_state, mapped_country) in CITY_TO_STATE_COUNTRY.items():
-                if city_name in normalized:
+                if re.search(r"\b" + re.escape(city_name) + r"\b", normalized):
                     city = city_name.title()
+                    states.add(mapped_state)
                     state = state or mapped_state
                     country = country or mapped_country
+                    countries.add(mapped_country)
                     break
-        return {"country": country, "state": state, "city": city, "is_remote": False}
+        # Composite/negative restrictions need review, not a guessed eligible country.
+        if len(countries) > 1 or len(states) > 1 or re.search(r"\b(?:except|excluding|outside|not in)\b", normalized):
+            country, state, city = "", "", ""
+        elif not country and is_remote:
+            country = "Remote"
+        return {"country": country, "state": state, "city": city, "is_remote": is_remote}
 
     def _normalize_country(self, value: str) -> str:
         lowered = str(value or "").strip().lower()

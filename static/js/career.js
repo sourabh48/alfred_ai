@@ -29,8 +29,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function loadCareerDashboard(options = {}) {
     Alfred.setPageBusy("careerRoot", true, { label: "Loading career intelligence" });
-    return Alfred.fetchJSON(`/api/career/dashboard/${careerDashboardQueryString()}`)
+    const query = careerDashboardQueryString();
+    return Alfred.fetchJSON(`/api/career/dashboard/${query}`)
         .then(data => {
+            if (query !== careerDashboardQueryString()) {
+                return;
+            }
             // A response can arrive after the owner opens sources or starts editing.
             if (options.live && Alfred.shouldPauseLiveRefresh(document.getElementById("careerRoot"))) {
                 return;
@@ -57,7 +61,7 @@ function loadCareerDashboard(options = {}) {
             renderOpeningFilters(data.opening_filters || {}, data.active_opening_filters || careerOpeningFilters);
             renderOpenings(data.openings || [], data.opening_counts || {});
             renderSimulationPanel();
-            if (!options.live) {
+            if (!options.live && !options.preserveEdits) {
                 hydrateCareerForm(profile);
                 hydrateSimulationForm(profile, projection);
             }
@@ -89,7 +93,7 @@ function updateCareerOpeningFilters(event) {
     } else {
         careerOpeningFilters.state = target.value || "";
     }
-    loadCareerDashboard({ live: true });
+    loadCareerDashboard({ preserveEdits: true });
 }
 
 function renderOpeningFilters(filters, active) {
@@ -609,7 +613,7 @@ function renderOpenings(items, counts = {}) {
     target.innerHTML = items.length ? items.map(item => `
         <div class="mini-card">
             <div class="fw-semibold">${Alfred.escapeHtml(item.title || "Opening")}</div>
-            <div class="muted small">${Alfred.escapeHtml(item.company || "Unknown company")} | ${Alfred.escapeHtml(item.location || "Remote")}</div>
+            <div class="muted small">${Alfred.escapeHtml(item.company || "Unknown company")} | ${Alfred.escapeHtml(item.location || "Location not specified")}</div>
             <div class="muted small">${Alfred.escapeHtml(item.category || "")}${item.salary ? ` | ${Alfred.escapeHtml(item.salary)}` : ""}</div>
             <div class="muted small mt-2">${item.tags?.length ? Alfred.escapeHtml(item.tags.join(", ")) : ""}</div>
             <div class="muted small mt-2">${Alfred.escapeHtml(item.portal_name || "Verified portal")} | relevance ${Alfred.formatNumber(item.relevance_score || 0, 0)}/100${item.verified_source ? " | verified source" : ""}</div>

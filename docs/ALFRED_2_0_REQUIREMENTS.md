@@ -78,6 +78,20 @@ Existing CAREER-03/06 own matching/market acceptance. Resume versions, recruiter
 drafts/attachments and outcome feedback reuse the current owned document pipeline.
 Sending email/messages, applications or resumes always needs explicit confirmation.
 
+Job discovery distinguishes feed freshness from opening availability. Unknown or
+expired provenance cannot become verified/fresh merely because an owner cache or
+feed response exists. Retain useful cached leads with explicit status, source and
+checked/expiry dates; opening availability stays unverified until independently
+confirmed. Posting/source links must be validated HTTPS and escaped in HTML.
+Deduplicate canonical posting identities, preserve distinct job IDs, prefer fresh
+evidence and keep provider failures isolated. No implicit application submission.
+
+Remote work is separate from geographic eligibility. Retain explicit country/state
+restrictions; only an explicit unqualified worldwide label can match all countries.
+Missing locations must stay unspecified. Composite, conflicting or negative
+restrictions need review rather than a guessed country. Original location text
+remains visible; these filters do not confirm employment/work-permit eligibility.
+
 Travel never equates car routes with bike legality, geometric offsets with road
 detours, cached links with live inventory, or research leads with permits/bookings.
 Day edits, chosen routes, budgets, maps, save/reopen and offline recovery must agree.
