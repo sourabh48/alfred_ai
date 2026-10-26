@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 cumulative READY/open, source8f505a3 run40295889832 native/Linux PASS but Selenium CANCELLED; one targeted retry requested, cancellation is not acceptance. Accepted source79a26ae run40292154135 PASS preserved. Isolated policy/feature PRs use separate refs in CI_PIPELINE_STATE. READY_TO_MERGE: NO — current-head CI incomplete, reviews0, protection403/rules visibility unavailable, Pages authorization absent and cumulative-diff review outstanding. Conditional automatic section merges are authorized only after all gates; former manual-only policy is superseded. No merge/publication/protection bypass.
+PR/CI: Owner merged PR17 source503b848 into development/alfred-integrated as d5cc181 (not master). Local development fast-forwarded safely; master staysc47fed9 and PR16 remains open, fresh exact-head run40324546766 IN_PROGRESS. Yahoo scope sourcec60c807/checkpoint8679824 preserved; authenticated browser restored, separate scoped draft against development prepared. Resolve current PR/run in EXECUTION_STATE/CI_PIPELINE_STATE. READY_TO_MERGE:NO — exact-head CI/review/protection/cumulative-diff/Pages gates remain; no new master merge/publication/deployment.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->

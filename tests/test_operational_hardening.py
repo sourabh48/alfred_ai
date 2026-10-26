@@ -19,6 +19,7 @@ from apps.integrations.services.verified_intelligence import (
     proof_contract_payload,
 )
 from apps.reports.models import SystemTicket
+from tests.test_yahoo_market_acceptance import market_payload
 
 
 class VerifiedIntelligenceCircuitBreakerTests(TestCase):
@@ -400,7 +401,7 @@ class VerifiedIntelligenceCircuitBreakerTests(TestCase):
             verified_intelligence,
             "_fetch_market_snapshot",
             return_value=(
-                {"nifty_close": 123.45, "one_month_return_pct": 1.1, "india_vix": 12.3},
+                market_payload(nifty_close=123.45, one_month_return_pct=1.1, india_vix=12.3),
                 "Market refreshed.",
                 "Fresh market data.",
             ),
@@ -556,7 +557,7 @@ class VerifiedIntelligenceCircuitBreakerTests(TestCase):
         ) as world_bank_mock, patch.object(
             verified_intelligence,
             "_fetch_market_snapshot",
-            return_value=({"nifty_close": 25000.0, "one_month_return_pct": 1.0, "india_vix": 12.0}, "Market refreshed.", "notes"),
+            return_value=(market_payload(nifty_close=25000.0, one_month_return_pct=1.0, india_vix=12.0), "Market refreshed.", "notes"),
         ) as market_mock, patch.object(
             verified_intelligence,
             "_fetch_geocode",

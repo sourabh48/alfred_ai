@@ -26,16 +26,35 @@ EXECUTION_STATE owns active coding; PROJECT_STATUS owns 143 IDs and acceptance;
 | Task / scope | State / local completion | Source branch / SHA | Base / dependency | PR / CI | Local acceptance | Review / integration gates | Merge / post-merge | Recovery |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Cumulative integration; includes INV-02 scopes, INV-05/SCOPE-01 and earlier sections | CI_PENDING after cancellation; INV-05/SCOPE-01 accepted100% at79a26ae | development/alfred-integrated / 8f505a3f5fc553e9b1664e3f5827044c76eebb54 | master c47fed95f919859aa62f1875512e3cb8452f2d48 | #16; run40295889832 native121481722900 and Linux121481723333 PASS, Selenium121481723278 CANCELLED; one targeted retry requested, result in policy handoff receipt | Accepted source79a26ae CI40292154135 all three PASS;56 backend +11 metadata,one Chrome/4 overlapping Axe;privacy0;prior INV-02 retained | MERGE_BLOCKED: cancellation is not PASS; reviews0/protection403/Pages approval absent/full cumulative diff review | Not merged; no merge SHA/post-merge acceptance | Reconcile retry at natural checkpoint; do not append unrelated sections or rerun successful jobs |
-| UPSTREAM-POLICY / sprint contract | LOCAL_ACCEPTED90%; CI_PENDING95% after push | development/upstream-policy-20261026 / resolve commit touching this row | 8f505a3; depends on unmerged PR16 bootstrap/execution docs | Resolve PR by unique source branch; actual PR/run recorded in ignored `artifacts/sprint-8f505a3/policy-handoff.json` after creation | 12 metadata/CI-ref-isolation PASS, zero skips; four pinned repo identities/licenses/source-test catalog; no upstream integration claimed; Chrome/money N/A (policy only) | Same master gates; stack target development/alfred-integrated, not master-independent | Not merged | Push once and open scoped stacked PR; next independent section records assigned PR/run IDs without restarting this PR |
+| UPSTREAM-POLICY / sprint contract | CI_PASSED100%; MERGE_BLOCKED | development/upstream-policy-20261026 / 503b84864cc9f61f8f254c8436e4b0183d04e513 | 8f505a3; depends on unmerged PR16 bootstrap/execution docs | Draft #17; exact-head run40300637754 PASS; Windows121497359610/Selenium121497359953/Linux121497360147 success | 12 metadata/CI-ref-isolation PASS, zero skips; four pinned repo identities/licenses/source-test catalog; privacy0; no upstream integration claimed; Chrome/money N/A (policy only) | Same master gates; stack target development/alfred-integrated, not master-independent | Not merged | Preserve source/run; policy closure in yahoo/policy-ci-pass.json; do not transfer green CI to new Yahoo source |
+| INV-05 / SCOPE-02 Yahoo observation integrity | COMMITTED_PUSHED95%; BLOCKED_EXTERNAL / CI_NOT_SUBMITTED | development/inv05-yahoo-evidence-20261026 / c60c807faac3f7c269a9041eb8d88abf67a5ac0c implementation; later docs checkpoint resolved from EXECUTION_STATE | 503b848 / PR17 then PR16; explicitly stacked | No PR/run assigned: connector creation403, authenticated browser disconnected/native pipe absent, gh absent; yahoo/handoff.json records exact refs | 80 backend +12 metadata PASS; one unique Chrome +4 overlapping Axe audits zero violations; both-theme contrast; Decimal/ownership/outage/expiry/recovery; source privacy0 | Restore existing authenticated browser or owner creates prepared scoped draft; reviews/protection/Pages/dependency gates remain; full INV-05 unaccepted | Not merged | Submit prepared compare link/pr-draft.json; exact-head CI then gates; no fourth candidate and no repeated denied action |
 
-Candidate limit currently includes PR16 plus policy section; next selected feature
-may use the third slot. New branches must retain an exact independently reviewable
+Candidate limit now includes PR16, policy PR17 and the Yahoo section's reserved
+third slot. New branches must retain an exact independently reviewable
 base. When eventual master contains prerequisites, retarget and revalidate rather
 than transplanting dependent commits or rewriting accepted history.
+
+Resolved policy handoff: PR **17**, draft, source **503b84864cc9f61f8f254c8436e4b0183d04e513**,
+base development/alfred-integrated at8f505a3; run **40300637754 PASS**, bounded policy100%.
+PR creation connector403 was resolved through the already signed-in browser UI;
+no permissions/credentials changed. Exact metadata in policy-handoff.json.
+
+Active third candidate: **INV-05/SCOPE-02**, COMMITTED_PUSHED95% on
+development/inv05-yahoo-evidence-20261026, pinned base503b848 / PR17 dependency.
+Sourcec60c807 pushed/remote verified, privacy0; PR creation externally blocked, no CI run submitted. Resume through the exact compare link in EXECUTION_STATE. Retarget/revalidate only after
+prerequisites reach master. Candidate capacity is now reserved at three; do not
+submit a fourth while these integration blockers persist.
 
 PR16 targeted Selenium retry request was denied **403 (Actions write unavailable)**.
 No retry was queued. Owner/authorized maintainer must rerun cancelled job121481723278;
 successful native/Linux jobs are preserved. Do not repeatedly retry denied access.
+
+## Current reconciliation — after owner merged PR17
+
+- PR17 confirmed merged **into development/alfred-integrated**, merge d5cc181faae5c61d6de65f00ce21375ce73de33b, source503b848. Policy exact-head run40300637754 PASS retained; development merge has identical treeefc4263eaab7f213c4b479ef6c5ebfd0530549d7. Local integration fast-forwarded; master unchangedc47fed9. Do not label this MERGED_VERIFIED on master.
+- PR16 now has sourced5cc181, fresh run40324546766 CI_PENDING. Earlier8f505a3 cancellation and failed retry403 above are historical; no inherited green check. Required master reviews/protection/Pages gates remain unresolved.
+- Yahoo scope95%, unchanged sourcec60c807 / checkpoint8679824; all8 accepted Git blobs and four receipt hashes preserved (raw EOL hashes changed on checkout). Existing signed-in browser restored. Submit separate draft from development/inv05-yahoo-evidence-20261026 **against development/alfred-integrated atd5cc181**, not the now-merged policy branch. Actual post-recovery source/PR/run in yahoo/post-pr17/handoff.json; CI_PENDING only after submission.
+- Outstanding integration capacity: PR16 plus Yahoo =2/3. PR17 closed; old candidate-cap/browser-blocker text above is historical. Current coding/integration remains INV-05/SCOPE-02; next queued CAREER-03 has not started. Do not make an unrelated push to a running PR.
 
 ## CI isolation evidence
 
