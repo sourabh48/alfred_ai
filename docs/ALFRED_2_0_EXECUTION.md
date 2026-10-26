@@ -12,13 +12,15 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
   plan JSON and manual multi-stop API now support desktop activity CRUD, pointer/
   keyboard activity/stop moves, stable IDs, undo/history, retry/CAS revision safety,
   saved reopen and explicit old-estimate invalidation. No replacement planner.
-- PR16 is OPEN at4b012a2, reopened by explicit owner request. This supersedes the
-  older no-open-PR checkpoint. Head CI40394951006 PASS all3 jobs; PR CI40414777100
-  IN_PROGRESS at recovery;0 reviews/approvals. Receipts:
-  `artifacts/travel-discovery-20261027/pr16-validation.json`. No eligible scoped
-  merge: PR16 contains the cumulative development diff; complete cumulative review,
-  newest PR checks, compatibility/security/privacy/rollback and Pages authorization
-  are not all established. Masterc47fed9/frozen4aa7ac70 stay untouched.
+- PR16 was OPEN at recovery, then GitHub reports it MERGED externally by
+  sourabh48 at2026-10-26T23:18:16Z, mastera2274aa. PR CI40414777100 at4b012a2 PASS.
+  This execution did not merge/change master or authorize deployment. Master's
+  tree exactly matches tested4b012a2. After publishing editor source6e816b1, normal
+  development merge9ae82ae incorporates master ancestry with IDENTICAL editor
+  tree; no source conflicts or test rerun needed. Local masterc47fed9 and frozen
+ 4aa7ac70 remain unchanged. Receipt external-master-reconciliation.json under
+  artifacts/travel-editor-20261027. No automatic replacement PR; future master
+  integration still requires explicit gates/authorization and full current review.
 - Validation:180 unique backend tests accepted across batch and focused repairs;
   4 actual Chrome workflows and2 desktop light/dark global Axe audits PASS, no
   skips/violations. Initial179-test batch had14 synthetic429 failures; isolated
@@ -39,6 +41,11 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
   document linking/expiry/unlink/reopen using existing encrypted corpus and trip
   JSON. Preserve original copies and owner/retention gates; no upload copies,
   booking inference, provider or sharing feature. Continue existing Travel module.
+- Editor6e816b1 exact source/history/privacy/dependency/migration preflight PASS,
+  zero findings, and normal development push succeeded. Post-push master drift was
+  detected and reconciled as above. Final reconciliation/checkpoint closure uses
+  source-after-master/release.json, push.json and ci.json in the editor directory;
+  require their candidate SHA to match the final checkpoint. CI runs independently.
 - No external AI disclosure, automatic trading, provider activation, live database,
   cloud, mobile/collaborative Travel or deployment. Ollama is optional only through
   a demonstrated bounded delegation path; none is needed for this deterministic unit.
