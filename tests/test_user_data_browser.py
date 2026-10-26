@@ -449,6 +449,27 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(query.get_property('value'), '')
         self.assertEqual(self.text('memoryEvaluationAdd'), 'Add question to run')
 
+    def test_memory_evaluation_links_missed_sources_to_current_owner_corrections(self):
+        from selenium.webdriver.support.ui import Select
+        store, owner, identities = self.memory_evaluation_fixture()
+        before = store.list_memories(owner)
+        self.browser.find_element(self.By.ID, 'memoryEvaluationQuery').send_keys('mountain hiking')
+        expected = Select(self.browser.find_element(self.By.ID, 'memoryEvaluationExpected'))
+        for identity in identities:
+            expected.select_by_value(identity)
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: '2 missed' in self.text('memoryEvaluationDetails'))
+        missed = self.browser.find_elements(self.By.CSS_SELECTOR, '#memoryEvaluationDetails [data-missed-source]')
+        self.assertEqual({row.get_attribute('data-missed-source') for row in missed}, set(identities[1:]))
+        self.assertTrue(all('Expected but not retrieved:' in row.text for row in missed))
+        self.memory_click(f'#memoryEvaluationDetails [data-missed-source="{identities[1]}"] a')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, f'memory-{identities[1]}').is_displayed())
+        self.assertIn('I prefer the coast', self.text(f'memory-{identities[1]}'))
+        self.assertEqual(store.list_memories(owner), before)
+        self.capture('memory-evaluation-missed-source-review')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('memoryEvaluationDetails'), '')
+
     def test_multi_case_memory_evaluation_metrics_citations_mobile_and_clearing(self):
         from selenium.webdriver.support.ui import Select
         store,owner,identities=self.memory_evaluation_fixture()

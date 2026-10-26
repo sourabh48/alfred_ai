@@ -19,9 +19,15 @@ Resolve this checkpoint HEAD with `git log -1 --format=%H -- docs/PROJECT_STATUS
   The initial runner-option typo ran zero tests and is not acceptance evidence.
 - Baseline **75/143 verified**, extensions **0/13 accepted**, unchanged. AI-16
   remains partial; reviewed local workflows are not general accuracy/calibration.
-- NEXT TASK: show missed expected citations alongside returned citations, with
-  direct links into existing owner correction controls; then add score-band
-  relevance diagnostics without changing the frozen policy or activating models.
+- Unit 2 COMPLETE (base b26cb80): per-question results link every missed expected
+  source to its current owner memory/correction controls. Results also explain
+  when expected labels exceed the three-reference limit. Source contents are
+  rendered as text; source changes invalidate results, and page-hide clears links.
+  Actual Chrome **1 PASS, zero skips**, including unchanged vault records and
+  correct missed-source IDs. Receipt fast-memory-unit2.json; screenshot/proof in
+  artifacts/fast-memory-20261027/unit2-browser. JS syntax/whitespace PASS.
+- NEXT TASK: add score-band relevance diagnostics with support counts, without
+  claiming calibrated probabilities or changing the frozen retrieval policy.
 - No push/master/production, operator database, frozen candidate4aa7ac70, AWS,
   paid OpenAI, cloud sync, private-history or FIN-CURRENCY operation. Resume:
   `Set-Location F:/ALFRED_DEV/post-audit; git status -sb` then read this checkpoint.

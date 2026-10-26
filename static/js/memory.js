@@ -480,6 +480,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     link.href = `/settings/#memory-${cite.id}`; link.textContent = currentMemories.get(cite.id); link.title = `Memory ${cite.id}`;
                     reference.append(link,document.createTextNode(` · rank ${cite.rank} · cosine ${cite.score.toFixed(3)} · ${cite.relevant ? 'relevant' : 'unexpected'}`)); row.append(reference);
                 });
+                const returned = new Set(item.citations.map(cite => cite.id));
+                item.expected_ids.filter(id => !returned.has(id)).forEach(id => {
+                    if (!/^[a-f0-9]{32}$/.test(id) || !currentMemories.has(id)) throw new Error("Expected sources changed. Refresh memories and review labels before rerunning.");
+                    const reference = document.createElement("p"), link = document.createElement("a");
+                    link.href = `/settings/#memory-${id}`; link.textContent = currentMemories.get(id);
+                    reference.dataset.missedSource = id;
+                    reference.append(document.createTextNode("Expected but not retrieved: "),link); row.append(reference);
+                });
+                if (item.expected_ids.length > result.result_limit) {
+                    const limit = document.createElement("p"); limit.className = "small";
+                    limit.textContent = `This question has ${item.expected_ids.length} expected sources; at most ${result.result_limit} can be returned in one check. Some misses are unavoidable at this result limit.`;
+                    row.append(limit);
+                }
                 evaluationDetails.append(row);
             });
             evaluationFeedback.textContent = "Owner and current-source checks passed for this run. Results measure your relevance labels, not truth or financial authority. No queries or results saved.";
