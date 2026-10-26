@@ -4,3 +4,9 @@ html:not([data-theme="dark"]) :is(#plannerResults,#plannerEvidence) .btn-outline
 html[data-theme="dark"] .travel-candidate { background:var(--alfred-surface); color:var(--alfred-ink); border-color:var(--alfred-stroke); }
 html[data-theme="dark"] .travel-candidate header { background:#203751; }
 html[data-theme="dark"] .travel-candidate .travel-fit { color:var(--alfred-muted); }
+[data-editor-item] { padding:.8rem 0; border-bottom:1px solid var(--alfred-stroke); overflow-wrap:anywhere; }
+[data-editor-item][draggable="true"], [data-editor-stop][draggable="true"] > strong { cursor:grab; }
+[data-itinerary-editor] form { display:grid; gap:.5rem; margin:.6rem 0; }
+html:not([data-theme="dark"]) [data-itinerary-editor] .btn-outline-secondary { --bs-btn-color:#495057; --bs-btn-border-color:#495057; }
+html[data-theme="dark"] [data-itinerary-editor] .travel-day { background:var(--alfred-surface); color:var(--alfred-ink); border-color:var(--alfred-stroke); }
+html[data-theme="dark"] [data-itinerary-editor] :is(.travel-fit,.travel-priority) { color:var(--alfred-muted); }

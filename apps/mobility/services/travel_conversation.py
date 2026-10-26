@@ -257,6 +257,15 @@ def ready_prompt(session, prefix=""):
 @transaction.atomic
 def send_message(session_id, user, text):
     session = TravelPlanningSession.objects.select_for_update().get(pk=session_id, user=user)
+    before, revision = deepcopy(session.itinerary), session.revision
+    session = _send_message(session, user, text)
+    if session.itinerary != before and session.revision == revision:
+        session.revision += 1
+        session.save(update_fields=["revision", "updated_at"])
+    return session
+
+
+def _send_message(session, user, text):
     text = str(text).strip()
     if not text or len(text) > 2000:
         raise ValidationError("Send a message of 1–2,000 characters.")

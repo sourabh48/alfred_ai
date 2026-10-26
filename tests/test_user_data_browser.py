@@ -4495,6 +4495,129 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'no change was made' in self.text('plannerOrderProposal'))
         self.assertFalse(self.browser.find_elements(self.By.ID,'plannerApplyOrder'))
 
+    def travel_editor_fixture(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import fact
+        from apps.mobility.services.travel_itinerary import build_multi_stop_itinerary
+        from tests.test_travel_candidate_pool import synthetic_pool
+        self.enterContext(patch('apps.mobility.services.travel_research.dispatch'))
+        self.enterContext(patch('apps.mobility.services.travel.providers.base.request', side_effect=AssertionError('No live provider')))
+        session = new_session(self.scenario['user'])
+        session.state = {k:fact(v) for k,v in dict(origin='Bengaluru',trip_duration=4,
+            available_start_date=str(timezone.localdate()+timedelta(days=2)),
+            available_end_date=str(timezone.localdate()+timedelta(days=5)),budget=15000,transport_mode='ride').items()}
+        stops = synthetic_pool(self.scenario['user'], session.state)[:2]
+        session.state['_itinerary_stops'] = fact(stops)
+        session.state['selected_destination'] = fact(stops[0]['name'])
+        session.itinerary = build_multi_stop_itinerary(session.state,stops)
+        session.itinerary['owner_note'] = 'Synthetic unrelated note retained'
+        session.status='ready'; session.save()
+        return session
+
+    def test_travel_editor_desktop_pointer_keyboard_undo_save_and_reopen(self):
+        from selenium.webdriver import ActionChains
+        from selenium.webdriver.common.keys import Keys
+        from apps.mobility.services.travel_discovery import value
+        session = self.travel_editor_fixture()
+        expenses = list(Expense.objects.filter(user=self.scenario['user']).values())
+        self.login(); self.browser.set_window_size(1440,1500)
+        self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-itinerary-editor]'))
+        self.browser.execute_script("Object.defineProperty(crypto,'randomUUID',{value:undefined,configurable:true})")
+        self.memory_click('[data-day="1"] details:has([data-editor-add]) > summary')
+        add = '[data-day="1"] [data-editor-add]'
+        self.browser.find_element(self.By.CSS_SELECTOR,add+' input').send_keys('Synthetic museum <b>literal</b>')
+        self.memory_click(add+' button')
+        self.wait.until(lambda _: 'Synthetic museum' in self.text('plannerItinerary'))
+        summaries=[row.text for row in self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerItinerary summary')]
+        self.assertIn('Packing, vehicle and pre-trip checks',summaries)
+        self.assertIn('Research sources',summaries)
+        session.refresh_from_db()
+        identity = session.itinerary['days'][0]['items'][-1]['id']
+        row = f'[data-editor-item="{identity}"]'
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,row+' strong b'))
+        self.memory_click(row+' details > summary')
+        field = self.browser.find_element(self.By.CSS_SELECTOR,row+' input[name="title"]')
+        field.clear(); field.send_keys('Corrected synthetic museum')
+        self.browser.find_element(self.By.CSS_SELECTOR,row+' button[type="submit"], '+row+' form button').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Corrected synthetic museum' in self.browser.find_element(self.By.CSS_SELECTOR,row+' > strong').text)
+        source = self.browser.find_element(self.By.CSS_SELECTOR,row+' > strong')
+        target = self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="2"] [data-editor-item]:last-child > strong')
+        self.browser.execute_script("arguments[0].scrollIntoView({block:'center',behavior:'instant'})",source)
+        ActionChains(self.browser).move_to_element(source).click_and_hold().pause(.3).move_to_element(target).pause(.3).release().perform()
+        def moved():
+            session.refresh_from_db()
+            return any(i['id']==identity for i in session.itinerary['days'][1]['items'])
+        self.wait.until(lambda _: moved())
+        names = [s['name'] for s in value(session.state,'_itinerary_stops')]
+        source = self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li:first-child > strong')
+        target = self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li:last-child > strong')
+        self.browser.execute_script("arguments[0].scrollIntoView({block:'center',behavior:'instant'})",source)
+        ActionChains(self.browser).move_to_element(source).click_and_hold().pause(.3).move_to_element(target).pause(.3).release().perform()
+        self.wait.until(lambda _: names[1] in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li:first-child').text)
+        self.browser.find_element(self.By.CSS_SELECTOR,'[data-editor-undo]').send_keys(Keys.SPACE)
+        self.wait.until(lambda _: names[0] in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li:first-child').text)
+        session.refresh_from_db()
+        first = session.itinerary['days'][0]
+        activity = next(i for i in first['items'] if i['type']!='travel')
+        old_position = first['items'].index(activity)
+        control = self.browser.find_element(self.By.CSS_SELECTOR,f'[data-editor-item="{activity["id"]}"] [data-editor-move="1"]')
+        control.send_keys(Keys.SPACE)
+        def later():
+            session.refresh_from_db()
+            return next(n for n,i in enumerate(session.itinerary['days'][0]['items']) if i['id']==activity['id'])==old_position+1
+        self.wait.until(lambda _: later())
+        self.memory_click(row+' [data-editor-remove]')
+        self.wait.until(lambda _: not self.browser.find_elements(self.By.CSS_SELECTOR,row))
+        self.memory_click('[data-editor-undo]')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,row))
+        self.assertIn('previous estimates', self.text('plannerItinerary'))
+        self.assertIn('Revision history',self.text('plannerItinerary'))
+        self.memory_click('#plannerSave')
+        self.wait.until(lambda _: 'Travel Plan saved' in self.text('plannerAlert'))
+        session.refresh_from_db(); session.plan.refresh_from_db()
+        self.assertEqual(session.plan.itinerary,session.itinerary)
+        self.assertEqual(session.itinerary['owner_note'],'Synthetic unrelated note retained')
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,row))
+        self.browser.execute_script("document.querySelector('[data-itinerary-editor]').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('travel-editor-desktop-saved')
+        self.assertEqual(list(Expense.objects.filter(user=self.scenario['user']).values()),expenses)
+
+    def test_travel_editor_conflict_preserves_draft_and_lost_response_retry_is_idempotent(self):
+        from uuid import uuid4
+        from apps.mobility.services.travel.editor import apply_edit
+        session=self.travel_editor_fixture()
+        self.login(); self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-itinerary-editor]'))
+        self.memory_click('[data-day="1"] details:has([data-editor-add]) > summary')
+        form='[data-day="1"] [data-editor-add]'
+        field=self.browser.find_element(self.By.CSS_SELECTOR,form+' input')
+        field.send_keys('Synthetic preserved stale draft')
+        from apps.mobility.services.travel.editor import editor_payload
+        itinerary,_=editor_payload(session)
+        apply_edit(session,dict(operation='add',revision=session.revision,request_id=str(uuid4()),
+            day_id=itinerary['days'][0]['id'],fields={'title':'Synthetic competing edit'}))
+        self.memory_click(form+' button')
+        self.wait.until(lambda _: 'trip changed' in self.text('plannerAlert').lower())
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,form+' input').get_attribute('value'),'Synthetic preserved stale draft')
+        self.memory_click('[data-editor-reload]')
+        self.wait.until(lambda _: 'Synthetic competing edit' in self.text('plannerItinerary'))
+        self.memory_click('[data-day="1"] details:has([data-editor-add]) > summary')
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,form+' input').get_attribute('value'),'Synthetic preserved stale draft')
+        self.browser.execute_script("""const original=Alfred.fetchJSON;let once=true;Alfred.fetchJSON=async function(url,options){const result=await original(url,options);if(once&&options?.body&&JSON.parse(options.body).action==='itinerary_edit'){once=false;throw Error('Synthetic response interrupted')}return result};""")
+        revision=session.revision
+        self.memory_click(form+' button')
+        self.wait.until(lambda _: 'Synthetic response interrupted' in self.text('plannerAlert'))
+        session.refresh_from_db(); self.assertEqual(session.revision,revision+1)
+        self.memory_click(form+' button')
+        self.wait.until(lambda _: 'Synthetic preserved stale draft' in self.text('plannerItinerary'))
+        session.refresh_from_db(); self.assertEqual(session.revision,revision+1)
+        self.assertEqual(sum(i['title']=='Synthetic preserved stale draft' for d in session.itinerary['days'] for i in d['items']),1)
+        self.capture('travel-editor-stale-draft-idempotent-retry')
+
     def test_travel_discovery_novelty_sources_expiry_and_offline_reference(self):
         from copy import deepcopy
         from datetime import timedelta

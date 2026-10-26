@@ -88,7 +88,15 @@ class TravelMultiStopTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["id"], session.pk)
         self.assertEqual(response.json()["itinerary_stops"], names[::-1])
-        self.assertEqual(response.json()["itinerary"]["days"], session.itinerary["days"])
+        restored = deepcopy(response.json()["itinerary"]["days"])
+        identities = []
+        for day in restored:
+            identities.append(day.pop("id"))
+            day.pop("stop_id", None)
+            for item in day["items"]:
+                identities.append(item.pop("id"))
+        self.assertEqual(len(identities), len(set(identities)))
+        self.assertEqual(restored, session.itinerary["days"])
         self.assertEqual(self.set_stops(session, names).status_code, 200)
 
     def test_invalid_or_stale_stop_requests_never_change_the_existing_trip(self):

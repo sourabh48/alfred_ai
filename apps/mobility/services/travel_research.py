@@ -194,6 +194,7 @@ def run_research(run_id):
                 status=status, completed_at=timezone.now(), lease_until=None, summary=summary, changes=changes, result=options,
                 candidate_count=len(options), sources_checked=run.evidence.exclude(retrieved_at=None).count())
             if status == "ready" and updated:
+                previous_itinerary = deepcopy(current.itinerary)
                 current.state["_destination_pool"] = fact(pool, "ranked_destination_pool", False)
                 current.state["_destination_offset"] = fact(offset, "requested_batch")
                 current.candidates = options[:3]
@@ -225,7 +226,9 @@ def run_research(run_id):
                             for i, day in enumerate(days):
                                 total = selected["budget"]["expected"]
                                 day["estimated_cost"] = total//len(days)+(total%len(days) if i == len(days)-1 else 0)
-                current.save(update_fields=["candidates", "status", "itinerary", "state", "updated_at"])
+                if current.itinerary != previous_itinerary:
+                    current.revision += 1
+                current.save(update_fields=["candidates", "status", "itinerary", "state", "revision", "updated_at"])
                 if current.plan_id and current.plan.status == "researching":
                     current.plan.status = "suggestions_ready"
                     current.plan.save(update_fields=["status","updated_at"])

@@ -19,20 +19,37 @@ TRAVEL-04 slices are reused; genuine AI/outcome/currency gates remain open. The
 owner-selected deterministic editor is independent of those blocked expansions;
 no capability is promoted by this exception. **75/143 verified;0/13 extensions**.
 
-**NEXT ACTION: TRAVEL2-001 IMPLEMENTING.** Backend and desktop controls are present
-in uncommitted source. Initial seven unique backend workflows accepted across5
-passes and2 repaired read-aging assertions; actual pointer/keyboard and stale-draft/
-lost-response workflows each passed in their focused receipts. Full integration
-`travel-editor-backend-batch` / `travel-editor-browser-final` remains pending; isolate
-new-test cache state after synthetic-account429 leakage, preserving runtime limits.
-Native review repairs include stop drag markers, LAN-safe request IDs, preserved
-packing/safety/source panels, collision-safe legacy IDs and chat/research revision
-advancement. Finish affected integration, desktop Axe, source/privacy/migration and
-final native review before source commit/push. Both trackers retain0/13 extensions.
-Reuse current models/JSON, multi-stop planner and costs; affected estimates are
-explicitly invalidated. No provider, model, money-policy, live-data, private-disclosure,
-master, release or deployment changes. Receipts: artifacts/ci-repair-ac05515/
-travel-editor-*.json and artifacts/travel-editor-20261027/.
+**TRAVEL2-001 LOCAL_VERIFIED / CI_PENDING.** Complete bounded desktop activity CRUD,
+native drag/keyboard activity and stop ordering, stable identities,10 undo states,
+20 revision/request receipts,512KiB undo cap, CAS/stale checks and idempotent retry.
+Existing owned session/plan JSON saves/reopens; unrelated notes, packing, vehicle,
+safety checks and source evidence remain. Chat and research mutations now advance
+revision; unknown/new activities and reordered stops invalidate old routes/prices.
+No monetary arithmetic, provider/model, source upload or schema change.
+
+**180 unique backend tests accepted across receipts**,4 actual Chrome workflows
+PASS,2 desktop light/dark global Axe audits PASS (zero violations/skips). The179-test
+batch initially had14 synthetic429 failures: isolate new-test cache per reused
+account, then12 editor PASS,11 affected legacy PASS and1 legacy identity-contract
+case PASS. The latter still checks every original saved field plus unique new IDs.
+Counts overlap; never add reruns to totals. Wrong extracted-method rerun labels
+executed no real cases and are not evidence. Runtime rate-limit regression remains
+enforced. Native source recheck clean after LAN UUID, ID collision, revision,
+source/safety renderer and drag repairs; test fixtures summary-reviewed. JS,
+migration-drift and generated143/13 checks PASS; Graphify AST11314/31358/523 PASS.
+
+Receipts: artifacts/travel-editor-20261027/local-acceptance.json, browser-final and
+accessibility.json; artifacts/ci-repair-ac05515/travel-editor-*.json. Failed receipts
+are retained. Exact committed source/history privacy and push are finalized after
+this commit in source-preflight/release.json and push.json under the editor artifact
+directory; require PASS before remote push. Source commit resolves with
+`git log -1 --format=%H -- apps/mobility/services/travel/editor.py`. Baseline75/143
+and extensions0/13 unchanged while new exact-head CI/formal acceptance are pending.
+
+**NEXT ACTION:** finish privacy/push, then TRAVEL2-002 bounded owner-selected corpus
+document links, expiry/unavailability, unlink and reopen in existing Travel JSON.
+Do not duplicate files, infer bookings, activate providers or touch operator data,
+master/frozen/release branches. Both trackers own this continuation checkpoint.
 
 ### Previous Travel batch (accepted bounded source)
 

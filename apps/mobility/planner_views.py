@@ -23,6 +23,7 @@ from .services.travel.cache import usage_summary
 from .services.travel.discovery import remember, place_key
 from .services.travel.intent import PROFILE_KEYS, validate_preference
 from .services.travel_itinerary import build_itinerary, build_multi_stop_itinerary, compare_stop_orders
+from .services.travel.editor import apply_edit, editor_payload
 
 
 class PlannerWriteThrottle(UserRateThrottle):
@@ -48,7 +49,7 @@ def session_payload(session):
                 if source["data_type"] == "weather":
                     candidate["weather"] = {"summary":"This forecast is stale. Recheck this trip for current information.","confidence":"UNKNOWN"}
                     candidate["factors"]["Weather"] = "Stale · recheck"
-    itinerary = deepcopy(session.itinerary)
+    itinerary, editor = editor_payload(session)
     if itinerary:
         for source in itinerary.get("sources", []):
             if source.get("valid_until") and source["valid_until"] <= now:
@@ -66,6 +67,7 @@ def session_payload(session):
                 "has_more": offset+3 < pool_count and (not value(session.state, "selected_destination") or bool(value(session.state, "_itinerary_stops")))},
             "map_config":map_configuration(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
+            "itinerary_editor": editor,
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),
             "research": ({"id": run.id, "status": run.status, "outdated": outdated,
                           "stage": "Recheck needed" if outdated else STAGES.get(run.status, run.status),
@@ -115,6 +117,8 @@ class TravelSessionDetail(APIView):
         action = request.data.get("action", "message")
         if action == "message":
             session = send_message(pk, request.user, request.data.get("text", ""))
+        elif action == "itinerary_edit":
+            apply_edit(session, request.data)
         elif action in ("restriction_review", "restriction_withdraw"):
             if type(request.data.get("revision")) is not int or request.data["revision"] != session.revision:
                 return Response({"detail": "This trip changed. Reload before reviewing a route restriction."}, status=409)
@@ -202,6 +206,8 @@ class TravelSessionDetail(APIView):
             session.status = "ready" if stops else "researched"
             session.save()
         elif action == "save":
+            if value(session.state, "_itinerary_editor", {}) and (type(request.data.get("revision")) is not int or request.data["revision"] != session.revision):
+                return Response({"detail": "This trip changed. Reload before saving the edited itinerary."}, status=409)
             save_plan(session, draft=request.data.get("draft") is True)
         elif action == "vehicle":
             bike = get_object_or_404(BikeProfile, pk=request.data.get("vehicle_id"), user=request.user)
