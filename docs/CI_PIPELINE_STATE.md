@@ -56,6 +56,21 @@ successful native/Linux jobs are preserved. Do not repeatedly retry denied acces
 - Yahoo scope95%, unchanged sourcec60c807 / checkpoint8679824; all8 accepted Git blobs and four receipt hashes preserved (raw EOL hashes changed on checkout). Existing signed-in browser restored. Submit separate draft from development/inv05-yahoo-evidence-20261026 **against development/alfred-integrated atd5cc181**, not the now-merged policy branch. Actual post-recovery source/PR/run in yahoo/post-pr17/handoff.json; CI_PENDING only after submission.
 - Outstanding integration capacity: PR16 plus Yahoo =2/3. PR17 closed; old candidate-cap/browser-blocker text above is historical. Current coding/integration remains INV-05/SCOPE-02; next queued CAREER-03 has not started. Do not make an unrelated push to a running PR.
 
+
+| Task/scope | State/progress | Source/base | PR/CI | Evidence | Merge blockers/recovery |
+| --- | --- | --- | --- | --- | --- |
+| Cumulative development integration | MERGE_BLOCKED | development/alfred-integrated d5cc181 / masterc47fed9 | PR16 open; exact-head run40324546766 SUCCESS, master review/protection/Pages gates unresolved | Prior accepted INV-02/AMFI/policy receipts preserved; no inherited green from another SHA | Cumulative diff, exact CI, independent review/protection and explicit Pages publication authorization; no master merge |
+| INV-05/SCOPE-02 Yahoo integrity | CI_PASSED100%; MERGE_BLOCKED | development/inv05-yahoo-evidence-20261026 daed068 / developmentd5cc181 | PR18 READY/open; run40325761619 PASS; Linux121581905200/Selenium121581905333/Windows121581905400 success | Preserved80 backend/12 metadata/one Chrome/four overlapping Axe/source privacy0; exact source/blobs/receipts match; parent INV-05 unaccepted | Reviews0, applicable protection/rules visibility; source remains on sibling branch; do not push unrelated changes or transfer its CI to Career |
+| CAREER-03/SCOPE-01 normalized feed leads | LOCAL_ACCEPTED90%; 95% after validated push, exact-head CI pending | development/career-discovery-evidence-20261026 / base d5cc181; resolve source from tests/test_career_discovery_acceptance.py after commit | Separate draft PR to development; exact PR/source/run resolved in artifacts/career-discovery-d5cc181/handoff.json | Backend66 PASS; actual Chrome recovery/unsafe links/owner flow and four overlapping Axe audits zero violations; both-theme contrast>=4.5; metadata12/migration drift PASS; clean source privacy proof before push | Third reserved candidate; full CAREER-03/live-provider acceptance unaccepted; no fourth submission; retarget/reconcile tracker conflicts safely on integration |
+
+PR17 owner-merged into development asd5cc181, source503b848; policy bounded100%
+and exact-head CI40300637754 PASS. Not a master merge. Masterc47fed9 unchanged.
+Older PR16 source8f505a3 run40295889832 cancellation/403 retry is historical,
+superseded by its new d5cc181 run. No repeated denied action or unchanged suite run.
+
+Candidate cap3 includes PR16, PR18 and this Career section. One coding scope only.
+Domain source independent; shared tracker conflicts must preserve latest IDs and
+accepted evidence. Further candidate selection requires capacity or a safe repair.
 ## CI isolation evidence
 
 `.github/workflows/browser-regression.yml` currently groups by

@@ -141,6 +141,66 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 f'#accountProfileForm [name="{field}"]').get_attribute('value'), amount)
         self.capture('user-decimal-profile-reload')
 
+    def test_career_discovery_marks_cached_leads_and_recovers_without_unsafe_links(self):
+        from apps.career.models import CareerProfile
+        from apps.career.services.job_intelligence import JobIntelligenceService, job_intelligence
+        from tests.test_career_discovery_acceptance import feeds, feed, lead
+
+        self.enterContext(patch.object(job_intelligence, "suggest_openings", side_effect=lambda *a, **kw:
+            JobIntelligenceService.suggest_openings(job_intelligence, *a, **kw)))
+        mocks = feeds(self, [feed(jobs=[lead(title='<img src=x onerror="window.discoveryLeak=true"> Synthetic Analyst'),
+            lead(url="javascript:alert(1)")]), feed(1, status="stale", jobs=[lead(url="https://jobs.example.org/cached")]),
+            {"jobs": [lead(url="https://jobs.example.org/unknown")]}])
+        CareerProfile.objects.create(user=self.scenario['user'], role='Data Analyst', experience_years=3,
+            skills='Python, SQL', last_salary=80000)
+        before = list(CareerProfile.objects.order_by("pk").values())
+        self.login(); self.browser.get(self.live_server_url + "/career/")
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status]')) == 3)
+        text = self.text('careerOpenings')
+        self.assertIn('Fresh feed evidence', text)
+        self.assertIn('Stale cached lead', text)
+        self.assertIn('Unverified lead', text)
+        self.assertIn('Availability is unverified', self.text('careerOpeningsMeta'))
+        self.assertIn('Source-backed job leads matched', self.browser.find_element(self.By.ID, 'careerRoot').text)
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings img')), 0)
+        self.assertFalse(self.browser.execute_script('return Boolean(window.discoveryLeak)'))
+        self.assertTrue(all(a.get_attribute('href').startswith('https://')
+            for a in self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings a')))
+        self.browser.execute_script("document.getElementById('careerOpenings').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('career-discovery-desktop')
+        from alfred_ai.services.public_http import PublicHTTPError
+        mocks[0].side_effect = PublicHTTPError('timeout'); cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: not self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status="fresh"]'))
+        self.wait.until(lambda _: 'Stale cached lead' in self.text('careerOpenings'))
+        mocks[0].side_effect = None; mocks[0].return_value = feed(); cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status="fresh"]'))
+        self.assertEqual(list(CareerProfile.objects.order_by('pk').values()), before)
+        self.browser.execute_script("renderOpenings([{title:'Unsafe lead',url:'javascript:alert(1)',source_status:'unknown',tags:[]}],{filtered_candidates:0,total_candidates:1})")
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings a')), 0)
+        self.assertIn('0 of 1', self.text('careerOpeningsMeta'))
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status="fresh"]'))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+            {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.getElementById('careerOpenings').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('career-discovery-390px')
+        for theme in ('light', 'dark'):
+            self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'careerRoot').get_attribute('data-page-busy') == 'false')
+            self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+            ratios = self.browser.execute_script(r"""function lum(rgb) {
+                const v=rgb.match(/[\d.]+/g).slice(0,3).map(n=>{n=Number(n)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4});
+                return .2126*v[0]+.7152*v[1]+.0722*v[2];
+            }
+            return [...document.querySelectorAll('#careerOpenings .muted, #careerOpenings a, #careerOpenings .fw-semibold')].map(e=>{
+                const a=lum(getComputedStyle(e).color),b=lum(getComputedStyle(e.closest('.mini-card')).backgroundColor);
+                return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+            });""")
+            self.assertGreaterEqual(len(ratios), 10)
+            self.assertTrue(all(ratio >= 4.5 for ratio in ratios), (theme, ratios))
+
     def test_career_matching_cites_saved_sources_and_abstains_without_requirements(self):
         self.browser.set_window_size(1440,1200)
         from apps.career.models import CareerJobAnalysis, CareerResume

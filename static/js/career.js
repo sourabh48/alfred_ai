@@ -596,27 +596,39 @@ function renderLayoffNews(items) {
     `).join("") : `<div class="empty-state">No layoff news items were pulled from the configured feed right now.</div>`;
 }
 
+function openingSourceLink(value) {
+    try {
+        const url = new URL(value);
+        if (url.protocol === "https:" && !url.username && !url.password) return url.href;
+    } catch (_) { /* Untrusted feed links remain inactive. */ }
+    return "";
+}
+
 function renderOpenings(items, counts = {}) {
     const target = document.getElementById("careerOpenings");
     const meta = document.getElementById("careerOpeningsMeta");
     if (meta) {
-        const filteredCount = Number(counts.filtered_candidates || items.length || 0);
-        const totalCount = Number(counts.total_candidates || filteredCount);
+        const filteredCount = Number(counts.filtered_candidates ?? items.length);
+        const totalCount = Number(counts.total_candidates ?? filteredCount);
         meta.textContent = filteredCount === totalCount
-            ? `${filteredCount} verified opening${filteredCount === 1 ? "" : "s"} matched your profile right now.`
-            : `${filteredCount} of ${totalCount} verified openings match the active location filter.`;
+            ? `${filteredCount} job lead${filteredCount === 1 ? "" : "s"} matched your search. Availability is unverified.`
+            : `${filteredCount} of ${totalCount} job leads match the active location filter. Availability is unverified.`;
     }
-    target.innerHTML = items.length ? items.map(item => `
-        <div class="mini-card">
+    target.innerHTML = items.length ? items.map(item => {
+        const link = openingSourceLink(item.url), proof = openingSourceLink(item.source_evidence?.source_url);
+        const labels = {fresh:"Fresh feed evidence; opening availability is unverified.", stale:"Stale cached lead; recheck the source.", unknown:"Unverified lead; freshness evidence is missing.", unavailable:"Source unavailable; cached lead only."};
+        return `
+        <div class="mini-card surface-card">
             <div class="fw-semibold">${Alfred.escapeHtml(item.title || "Opening")}</div>
             <div class="muted small">${Alfred.escapeHtml(item.company || "Unknown company")} | ${Alfred.escapeHtml(item.location || "Remote")}</div>
             <div class="muted small">${Alfred.escapeHtml(item.category || "")}${item.salary ? ` | ${Alfred.escapeHtml(item.salary)}` : ""}</div>
             <div class="muted small mt-2">${item.tags?.length ? Alfred.escapeHtml(item.tags.join(", ")) : ""}</div>
-            <div class="muted small mt-2">${Alfred.escapeHtml(item.portal_name || "Verified portal")} | relevance ${Alfred.formatNumber(item.relevance_score || 0, 0)}/100${item.verified_source ? " | verified source" : ""}</div>
+            <div class="muted small mt-2">${Alfred.escapeHtml(item.portal_name || "Source")} | rule-based relevance ${Alfred.formatNumber(item.relevance_score || 0, 0)}/100; not a hiring probability</div>
+            <div class="muted small mt-2" data-opening-source-status="${Alfred.escapeHtml(item.source_status || "unknown")}">${Alfred.escapeHtml(labels[item.source_status] || labels.unknown)} ${item.source_evidence?.verified_at ? `Checked ${Alfred.escapeHtml(item.source_evidence.verified_at)}.` : ""} ${item.source_evidence?.stale_after ? `Evidence expires ${Alfred.escapeHtml(item.source_evidence.stale_after)}.` : ""}</div>
             <div class="muted small mt-2">${(item.match_reasons || []).length ? Alfred.escapeHtml(item.match_reasons.join(" ")) : "Matched from your role and tracked skills."}</div>
-            <div class="mt-2"><a href="${item.url}" target="_blank" rel="noopener">Apply</a></div>
+            <div class="mt-2">${link ? `<a href="${Alfred.escapeHtml(link)}" target="_blank" rel="noopener">View posting</a>` : "Posting link unavailable"}${proof ? ` · <a href="${Alfred.escapeHtml(proof)}" target="_blank" rel="noopener">Source feed</a>` : ""}</div>
         </div>
-    `).join("") : `<div class="empty-state">No live openings were returned from the configured job source for the current role.</div>`;
+    `; }).join("") : `<div class="empty-state">No source-backed job leads are available for this search.</div>`;
 }
 
 function hydrateCareerForm(profile) {

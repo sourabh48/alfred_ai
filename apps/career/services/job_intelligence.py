@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, DecimalException
 import hashlib
 import json
@@ -17,7 +17,7 @@ from alfred_ai.services import extract_document_text
 from alfred_ai.services.upload_limits import document_source
 from alfred_ai.services import public_http
 from apps.integrations.services import verified_intelligence
-from apps.integrations.services.verified_intelligence import freshness_snapshot
+from apps.integrations.services.verified_intelligence import InsightResult, freshness_snapshot
 from apps.expenses.money import expense_money, money_float
 from apps.users.money import profile_money
 from .resume_intelligence import extract_skill_terms
@@ -376,18 +376,29 @@ class JobIntelligenceService:
         for term in [item.strip() for item in search_terms if item and item.strip()]:
             if term.lower() not in {existing.lower() for existing in unique_terms}:
                 unique_terms.append(term)
-        seen_urls, jobs, evidence_records, feed_queries = set(), [], [], []
+        by_url, evidence_records, feed_queries = {}, [], []
         for term in unique_terms[:5]:
             for feed_result in self._live_job_feed_results(term):
                 evidence_records.append(feed_result["evidence"])
                 feed_queries.append({"term": term, "source_name": feed_result["source_name"]})
                 for item in feed_result["payload"].get("jobs", []):
-                    item = {**item, "_aggregator_name": feed_result["source_name"]}
-                    url = item.get("url", "")
-                    if not url or url in seen_urls:
+                    if not isinstance(item, dict) or not isinstance(item.get("title"), str) or not item["title"].strip():
                         continue
-                    seen_urls.add(url)
-                    jobs.append(self._normalize_opening(item, role=role, skills=skills, evidence=feed_result["evidence"]))
+                    if any(item.get(key) is not None and not isinstance(item[key], str)
+                           for key in ("company", "company_name", "location", "category", "salary", "publication_date")):
+                        continue
+                    url = public_http.normalized_link(item.get("url"))
+                    if not url:
+                        continue
+                    url = urlparse(url)._replace(fragment="").geturl()
+                    item = {**item, "_aggregator_name": feed_result["source_name"]}
+                    item["url"] = url
+                    tags = item.get("tags") or []
+                    item["tags"] = [tag for tag in (tags if isinstance(tags, list) else [tags]) if isinstance(tag, str)][:8]
+                    opening = self._normalize_opening(item, role=role, skills=skills, evidence=feed_result["evidence"])
+                    if url not in by_url or (opening["verified_source"] and not by_url[url]["verified_source"]):
+                        by_url[url] = opening
+        jobs = list(by_url.values())
         evidence = self._combine_evidence(
             evidence_records,
             title="Multi-source live opening suggestions",
@@ -395,6 +406,7 @@ class JobIntelligenceService:
             source_url=JOB_FEED_ADAPTERS[0]["source_url"],
             summary=f"Merged {len(jobs)} opening(s) across {len(unique_terms[:5])} search variant(s) and {len(JOB_FEED_ADAPTERS)} configured feed adapter(s).",
         )
+        evidence["status"] = "fresh" if evidence["freshness"]["proof_complete"] else ("stale" if jobs else "failed")
         filtered_jobs = [
             item for item in jobs
             if self._opening_matches_location(item, country=country, state=state)
@@ -434,23 +446,49 @@ class JobIntelligenceService:
         results = []
         for adapter in JOB_FEED_ADAPTERS:
             method = getattr(verified_intelligence, adapter["method"])
-            result = method(term)
+            try:
+                result = method(term)
+            except (public_http.PublicHTTPError, ValueError, TypeError):
+                result = InsightResult({}, {"status": "unavailable", "source_url": adapter["source_url"]}, False)
             payload = getattr(result, "payload", result if isinstance(result, dict) else {}) or {}
             evidence = getattr(result, "evidence", {}) or {}
+            if not isinstance(evidence, dict):
+                evidence = {}
             if not evidence:
                 evidence = {
                     "title": f"{adapter['name']} job search for {term}",
                     "source_name": adapter["name"],
                     "source_url": adapter["source_url"],
                     "summary": "Feed returned payload without stored evidence metadata.",
-                    "status": "fresh",
+                    "status": "unknown",
                     "fetched_at": "",
                     "verified_at": "",
                     "stale_after": "",
                     "query": term,
                 }
-            results.append({"source_name": adapter["name"], "payload": payload, "evidence": evidence})
+            evidence = {**evidence, "source_name": adapter["name"],
+                "source_url": public_http.normalized_link(evidence.get("source_url"))}
+            if evidence["source_url"] != adapter["source_url"]:
+                evidence.update(status="unknown", source_url="")
+            evidence["status"] = self.opening_evidence_status(evidence)
+            rows = payload.get("jobs", []) if isinstance(payload, dict) else []
+            results.append({"source_name": adapter["name"], "payload": {"jobs": rows[:10] if isinstance(rows, list) else []}, "evidence": evidence})
         return results
+
+    def opening_evidence_status(self, evidence: dict) -> str:
+        if not isinstance(evidence, dict):
+            return "unknown"
+        if evidence.get("status") not in {"fresh", "stale"}:
+            return "unavailable" if evidence.get("status") in {"failed", "unavailable"} else "unknown"
+        try:
+            verified = datetime.fromisoformat(evidence.get("verified_at", "").replace("Z", "+00:00"))
+            expires = datetime.fromisoformat(evidence.get("stale_after", "").replace("Z", "+00:00"))
+        except (ValueError, TypeError, AttributeError):
+            return "unknown"
+        if (timezone.is_naive(verified) or timezone.is_naive(expires) or verified > timezone.now()
+                or expires <= verified or public_http.normalized_link(evidence.get("source_url")) not in {a["source_url"] for a in JOB_FEED_ADAPTERS}):
+            return "unknown"
+        return "fresh" if evidence["status"] == "fresh" and expires > timezone.now() else "stale"
 
     def _normalize_opening(self, item: dict, *, role: str, skills: list[str], evidence: dict) -> dict:
         company = item.get("company") or item.get("company_name") or ""
@@ -462,6 +500,7 @@ class JobIntelligenceService:
         tags = item.get("tags", []) or []
         if isinstance(tags, str):
             tags = [tags]
+        source_status = self.opening_evidence_status(evidence)
         return {
             "title": item.get("title", ""),
             "company": company,
@@ -472,7 +511,7 @@ class JobIntelligenceService:
             "is_remote": location_meta["is_remote"],
             "category": item.get("category", ""),
             "url": item.get("url", ""),
-            "publication_date": item.get("publication_date", ""),
+            "publication_date": item.get("publication_date") or "",
             "salary": item.get("salary", ""),
             "salary_signal": salary_signal,
             "tags": tags[:8],
@@ -481,8 +520,9 @@ class JobIntelligenceService:
             "portal_family": self._portal_family(item.get("url", "")),
             "portal_host": urlparse(item.get("url", "")).netloc.replace("www.", ""),
             "aggregator_name": aggregator_name,
-            "verified_source": evidence.get("status", "fresh") in {"fresh", "stale"},
-            "source_status": evidence.get("status", ""),
+            "verified_source": source_status == "fresh",
+            "source_status": source_status,
+            "source_evidence": evidence,
             "verified_at": evidence.get("verified_at", ""),
             "relevance_score": relevance["score"],
             "match_reasons": relevance["reasons"],
