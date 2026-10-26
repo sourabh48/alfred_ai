@@ -143,8 +143,9 @@ def synchronize(root=ROOT, *, write=False, audit=None):
         'Generated from canonical status rows and the requirements dependency matrix. Regenerate with',
         '`python scripts/project_execution.py --write`; check without changes using `--check`.',
         'Use the configured SDK. No network, provider activation or feature execution occurs.', '',
-        '**Selection:** only `next` starts a new task. `continue` resumes EXECUTION_STATE;',
-        '`status` is read-only. Finish or explicitly defer the current task first.',
+        '**Selection:** `next` selects one task; explicit `sprint` continuously selects eligible scopes.',
+        '`continue` resumes EXECUTION_STATE; `status` is read-only. Finish or explicitly defer',
+        'local work first; CI_PENDING may coexist with independent IMPLEMENTING work.',
         'Phase A → B → C → D; module-by-module inside each phase. Skip an actually blocked',
         'item with its exact reason; do not call its acceptance complete. Later-phase',
         'prerequisite exceptions need a recorded reason. Accepted baseline rows are never requeued.', '',
@@ -170,7 +171,7 @@ def synchronize(root=ROOT, *, write=False, audit=None):
         queue.append('| ' + str(index) + ' | ' + PHASE[row['status']] + ' | ' + row['id'] + ' — ' + row['title'] + ' | ' + row['status'] +
                      ' | P' + str(row['priority']) + ' / ' + effort + ' | ' + (', '.join(prerequisites.get(row['id'], [])) or 'Scoped source/evidence inspection') +
                      ' | B/P; U if affected; MONEY if changed | ' + ready + ' |')
-    queue += ['', '**Next eligible after BOOTSTRAP-01 and explicit `next`: ' + str(next_task) + '.**', '',
+    queue += ['', '**Next eligible for `next` or active `sprint`: ' + str(next_task) + '.**', '',
               '## Accepted baseline — excluded from execution', '', '| ID | Capability | Status |', '| --- | --- | --- |']
     queue += ['| ' + r['id'] + ' | ' + r['title'] + ' | ' + r['status'] + ' |' for r in ordered(rows) if r['status'] == STATES[5]]
     queue += ['', '## Separate 2.0 extensions — after authorized baseline closure', '',

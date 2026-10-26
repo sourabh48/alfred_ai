@@ -8,6 +8,18 @@ from datetime import datetime, timezone
 from scripts import release_gate as release
 
 
+class SectionCIIsolationTests(unittest.TestCase):
+    def test_distinct_section_prs_do_not_share_a_cancellation_group(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/browser-regression.yml').read_text(encoding='utf-8')
+        concurrency = workflow.split('concurrency:\n', 1)[1].split('\njobs:', 1)[0]
+        group = next(line.split('group:', 1)[1].strip() for line in concurrency.splitlines() if 'group:' in line)
+        self.assertIn('${{ github.ref }}', group)
+        first = group.replace('${{ github.ref }}', 'refs/pull/16/merge')
+        second = group.replace('${{ github.ref }}', 'refs/pull/17/merge')
+        self.assertNotEqual(first, second)
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", concurrency)
+
+
 class ReleaseRepositoryFixture:
     def setUp(self):
         self.temporary = TemporaryDirectory(prefix="alfred-release-synthetic-")

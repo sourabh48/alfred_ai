@@ -4,8 +4,9 @@ Generated from canonical status rows and the requirements dependency matrix. Reg
 `python scripts/project_execution.py --write`; check without changes using `--check`.
 Use the configured SDK. No network, provider activation or feature execution occurs.
 
-**Selection:** only `next` starts a new task. `continue` resumes EXECUTION_STATE;
-`status` is read-only. Finish or explicitly defer the current task first.
+**Selection:** `next` selects one task; explicit `sprint` continuously selects eligible scopes.
+`continue` resumes EXECUTION_STATE; `status` is read-only. Finish or explicitly defer
+local work first; CI_PENDING may coexist with independent IMPLEMENTING work.
 Phase A → B → C → D; module-by-module inside each phase. Skip an actually blocked
 item with its exact reason; do not call its acceptance complete. Later-phase
 prerequisite exceptions need a recorded reason. Accepted baseline rows are never requeued.
@@ -89,7 +90,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 67 | D | SYNC-02 — Non-AWS encrypted object adapter (AWS withdrawn) | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
 | 68 | D | SYNC-11 — Full application/cloud backup | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
 
-**Next eligible after BOOTSTRAP-01 and explicit `next`: INV-05.**
+**Next eligible for `next` or active `sprint`: INV-05.**
 
 ## Accepted baseline — excluded from execution
 
