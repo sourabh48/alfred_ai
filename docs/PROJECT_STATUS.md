@@ -4,6 +4,28 @@
 
 ## Active implementation checkpoint — 2026-10-27
 
+**Current command: sprint continuation.** Canonical development resumed clean at
+**7d1a44b**, already pushed with all Yahoo, Discovery, Geography and Memory source
+refs contained. No consolidation or completed Memory tests are restarted. All PRs
+remain owner-closed; masterc47fed9 and frozen4aa7ac70 remain unchanged. Consolidated
+remote run40389906654 is still in progress at task selection; it is not green.
+
+- Unit1 COMPLETE: TRAVEL-02 destination history matches case/spacing and catalog
+  aliases, includes exact dynamic log/photo locations, combines repeated completed
+  trip counts and honors every rejection across source IDs. Another owner's
+  records remain isolated; explicit destination requests still take precedence.
+  Four regression tests reproduced failures before the fix; **14 focused backend
+  PASS, zero skips**, including accepted candidate-pool and existing ranking tests.
+  Receipts: artifacts/ci-repair-ac05515/travel-novelty-{red,unit1}.json. No schema,
+  provider activation, private disclosure or money change. TRAVEL-02 remains
+  IMPLEMENTED_NOT_ACCEPTED for its full scope; **75/143 verified, 0/13 extensions**.
+- NEXT TASK: reject unsuccessful dynamic-discovery payloads, then expose aged
+  discovery provenance in the existing Travel evidence UI. Use this worktree and
+  branch; no new PR, branch, master operation or live/operator-data check.
+- Resolve this checkpoint's commit with `git log -1 --format=%H -- docs/PROJECT_STATUS.md`.
+
+### Previous consolidation and Memory evidence (completed)
+
 **Current command: MERGE EVERYTHING AND PUSH.** Combined source merges
 canonical development **6fc1e54** into the fully reconciled Yahoo/Discovery/Geography
 candidate **fc2a4d2**. All original source commits and the five Memory commits are
