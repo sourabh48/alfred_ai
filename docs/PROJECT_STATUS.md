@@ -4,6 +4,38 @@
 
 ## Active implementation checkpoint — 2026-10-27
 
+**Current command: recover and execute ALFRED2.0.** Recovery HEAD **4b012a2**, clean
+and synchronized; masterc47fed9/frozen4aa7ac70 and all worktrees preserved. **PR16 is
+OPEN**, reopened by the owner's explicit request; old zero-PR/owner-closed notes
+below are historical. Head CI40394951006 PASS all3 jobs; PR CI40414777100 still
+IN_PROGRESS at recovery;0 reviews/approvals. No eligible cumulative master merge:
+full review, newest checks, compatibility/privacy/security/rollback and Pages
+authorization are not all established. No merge or deployment attempted.
+
+Created [ALFRED2.0 execution](ALFRED_2_0_EXECUTION.md), deduplicating the existing13
+extensions and shared coordination work without changing143 baseline IDs or counts.
+Mandatory sequence is reconciled there: accepted DOC-02/06/TRAVEL-03 and manual
+TRAVEL-04 slices are reused; genuine AI/outcome/currency gates remain open. The
+owner-selected deterministic editor is independent of those blocked expansions;
+no capability is promoted by this exception. **75/143 verified;0/13 extensions**.
+
+**NEXT ACTION: TRAVEL2-001 IMPLEMENTING.** Backend and desktop controls are present
+in uncommitted source. Initial seven unique backend workflows accepted across5
+passes and2 repaired read-aging assertions; actual pointer/keyboard and stale-draft/
+lost-response workflows each passed in their focused receipts. Full integration
+`travel-editor-backend-batch` / `travel-editor-browser-final` remains pending; isolate
+new-test cache state after synthetic-account429 leakage, preserving runtime limits.
+Native review repairs include stop drag markers, LAN-safe request IDs, preserved
+packing/safety/source panels, collision-safe legacy IDs and chat/research revision
+advancement. Finish affected integration, desktop Axe, source/privacy/migration and
+final native review before source commit/push. Both trackers retain0/13 extensions.
+Reuse current models/JSON, multi-stop planner and costs; affected estimates are
+explicitly invalidated. No provider, model, money-policy, live-data, private-disclosure,
+master, release or deployment changes. Receipts: artifacts/ci-repair-ac05515/
+travel-editor-*.json and artifacts/travel-editor-20261027/.
+
+### Previous Travel batch (accepted bounded source)
+
 **Current command: sprint continuation.** Canonical development resumed clean at
 **7d1a44b**, already pushed with all Yahoo, Discovery, Geography and Memory source
 refs contained. No consolidation or completed Memory tests are restarted. All PRs
