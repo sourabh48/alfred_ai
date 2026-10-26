@@ -262,6 +262,8 @@ function renderInvestmentWatchlist(watchlist) {
                             <p class="metric-kicker mb-1">${Alfred.escapeHtml(item.family_label || item.family || "Fund")}</p>
                             <h3 class="investment-watch-title mb-1">${Alfred.escapeHtml(item.scheme_name || "Mutual fund")}</h3>
                             <p class="metric-caption mb-0">${Alfred.escapeHtml(item.fund_house || "Fund house unavailable")}</p>
+                            <p class="metric-caption mb-0">Quoted NAV: ${Alfred.escapeHtml(item.nav_source_value ?? String(item.nav ?? "unavailable"))} · Source date: ${Alfred.escapeHtml(item.nav_date || "unknown")}</p>
+                            <p class="metric-caption mb-0">${Alfred.escapeHtml(String(item.observation_count ?? "Unknown"))} observations · ${Alfred.escapeHtml(String(item.history_days ?? "Unknown"))}-day observed window. No currency conversion or holding revaluation.</p>
                         </div>
                         <div class="investment-watch-score">
                             <span>${Alfred.formatNumber(score, 1)} / 100</span>

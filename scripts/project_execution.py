@@ -14,6 +14,7 @@ MODULE_ORDER = ('FIN', 'LOAN', 'INV', 'DOC', 'AI', 'CAREER', 'TRAVEL', 'FAMILY',
 GATES = {
     'LOAN-08': 'BLOCKED_EVIDENCE: independent lender/document acceptance corpus',
     'INV-02': 'BLOCKED_EVIDENCE: broader broker/layout/OCR and authorized real-account corpus; bounded receipts in EXECUTION_STATE',
+    'INV-05': 'READY_FOR_SCOPED_INSPECTION: SCOPE-01 AMFI receipts in EXECUTION_STATE; next Yahoo bar identity/timestamp/cache scope; live terms/access remain unaccepted',
     'AI-10': 'BLOCKED_APPROVAL: private-history activation remains off',
     'AI-14': 'BLOCKED_EVIDENCE: eligible consented training and reviewed outcomes',
     'AI-15': 'BLOCKED_EVIDENCE: genuine per-model held-out outcomes',
@@ -163,7 +164,7 @@ def synchronize(root=ROOT, *, write=False, audit=None):
             continue
         index += 1
         ready = readiness(row, statuses, prerequisites)
-        if next_task is None and ready == 'READY_FOR_SCOPED_INSPECTION':
+        if next_task is None and ready.startswith('READY_FOR_SCOPED_INSPECTION'):
             next_task = row['id']
         effort = 'L' if row['status'] != STATES[0] or ready.startswith('BLOCKED_') else 'M'
         queue.append('| ' + str(index) + ' | ' + PHASE[row['status']] + ' | ' + row['id'] + ' — ' + row['title'] + ' | ' + row['status'] +

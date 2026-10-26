@@ -104,6 +104,19 @@ extraction method and confidence diagnostics without claiming measured accuracy.
 Do not infer currency or broker authenticity. A synthetic layout receipt alone
 does not complete broad broker/OCR or real-account acceptance.
 
+INV-05 research acceptance requires positive finite Decimal source NAVs, consistent
+scheme/ISIN identity, distinct dated observations, and actual prior-observation
+lookback baselines. A quote and a prior lookback baseline may be at most seven
+calendar days older than their target date; this is a bounded research rule, not
+an exchange-calendar guarantee. Missing 60-day coverage stays unavailable. Report
+actual observed dates/counts and peak-to-trough drawdown; observation-return
+volatility is not a daily forecast. Missing, conflicting, future or expired
+evidence must abstain even through an owner-summary cache hit. Show source quotes,
+dates and citations without revaluing recorded holdings or inferring currency.
+Synthetic transport acceptance does not establish live terms, quota, exchange
+timestamps, Yahoo symbol/bar alignment or real-account acceptance. No BETTER
+adapter identity has been established; do not invent one or activate a provider.
+
 Wealth adapts read-only institution/asset snapshots and strictly post-snapshot
 events only where reconciliation supports them; includes emergency funds,
 obligations/goals, career-income scenarios, reserve-aware sizing, look-through,

@@ -3685,6 +3685,80 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
         self.capture('investment-tables-390px')
 
+    def test_investment_watchlist_research_freshness_outage_and_recovery_preserve_holdings(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.investments.models import Investment
+        from apps.investments.services.portfolio_intelligence import PortfolioIntelligenceService, portfolio_intelligence_service
+        from tests.test_investment_market_acceptance import SCHEME, SyntheticAMFI, source_result
+
+        foreign = get_user_model().objects.create_user(username='synthetic-watchlist-private-owner')
+        Investment.objects.create(user=foreign, asset_type='equity', asset_name='PRIVATE-WATCHLIST-HOLDING', current_value='999999.99')
+        before = list(Investment.objects.values())
+        transport = SyntheticAMFI()
+        market = source_result({'one_month_return_pct': 0, 'india_vix': 14})
+        self.enterContext(patch('apps.investments.services.portfolio_intelligence.public_http.request', side_effect=transport))
+        self.enterContext(patch('apps.investments.services.portfolio_intelligence.verified_intelligence.market_snapshot', side_effect=lambda: market))
+        self.enterContext(patch.object(portfolio_intelligence_service, 'build_short_horizon_watchlist',
+            side_effect=lambda owner: PortfolioIntelligenceService.build_short_horizon_watchlist(portfolio_intelligence_service, owner)))
+        self.login()
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: SCHEME in self.text('investmentWatchlistCards'))
+        cards = self.text('investmentWatchlistCards')
+        self.assertIn('Quoted NAV: 106.0001', cards)
+        self.assertIn(timezone.localdate().isoformat(), cards)
+        self.assertIn('61 observations', cards)
+        self.assertIn('60-day observed window', cards)
+        self.assertIn('No currency conversion or holding revaluation', cards)
+        self.assertNotIn('PRIVATE-WATCHLIST-HOLDING', self.text('investmentPositionsBody'))
+        links = self.browser.find_elements(self.By.CSS_SELECTOR, '#investmentWatchlistCards a')
+        self.assertTrue(any('NAVOpen.txt' in link.get_attribute('href') for link in links))
+        self.browser.execute_script("document.getElementById('investmentWatchlistMode').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-100)")
+        self.capture('investment-watchlist-source-desktop')
+
+        market.evidence['status'] = 'stale'
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'Market guidance' in self.text('investmentRecommendationList') and 'Recorded holdings are unchanged' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        self.assertNotIn(SCHEME, self.text('investmentWatchlistCards'))
+        self.assertNotIn('Verified market context is', self.text('investmentRecommendationList'))
+        self.assertEqual(list(Investment.objects.values()), before)
+
+        market.evidence['status'] = 'fresh'
+        transport.fail = True
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'Recorded holdings are unchanged' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        self.assertIn('Recorded holdings are unchanged', self.text('investmentWatchlistSummary'))
+        self.assertEqual(list(Investment.objects.values()), before)
+
+        transport.fail = False
+        transport.latest = 'No synthetic observations available'
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'Recorded holdings are unchanged' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        self.assertNotIn('Quoted NAV:', self.text('investmentWatchlistCards'))
+
+        stale = SyntheticAMFI(end=timezone.localdate() - timedelta(days=8))
+        transport.latest, transport.rows = stale.latest, stale.rows
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'no funds have recent' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        self.assertNotIn(SCHEME, self.text('investmentWatchlistCards'))
+
+        fresh = SyntheticAMFI()
+        transport.latest, transport.rows = fresh.latest, fresh.rows
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: SCHEME in self.text('investmentWatchlistCards'))
+        self.assertEqual(list(Investment.objects.values()), before)
+        self.assertNotIn('PRIVATE-WATCHLIST-HOLDING', str(transport.calls))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+            {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.browser.execute_script("document.getElementById('investmentWatchlistMode').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-100)")
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('investment-watchlist-source-390px')
+
     def test_investment_projection_starts_with_recorded_value_on_real_page(self):
         self.login()
         self.browser.get(self.live_server_url + "/investments/")

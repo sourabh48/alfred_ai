@@ -2,8 +2,9 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
-from scripts.project_execution import ROOT, inventory, ordered, synchronize
+from scripts.project_execution import GATES, ROOT, inventory, ordered, synchronize
 
 
 class ProjectExecutionTests(TestCase):
@@ -22,6 +23,12 @@ class ProjectExecutionTests(TestCase):
         self.assertEqual(sum(result['counts'].values()), 143)
         self.assertEqual(result['baseline'], sum(r['status'] == 'COMPLETE_VERIFIED' for r in rows))
         self.assertEqual(result['changed'], [])
+
+    def test_ready_scope_with_acceptance_note_remains_eligible(self):
+        root = self.fixture()
+        first = synchronize(root, write=True)['next_task']
+        with patch.dict(GATES, {first: 'READY_FOR_SCOPED_INSPECTION: next bounded acceptance scope'}):
+            self.assertEqual(synchronize(root, write=True)['next_task'], first)
 
     def test_unknown_and_duplicate_baseline_rows_fail_closed(self):
         row = '### DOC-01 — Synthetic capability\n\n**COMPLETE_VERIFIED** · Documents · P1.\n- Source: synthetic\n'

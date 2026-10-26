@@ -10,15 +10,15 @@ exact resume command. [Requirements](ALFRED_2_0_REQUIREMENTS.md) own product int
 resumes the task in EXECUTION_STATE; `next` selects a new task after completion or explicit
 deferral; `status` is read-only. No automatic feature switching.
 
-- **PR/CI:** PR #16 READY/open, unmerged. Accepted source HEAD 45a91a7 exact-head run 40241945067 PASS: Windows native, Selenium, Linux. Source/history privacy PASS, zero findings. This documentation-only handoff requires its own fresh CI before owner merge; no different-head green claim. READY_TO_MERGE: NO — independent reviews 0, protection GET 403, Pages authorization absent. AGENTS requires manual owner merge. No merge/publication or protection bypass.
-- **Current task:** INV-02/SCOPE-02 COMPLETE/100% for bounded synthetic layout/correction acceptance at 45a91a7: 97 backend, 3 unique Chrome and 4 Axe PASS; executable/test hashes unchanged and exact-head CI passed. READY_FOR_NEXT: YES; stop and await `next` for INV-05. Full INV-02 remains IMPLEMENTED_NOT_ACCEPTED, baseline 75/143; broader broker/OCR/authorized real-account evidence absent. BOOTSTRAP-01/SCOPE-01 remain COMPLETE/100%; TRAVEL-09 deferred; Hub remote Git sync OFF.
+- **PR/CI:** PR #16 READY/open, unmerged. Recovery HEAD 06873da exact-head run 40286766839 PASS: Windows native, Selenium, Linux. INV-05 changes require their own pushed-head CI; no transferred green claim. READY_TO_MERGE: NO — independent reviews 0, protection GET 403, Pages authorization absent. AGENTS requires manual owner merge. No merge/publication or protection bypass.
+- **Current task:** INV-05/SCOPE-01 AMFI observation integrity, historical metrics and source-expiry acceptance; 56 backend + 11 metadata, actual Chrome and 4 Axe PASS. Durable handoff 95% once clean-source privacy/commit/push receipts match checkpoint HEAD; exact pushed-head CI pending. Full INV-05 remains IMPLEMENTED_NOT_ACCEPTED; baseline 75/143 and extensions 0/13. INV-02/SCOPE-01/SCOPE-02 and BOOTSTRAP-01 remain COMPLETE/100%; TRAVEL-09 deferred; Hub remote Git sync OFF. `continue` closes this scope before `next` selects Yahoo identity/timestamp acceptance.
 
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 75/143 (52.4%) verified.**
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 READY/open, unmerged. Accepted source HEAD 45a91a7 exact-head run 40241945067 PASS: Windows native, Selenium, Linux. Source/history privacy PASS, zero findings. This documentation-only handoff requires its own fresh CI before owner merge; no different-head green claim. READY_TO_MERGE: NO — independent reviews 0, protection GET 403, Pages authorization absent. AGENTS requires manual owner merge. No merge/publication or protection bypass.
+PR/CI: PR #16 READY/open, unmerged. Recovery HEAD 06873da exact-head run 40286766839 PASS: Windows native, Selenium, Linux. INV-05 changes require their own pushed-head CI; no transferred green claim. READY_TO_MERGE: NO — independent reviews 0, protection GET 403, Pages authorization absent. AGENTS requires manual owner merge. No merge/publication or protection bypass.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 
@@ -64,6 +64,8 @@ Change a status to ACCEPTED only with source-bound backend/UI/privacy evidence.
 <!-- END EXTENSION ACCEPTANCE -->
 
 ## Historical checkpoints (newest first)
+
+- **INV-05/SCOPE-01 — LOCAL ACCEPTANCE — 2026-10-26:** Explicit `next` recovered clean, pushed HEAD `06873da3a627189d25e73bc8748fe935ee027ce0`; its run `40286766839` passed all three jobs. Existing AMFI/HTTP/cache/proof paths now reject nonfinite/nonpositive NAVs, stale/future/identity-conflicting observations, duplicate-date inflation and unaligned latest/history NAVs. Decimal source values retain unit-price precision; actual observation dates/baselines prevent invented 60-day returns, and drawdown includes recovered losses. Missing/stale Yahoo summary values no longer become a verified zero; provider expiry suppresses cached owner research without changing holdings. UI shows original NAV/date/coverage; screenshot review found and fixed dark metric contrast using the existing surface token. Fresh final focused backend **56 PASS**, Chrome workflow PASS, **4 Axe audits zero violations**; money/reconciliation/owner/outage/recovery covered with synthetic provider transport. Receipts: `artifacts/ci-repair-ac05515/inv05-backend-final.json`, `inv05-axe-contrast-final.json`; captures/accessibility under `artifacts/inv05-06873da/`. Contrast incomplete/manual screen-reader remains unverified; inspect source-bound receipts before reuse. Earlier red/intermediate runs remain diagnostic, not extra totals. Full INV-05 remains unaccepted; no live terms/quota, Yahoo bar symbol/timestamp alignment, real-account or packaged acceptance established. No BETTER adapter identified. NEXT: finish source boundary/commit/push and check this scope's exact-head CI; then await `next` for INV-05/SCOPE-02. No provider activation, currency/schema/holding write, production, master merge or Pages operation.
 
 - **INV-02/SCOPE-02 — CI CLOSURE — 2026-10-26:** `continue` recovered clean, pushed HEAD `45a91a715577c61eecb8386e7762376cd35bcfc0`. Exact-head run `40241945067` PASS; native-windows `121315486163`, Selenium `121315486280`, Linux `121315486557` all successful. Eight accepted executable/test hashes match the saved proof; 97 backend/3 Chrome/4 Axe receipts were reused without rerunning unchanged acceptance. Fresh source/history privacy PASS with zero findings: `artifacts/inv02-scope02-7807d36/boundary/ci-close/`. Bounded task closes **95% → 100%**, READY_FOR_NEXT YES; full INV-02 remains unaccepted and 75/143 unchanged. This handoff changes README/status/state only; its own fresh PR checks are a separate owner-merge gate. PR #16 is still open, reviews 0, protection access 403, Pages authorization absent; READY_TO_MERGE NO. Remote master c47fed9 and separate local master 3932f39 were preserved; no branch synchronization, merge, deployment, provider/data or runtime change. NEXT: wait for `next` before INV-05; `continue` handles a confirmed manual owner merge without selecting another feature.
 
@@ -1155,10 +1157,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 - Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
 - APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
-- Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Source implemented; current real-live acceptance NOT_RUN.
-- Limitations/dependencies: Adapters/cache/provenance exist; no fresh authorized provider request was made in this audit. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Validate provider terms, quote age and account limits.
+- Tests: [tests/test_investment_market_acceptance.py](../tests/test_investment_market_acceptance.py), [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py); 56 focused backend PASS, actual Chrome recovery flow and 4 Axe audits PASS; source-bound receipts in INV-05/SCOPE-01 checkpoint above.
+- Acceptance: SCOPE-01 synthetic AMFI precision/identity/freshness/history/cache-expiry and owner-safe unavailable/recovery acceptance passes locally; required pushed-head CI pending. Full capability and real-live acceptance remain NOT_RUN.
+- Limitations/dependencies: No live provider/terms/quota or real-account acceptance; Yahoo bar identity/timestamp alignment remains unaccepted. No established BETTER adapter. Seven-calendar-day research bound is not exchange-calendar verification; no currency inference, FX or recorded holding revaluation.
+- Next: Close SCOPE-01 exact-head CI; only explicit `next` starts SCOPE-02 Yahoo bar identity/timestamp/cache acceptance, then authorized live-provider evidence.
 
 ### INV-06 — Long-term investment planning
 

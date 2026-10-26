@@ -17,7 +17,7 @@ from alfred_ai.services.materialized_cache import materialize_payload
 from alfred_ai.services import record_parser_learning
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.reports.services import operational_logging_service
-from apps.integrations.services.verified_intelligence import proof_contract_payload
+from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 from .services.portfolio_intelligence import portfolio_intelligence_service
 from .models import Investment, InvestmentImportDocument
 from .money import investment_money, investment_total_float
@@ -55,7 +55,7 @@ class InvestmentSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        revision = _investment_revision(request.user)
+        revision = f"{_investment_revision(request.user)}:market-v2:{timezone.localdate().isoformat()}"
         payload = materialize_payload(
             namespace="investments-summary",
             user_id=request.user.id,
@@ -63,6 +63,20 @@ class InvestmentSummaryView(APIView):
             ttl_seconds=45,
             builder=lambda: _investment_summary_payload(request.user),
         )
+        # Cached owner totals cannot extend a provider's evidence lifetime.
+        context = payload.get("market_context") or {}
+        context_freshness = freshness_snapshot(context.get("evidence") or [])
+        if not context_freshness["proof_complete"]:
+            payload["market_context"] = {**context, "freshness": context_freshness, "suggestions": [{
+                "type": "source_unavailable", "message": "Market guidance unavailable: source evidence expired or is missing. Recorded holdings are unchanged."
+            }]}
+        watchlist = payload.get("watchlist") or {}
+        if watchlist.get("available"):
+            evidence = watchlist.get("evidence") or []
+            freshness = freshness_snapshot(evidence[:3])
+            if len(evidence) < 3 or not freshness["proof_complete"]:
+                payload["watchlist"] = {**watchlist, "available": False, "items": [], "freshness": freshness,
+                    "summary": "Watchlist unavailable: cached source evidence expired. Recorded holdings are unchanged."}
         return Response(payload)
 
 
