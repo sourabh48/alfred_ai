@@ -9,10 +9,13 @@
 - `next`: finish/checkpoint or explicitly defer the current task, then select one
   eligible task from `docs/EXECUTION_QUEUE.md`; stop when completed or blocked.
 - `status`: read-only Git/PR/task/baseline/extensions/blocker report; no mutations.
-- `sprint`: continuous safe queue selection during this active execution. Commit
-  locally validated isolated section PRs, then code the next eligible independent
-  scope while CI runs. Reconcile at milestones; never idle-poll, transfer green
-  checks between SHAs, or call CI_PENDING fully accepted.
+- `sprint`: continuous safe queue selection during this active execution. Use
+  development/alfred-integrated as the only canonical development branch and
+  PR #16 as its single integration PR to master. Validate local scopes and
+  integrate only as permitted by the unchanged checks/reviews. While long CI
+  runs independently, code in an isolated temporary worktree. Reconcile at
+  milestones; never idle-poll, transfer green checks between SHAs, or call
+  CI_PENDING fully accepted.
 - Follow phases IMPLEMENTED_NOT_ACCEPTED → PARTIALLY_IMPLEMENTED → BLOCKED
   (approval/external) → NOT_IMPLEMENTED, module-by-module. Skip only actual
   blockers; document later-phase prerequisite exceptions. Do not repeat verified work.
@@ -57,7 +60,7 @@
   separate. Mapping is not integration/live accuracy. No implicit provider, cloud,
   private disclosure, sending, booking, trading or financial-record mutation.
 
-## Non-blocking section pipeline
+## Single development branch and non-blocking CI
 
 - `docs/CI_PIPELINE_STATE.md` records section state, branch/source/base/PR/run,
   local evidence, CI, dependencies/reviews/publication blockers, merge SHA,
@@ -67,16 +70,25 @@
   MERGE_READY → MERGED → POST_MERGE_VERIFYING → MERGED_VERIFIED.
   BLOCKED_APPROVAL/BLOCKED_EXTERNAL stay explicit; CI_PENDING is at most 95%.
   Bounded acceptance never automatically verifies its parent capability.
-- Maximum three outstanding integration candidates initially, including cumulative
-  PR #16; one active coding scope, isolated branches/worktrees. Distinct PR refs
-  isolate workflow concurrency. Do not push unrelated sections into a testing PR,
-  disable cancellation or change coverage/sharding without regression evidence.
-- Use verified bases; explicitly stack dependent PRs and pin their base SHA.
-  Retarget/revalidate against eventual master before merge. Never call a stacked
-  or cumulative diff independent of its prerequisites.
+- Do not automatically create a GitHub PR per minor section. Temporary local
+  branches/worktrees are for independent development or safe reconciliation;
+  they are not alternative canonical development branches. Keep PR #16 open
+  for development/alfred-integrated -> master; preserve PR #18/#19 and their
+  source branches until verified integration permits their closure.
+- Pin source/base/dependencies and test receipts for each scope. Reconcile
+  overlapping code and documentation deliberately, retaining accepted behavior.
+  Locally verified features may enter development only when mandatory checks,
+  independent/project reviews and GitHub protection/ruleset requirements pass.
+  A local trial merge on a preparation branch is not canonical integration.
+- Keep coding independently during long CI. A newer development HEAD invalidates
+  an older merge-readiness claim: validate the newest consolidated HEAD and full
+  cumulative diff before master merge. Preserve existing cancellation/coverage
+  policy unless a measured regression justifies a reviewed change.
+- Remove temporary worktrees/branches only after verified containment and
+  rollback evidence; preserve dirty work and never delete unmerged sources.
 - Reconcile at task selection, local acceptance, push, pre-merge and handoff.
-  No polling daemon is needed: use existing GitHub tooling. At the candidate cap,
-  reconcile/repair, prepare safe local work, or checkpoint instead of spinning.
+  No polling daemon is needed: use existing GitHub tooling. Record exact blockers
+  and stop a blocked merge; continue only safe preparation and validation.
 
 ## ALFRED — conditional automatic section merge policy
 
@@ -87,9 +99,10 @@
   skips, independent reviews (including project rules), protection/rulesets,
   privacy/security, compatibility/rollback, dependencies and authorized publication.
   PR #16 requires its entire cumulative diff reviewed; it is not an isolated slice.
-- Before the first automated merge verify Pages source/workflows and request
-  explicit publishing approval for the concrete scope. Changed consequences need
-  new approval; application deployment remains separately prohibited.
+- Before master integration verify Pages source/workflows and obtain explicit
+  publishing authorization for the full concrete scope. Development integration
+  does not authorize Pages or application deployment. Changed publishing
+  consequences need new approval; application deployment remains separate.
 - All gates pass: READY_TO_MERGE YES, perform a supported protection-compliant merge.
   Native auto-merge only if enabled and all non-CI gates already pass. Otherwise
   report NO, exact blockers/responsible party, and preserve the PR. Never repeatedly

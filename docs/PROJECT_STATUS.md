@@ -1,39 +1,21 @@
 # ALFRED Project Status
 
-**Canonical original 143-capability inventory and acceptance evidence. Updated 2026-10-26.**
+**Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
 ## Current execution
 
-Read [EXECUTION_STATE](EXECUTION_STATE.md) for the current task, refs, evidence and
-exact resume command. [Requirements](ALFRED_2_0_REQUIREMENTS.md) own product intent;
-[EXECUTION_QUEUE](EXECUTION_QUEUE.md) owns deterministic selection. `continue`
-resumes the task in EXECUTION_STATE; `next` selects a new task after completion or explicit
-deferral; `status` is read-only. Explicit `sprint` permits continuous eligible scope
-selection with separate PRs and at most three outstanding integration candidates.
+Read [EXECUTION_STATE](EXECUTION_STATE.md) for source-bound task state and resume;
+[requirements](ALFRED_2_0_REQUIREMENTS.md) own intent and [queue](EXECUTION_QUEUE.md)
+owns deterministic selection. Sprint uses one canonical development branch and PR16.
 
-- **PR/CI:** Owner merged PR17 source503b848 into development/alfred-integrated as d5cc181 (not master). Local development fast-forwarded safely; master staysc47fed9 and PR16 remains open, fresh exact-head run40324546766 IN_PROGRESS. Yahoo scope sourcec60c807/checkpoint8679824 preserved; authenticated browser restored, separate scoped draft against development prepared. Resolve current PR/run in EXECUTION_STATE/CI_PIPELINE_STATE. READY_TO_MERGE:NO — exact-head CI/review/protection/cumulative-diff/Pages gates remain; no new master merge/publication/deployment.
-- **Current task:** INV-05/SCOPE-02 integration recovery95%; record PR17 owner merge, synchronize development, submit Yahoo draft using restored existing browser. Eight committed source blobs and four receipt hashes preserved; reuse80 backend/12 metadata/one Chrome/4 overlapping Axe, privacy0; no new capability verification. Full INV-05 unaccepted; baseline75/143/extensions0/13. PR17 closure leaves2 outstanding candidates including Yahoo; CAREER-03 remains queued, not started by this continuation.
-
-deferral; `status` is read-only. Explicit `sprint` permits continuous eligible scope selection with separate PRs and maximum3 integration candidates.
-
-- **PR/CI:** PR18 READY/open atdaed068, exact-head run40325761619 PASS all3 jobs; bounded INV-05/SCOPE-02 closes100% with preserved receipts, full INV-05 unaccepted. Reviews0; protection/rules visibility and applicable review gates block automatic development merge. PR17 merged into developmentd5cc181, not master; PR16 remains open atd5cc181, run40324546766 SUCCESS; masterc47fed9 unchanged. CAREER-03 is the third reserved scoped candidate; separate refs preserve CI. Master cumulative review/Pages approval remain mandatory; no merge/publication bypass.
-- **Current task:** Explicit sprint CAREER-03/SCOPE-01 normalized-feed lead integrity, independent branch development/career-discovery-evidence-20261026 fromd5cc181. Fixed fabricated freshness, unsafe links, stale verified flags, duplicate source precedence and owner-cache expiry; backend66 PASS and actual Chrome/contrast workflow +4 overlapping Axe audits zero violations. Metadata/source privacy/checkpoint/push/CI remain before acceptance. Baseline75/143/extensions0/13 unchanged. Full capability/live provider and real-account acceptance unverified.
-
-deferral; `status` is read-only. Explicit `sprint` permits continuous eligible scope selection with separate PRs and maximum3 integration candidates.
-
-- **PR/CI:** PR16 exact source d5cc181/run40324546766 PASS, open against masterc47fed9; cumulative review/protection/Pages gates remain. PR18 READY/open atdaed068/run40325761619 all3 PASS, INV-05/SCOPE-02 accepted100% only; reviews0/protection visibility block development merge. PR19 DRAFT/open atd8f57be/run40336191319 CANCELLED (Linux/Windows PASS; Selenium cancelled near30-minute job budget). Verified artifact12659336187 retained; no final test summary or assertion regression established, no newer SHA/run. Three submitted candidates, zero free slots; no merge performed.
-- **Current task:** Explicit sprint CAREER-03/SCOPE-02 geography acceptance, isolated local-only branch development/career-geography-20261026 from verifiedd5cc181. Missing locations remain unknown; remote country/state restrictions survive filtering; conflicting restrictions abstain. Backend56/metadata12 PASS; one actual Chrome/four overlapping Axe PASS. Isolated source1c5f11e pushed/clean95%, CI_NOT_SUBMITTED; source/history privacy PASS0. No fourth PR; exact-head CI is still required. No fourth PR, provider/currency/data changes or parent promotion. PR19 source and evidence preserved on sibling branch.
-
+- **PR/CI:** Canonical developmentd5cc181/masterc47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded30m and retry403. Independent project reviews absent on all three. Local reconciliation candidate contains Yahoo, Discovery and Geography, pending consolidated validation; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed.
+- **Current task:** Consolidation safe preparation/validation on preparation/alfred-consolidation-20261026; required reviews and PR19 CI block integration. Preserve143 original IDs/75 verified and13 extensions/0 accepted. See CONSOLIDATION_STATE for sources, dependency/conflict decisions and original receipts. Stage7 selection is not reached.
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 75/143 (52.4%) verified.**
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: Owner merged PR17 source503b848 into development/alfred-integrated as d5cc181 (not master). Local development fast-forwarded safely; master staysc47fed9 and PR16 remains open, fresh exact-head run40324546766 IN_PROGRESS. Yahoo scope sourcec60c807/checkpoint8679824 preserved; authenticated browser restored, separate scoped draft against development prepared. Resolve current PR/run in EXECUTION_STATE/CI_PIPELINE_STATE. READY_TO_MERGE:NO — exact-head CI/review/protection/cumulative-diff/Pages gates remain; no new master merge/publication/deployment.
-
-PR/CI: PR18 READY/open atdaed068, exact-head run40325761619 PASS all3 jobs; bounded INV-05/SCOPE-02 closes100% with preserved receipts, full INV-05 unaccepted. Reviews0; protection/rules visibility and applicable review gates block automatic development merge. PR17 merged into developmentd5cc181, not master; PR16 remains open atd5cc181, run40324546766 SUCCESS; masterc47fed9 unchanged. CAREER-03 is the third reserved scoped candidate; separate refs preserve CI. Master cumulative review/Pages approval remain mandatory; no merge/publication bypass.
-
-PR/CI: PR16 exact source d5cc181/run40324546766 PASS, open against masterc47fed9; cumulative review/protection/Pages gates remain. PR18 READY/open atdaed068/run40325761619 all3 PASS, INV-05/SCOPE-02 accepted100% only; reviews0/protection visibility block development merge. PR19 DRAFT/open atd8f57be/run40336191319 CANCELLED (Linux/Windows PASS; Selenium cancelled near30-minute job budget). Verified artifact12659336187 retained; no final test summary or assertion regression established, no newer SHA/run. Three submitted candidates, zero free slots; no merge performed.
+PR/CI: Canonical developmentd5cc181/masterc47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded30m and retry403. Independent project reviews absent on all three. Local reconciliation candidate contains Yahoo, Discovery and Geography, pending consolidated validation; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 
@@ -1183,18 +1165,12 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
 
-- Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/integrations/services/verified_intelligence.py](../apps/integrations/services/verified_intelligence.py), [apps/investments/views.py](../apps/investments/views.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
-- APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
-- Tests: [tests/test_yahoo_market_acceptance.py](../tests/test_yahoo_market_acceptance.py), [tests/test_investment_market_acceptance.py](../tests/test_investment_market_acceptance.py), [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py); SCOPE-02 affected backend80 PASS and actual Chrome recovery/contrast flow with 4 overlapping Axe audits; source-bound receipts in EXECUTION_STATE. Preserve SCOPE-01 receipts; overlapping totals are not additive.
-- Acceptance: SCOPE-01 synthetic AMFI precision/identity/freshness/history/cache-expiry and owner-safe unavailable/recovery COMPLETE at79a26ae, CI40292154135 PASS. SCOPE-02 sourcec60c807 synthetic Yahoo symbol/date/close/baseline and persisted/cache-expiry locally validated/pushed95%; PR creation externally blocked and CI not submitted, not100%. Full capability/real-live acceptance NOT_RUN.
-- Limitations/dependencies: No live provider/terms/quota or real-account acceptance. No established BETTER adapter. Daily bars and seven-calendar-day research bounds do not prove exchange-closing correctness or a trading calendar; no currency inference, FX or recorded holding revaluation. Cross-domain risk/career zero defaults are outside this scoped acceptance.
-- Next: Reconcile SCOPE-02 exact-head CI and stack dependency/merge gates. Remaining live/real-account evidence is blocked; no repeated synthetic acceptance. `sprint` may select CAREER-03 when candidate capacity permits; other command semantics remain unchanged.
-
-- Tests: [tests/test_investment_market_acceptance.py](../tests/test_investment_market_acceptance.py), [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py); 56 focused backend PASS, actual Chrome recovery flow and 4 Axe audits PASS; source-bound receipts in INV-05/SCOPE-01 checkpoint above.
-- Acceptance: SCOPE-01 synthetic AMFI acceptance COMPLETE at79a26ae, CI40292154135 PASS. Sibling PR18 SCOPE-02 Yahoo identity/date/close/baseline and source/cache expiry COMPLETE100% atdaed068, exact-head CI40325761619 PASS all3 jobs with preserved local receipts. Yahoo source remains on its separate branch pending integration; this independent Career branch does not claim to contain it. Full capability/live acceptance NOT_RUN.
-- Limitations/dependencies: No live provider/terms/quota, exchange-close correctness or real-account acceptance; no established BETTER adapter. Seven-calendar-day research bound is not an exchange calendar; no currency inference, FX or holding revaluation. PR18 is review/protection blocked, not merged.
-- Next: Preserve both accepted scopes and reconcile PR18 integration gates; remaining live/authorized provider evidence stays blocked. Sprint may continue independent eligible work without touching Yahoo source.
-
+- Source: [portfolio intelligence](../apps/investments/services/portfolio_intelligence.py), [verified intelligence](../apps/integrations/services/verified_intelligence.py), [investment API](../apps/investments/views.py), [models](../apps/investments/models.py), [URLs](../apps/investments/urls.py).
+- APIs/UI/models: /investments/; /api/investments/; Investment; optional external evidence.
+- Tests: [AMFI](../tests/test_investment_market_acceptance.py), [Yahoo](../tests/test_yahoo_market_acceptance.py), [money](../tests/test_investment_money.py), [projection](../tests/test_investment_projection.py), [Chrome](../tests/test_user_data_browser.py). Original56 AMFI and80 Yahoo backend totals overlap; Chrome/Axe receipts retained separately in EXECUTION_STATE/CONSOLIDATION_STATE.
+- Acceptance: SCOPE-01 AMFI complete at79a26ae/run40292154135 PASS, already in canonical development. SCOPE-02 Yahoo complete100% atdaed068/run40325761619 all3 PASS; source reconciled into local candidate only, PR18 still review-blocked. Identity/date/close/dated baseline, source/cache expiry, unavailable recovery and unchanged owned records retained. Candidate results require separate receipts.
+- Limitations/dependencies: Full capability/live terms/quota, real accounts and exchange-close correctness remain unaccepted. Seven-calendar-day bound is not an exchange calendar. No BETTER adapter, currency inference, FX or holding revaluation. Cross-domain risk/career defaults remain outside this scope.
+- Next: Obtain mandatory review and validate permitted integration; retain both bounded receipts. Do not repeat or promote completed synthetic scope into full capability acceptance.
 ### INV-06 — Long-term investment planning
 
 **PARTIALLY_IMPLEMENTED** · Investments · P2.
@@ -2012,16 +1988,12 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **IMPLEMENTED_NOT_ACCEPTED** · Career · P2.
 
-- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
-- APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
-- Tests: [tests/test_career_discovery_acceptance.py](../tests/test_career_discovery_acceptance.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py), [tests/test_user_data_browser.py](../tests/test_user_data_browser.py); affected discovery/adaptive/matching/recruiter/HTTP/API/ownership/income/financial-baseline tests66 PASS, zero skips. Browser/Axe and exact-source CI receipts in EXECUTION_STATE; historical totals not additive.
-- Acceptance: SCOPE-01 normalized feed leads locally validated: backend65 and Chrome/contrast workflow PASS, four overlapping Axe audits zero violations. Accurate freshness/unknown/cache labels, safe posting/citation URLs, duplicate precedence, bounded malformed input/outage recovery and owner-cache expiry. Source/checkpoint/privacy/push/exact-head CI complete the remaining gates; bounded acceptance never promotes the full capability. Live posting/provider/normal real-account acceptance NOT_RUN.
-
-- Tests: [location rules/API](../tests/test_career_location_acceptance.py), [Chrome](../tests/test_user_data_browser.py); current geography/backend/matching/recruiter/income/financial-baseline56 PASS, zero skips. Prior normalized-feed tests/evidence remain on [PR19 source](https://github.com/sourabh48/alfred_ai/blob/d8f57bead981abc2647fcc0f94aee2c57550a87b/tests/test_career_discovery_acceptance.py), not claimed present on this independent branch.
-- Acceptance: SCOPE-01 remains95% at PR19d8f57be with preserved66 backend/12 metadata/one Chrome/four overlapping Axe/privacy0, exact-head run40336191319 cancelled/incomplete (Linux/Windows PASS, Selenium cancelled). SCOPE-02 local geography acceptance retains explicit country/state restrictions, unknown/mixed/negative locations, owner cache identity and unchanged financial records; Chrome covers focused dropdown reloads, stale response rejection and unsaved edits. Full arbitrary/live geography/provider/real-account acceptance remains NOT_RUN; no parent promotion.
-- Limitations/dependencies: Existing Remotive/Arbeitnow/RemoteOK feeds and JSON-LD/Greenhouse/Lever/Workday/Ashby parsers preserved; live terms/geography/coverage/liveness and provider-specific translation acceptance remain separate. Source freshness is not vacancy availability. No new provider, private-data disclosure, automatic application or salary/financial policy changes.
-- Next: Finish bounded UI/Axe/privacy/exact-head CI, then inspect provider-specific translation/date/geography gaps within CAREER-03 when candidate capacity permits. Preserve accepted CAREER-02 and queued module order.
-
+- Source: [job intelligence](../apps/career/services/job_intelligence.py), [owner API](../apps/career/views.py), [Career UI](../static/js/career.js), [template](../templates/career/list.html).
+- APIs/UI/models: /career/; /api/career/dashboard/; existing owned CareerProfile and cache.
+- Tests: [discovery](../tests/test_career_discovery_acceptance.py), [geography](../tests/test_career_location_acceptance.py), [matching](../tests/test_career_matching_acceptance.py), [recruiter/evidence](../tests/test_career_recruiter_and_evidence.py), [Chrome](../tests/test_user_data_browser.py). Original66 Discovery and56 Geography backend totals overlap. Both suites are retained on the local reconciliation candidate and backend profile.
+- Acceptance: SCOPE-01 provenance/unknown/stale labels, safe URLs, canonical duplicates, bounded failures and owner-cache expiry atd8f57be retains local66 backend/12 metadata/one Chrome/four overlapping Axe/privacy0. Exact-head run40336191319 cancelled after Selenium exceeded30m; fresh local66 PASS does not replace CI. SCOPE-02 source1c5f11e/checkpointdc96b19 retains56 backend/12 metadata/one Chrome/four overlapping Axe/privacy0; no CI. Country/state restrictions, missing/ambiguous/negative geography, focused dropdown response ordering and unsaved edits coexist with Discovery on the local candidate only. Both scopes remain95% pending their required gates; no canonical integration claimed.
+- Limitations/dependencies: Full CAREER-03, arbitrary/live geography, work permits/legal eligibility, listing availability, provider terms, real accounts, manual screen-reader and packaged acceptance remain unaccepted. No provider/schema/currency/financial writes or application sending.
+- Next: Finish consolidated candidate verification; obtain required independent review and authorized exact-head CI before integration. Stage7 selection follows consolidation, not blocked-merge bypass.
 ### CAREER-04 — Recruiter email/attachment processing
 
 **PARTIALLY_IMPLEMENTED** · Career · P2.
