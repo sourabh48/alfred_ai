@@ -168,6 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
         evaluationControls();
     }
     function editorCase() {
+        if (!query.value.trim()) throw new Error("Enter a question before adding or saving a case; the existing cases are retained.");
         if (!query.reportValidity() || !expected.reportValidity()) throw new Error("Review the question and current expected memories.");
         return {query:query.value.trim(),expected_ids:[...expected.selectedOptions].map(option => option.value).filter(Boolean)};
     }

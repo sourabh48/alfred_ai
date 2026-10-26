@@ -190,6 +190,16 @@ class MemoryEvaluationTests(TestCase):
                 for private in (foreign,owned,'SYNTHETIC-QUERY','SYNTHETIC-FOREIGN','SYNTHETIC-STALE','per_case'):
                     self.assertNotIn(private,response.content.decode())
 
+    def test_inconsistent_cutoff_or_ranking_rejects_the_whole_report(self):
+        owned=self.save('mountain'); second=self.save('coast')
+        for rows in ([dict(id=owned,score=.44)],
+                [dict(id=owned,score=.6),dict(id=second,score=.9)]):
+            with self.subTest(rows=len(rows)),patch.object(MemoryStore,'retrieve',return_value=rows):
+                response=self.post([dict(query='SYNTHETIC-QUERY mountain',expected_ids=[owned])])
+                self.assertEqual(response.status_code,409)
+                for private in (owned,second,'SYNTHETIC-QUERY','per_case','score_diagnostics'):
+                    self.assertNotIn(private,response.content.decode())
+
     def test_deleted_or_corrected_source_during_any_case_invalidates_the_whole_report(self):
         owned=self.save('mountain'); retrieve=self.store.retrieve
         def deleting(user,query,**kwargs):

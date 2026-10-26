@@ -117,6 +117,9 @@ class MemoryLearning:
                     or not isfinite(item['score']) or abs(item['score'])>1.000001 for item in results)
                     or len({item['id'] for item in results})!=len(results)):
                 raise MemoryConflict('Retrieval references are no longer valid for this owner.')
+            scores=[item['score'] for item in results]
+            if scores!=sorted(scores,reverse=True) or (min_score is not None and any(score<min_score for score in scores)):
+                raise MemoryConflict('Retrieval no longer matches the reviewed ranking or cutoff.')
             for item in results:
                 if any(key in item and item[key]!=records[item['id']][key] for key in ('content','provenance','sensitivity','verified_at')):
                     raise MemoryConflict('Retrieved memory changed during evaluation.')

@@ -32,8 +32,16 @@ Resolve this checkpoint HEAD with `git log -1 --format=%H -- docs/PROJECT_STATUS
   fast-memory-unit3-backend.json and fast-memory-unit3-browser.json. Browser
   demonstrates a high-score false match, corrected labels, unchanged cutoff/vault
   and page-hide clearing. No statistical calibration or policy promotion claimed.
-- NEXT TASK: reject inconsistent cutoff/ranking reports and empty queued edits,
-  then run the affected integration batch, inventory check and AST refresh.
+- Unit 4 COMPLETE (base 955594d): whole-report rejection for returned scores below
+  the requested cutoff or inconsistent cosine ordering; no partial IDs/diagnostics
+  escape the existing session/owner boundary. Reproduced both invalid API reports
+  as HTTP200 before the fix (fast-memory-unit4-red-api.json); corrected focused
+  API **1 PASS**, actual Chrome **1 PASS**, zero skips. Empty queued edits now
+  preserve the original case and require a question. Receipts
+  fast-memory-unit4-backend.json and fast-memory-unit4-browser.json.
+- NEXT TASK: run affected backend/browser integration checks and AST refresh;
+  keep statistical calibration/live cohorts approval/evidence-gated. No completed
+  historical multi-case or held-out acceptance is restarted.
 - No push/master/production, operator database, frozen candidate4aa7ac70, AWS,
   paid OpenAI, cloud sync, private-history or FIN-CURRENCY operation. Resume:
   `Set-Location F:/ALFRED_DEV/post-audit; git status -sb` then read this checkpoint.
