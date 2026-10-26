@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 cumulative READY/open, source8f505a3 run40295889832 native/Linux PASS but Selenium CANCELLED; targeted retry denied403, no retry queued. Accepted source79a26ae run40292154135 PASS preserved. Policy PR17 draft/source503b848/run40300637754 PASS all3 jobs, bounded policy100%/merge blocked; Yahoo section reserves candidate3 on its separate branch. See CI_PIPELINE_STATE. READY_TO_MERGE: NO — PR16/new-source CI incomplete, reviews0, protection403/rules visibility unavailable, Pages authorization absent and cumulative-diff review outstanding. Conditional automatic section merges require every gate; no merge/publication/protection bypass.
+PR/CI: PR #16 cumulative READY/open, source8f505a3 run40295889832 native/Linux PASS but Selenium CANCELLED; targeted retry denied403, no retry queued. Accepted source79a26ae run40292154135 PASS preserved. Policy PR17 draft/source503b848/run40300637754 PASS all3 jobs, bounded policy100%/merge blocked. Yahoo sourcec60c807 pushed, third candidate reserved; PR creation blocked (connector403/browser disconnected/gh absent), CI_NOT_SUBMITTED. See CI_PIPELINE_STATE. READY_TO_MERGE: NO — PR16/new-source CI incomplete, reviews0, protection403/rules visibility unavailable, Pages authorization absent and cumulative-diff review outstanding. No merge/publication/protection bypass.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->
