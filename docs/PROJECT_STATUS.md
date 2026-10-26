@@ -47,10 +47,32 @@ remote run40389906654 is still in progress at task selection; it is not green.
   Native repaired-source review found no further supported issue; fixtures were
   summary-reviewed. Optional Claude review could not start (Windows launcher EINVAL)
   and supplies no outside-review coverage. Migration drift PASS/no changes.
-- NEXT TASK: finish scoped Travel accessibility repair (light outline-button
-  contrast and dark candidate-card contrast), then final source/privacy validation
-  and normal development push only when gates pass. Use this worktree and
-  branch; no new PR, branch, master operation or live/operator-data check.
+- Unit5 COMPLETE (base36636f3): four scoped CSS rules correct light outline-button
+  contrast and dark candidate-card/header/fit contrast. Native review caught an
+  overbroad fit selector before push; narrowing it preserves existing itinerary
+  day labels. **8 global Axe audits PASS, zero violations**, guide/offline ×1440/390px
+  ×light/dark, no rule exclusions. Initial4.15:1 and dark1.67:1 failures remain in
+  artifacts/travel-discovery-20261027/accessibility-*-failure.json. Final matrix
+  accessibility.json and travel-discovery-accessibility-scoped.json (ci-repair
+  receipts) bind corrected CSS. Incomplete Axe/manual screen-reader coverage stays
+  unverified; these audits do not establish full WCAG acceptance.
+- Batch complete: five units on the existing branch/worktree. Final cross-feature
+  **123 backend PASS, 3 Chrome workflows PASS**, zero skips; totals overlap focused
+  unit checks and are not additive. Migration drift, JS syntax and generated
+ 143-ID/13-extension checks PASS. Native review has no remaining supported blocker;
+  receipt artifacts/ci-repair-ac05515/travel-native-review.json. AST Graphify PASS,
+ 11264 nodes/31208 edges/486 communities; no model/provider calls. Source/privacy
+  preflight and normal development push are finalized after this commit; exact
+  HEAD/results belong to artifacts/travel-discovery-20261027/{source-preflight/release,push,ci}.json.
+  Require source/privacy PASS before push. GitHub development has no effective
+  rules/protection/rulesets and zero open PRs, verified without settings changes.
+  Master, frozen candidate and all source branches remain preserved. New exact-head
+  CI runs independently after push; pending CI is not acceptance or deployment.
+- NEXT TASK: TRAVEL2-001 desktop itinerary editing/undo with revision safety,
+  extending the accepted TRAVEL-04 manual multi-stop/reorder foundation. Do not
+  repeat its accepted actions or TRAVEL-03 pools, enable providers, claim live
+  discovery accuracy, reopen PRs, change master or touch operator data. Full
+  TRAVEL-02 acceptance, external-model evidence and FIN-CURRENCY remain gated.
 - Resolve this checkpoint's commit with `git log -1 --format=%H -- docs/PROJECT_STATUS.md`.
 
 ### Previous consolidation and Memory evidence (completed)
@@ -1876,7 +1898,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
 - Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Acceptance: bounded synthetic destination novelty/source provenance accepted2026-10-27: case/spacing and owner-isolated recorded visits/rejections, failed/empty/filtered provider fallback, read-time expiry and invalid-clock abstention, escaped guide links and explicit static references. Batch123 backend/3 Chrome/8 global Axe PASS; active checkpoint and artifacts/travel-discovery-20261027. Full real-account destination accuracy and live provider/terms acceptance remain PENDING; this does not promote the parent capability.
 - Limitations/dependencies: Dynamic Wikivoyage/provider discovery and saved history exist; absent visits are not proof of never visiting. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Accept actual intended destinations/sources under current terms.
 
