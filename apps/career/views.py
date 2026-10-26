@@ -292,6 +292,7 @@ def _career_dashboard_revision(user, *, country: str = "", state: str = "") -> s
             loan_meta["count"], loan_meta["max_id"],
             country,
             state,
+            "geography-v2",
         ]
     )
 

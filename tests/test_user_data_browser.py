@@ -4632,3 +4632,62 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn(month_start(-1).strftime("%B %Y"), self.text("dashboardPeriodNote"))
         self.assertNotIn("Current Month", self.text("dashboardSummaryCards"))
         self.capture("older-history-dashboard")
+
+    def test_career_country_filters_preserve_remote_restrictions_and_unknown_locations(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.career.models import CareerProfile
+        from apps.career.services import job_intelligence
+        from tests.test_career_location_acceptance import location_feed_results
+
+        owner = self.scenario['user']
+        CareerProfile.objects.create(user=owner, role='Developer', skills='Python', experience_years=3)
+        profiles = list(CareerProfile.objects.order_by('pk').values())
+        self.enterContext(patch.object(job_intelligence, '_live_job_feed_results', side_effect=location_feed_results))
+        self.enterContext(patch.object(job_intelligence, 'suggest_openings',
+            side_effect=lambda *a, **kw: type(job_intelligence).suggest_openings(job_intelligence, *a, **kw)))
+        self.login()
+        self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings > .mini-card')) == 8)
+        self.assertIn('Location not specified', self.text('careerOpenings'))
+        self.assertIn('Remote work does not confirm country eligibility', self.browser.find_element(self.By.ID, 'careerRoot').text)
+        self.browser.execute_script("document.querySelector('#careerProfileForm [name=role]').value = 'Unsaved local draft';")
+
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('India')
+        self.wait.until(lambda _: '3 of 8' in self.text('careerOpeningsMeta'))
+        self.assertNotIn('US only', self.text('careerOpenings'))
+        self.assertNotIn('India / United States', self.text('careerOpenings'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR, '#careerProfileForm [name=role]').get_attribute('value'), 'Unsaved local draft')
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningStateFilter')).select_by_value('Karnataka')
+        self.wait.until(lambda _: '1 of 8' in self.text('careerOpeningsMeta'))
+        self.assertIn('Remote - Bengaluru, Karnataka, India', self.text('careerOpenings'))
+
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('United States')
+        self.wait.until(lambda _: '2 of 8' in self.text('careerOpeningsMeta'))
+        self.assertIn('Remote (US only)', self.text('careerOpenings'))
+        self.assertNotIn('except United States', self.text('careerOpenings'))
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('Remote')
+        self.wait.until(lambda _: '5 of 8' in self.text('careerOpeningsMeta'))
+        self.assertNotIn('Non-remote', self.text('careerOpenings'))
+        self.browser.execute_script("""const fetch = window.fetch;
+            window.fetch = (url, options) => fetch(url, options).then(response => {
+                if (String(url).endsWith('/api/career/dashboard/?country=India')) {
+                    return new Promise(resolve => {window.releaseCountryResponse = () => resolve(response);});
+                }
+                return response;
+            }); window.restoreCountryFetch = () => {window.fetch = fetch;};""")
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('India')
+        self.wait.until(lambda _: self.browser.execute_script("return typeof window.releaseCountryResponse === 'function'"))
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('United States')
+        self.wait.until(lambda _: '2 of 8' in self.text('careerOpeningsMeta'))
+        self.browser.execute_async_script("window.restoreCountryFetch(); window.releaseCountryResponse(); requestAnimationFrame(()=>requestAnimationFrame(arguments[arguments.length-1]));")
+        self.assertIn('2 of 8', self.text('careerOpeningsMeta'))
+        self.assertEqual(Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).first_selected_option.get_attribute('value'), 'United States')
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('India')
+        self.wait.until(lambda _: '3 of 8' in self.text('careerOpeningsMeta'))
+        self.assertEqual(profiles, list(CareerProfile.objects.order_by('pk').values()))
+        self.browser.execute_script("document.getElementById('careerOpenings').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('career-country-restrictions-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':900,'deviceScaleFactor':1,'mobile':True})
+        self.wait.until(lambda _: self.browser.execute_script("return !document.querySelector('.page-load-shell.is-loading')"))
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'), 391)
+        self.capture('career-country-restrictions-390px')
