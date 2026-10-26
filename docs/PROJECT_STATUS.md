@@ -25,8 +25,19 @@ remote run40389906654 is still in progress at task selection; it is not green.
   access/availability. The failure was reproduced before the one-line fix;
   **3 focused backend PASS, zero skips**, travel-fallback-{red,unit2}.json under
   artifacts/ci-repair-ac05515. No extra provider calls or dependency changes.
-- NEXT TASK: expose aged discovery provenance in the existing Travel evidence UI.
-  Use this worktree and
+- Unit3 COMPLETE (baseacc5339): existing Travel evidence UI shows discovery guide
+  provenance, original check/expiry, recorded novelty, explicit offline catalog
+  fallback and stale/unverified states. Saved discovery uses the existing places
+  timestamp/source validation; malformed/future/naive clocks abstain, read-time
+  aging does not rewrite saved evidence, and unsafe links/markup stay inert.
+  **9 focused backend PASS, 1 actual Chrome PASS**, zero skips, JS syntax PASS.
+  Receipts travel-evidence-unit3-backend.json and
+  travel-evidence-unit3-browser-repaired.json under artifacts/ci-repair-ac05515;
+  inspected desktop/narrow captures under artifacts/travel-discovery-20261027.
+  Initial browser failure was Windows' minimum window width; the corrected test
+  asserts actual390px via existing CDP emulation and retains the overflow check.
+- NEXT TASK: batch cross-feature, accessibility and source/privacy validation;
+  complete native review and normal development push only when gates pass. Use this worktree and
   branch; no new PR, branch, master operation or live/operator-data check.
 - Resolve this checkpoint's commit with `git log -1 --format=%H -- docs/PROJECT_STATUS.md`.
 

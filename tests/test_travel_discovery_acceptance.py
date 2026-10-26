@@ -4,14 +4,26 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.test import TestCase
+from django.utils import timezone
 
 from apps.mobility.models import TravelPlan, TripLog, TripPhoto
 from apps.mobility.services.travel.discovery import remember
 from apps.mobility.services.travel.providers.base import ProviderResult
+from apps.mobility.services.travel.presentation import age_saved_facts
 from apps.mobility.services.travel.research import discover_destinations
 from apps.mobility.services.travel_catalog import DESTINATIONS
 from apps.mobility.services.travel_discovery import candidates_for, fact
+from apps.mobility.services.travel_conversation import new_session
 from tests import test_travel_planner as fixtures
+
+
+def synthetic_discovery_result():
+    now = timezone.now()
+    return ProviderResult("wikivoyage", "destinations", success=True, status="ok", freshness="LIVE",
+        confidence="LIKELY", source_url="https://en.wikivoyage.org/wiki/Special:Search",
+        attribution="Synthetic guide fixture; no live access or availability check",
+        retrieved_at=(now-timedelta(hours=1)).isoformat(), verified_at=(now-timedelta(hours=1)).isoformat(),
+        expires_at=(now+timedelta(hours=1)).isoformat()).as_dict()
 
 
 class TravelDiscoveryAcceptanceTests(TestCase):
@@ -76,3 +88,44 @@ class TravelDiscoveryAcceptanceTests(TestCase):
             self.assertIn("access remains unverified", " ".join(options[0]["why"]))
             source.payload = {"destinations": []}
             self.assertEqual(discover_destinations(self.user, {"origin": fact("Bengaluru")}, []), [])
+
+    def test_saved_discovery_freshness_tracks_expiry_without_mutating_the_original(self):
+        candidate = self.options("Synthetic Valley")[0]
+        candidate.update(source_freshness="LIVE", discovery_result=synthetic_discovery_result(),
+            quality={"verified": ["destinations"]})
+        before = deepcopy(candidate)
+        result = age_saved_facts({"candidates": [candidate]})["candidates"][0]
+        self.assertEqual(result["source_freshness"], "RECENTLY_VERIFIED")
+        self.assertEqual(candidate, before)
+        candidate["discovery_result"]["expires_at"] = (timezone.now()-timedelta(seconds=1)).isoformat()
+        result = age_saved_facts({"candidates": [candidate]})["candidates"][0]
+        self.assertEqual(result["source_freshness"], "CACHED")
+        self.assertEqual(result["discovery_result"]["status"], "stale")
+        self.assertEqual(result["discovery_result"]["confidence"], "UNKNOWN")
+        self.assertNotIn("destinations", result["quality"]["verified"])
+
+    def test_incomplete_discovery_source_or_clock_never_claims_freshness(self):
+        for field, invalid in (("retrieved_at", None), ("retrieved_at", (timezone.now()+timedelta(days=1)).isoformat()),
+                ("expires_at", "2026-99-99T12:00:00Z"), ("expires_at", "2026-10-29T12:00:00"),
+                ("source_url", "javascript:alert(1)")):
+            with self.subTest(field=field):
+                source = synthetic_discovery_result(); source[field] = invalid
+                candidate = self.options("Synthetic Valley")[0]
+                candidate.update(source_freshness="LIVE", discovery_result=source, quality={"verified": ["destinations"]})
+                result = age_saved_facts({"candidates": [candidate]})["candidates"][0]
+                self.assertEqual(result["source_freshness"], "UNKNOWN")
+                self.assertNotIn("destinations", result["quality"]["verified"])
+
+    def test_discovery_api_preserves_saved_evidence_and_owner_boundary(self):
+        session = new_session(self.user)
+        candidate = self.options("Synthetic Valley")[0]
+        candidate.update(source_freshness="LIVE", discovery_result=synthetic_discovery_result())
+        session.candidates = [candidate]; session.save()
+        before = deepcopy(session.candidates)
+        url = f"/api/mobility/planner/sessions/{session.pk}/"
+        payload = self.client.get(url).json()
+        self.assertEqual(payload["candidates"][0]["source_freshness"], "RECENTLY_VERIFIED")
+        self.assertEqual(payload["candidates"][0]["discovery_result"]["retrieved_at"], candidate["discovery_result"]["retrieved_at"])
+        session.refresh_from_db(); self.assertEqual(session.candidates, before)
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(url).status_code, 404)

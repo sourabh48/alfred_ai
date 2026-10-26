@@ -4495,6 +4495,57 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'no change was made' in self.text('plannerOrderProposal'))
         self.assertFalse(self.browser.find_elements(self.By.ID,'plannerApplyOrder'))
 
+    def test_travel_discovery_novelty_sources_expiry_and_offline_reference(self):
+        from copy import deepcopy
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import candidates_for
+        from tests.test_travel_discovery_acceptance import synthetic_discovery_result
+        session = new_session(self.scenario["user"])
+        candidate = candidates_for(self.scenario["user"], {})[0]
+        candidate.update(source="https://en.wikivoyage.org/wiki/Synthetic_Valley", source_freshness="LIVE",
+            discovery_result=synthetic_discovery_result(), quality={"verified": ["destinations"]})
+        candidate["discovery_result"]["attribution"] += ' <img src=x onerror="window.discoveryLeak=true">'
+        session.candidates = [candidate]; session.save()
+        before = deepcopy(session.candidates)
+        selector = "#plannerEvidenceBody [data-discovery-evidence]"
+        def panel():
+            return self.browser.find_element(self.By.CSS_SELECTOR, selector)
+        self.login(); self.browser.get(self.live_server_url + f"/mobility/?session={session.pk}")
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector) and "RECENTLY_VERIFIED" in panel().text)
+        self.assertIn("Missing visit records do not prove", panel().text)
+        self.assertIn("current access and availability remain unverified", panel().text)
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, selector+" img"))
+        self.assertFalse(self.browser.execute_script("return Boolean(window.discoveryLeak)"))
+        links = self.browser.find_elements(self.By.CSS_SELECTOR, selector+" a")
+        self.assertTrue(any(link.get_attribute("href")==candidate["source"] for link in links))
+        self.assertTrue(all("noopener" in link.get_attribute("rel") for link in links))
+        self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});", panel())
+        self.capture("travel-discovery-source-desktop")
+        session.refresh_from_db(); self.assertEqual(session.candidates, before)
+        candidate["discovery_result"]["expires_at"] = (timezone.now()-timedelta(seconds=1)).isoformat()
+        session.candidates = [candidate]; session.save(); self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector) and "STALE" in panel().text)
+        self.assertIn("Recheck Trip", panel().text)
+        candidate["discovery_result"] = synthetic_discovery_result()
+        candidate["discovery_result"].update(source_url="javascript:alert(1)", expires_at="invalid")
+        session.candidates = [candidate]; session.save(); self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector) and "UNKNOWN" in panel().text)
+        self.assertNotIn("Invalid Date", panel().text)
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, selector+' a[href^="javascript:"]'))
+        candidate.update(source_freshness="STATIC_REFERENCE", discovery_result={"success":False, "error":"provider_not_configured"})
+        session.candidates = [candidate]; session.save(); self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector) and "STATIC_REFERENCE" in panel().text)
+        self.assertIn("Offline catalog suggestion", panel().text)
+        self.assertNotIn("RECENTLY_VERIFIED", panel().text)
+        self.addCleanup(self.browser.execute_cdp_cmd, "Emulation.clearDeviceMetricsOverride", {})
+        self.browser.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", dict(width=390,height=844,deviceScaleFactor=1,mobile=True))
+        self.assertEqual(self.browser.execute_script("return innerWidth"), 390)
+        self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});", panel())
+        self.assertLessEqual(self.browser.execute_script("return document.documentElement.scrollWidth"), 391)
+        self.capture("travel-discovery-offline-mobile")
+
     def test_travel_places_provenance_stale_and_unavailable_are_explicit(self):
         from copy import deepcopy
         from datetime import timedelta

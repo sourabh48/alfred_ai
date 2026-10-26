@@ -79,14 +79,17 @@ def age_saved_facts(payload):
                     walk(item)
     walk(result)
     for d in [*result.get("candidates",[]),result.get("itinerary",{})]:
-        places = d.get("places_result", {})
-        if places.get("success"):
-            checked, expiry = timestamp(places.get("retrieved_at")), timestamp(places.get("expires_at"))
-            if not (checked and expiry and checked <= now and checked < expiry and places.get("source_url")):
-                places.update(status="unverified", freshness="UNKNOWN", confidence="UNKNOWN",
-                              error=places.get("error") or "place_source_or_check_time_unverified")
-            elif places.get("stale"):
-                places["status"] = "stale"
+        for key, kind in (("places_result", "place"), ("discovery_result", "discovery")):
+            source = d.get(key, {})
+            if source.get("success"):
+                checked, expiry = timestamp(source.get("retrieved_at")), timestamp(source.get("expires_at"))
+                if not (checked and expiry and checked <= now and checked < expiry and source.get("source_url")):
+                    source.update(status="unverified", freshness="UNKNOWN", confidence="UNKNOWN",
+                                  error=source.get("error") or kind + "_source_or_check_time_unverified")
+                elif source.get("stale"):
+                    source["status"] = "stale"
+        if d.get("discovery_result", {}).get("success"):
+            d["source_freshness"] = d["discovery_result"].get("freshness", "UNKNOWN")
         if d.get("weather_result",{}).get("stale"):
             d.setdefault("weather",{}).update(summary="Cached forecast has expired. Refresh before relying on it.",confidence="UNKNOWN",freshness="CACHED")
             d["weather_proposals"] = []
