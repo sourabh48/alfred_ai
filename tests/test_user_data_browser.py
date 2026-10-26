@@ -654,7 +654,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('An expected source changed',self.text('memoryEvaluationCases'))
         self.memory_click('#memoryEvaluationForm button[type="submit"]')
         self.wait.until(lambda _: 'cannot be substituted automatically' in self.text('memoryEvaluationFeedback'))
-        self.memory_click('#memoryEvaluationCases button')
+        self.memory_click('#memoryEvaluationCases button[aria-label="Remove question 1"]')
         current=next(record['id'] for record in store.list_memories(owner) if 'corrected' in record['content']['statement'])
         query.send_keys('mountain retry draft'); Select(self.browser.find_element(self.By.ID,'memoryEvaluationExpected')).select_by_value(current)
         with patch.object(MemoryStore,'retrieve',side_effect=EmbeddingUnavailable('SYNTHETIC-PRIVATE F:/synthetic/private-key.txt')):

@@ -39,9 +39,26 @@ Resolve this checkpoint HEAD with `git log -1 --format=%H -- docs/PROJECT_STATUS
   API **1 PASS**, actual Chrome **1 PASS**, zero skips. Empty queued edits now
   preserve the original case and require a question. Receipts
   fast-memory-unit4-backend.json and fast-memory-unit4-browser.json.
-- NEXT TASK: run affected backend/browser integration checks and AST refresh;
-  keep statistical calibration/live cohorts approval/evidence-gated. No completed
-  historical multi-case or held-out acceptance is restarted.
+- Batch source **0c605c0**, units b26cb80 /52997c9 /955594d /0c605c0.
+  Affected integration **124 backend PASS, zero skips** (memory learning/evaluation,
+  frozen cohort policy, private storage, session/CSRF, financial baseline and
+  tracker checks): fast-memory-batch-backend.json. **Six unique Chrome workflows
+  accepted across final receipts**, including editing, missed references, score
+  diagnostics, existing mobile metrics, stale-source/outage recovery and pending
+  cancellation/case limits. The five-case browser batch initially had four passes
+  and one obsolete generic button selector; the explicit Remove-question selector
+  repair passed its isolated rerun (fast-memory-batch-browser-repaired.json), with
+  all privacy/draft assertions retained. Overlapping focused/rerun totals are not
+  additive; no backend rerun for this test-selector-only repair.
+- JS syntax, whitespace and generated143-ID/13-extension check PASS. AST Graphify
+  update PASS (11,172 nodes/30,889 edges/515 communities); no semantic/model call.
+  Frozen retrieval policy/holdout, runtime configuration, master and release
+  candidate4aa7ac70 are unchanged. Commits are local only; no new PR/branch/worktree.
+- NEXT TASK: TRAVEL-02 bounded discovery novelty/source freshness acceptance,
+  starting with its existing tracker evidence and scoped graph query; preserve
+  accepted TRAVEL-03 pools. Skip completed Memory scopes, independent/chronological
+  model-quality evidence blockers, pending feature-branch integration gates and
+  FIN-CURRENCY approval. Do not activate providers or claim real-account accuracy.
 - No push/master/production, operator database, frozen candidate4aa7ac70, AWS,
   paid OpenAI, cloud sync, private-history or FIN-CURRENCY operation. Resume:
   `Set-Location F:/ALFRED_DEV/post-audit; git status -sb` then read this checkpoint.
