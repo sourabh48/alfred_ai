@@ -49,6 +49,13 @@ PR16 targeted Selenium retry request was denied **403 (Actions write unavailable
 No retry was queued. Owner/authorized maintainer must rerun cancelled job121481723278;
 successful native/Linux jobs are preserved. Do not repeatedly retry denied access.
 
+## Current reconciliation — after owner merged PR17
+
+- PR17 confirmed merged **into development/alfred-integrated**, merge d5cc181faae5c61d6de65f00ce21375ce73de33b, source503b848. Policy exact-head run40300637754 PASS retained; development merge has identical treeefc4263eaab7f213c4b479ef6c5ebfd0530549d7. Local integration fast-forwarded; master unchangedc47fed9. Do not label this MERGED_VERIFIED on master.
+- PR16 now has sourced5cc181, fresh run40324546766 CI_PENDING. Earlier8f505a3 cancellation and failed retry403 above are historical; no inherited green check. Required master reviews/protection/Pages gates remain unresolved.
+- Yahoo scope95%, unchanged sourcec60c807 / checkpoint8679824; all8 accepted Git blobs and four receipt hashes preserved (raw EOL hashes changed on checkout). Existing signed-in browser restored. Submit separate draft from development/inv05-yahoo-evidence-20261026 **against development/alfred-integrated atd5cc181**, not the now-merged policy branch. Actual post-recovery source/PR/run in yahoo/post-pr17/handoff.json; CI_PENDING only after submission.
+- Outstanding integration capacity: PR16 plus Yahoo =2/3. PR17 closed; old candidate-cap/browser-blocker text above is historical. Current coding/integration remains INV-05/SCOPE-02; next queued CAREER-03 has not started. Do not make an unrelated push to a running PR.
+
 ## CI isolation evidence
 
 `.github/workflows/browser-regression.yml` currently groups by
