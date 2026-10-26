@@ -36,8 +36,20 @@ remote run40389906654 is still in progress at task selection; it is not green.
   inspected desktop/narrow captures under artifacts/travel-discovery-20261027.
   Initial browser failure was Windows' minimum window width; the corrected test
   asserts actual390px via existing CDP emulation and retains the overflow check.
-- NEXT TASK: batch cross-feature, accessibility and source/privacy validation;
-  complete native review and normal development push only when gates pass. Use this worktree and
+- Unit4 COMPLETE (base495ba9d): native review found that successful empty or
+  fully filtered discovery could relabel offline suggestions as fresh guide
+  evidence. Preserve STATIC_REFERENCE while retaining truthful query metadata;
+  remove destinations from verified categories for static suggestions. Regression
+  covers empty/filtered results; actual Chrome covers successful offline fallback.
+  **123 integration backend PASS, 3 Chrome workflows PASS, zero skips**, including
+  accepted pools/places, financial baseline and session-security checks. Receipts
+  travel-discovery-batch-{backend,browser}.json under artifacts/ci-repair-ac05515.
+  Native repaired-source review found no further supported issue; fixtures were
+  summary-reviewed. Optional Claude review could not start (Windows launcher EINVAL)
+  and supplies no outside-review coverage. Migration drift PASS/no changes.
+- NEXT TASK: finish scoped Travel accessibility repair (light outline-button
+  contrast and dark candidate-card contrast), then final source/privacy validation
+  and normal development push only when gates pass. Use this worktree and
   branch; no new PR, branch, master operation or live/operator-data check.
 - Resolve this checkpoint's commit with `git log -1 --format=%H -- docs/PROJECT_STATUS.md`.
 

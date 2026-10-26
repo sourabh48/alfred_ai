@@ -4534,7 +4534,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector) and "UNKNOWN" in panel().text)
         self.assertNotIn("Invalid Date", panel().text)
         self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, selector+' a[href^="javascript:"]'))
-        candidate.update(source_freshness="STATIC_REFERENCE", discovery_result={"success":False, "error":"provider_not_configured"})
+        candidate.update(source_freshness="STATIC_REFERENCE", discovery_result=synthetic_discovery_result())
         session.candidates = [candidate]; session.save(); self.browser.refresh()
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector) and "STATIC_REFERENCE" in panel().text)
         self.assertIn("Offline catalog suggestion", panel().text)

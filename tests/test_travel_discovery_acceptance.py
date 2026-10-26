@@ -104,6 +104,23 @@ class TravelDiscoveryAcceptanceTests(TestCase):
         self.assertEqual(result["discovery_result"]["confidence"], "UNKNOWN")
         self.assertNotIn("destinations", result["quality"]["verified"])
 
+    def test_successful_empty_or_filtered_query_does_not_verify_offline_catalog_candidates(self):
+        seed = dict(deepcopy(DESTINATIONS[1]), name="Rejected guide suggestion")
+        remember(self.user, seed, "rejected")
+        for seeds in ([], [seed]):
+            with self.subTest(seeds=len(seeds)):
+                source = ProviderResult(**synthetic_discovery_result())
+                source.payload = {"destinations": seeds}
+                with patch("apps.mobility.services.travel.research.query", return_value=source):
+                    candidates = discover_destinations(self.user, {"origin": fact("Bengaluru")}, self.options("Offline reference"))
+                candidates[0]["quality"] = {"verified": ["destinations"]}
+                candidate = age_saved_facts({"candidates": candidates})["candidates"][0]
+                self.assertEqual(candidate["name"], "Offline reference")
+                self.assertEqual(candidate["source_freshness"], "STATIC_REFERENCE")
+                self.assertTrue(candidate["discovery_result"]["success"])
+                self.assertNotIn("destinations", candidate["quality"]["verified"])
+                self.assertIn("offline seed catalog", " ".join(candidate["issues"]))
+
     def test_incomplete_discovery_source_or_clock_never_claims_freshness(self):
         for field, invalid in (("retrieved_at", None), ("retrieved_at", (timezone.now()+timedelta(days=1)).isoformat()),
                 ("expires_at", "2026-99-99T12:00:00Z"), ("expires_at", "2026-10-29T12:00:00"),
