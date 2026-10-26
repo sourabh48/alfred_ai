@@ -127,19 +127,31 @@ proposal cards reject stale dependency fingerprints before any authorized write.
 
 ## Upstream strategy and approval decisions
 
-- **Career Ops:** exact repository identity is unknown. Defer only repository-
-  dependent conversion; do not guess an unrelated project. Existing Django Career
-  development remains eligible. No permanent Node backend.
+- **Career Ops:** https://github.com/career-ops-hq/career-ops is resolved, MIT at
+  the pin in UPSTREAM_REFERENCE_MATRIX. Incrementally port approved useful business
+  workflows into existing Python/Django Career, preserving ownership, documents,
+  profiles and outcomes. No permanent Node/Go backend or CLI-system conversion.
 - **TREK:** https://github.com/liketrek/TREK — recorded AGPL-3.0 review; independent
   Django implementation only. No code/assets copying without licensing approval.
 - **TradingAgents:** https://github.com/TauricResearch/TradingAgents — recorded
   Apache-2.0/version 0.7.0 review. Component-specific attribution/dependencies must
-  be checked again before reuse. Recorded pandas/yfinance conflicts preclude bulk
-  installation. Prefer compatible Python/Ollama; no automatic trades/paid activation.
+  be checked at pinned source. Reuse compatible Python research-engine components
+  through thin owner/consent/evidence adapters; do not rebuild graph/debate/risk/
+  memory/backtest engines for native appearance. Exact dependency conflicts require
+  isolated validation, not bulk installation. Prefer Ollama; no automatic trades,
+  paid activation or private/cloud disclosure.
 - **Aurelio:** https://github.com/losalossantos/aurelio-finance — recorded MIT,
   **reference only**, no runtime integration. Inspect relevant public docs/source/
   tests before selecting any algorithm; adapt against canonical ALFRED calculations.
-  This bootstrap selects no new upstream algorithm or code.
+  Source/test inspection is separate from adoption and live accuracy evidence.
+- Permanent decisions: [matrix](UPSTREAM_REFERENCE_MATRIX.md),
+  [architecture](ALFRED_2_0_INTEGRATION_ARCHITECTURE.md). Feature families map to
+  existing original/extension IDs without changing the queue or denominators.
+- Explicit `sprint` permits continuous eligible section selection with isolated
+  PRs and at most three outstanding candidates. CI_PENDING stays at most 95%.
+  Conditional automatic section merging supersedes manual-only policy but never
+  waives independent/project reviews, protection visibility, exact-head CI, Pages
+  authorization or production boundaries. See AGENTS and CI_PIPELINE_STATE.
 - Currency/FX/historical denomination/valuation contract remains **unapproved**.
   Existing INR-labelled native estimates do not authorize global denomination policy.
 - Production/live migrations, irreversible financial changes, Pages/protection,

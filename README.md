@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 READY/open, unmerged. Accepted source 79a26ae exact-head run 40292154135 PASS: Windows native, Selenium, Linux. Ten accepted source hashes and three receipt hashes match; source/history privacy PASS, zero findings. This documentation-only closure requires its own PR checks before owner merge; no transferred green claim. READY_TO_MERGE: NO — independent reviews 0, protection GET 403, Pages authorization absent. AGENTS requires manual owner merge. No merge/publication or protection bypass.
+PR/CI: PR #16 cumulative READY/open, source8f505a3 run40295889832 native/Linux PASS but Selenium CANCELLED; one targeted retry requested, cancellation is not acceptance. Accepted source79a26ae run40292154135 PASS preserved. Isolated policy/feature PRs use separate refs in CI_PIPELINE_STATE. READY_TO_MERGE: NO — current-head CI incomplete, reviews0, protection403/rules visibility unavailable, Pages authorization absent and cumulative-diff review outstanding. Conditional automatic section merges are authorized only after all gates; former manual-only policy is superseded. No merge/publication/protection bypass.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->
@@ -52,8 +52,12 @@ a merge is not deployment authorization. No current production health is claimed
   jobs, offline recovery and explicit confirmation. Private Git sync stays disabled.
 
 Aurelio is reference-only; TREK ideas are independently implemented; TradingAgents
-reuse requires component/license/dependency checks. Career Ops repository identity
-is unresolved. See requirements for exact scope, exclusions and approval decisions.
+uses compatible Python engine reuse through thin adapters. Career Ops business
+behavior is incrementally ported into Django from the
+[resolved repository](https://github.com/career-ops-hq/career-ops).
+No new upstream integration is claimed. See the [pinned matrix](docs/UPSTREAM_REFERENCE_MATRIX.md),
+[shared boundaries](docs/ALFRED_2_0_INTEGRATION_ARCHITECTURE.md) and
+[CI/integration lanes](docs/CI_PIPELINE_STATE.md).
 
 ## Install and develop
 
@@ -85,6 +89,9 @@ network-free; it does not verify product behavior or activate integrations.
   eligible queue item in phase/module order, execute that one task, then stop.
 - **`status`** — read-only report of refs, PR/CI, task progress, baseline/modules,
   extensions, remaining categories and approval decisions. No source mutations.
+- **`sprint`** — continuously select eligible scopes during this active execution;
+  isolate section PRs, code while CI runs, and reconcile at milestones. Automatic
+  merges require all review/protection/privacy/publication gates.
 
 Before interruption, record exact tests/artifacts, refs, changed/dirty files,
 blockers and the next command in EXECUTION_STATE. Never reset, clean, force-push,

@@ -1,8 +1,20 @@
 # ALFRED execution state
 
-Updated: 2026-10-26 (Asia/Calcutta). Command: `continue`, close INV-05/SCOPE-01 CI only.
+Updated: 2026-10-26 (Asia/Calcutta). Command: explicit **sprint**, non-blocking CI.
 
-## Current task — INV-05/SCOPE-01
+## Active sprint — UPSTREAM-POLICY / section-pipeline contract
+
+- Policy section LOCAL_ACCEPTED / 90%; **95% once committed/pushed** with matching boundary/handoff receipt: recovery/gap10 + implementation45 + focused acceptance25 + docs10 + commit/push5; exact-head CI5 remains. **12 tests PASS**, zero skips: `artifacts/ci-repair-ac05515/upstream-policy-focused.json`. Generated 143-ID/13-story views pass. Distinct PR refs produce different cancellation groups; workflow cancellation/coverage unchanged. No application UI, money algorithm or migration changed, so Chrome/financial reruns are not applicable to this policy scope. One coding scope; maximum three outstanding integration candidates including PR16.
+- Branch `development/upstream-policy-20261026`, base `8f505a3f5fc553e9b1664e3f5827044c76eebb54`; original development ref and primary master worktree preserved. Task-owned policy/docs/generator and one CI-ref regression test only. No application/provider/schema/runtime changes.
+- Four upstream identities/default branches/pins/LICENSE texts inspected; bounded source/test contracts in UPSTREAM_REFERENCE_MATRIX. Career Ops identity resolved, no upstream functionality integrated. Exact engine dependency conflict recorded; no installs or copied source/assets. Shared boundaries in ALFRED_2_0_INTEGRATION_ARCHITECTURE.
+- Sprint and conditional automatic merge policy now supersede former manual-only guidance, including historical instructions below. Required reviews/protection/Pages and production/privacy gates remain. Pages publication was requested separately; silence is not approval.
+- PR16 source8f505a3 run40295889832: native/Linux PASS, Selenium121481723278 CANCELLED with unchanged source SHA; one targeted retry requested (result in policy handoff receipt). Cancellation is not PASS. Accepted INV05 source79a26ae run40292154135 PASS preserved. Reviews0/protection403/rules/Pages visibility unavailable, publication unapproved, cumulative diff not accepted as a new isolated slice. MERGE_BLOCKED; no merge.
+- Pipeline ledger: CI_PIPELINE_STATE. New policy PR will be explicitly stacked on development/alfred-integrated because its execution docs are absent from master; never merge dependent source onto master without prerequisite integration/revalidation.
+- Targeted PR16 Selenium retry was denied **403 Actions write unavailable**. No retry was queued; owner/authorized maintainer must rerun cancelled job121481723278. Do not repeatedly retry denied permissions or rerun successful native/Linux jobs.
+- Next exact action: finish AST/diff/source-history boundary, commit/push branch, open scoped stacked PR; actual commit/PR/run receipts under `artifacts/sprint-8f505a3/`. Do not push a second policy commit solely to write its own PR/run number; the next independent section ledger may record those resolved IDs. Reconcile PR16 once, then select eligible INV-05/SCOPE-02 on its own branch/PR under sprint authorization. No broad suite rerun or CI waiting loop.
+- READY_FOR_NEXT: NO while local policy work is unfinished. Prior accepted scope below remains immutable COMPLETE/100%. This record is the active task; the older scope's stop instruction is superseded only by explicit sprint selection authority.
+
+## Preserved accepted scope — INV-05/SCOPE-01
 
 - **AMFI watchlist observation integrity, historical metrics and source-expiry acceptance. COMPLETE / SCOPE-01, 100%**: recovery/gap 10 + implementation/integration 45 + focused acceptance 25 + documentation 10 + validated commit/push/exact-source CI 10. Accepted source **`79a26aeeeba778201871b04a8c6e89cd9e1a70df`**, exact-head run **40292154135 PASS**, all three jobs successful. This is bounded synthetic research acceptance; full INV-05 stays IMPLEMENTED_NOT_ACCEPTED. This documentation-only closure has its own PR checks, a separate merge gate; do not transfer accepted-source CI to the closure SHA.
 - Branch `development/alfred-integrated`; recovery local/upstream HEAD `06873da3a627189d25e73bc8748fe935ee027ce0`, initially clean. Remote master `c47fed95f919859aa62f1875512e3cb8452f2d48`. Separate primary worktree local master `3932f391aa4eed7b3200ad3b034f7991435e01e4` untouched. No staged/unrelated work was overwritten.
