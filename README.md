@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR #16 READY/open, unmerged. Source 41eba07 committed/pushed; source/history privacy PASS, zero findings. New source-head run 40241123906 queued when observed; final documentation-head CI must be inspected separately. Recovery 7807d36 CI 40236052781 PASS, including Linux Travel; no Travel source/assertion changed. Independent reviews 0, protection GET 403, Pages authorization absent. No merge/publication or protection bypass.
+PR/CI: PR #16 READY/open, unmerged. Accepted source HEAD 45a91a7 exact-head run 40241945067 PASS: Windows native, Selenium, Linux. Source/history privacy PASS, zero findings. This documentation-only handoff requires its own fresh CI before owner merge; no different-head green claim. READY_TO_MERGE: NO — independent reviews 0, protection GET 403, Pages authorization absent. AGENTS requires manual owner merge. No merge/publication or protection bypass.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->
