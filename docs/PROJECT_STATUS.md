@@ -2,6 +2,76 @@
 
 **Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
+## Active implementation checkpoint — 2026-10-27
+
+**Current command: MERGE EVERYTHING AND PUSH.** Latest combined preparation merges
+canonical development **6fc1e54** into the fully reconciled Yahoo/Discovery/Geography
+candidate **fc2a4d2**. All original source commits and the five Memory commits are
+retained; no executable merge conflict. Fresh combined tests/review are in progress.
+This is local preparation until mandatory integration gates pass; canonical remote
+development remains6fc1e54 and master remainsc47fed9. Owner explicitly closed
+PR16/18/19 without merging; do not create or reopen PRs automatically. Previous
+state/pipeline snapshots below are historical; this checkpoint owns current state.
+
+Fast continuous development uses the existing post-audit worktree on
+development/alfred-integrated. Requested dfdeac0 is an older ancestor; recovery
+HEAD was d5cc181, clean. Earlier multi-case evaluation/held-out work is already
+implemented and is not restarted. This checkpoint supersedes older task selection.
+Resolve this checkpoint HEAD with `git log -1 --format=%H -- docs/PROJECT_STATUS.md`.
+
+- Unit 1 COMPLETE: edit queued Memory evaluation questions in place, preserve
+  unsaved drafts, require explicit review after source changes, prevent duplicate
+  submission while editing, and clear editor state on page-hide. Actual Chrome
+  regression **1 PASS, zero skips**; JS syntax/whitespace PASS. Receipt:
+  artifacts/ci-repair-ac05515/fast-memory-unit1-corrected.json and
+  artifacts/fast-memory-20261027/unit1-browser/browser_regression_summary.json.
+  The initial runner-option typo ran zero tests and is not acceptance evidence.
+- Baseline **75/143 verified**, extensions **0/13 accepted**, unchanged. AI-16
+  remains partial; reviewed local workflows are not general accuracy/calibration.
+- Unit 2 COMPLETE (base b26cb80): per-question results link every missed expected
+  source to its current owner memory/correction controls. Results also explain
+  when expected labels exceed the three-reference limit. Source contents are
+  rendered as text; source changes invalidate results, and page-hide clears links.
+  Actual Chrome **1 PASS, zero skips**, including unchanged vault records and
+  correct missed-source IDs. Receipt fast-memory-unit2.json; screenshot/proof in
+  artifacts/fast-memory-20261027/unit2-browser. JS syntax/whitespace PASS.
+- Unit 3 COMPLETE (base 52997c9): four cosine bands report returned/relevant
+  support counts and observed precision, including explicit no-sample values.
+  Backend **19 PASS**, Chrome **1 PASS**, zero skips; receipts
+  fast-memory-unit3-backend.json and fast-memory-unit3-browser.json. Browser
+  demonstrates a high-score false match, corrected labels, unchanged cutoff/vault
+  and page-hide clearing. No statistical calibration or policy promotion claimed.
+- Unit 4 COMPLETE (base 955594d): whole-report rejection for returned scores below
+  the requested cutoff or inconsistent cosine ordering; no partial IDs/diagnostics
+  escape the existing session/owner boundary. Reproduced both invalid API reports
+  as HTTP200 before the fix (fast-memory-unit4-red-api.json); corrected focused
+  API **1 PASS**, actual Chrome **1 PASS**, zero skips. Empty queued edits now
+  preserve the original case and require a question. Receipts
+  fast-memory-unit4-backend.json and fast-memory-unit4-browser.json.
+- Batch source **0c605c0**, units b26cb80 /52997c9 /955594d /0c605c0.
+  Affected integration **124 backend PASS, zero skips** (memory learning/evaluation,
+  frozen cohort policy, private storage, session/CSRF, financial baseline and
+  tracker checks): fast-memory-batch-backend.json. **Six unique Chrome workflows
+  accepted across final receipts**, including editing, missed references, score
+  diagnostics, existing mobile metrics, stale-source/outage recovery and pending
+  cancellation/case limits. The five-case browser batch initially had four passes
+  and one obsolete generic button selector; the explicit Remove-question selector
+  repair passed its isolated rerun (fast-memory-batch-browser-repaired.json), with
+  all privacy/draft assertions retained. Overlapping focused/rerun totals are not
+  additive; no backend rerun for this test-selector-only repair.
+- JS syntax, whitespace and generated143-ID/13-extension check PASS. AST Graphify
+  update PASS (11,172 nodes/30,889 edges/515 communities); no semantic/model call.
+  Frozen retrieval policy/holdout, runtime configuration, master and release
+  candidate4aa7ac70 are unchanged. Commits are local only; no new PR/branch/worktree.
+- NEXT TASK: TRAVEL-02 bounded discovery novelty/source freshness acceptance,
+  starting with its existing tracker evidence and scoped graph query; preserve
+  accepted TRAVEL-03 pools. Skip completed Memory scopes, independent/chronological
+  model-quality evidence blockers, pending feature-branch integration gates and
+  FIN-CURRENCY approval. Do not activate providers or claim real-account accuracy.
+- No push/master/production, operator database, frozen candidate4aa7ac70, AWS,
+  paid OpenAI, cloud sync, private-history or FIN-CURRENCY operation. Resume:
+  `Set-Location F:/ALFRED_DEV/post-audit; git status -sb` then read this checkpoint.
+
 ## Current execution
 
 Read [EXECUTION_STATE](EXECUTION_STATE.md) for source-bound task state and resume;

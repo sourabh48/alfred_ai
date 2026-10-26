@@ -72,9 +72,10 @@
   Bounded acceptance never automatically verifies its parent capability.
 - Do not automatically create a GitHub PR per minor section. Temporary local
   branches/worktrees are for independent development or safe reconciliation;
-  they are not alternative canonical development branches. Keep PR #16 open
-  for development/alfred-integrated -> master; preserve PR #18/#19 and their
-  source branches until verified integration permits their closure.
+  they are not alternative canonical development branches. The owner closed
+  PR #16/#18/#19 on2026-10-27. Do not create or reopen a PR automatically;
+  preserve all source branches and commits. Master integration/publication
+  still needs its separately required checks, reviews and authorization.
 - Pin source/base/dependencies and test receipts for each scope. Reconcile
   overlapping code and documentation deliberately, retaining accepted behavior.
   Locally verified features may enter development only when mandatory checks,

@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const feedback = document.getElementById("memoryFeedback");
     const expected = document.getElementById("memoryEvaluationExpected");
     const quality = document.getElementById("memoryEvaluationResult");
+    const scoreBands = document.getElementById("memoryEvaluationScoreBands");
     const query = document.getElementById("memoryEvaluationQuery");
     const search = document.getElementById("memorySearch");
     const category = document.getElementById("memoryCategory");
@@ -123,11 +124,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     comparisonSuite.addEventListener("change",comparisonPolicy);
     let comparisonController = null, comparisonEnabled = false;
-    let cases = [], currentMemories = new Map(), previousExpected = new Set([""]), editorNeedsReview = false, evaluationPending = false, evaluationController = null;
+    let cases = [], editingCase = null, currentMemories = new Map(), previousExpected = new Set([""]), editorNeedsReview = false, evaluationPending = false, evaluationController = null;
     let generation = 0;
     let active = true;
     function message(text) { if (active) feedback.textContent = text; }
-    function clearEvaluationResult() { quality.textContent = ""; evaluationDetails.replaceChildren(); }
+    function clearEvaluationResult() { quality.textContent = ""; evaluationDetails.replaceChildren(); scoreBands.replaceChildren(); }
     function evaluationControls() {
         evaluationForm.querySelectorAll("button").forEach(button => { button.disabled = !active || evaluationPending; });
         query.readOnly = evaluationPending || !active; query.required = !cases.length;
@@ -143,14 +144,31 @@ document.addEventListener("DOMContentLoaded", () => {
             label.textContent = item.expected_ids.some(id => !currentMemories.has(id))
                 ? "An expected source changed or is unavailable. Remove this case and review current memories; your question is preserved here."
                 : item.expected_ids.length ? `Expected relevant memories: ${item.expected_ids.map(id => currentMemories.get(id)).join('; ')}` : "Expected: no memory should match.";
+            const edit = document.createElement("button"); edit.type = "button"; edit.className = "btn btn-outline-secondary btn-sm me-2";
+            edit.textContent = "Edit question"; edit.setAttribute("aria-label", `Edit question ${index+1}`);
+            edit.addEventListener("click", () => {
+                if (query.value.trim()) { evaluationFeedback.textContent = "Save or clear your current question draft before editing another case."; return; }
+                editingCase = index; query.value = item.query;
+                const missing = item.expected_ids.some(id => !currentMemories.has(id));
+                [...expected.options].forEach(option => { option.selected = !missing && (item.expected_ids.length ? item.expected_ids.includes(option.value) : !option.value); });
+                previousExpected = new Set([...expected.selectedOptions].map(option => option.value)); editorNeedsReview = missing;
+                evaluationAdd.textContent = "Save question changes"; clearEvaluationResult(); evaluationControls(); query.focus();
+                evaluationFeedback.textContent = missing ? "Expected sources changed. Explicitly review current sources before saving; the original case is retained." : `Editing question ${index+1}. Save changes before running.`;
+            });
             const remove = document.createElement("button"); remove.type = "button"; remove.className = "btn btn-outline-secondary btn-sm";
             remove.textContent = "Remove question"; remove.setAttribute("aria-label", `Remove question ${index+1}`);
-            remove.addEventListener("click", () => { cases.splice(index,1); clearEvaluationResult(); renderCases(); });
-            row.append(question,label,remove); evaluationCases.append(row);
+            remove.addEventListener("click", () => {
+                cases.splice(index,1);
+                if (editingCase === index) { editingCase = null; evaluationAdd.textContent = "Add question to run"; }
+                else if (editingCase !== null && editingCase > index) editingCase--;
+                clearEvaluationResult(); renderCases();
+            });
+            row.append(question,label,edit,remove); evaluationCases.append(row);
         });
         evaluationControls();
     }
     function editorCase() {
+        if (!query.value.trim()) throw new Error("Enter a question before adding or saving a case; the existing cases are retained.");
         if (!query.reportValidity() || !expected.reportValidity()) throw new Error("Review the question and current expected memories.");
         return {query:query.value.trim(),expected_ids:[...expected.selectedOptions].map(option => option.value).filter(Boolean)};
     }
@@ -171,13 +189,15 @@ document.addEventListener("DOMContentLoaded", () => {
     evaluationThreshold.addEventListener("input", clearEvaluationResult);
     evaluationAdd.addEventListener("click", () => {
         try {
-            cases = boundedCases([...cases,editorCase()]); query.value = "";
+            const revised = [...cases], item = editorCase();
+            if (editingCase === null) revised.push(item); else revised[editingCase] = item;
+            cases = boundedCases(revised); editingCase = null; evaluationAdd.textContent = "Add question to run"; query.value = "";
             [...expected.options].forEach(option => { option.selected = !option.value; }); previousExpected = new Set([""]); editorNeedsReview = false;
             clearEvaluationResult(); renderCases(); evaluationFeedback.textContent = `${cases.length} questions added. No inference has run.`;
         } catch (error) { evaluationFeedback.textContent = error.message; }
     });
     evaluationClear.addEventListener("click", () => {
-        cases = []; query.value = ""; previousExpected = new Set([""]); editorNeedsReview = false;
+        cases = []; editingCase = null; evaluationAdd.textContent = "Add question to run"; query.value = ""; previousExpected = new Set([""]); editorNeedsReview = false;
         [...expected.options].forEach(option => { option.selected = !option.value; });
         clearEvaluationResult(); renderCases(); evaluationFeedback.textContent = "Questions and results cleared from this page.";
     });
@@ -424,6 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
     evaluationForm.addEventListener("submit", async event => {
         event.preventDefault();
         if (!active || evaluationPending) return;
+        if (editingCase !== null) { evaluationFeedback.textContent = "Save question changes before running the evaluation."; return; }
         const ticket = generation;
         let submitted;
         try { submitted = boundedCases([...cases,...(query.value.trim() ? [editorCase()] : [])]); }
@@ -450,6 +471,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 context.embedding_identity ? `Indexed model fingerprint: ${context.embedding_identity.slice(0,12)}; ${context.dimensions} dimensions; ${context.indexed_memories} memories.` : "No indexed model: empty memory vault.",
                 "Compare only the same model, cutoff, reviewed questions and source revisions. This run alone cannot establish model drift."
             ].join(" ");
+            const table = document.createElement("table"); table.className = "table table-sm";
+            const caption = document.createElement("caption");
+            caption.textContent = "Observed relevance in this reviewed run only. Cosine scores are not probabilities; small or repeated samples do not establish calibrated confidence. No cutoff or model is changed.";
+            table.append(caption);
+            const header = document.createElement("tr");
+            ["Cosine band", "Returned references", "Relevant references", "Observed precision"].forEach(label => {
+                const cell = document.createElement("th"); cell.scope = "col"; cell.textContent = label; header.append(cell);
+            });
+            const head = document.createElement("thead"); head.append(header); table.append(head);
+            const body = document.createElement("tbody");
+            result.score_diagnostics.bands.forEach(band => {
+                const row = document.createElement("tr");
+                [`${band.lower.toFixed(2)} ${band.upper === 1 ? 'to' : 'to below'} ${band.upper.toFixed(2)}`,band.returned,band.relevant,percent(band.observed_precision)].forEach(value => {
+                    const cell = document.createElement("td"); cell.textContent = value; row.append(cell);
+                });
+                body.append(row);
+            });
+            table.append(body); scoreBands.append(table);
             result.per_case.forEach(item => {
                 const row = document.createElement("li"); row.className = "memory-card";
                 const question = document.createElement("p"); question.textContent = submitted[item.case-1].query;
@@ -461,6 +500,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     link.href = `/settings/#memory-${cite.id}`; link.textContent = currentMemories.get(cite.id); link.title = `Memory ${cite.id}`;
                     reference.append(link,document.createTextNode(` · rank ${cite.rank} · cosine ${cite.score.toFixed(3)} · ${cite.relevant ? 'relevant' : 'unexpected'}`)); row.append(reference);
                 });
+                const returned = new Set(item.citations.map(cite => cite.id));
+                item.expected_ids.filter(id => !returned.has(id)).forEach(id => {
+                    if (!/^[a-f0-9]{32}$/.test(id) || !currentMemories.has(id)) throw new Error("Expected sources changed. Refresh memories and review labels before rerunning.");
+                    const reference = document.createElement("p"), link = document.createElement("a");
+                    link.href = `/settings/#memory-${id}`; link.textContent = currentMemories.get(id);
+                    reference.dataset.missedSource = id;
+                    reference.append(document.createTextNode("Expected but not retrieved: "),link); row.append(reference);
+                });
+                if (item.expected_ids.length > result.result_limit) {
+                    const limit = document.createElement("p"); limit.className = "small";
+                    limit.textContent = `This question has ${item.expected_ids.length} expected sources; at most ${result.result_limit} can be returned in one check. Some misses are unavoidable at this result limit.`;
+                    row.append(limit);
+                }
                 evaluationDetails.append(row);
             });
             evaluationFeedback.textContent = "Owner and current-source checks passed for this run. Results measure your relevance labels, not truth or financial authority. No queries or results saved.";
@@ -532,7 +584,7 @@ document.addEventListener("DOMContentLoaded", () => {
         category.replaceChildren(); document.getElementById("memoryCount").textContent = "";
         evaluationController?.abort(); evaluationController = null; evaluationPending = false;
         evaluationForm.setAttribute("aria-busy","false"); editorNeedsReview = false;
-        cases = []; currentMemories.clear(); previousExpected.clear(); evaluationCases.replaceChildren();
+        cases = []; editingCase = null; evaluationAdd.textContent = "Add question to run"; currentMemories.clear(); previousExpected.clear(); evaluationCases.replaceChildren();
         expected.replaceChildren(); query.value = ""; clearEvaluationResult(); evaluationFeedback.textContent = ""; evaluationThreshold.value = ""; evaluationControls();
         document.getElementById("memorySyncStatus").textContent = "";
         document.getElementById("memoryReasoningStatus").textContent = "";
