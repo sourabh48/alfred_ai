@@ -5,11 +5,98 @@ document.addEventListener("DOMContentLoaded", () => {
     const feedback = document.getElementById("memoryFeedback");
     const expected = document.getElementById("memoryEvaluationExpected");
     const quality = document.getElementById("memoryEvaluationResult");
+    const scoreBands = document.getElementById("memoryEvaluationScoreBands");
     const query = document.getElementById("memoryEvaluationQuery");
     const search = document.getElementById("memorySearch");
     const category = document.getElementById("memoryCategory");
     const selectedReset = document.getElementById("memorySelectedReset");
     const candidates = document.getElementById("memoryCandidates");
+    const hubPanel = document.getElementById("knowledgeHub"), hubPacks = document.getElementById("knowledgeHubPacks");
+    const hubStatus = document.getElementById("knowledgeHubStatus"), hubFeedback = document.getElementById("knowledgeHubFeedback");
+    const hubSources = document.getElementById("knowledgeHubSources"), hubParent = document.getElementById("knowledgeHubParent");
+    let hubGeneration = 0, hubSessionGeneration = 0, hubReadController = null, hubActionController = null, hubBusy = false;
+    async function hubRefresh() {
+        if (!active) return;
+        const ticket = ++hubGeneration;
+        hubReadController?.abort(); hubReadController = new AbortController();
+        const data = await Alfred.fetchJSON("/api/ai/memories/hub/", {signal: hubReadController.signal});
+        if (!active || ticket !== hubGeneration) return;
+        const selected = new Set([...hubSources.selectedOptions].map(option => option.value)), parent = hubParent.value;
+        hubStatus.textContent = `Local learning revision ${data.revision}; durable checkpoint ${data.checkpoint}. ${data.pending ? 'Reviewed updates queued' : 'No reviewed updates queued'}. Failures ${data.failures}${data.conflict ? '; conflict needs operator review; history retained' : ''}.`;
+        document.getElementById("knowledgeHubEnabled").checked = data.enabled;
+        document.getElementById("knowledgeHubRemoteConsent").checked = data.remote_consent;
+        hubSources.replaceChildren(); hubParent.replaceChildren(new Option("New pack", ""));
+        data.sources.forEach(source => { const option = new Option(`${source.statement} · ${source.source}`, source.id); option.selected = selected.has(source.id); hubSources.append(option); });
+        hubPacks.replaceChildren();
+        if (!data.packs.length) hubPacks.textContent = "No knowledge packs. Select public source memories to prepare a draft.";
+        data.packs.forEach(pack => {
+            const row = document.createElement("article"); row.className = "memory-card"; row.dataset.packId = pack.id;
+            const heading = document.createElement("h4"); heading.className = "h6"; heading.textContent = `Version ${pack.version} · ${pack.status}`;
+            const integrity = document.createElement("p"); integrity.className = "small text-break"; integrity.textContent = `Digest ${pack.digest} · expires ${pack.expires_at}`;
+            const entries = document.createElement("ul");
+            pack.entries.forEach(entry => {
+                const item = document.createElement("li"), citation = document.createElement("a");
+                item.textContent = `${entry.statement} · `; citation.textContent = entry.source; citation.href = entry.citation; item.append(citation); entries.append(item);
+            });
+            row.append(heading, integrity, entries);
+            if (pack.origin === "local") {
+                if (pack.state === "promoted") hubParent.append(new Option(`Version ${pack.version} · ${pack.id.slice(0, 8)}`, pack.id));
+                const label = document.createElement("label"), checked = document.createElement("input"); checked.type = "checkbox";
+                label.append(checked, " I reviewed the exact text, citations, privacy and supplementary-data limits.");
+                const promote = document.createElement("button"); promote.type = "button"; promote.className = "btn btn-outline-primary m-1"; promote.textContent = "Promote reviewed pack";
+                promote.disabled = hubBusy || !data.enabled || pack.status !== "DRAFT";
+                const withdraw = document.createElement("button"); withdraw.type = "button"; withdraw.className = "btn btn-outline-danger m-1"; withdraw.textContent = "Withdraw pack"; withdraw.disabled = hubBusy || pack.state === "withdrawn";
+                const review = action => {
+                    if (!checked.checked) { hubFeedback.textContent = "Review this pack and check its confirmation before continuing."; return; }
+                    hubPerform({action, id: pack.id, digest: pack.digest, reviewed: true});
+                };
+                promote.addEventListener("click", () => review("promote")); withdraw.addEventListener("click", () => review("withdraw"));
+                row.append(label, document.createElement("br"), promote, withdraw);
+            }
+            hubPacks.append(row);
+        });
+        if ([...hubParent.options].some(option => option.value === parent)) hubParent.value = parent;
+        hubPanel.querySelectorAll("#knowledgeHubPolicy input, #knowledgeHubPolicy button, #knowledgeHubCheckpoint").forEach(node => { node.disabled = hubBusy; });
+        hubPanel.querySelectorAll("#knowledgeHubDraft select, #knowledgeHubDraft button").forEach(node => { node.disabled = hubBusy || !data.enabled; });
+        hubPanel.querySelectorAll("#knowledgeHubRemotePolicy input, #knowledgeHubRemotePolicy button").forEach(node => { node.disabled = hubBusy || !data.enabled || !data.remote_available; });
+        document.getElementById("knowledgeHubSync").disabled = hubBusy || !data.remote_available || !data.remote_consent || !data.enabled;
+        document.getElementById("knowledgeHubRefresh").disabled = hubBusy;
+        const reconcile = document.getElementById("knowledgeHubReconcile");
+        reconcile.hidden = !data.conflict || !data.review_head || !data.review_digest;
+        document.getElementById("knowledgeHubReconcileLabel").hidden = reconcile.hidden;
+        document.getElementById("knowledgeHubReconcileReviewed").checked = false;
+        document.getElementById("knowledgeHubReconcileReviewed").disabled = hubBusy;
+        reconcile.disabled = hubBusy || reconcile.hidden || !data.enabled || !data.remote_consent;
+        reconcile.onclick = () => {
+            if (!document.getElementById("knowledgeHubReconcileReviewed").checked) { hubFeedback.textContent = "Review cached remote packs before reconciling."; return; }
+            hubPerform({action: "reconcile", head: data.review_head, digest: data.review_digest, reviewed: true});
+        };
+    }
+    async function hubPerform(payload) {
+        if (hubBusy || !active) return;
+        hubBusy = true; hubFeedback.textContent = "Saving reviewed local state…";
+        hubPanel.querySelectorAll("button,input,select").forEach(node => { node.disabled = true; });
+        const controller = new AbortController(); hubActionController = controller;
+        const sessionTicket = hubSessionGeneration;
+        try {
+            await Alfred.fetchJSON("/api/ai/memories/hub/", {method: "POST", body: JSON.stringify(payload), signal: controller.signal});
+            if (!active || sessionTicket !== hubSessionGeneration) return;
+            hubFeedback.textContent = payload.action === "draft" ? "Pack prepared. Review every statement before promotion." : "Local review saved. Remote uploads require separate authorization and consent.";
+        } catch (error) {
+            if (active && sessionTicket === hubSessionGeneration) { hubFeedback.textContent = `${error.message} Your selection is retained; refresh current sources before retrying.`; if ([401,403].includes(error.status)) window.dispatchEvent(new Event("pagehide")); }
+        } finally {
+            if (sessionTicket === hubSessionGeneration) {
+                hubBusy = false; hubActionController = null;
+                if (active) { document.getElementById("knowledgeHubRefresh").disabled = false; hubRefresh().catch(error => { if (active) hubStatus.textContent = error.message; }); }
+            }
+        }
+    }
+    document.getElementById("knowledgeHubPolicy").addEventListener("submit", event => { event.preventDefault(); hubPerform({action: "configure", enabled: document.getElementById("knowledgeHubEnabled").checked, consent: true}); });
+    document.getElementById("knowledgeHubDraft").addEventListener("submit", event => { event.preventDefault(); const ids = [...hubSources.selectedOptions].map(option => option.value); if (ids.length > 8) { hubFeedback.textContent = "Select at most eight sources."; return; } hubPerform({action: "draft", ids, ...(hubParent.value ? {parent: hubParent.value} : {})}); });
+    document.getElementById("knowledgeHubRemotePolicy").addEventListener("submit", event => { event.preventDefault(); hubPerform({action: "remote_consent", enabled: document.getElementById("knowledgeHubRemoteConsent").checked, consent: true}); });
+    document.getElementById("knowledgeHubCheckpoint").addEventListener("click", () => hubPerform({action: "checkpoint"}));
+    document.getElementById("knowledgeHubSync").addEventListener("click", () => hubPerform({action: "sync"}));
+    document.getElementById("knowledgeHubRefresh").addEventListener("click", () => { hubRefresh().catch(error => { if (active) hubStatus.textContent = error.message; }); });
     const evaluationCases = document.getElementById("memoryEvaluationCases");
     const evaluationDetails = document.getElementById("memoryEvaluationDetails");
     const evaluationFeedback = document.getElementById("memoryEvaluationFeedback");
@@ -37,11 +124,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     comparisonSuite.addEventListener("change",comparisonPolicy);
     let comparisonController = null, comparisonEnabled = false;
-    let cases = [], currentMemories = new Map(), previousExpected = new Set([""]), editorNeedsReview = false, evaluationPending = false, evaluationController = null;
+    let cases = [], editingCase = null, currentMemories = new Map(), previousExpected = new Set([""]), editorNeedsReview = false, evaluationPending = false, evaluationController = null;
     let generation = 0;
     let active = true;
     function message(text) { if (active) feedback.textContent = text; }
-    function clearEvaluationResult() { quality.textContent = ""; evaluationDetails.replaceChildren(); }
+    function clearEvaluationResult() { quality.textContent = ""; evaluationDetails.replaceChildren(); scoreBands.replaceChildren(); }
     function evaluationControls() {
         evaluationForm.querySelectorAll("button").forEach(button => { button.disabled = !active || evaluationPending; });
         query.readOnly = evaluationPending || !active; query.required = !cases.length;
@@ -57,14 +144,31 @@ document.addEventListener("DOMContentLoaded", () => {
             label.textContent = item.expected_ids.some(id => !currentMemories.has(id))
                 ? "An expected source changed or is unavailable. Remove this case and review current memories; your question is preserved here."
                 : item.expected_ids.length ? `Expected relevant memories: ${item.expected_ids.map(id => currentMemories.get(id)).join('; ')}` : "Expected: no memory should match.";
+            const edit = document.createElement("button"); edit.type = "button"; edit.className = "btn btn-outline-secondary btn-sm me-2";
+            edit.textContent = "Edit question"; edit.setAttribute("aria-label", `Edit question ${index+1}`);
+            edit.addEventListener("click", () => {
+                if (query.value.trim()) { evaluationFeedback.textContent = "Save or clear your current question draft before editing another case."; return; }
+                editingCase = index; query.value = item.query;
+                const missing = item.expected_ids.some(id => !currentMemories.has(id));
+                [...expected.options].forEach(option => { option.selected = !missing && (item.expected_ids.length ? item.expected_ids.includes(option.value) : !option.value); });
+                previousExpected = new Set([...expected.selectedOptions].map(option => option.value)); editorNeedsReview = missing;
+                evaluationAdd.textContent = "Save question changes"; clearEvaluationResult(); evaluationControls(); query.focus();
+                evaluationFeedback.textContent = missing ? "Expected sources changed. Explicitly review current sources before saving; the original case is retained." : `Editing question ${index+1}. Save changes before running.`;
+            });
             const remove = document.createElement("button"); remove.type = "button"; remove.className = "btn btn-outline-secondary btn-sm";
             remove.textContent = "Remove question"; remove.setAttribute("aria-label", `Remove question ${index+1}`);
-            remove.addEventListener("click", () => { cases.splice(index,1); clearEvaluationResult(); renderCases(); });
-            row.append(question,label,remove); evaluationCases.append(row);
+            remove.addEventListener("click", () => {
+                cases.splice(index,1);
+                if (editingCase === index) { editingCase = null; evaluationAdd.textContent = "Add question to run"; }
+                else if (editingCase !== null && editingCase > index) editingCase--;
+                clearEvaluationResult(); renderCases();
+            });
+            row.append(question,label,edit,remove); evaluationCases.append(row);
         });
         evaluationControls();
     }
     function editorCase() {
+        if (!query.value.trim()) throw new Error("Enter a question before adding or saving a case; the existing cases are retained.");
         if (!query.reportValidity() || !expected.reportValidity()) throw new Error("Review the question and current expected memories.");
         return {query:query.value.trim(),expected_ids:[...expected.selectedOptions].map(option => option.value).filter(Boolean)};
     }
@@ -85,13 +189,15 @@ document.addEventListener("DOMContentLoaded", () => {
     evaluationThreshold.addEventListener("input", clearEvaluationResult);
     evaluationAdd.addEventListener("click", () => {
         try {
-            cases = boundedCases([...cases,editorCase()]); query.value = "";
+            const revised = [...cases], item = editorCase();
+            if (editingCase === null) revised.push(item); else revised[editingCase] = item;
+            cases = boundedCases(revised); editingCase = null; evaluationAdd.textContent = "Add question to run"; query.value = "";
             [...expected.options].forEach(option => { option.selected = !option.value; }); previousExpected = new Set([""]); editorNeedsReview = false;
             clearEvaluationResult(); renderCases(); evaluationFeedback.textContent = `${cases.length} questions added. No inference has run.`;
         } catch (error) { evaluationFeedback.textContent = error.message; }
     });
     evaluationClear.addEventListener("click", () => {
-        cases = []; query.value = ""; previousExpected = new Set([""]); editorNeedsReview = false;
+        cases = []; editingCase = null; evaluationAdd.textContent = "Add question to run"; query.value = ""; previousExpected = new Set([""]); editorNeedsReview = false;
         [...expected.options].forEach(option => { option.selected = !option.value; });
         clearEvaluationResult(); renderCases(); evaluationFeedback.textContent = "Questions and results cleared from this page.";
     });
@@ -284,6 +390,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if (/^#memory-[a-f0-9]{32}$/.test(location.hash)) document.getElementById(location.hash.slice(1))?.scrollIntoView({block:"center"});
         refreshPrivacy().catch(error => message(error.message));
+        hubRefresh().catch(error => { if (active) hubStatus.textContent = error.message; });
     }
     document.getElementById("memoryRetentionForm").addEventListener("submit", async event => {
         event.preventDefault();
@@ -337,6 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
     evaluationForm.addEventListener("submit", async event => {
         event.preventDefault();
         if (!active || evaluationPending) return;
+        if (editingCase !== null) { evaluationFeedback.textContent = "Save question changes before running the evaluation."; return; }
         const ticket = generation;
         let submitted;
         try { submitted = boundedCases([...cases,...(query.value.trim() ? [editorCase()] : [])]); }
@@ -363,6 +471,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 context.embedding_identity ? `Indexed model fingerprint: ${context.embedding_identity.slice(0,12)}; ${context.dimensions} dimensions; ${context.indexed_memories} memories.` : "No indexed model: empty memory vault.",
                 "Compare only the same model, cutoff, reviewed questions and source revisions. This run alone cannot establish model drift."
             ].join(" ");
+            const table = document.createElement("table"); table.className = "table table-sm";
+            const caption = document.createElement("caption");
+            caption.textContent = "Observed relevance in this reviewed run only. Cosine scores are not probabilities; small or repeated samples do not establish calibrated confidence. No cutoff or model is changed.";
+            table.append(caption);
+            const header = document.createElement("tr");
+            ["Cosine band", "Returned references", "Relevant references", "Observed precision"].forEach(label => {
+                const cell = document.createElement("th"); cell.scope = "col"; cell.textContent = label; header.append(cell);
+            });
+            const head = document.createElement("thead"); head.append(header); table.append(head);
+            const body = document.createElement("tbody");
+            result.score_diagnostics.bands.forEach(band => {
+                const row = document.createElement("tr");
+                [`${band.lower.toFixed(2)} ${band.upper === 1 ? 'to' : 'to below'} ${band.upper.toFixed(2)}`,band.returned,band.relevant,percent(band.observed_precision)].forEach(value => {
+                    const cell = document.createElement("td"); cell.textContent = value; row.append(cell);
+                });
+                body.append(row);
+            });
+            table.append(body); scoreBands.append(table);
             result.per_case.forEach(item => {
                 const row = document.createElement("li"); row.className = "memory-card";
                 const question = document.createElement("p"); question.textContent = submitted[item.case-1].query;
@@ -374,6 +500,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     link.href = `/settings/#memory-${cite.id}`; link.textContent = currentMemories.get(cite.id); link.title = `Memory ${cite.id}`;
                     reference.append(link,document.createTextNode(` · rank ${cite.rank} · cosine ${cite.score.toFixed(3)} · ${cite.relevant ? 'relevant' : 'unexpected'}`)); row.append(reference);
                 });
+                const returned = new Set(item.citations.map(cite => cite.id));
+                item.expected_ids.filter(id => !returned.has(id)).forEach(id => {
+                    if (!/^[a-f0-9]{32}$/.test(id) || !currentMemories.has(id)) throw new Error("Expected sources changed. Refresh memories and review labels before rerunning.");
+                    const reference = document.createElement("p"), link = document.createElement("a");
+                    link.href = `/settings/#memory-${id}`; link.textContent = currentMemories.get(id);
+                    reference.dataset.missedSource = id;
+                    reference.append(document.createTextNode("Expected but not retrieved: "),link); row.append(reference);
+                });
+                if (item.expected_ids.length > result.result_limit) {
+                    const limit = document.createElement("p"); limit.className = "small";
+                    limit.textContent = `This question has ${item.expected_ids.length} expected sources; at most ${result.result_limit} can be returned in one check. Some misses are unavoidable at this result limit.`;
+                    row.append(limit);
+                }
                 evaluationDetails.append(row);
             });
             evaluationFeedback.textContent = "Owner and current-source checks passed for this run. Results measure your relevance labels, not truth or financial authority. No queries or results saved.";
@@ -434,6 +573,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     refresh().catch(error => message(error.message));
     window.addEventListener("pagehide", () => {
+        hubGeneration++; hubSessionGeneration++; hubReadController?.abort(); hubActionController?.abort(); hubBusy = false; hubActionController = null;
+        hubPacks.replaceChildren(); hubSources.replaceChildren(); hubParent.replaceChildren(); hubStatus.textContent = ""; hubFeedback.textContent = "";
+        document.getElementById("knowledgeHubEnabled").checked = false; document.getElementById("knowledgeHubRemoteConsent").checked = false;
+        hubPanel.querySelectorAll("button,input,select").forEach(node => { node.disabled = true; });
         active = false; generation++; list.replaceChildren(); candidates.replaceChildren(); feedback.textContent = ""; search.value = "";
         comparisonController?.abort(); comparisonController=null; comparisonEnabled=false; comparisonStatus.textContent=""; comparisonResults.replaceChildren(); baselineModel.replaceChildren(); candidateModel.replaceChildren(); document.getElementById("memoryComparisonPolicy").textContent="";
         comparisonConfig=null; comparisonSuite.replaceChildren(); candidateProtocol.replaceChildren();
@@ -441,7 +584,7 @@ document.addEventListener("DOMContentLoaded", () => {
         category.replaceChildren(); document.getElementById("memoryCount").textContent = "";
         evaluationController?.abort(); evaluationController = null; evaluationPending = false;
         evaluationForm.setAttribute("aria-busy","false"); editorNeedsReview = false;
-        cases = []; currentMemories.clear(); previousExpected.clear(); evaluationCases.replaceChildren();
+        cases = []; editingCase = null; evaluationAdd.textContent = "Add question to run"; currentMemories.clear(); previousExpected.clear(); evaluationCases.replaceChildren();
         expected.replaceChildren(); query.value = ""; clearEvaluationResult(); evaluationFeedback.textContent = ""; evaluationThreshold.value = ""; evaluationControls();
         document.getElementById("memorySyncStatus").textContent = "";
         document.getElementById("memoryReasoningStatus").textContent = "";

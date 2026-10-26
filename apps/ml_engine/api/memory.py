@@ -175,6 +175,65 @@ class MemoryReasoningAPI(MemoryAPI):
         return Response(present_answer(result,'general',data['query']))
 
 
+class KnowledgeHubAPI(MemoryAPI):
+    def get(self, request):
+        from ..services.knowledge_hub import KnowledgeHub
+        from ..services.knowledge_git import configured_git
+        return Response(dict(KnowledgeHub(memory_store()).snapshot(request.user), remote_available=configured_git()))
+
+    def post(self, request):
+        from ..services.knowledge_hub import KnowledgeHub
+        from ..services.knowledge_git import configured_git, git_provider
+        from ..services.persistent_memory import _owner
+        import time
+        data = self.payload(('action', 'enabled', 'consent', 'ids', 'parent', 'id', 'digest', 'head', 'reviewed'))
+        allowed = {'configure': {'action', 'enabled', 'consent'}, 'draft': {'action', 'ids', 'parent'},
+                   'promote': {'action', 'id', 'digest', 'reviewed'}, 'withdraw': {'action', 'id', 'digest', 'reviewed'},
+                   'checkpoint': {'action'}, 'remote_consent': {'action', 'enabled', 'consent'}, 'sync': {'action'},
+                   'reconcile': {'action', 'head', 'digest', 'reviewed'}}
+        action = data.get('action')
+        if not isinstance(action, str) or action not in allowed or set(data) - allowed[action]:
+            raise ValueError()
+        store = memory_store()
+        hub = KnowledgeHub(store)
+        if action == 'configure':
+            hub.configure(request.user, enabled=data.get('enabled'), consent=data.get('consent', False))
+        elif action == 'draft':
+            return Response({'id': hub.draft(request.user, data.get('ids'), parent=data.get('parent'))}, status=201)
+        elif action in ('promote', 'withdraw'):
+            hub.review(request.user, data.get('id'), data.get('digest'), promote=action == 'promote', reviewed=data.get('reviewed'))
+        elif action == 'checkpoint':
+            return Response({'checkpoint': hub.checkpoint(request.user)})
+        elif action == 'reconcile':
+            hub.resolve_conflict(request.user, data.get('head'), data.get('digest'), reviewed=data.get('reviewed'))
+        elif action == 'remote_consent':
+            enabled = data.get('enabled')
+            if type(enabled) is not bool or (enabled and (not configured_git() or data.get('consent') is not True)):
+                raise PermissionError('Remote knowledge synchronization is not authorized.')
+            owner = _owner(request.user)
+            with store._transaction() as db:
+                state, policy = hub._state(db, owner)
+                if enabled and not policy['enabled']:
+                    raise PermissionError('Enable local pack review first.')
+                if enabled:
+                    MemorySynchronizer(store, None)._key(owner, create=not state.get('key_created', False))
+                    state['key_created'] = True
+                policy['remote_consent'] = enabled
+                store._write_sync_state(db, owner, state)
+        elif action == 'sync':
+            if not configured_git():
+                raise PermissionError('Remote knowledge synchronization remains disabled.')
+            deadline = time.monotonic() + 5
+            # Consent is checked before constructing a transport or contacting its repository.
+            with store._transaction() as db:
+                _, policy = hub._state(db, _owner(request.user))
+                if not policy['enabled'] or not policy['remote_consent']:
+                    raise PermissionError('Separate owner synchronization consent is required.')
+            result = KnowledgeHub(store, deadline=deadline).sync(request.user, git_provider(store, deadline=deadline), seconds=5)
+            return Response({'result': result})
+        return Response({'updated': True})
+
+
 class MemoryLearningAPI(MemoryAPI):
     def get(self,request):
         from ..services.retrieval_quality import configuration

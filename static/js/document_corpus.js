@@ -8,13 +8,14 @@ function initDocumentCorpus(getSelected) {
     const uploadForm=document.getElementById('documentCorpusUpload'), uploadFile=document.getElementById('documentCorpusFile');
     const uploadConsent=document.getElementById('documentCorpusUploadConsent');
     const question=document.getElementById('documentCorpusQuestion'), ask=document.getElementById('documentCorpusAsk');
+    const contextMode=document.getElementById('documentCorpusContextMode');
     let active=true, busy=false, generation=0, controller=null, expiryTimer=null;
     function clearResults() { clearTimeout(expiryTimer); expiryTimer=null; results.replaceChildren(); }
     function node(tag, text, className='') {
         const element=document.createElement(tag); element.textContent=text; element.className=className; return element;
     }
     function controls() {
-        [ingest,consent,days,refresh,query,question,ask,...uploadForm.elements,...form.querySelectorAll('button'),...listing.querySelectorAll('input,button')]
+        [ingest,consent,days,refresh,query,question,ask,contextMode,...uploadForm.elements,...form.querySelectorAll('button'),...listing.querySelectorAll('input,button')]
             .forEach(control => { control.disabled=!active || busy; });
         ingest.disabled=!active || busy || !getSelected() || !consent.checked;
         listing.setAttribute('aria-busy',String(busy)); results.setAttribute('aria-busy',String(busy));
@@ -61,6 +62,11 @@ function initDocumentCorpus(getSelected) {
         if (!data.documents.length) listing.append(node('p','No current private document copies. Select an original above to store one.'));
     }
     function renderResults(data) {
+        if (data.context_mode==='full_extraction') {
+            results.append(node('p', data.context_complete ?
+                'All selected retained extracted text was supplied to the local model. This does not verify original extraction or answer accuracy.' :
+                'Complete extracted context was not supplied; no answer was accepted.', 'small'));
+        }
         data.results.forEach(hit=>{
             const card=node('article','','surface-card'); card.append(node('h3',hit.document_name,'h6'));
             const quote=node('p',hit.excerpt,'text-break'); quote.style.whiteSpace='pre-wrap'; card.append(quote);
@@ -116,6 +122,7 @@ function initDocumentCorpus(getSelected) {
     });
     consent.addEventListener('change',controls);
     [query,question].forEach(input=>input.addEventListener('input',()=>{clearResults();status.textContent='';}));
+    contextMode.addEventListener('change',()=>{clearResults();status.textContent='';});
     ingest.addEventListener('click',()=>{
         const selected=getSelected();
         if (!selected || !consent.checked || !days.reportValidity()) return;
@@ -135,9 +142,11 @@ function initDocumentCorpus(getSelected) {
     ask.addEventListener('click',()=>{
         const ids=[...listing.querySelectorAll('input:checked')].map(input=>input.value);
         if (!ids.length) { status.textContent='Explicitly select one to three private documents first.'; return; }
-        if (!query.reportValidity() || !question.reportValidity()) return;
+        if ((contextMode.value==='keywords' && !query.reportValidity()) || !question.reportValidity()) return;
+        const body={ids,question:question.value,context_mode:contextMode.value};
+        if (contextMode.value==='keywords') body.keywords=query.value;
         perform(signal=>Alfred.fetchJSON(base+'question/',{method:'POST',
-            body:JSON.stringify({ids,question:question.value,keywords:query.value}),signal}));
+            body:JSON.stringify(body),signal}));
     });
     function selectionChanged() {
         generation++; controller?.abort(); controller=null; busy=false; consent.checked=false;
@@ -147,6 +156,7 @@ function initDocumentCorpus(getSelected) {
     window.addEventListener('pagehide',()=>{
         active=false; selectionChanged(); listing.replaceChildren(); query.value=''; limits.textContent='';
         question.value='';
+        contextMode.value='keywords';
         uploadForm.reset();
     });
     window.addEventListener('pageshow',event=>{if(event.persisted){active=true;controls();}});

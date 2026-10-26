@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 from base64 import b64encode, b64decode
 from hashlib import sha256
+from itertools import islice
 import json
 from pathlib import Path
 import re
@@ -15,7 +16,7 @@ from django.utils import timezone
 from alfred_ai.services.bounded_parser import run_bounded_parser
 from alfred_ai.services.upload_limits import UploadLimitExceeded
 from .canonical_evidence import _discovery_catalog, SourceSelectionConflict
-from .document_knowledge import document_text, matching_passages, _terms, TEXT_BYTES, RESULT_LIMIT, EVIDENCE_LIMITATION
+from .document_knowledge import document_text, matching_passages, _passages, _terms, TEXT_BYTES, RESULT_LIMIT, EVIDENCE_LIMITATION
 from .memory_sync import valid_id
 from .persistent_memory import _owner, MemoryConflict
 
@@ -265,8 +266,8 @@ class DocumentCorpus:
             raise Http404
         return result
 
-    def search(self, user, identities, query):
-        owner = _owner(user); terms = _terms(query)
+    def search(self, user, identities, query, *, full_context=False):
+        owner = _owner(user); terms = None if full_context else _terms(query)
         if (not isinstance(identities, list) or not 1 <= len(identities) <= MAX_SELECTED
                 or any(not valid_id(identity) for identity in identities) or len(set(identities)) != len(identities)):
             raise ValueError('Select one to three distinct private documents.')
@@ -276,7 +277,12 @@ class DocumentCorpus:
             records = self._live(db, user, [self._decode(db, owner, *rows[identity]) for identity in identities if identity in rows])
             matches = []
             for record in records:
-                matches.extend(dict(hit, **self._summary(record)) for hit in matching_passages(record['text'], terms, record['index']))
+                if full_context:
+                    passages = (dict(start=start, end=end, excerpt=excerpt)
+                        for start, end, excerpt in _passages(record['text']))
+                    matches.extend(dict(hit, **self._summary(record)) for hit in islice(passages, RESULT_LIMIT + 1))
+                else:
+                    matches.extend(dict(hit, **self._summary(record)) for hit in matching_passages(record['text'], terms, record['index']))
             live = self._live(db, user, records)
             conflict = len(records) != len(identities) or len(live) != len(records)
         # Commit expiry/invalidation before reporting a stale selection.

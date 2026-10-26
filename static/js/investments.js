@@ -262,6 +262,8 @@ function renderInvestmentWatchlist(watchlist) {
                             <p class="metric-kicker mb-1">${Alfred.escapeHtml(item.family_label || item.family || "Fund")}</p>
                             <h3 class="investment-watch-title mb-1">${Alfred.escapeHtml(item.scheme_name || "Mutual fund")}</h3>
                             <p class="metric-caption mb-0">${Alfred.escapeHtml(item.fund_house || "Fund house unavailable")}</p>
+                            <p class="metric-caption mb-0">Quoted NAV: ${Alfred.escapeHtml(item.nav_source_value ?? String(item.nav ?? "unavailable"))} · Source date: ${Alfred.escapeHtml(item.nav_date || "unknown")}</p>
+                            <p class="metric-caption mb-0">${Alfred.escapeHtml(String(item.observation_count ?? "Unknown"))} observations · ${Alfred.escapeHtml(String(item.history_days ?? "Unknown"))}-day observed window. No currency conversion or holding revaluation.</p>
                         </div>
                         <div class="investment-watch-score">
                             <span>${Alfred.formatNumber(score, 1)} / 100</span>
@@ -322,6 +324,7 @@ function renderInvestmentPositions(items) {
             <td>
                 <div class="fw-semibold">${Alfred.escapeHtml(item.asset_name)}</div>
                 <div class="muted small">${Alfred.escapeHtml(item.asset_type.replaceAll("_", " "))} | ${Alfred.escapeHtml(item.institution || "Unspecified institution")}</div>
+                <div class="muted small">Account: ${Alfred.escapeHtml(item.account_number ? `…${item.account_number.slice(-4)}` : "not recorded")}</div>
             </td>
             <td class="text-end">${Alfred.formatCurrency(item.invested_amount)}</td>
             <td class="text-end">${Alfred.formatCurrency(item.current_value)}</td>
@@ -355,6 +358,7 @@ function renderInvestmentImports(items) {
                     <div class="fw-semibold">${Alfred.escapeHtml(item.broker_name || "Portfolio import")}</div>
                     <div class="muted small">${Alfred.escapeHtml(parserLabel)} | ${(Number(item.parse_confidence || 0) * 100).toFixed(0)}% confidence</div>
                     <div class="muted small">${Alfred.escapeHtml(item.summary || `${linkedCount} holdings linked`)}</div>
+                    ${item.extracted_payload?.layout_review ? `<div class="muted small">Source extraction: ${Alfred.escapeHtml(item.extracted_payload.layout_review.reason || "Review the source table.")}${item.extracted_payload.review_queue_resolved ? " Owner corrections applied; source extraction is unchanged." : ""}</div>` : ""}
                 </div>
             </div>
         `;

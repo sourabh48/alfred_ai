@@ -3,6 +3,7 @@ from copy import deepcopy
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.throttling import UserRateThrottle
@@ -11,12 +12,13 @@ from rest_framework.views import APIView
 
 from .models import BikeProfile, TravelFeedback, TravelPlan, TravelPlanningSession, TripPhoto
 from .serializers import TravelPlanSerializer
-from .services.travel_conversation import STYLE_WORDS, new_session, save_plan, send_message
+from .services.travel_conversation import STYLE_WORDS, new_session, save_plan, say, send_message
 from apps.expenses.money import money_float
-from .services.travel_discovery import fact, learn, profile_for, value
+from .services.travel_discovery import budget_for, fact, learn, profile_for, value
 from .services.travel_research import STAGES, TERMINAL, evidence_payload, queue_research
 from .services.travel.presentation import age_saved_facts
-from .services.travel.mapping import map_configuration
+from .services.travel.restrictions import KIND, record_restriction, restriction_context
+from .services.travel.mapping import map_configuration, map_features
 from .services.travel.cache import usage_summary
 from .services.travel.discovery import remember, place_key
 from .services.travel.intent import PROFILE_KEYS, validate_preference
@@ -56,7 +58,7 @@ def session_payload(session):
                     itinerary["weather"] = {"summary":"This forecast is stale. Recheck Trip before relying on it.","confidence":"UNKNOWN"}
     offset = value(session.state, "_destination_offset", 0)
     pool_count = len(value(session.state, "_destination_pool", []))
-    return age_saved_facts({"id": session.id, "title": session.title,
+    payload = age_saved_facts({"id": session.id, "title": session.title,
             "state": {key: val for key, val in session.state.items() if not key.startswith(("_destination_", "_itinerary_"))}, "status": session.status,
             "itinerary_stops": [s["name"] for s in value(session.state, "_itinerary_stops", [])],
             "destination_pool": {"total": pool_count, "offset": offset,
@@ -73,6 +75,7 @@ def session_payload(session):
                           "sources_checked": 0 if outdated else run.sources_checked, "candidate_count": run.candidate_count,
                           "created_at": run.created_at, "completed_at": None if outdated else run.completed_at,
                           "evidence": [] if outdated else [evidence_payload(e) for e in run.evidence.all()]} if run else None)})
+    return restriction_context(session, payload)
 
 
 class TravelSessionList(APIView):
@@ -112,6 +115,64 @@ class TravelSessionDetail(APIView):
         action = request.data.get("action", "message")
         if action == "message":
             session = send_message(pk, request.user, request.data.get("text", ""))
+        elif action in ("restriction_review", "restriction_withdraw"):
+            if type(request.data.get("revision")) is not int or request.data["revision"] != session.revision:
+                return Response({"detail": "This trip changed. Reload before reviewing a route restriction."}, status=409)
+            data = {k: v for k, v in request.data.items() if k not in ("action", "revision")}
+            if action == "restriction_review":
+                evidence = record_restriction(session, data)
+                say(session, f"Saved your reviewed restriction reference #{evidence.pk}. Source authenticity and whole-route motorcycle legality remain unverified.")
+            else:
+                if set(data) != {"evidence_id"} or type(data["evidence_id"]) is not int or data["evidence_id"] < 1:
+                    raise ValidationError({"detail": "Choose one of this conversation's reviewed references."})
+                from .models import TravelResearchEvidence
+                evidence = get_object_or_404(TravelResearchEvidence, pk=data["evidence_id"], research__session=session,
+                    data_type=KIND, provider="owner_reviewed_reference")
+                evidence.status = "withdrawn"
+                evidence.save(update_fields=["status"])
+                say(session, f"Withdrew your review of restriction reference #{evidence.pk}; the historical quotation and source are retained.")
+            session.revision += 1
+            session.save(update_fields=["revision", "updated_at"])
+        elif action == "route_choice":
+            if type(request.data.get("revision")) is not int or request.data["revision"] != session.revision:
+                return Response({"detail": "This trip changed. Reload it before choosing a route."}, status=409)
+            if len(value(session.state, "_itinerary_stops", [])) > 1:
+                raise ValidationError("These routes start at home, not at the preceding stop. Multi-stop legs need separate verification.")
+            index, route_id = request.data.get("candidate_index"), request.data.get("route_id")
+            if type(index) is not int or not 0 <= index < len(session.candidates) or not isinstance(route_id, str):
+                raise ValidationError("Choose a route shown for this conversation's destination.")
+            candidate = session.candidates[index]
+            result = candidate.get("route_result", {})
+            route = next((r for r in result.get("payload", {}).get("routes", []) if r.get("route_id") == route_id), None)
+            try:
+                checked, expiry = (parse_datetime(str(result.get(k) or "")) for k in ("retrieved_at", "expires_at"))
+            except (ValueError, TypeError, OverflowError):
+                checked = expiry = None
+            now = timezone.now()
+            if (not route or not result.get("success") or result.get("stale") or not result.get("source_url")
+                    or not checked or not expiry or not timezone.is_aware(checked) or not timezone.is_aware(expiry)
+                    or not checked <= now < expiry):
+                return Response({"detail": "This route changed or expired. Recheck the trip before choosing again."}, status=409)
+            candidate.update(selected_route_id=route_id, route_choice_confirmed=True, route_choice_required=False,
+                distance_km=route["distance_km"], travel_hours=route["duration_hours"],
+                distance_basis="Selected provider geometry; duration is an estimate. Scenic quality, motorcycle legality, closures and corridor stops remain unverified.")
+            candidate["budget"] = budget_for(session.state, candidate)
+            candidate["map"] = map_features(candidate)
+            candidate["sources"] = [s for s in candidate.get("sources", []) if s.get("data_type") != "budget"] + [{
+                "data_type": "budget", "finding": candidate["budget"], "confidence": "ESTIMATED", "freshness": "ESTIMATED",
+                "source_name": "ALFRED budget formulas; selected route allowance", "source_url": "", "retrieved_at": now.isoformat()}]
+            candidate["factors"]["Budget"] = "Over target" if candidate["budget"]["over_budget"] else "Within estimate"
+            candidate["route_alternatives_note"] = "Route choice updates the allowance, not the destination ranking. Stops, road access and scenic quality need separate verification."
+            pool = value(session.state, "_destination_pool", [])
+            if pool:
+                session.state["_destination_pool"] = fact([deepcopy(candidate) if (c["name"], c.get("lat"), c.get("lon")) ==
+                    (candidate["name"], candidate.get("lat"), candidate.get("lon")) else c for c in pool])
+            if session.itinerary.get("destination") == candidate["name"]:
+                session.itinerary = build_itinerary(session.state, candidate)
+                if value(session.state, "_itinerary_stops", []):
+                    session.state["_itinerary_stops"] = fact([deepcopy(candidate)])
+            session.revision += 1
+            session.save()
         elif action in ("itinerary_stops", "itinerary_order_preview"):
             revision = request.data.get("revision")
             if type(revision) is not int or revision != session.revision:

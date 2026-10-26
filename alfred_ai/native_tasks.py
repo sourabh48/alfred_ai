@@ -71,6 +71,7 @@ def native_private_memory_cleanup():
 def native_private_memory_sync():
     from django.core.management import call_command
     call_command('sync_private_memory', seconds=2, verbosity=0)
+    call_command('checkpoint_knowledge_hub', seconds=2, verbosity=0)
 
 
 @db_periodic_task(crontab(minute="0", hour="3"))

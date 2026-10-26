@@ -35,6 +35,11 @@ def learn(user, key, val, source, confidence=0.6, confirmed=False):
     profile.save(update_fields=["preferences", "updated_at"])
 
 
+def destination_name(name):
+    name = " ".join(str(name).split())
+    return (lookup(name) or {}).get("name", name.casefold())
+
+
 def history_for(user):
     visits = Counter()
     recent = Counter()
@@ -42,22 +47,27 @@ def history_for(user):
     now = timezone.localdate()
     for p in TravelPlan.objects.filter(user=user).prefetch_related("logs").select_related("feedback"):
         if p.destination and (p.status == "completed" or p.logs.exists()):
-            name = (lookup(p.destination) or {}).get("name", p.destination)
+            name = destination_name(p.destination)
             visits[name] += 1
             if p.end_date and 0 <= (now - p.end_date).days <= 365:
                 recent[name] += 1
         try:
-            ratings[p.destination] = p.feedback.rating
+            ratings[destination_name(p.destination)] = p.feedback.rating
         except TravelPlan.feedback.RelatedObjectDoesNotExist:
             pass
     locations = list(TripLog.objects.filter(user=user).exclude(location_name="").values_list("location_name", flat=True))
     locations += list(TripPhoto.objects.filter(user=user).exclude(location_name="").values_list("location_name", flat=True))
+    for location in locations:
+        name = destination_name(location)
+        if name:
+            visits[name] = max(visits[name], 1)
     for d in DESTINATIONS:
         if not visits[d["name"]] and any(d["name"].lower() in loc.lower() for loc in locations):
             visits[d["name"]] = 1
     for row in UserDestinationHistory.objects.filter(user=user):
         if "visited" in row.events:
-            visits[row.name] = max(visits[row.name],1)
+            name = destination_name(row.name)
+            visits[name] = max(visits[name],1)
     return {"visits": dict(visits), "recent": dict(recent), "ratings": ratings}
 
 
@@ -69,7 +79,12 @@ def budget_for(state, destination, *, relaxed_days=0):
 def candidates_for(user, state, limit=3, *, destinations=None, origin_coordinates=None):
     profile = profile_for(user)
     history = history_for(user)
-    memory = {row.name.casefold():row for row in UserDestinationHistory.objects.filter(user=user)}
+    shown, rejected = Counter(), set()
+    for row in UserDestinationHistory.objects.filter(user=user):
+        name = destination_name(row.name)
+        shown[name] += row.shown_count
+        if "rejected" in row.events:
+            rejected.add(name)
     styles = set(value(state, "preferred_trip_style", []) + value(state, "preferred_activities", []))
     weights = {s:1 for s in styles}
     for k, pref in profile.preferences.items():
@@ -91,9 +106,9 @@ def candidates_for(user, state, limit=3, *, destinations=None, origin_coordinate
     for seed in (DESTINATIONS if destinations is None else destinations):
         d = dict(seed)
         d.setdefault("source_freshness", "STATIC_REFERENCE")
-        record = memory.get(d["name"].casefold())
-        explicitly_requested = str(value(state,"requested_destination","")).casefold() == d["name"].casefold()
-        if not explicitly_requested and ((record and "rejected" in record.events) or (value(state,"only_new_places") and history["visits"].get(d["name"]))):
+        name = destination_name(d["name"])
+        explicitly_requested = destination_name(value(state,"requested_destination","")) == name
+        if not explicitly_requested and (name in rejected or (value(state,"only_new_places") and history["visits"].get(name))):
             continue
         if any(a in d["name"].lower() for a in avoid):
             continue
@@ -111,22 +126,22 @@ def candidates_for(user, state, limit=3, *, destinations=None, origin_coordinate
         budget = budget_for(state, d)
         d["budget"] = budget
         match = sorted(styles.intersection(d["styles"]))
-        visits = history["visits"].get(d["name"], 0)
-        recent = history["recent"].get(d["name"], 0)
+        visits = history["visits"].get(name, 0)
+        recent = history["recent"].get(name, 0)
         budget_fit = not budget["over_budget"]
         day_limit = value(state, "maximum_daily_driving", 300)
         driving = value(state,"transport_mode","mixed") in {"ride","roadtrip"}
         distance_limit = day_limit if driving else max(200,days*200)
         time_fit = km is not None and km * (2 if days == 1 else 1) <= distance_limit and days <= d.get("maximum_days",30)
         score = 30 + 20*budget_fit + 15*time_fit + min(20, 5*sum(weights.get(s,1) for s in match))
-        if record and not explicitly_requested:
-            score -= min(15,record.shown_count*3)
+        if not explicitly_requested:
+            score -= min(15,shown[name]*3)
         score += (12 if not visits else -min(12, recent*6)) if novelty == "mostly_new" else (12 if visits else 0) if novelty == "mostly_familiar" else (4 if not recent else 0)
         if km:
             score -= min(35, max(0, km-300)/40)
         if days > d.get("maximum_days",30):
             score -= 8*(days-d["maximum_days"])
-        rating = history["ratings"].get(d["name"])
+        rating = history["ratings"].get(name)
         score += 5 if rating == "loved" else -10 if rating == "disliked" else 0
         destination_preference = profile.preferences.get("destination:"+d["name"], {})
         if destination_preference.get("value") is False:

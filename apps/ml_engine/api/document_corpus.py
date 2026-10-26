@@ -35,9 +35,10 @@ class DocumentCorpusQuestionAPI(MemoryAPI):
         from ..services.document_questions import answer_question
         if request.query_params:
             raise ValueError('Questions and selected documents belong in the request body.')
-        data = self.payload(('ids', 'question', 'keywords'))
+        data = self.payload(('ids', 'question', 'keywords', 'context_mode'))
         return Response(answer_question(DocumentCorpus(memory_store()), request.user,
-            data.get('ids'), data.get('question'), data.get('keywords')))
+            data.get('ids'), data.get('question'), data.get('keywords'),
+            context_mode=data.get('context_mode', 'keywords')))
 
 
 class DocumentCorpusUploadAPI(MemoryAPI):

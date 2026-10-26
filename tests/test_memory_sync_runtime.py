@@ -170,9 +170,12 @@ class MemorySyncRuntimeTests(TestCase):
         self.assertEqual(self.sync.status(self.alice)['revision'],2)
         child.wait.assert_called_once(); server.close.assert_called_once()
         self.assertEqual(order.count('sync_private_memory'),2)
+        self.assertEqual(order.count('checkpoint_knowledge_hub'),2)
 
     def test_native_tick_uses_bounded_command(self):
         from alfred_ai.native_tasks import native_private_memory_sync
         with patch('django.core.management.call_command') as command:
             native_private_memory_sync.call_local()
-        command.assert_called_once_with('sync_private_memory',seconds=2,verbosity=0)
+        from unittest.mock import call
+        self.assertEqual(command.call_args_list, [call('sync_private_memory',seconds=2,verbosity=0),
+                                                call('checkpoint_knowledge_hub',seconds=2,verbosity=0)])

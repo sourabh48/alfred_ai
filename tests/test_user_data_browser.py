@@ -141,6 +141,67 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 f'#accountProfileForm [name="{field}"]').get_attribute('value'), amount)
         self.capture('user-decimal-profile-reload')
 
+    def test_career_discovery_marks_cached_leads_and_recovers_without_unsafe_links(self):
+        from apps.career.models import CareerProfile
+        from apps.career.services.job_intelligence import JobIntelligenceService, job_intelligence
+        from tests.test_career_discovery_acceptance import feeds, feed, lead
+
+        self.enterContext(patch.object(job_intelligence, "suggest_openings", side_effect=lambda *a, **kw:
+            JobIntelligenceService.suggest_openings(job_intelligence, *a, **kw)))
+        mocks = feeds(self, [feed(jobs=[lead(title='<img src=x onerror="window.discoveryLeak=true"> Synthetic Analyst'),
+            lead(url="javascript:alert(1)")]), feed(1, status="stale", jobs=[lead(url="https://jobs.example.org/cached")]),
+            {"jobs": [lead(url="https://jobs.example.org/unknown")]}])
+        CareerProfile.objects.create(user=self.scenario['user'], role='Data Analyst', experience_years=3,
+            skills='Python, SQL', last_salary=80000)
+        before = list(CareerProfile.objects.order_by("pk").values())
+        self.login(); self.browser.get(self.live_server_url + "/career/")
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status]')) == 3)
+        self.wait.until(lambda _: 'Fresh feed evidence' in self.text('careerOpenings'))
+        text = self.text('careerOpenings')
+        self.assertIn('Fresh feed evidence', text)
+        self.assertIn('Stale cached lead', text)
+        self.assertIn('Unverified lead', text)
+        self.assertIn('Availability is unverified', self.text('careerOpeningsMeta'))
+        self.assertIn('Source-backed job leads matched', self.browser.find_element(self.By.ID, 'careerRoot').text)
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings img')), 0)
+        self.assertFalse(self.browser.execute_script('return Boolean(window.discoveryLeak)'))
+        self.assertTrue(all(a.get_attribute('href').startswith('https://')
+            for a in self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings a')))
+        self.browser.execute_script("document.getElementById('careerOpenings').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('career-discovery-desktop')
+        from alfred_ai.services.public_http import PublicHTTPError
+        mocks[0].side_effect = PublicHTTPError('timeout'); cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: not self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status="fresh"]'))
+        self.wait.until(lambda _: 'Stale cached lead' in self.text('careerOpenings'))
+        mocks[0].side_effect = None; mocks[0].return_value = feed(); cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status="fresh"]'))
+        self.assertEqual(list(CareerProfile.objects.order_by('pk').values()), before)
+        self.browser.execute_script("renderOpenings([{title:'Unsafe lead',url:'javascript:alert(1)',source_status:'unknown',tags:[]}],{filtered_candidates:0,total_candidates:1})")
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings a')), 0)
+        self.assertIn('0 of 1', self.text('careerOpeningsMeta'))
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status="fresh"]'))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+            {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.getElementById('careerOpenings').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('career-discovery-390px')
+        for theme in ('light', 'dark'):
+            self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'careerRoot').get_attribute('data-page-busy') == 'false')
+            self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+            ratios = self.browser.execute_script(r"""function lum(rgb) {
+                const v=rgb.match(/[\d.]+/g).slice(0,3).map(n=>{n=Number(n)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4});
+                return .2126*v[0]+.7152*v[1]+.0722*v[2];
+            }
+            return [...document.querySelectorAll('#careerOpenings .muted, #careerOpenings a, #careerOpenings .fw-semibold')].map(e=>{
+                const a=lum(getComputedStyle(e).color),b=lum(getComputedStyle(e.closest('.mini-card')).backgroundColor);
+                return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+            });""")
+            self.assertGreaterEqual(len(ratios), 10)
+            self.assertTrue(all(ratio >= 4.5 for ratio in ratios), (theme, ratios))
+
     def test_career_matching_cites_saved_sources_and_abstains_without_requirements(self):
         self.browser.set_window_size(1440,1200)
         from apps.career.models import CareerJobAnalysis, CareerResume
@@ -418,6 +479,95 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'memoryEvaluationExpected').find_elements(self.By.TAG_NAME,'option'))==4)
         return store,owner,identities
 
+    def test_memory_evaluation_edits_queued_cases_without_duplicates_or_lost_drafts(self):
+        from selenium.webdriver.support.ui import Select
+        self.memory_evaluation_fixture()
+        query = self.browser.find_element(self.By.ID, 'memoryEvaluationQuery')
+        query.send_keys('Original no-match question'); self.memory_click('#memoryEvaluationAdd')
+        query.send_keys('Second no-match question'); self.memory_click('#memoryEvaluationAdd')
+        self.memory_click('#memoryEvaluationCases button[aria-label="Edit question 1"]')
+        query.clear(); self.memory_click('#memoryEvaluationAdd')
+        self.assertIn('Enter a question', self.text('memoryEvaluationFeedback'))
+        self.assertIn('Original no-match question', self.text('memoryEvaluationCases'))
+        query.send_keys('Corrected no-match question')
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.assertIn('Save question changes', self.text('memoryEvaluationFeedback'))
+        self.memory_click('#memoryEvaluationAdd')
+        rows = self.browser.find_elements(self.By.CSS_SELECTOR, '#memoryEvaluationCases > li')
+        self.assertEqual(len(rows), 2)
+        self.assertIn('Corrected no-match question', rows[0].text)
+        self.assertNotIn('Original no-match', self.text('memoryEvaluationCases'))
+        query.send_keys('Unsaved third draft')
+        self.memory_click('#memoryEvaluationCases button[aria-label="Edit question 2"]')
+        self.assertEqual(query.get_property('value'), 'Unsaved third draft')
+        self.assertIn('current question draft', self.text('memoryEvaluationFeedback'))
+        query.clear(); self.memory_click('#memoryEvaluationCases button[aria-label="Edit question 2"]')
+        self.memory_click('#memoryEvaluationCases button[aria-label="Remove question 2"]')
+        self.assertEqual(query.get_property('value'), 'Second no-match question')
+        self.assertEqual(self.text('memoryEvaluationAdd'), 'Add question to run')
+        self.memory_click('#memoryEvaluationAdd')
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: '2 questions.' in self.text('memoryEvaluationResult'))
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('memoryEvaluationCases'), '')
+        self.assertEqual(query.get_property('value'), '')
+        self.assertEqual(self.text('memoryEvaluationAdd'), 'Add question to run')
+
+    def test_memory_evaluation_links_missed_sources_to_current_owner_corrections(self):
+        from selenium.webdriver.support.ui import Select
+        store, owner, identities = self.memory_evaluation_fixture()
+        before = store.list_memories(owner)
+        self.browser.find_element(self.By.ID, 'memoryEvaluationQuery').send_keys('mountain hiking')
+        expected = Select(self.browser.find_element(self.By.ID, 'memoryEvaluationExpected'))
+        for identity in identities:
+            expected.select_by_value(identity)
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: '2 missed' in self.text('memoryEvaluationDetails'))
+        missed = self.browser.find_elements(self.By.CSS_SELECTOR, '#memoryEvaluationDetails [data-missed-source]')
+        self.assertEqual({row.get_attribute('data-missed-source') for row in missed}, set(identities[1:]))
+        self.assertTrue(all('Expected but not retrieved:' in row.text for row in missed))
+        self.memory_click(f'#memoryEvaluationDetails [data-missed-source="{identities[1]}"] a')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, f'memory-{identities[1]}').is_displayed())
+        self.assertIn('I prefer the coast', self.text(f'memory-{identities[1]}'))
+        self.assertEqual(store.list_memories(owner), before)
+        self.capture('memory-evaluation-missed-source-review')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('memoryEvaluationDetails'), '')
+
+    def test_memory_evaluation_score_bands_explain_high_score_false_matches(self):
+        from selenium.webdriver.support.ui import Select
+        from selenium.webdriver.common.keys import Keys
+        store, owner, identities = self.memory_evaluation_fixture()
+        before = store.list_memories(owner)
+        self.browser.find_element(self.By.ID, 'memoryEvaluationQuery').send_keys('mountain hiking')
+        cutoff = self.browser.find_element(self.By.ID, 'memoryEvaluationThreshold').get_property('value')
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: 'Observed relevance in this reviewed run only.' in self.text('memoryEvaluationScoreBands'))
+        rows = self.browser.find_elements(self.By.CSS_SELECTOR, '#memoryEvaluationScoreBands tbody tr')
+        self.assertEqual(len(rows), 4)
+        self.assertIn('not applicable', rows[0].text)
+        self.assertIn('0.0%', rows[-1].text)
+        self.assertIn('scores are not probabilities', self.text('memoryEvaluationScoreBands'))
+        self.assertIn('No cutoff or model is changed', self.text('memoryEvaluationScoreBands'))
+        Select(self.browser.find_element(self.By.ID, 'memoryEvaluationExpected')).select_by_value(identities[0])
+        self.assertEqual(self.text('memoryEvaluationScoreBands'), '')
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: '100.0%' in self.text('memoryEvaluationScoreBands'))
+        self.assertEqual(self.browser.find_element(self.By.ID, 'memoryEvaluationThreshold').get_property('value'), cutoff)
+        self.assertEqual(store.list_memories(owner), before)
+        band = self.browser.find_element(self.By.ID, 'memoryEvaluationScoreBands')
+        self.assertEqual(band.get_attribute('role'), 'region')
+        self.assertEqual(band.get_attribute('tabindex'), '0')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=390,height=900,deviceScaleFactor=1,mobile=True))
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.browser.execute_script('arguments[0].focus()', band)
+        band.send_keys(Keys.ARROW_RIGHT)
+        self.wait.until(lambda _: self.browser.execute_script('return arguments[0].scrollLeft > 0', band))
+        self.browser.execute_script("document.getElementById('memoryEvaluationScoreBands').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('memory-evaluation-score-diagnostics')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('memoryEvaluationScoreBands'), '')
+
     def test_multi_case_memory_evaluation_metrics_citations_mobile_and_clearing(self):
         from selenium.webdriver.support.ui import Select
         store,owner,identities=self.memory_evaluation_fixture()
@@ -574,7 +724,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('An expected source changed',self.text('memoryEvaluationCases'))
         self.memory_click('#memoryEvaluationForm button[type="submit"]')
         self.wait.until(lambda _: 'cannot be substituted automatically' in self.text('memoryEvaluationFeedback'))
-        self.memory_click('#memoryEvaluationCases button')
+        self.memory_click('#memoryEvaluationCases button[aria-label="Remove question 1"]')
         current=next(record['id'] for record in store.list_memories(owner) if 'corrected' in record['content']['statement'])
         query.send_keys('mountain retry draft'); Select(self.browser.find_element(self.By.ID,'memoryEvaluationExpected')).select_by_value(current)
         with patch.object(MemoryStore,'retrieve',side_effect=EmbeddingUnavailable('SYNTHETIC-PRIVATE F:/synthetic/private-key.txt')):
@@ -848,6 +998,108 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('ui-c-finance-overview')
         self.memory_click('a[href="/ai/insights/?scope=finance#intelligencePanel"]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_attribute('value')=='finance')
+
+    def test_intelligence_hub_pack_consent_review_citations_versions_and_invalidation(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-hub-ui-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_KNOWLEDGE_GIT_AUTHORIZED=False, ALFRED_KNOWLEDGE_GIT_REMOTE=''))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
+        store = MemoryStore(root/'vault'); owner = self.scenario['user']
+        source = store.save_verified(owner, {'statement': 'SYNTHETIC public hiking <b>reference</b>'}, {'source': 'synthetic reviewed guide'}, sensitivity='public', verified=True)
+        store.save_verified(owner, {'statement': 'SYNTHETIC PRIVATE MUST STAY OUT OF PACKS'}, {'source': 'synthetic private'}, verified=True)
+        self.login(); self.browser.get(self.live_server_url+'/settings/#knowledgeHub')
+        self.wait.until(lambda _: 'durable checkpoint' in self.text('knowledgeHubStatus'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'knowledgeHubSources').is_enabled())
+        self.memory_click('#knowledgeHubEnabled'); self.memory_click('#knowledgeHubPolicy button')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'knowledgeHubSources').is_enabled())
+        self.assertNotIn('PRIVATE MUST', self.text('knowledgeHubSources'))
+        Select(self.browser.find_element(self.By.ID, 'knowledgeHubSources')).select_by_value(source)
+        self.memory_click('#knowledgeHubDraft button')
+        self.wait.until(lambda _: 'DRAFT' in self.text('knowledgeHubPacks'))
+        packs = self.browser.find_element(self.By.ID, 'knowledgeHubPacks')
+        self.assertEqual(packs.aria_role, 'region')
+        self.assertEqual(packs.accessible_name, 'Knowledge packs')
+        self.assertEqual(self.browser.find_elements(self.By.CSS_SELECTOR, '#knowledgeHubPacks b'), [])
+        self.assertIn('/settings/#memory-'+source, self.browser.find_element(self.By.CSS_SELECTOR, '#knowledgeHubPacks a').get_attribute('href'))
+        self.memory_click('#knowledgeHubPacks article button.btn-outline-primary')
+        self.wait.until(lambda _: 'check its confirmation' in self.text('knowledgeHubFeedback'))
+        self.memory_click('#knowledgeHubPacks article input[type=checkbox]')
+        self.memory_click('#knowledgeHubPacks article button.btn-outline-primary')
+        self.wait.until(lambda _: 'PROMOTED' in self.text('knowledgeHubPacks'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'knowledgeHubSync').is_enabled())
+        self.assertFalse(self.browser.find_element(self.By.ID, 'knowledgeHubRemoteConsent').is_enabled())
+        self.capture('intelligence-hub-reviewed-desktop')
+        self.browser.set_window_size(390, 900)
+        self.memory_click('#knowledgeHubRefresh')
+        self.wait.until(lambda _: 'PROMOTED' in self.text('knowledgeHubPacks'))
+        self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth + 1'))
+        self.capture('intelligence-hub-reviewed-narrow')
+        self.browser.set_window_size(1440, 1200)
+        self.browser.refresh()
+        self.wait.until(lambda _: 'PROMOTED' in self.text('knowledgeHubPacks'))
+        store.delete_memory(owner, source)
+        self.memory_click('#knowledgeHubRefresh')
+        self.wait.until(lambda _: 'SOURCE_CHANGED' in self.text('knowledgeHubPacks'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, '#knowledgeHubPacks article button.btn-outline-primary').is_enabled())
+        self.memory_click('#knowledgeHubPacks article input[type=checkbox]')
+        self.memory_click('#knowledgeHubPacks article button.btn-outline-danger')
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, '#knowledgeHubPacks article button.btn-outline-danger').get_attribute('disabled'))
+        self.memory_click('#knowledgeHubCheckpoint')
+        self.wait.until(lambda _: 'Local review saved' in self.text('knowledgeHubFeedback'))
+        self.assertEqual(len(store.list_memories(owner)), 1)
+
+    def test_intelligence_hub_failed_draft_retains_selection_and_pagehide_clears_data(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.knowledge_hub import KnowledgeHub
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-hub-ui-failure-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_KNOWLEDGE_GIT_AUTHORIZED=False, ALFRED_KNOWLEDGE_GIT_REMOTE=''))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
+        store = MemoryStore(root/'vault'); owner = self.scenario['user']
+        source = store.save_verified(owner, {'statement': 'SYNTHETIC retained public selection'}, {'source': 'synthetic guide'}, sensitivity='public', verified=True)
+        KnowledgeHub(store).configure(owner, enabled=True, consent=True)
+        self.login(); self.browser.get(self.live_server_url+'/settings/#knowledgeHub')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'knowledgeHubSources').is_enabled())
+        Select(self.browser.find_element(self.By.ID, 'knowledgeHubSources')).select_by_value(source)
+        with patch.object(KnowledgeHub, 'draft', side_effect=RuntimeError('synthetic unavailable')):
+            self.memory_click('#knowledgeHubDraft button')
+            self.wait.until(lambda _: 'selection is retained' in self.text('knowledgeHubFeedback'))
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, '#knowledgeHubDraft button').is_enabled())
+        self.assertEqual(Select(self.browser.find_element(self.By.ID, 'knowledgeHubSources')).first_selected_option.get_attribute('value'), source)
+        self.memory_click('#knowledgeHubDraft button')
+        self.wait.until(lambda _: 'DRAFT' in self.text('knowledgeHubPacks'))
+        self.assertEqual(self.memory_post('hub', {'action': 'checkpoint'}, csrf=False)['status'], 403)
+        from apps.ml_engine.services.persistent_memory import _owner
+        from apps.ml_engine.services.memory_sync import encoded
+        from hashlib import sha256
+        from uuid import uuid4
+        hub = KnowledgeHub(store)
+        with store._transaction() as db:
+            record = dict(hub._records(db, _owner(owner))[0])
+            record.update(id=uuid4().hex, state='promoted', origin='remote')
+            record['lineage'] = record['id']
+            record['digest'] = sha256(encoded({k:v for k,v in record.items() if k not in ('digest','state','origin')})).hexdigest()
+            hub._write(db, _owner(owner), record, new=True)
+            state, policy = hub._state(db, _owner(owner))
+            policy.update(remote_consent=True, conflict=True, pending=True, head='1'*40, review_head='2'*40, review_digest='d'*64)
+            store._write_sync_state(db, _owner(owner), state)
+        self.memory_click('#knowledgeHubRefresh')
+        self.wait.until(lambda _: 'REMOTE_REVIEW_REQUIRED' in self.text('knowledgeHubPacks'))
+        self.memory_click('#knowledgeHubReconcile')
+        self.wait.until(lambda _: 'Review cached remote packs' in self.text('knowledgeHubFeedback'))
+        self.memory_click('#knowledgeHubReconcileReviewed'); self.memory_click('#knowledgeHubReconcile')
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, 'knowledgeHubReconcile').is_displayed())
+        self.assertEqual(len(store.list_memories(owner)), 1)
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('knowledgeHubPacks'), '')
+        self.assertEqual(self.text('knowledgeHubSources'), '')
+        self.assertFalse(self.browser.find_element(self.By.ID, 'knowledgeHubCheckpoint').is_enabled())
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: 'DRAFT' in self.text('knowledgeHubPacks'))
+        self.assertTrue(self.browser.find_element(self.By.ID, 'knowledgeHubRefresh').is_enabled())
 
     def test_memory_search_candidate_review_and_selected_revocation(self):
         from selenium.webdriver.support.ui import Select
@@ -2311,6 +2563,107 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(result['status'],400); model.assert_not_called()
         self.assertNotIn('persistent_memory',str(result))
 
+    def test_private_document_whole_extraction_context_limits_retry_and_invalidation(self):
+        from unittest.mock import Mock
+        from selenium.webdriver.support.ui import Select
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.expenses.models import BankAccount
+        from apps.investments.models import Investment
+        from apps.loans.models import Loan
+        from apps.ml_engine.services.document_corpus import DocumentCorpus
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-whole-context-browser-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=root/'vault'))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
+        local = Mock(select=Mock(return_value='{"state":"conflict","evidence":[0,1]}'))
+        self.enterContext(patch('apps.ml_engine.services.document_questions.DocumentQuestionReasoner', return_value=local))
+        corpus = DocumentCorpus(MemoryStore(root/'vault', embedder=SyntheticEmbeddings()))
+        owner = self.scenario['user']
+        text = 'Exit load applies for thirty days. ' + 'Administrative context only. ' * 24 + '\nException: the period is ninety days. <img src=x onerror="window.fullContextLeak=true">'
+        small = corpus.upload(owner, SimpleUploadedFile('Synthetic <img src=x>.txt', text.encode()), consent=True, days=1)['document']
+        large = corpus.upload(owner, SimpleUploadedFile('Synthetic long context.txt', b'Administrative text. ' * 300), consent=True, days=1)['document']
+        foreign = get_user_model().objects.create_user(username='whole-context-foreign')
+        corpus.upload(foreign, SimpleUploadedFile('FOREIGN-PRIVATE-CONTEXT.txt', b'Foreign private text.'), consent=True, days=1)
+        financial_models = (Expense, BankAccount, Investment, Loan)
+        before = [list(model.objects.values()) for model in financial_models]
+        self.login(); self.browser.get(self.live_server_url + '/documents/')
+        question = self.browser.find_element(self.By.ID, 'documentCorpusQuestion')
+        question.send_keys('For how long does the exit load apply?')
+        mode = self.browser.find_element(self.By.ID, 'documentCorpusContextMode')
+        Select(mode).select_by_value('full_extraction')
+        self.memory_click('#documentCorpusAsk')
+        self.assertIn('Explicitly select', self.text('documentCorpusStatus'))
+        local.select.assert_not_called()
+        self.memory_click('#documentCorpusRefresh')
+        self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
+        self.assertNotIn('FOREIGN-PRIVATE', self.text('documentCorpusList'))
+        self.memory_click(f'#documentCorpusList input[value="{small["id"]}"]')
+        self.browser.execute_script("""
+            window.__wholeOriginalFetch=Alfred.fetchJSON;
+            Alfred.fetchJSON=(...args)=>window.__wholeOriginalFetch(...args).then(value=>
+                String(args[0]).endsWith('/question/') ? new Promise(resolve=>{
+                    window.__releaseWholeContext=()=>resolve(value);
+                }) : value);
+        """)
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: self.browser.execute_script('return Boolean(window.__releaseWholeContext)'))
+        self.assertFalse(mode.is_enabled())
+        self.browser.execute_script('Alfred.fetchJSON=window.__wholeOriginalFetch;window.__releaseWholeContext();')
+        self.wait.until(lambda _: 'may conflict' in self.text('documentCorpusStatus'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'})")
+        self.wait.until(lambda _: 'ninety days' in self.text('documentCorpusResults'))
+        self.assertIn('ninety days', self.text('documentCorpusResults'))
+        self.assertIn('All selected retained extracted text was supplied', self.text('documentCorpusResults'))
+        self.assertIn('Original SHA-256', self.text('documentCorpusResults'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, '#documentCorpusResults img'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.fullContextLeak)'))
+        self.browser.execute_script("document.getElementById('documentCorpusResults').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('whole-extraction-conflict-desktop')
+        self.browser.set_window_size(390, 844)
+        self.browser.execute_script("document.getElementById('documentCorpusContextMode').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth + 1'))
+        self.capture('whole-extraction-mode-narrow')
+        Select(mode).select_by_value('keywords')
+        self.assertEqual(self.text('documentCorpusResults'), '')
+        query = self.browser.find_element(self.By.ID, 'documentCorpusQuery'); query.send_keys('exit load')
+        local.select.return_value = '{"state":"evidence","evidence":[0]}'
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'selected these exact' in self.text('documentCorpusStatus'))
+        self.assertNotIn('ninety days', self.text('documentCorpusResults'))
+        Select(mode).select_by_value('full_extraction')
+        self.assertEqual(self.text('documentCorpusResults'), '')
+        self.memory_click(f'#documentCorpusList input[value="{small["id"]}"]')
+        self.memory_click(f'#documentCorpusList input[value="{large["id"]}"]')
+        calls = local.select.call_count
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'No partial context' in self.text('documentCorpusStatus'))
+        self.assertEqual(local.select.call_count, calls)
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, '#documentCorpusResults article'))
+        self.memory_click(f'#documentCorpusList input[value="{large["id"]}"]')
+        self.memory_click(f'#documentCorpusList input[value="{small["id"]}"]')
+        local.select.side_effect = EmbeddingUnavailable('Synthetic local outage')
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'local model is unavailable' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.text('documentCorpusResults'), '')
+        self.assertEqual(question.get_attribute('value'), 'For how long does the exit load apply?')
+        local.select.side_effect = None
+        local.select.return_value = '{"state":"conflict","evidence":[0,1]}'
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'may conflict' in self.text('documentCorpusStatus'))
+        def revoke(*args, **kwargs):
+            corpus.delete(owner, small['id'])
+            return '{"state":"conflict","evidence":[0,1]}'
+        local.select.side_effect = revoke
+        self.memory_click('#documentCorpusAsk')
+        self.wait.until(lambda _: 'sources changed' in self.text('documentCorpusStatus'))
+        self.assertEqual(self.text('documentCorpusResults'), '')
+        self.assertEqual(before, [list(model.objects.values()) for model in financial_models])
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(question.get_property('value'), '')
+        self.assertEqual(mode.get_property('value'), 'keywords')
+
     def test_private_document_questions_selection_conflict_abstention_and_stale_sources(self):
         from unittest.mock import Mock
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -3392,6 +3745,236 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('investmentReviewItems'),'')
         holding.refresh_from_db(); self.assertEqual(str(holding.current_value),'123.45')
 
+    def test_investment_pdf_upload_keeps_accounts_receipts_and_reimport_identity(self):
+        from decimal import Decimal
+        from apps.investments.models import Investment, InvestmentImportDocument
+        from tests.test_investment_import_acceptance import ASSET, portfolio_pdf
+
+        owner = self.scenario['user']
+        other = get_user_model().objects.create_user(username='synthetic-pdf-other')
+        foreign = Investment.objects.create(user=other, asset_type='cash', asset_name=ASSET,
+            account_number='SYNTH-A', current_value='42.00')
+        directory = Path(self.enterContext(TemporaryDirectory(prefix='alfred-pdf-acceptance-')))
+        pdf = directory / 'synthetic-multi-account.pdf'
+        pdf.write_bytes(portfolio_pdf([('SYNTH-A', '100.25', '110.20'), ('SYNTH-B', '100.25', '110.20')]))
+        self.login()
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'investmentPdfFiles'))
+        for count in (1, 2):
+            self.browser.find_element(self.By.ID, 'investmentPdfFiles').send_keys(str(pdf))
+            self.memory_click('#uploadInvestmentPdfBtn')
+            self.wait.until(lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=pdf.name).count() == count)
+            self.wait.until(lambda _: '2 investment record(s)' in self.text('investmentImportStatus'))
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'uploadInvestmentPdfBtn').is_enabled())
+            self.wait.until(lambda _: pdf.name in self.text('investmentImportList'))
+        rows = Investment.objects.filter(user=owner, asset_name=ASSET)
+        self.assertEqual(set(rows.values_list('account_number', flat=True)), {'SYNTH-A', 'SYNTH-B'})
+        self.assertEqual(rows.count(), 2)
+        self.wait.until(lambda _: '…TH-A' in self.text('investmentPositionsBody') and '…TH-B' in self.text('investmentPositionsBody'))
+        self.assertNotIn('SYNTH-A', self.text('investmentPositionsBody'))
+        self.assertEqual(sum((row.current_value for row in rows), Decimal('0')), Decimal('220.40'))
+        for document in InvestmentImportDocument.objects.filter(user=owner, file_name=pdf.name):
+            self.assertEqual(document.linked_investments.count(), 2)
+            self.assertEqual(document.field_evidence.count(), 2)
+            for proof in document.field_evidence.all():
+                self.assertEqual(Decimal(proof.source_values['current_value']), Decimal('110.20'))
+        foreign.refresh_from_db()
+        self.assertEqual(foreign.current_value, Decimal('42.00'))
+        self.capture('investment-pdf-accounts-desktop')
+        self.browser.refresh()
+        self.wait.until(lambda _: pdf.name in self.text('investmentImportList'))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+            {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.browser.execute_script("document.getElementById('investmentImportList').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('investment-pdf-accounts-390px')
+
+    def test_investment_broker_style_tables_reimport_and_reopen_with_source_notes(self):
+        from decimal import Decimal
+        from apps.investments.models import Investment, InvestmentImportDocument
+        from tests.test_investment_layout_acceptance import GROWW_TABLE, ZERODHA_TABLE, table_pdf
+
+        owner = self.scenario['user']
+        directory = Path(self.enterContext(TemporaryDirectory(prefix='alfred-table-acceptance-')))
+        self.login()
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'investmentPdfFiles'))
+        for name, text, copies in (('synthetic-groww.pdf', GROWW_TABLE, 2), ('synthetic-zerodha.pdf', ZERODHA_TABLE, 1)):
+            pdf = directory / name
+            pdf.write_bytes(table_pdf(text))
+            for count in range(1, copies + 1):
+                self.browser.find_element(self.By.ID, 'investmentPdfFiles').send_keys(str(pdf))
+                self.memory_click('#uploadInvestmentPdfBtn')
+                self.wait.until(lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=name).count() == count)
+                self.wait.until(lambda _: '2 investment record(s)' in self.text('investmentImportStatus'))
+                self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'uploadInvestmentPdfBtn').is_enabled())
+            document = InvestmentImportDocument.objects.filter(user=owner, file_name=name).latest('pk')
+            self.assertEqual(document.parser_status, 'parsed')
+            self.assertEqual(document.field_evidence.count(), 2)
+        fund_rows = Investment.objects.filter(user=owner, institution='Groww', account_number='SYNTH-A')
+        self.assertEqual(fund_rows.count(), 2)
+        self.assertEqual(sum((r.current_value for r in fund_rows), Decimal(0)), Decimal('330.60'))
+        self.assertEqual(list(Investment.objects.filter(user=owner, asset_name='SYNTHA').order_by('account_number').values_list('current_value', flat=True)), [Decimal('3.08')] * 2)
+        self.wait.until(lambda _: 'currency is not inferred' in self.text('investmentImportList'))
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#investmentImportList .data-row')) == 3)
+        self.assertNotIn('999.125', self.text('investmentPositionsBody'))
+        from selenium.webdriver.common.keys import Keys
+        imports = self.browser.find_element(self.By.ID, 'investmentImportList')
+        imports.send_keys(Keys.PAGE_DOWN)
+        self.assertEqual(self.browser.execute_script('return document.activeElement.id'), 'investmentImportList')
+        self.wait.until(lambda _: self.browser.execute_script('return arguments[0].scrollTop', imports) > 0)
+        self.assertGreater(self.browser.execute_script('return arguments[0].scrollTop', imports), 0)
+        self.capture('investment-tables-desktop')
+        self.browser.refresh()
+        self.wait.until(lambda _: 'synthetic-groww.pdf' in self.text('investmentImportList'))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+            {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.browser.execute_script("document.getElementById('investmentImportList').scrollIntoView({block:'center',behavior:'instant'})")
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('investment-tables-390px')
+
+    def test_investment_watchlist_research_freshness_outage_and_recovery_preserve_holdings(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.investments.models import Investment
+        from apps.investments.services.portfolio_intelligence import PortfolioIntelligenceService, portfolio_intelligence_service
+        from tests.test_investment_market_acceptance import SCHEME, SyntheticAMFI, source_result
+
+        foreign = get_user_model().objects.create_user(username='synthetic-watchlist-private-owner')
+        Investment.objects.create(user=foreign, asset_type='equity', asset_name='PRIVATE-WATCHLIST-HOLDING', current_value='999999.99')
+        before = list(Investment.objects.values())
+        transport = SyntheticAMFI()
+        market = source_result({'one_month_return_pct': 0, 'india_vix': 14})
+        self.enterContext(patch('apps.investments.services.portfolio_intelligence.public_http.request', side_effect=transport))
+        self.enterContext(patch('apps.investments.services.portfolio_intelligence.verified_intelligence.market_snapshot', side_effect=lambda: market))
+        self.enterContext(patch.object(portfolio_intelligence_service, 'build_short_horizon_watchlist',
+            side_effect=lambda owner: PortfolioIntelligenceService.build_short_horizon_watchlist(portfolio_intelligence_service, owner)))
+        self.login()
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: SCHEME in self.text('investmentWatchlistCards'))
+        cards = self.text('investmentWatchlistCards')
+        self.assertIn('Quoted NAV: 106.0001', cards)
+        self.assertIn(timezone.localdate().isoformat(), cards)
+        self.assertIn('61 observations', cards)
+        self.assertIn('60-day observed window', cards)
+        self.assertIn('No currency conversion or holding revaluation', cards)
+        self.assertNotIn('PRIVATE-WATCHLIST-HOLDING', self.text('investmentPositionsBody'))
+        links = self.browser.find_elements(self.By.CSS_SELECTOR, '#investmentWatchlistCards a')
+        self.assertTrue(any('NAVOpen.txt' in link.get_attribute('href') for link in links))
+        self.browser.execute_script("document.getElementById('investmentWatchlistMode').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-100)")
+        self.capture('investment-watchlist-source-desktop')
+
+        market.evidence['status'] = 'stale'
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'Market guidance' in self.text('investmentRecommendationList') and 'Recorded holdings are unchanged' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        self.assertNotIn(SCHEME, self.text('investmentWatchlistCards'))
+        self.assertNotIn('Verified market context is', self.text('investmentRecommendationList'))
+        self.assertEqual(list(Investment.objects.values()), before)
+
+        market.evidence['status'] = 'fresh'
+        transport.fail = True
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'Recorded holdings are unchanged' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        self.assertIn('Recorded holdings are unchanged', self.text('investmentWatchlistSummary'))
+        self.assertEqual(list(Investment.objects.values()), before)
+
+        transport.fail = False
+        transport.latest = 'No synthetic observations available'
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'Recorded holdings are unchanged' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        self.assertNotIn('Quoted NAV:', self.text('investmentWatchlistCards'))
+
+        stale = SyntheticAMFI(end=timezone.localdate() - timedelta(days=8))
+        transport.latest, transport.rows = stale.latest, stale.rows
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'no funds have recent' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        self.assertNotIn(SCHEME, self.text('investmentWatchlistCards'))
+
+        fresh = SyntheticAMFI()
+        transport.latest, transport.rows = fresh.latest, fresh.rows
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: SCHEME in self.text('investmentWatchlistCards'))
+        self.assertEqual(list(Investment.objects.values()), before)
+        self.assertNotIn('PRIVATE-WATCHLIST-HOLDING', str(transport.calls))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+            {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.browser.execute_script("document.getElementById('investmentWatchlistMode').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-100)")
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.capture('investment-watchlist-source-390px')
+
+    def test_yahoo_market_observations_identity_expiry_and_recovery_on_investment_page(self):
+        from apps.integrations.services.verified_intelligence import VerifiedIntelligenceService, verified_intelligence
+        from apps.investments.models import Investment
+        from apps.investments.services.portfolio_intelligence import PortfolioIntelligenceService, portfolio_intelligence_service
+        from tests.test_yahoo_market_acceptance import SyntheticYahoo
+        from tests.test_investment_market_acceptance import SCHEME
+
+        transport = SyntheticYahoo()
+        self.enterContext(patch('apps.integrations.services.verified_intelligence.public_http.request', side_effect=transport))
+        self.enterContext(patch.object(verified_intelligence, 'market_snapshot',
+            side_effect=lambda *a, **kw: VerifiedIntelligenceService.market_snapshot(verified_intelligence, *a, **kw)))
+        self.enterContext(patch.object(portfolio_intelligence_service, 'build_short_horizon_watchlist',
+            side_effect=lambda owner: PortfolioIntelligenceService.build_short_horizon_watchlist(portfolio_intelligence_service, owner)))
+        before = list(Investment.objects.values())
+        self.login()
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: SCHEME in self.text('investmentWatchlistCards'))
+        evidence = self.text('investmentWatchlistEvidence')
+        self.assertIn(transport.end.isoformat(), evidence)
+        self.assertIn('30-day lookback', evidence)
+        self.assertIn('not independently verified exchange closing prices', evidence)
+        self.assertTrue(any('finance.yahoo.com' in link.get_attribute('href')
+            for link in self.browser.find_elements(self.By.CSS_SELECTOR, '#investmentWatchlistEvidence a')))
+        self.browser.execute_script("document.getElementById('investmentWatchlistEvidence').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('yahoo-market-observations-desktop')
+
+        transport.charts['^NSEI']['chart']['result'][0]['meta']['symbol'] = 'FOREIGN'
+        verified_intelligence.market_snapshot(force=True); cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'Recorded holdings are unchanged' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        self.assertNotIn(SCHEME, self.text('investmentWatchlistCards'))
+        self.assertEqual(list(Investment.objects.values()), before)
+
+        from datetime import timedelta
+        from django.utils import timezone
+        transport.charts = SyntheticYahoo(end=timezone.now() - timedelta(days=8)).charts
+        cache.clear(); verified_intelligence.market_snapshot(force=True); self.browser.refresh()
+        self.wait.until(lambda _: 'Recorded holdings are unchanged' in self.text('investmentWatchlistSummary'))
+        self.assertEqual(self.text('investmentWatchlistMode'), 'Unavailable')
+        transport.charts = SyntheticYahoo().charts
+        cache.clear(); verified_intelligence.market_snapshot(force=True); self.browser.refresh()
+        self.wait.until(lambda _: SCHEME in self.text('investmentWatchlistCards'))
+        self.assertEqual(list(Investment.objects.values()), before)
+        self.assertNotIn('PRIVATE', str(transport.calls))
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',
+            {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
+        self.browser.execute_script("document.getElementById('investmentWatchlistEvidence').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('yahoo-market-observations-390px')
+        contrast = r"""function light(rgb) {
+            const v=rgb.match(/[\d.]+/g).slice(0,3).map(n=>{n=Number(n)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4});
+            return .2126*v[0]+.7152*v[1]+.0722*v[2];
+        }
+        return [...document.querySelectorAll('#investmentWatchlistEvidence .insight-item, #investmentWatchlistEvidence a, #investmentWatchlistAlgorithm .mini-card, #investmentWatchlistAlgorithm .muted, #investmentWatchlistAlgorithm .metric-caption')].map(e=>{
+            const a=light(getComputedStyle(e).color), b=light(getComputedStyle(e.closest('.insight-item, .mini-card')).backgroundColor);
+            return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+        });"""
+        for theme in ('light', 'dark'):
+            self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+            self.wait.until(lambda _: self.browser.execute_script(
+                "return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+            ratios = self.browser.execute_script(contrast)
+            self.assertGreaterEqual(len(ratios), 6)
+            self.assertTrue(all(ratio >= 4.5 for ratio in ratios), (theme, ratios))
+
     def test_investment_projection_starts_with_recorded_value_on_real_page(self):
         self.login()
         self.browser.get(self.live_server_url + "/investments/")
@@ -3912,6 +4495,57 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'no change was made' in self.text('plannerOrderProposal'))
         self.assertFalse(self.browser.find_elements(self.By.ID,'plannerApplyOrder'))
 
+    def test_travel_discovery_novelty_sources_expiry_and_offline_reference(self):
+        from copy import deepcopy
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import candidates_for
+        from tests.test_travel_discovery_acceptance import synthetic_discovery_result
+        session = new_session(self.scenario["user"])
+        candidate = candidates_for(self.scenario["user"], {})[0]
+        candidate.update(source="https://en.wikivoyage.org/wiki/Synthetic_Valley", source_freshness="LIVE",
+            discovery_result=synthetic_discovery_result(), quality={"verified": ["destinations"]})
+        candidate["discovery_result"]["attribution"] += ' <img src=x onerror="window.discoveryLeak=true">'
+        session.candidates = [candidate]; session.save()
+        before = deepcopy(session.candidates)
+        selector = "#plannerEvidenceBody [data-discovery-evidence]"
+        def panel():
+            return self.browser.find_element(self.By.CSS_SELECTOR, selector)
+        self.login(); self.browser.get(self.live_server_url + f"/mobility/?session={session.pk}")
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector) and "RECENTLY_VERIFIED" in panel().text)
+        self.assertIn("Missing visit records do not prove", panel().text)
+        self.assertIn("current access and availability remain unverified", panel().text)
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, selector+" img"))
+        self.assertFalse(self.browser.execute_script("return Boolean(window.discoveryLeak)"))
+        links = self.browser.find_elements(self.By.CSS_SELECTOR, selector+" a")
+        self.assertTrue(any(link.get_attribute("href")==candidate["source"] for link in links))
+        self.assertTrue(all("noopener" in link.get_attribute("rel") for link in links))
+        self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});", panel())
+        self.capture("travel-discovery-source-desktop")
+        session.refresh_from_db(); self.assertEqual(session.candidates, before)
+        candidate["discovery_result"]["expires_at"] = (timezone.now()-timedelta(seconds=1)).isoformat()
+        session.candidates = [candidate]; session.save(); self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector) and "STALE" in panel().text)
+        self.assertIn("Recheck Trip", panel().text)
+        candidate["discovery_result"] = synthetic_discovery_result()
+        candidate["discovery_result"].update(source_url="javascript:alert(1)", expires_at="invalid")
+        session.candidates = [candidate]; session.save(); self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector) and "UNKNOWN" in panel().text)
+        self.assertNotIn("Invalid Date", panel().text)
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, selector+' a[href^="javascript:"]'))
+        candidate.update(source_freshness="STATIC_REFERENCE", discovery_result=synthetic_discovery_result())
+        session.candidates = [candidate]; session.save(); self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector) and "STATIC_REFERENCE" in panel().text)
+        self.assertIn("Offline catalog suggestion", panel().text)
+        self.assertNotIn("RECENTLY_VERIFIED", panel().text)
+        self.addCleanup(self.browser.execute_cdp_cmd, "Emulation.clearDeviceMetricsOverride", {})
+        self.browser.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", dict(width=390,height=844,deviceScaleFactor=1,mobile=True))
+        self.assertEqual(self.browser.execute_script("return innerWidth"), 390)
+        self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});", panel())
+        self.assertLessEqual(self.browser.execute_script("return document.documentElement.scrollWidth"), 391)
+        self.capture("travel-discovery-offline-mobile")
+
     def test_travel_places_provenance_stale_and_unavailable_are_explicit(self):
         from copy import deepcopy
         from datetime import timedelta
@@ -4139,3 +4773,62 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn(month_start(-1).strftime("%B %Y"), self.text("dashboardPeriodNote"))
         self.assertNotIn("Current Month", self.text("dashboardSummaryCards"))
         self.capture("older-history-dashboard")
+
+    def test_career_country_filters_preserve_remote_restrictions_and_unknown_locations(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.career.models import CareerProfile
+        from apps.career.services import job_intelligence
+        from tests.test_career_location_acceptance import location_feed_results
+
+        owner = self.scenario['user']
+        CareerProfile.objects.create(user=owner, role='Developer', skills='Python', experience_years=3)
+        profiles = list(CareerProfile.objects.order_by('pk').values())
+        self.enterContext(patch.object(job_intelligence, '_live_job_feed_results', side_effect=location_feed_results))
+        self.enterContext(patch.object(job_intelligence, 'suggest_openings',
+            side_effect=lambda *a, **kw: type(job_intelligence).suggest_openings(job_intelligence, *a, **kw)))
+        self.login()
+        self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings > .mini-card')) == 8)
+        self.assertIn('Location not specified', self.text('careerOpenings'))
+        self.assertIn('Remote work does not confirm country eligibility', self.browser.find_element(self.By.ID, 'careerRoot').text)
+        self.browser.execute_script("document.querySelector('#careerProfileForm [name=role]').value = 'Unsaved local draft';")
+
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('India')
+        self.wait.until(lambda _: '3 of 8' in self.text('careerOpeningsMeta'))
+        self.assertNotIn('US only', self.text('careerOpenings'))
+        self.assertNotIn('India / United States', self.text('careerOpenings'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR, '#careerProfileForm [name=role]').get_attribute('value'), 'Unsaved local draft')
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningStateFilter')).select_by_value('Karnataka')
+        self.wait.until(lambda _: '1 of 8' in self.text('careerOpeningsMeta'))
+        self.assertIn('Remote - Bengaluru, Karnataka, India', self.text('careerOpenings'))
+
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('United States')
+        self.wait.until(lambda _: '2 of 8' in self.text('careerOpeningsMeta'))
+        self.assertIn('Remote (US only)', self.text('careerOpenings'))
+        self.assertNotIn('except United States', self.text('careerOpenings'))
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('Remote')
+        self.wait.until(lambda _: '5 of 8' in self.text('careerOpeningsMeta'))
+        self.assertNotIn('Non-remote', self.text('careerOpenings'))
+        self.browser.execute_script("""const fetch = window.fetch;
+            window.fetch = (url, options) => fetch(url, options).then(response => {
+                if (String(url).endsWith('/api/career/dashboard/?country=India')) {
+                    return new Promise(resolve => {window.releaseCountryResponse = () => resolve(response);});
+                }
+                return response;
+            }); window.restoreCountryFetch = () => {window.fetch = fetch;};""")
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('India')
+        self.wait.until(lambda _: self.browser.execute_script("return typeof window.releaseCountryResponse === 'function'"))
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('United States')
+        self.wait.until(lambda _: '2 of 8' in self.text('careerOpeningsMeta'))
+        self.browser.execute_async_script("window.restoreCountryFetch(); window.releaseCountryResponse(); requestAnimationFrame(()=>requestAnimationFrame(arguments[arguments.length-1]));")
+        self.assertIn('2 of 8', self.text('careerOpeningsMeta'))
+        self.assertEqual(Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).first_selected_option.get_attribute('value'), 'United States')
+        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('India')
+        self.wait.until(lambda _: '3 of 8' in self.text('careerOpeningsMeta'))
+        self.assertEqual(profiles, list(CareerProfile.objects.order_by('pk').values()))
+        self.browser.execute_script("document.getElementById('careerOpenings').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('career-country-restrictions-desktop')
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':900,'deviceScaleFactor':1,'mobile':True})
+        self.wait.until(lambda _: self.browser.execute_script("return !document.querySelector('.page-load-shell.is-loading')"))
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'), 391)
+        self.capture('career-country-restrictions-390px')

@@ -292,6 +292,7 @@ def _career_dashboard_revision(user, *, country: str = "", state: str = "") -> s
             loan_meta["count"], loan_meta["max_id"],
             country,
             state,
+            "geography-v2",
         ]
     )
 
@@ -782,10 +783,13 @@ def career_dashboard(request):
     payload = materialize_payload(
         namespace="career-dashboard",
         user_id=request.user.id,
-        revision=_career_dashboard_revision(request.user, country=country, state=state),
+        revision=_career_dashboard_revision(request.user, country=country, state=state) + ":discovery-v2",
         ttl_seconds=45,
         builder=lambda: _career_dashboard_payload(request),
     )
+    # Owner caching cannot extend a job feed's evidence lifetime.
+    payload["openings"] = [{**item, "source_status": (source_status := job_intelligence.opening_evidence_status(item.get("source_evidence") or {})),
+        "verified_source": source_status == "fresh"} for item in payload.get("openings", [])]
     return Response(payload)
 
 

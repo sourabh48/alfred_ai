@@ -15,7 +15,7 @@ def map_features(destination):
     route = destination.get("route_result", {})
     for index, item in enumerate(route.get("payload", {}).get("routes", [])):
         features.append({"type": "Feature", "geometry": item["geometry"],
-            "properties": {"name": f"Route {index+1}", "kind": "route", "freshness": route.get("freshness", "UNKNOWN"), "expires_at":route.get("expires_at")}})
+            "properties": {"name": f"Route {index+1}", "kind": "route", "selected": bool(item.get("route_id") and item["route_id"] == destination.get("selected_route_id")), "freshness": route.get("freshness", "UNKNOWN"), "expires_at":route.get("expires_at")}})
     if destination.get("origin_location"):
         origin = destination["origin_location"]
         point(origin["name"],"origin",origin["lat"],origin["lon"],"STATIC_REFERENCE")

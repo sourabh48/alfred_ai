@@ -2,7 +2,7 @@
 window.TravelResearchPanels = (() => {
     const esc = v => Alfred.escapeHtml(String(v ?? ""));
     const money = (v, currency="INR") => v == null ? "Not available" : `${esc(currency)} ${esc(Number(v).toLocaleString(undefined,{maximumFractionDigits:2}))}`;
-    const stamp = v => v ? new Date(v).toLocaleString() : "Not checked";
+    const stamp = v => v && Number.isFinite(Date.parse(v)) ? new Date(v).toLocaleString() : "Not checked";
     const label = r => `${r?.freshness || "UNKNOWN"}${r?.stale ? " · STALE" : ""}`;
     let session, selectedName, map, layers, mapGeometry, mapEnabled = false;
     const $ = id => document.getElementById(id);
@@ -42,6 +42,10 @@ window.TravelResearchPanels = (() => {
             return `<details><summary>${esc(kind[0].toUpperCase()+kind.slice(1))} · ${esc(label(r))}</summary>${provenance(r)}${(r.payload?.options || []).slice(0,4).map(o=>`<article><strong>${esc(o.carrier || o.provider)} · ${esc(o.origin)} → ${esc(o.destination)}</strong><p>${esc(o.departure || "Time unknown")} – ${esc(o.arrival || "Time unknown")} · ${esc(o.duration || "Duration unknown")} · ${esc(o.transfers ?? "Unknown")} transfers</p><p>${money(o.fare,o.currency)} · ${esc(o.availability)}</p>${o.fare_scope ? `<p>${esc(o.fare_scope)}</p>` : ""}${link(o.booking_url,"Open operator")}</article>`).join("") || '<p>Current availability could not be verified. Check the operator externally.</p>'}${searchLinks(d,[kind])}</details>`;
         }).join("")}${(d.mode_comparison || []).length ? `<h4 class="h6 mt-3">Mode comparison · ESTIMATED budgets</h4><ul>${d.mode_comparison.map(m=>`<li>${esc(m.mode)}: ${money(m.budget.expected)} expected · ${esc(m.availability)}</li>`).join("")}</ul>` : ""}`;
     }
+    function discovery(d) {
+        const r = d.discovery_result || {};
+        return `<div data-discovery-evidence><h3 class="h5">Destination discovery and novelty</h3><p>${esc(d.novelty || "Not yet assessed")}. Missing visit records do not prove you have never been.</p>${d.source_freshness === "STATIC_REFERENCE" ? `<p><span class="travel-freshness">STATIC_REFERENCE</span> ${link(d.source,"Destination reference")} · Offline catalog suggestion; no fresh discovery source is available.</p>` : r.success ? `${provenance(r)}<p>${link(d.source,"Destination guide")} · Community travel-guide lead; current access and availability remain unverified.</p>${r.stale ? '<p role="status">Cached discovery evidence has expired. Recheck Trip before relying on these leads.</p>' : ''}` : '<p>Discovery source not verified for this destination.</p>'}<p class="small">Novelty uses only your recorded trips, logs, photo locations and destination history. A guide result does not establish opening hours, permits or booking availability.</p></div>`;
+    }
     function sources(d) {
         const r = d.permit_result || {}, p = r.payload || {};
         const research = d.web_research || [];
@@ -66,7 +70,7 @@ window.TravelResearchPanels = (() => {
         if (!d) return;
         Alfred.setHTMLIfChanged("plannerResearchChoices", (session.candidates || []).map(x=>`<button class="btn btn-sm btn-outline-primary" data-research-destination="${esc(x.name)}" aria-pressed="${(d.name || d.destination)===x.name}">${esc(x.name)}</button>`).join(""));
         $("plannerEvidenceTitle").textContent = `Research for ${d.name || d.destination}`;
-        Alfred.setHTMLIfChanged("plannerEvidenceBody", [quality(d),weather(d),stays(d),transport(d),sources(d),places(d),costs(d)].map(html=>`<section class="surface-card">${html}</section>`).join(""));
+        Alfred.setHTMLIfChanged("plannerEvidenceBody", [quality(d),discovery(d),weather(d),stays(d),transport(d),sources(d),places(d),costs(d)].map(html=>`<section class="surface-card">${html}</section>`).join(""));
         $("plannerQuota").hidden = !session.can_view_provider_usage;
         renderMap(d);
     }
@@ -87,7 +91,7 @@ window.TravelResearchPanels = (() => {
         if (layers) map.removeLayer(layers);
         try {
             layers = L.geoJSON(d.map || {type:"FeatureCollection",features:[]},{
-                style:f=>({color:f.properties?.freshness === "CACHED" ? "#946335" : "#206c65",weight:4}),
+                style:f=>({color:f.properties?.freshness === "CACHED" ? "#946335" : "#206c65",weight:f.properties?.selected ? 7 : 3,opacity:f.properties?.selected ? 1 : 0.6}),
                 pointToLayer:(f,latlng)=>L.circleMarker(latlng,{radius:7,color:"#206c65",fillOpacity:.8}),
                 onEachFeature:(f,layer)=>layer.bindPopup(`<strong>${esc(f.properties?.name)}</strong><br>${esc(f.properties?.kind)} · ${esc(f.properties?.freshness || "UNKNOWN")}<br>${link(f.properties?.source_url,"Source")}`)
             }).addTo(map);

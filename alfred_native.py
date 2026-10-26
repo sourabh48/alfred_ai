@@ -239,6 +239,7 @@ def serve(data, port):
         call_command("migrate", interactive=False, verbosity=1)
         call_command("prune_private_memory", verbosity=0)
         call_command("sync_private_memory", seconds=5, verbosity=0)
+        call_command("checkpoint_knowledge_hub", seconds=2, verbosity=0)
         call_command("collectstatic", interactive=False, verbosity=0)
         child = spawn("worker", data, "--instance", instance, "--parent-pid", str(os.getpid()))
         # This is an actual queued task, not eager execution or a process ping.
@@ -294,6 +295,7 @@ def serve(data, port):
             child.wait()  # Do not cut off a running document import or model save.
         if configured:
             call_command("sync_private_memory", seconds=5, verbosity=0)
+            call_command("checkpoint_knowledge_hub", seconds=2, verbosity=0)
         (runtime / f"stop-{instance}").unlink(missing_ok=True)
         if tray is not None:
             tray.close()

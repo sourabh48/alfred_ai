@@ -14,6 +14,12 @@ LIMITATION = ('Extractive local AI selection, not independently verified facts o
     'Only the selected retrieved excerpts were considered; omitted text may change their meaning. '
     'Review original files and corrected canonical records. No question, answer or document is sent to a cloud provider, '
     'saved as a verified memory or added to conversation history.')
+FULL_LIMITATION = ('Whole-extraction mode requires all selected retained extracted text to fit the bounded local request. '
+    'Extraction can omit pages, OCR or context from the original; complete extraction, authenticity and answer accuracy are not established. '
+    'The model selects quotations, never financial calculations or verified facts. Review original files and corrected canonical records. '
+    'No question, answer or document is sent to a cloud provider, saved as a verified memory or added to conversation history.')
+CONTEXT_LIMIT = ('The complete selected extraction does not fit the local context limit. No partial context or answer was accepted. '
+    'Select fewer or shorter documents, or explicitly switch to keyword excerpts.')
 
 
 class DocumentQuestionReasoner(OllamaReasoner):
@@ -43,30 +49,43 @@ class DocumentQuestionReasoner(OllamaReasoner):
         return message['content']
 
 
-def answer_question(corpus, user, identities, question, keywords, *, local=None):
+def answer_question(corpus, user, identities, question, keywords=None, *, local=None, context_mode='keywords'):
+    if context_mode not in ('keywords', 'full_extraction'):
+        raise ValueError('Choose keyword excerpts or whole-extraction context.')
+    full_context = context_mode == 'full_extraction'
+    if full_context and keywords not in (None, ''):
+        raise ValueError('Whole-extraction mode does not filter by keywords.')
     if (not isinstance(question, str) or not question.strip() or len(question) > 512 or len(question.encode()) > 1024
             or any(ord(char) < 32 or ord(char) == 127 for char in question)):
         raise ValueError('Enter a question within 512 characters and 1024 bytes.')
-    initial = corpus.search(user, identities, keywords)
+    options = {'full_context': True} if full_context else {}
+    initial = corpus.search(user, identities, keywords, **options)
     response = dict(results=[], status='insufficient_evidence', answer='The selected excerpts do not establish an answer. '
         'Narrow the keywords, review every selected document and its original context, or use reviewed financial records.',
-        financial_authority=False, full_text_qa=False, checked_at=initial['checked_at'], limitation=LIMITATION,
+        financial_authority=False, full_text_qa=False, checked_at=initial['checked_at'],
+        limitation=FULL_LIMITATION if full_context else LIMITATION, context_mode=context_mode, context_complete=False,
         more_matches=initial['more_matches'], result_limit=initial['result_limit'])
     hits = initial['results']
     if initial['more_matches'] or {hit['id'] for hit in hits} != set(identities):
+        if full_context and initial['more_matches']:
+            response.update(status='context_limit', answer=CONTEXT_LIMIT)
         return response
     payload = dict(question=question, passages=[dict(id=index, document=identities.index(hit['id']), text=hit['excerpt'])
         for index, hit in enumerate(hits)])
     if len(json.dumps(payload, ensure_ascii=False, allow_nan=False).encode()) > 4096:
+        if full_context:
+            response.update(status='context_limit', answer=CONTEXT_LIMIT)
+            return response
         raise ValueError('Narrow the keywords or select fewer documents before asking.')
     deadline = time.monotonic() + 30
     raw = (local if local is not None else DocumentQuestionReasoner()).select(payload, deadline=deadline)
     if time.monotonic() >= deadline:
         raise EmbeddingUnavailable('Local document selection exceeded its deadline.')
-    fresh = corpus.search(user, identities, keywords)
+    fresh = corpus.search(user, identities, keywords, **options)
     if fresh['results'] != hits or fresh['more_matches'] != initial['more_matches']:
         raise SourceSelectionConflict()
     response['checked_at'] = fresh['checked_at']
+    response['context_complete'] = full_context
     try:
         def unique_fields(pairs):
             result = dict(pairs)

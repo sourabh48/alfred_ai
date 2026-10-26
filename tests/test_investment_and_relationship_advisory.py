@@ -288,14 +288,15 @@ class InvestmentAndRelationshipAdvisoryTests(TestCase):
 
     def test_investment_summary_exposes_short_horizon_watchlist_with_proof(self):
         cache.clear()
+        end_date = timezone.localdate()
         latest_report = "\n".join([
             "Scheme Code;ISIN Div Payout/ ISIN Growth;ISIN Div Reinvestment;Scheme Name;Net Asset Value;Date",
             "Open Ended Schemes(Equity Scheme - Flexi Cap Fund)",
             "Axis Mutual Fund",
-            "120000;INF000000001;INF000000002;Axis Flexi Cap Fund - Direct Plan - Growth;18.4000;31-Mar-2026",
+            f"120000;INF000000001;INF000000002;Axis Flexi Cap Fund - Direct Plan - Growth;18.4000;{end_date:%d-%b-%Y}",
             "Open Ended Schemes(Hybrid Scheme - Balanced Advantage Fund)",
             "ICICI Prudential Mutual Fund",
-            "120001;INF000000003;INF000000004;ICICI Prudential Balanced Advantage Fund - Direct Plan - Growth;22.1500;31-Mar-2026",
+            f"120001;INF000000003;INF000000004;ICICI Prudential Balanced Advantage Fund - Direct Plan - Growth;22.1500;{end_date:%d-%b-%Y}",
         ])
         history_lines = [
             "Scheme Code;Scheme Name;ISIN Div Payout/ISIN Growth;ISIN Div Reinvestment;Net Asset Value;Repurchase Price;Sale Price;Date",
@@ -304,7 +305,7 @@ class InvestmentAndRelationshipAdvisoryTests(TestCase):
         ]
         axis_navs = [15.00, 15.08, 15.16, 15.25, 15.34, 15.45, 15.58, 15.66, 15.74, 15.89, 16.02, 16.11, 16.26, 16.32, 16.48, 16.56, 16.67, 16.74, 16.83, 16.92, 17.05, 17.12, 17.23, 17.31, 17.44, 17.58, 17.69, 17.77, 17.89, 18.01, 18.12, 18.19, 18.26, 18.31, 18.36, 18.40]
         icici_navs = [20.00, 20.04, 20.09, 20.15, 20.18, 20.24, 20.31, 20.35, 20.40, 20.46, 20.50, 20.55, 20.58, 20.61, 20.67, 20.72, 20.78, 20.83, 20.90, 20.96, 21.03, 21.08, 21.16, 21.22, 21.31, 21.40, 21.48, 21.57, 21.63, 21.72, 21.81, 21.89, 21.95, 22.01, 22.08, 22.15]
-        start_date = date(2026, 2, 24)
+        start_date = end_date - timedelta(days=35)
         dates = [(start_date + timedelta(days=index)).strftime("%d-%b-%Y") for index in range(36)]
         for nav, nav_date in zip(axis_navs, dates):
             history_lines.append(f"120000;Axis Flexi Cap Fund - Direct Plan - Growth;INF000000001;INF000000002;{nav:.4f};;;{nav_date}")

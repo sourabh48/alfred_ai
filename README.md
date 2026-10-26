@@ -1,256 +1,124 @@
-> **Current status (2026-10-15):** M15 AI/UI source is deployed and GitHub master matches `3932f391`. Full product acceptance remains incomplete; normal-account, real-provider, clean-PC and independently portable recovery evidence are separate. Current service health was not observed by the audit. Start with the [feature matrix](docs/PROJECT_STATUS.md), [roadmap](docs/PROJECT_STATUS.md), [acceptance plan](docs/ALFRED_END_TO_END_ACCEPTANCE.md) and [executable completion prompt](artifacts/audit/ALFRED_MASTER_COMPLETION_CODEX_PROMPT.md).
+# ALFRED 2.0
 
-<p align="center">
-  <strong>Alfred - Finance Assistant</strong><br>
-  A product of <strong>Life on our Trails</strong><br><br>
-  <a href="https://sourabh48.github.io/alfred_ai/">Open the product website</a> ·
-  <a href="https://sourabh48.github.io/alfred_ai/guide/">Illustrated installation guide</a><br><br>
-  <img src="docs/assets/readme-hero.svg" alt="ALFRED — personal finance, documents and planning in one local workspace" width="100%">
-</p>
+A privacy-first Windows application connecting personal finance, documents,
+wealth, investment research, career, travel and local intelligence. ALFRED runs
+locally or on your LAN using **Django + Waitress + Huey + SQLite**. Ollama is the
+default AI route; encrypted memory and reviewed evidence supplement canonical
+calculations. Planned 2.0 upgrades reuse this application rather than separate apps.
 
-<p align="center">
-  <strong>Understand your money. Organize your documents. Plan what comes next.</strong><br>
-  A personal finance workspace that runs on your Windows PC, with a browser interface and background jobs included.
-</p>
+## Current verified status
 
-<p align="center">
-  <a href="https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Setup.exe"><img src="docs/assets/download-windows.svg" alt="Download ALFRED for Windows x64 — installer" width="304" height="64"></a>
-  &nbsp;
-  <a href="https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Windows-x64.zip"><img src="docs/assets/download-portable.svg" alt="Download the portable Windows ZIP" width="240" height="64"></a>
-</p>
+Generated from the [canonical inventory and PR checkpoint](docs/PROJECT_STATUS.md).
+Counts describe accepted scopes, not universal accuracy or production readiness.
 
-<p align="center">
-  <a href="#features">Features</a> ·
-  <a href="#install-for-users">Install for users</a> ·
-  <a href="#set-up-for-developers">Set up for developers</a> ·
-  <a href="#verification-status">Verification</a> ·
-  <a href="#documentation">Documentation</a>
-</p>
+<!-- BEGIN STATUS DASHBOARD -->
+**Baseline: 75/143 (52.4%) verified.**
 
-<p align="center">
-  <strong>Windows x64</strong> &nbsp; / &nbsp; <strong>Local or LAN hosting</strong> &nbsp; / &nbsp; <strong>Python included in downloads</strong>
-</p>
+IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
----
+PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
-## Features
+Extensions: **0/13 accepted**; separate source-bound story ledger.
+<!-- END STATUS DASHBOARD -->
 
-<table>
-  <tr>
-    <td width="50%">
-      <h3>💳 See your financial picture</h3>
-      Import statements, review transactions, track spending and budgets, and understand cash flow and net worth.
-    </td>
-    <td width="50%">
-      <h3>📄 Bring documents together</h3>
-      Upload statements, credit reports, loan documents and other supported files. Review uncertain extraction and correct it in the document center.
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <h3>📊 Keep plans connected</h3>
-      Track loans, repayments and investments alongside your everyday finances. Use career and vehicle workspaces for related planning.
-    </td>
-    <td>
-      <h3>🤝 Share with consent</h3>
-      Link consenting family accounts with a link code. Manage linked members and use <strong>Remove my data</strong> from Settings.
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <h3>🖥️ Run it on your own PC</h3>
-      Open ALFRED from a desktop shortcut. The Windows package includes the web server, Python, local database, OCR runtime and web assets.
-    </td>
-    <td>
-      <h3>⚙️ Keep work moving</h3>
-      Background jobs handle scheduled refresh, cleanup and eligible training. Queued work survives restarts; interrupted imports and training stay available for review.
-    </td>
-  </tr>
-</table>
+[Current task and exact resume](docs/EXECUTION_STATE.md) ·
+[Requirements](docs/ALFRED_2_0_REQUIREMENTS.md) ·
+[Dependency queue](docs/EXECUTION_QUEUE.md) ·
+[143-capability evidence](docs/PROJECT_STATUS.md) ·
+[Acceptance gates](docs/ALFRED_END_TO_END_ACCEPTANCE.md)
 
-ALFRED uses **Django + Waitress + Huey + SQLite** for its native Windows runtime.
-The Windows app includes a [chat-first Travel Planner](docs/TRAVEL_PLANNER.md):
-start without a destination, compare suggestions, build and edit an itinerary,
-and save the conversation as a travel plan. Start with dates, a budget or a craving;
-destination selection comes later. See the planner guide for current coverage.
+Implemented, verified, configured-provider, real-account, native/packaged and
+production acceptance are separate states. A pushed branch is not a merged PR;
+a merge is not deployment authorization. No current production health is claimed.
 
-Your data stays in your chosen local folder. Live external sources and configured
-integrations need internet access; the interface assets and OCR engines are bundled.
+## Features and coordinated upgrades
 
-## Install for users
+- **Finance and Wealth 2.0:** canonical income/expenses/loans/net worth, budgets,
+  reconciliation and source-grounded planning; expand goals, reserves, snapshots,
+  look-through and reviewable proposals. Preserve Decimal precision. Currency/FX/
+  valuation policy remains unapproved; never infer denomination from location.
+- **Career 2.0:** owned resume/JD/recruiter workflows, skill gaps, configurable
+  Bengaluru/Java/Spring Boot/AWS search interests, job/application outcomes,
+  interview preparation and evidence-labelled salary/career scenarios. No implicit sending.
+- **Travel 2.0:** conversational discovery, private plans, day/stop editing,
+  motorcycle/pillion budgets, maps and dated evidence. Expand routed detours,
+  independently supported restrictions, organizers/reminders and exports. Car
+  routing never proves motorcycle legality; links do not establish bookings/permits.
+- **Investment 2.0:** owned portfolios, imports, evidence and scenarios; expand
+  fundamentals/valuation, risk challenge, watchlists and goal-aware research.
+  Suggestions are uncertain; no automatic stock trading or unapproved market feed.
+- **Shared intelligence:** owner-isolated documents/citations, encrypted learning
+  candidates and reviewed packs, local models, quality/readiness checks, bounded
+  jobs, offline recovery and explicit confirmation. Private Git sync stays disabled.
 
-**Choose this route to use ALFRED without setting up a development environment.**
-You need a Windows x64 PC and a browser. Python, pip, Docker, PostgreSQL and Redis
-do not need to be installed separately.
+Aurelio is reference-only; TREK ideas are independently implemented; TradingAgents
+uses compatible Python engine reuse through thin adapters. Career Ops business
+behavior is incrementally ported into Django from the
+[resolved repository](https://github.com/career-ops-hq/career-ops).
+No new upstream integration is claimed. See the [pinned matrix](docs/UPSTREAM_REFERENCE_MATRIX.md),
+[shared boundaries](docs/ALFRED_2_0_INTEGRATION_ARCHITECTURE.md) and
+[CI/integration lanes](docs/CI_PIPELINE_STATE.md).
 
-**[Open the installation website →](https://sourabh48.github.io/alfred_ai/guide/)** ·
-[Read the guide on GitHub](docs/INSTALLATION.md)
+## Install and develop
 
-<table>
-  <tr>
-    <td width="50%"><a href="docs/INSTALLATION.md#1-download"><img src="docs/guide/images/01-download.svg" alt="Step 1: download the ALFRED Windows installer" width="100%"></a></td>
-    <td width="50%"><a href="docs/INSTALLATION.md#4-use-the-tray-icon"><img src="docs/guide/images/04-tray.svg" alt="Find the ALFRED A icon near the Windows clock and right-click for controls" width="100%"></a></td>
-  </tr>
-</table>
+For users: [Windows installation](docs/INSTALLATION.md), [package guide](docs/WINDOWS_PACKAGE.md)
+and [native runtime/recovery](docs/NATIVE_WINDOWS.md). Existing downloadable previews
+are historical artifacts; they do not contain every current development feature.
+Never promote a package or modify production based only on this README.
 
-*Illustrated steps; the full guide covers download, setup, first launch and the tray menu.*
+For developers: [development setup](docs/DEVELOPMENT.md), [repository map](docs/REPOSITORY.md),
+[Travel providers](docs/TRAVEL_PROVIDERS.md) and [project instructions](AGENTS.md).
+Keep secrets in ignored `config/local.env`; use the configured Python SDK and
+isolated synthetic test data. No cloud deployment wiring or AWS runtime activation.
 
-### 1. Download
-
-| Download | Best for | Approximate size |
-| --- | --- | --- |
-| **[Windows installer](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Setup.exe)** | Desktop and Start menu shortcuts, plus an uninstaller | 485 MB |
-| **[Portable ZIP](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/ALFRED-Windows-x64.zip)** | Running from an extracted program folder | 542 MB |
-| [SHA-256 checksums](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/SHA256SUMS.txt) | Checking the downloaded files | < 1 KB |
-| [Release manifest](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/release-manifest.json) | File sizes, hashes and build provenance | < 5 KB |
-
-The current download is **v1.1.0-preview.1**, adding conversational travel discovery,
-persistent research, editable itineraries and travel preferences. It retains the
-Windows tray controls and illustrated setup instructions. See the [release notes](https://github.com/sourabh48/alfred_ai/releases/tag/v1.1.0-preview.1)
-and [remaining acceptance checks](#verification-status). This preview installer
-is not digitally signed; checksums are provided with the release.
-
-See the [release verification](docs/TRAVEL_RELEASE_VERIFICATION_20260929.md)
-for package fingerprints, upgrade checks and remaining acceptance work.
-
-### 2. Install and open
-
-1. Run **ALFRED-Setup.exe** and complete setup. Installation is for your Windows
-   account; administrator access is not required.
-2. Open **ALFRED** from the desktop or Start menu. Wait for the launcher to open
-   your browser.
-3. Create your account, or sign in to an existing account in that data folder.
-   Start with a statement upload or enter your financial details.
-
-The browser normally opens at `http://127.0.0.1:8000/`. ALFRED selects another
-port if needed; use the launcher to open the correct address.
-
-The **ALFRED A icon stays in the Windows tray while the app runs**. Click it to
-open your workspace. Right-click for **Installation guide**, **Open data folder**
-and **Stop ALFRED**. If it is hidden, use the **↑ arrow** near the clock.
-The guide also opens offline from that menu.
-
-<details>
-<summary><strong>Using the portable ZIP instead</strong></summary>
-
-Extract the **entire ZIP**, open the `ALFRED` folder, and double-click
-**ALFRED Launcher.exe** or **Start ALFRED.cmd**. Keep `_internal` and both
-executables together. Run it from the extracted folder, not from inside the ZIP.
-
-Portable describes the program folder. By default, its data is still stored in
-`%LOCALAPPDATA%\ALFRED`, just like the installed app.
-
-</details>
-
-<details>
-<summary><strong>Check a download's SHA-256 checksum</strong></summary>
-
-Download [SHA256SUMS.txt](https://github.com/sourabh48/alfred_ai/releases/download/v1.1.0-preview.1/SHA256SUMS.txt)
-from the same release. In PowerShell, open the folder containing the installer:
+Check generated inventory views with the configured SDK:
 
 ```powershell
-Get-FileHash .\ALFRED-Setup.exe -Algorithm SHA256
+python scripts/project_execution.py --check
 ```
 
-Compare the returned hash with the installer entry in `SHA256SUMS.txt`.
-For the ZIP, replace the filename with `ALFRED-Windows-x64.zip`.
+Use `--write` only after intentional tracker/requirements changes. The script is
+network-free; it does not verify product behavior or activate integrations.
 
-</details>
+## Exact Codex commands
 
-### 3. Stop, update or uninstall
+- **`continue`** — read EXECUTION_STATE, verify Git/HEAD, recover the current task
+  and its incomplete step. Reuse valid evidence. If finished, report READY_FOR_NEXT
+  and wait; do not start another task.
+- **`next`** — checkpoint or explicitly defer the current task, select the next
+  eligible queue item in phase/module order, execute that one task, then stop.
+- **`status`** — read-only report of refs, PR/CI, task progress, baseline/modules,
+  extensions, remaining categories and approval decisions. No source mutations.
+- **`sprint`** — continuously select eligible scopes during this active execution;
+  isolate section PRs, code while CI runs, and reconcile at milestones. Automatic
+  merges require all review/protection/privacy/publication gates.
 
-- **Stop:** use **Stop ALFRED** in the tray or Start menu, or **Stop ALFRED.cmd** in the
-  portable folder. Closing the browser leaves background jobs running.
-- **Update:** keep a backup, then run the newer installer or replace the portable
-  program folder. The separate data folder is retained.
-- **Uninstall:** choose **Uninstall ALFRED** in the Start menu or Windows
-  **Settings → Apps**. The installed folder also includes **Uninstall ALFRED.cmd**.
-  Saved accounts, documents, settings and models are retained.
+Before interruption, record exact tests/artifacts, refs, changed/dirty files,
+blockers and the next command in EXECUTION_STATE. Never reset, clean, force-push,
+automatically stash or overwrite uncertain work. Master/Pages publishing and
+production require the documented approvals; do not bypass missing reviews or 403s.
 
-See the [Windows package guide](docs/WINDOWS_PACKAGE.md) for troubleshooting and
-the [startup guide](docs/NATIVE_WINDOWS.md#automatic-startup-after-windows-sign-in)
-for optional startup after Windows sign-in. Scheduled work runs while the PC
-and ALFRED are on.
+## Historical evidence
 
-## Set up for developers
-
-**Choose this route to edit the code, run tests or build your own package.**
-Use Git and **Python 3.12**, the currently tested development version. Run these
-commands in PowerShell:
-
-```powershell
-git clone https://github.com/sourabh48/alfred_ai.git
-cd alfred_ai
-
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe alfred_native.py start
-```
-
-The native launcher creates local configuration, applies migrations, prepares
-static files and starts the server, worker and scheduler. No separate database
-or queue service is needed. Keep an existing configured `.venv` when continuing
-work on a checkout. Runtime secrets belong in untracked files such as
-`config/local.env`.
-
-```powershell
-# Inspect or stop the source-based runtime
-.\.venv\Scripts\python.exe alfred_native.py status
-.\.venv\Scripts\python.exe alfred_native.py stop
-
-# Run backend checks; browser workflows are run separately
-$env:ALFRED_LOCAL_RUNTIME = 'true'
-$env:ALFRED_AUTO_TRAIN_ON_STARTUP = 'false'
-$env:ALFRED_RUN_BROWSER_TESTS = 'false'
-.\.venv\Scripts\python.exe manage.py check
-.\.venv\Scripts\python.exe manage.py test --noinput
-```
-
-Use a disposable checkout or data folder for integration tests. The
-[development guide](docs/DEVELOPMENT.md) covers browser tests, diagnostics and
-the Django development server. The [build guide](docs/WINDOWS_PACKAGE.md#build-the-same-release)
-covers the standalone package and installer.
+The dated reports and original Git history remain intact. They establish only
+what was tested then, not the acceptance of the current development branch.
+[README at the prior checkpoint](https://github.com/sourabh48/alfred_ai/blob/5af834c/README.md)
+retains the earlier distribution/setup record.
 
 <details>
-<summary><strong>Continuing an existing Windows checkout</strong></summary>
+<summary>Recorded 2026-09-26 through 2026-10-15 release evidence</summary>
 
-Double-click **ALFRED.lnk** or **Start ALFRED.cmd** when a packaged launcher is
-available. It uses that checkout's existing data. Use **Stop ALFRED.cmd** to stop
-it and **Enable ALFRED startup.cmd** to opt into quiet startup after sign-in.
-
-The checkout's data and `%LOCALAPPDATA%\ALFRED` are separate. Installing a release
-does not automatically import accounts or uploads from your development folder.
-
-</details>
-
-## Your data and recovery
-
-| How you run ALFRED | Default data location |
-| --- | --- |
-| Windows installer or portable package | `%LOCALAPPDATA%\ALFRED` |
-| Source checkout | The repository folder |
-
-Back up the **database, uploads, models and private configuration together**.
-Follow the [backup and restore guide](docs/NATIVE_WINDOWS.md#backup-and-restore)
-before moving data between machines or installations. The downloads exclude the
-developer's accounts, uploads and credentials.
-
-Queued jobs survive restart. Interrupted maintenance can retry; interrupted
-imports and training remain available for review. See
-[data privacy and storage](docs/DATA_PRIVACY_AND_STORAGE.md) for the full policy.
-Local-only access is the default; LAN access is a separate configuration decision.
-
-## Verification status
+### Historical verification receipts
 
 **Recorded Windows verification, 26–29 September 2026.** These are completed
 checks within the scope of the linked reports, not a claim of universal accuracy.
 
 | Check | Recorded result |
 | --- | --- |
-| Current launcher and tray | Real Windows icon registered and removed correctly; offline guide present |
-| Current packaged native runtime | **23 checks passed** on 28 September |
-| Current concurrent local usage | **24 users, 480 writes, zero errors** |
-| Current installed upgrade | **1.0.1 → 1.1.0 passed**, existing records retained and uninstaller present |
+| Then-current launcher and tray | Real Windows icon registered and removed correctly; offline guide present |
+| Then-current packaged native runtime | **23 checks passed** on 28 September |
+| Then-current concurrent local usage | **24 users, 480 writes, zero errors** |
+| Then-current installed upgrade | **1.0.1 → 1.1.0 passed**, existing records retained and uninstaller present |
 | Backend regression suite | **466 passed**; 11 browser cases skipped and checked separately |
 | Chrome browser workflows | **11 passed**, zero skips, including travel planning |
 | Full installer lifecycle | **6 passed** on the previous release; current full uninstall acceptance remains open |
@@ -274,35 +142,5 @@ The checkout includes [verification startup controls](docs/NATIVE_WINDOWS.md#ver
 that retain interrupted reports and begin a fresh observation after sign-in.
 Starting an observation does not count as passing it.
 
-## Documentation
 
-| I want to… | Read this |
-| --- | --- |
-| Install, update or uninstall | [Windows package guide](docs/WINDOWS_PACKAGE.md) |
-| Follow installation pictures | [Illustrated installation guide](docs/INSTALLATION.md) |
-| Open the website or manage search visibility | [Product website](https://sourabh48.github.io/alfred_ai/) · [Website and SEO](docs/WEBSITE.md) |
-| Find source files or ownership details | [Repository map](docs/REPOSITORY.md) · [Copyright and fingerprints](docs/OWNERSHIP.md) |
-| Configure startup, schedules or recovery | [Native Windows guide](docs/NATIVE_WINDOWS.md) |
-| Develop, test or build | [Development guide](docs/DEVELOPMENT.md) |
-| Continue a full product audit in Claude | [Claude audit and completion prompt](docs/CLAUDE_HANDOFF.md) |
-| Test a fresh Windows PC | [Windows acceptance checklist](docs/WINDOWS_ACCEPTANCE.md) |
-| Understand data handling | [Privacy and storage](docs/DATA_PRIVACY_AND_STORAGE.md) |
-| Understand the system and planned work | [Architecture](docs/ARCHITECTURE.md) · [Future scope](docs/FUTURE_SCOPE.md) |
-| Review completion and cleanup records | [Completion audit](docs/COMPLETION_AUDIT.md) · [Release verification](docs/WINDOWS_PACKAGE_VERIFICATION_20260927.md) |
-| Use the optional container runtime | [Local Docker Compose guide](docs/LOCAL_HOSTING.md) |
-
-ALFRED is local or LAN-hosted. Docker/PostgreSQL/Redis/Celery is an optional runtime. The native Windows app
-uses Waitress, Huey and SQLite. Public/cloud deployment is outside the current scope.
-
----
-
-<p align="center">
-  <strong>ALFRED</strong><br>
-  Finance Assistant by Life on our Trails.<br>
-  © 2026 Life on our Trails. All rights reserved.<br><br>
-  <a href="https://sourabh48.github.io/alfred_ai/">Product website</a> ·
-  <a href="docs/OWNERSHIP.md">Copyright and release fingerprints</a> ·
-  <a href="https://github.com/sourabh48/alfred_ai/releases/tag/v1.1.0-preview.1">Download the Windows preview</a> ·
-  <a href="https://github.com/sourabh48/alfred_ai/issues">Report an issue</a> ·
-  <a href="#features">Back to features ↑</a>
-</p>
+</details>

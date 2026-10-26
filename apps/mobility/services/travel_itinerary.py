@@ -164,6 +164,7 @@ def build_itinerary(state, destination):
            ("route_result","weather_result","places_result","permit_result","hotels_result","flights_result","trains_result","buses_result","discovery_result","weather_proposals","map","quality","mode_comparison","web_research","external_links")},
         "status": "preliminary", "days": itinerary_days, "budget": budget, "weather": destination["weather"],
         "route": {"summary": f"{origin} → {destination['name']} → {origin}", "distance_km_one_way": destination.get("distance_km"),
+                  "selected_route_id": destination.get("selected_route_id"),
                   "hours_one_way": destination.get("travel_hours"), "confidence": destination.get("route_result",{}).get("confidence","ESTIMATED"),
                   "note": destination.get("distance_basis","Town-centre estimate only.") + " Confirm a legal route, closures and fuel stops before departure.",
                   "options": [{"name": "Fastest", "status": "Needs current routing verification"},

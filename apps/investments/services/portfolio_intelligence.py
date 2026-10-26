@@ -7,7 +7,8 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from math import sqrt
+from decimal import Decimal, InvalidOperation, localcontext
+from math import isfinite, sqrt
 from statistics import mean, pstdev
 from typing import Dict, List, Optional, BinaryIO
 from bs4 import BeautifulSoup
@@ -32,6 +33,7 @@ AMFI_FAILURE_CACHE_TTL_SECONDS = 60 * 15
 WATCHLIST_HISTORY_DAYS = 60
 WATCHLIST_TARGET_COUNT = 5
 WATCHLIST_MIN_OBSERVATIONS = 18
+WATCHLIST_NAV_MAX_AGE_DAYS = 7
 WATCHLIST_PROOF_NEWS_LIMIT = 2
 WATCHLIST_NAME_EXCLUSIONS = ("IDCW", "DIVIDEND", "BONUS", "UNCLAIMED", "SEGREGATED", "REGULAR", "INTERVAL")
 WATCHLIST_NAME_REQUIRED = ("DIRECT", "GROWTH")
@@ -135,14 +137,26 @@ class PortfolioIntelligenceService:
         full_text = extracted.text or ""
         broker = self._detect_broker(full_text)
 
-        if "ZERODHA" in broker.upper():
-            parsed_investments = self._parse_zerodha_statement(full_text)
-        elif "GROWW" in broker.upper():
-            parsed_investments = self._parse_groww_statement(full_text)
-        else:
-            parsed_investments = self._parse_generic_statement(full_text, broker=broker)
+        parsed_investments, layout_review = self._parse_holdings_table(full_text, broker=broker)
+        # OCR diagnostics can be present even when digital text won; use the selected method.
+        if any(token in extracted.method.lower() for token in ("ocr", "tesseract")):
+            parsed_investments = []
+            layout_review = {"status": "needs_review", "reason": "OCR table amounts and account identity require source review before import."}
+        if layout_review and len(full_text) >= 30000:
+            parsed_investments = []
+            layout_review = {"status": "needs_review", "reason": "Extraction reached its text bound; review the complete source before import."}
+        if layout_review is None:
+            if "ZERODHA" in broker.upper():
+                parsed_investments = self._parse_zerodha_statement(full_text)
+            elif "GROWW" in broker.upper():
+                parsed_investments = self._parse_groww_statement(full_text)
+            else:
+                parsed_investments = self._parse_generic_statement(full_text, broker=broker)
 
         account_number = self._extract_account_hint(full_text)
+        if layout_review is not None:
+            accounts = {item["account_number"] for item in parsed_investments}
+            account_number = next(iter(accounts)) if len(accounts) == 1 else ""
         field_names = sorted(
             {
                 *[key for item in parsed_investments for key, value in item.items() if value not in ("", None, 0)],
@@ -168,6 +182,8 @@ class PortfolioIntelligenceService:
             parser_status = "failed"
 
         notes = [*extracted.notes, *learning_notes]
+        if layout_review:
+            notes.append(layout_review["reason"])
         summary = (
             f"{len(parsed_investments)} investment position(s) were extracted from the {broker} document."
             if parsed_investments
@@ -188,6 +204,7 @@ class PortfolioIntelligenceService:
                 "raw_notes": notes[:8],
                 "raw_text_excerpt": " ".join(full_text.split())[:600],
                 "extraction_review": extracted.review_payload,
+                "layout_review": layout_review,
                 "investments": parsed_investments,
             },
         }
@@ -359,9 +376,19 @@ class PortfolioIntelligenceService:
         inflation = verified_intelligence.world_bank_indicator("FP.CPI.TOTL.ZG", "India inflation rate")
         evidence.extend([market.evidence, inflation.evidence])
 
-        market_return = float(market.payload.get("one_month_return_pct") or 0)
-        vix = float(market.payload.get("india_vix") or 0)
-        inflation_value = float(inflation.payload.get("latest_value") or 0)
+        market_values = self._market_values(market.payload)
+        try:
+            raw_inflation = inflation.payload.get("latest_value")
+            inflation_value = float(raw_inflation) if not isinstance(raw_inflation, bool) else float("nan")
+        except (TypeError, ValueError, OverflowError):
+            inflation_value = float("nan")
+        if not freshness_snapshot(evidence)["proof_complete"] or market_values is None or not isfinite(inflation_value):
+            return {
+                "suggestions": [{"type": "source_unavailable", "message": "Market guidance is unavailable: required source observations are missing, invalid or expired."}],
+                "evidence": evidence, "freshness": freshness_snapshot(evidence),
+                "last_updated": timezone.now().isoformat(),
+            }
+        market_return, vix = market_values
 
         market_trend = "bullish" if market_return >= 0 else "defensive"
         suggestions.append({
@@ -440,10 +467,11 @@ class PortfolioIntelligenceService:
         )
 
         evidence = [market.evidence, latest_nav_report["evidence"], history_report["evidence"]]
-        if not latest_nav_report["items"] or not history_report["series"]:
+        market_values = self._market_values(market.payload)
+        if not latest_nav_report["items"] or not history_report["series"] or market_values is None or not freshness_snapshot(evidence)["proof_complete"]:
             return {
                 "available": False,
-                "summary": "Short-horizon watchlist is unavailable because verified AMFI fund data could not be loaded right now.",
+                "summary": "Watchlist unavailable: required market or AMFI observations are missing, invalid or expired. Recorded holdings are unchanged.",
                 "algorithm": self._watchlist_algorithm_payload(),
                 "items": [],
                 "evidence": evidence,
@@ -453,8 +481,8 @@ class PortfolioIntelligenceService:
 
         portfolio_mix = self._portfolio_mix(user)
         regime = self._market_regime(
-            market_return=float(market.payload.get("one_month_return_pct") or 0),
-            vix=float(market.payload.get("india_vix") or 0),
+            market_return=market_values[0],
+            vix=market_values[1],
         )
         ranked = self._rank_watchlist_candidates(
             latest_items=latest_nav_report["items"],
@@ -474,6 +502,8 @@ class PortfolioIntelligenceService:
             f"Built a {regime['label'].replace('_', ' ')} 1-2 month watchlist from official AMFI NAV history, "
             "current market regime, and user portfolio fit. These are ranked watch candidates, not guaranteed gain calls."
         )
+        if not items:
+            summary = "Watchlist unavailable: no funds have recent, consistent source identities and sufficient distinct historical observations. Recorded holdings are unchanged."
         return {
             "available": bool(items),
             "summary": summary,
@@ -500,7 +530,7 @@ class PortfolioIntelligenceService:
         return "Generic"
 
     def _get_amfi_latest_nav_report(self) -> dict:
-        cache_key = "investments:amfi:latest-open-nav:v1"
+        cache_key = "investments:amfi:latest-open-nav:v2"
         cached = cache.get(cache_key)
         if cached:
             return cached
@@ -535,6 +565,7 @@ class PortfolioIntelligenceService:
                 fetched_at=fetched_at,
                 ttl_seconds=AMFI_CACHE_TTL_SECONDS,
                 notes="Official AMFI latest NAV text report; filtered later to direct-growth shortlist candidates.",
+                status="fresh" if items else "failed",
             ),
         }
         cache.set(cache_key, report, AMFI_CACHE_TTL_SECONDS)
@@ -543,7 +574,7 @@ class PortfolioIntelligenceService:
     def _get_amfi_history_report(self, *, days: int) -> dict:
         to_date = timezone.localdate()
         from_date = to_date - timedelta(days=days)
-        cache_key = f"investments:amfi:history:{from_date.isoformat()}:{to_date.isoformat()}:v1"
+        cache_key = f"investments:amfi:history:{from_date.isoformat()}:{to_date.isoformat()}:v2"
         cached = cache.get(cache_key)
         if cached:
             return cached
@@ -585,6 +616,7 @@ class PortfolioIntelligenceService:
                 fetched_at=fetched_at,
                 ttl_seconds=AMFI_CACHE_TTL_SECONDS,
                 notes="Official AMFI history endpoint; Alfred uses the latest 60-day NAV window for momentum, drawdown, and volatility math.",
+                status="fresh" if series else "failed",
             ),
         }
         cache.set(cache_key, report, AMFI_CACHE_TTL_SECONDS)
@@ -630,15 +662,15 @@ class PortfolioIntelligenceService:
                 if len(parts) < 8:
                     continue
                 scheme_name = parts[1]
-                nav_value = self._to_float(parts[4])
+                nav_value = self._parse_nav(parts[4])
                 nav_date = self._parse_amfi_date(parts[7])
             else:
                 if len(parts) < 6:
                     continue
                 scheme_name = parts[3]
-                nav_value = self._to_float(parts[4])
+                nav_value = self._parse_nav(parts[4])
                 nav_date = self._parse_amfi_date(parts[5])
-            if nav_value <= 0 or nav_date is None:
+            if nav_value is None or nav_date is None or nav_date > timezone.localdate():
                 continue
             rows.append(
                 {
@@ -648,27 +680,44 @@ class PortfolioIntelligenceService:
                     "category": current_category,
                     "nav": nav_value,
                     "nav_date": nav_date,
+                    "isin_growth": parts[2] if history_mode else parts[1],
+                    "isin_reinvestment": parts[3] if history_mode else parts[2],
                 }
             )
         return rows
 
     def _rank_watchlist_candidates(self, *, latest_items: list[dict], history_series: list[dict], market: dict, regime: dict, portfolio_mix: dict) -> list[dict]:
-        latest_by_code = {item["scheme_code"]: item for item in latest_items if self._is_watchlist_candidate(item)}
+        latest_by_code = {}
+        conflicting = set()
+        today = timezone.localdate()
+        for item in latest_items:
+            if not self._is_watchlist_candidate(item) or not 0 <= (today - item["nav_date"]).days <= WATCHLIST_NAV_MAX_AGE_DAYS:
+                continue
+            code = item["scheme_code"]
+            if code in latest_by_code and latest_by_code[code] != item:
+                conflicting.add(code)
+            latest_by_code[code] = item
+        for code in conflicting:
+            latest_by_code.pop(code, None)
         history_by_code: dict[str, list[dict]] = defaultdict(list)
         for row in history_series:
             if row["scheme_code"] not in latest_by_code:
-                continue
-            if row["nav_date"] > latest_by_code[row["scheme_code"]]["nav_date"]:
                 continue
             history_by_code[row["scheme_code"]].append(row)
 
         ranked: list[dict] = []
         for scheme_code, latest in latest_by_code.items():
             series = sorted(history_by_code.get(scheme_code, []), key=lambda item: item["nav_date"])
-            if len(series) < WATCHLIST_MIN_OBSERVATIONS:
+            identity = ("scheme_name", "isin_growth", "isin_reinvestment")
+            if any(any(str(row.get(field, "")).casefold() != str(latest.get(field, "")).casefold() for field in identity)
+                   or not latest["nav_date"] - timedelta(days=WATCHLIST_HISTORY_DAYS) <= row["nav_date"] <= latest["nav_date"] for row in series):
                 continue
             metrics = self._series_metrics(series)
-            if metrics is None:
+            if metrics is None or metrics["observation_count"] < WATCHLIST_MIN_OBSERVATIONS:
+                continue
+            if metrics["return_10d_pct"] is None or metrics["return_30d_pct"] is None:
+                continue
+            if series[-1]["nav_date"] != latest["nav_date"] or series[-1]["nav"] != latest["nav"]:
                 continue
             family = self._watchlist_family(latest["category"], latest["scheme_name"])
             if not family:
@@ -745,12 +794,8 @@ class PortfolioIntelligenceService:
         why = [
             f"30-day NAV trend is {item['return_30d_pct']:.2f}%.",
             f"10-day confirmation trend is {item['return_10d_pct']:.2f}%.",
-            (
-                f"Drawdown from the 60-day high is only {abs(item['max_drawdown_pct']):.2f}%."
-                if item["max_drawdown_pct"] >= -3
-                else f"It is still {abs(item['max_drawdown_pct']):.2f}% below its 60-day high, which raises near-term risk."
-            ),
-            f"Realized volatility over the recent window is {item['realized_volatility_pct']:.2f}%.",
+            f"Largest observed peak-to-trough decline over {item['history_days']} days is {abs(item['max_drawdown_pct']):.2f}%.",
+            f"Observation-return volatility (21-observation scale) is {item['realized_volatility_pct']:.2f}%; gaps are not a daily forecast.",
             f"{item['family_label']} currently fits the {regime['label'].replace('_', ' ')} market regime.",
         ]
         proof = [
@@ -764,7 +809,8 @@ class PortfolioIntelligenceService:
                 "source_url": self._history_proof_url(),
                 "summary": (
                     f"Official AMFI history shows 30-day return {item['return_30d_pct']:.2f}%, "
-                    f"10-day return {item['return_10d_pct']:.2f}%, and 60-day drawdown {item['max_drawdown_pct']:.2f}%."
+                    f"10-day return {item['return_10d_pct']:.2f}%, and observed-window drawdown {item['max_drawdown_pct']:.2f}%. "
+                    f"Observed {item['history_start']} to {item['history_end']}; lookbacks use the latest prior observation."
                 ),
             },
         ]
@@ -795,13 +841,19 @@ class PortfolioIntelligenceService:
             "category": item["category"],
             "family": item["family"],
             "family_label": item["family_label"],
-            "nav": round(item["nav"], 4),
+            "nav": float(round(item["nav"], 4)),
+            "nav_source_value": str(item["nav"]),
             "nav_date": item["nav_date"].isoformat(),
+            "observation_count": item["observation_count"],
+            "history_days": item["history_days"],
+            "history_start": item["history_start"],
+            "history_end": item["history_end"],
+            "return_baselines": item["return_baselines"],
             "short_horizon_score": item["short_horizon_score"],
             "outlook_label": outlook_label,
             "return_10d_pct": round(item["return_10d_pct"], 2),
             "return_30d_pct": round(item["return_30d_pct"], 2),
-            "return_60d_pct": round(item["return_60d_pct"], 2),
+            "return_60d_pct": round(item["return_60d_pct"], 2) if item["return_60d_pct"] is not None else None,
             "max_drawdown_pct": round(item["max_drawdown_pct"], 2),
             "realized_volatility_pct": round(item["realized_volatility_pct"], 2),
             "why_it_ranked": why[:5],
@@ -810,38 +862,43 @@ class PortfolioIntelligenceService:
         }
 
     def _series_metrics(self, series: list[dict]) -> dict | None:
-        if len(series) < 2:
+        observations = {}
+        for row in series:
+            day = row.get("nav_date")
+            nav = self._parse_nav(row.get("nav"))
+            if type(day) is not date or nav is None or (day in observations and observations[day] != nav):
+                return None
+            observations[day] = nav
+        dates = sorted(observations)
+        if len(dates) < 2:
             return None
-        navs = [float(item["nav"]) for item in series if item.get("nav")]
-        dates = [item["nav_date"] for item in series]
-        latest_nav = navs[-1]
-        latest_date = dates[-1]
-        nav_10 = self._nav_at_or_before(series, latest_date - timedelta(days=10))
-        nav_30 = self._nav_at_or_before(series, latest_date - timedelta(days=30))
-        nav_60 = series[0]["nav"]
-        if not nav_10 or not nav_30 or not nav_60:
+        navs = [observations[day] for day in dates]
+        baselines = {days: next((day for day in reversed(dates) if day <= dates[-1] - timedelta(days=days)), None)
+                     for days in (10, 30, 60)}
+        for days, day in baselines.items():
+            if day is not None and (dates[-1] - day).days - days > WATCHLIST_NAV_MAX_AGE_DAYS:
+                baselines[days] = None
+        with localcontext() as context:
+            context.prec = 28
+            returns = {f"return_{days}d_pct": float((navs[-1] / observations[day] - 1) * 100) if day else None
+                       for days, day in baselines.items()}
+            changes = [float(current / previous - 1) for previous, current in zip(navs, navs[1:])]
+            if not all(isfinite(value) for value in changes + [v for v in returns.values() if v is not None]):
+                return None
+            peak, drawdown = navs[0], Decimal(0)
+            for nav in navs:
+                peak = max(peak, nav)
+                drawdown = min(drawdown, (nav / peak - 1) * 100)
+        try:
+            volatility = pstdev(changes) * sqrt(21) * 100 if len(changes) >= 2 else 0.0
+        except (OverflowError, ValueError):
             return None
-        daily_returns = []
-        for index in range(1, len(navs)):
-            previous = navs[index - 1]
-            current = navs[index]
-            if previous:
-                daily_returns.append((current - previous) / previous)
-        realized_volatility_pct = (pstdev(daily_returns) * sqrt(21) * 100) if len(daily_returns) >= 2 else 0.0
-        max_nav = max(navs)
-        return {
-            "return_10d_pct": ((latest_nav - nav_10) / nav_10) * 100 if nav_10 else 0.0,
-            "return_30d_pct": ((latest_nav - nav_30) / nav_30) * 100 if nav_30 else 0.0,
-            "return_60d_pct": ((latest_nav - nav_60) / nav_60) * 100 if nav_60 else 0.0,
-            "max_drawdown_pct": ((latest_nav - max_nav) / max_nav) * 100 if max_nav else 0.0,
-            "realized_volatility_pct": realized_volatility_pct,
-        }
-
-    def _nav_at_or_before(self, series: list[dict], target_date: date) -> float:
-        eligible = [item for item in series if item["nav_date"] <= target_date]
-        if not eligible:
-            return 0.0
-        return float(eligible[-1]["nav"])
+        if not isfinite(volatility):
+            return None
+        return {**returns, "max_drawdown_pct": float(drawdown), "realized_volatility_pct": volatility,
+                "observation_count": len(dates), "history_days": (dates[-1] - dates[0]).days,
+                "history_start": dates[0].isoformat(), "history_end": dates[-1].isoformat(),
+                "return_baselines": {str(days): day.isoformat() if day else None for days, day in baselines.items()}}
 
     def _portfolio_mix(self, user) -> dict:
         investments = list(Investment.objects.filter(user=user).only("asset_type", "current_value"))
@@ -920,12 +977,12 @@ class PortfolioIntelligenceService:
             "factors": [
                 {"label": "30-day NAV momentum", "effect": "positive"},
                 {"label": "10-day confirmation momentum", "effect": "positive"},
-                {"label": "60-day drawdown from peak", "effect": "negative"},
+                {"label": "Observed-window peak-to-trough drawdown", "effect": "negative"},
                 {"label": "Realized volatility", "effect": "negative"},
                 {"label": "Current market regime fit", "effect": "positive"},
                 {"label": "User portfolio diversification fit", "effect": "positive"},
             ],
-            "guardrail": "This ranks watchlist candidates. It does not promise that any fund will rise over the next 1-2 months.",
+            "guardrail": "Research only: NAV dates and prior lookback observations must be within 7 calendar days of their target date, with distinct consistent observations. Missing 60-day coverage stays unavailable; no currency conversion or holding revaluation. No guaranteed returns.",
         }
 
     def _watchlist_family(self, category: str, scheme_name: str) -> str:
@@ -993,11 +1050,24 @@ class PortfolioIntelligenceService:
         except Exception:
             return None
 
-    def _to_float(self, value: str) -> float:
+    def _parse_nav(self, value) -> Decimal | None:
         try:
-            return float(str(value or "").replace(",", ""))
-        except Exception:
-            return 0.0
+            nav = Decimal(str(value))
+            if nav.is_finite() and nav > 0 and isfinite(float(nav)) and float(nav) > 0:
+                return nav
+        except (InvalidOperation, ValueError, TypeError, OverflowError):
+            pass
+        return None
+
+    def _market_values(self, payload: dict) -> tuple[float, float] | None:
+        try:
+            raw = [payload.get("one_month_return_pct"), payload.get("india_vix")]
+            if any(value is None or isinstance(value, bool) for value in raw):
+                return None
+            values = tuple(float(value) for value in raw)
+            return values if all(isfinite(value) for value in values) and values[1] > 0 else None
+        except (TypeError, ValueError, OverflowError):
+            return None
 
     def _parse_zerodha_statement(self, text: str) -> List[Dict]:
         """Parse Zerodha holdings statement."""
@@ -1035,6 +1105,7 @@ class PortfolioIntelligenceService:
             user=user,
             asset_name=inv_data.get("asset_name", "Unknown"),
             institution=inv_data.get("institution", ""),
+            account_number=(inv_data.get("account_number") or "").strip(),
             defaults={
                 "asset_type": inv_data.get("asset_type", "equity"),
                 "invested_amount": investment_money(inv_data.get("invested_amount", 0)),
@@ -1043,6 +1114,96 @@ class PortfolioIntelligenceService:
             },
         )
         return investment, created
+
+    def _parse_holdings_table(self, text: str, *, broker: str):
+        """Read labelled money columns; an unsafe table must not fall back to positional guesses."""
+        # shortcut: labelled text tables only; expand positional layouts after representative corpus review.
+        aliases = {
+            "asset_name": {"symbol", "security", "fund name", "scheme name", "asset name"},
+            "invested_amount": {"invested amount", "invested value", "cost value", "investment amount"},
+            "current_value": {"current value", "market value", "current amount"},
+            "account_number": {"account", "account number", "folio", "folio number", "demat account"},
+        }
+        columns = None
+        header_labels = None
+        holdings = {}
+        source_rows = {}
+        total = None
+        account = ""
+        conflicting_account = False
+        fund_table = False
+
+        def review(reason):
+            return [], {"status": "needs_review", "reason": reason}
+
+        def amount(value):
+            # Currency/units/OCR substitutions are never inferred from a numeric-looking cell.
+            if not re.fullmatch(r"(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?", value):
+                raise ValueError("Uncertain monetary cell")
+            return investment_money(value.replace(",", ""))
+
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            cells = [cell.strip() for cell in re.split(r"\s*\|\s*|\t+| {2,}", line.strip())]
+            labels = [" ".join(cell.lower().split()) for cell in cells]
+            is_header = any(label in aliases["asset_name"] for label in labels)
+            if is_header:
+                indices = {name: [i for i, label in enumerate(labels) if label in choices]
+                           for name, choices in aliases.items()}
+                if any(len(indices[name]) != 1 for name in ("asset_name", "invested_amount", "current_value")) or len(indices["account_number"]) > 1:
+                    return review("Table money columns are missing or ambiguous; review the original document.")
+                if any(re.search(r"\b(?:currency|denomination|ccy)\b", label) for label in labels):
+                    return review("Currency-labelled tables require an approved denomination policy and source review.")
+                mapped = {name: values[0] for name, values in indices.items() if values}
+                if conflicting_account:
+                    return review("Conflicting account headings require source review.")
+                if columns is not None and labels != header_labels:
+                    return review("Conflicting table headers require source review.")
+                columns, width = mapped, len(cells)
+                header_labels = labels
+                fund_table = "fund name" in labels or "scheme name" in labels
+                continue
+            if columns is None:
+                hint = self._extract_account_hint(line)
+                if hint:
+                    if account and account != hint:
+                        conflicting_account = True
+                    account = hint
+                continue
+            if len(cells) != width or total is not None:
+                return review("Incomplete table rows or trailing content require source review.")
+            name = cells[columns["asset_name"]]
+            try:
+                invested = amount(cells[columns["invested_amount"]])
+                current = amount(cells[columns["current_value"]])
+            except ValueError:
+                return review("Uncertain table amounts require source review; no holdings were imported.")
+            if name.lower() in {"total", "grand total"}:
+                total = (invested, current)
+                continue
+            row_account = cells[columns["account_number"]] if "account_number" in columns else account
+            if not re.fullmatch(r"[A-Za-z0-9-]{6,24}", row_account) or not name or len(name) > 120:
+                return review("Missing or unsupported holding/account identity requires source review.")
+            item = {"asset_name": name, "asset_type": "mutual_fund" if fund_table else self._guess_asset_type(name),
+                    "institution": "" if broker == "Generic" else broker, "account_number": row_account,
+                    "invested_amount": cells[columns["invested_amount"]].replace(",", ""),
+                    "current_value": cells[columns["current_value"]].replace(",", ""), "annual_return_rate": 0}
+            key = (name, row_account)
+            if key in source_rows and source_rows[key] != cells:
+                return review("Conflicting duplicate holdings require source review.")
+            holdings[key] = item
+            source_rows[key] = cells
+            if len(holdings) > 30:
+                return review("Table exceeds the 30-position import bound; review without partial import.")
+        if columns is None:
+            return None, None
+        if not holdings:
+            return review("No complete holdings were found in the table.")
+        if total is not None and total != tuple(sum((amount(item[field]) for item in holdings.values()), start=investment_money(0))
+                                                for field in ("invested_amount", "current_value")):
+            return review("Table totals do not reconcile with the holdings; source review is required.")
+        return list(holdings.values()), {"status": "parsed", "reason": "Labelled table amounts and account identity extracted; currency is not inferred."}
 
     def _parse_line_items(self, text: str, *, institution: str) -> List[Dict]:
         investments: List[Dict] = []
@@ -1063,7 +1224,7 @@ class PortfolioIntelligenceService:
                 current_value = numeric_values[-1]
             elif len(numeric_values) == 1:
                 current_value = numeric_values[0]
-            key = (asset_name.lower(), asset_type, round(current_value, 2), round(invested_amount, 2))
+            key = (asset_name.lower(), asset_type, self._extract_account_hint(normalized), round(current_value, 2), round(invested_amount, 2))
             if key in seen:
                 continue
             seen.add(key)
@@ -1106,7 +1267,7 @@ class PortfolioIntelligenceService:
         return "equity"
 
     def _extract_account_hint(self, text: str) -> str:
-        match = re.search(r"(?:folio|account|demat)\s*(?:no|number|id)?\s*[:#-]?\s*([A-Z0-9-]{6,24})", text, re.IGNORECASE)
+        match = re.search(r"\b(?:folio|account|demat)\b[ \t]*(?:no\.?|number|id)?[ \t]*[:#-]?[ \t]*([A-Z0-9-]{6,24})\b", text, re.IGNORECASE)
         return (match.group(1) if match else "").strip()
 
     def _calculate_portfolio_risk_score(self, asset_breakdown: Dict, total_value: float) -> float:

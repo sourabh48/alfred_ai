@@ -21,6 +21,34 @@
         <div id="memoryCandidates" class="data-stack mb-3"></div>
     </section>
     <button id="memoryRefreshButton" class="btn btn-outline-secondary mb-3" type="button">Refresh Memories</button>
+    <section id="knowledgeHub" class="mb-4" aria-labelledby="knowledgeHubTitle">
+        <h3 id="knowledgeHubTitle" class="h5">Intelligence Hub · reviewed knowledge packs</h3>
+        <p>Local suggestions stay encrypted and unverified until you review them. Packs contain only explicitly selected public, owner-confirmed statements. Screening cannot prove privacy or truth: review every statement and citation. Packs are supplementary data; they cannot change finances, code, models or training.</p>
+        <p id="knowledgeHubStatus" role="status" aria-live="polite">Loading local checkpoint.</p>
+        <form id="knowledgeHubPolicy" data-live-refresh-hold="true">
+            <label class="d-block"><input id="knowledgeHubEnabled" type="checkbox" disabled> Opt in to local knowledge-pack review. This does not authorize uploads.</label>
+            <button type="submit" class="btn btn-outline-primary my-2" disabled>Save local pack consent</button>
+        </form>
+        <form id="knowledgeHubDraft" data-live-refresh-hold="true">
+            <label for="knowledgeHubSources" class="form-label">Public verified source memories (up to eight)</label>
+            <select id="knowledgeHubSources" class="form-select mb-2" multiple size="4" required disabled></select>
+            <label for="knowledgeHubParent" class="form-label">Version</label>
+            <select id="knowledgeHubParent" class="form-select mb-2" disabled><option value="">New pack</option></select>
+            <button type="submit" class="btn btn-outline-primary" disabled>Prepare reviewable pack</button>
+        </form>
+        <div id="knowledgeHubPacks" class="data-stack my-3" role="region" aria-label="Knowledge packs"></div>
+        <form id="knowledgeHubRemotePolicy" data-live-refresh-hold="true">
+            <label class="d-block"><input id="knowledgeHubRemoteConsent" type="checkbox" disabled> Allow reviewed encrypted packs to the separately approved private Git repository.</label>
+            <button type="submit" class="btn btn-outline-secondary my-2" disabled>Save remote consent</button>
+        </form>
+        <p id="knowledgeHubRemoteStatus" class="small">Remote Git is disabled until separate operator approval and owner consent. No repository or credentials are created here. Cached remote packs require review and are never installed automatically. Historical Git commits can retain withdrawn data.</p>
+        <button id="knowledgeHubCheckpoint" type="button" class="btn btn-outline-secondary" disabled>Checkpoint local learning</button>
+        <button id="knowledgeHubSync" type="button" class="btn btn-outline-secondary" disabled>Retry approved pack sync</button>
+        <label id="knowledgeHubReconcileLabel" class="mt-2" hidden><input id="knowledgeHubReconcileReviewed" type="checkbox"> I reviewed the cached remote packs. Preserve both histories and retry their merge.</label>
+        <button id="knowledgeHubReconcile" type="button" class="btn btn-outline-warning" hidden disabled>Reconcile reviewed checkpoint</button>
+        <button id="knowledgeHubRefresh" type="button" class="btn btn-outline-secondary">Refresh packs</button>
+        <p id="knowledgeHubFeedback" role="status" aria-live="polite"></p>
+    </section>
     <form id="memoryEvaluationForm" class="mb-3" data-live-refresh-hold="true">
         <h3 class="h5">Check Memory Retrieval</h3>
         <p>Test up to twenty questions against current owner-confirmed memories. Choose every relevant memory, or no expected match. Relevant statements may conflict; this check never resolves contradictions or verifies financial facts. Questions and results stay on this page and are not saved, trained on or sent to cloud reasoning.</p>
@@ -38,6 +66,7 @@
         <p id="memoryEvaluationFeedback" role="status" aria-live="polite" class="small"></p>
         <ol id="memoryEvaluationCases" class="data-stack my-3" aria-label="Questions in this evaluation"></ol>
         <p id="memoryEvaluationResult" role="status" aria-live="polite" class="mt-2"></p>
+        <div id="memoryEvaluationScoreBands" class="table-responsive" role="region" tabindex="0" aria-label="Observed relevance by cosine score"></div>
         <ol id="memoryEvaluationDetails" class="data-stack" aria-label="Per-question retrieval results"></ol>
         <p class="small">Precision counts relevant returned references; recall counts expected references found. Abstention is measured on no-match questions. Citation checks confirm current ownership and record identity, not the truth of a claim. Results describe this run only; rerun after source changes.</p>
     </form>
