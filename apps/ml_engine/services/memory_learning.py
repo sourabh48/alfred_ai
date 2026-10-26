@@ -137,6 +137,14 @@ class MemoryLearning:
                 or {r['id']:r for r in self.store.list_memories(user)}!=records):
             raise MemoryConflict('Memory changed during evaluation.')
         if time.monotonic()>=deadline: raise EmbeddingUnavailable('Local evaluation deadline exceeded.')
+        score_bands=[dict(lower=lower,upper=upper,returned=0,relevant=0)
+            for lower,upper in ((-1,.5),(.5,.75),(.75,.9),(.9,1))]
+        for case in per_case:
+            for citation in case['citations']:
+                band=next(band for band in score_bands if citation['score']<band['upper'] or band['upper']==1)
+                band['returned']+=1; band['relevant']+=citation['relevant']
+        for band in score_bands:
+            band['observed_precision']=band['relevant']/band['returned'] if band['returned'] else None
         return {'cases':len(cases),'positive_cases':len(ranks),'negative_cases':negative_cases,
             'recall_at_3':sum(case['recall'] for case in per_case if case['recall'] is not None)/len(ranks) if ranks else None,
             'mean_reciprocal_rank':sum(ranks)/len(ranks) if ranks else None,
@@ -153,6 +161,8 @@ class MemoryLearning:
                 false_abstentions=sum(bool(case['expected_ids']) and case['abstained'] for case in per_case),false_matches=false_positives),
             'ranking_metric_scope':'positive_cases_only_fixed_k_denominator; negative_cases_measured_by_abstention',
             'min_score':min_score,'result_limit':3,'per_case':per_case,
+            'score_diagnostics':dict(bands=score_bands,scope='reviewed_cases_in_this_run_only',
+                score_is_probability=False,automatic_threshold_change=False),
             'processing_budget_seconds':EVALUATION_SECONDS,
             'retrieval_context':dict(protocol=self.store.retrieval_protocol,**profile,
                 comparison='same_model_cutoff_reviewed_cases_and_source_revisions_required',cohort_persistence='none'),

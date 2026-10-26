@@ -105,6 +105,26 @@ class MemoryEvaluationTests(TestCase):
         self.assertIsNone(result['retrieval_context']['embedding_identity'])
         self.assertIsNone(result['retrieval_context']['dimensions'])
         self.assertEqual(result['retrieval_context']['indexed_memories'],0)
+        self.assertTrue(all(band['returned']==0 and band['observed_precision'] is None
+            for band in result['score_diagnostics']['bands']))
+
+    def test_score_bands_measure_reviewed_relevance_without_claiming_probabilities(self):
+        identities=[self.save('mountain source '+str(i)) for i in range(6)]
+        rows=[dict(id=identity,score=score) for identity,score in zip(identities,(-.5,.49,.5,.75,.9,1))]
+        cases=[dict(query='SYNTHETIC-QUERY first',expected_ids=[identities[0],identities[2]]),
+            dict(query='SYNTHETIC-QUERY second',expected_ids=[identities[4]])]
+        before=self.store.list_memories(self.alice)
+        with patch.object(self.store,'retrieve',side_effect=[list(reversed(rows[:3])),list(reversed(rows[3:]))]):
+            result=self.learning.evaluate(self.alice,cases,min_score=-1)
+        diagnostics=result['score_diagnostics']
+        self.assertFalse(diagnostics['score_is_probability'])
+        self.assertFalse(diagnostics['automatic_threshold_change'])
+        self.assertEqual(diagnostics['scope'],'reviewed_cases_in_this_run_only')
+        self.assertEqual([(b['returned'],b['relevant'],b['observed_precision']) for b in diagnostics['bands']],
+            [(2,1,.5),(1,1,1),(1,0,0),(2,1,.5)])
+        self.assertEqual(sum(b['returned'] for b in diagnostics['bands']),result['checked_citations'])
+        self.assertEqual(self.store.list_memories(self.alice),before)
+        self.assertNotIn('SYNTHETIC-QUERY',json.dumps(diagnostics))
 
     def test_indexed_profile_excludes_foreign_models_and_does_not_expose_model_strings_or_vectors(self):
         owned=self.save('mountain')

@@ -470,6 +470,31 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(self.text('memoryEvaluationDetails'), '')
 
+    def test_memory_evaluation_score_bands_explain_high_score_false_matches(self):
+        from selenium.webdriver.support.ui import Select
+        store, owner, identities = self.memory_evaluation_fixture()
+        before = store.list_memories(owner)
+        self.browser.find_element(self.By.ID, 'memoryEvaluationQuery').send_keys('mountain hiking')
+        cutoff = self.browser.find_element(self.By.ID, 'memoryEvaluationThreshold').get_property('value')
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: 'Observed relevance in this reviewed run only.' in self.text('memoryEvaluationScoreBands'))
+        rows = self.browser.find_elements(self.By.CSS_SELECTOR, '#memoryEvaluationScoreBands tbody tr')
+        self.assertEqual(len(rows), 4)
+        self.assertIn('not applicable', rows[0].text)
+        self.assertIn('0.0%', rows[-1].text)
+        self.assertIn('scores are not probabilities', self.text('memoryEvaluationScoreBands'))
+        self.assertIn('No cutoff or model is changed', self.text('memoryEvaluationScoreBands'))
+        Select(self.browser.find_element(self.By.ID, 'memoryEvaluationExpected')).select_by_value(identities[0])
+        self.assertEqual(self.text('memoryEvaluationScoreBands'), '')
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: '100.0%' in self.text('memoryEvaluationScoreBands'))
+        self.assertEqual(self.browser.find_element(self.By.ID, 'memoryEvaluationThreshold').get_property('value'), cutoff)
+        self.assertEqual(store.list_memories(owner), before)
+        self.browser.execute_script("document.getElementById('memoryEvaluationScoreBands').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('memory-evaluation-score-diagnostics')
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('memoryEvaluationScoreBands'), '')
+
     def test_multi_case_memory_evaluation_metrics_citations_mobile_and_clearing(self):
         from selenium.webdriver.support.ui import Select
         store,owner,identities=self.memory_evaluation_fixture()

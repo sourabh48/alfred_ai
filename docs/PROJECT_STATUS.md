@@ -26,8 +26,14 @@ Resolve this checkpoint HEAD with `git log -1 --format=%H -- docs/PROJECT_STATUS
   Actual Chrome **1 PASS, zero skips**, including unchanged vault records and
   correct missed-source IDs. Receipt fast-memory-unit2.json; screenshot/proof in
   artifacts/fast-memory-20261027/unit2-browser. JS syntax/whitespace PASS.
-- NEXT TASK: add score-band relevance diagnostics with support counts, without
-  claiming calibrated probabilities or changing the frozen retrieval policy.
+- Unit 3 COMPLETE (base 52997c9): four cosine bands report returned/relevant
+  support counts and observed precision, including explicit no-sample values.
+  Backend **19 PASS**, Chrome **1 PASS**, zero skips; receipts
+  fast-memory-unit3-backend.json and fast-memory-unit3-browser.json. Browser
+  demonstrates a high-score false match, corrected labels, unchanged cutoff/vault
+  and page-hide clearing. No statistical calibration or policy promotion claimed.
+- NEXT TASK: reject inconsistent cutoff/ranking reports and empty queued edits,
+  then run the affected integration batch, inventory check and AST refresh.
 - No push/master/production, operator database, frozen candidate4aa7ac70, AWS,
   paid OpenAI, cloud sync, private-history or FIN-CURRENCY operation. Resume:
   `Set-Location F:/ALFRED_DEV/post-audit; git status -sb` then read this checkpoint.

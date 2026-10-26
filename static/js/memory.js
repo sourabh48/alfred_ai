@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const feedback = document.getElementById("memoryFeedback");
     const expected = document.getElementById("memoryEvaluationExpected");
     const quality = document.getElementById("memoryEvaluationResult");
+    const scoreBands = document.getElementById("memoryEvaluationScoreBands");
     const query = document.getElementById("memoryEvaluationQuery");
     const search = document.getElementById("memorySearch");
     const category = document.getElementById("memoryCategory");
@@ -127,7 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let generation = 0;
     let active = true;
     function message(text) { if (active) feedback.textContent = text; }
-    function clearEvaluationResult() { quality.textContent = ""; evaluationDetails.replaceChildren(); }
+    function clearEvaluationResult() { quality.textContent = ""; evaluationDetails.replaceChildren(); scoreBands.replaceChildren(); }
     function evaluationControls() {
         evaluationForm.querySelectorAll("button").forEach(button => { button.disabled = !active || evaluationPending; });
         query.readOnly = evaluationPending || !active; query.required = !cases.length;
@@ -469,6 +470,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 context.embedding_identity ? `Indexed model fingerprint: ${context.embedding_identity.slice(0,12)}; ${context.dimensions} dimensions; ${context.indexed_memories} memories.` : "No indexed model: empty memory vault.",
                 "Compare only the same model, cutoff, reviewed questions and source revisions. This run alone cannot establish model drift."
             ].join(" ");
+            const table = document.createElement("table"); table.className = "table table-sm";
+            const caption = document.createElement("caption");
+            caption.textContent = "Observed relevance in this reviewed run only. Cosine scores are not probabilities; small or repeated samples do not establish calibrated confidence. No cutoff or model is changed.";
+            table.append(caption);
+            const header = document.createElement("tr");
+            ["Cosine band", "Returned references", "Relevant references", "Observed precision"].forEach(label => {
+                const cell = document.createElement("th"); cell.scope = "col"; cell.textContent = label; header.append(cell);
+            });
+            const head = document.createElement("thead"); head.append(header); table.append(head);
+            const body = document.createElement("tbody");
+            result.score_diagnostics.bands.forEach(band => {
+                const row = document.createElement("tr");
+                [`${band.lower.toFixed(2)} ${band.upper === 1 ? 'to' : 'to below'} ${band.upper.toFixed(2)}`,band.returned,band.relevant,percent(band.observed_precision)].forEach(value => {
+                    const cell = document.createElement("td"); cell.textContent = value; row.append(cell);
+                });
+                body.append(row);
+            });
+            table.append(body); scoreBands.append(table);
             result.per_case.forEach(item => {
                 const row = document.createElement("li"); row.className = "memory-card";
                 const question = document.createElement("p"); question.textContent = submitted[item.case-1].query;
