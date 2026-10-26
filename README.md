@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 24 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 75
 
-PR/CI: PR16 exact source d5cc181/run40324546766 PASS, open against masterc47fed9; cumulative review/protection/Pages gates remain. PR18 READY/open atdaed068/run40325761619 all3 PASS, INV-05/SCOPE-02 accepted100% only; reviews0/protection visibility block development merge. PR19 DRAFT/open atd8f57be/run40336191319 pending (Linux PASS, Windows/Selenium running). Three submitted candidates, zero free slots; no merge performed.
+PR/CI: PR16 exact source d5cc181/run40324546766 PASS, open against masterc47fed9; cumulative review/protection/Pages gates remain. PR18 READY/open atdaed068/run40325761619 all3 PASS, INV-05/SCOPE-02 accepted100% only; reviews0/protection visibility block development merge. PR19 DRAFT/open atd8f57be/run40336191319 CANCELLED (Linux/Windows PASS; Selenium cancelled near30-minute job budget). Verified artifact12659336187 retained; no final test summary or assertion regression established, no newer SHA/run. Three submitted candidates, zero free slots; no merge performed.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->
