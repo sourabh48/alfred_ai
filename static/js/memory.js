@@ -123,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     comparisonSuite.addEventListener("change",comparisonPolicy);
     let comparisonController = null, comparisonEnabled = false;
-    let cases = [], currentMemories = new Map(), previousExpected = new Set([""]), editorNeedsReview = false, evaluationPending = false, evaluationController = null;
+    let cases = [], editingCase = null, currentMemories = new Map(), previousExpected = new Set([""]), editorNeedsReview = false, evaluationPending = false, evaluationController = null;
     let generation = 0;
     let active = true;
     function message(text) { if (active) feedback.textContent = text; }
@@ -143,10 +143,26 @@ document.addEventListener("DOMContentLoaded", () => {
             label.textContent = item.expected_ids.some(id => !currentMemories.has(id))
                 ? "An expected source changed or is unavailable. Remove this case and review current memories; your question is preserved here."
                 : item.expected_ids.length ? `Expected relevant memories: ${item.expected_ids.map(id => currentMemories.get(id)).join('; ')}` : "Expected: no memory should match.";
+            const edit = document.createElement("button"); edit.type = "button"; edit.className = "btn btn-outline-secondary btn-sm me-2";
+            edit.textContent = "Edit question"; edit.setAttribute("aria-label", `Edit question ${index+1}`);
+            edit.addEventListener("click", () => {
+                if (query.value.trim()) { evaluationFeedback.textContent = "Save or clear your current question draft before editing another case."; return; }
+                editingCase = index; query.value = item.query;
+                const missing = item.expected_ids.some(id => !currentMemories.has(id));
+                [...expected.options].forEach(option => { option.selected = !missing && (item.expected_ids.length ? item.expected_ids.includes(option.value) : !option.value); });
+                previousExpected = new Set([...expected.selectedOptions].map(option => option.value)); editorNeedsReview = missing;
+                evaluationAdd.textContent = "Save question changes"; clearEvaluationResult(); evaluationControls(); query.focus();
+                evaluationFeedback.textContent = missing ? "Expected sources changed. Explicitly review current sources before saving; the original case is retained." : `Editing question ${index+1}. Save changes before running.`;
+            });
             const remove = document.createElement("button"); remove.type = "button"; remove.className = "btn btn-outline-secondary btn-sm";
             remove.textContent = "Remove question"; remove.setAttribute("aria-label", `Remove question ${index+1}`);
-            remove.addEventListener("click", () => { cases.splice(index,1); clearEvaluationResult(); renderCases(); });
-            row.append(question,label,remove); evaluationCases.append(row);
+            remove.addEventListener("click", () => {
+                cases.splice(index,1);
+                if (editingCase === index) { editingCase = null; evaluationAdd.textContent = "Add question to run"; }
+                else if (editingCase !== null && editingCase > index) editingCase--;
+                clearEvaluationResult(); renderCases();
+            });
+            row.append(question,label,edit,remove); evaluationCases.append(row);
         });
         evaluationControls();
     }
@@ -171,13 +187,15 @@ document.addEventListener("DOMContentLoaded", () => {
     evaluationThreshold.addEventListener("input", clearEvaluationResult);
     evaluationAdd.addEventListener("click", () => {
         try {
-            cases = boundedCases([...cases,editorCase()]); query.value = "";
+            const revised = [...cases], item = editorCase();
+            if (editingCase === null) revised.push(item); else revised[editingCase] = item;
+            cases = boundedCases(revised); editingCase = null; evaluationAdd.textContent = "Add question to run"; query.value = "";
             [...expected.options].forEach(option => { option.selected = !option.value; }); previousExpected = new Set([""]); editorNeedsReview = false;
             clearEvaluationResult(); renderCases(); evaluationFeedback.textContent = `${cases.length} questions added. No inference has run.`;
         } catch (error) { evaluationFeedback.textContent = error.message; }
     });
     evaluationClear.addEventListener("click", () => {
-        cases = []; query.value = ""; previousExpected = new Set([""]); editorNeedsReview = false;
+        cases = []; editingCase = null; evaluationAdd.textContent = "Add question to run"; query.value = ""; previousExpected = new Set([""]); editorNeedsReview = false;
         [...expected.options].forEach(option => { option.selected = !option.value; });
         clearEvaluationResult(); renderCases(); evaluationFeedback.textContent = "Questions and results cleared from this page.";
     });
@@ -424,6 +442,7 @@ document.addEventListener("DOMContentLoaded", () => {
     evaluationForm.addEventListener("submit", async event => {
         event.preventDefault();
         if (!active || evaluationPending) return;
+        if (editingCase !== null) { evaluationFeedback.textContent = "Save question changes before running the evaluation."; return; }
         const ticket = generation;
         let submitted;
         try { submitted = boundedCases([...cases,...(query.value.trim() ? [editorCase()] : [])]); }
@@ -532,7 +551,7 @@ document.addEventListener("DOMContentLoaded", () => {
         category.replaceChildren(); document.getElementById("memoryCount").textContent = "";
         evaluationController?.abort(); evaluationController = null; evaluationPending = false;
         evaluationForm.setAttribute("aria-busy","false"); editorNeedsReview = false;
-        cases = []; currentMemories.clear(); previousExpected.clear(); evaluationCases.replaceChildren();
+        cases = []; editingCase = null; evaluationAdd.textContent = "Add question to run"; currentMemories.clear(); previousExpected.clear(); evaluationCases.replaceChildren();
         expected.replaceChildren(); query.value = ""; clearEvaluationResult(); evaluationFeedback.textContent = ""; evaluationThreshold.value = ""; evaluationControls();
         document.getElementById("memorySyncStatus").textContent = "";
         document.getElementById("memoryReasoningStatus").textContent = "";

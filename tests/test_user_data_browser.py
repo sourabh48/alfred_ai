@@ -418,6 +418,37 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'memoryEvaluationExpected').find_elements(self.By.TAG_NAME,'option'))==4)
         return store,owner,identities
 
+    def test_memory_evaluation_edits_queued_cases_without_duplicates_or_lost_drafts(self):
+        from selenium.webdriver.support.ui import Select
+        self.memory_evaluation_fixture()
+        query = self.browser.find_element(self.By.ID, 'memoryEvaluationQuery')
+        query.send_keys('Original no-match question'); self.memory_click('#memoryEvaluationAdd')
+        query.send_keys('Second no-match question'); self.memory_click('#memoryEvaluationAdd')
+        self.memory_click('#memoryEvaluationCases button[aria-label="Edit question 1"]')
+        query.clear(); query.send_keys('Corrected no-match question')
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.assertIn('Save question changes', self.text('memoryEvaluationFeedback'))
+        self.memory_click('#memoryEvaluationAdd')
+        rows = self.browser.find_elements(self.By.CSS_SELECTOR, '#memoryEvaluationCases > li')
+        self.assertEqual(len(rows), 2)
+        self.assertIn('Corrected no-match question', rows[0].text)
+        self.assertNotIn('Original no-match', self.text('memoryEvaluationCases'))
+        query.send_keys('Unsaved third draft')
+        self.memory_click('#memoryEvaluationCases button[aria-label="Edit question 2"]')
+        self.assertEqual(query.get_property('value'), 'Unsaved third draft')
+        self.assertIn('current question draft', self.text('memoryEvaluationFeedback'))
+        query.clear(); self.memory_click('#memoryEvaluationCases button[aria-label="Edit question 2"]')
+        self.memory_click('#memoryEvaluationCases button[aria-label="Remove question 2"]')
+        self.assertEqual(query.get_property('value'), 'Second no-match question')
+        self.assertEqual(self.text('memoryEvaluationAdd'), 'Add question to run')
+        self.memory_click('#memoryEvaluationAdd')
+        self.memory_click('#memoryEvaluationForm button[type="submit"]')
+        self.wait.until(lambda _: '2 questions.' in self.text('memoryEvaluationResult'))
+        self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
+        self.assertEqual(self.text('memoryEvaluationCases'), '')
+        self.assertEqual(query.get_property('value'), '')
+        self.assertEqual(self.text('memoryEvaluationAdd'), 'Add question to run')
+
     def test_multi_case_memory_evaluation_metrics_citations_mobile_and_clearing(self):
         from selenium.webdriver.support.ui import Select
         store,owner,identities=self.memory_evaluation_fixture()

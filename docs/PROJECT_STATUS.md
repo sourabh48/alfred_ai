@@ -2,6 +2,30 @@
 
 **Canonical original 143-capability inventory and acceptance evidence. Updated 2026-10-26.**
 
+## Active implementation checkpoint — 2026-10-27
+
+Fast continuous development uses the existing post-audit worktree on
+development/alfred-integrated. Requested dfdeac0 is an older ancestor; recovery
+HEAD was d5cc181, clean. Earlier multi-case evaluation/held-out work is already
+implemented and is not restarted. This checkpoint supersedes older task selection.
+Resolve this checkpoint HEAD with `git log -1 --format=%H -- docs/PROJECT_STATUS.md`.
+
+- Unit 1 COMPLETE: edit queued Memory evaluation questions in place, preserve
+  unsaved drafts, require explicit review after source changes, prevent duplicate
+  submission while editing, and clear editor state on page-hide. Actual Chrome
+  regression **1 PASS, zero skips**; JS syntax/whitespace PASS. Receipt:
+  artifacts/ci-repair-ac05515/fast-memory-unit1-corrected.json and
+  artifacts/fast-memory-20261027/unit1-browser/browser_regression_summary.json.
+  The initial runner-option typo ran zero tests and is not acceptance evidence.
+- Baseline **75/143 verified**, extensions **0/13 accepted**, unchanged. AI-16
+  remains partial; reviewed local workflows are not general accuracy/calibration.
+- NEXT TASK: show missed expected citations alongside returned citations, with
+  direct links into existing owner correction controls; then add score-band
+  relevance diagnostics without changing the frozen policy or activating models.
+- No push/master/production, operator database, frozen candidate4aa7ac70, AWS,
+  paid OpenAI, cloud sync, private-history or FIN-CURRENCY operation. Resume:
+  `Set-Location F:/ALFRED_DEV/post-audit; git status -sb` then read this checkpoint.
+
 ## Current execution
 
 Read [EXECUTION_STATE](EXECUTION_STATE.md) for the current task, refs, evidence and
