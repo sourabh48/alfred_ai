@@ -10,6 +10,9 @@ window.TravelPlanner = (() => {
         documentEpoch++; documentActive=false;
         if (state.session) {state.session.trip_documents=[];delete state.session.document_choices;state.session.packing_checklist=null;}
         window.TravelPacking.clear();
+        if(state.session)state.session.travel_reminders=null;
+        window.TravelReminders.clear();
+        const reminders=$('plannerReminders');if(reminders){reminders.replaceChildren();reminders.hidden=true;}
         const packing=$('plannerPacking');if(packing){packing.replaceChildren();packing.hidden=true;}
         const panel=$('plannerDocuments'); if(panel){panel.replaceChildren();panel.hidden=true;}
     }
@@ -18,7 +21,7 @@ window.TravelPlanner = (() => {
         try {
             const data=await Alfred.fetchJSON(url,options);
             if (data?.trip_documents && (!documentActive || epoch!==documentEpoch)) {
-                data.trip_documents=[];delete data.document_choices;data.packing_checklist=null;
+                data.trip_documents=[];delete data.document_choices;data.packing_checklist=null;data.travel_reminders=null;
             }
             return data;
         } catch(error) {
@@ -40,6 +43,7 @@ window.TravelPlanner = (() => {
     }
     const field = key => state.session?.state?.[key]?.value;
     function syncActionState() {
+        document.querySelectorAll('#plannerReminders [data-reminder-control]').forEach(control=>{control.disabled=state.busy || control.dataset.batchUnavailable==='true';});
         document.querySelectorAll('#plannerPacking [data-packing-control]').forEach(control=>{control.disabled=state.busy || control.dataset.batchUnavailable==='true';});
         document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], [data-route-choice], [data-restriction-fields], [data-restriction-withdraw], [data-add-stop], [data-stop-index], #plannerCompareOrder, #plannerApplyOrder, #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button, [data-editor-control], #plannerDocuments button')
             .forEach(control => { control.disabled = state.busy || control.dataset.batchUnavailable === "true"; });
@@ -82,7 +86,7 @@ window.TravelPlanner = (() => {
         render();
         await list();
     }
-    async function action(payload) {
+    async function action(payload,onFailure) {
         if (state.busy || !state.session) return;
         documentEpoch++;
         const identity=state.session.id;
@@ -105,7 +109,7 @@ window.TravelPlanner = (() => {
                 alert(payload.draft ? "Draft saved." : "Travel Plan saved. Open it from Your Plans below.");
             }
             return true;
-        } catch (err) { alert(err.message); return accepted; }
+        } catch (err) { alert(err.message); if(!accepted && typeof onFailure==='function')onFailure(err);return accepted; }
         finally { state.busy = false; syncActionState(); schedulePoll(); if(documentRefreshPending && !document.hidden)refreshDocumentContext(); }
     }
     async function message(text) {
@@ -117,14 +121,16 @@ window.TravelPlanner = (() => {
     }
     function schedulePoll() {
         clearTimeout(state.timer);
-        if (state.session?.research && !["ready", "failed", "superseded"].includes(state.session.research.status)) {
+        const researching=state.session?.research && !["ready", "failed", "superseded"].includes(state.session.research.status);
+        const reminding=state.session?.travel_reminders?.enabled && state.session.travel_reminders.reminders.some(row=>row.status==='scheduled');
+        if (researching || reminding) {
             state.timer = setTimeout(async () => {
                 if (state.busy || document.hidden) { schedulePoll(); return; }
                 const identity=state.session.id, epoch=documentEpoch;
                 try { const next=await fetchPlanner(api+`sessions/${identity}/`);
-                    if(epoch===documentEpoch && state.session?.id===identity && next.id===identity && next.revision>=state.session.revision){state.session=next;render();} }
+                    if(epoch===documentEpoch && state.session?.id===identity && next.id===identity && next.revision>=state.session.revision){const changed=next.revision>state.session.revision;state.session=next;if(researching||changed)render();else schedulePoll();} }
                 catch (err) { alert(`Progress could not refresh: ${err.message}. Your request is saved.`); schedulePoll(); }
-            }, 2500);
+            }, researching ? 2500 : 15000);
         }
     }
     function render() {
@@ -146,6 +152,7 @@ window.TravelPlanner = (() => {
         $("plannerResults").hidden = !session.candidates.length;
         candidates(); comparison(); itinerary(); stops(); documents();
         if(documentActive)window.TravelPacking.render(session);
+        if(documentActive)window.TravelReminders.render(session);
         window.TravelResearchPanels.render(session);
         if (session.plan_id) populateDetails(session.plan_id);
         else $("planDetails").hidden = true;
@@ -224,6 +231,7 @@ window.TravelPlanner = (() => {
         if (!$("travelPlanner")) return;
         window.TravelItineraryEditor.init(action);
         window.TravelPacking.init({current:()=>state.session,send:action,reload:()=>open(state.session.id).catch(error=>alert(error.message))});
+        window.TravelReminders.init({current:()=>state.session,send:action,reload:()=>open(state.session.id).catch(error=>alert(error.message))});
         $("plannerComposer").addEventListener("submit", e=>{e.preventDefault(); message($("plannerInput").value);});
         $("plannerNew").addEventListener("click", ()=>create().catch(e=>alert(e.message)));
         $("plannerDraft").addEventListener("click", ()=>action({action:"save",draft:true}));

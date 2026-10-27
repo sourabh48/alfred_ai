@@ -15,6 +15,7 @@ from huey.storage import SqliteStorage
 
 
 REPLAY_SAFE = frozenset({
+    "alfred_ai.native_tasks.native_travel_reminders",
     "alfred_ai.tasks.production_probe_task",
     "alfred_ai.tasks.production_beat_heartbeat",
     "alfred_ai.native_tasks.native_scheduler_heartbeat",

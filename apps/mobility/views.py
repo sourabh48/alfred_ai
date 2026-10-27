@@ -685,7 +685,10 @@ class TravelPlanDetailView(RetrieveUpdateDestroyAPIView):
                              for key in ("start_date", "end_date"))
         destination_changed = "destination" in serializer.validated_data and original.destination != serializer.validated_data["destination"]
         plan = serializer.save()
+        from .services.travel.reminders import cancel_closed_trip
+        cancel_closed_trip(plan)
         if session:
+            session.refresh_from_db()
             if changed:
                 if destination_changed:
                     session.state.pop("_itinerary_stops", None)

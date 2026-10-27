@@ -1,6 +1,51 @@
 # ALFRED execution state
 
-## Active checkpoint — TRAVEL2-003/SCOPE-01 (2026-10-27)
+## Active checkpoint — TRAVEL2-003/SCOPE-02 (2026-10-27)
+
+- MODE NEXT; recovery44f952bf6bc6aa1c431a87848b6a8750d8ff0c5b clean/synchronized,
+  development/alfred-integrated, F:/ALFRED_DEV/post-audit. CI40485342191 checked
+  once: in_progress, not PASS. Preserve prior packing/organizer receipts/counts.
+- LOCAL_VERIFIED opt-in local reminders in saved-plan JSON (_travel_reminders),
+ 20 schedules/100 retained occurrences. Atomic schedule/delivery CAS, own revision,
+  UUID requests/occurrences, UTC from explicit IANA/local time with DST gap/fold
+  checks. Opt-out/closed trips cancel pending occurrences; no external delivery.
+- Source: travel/reminders.py, canonical JSON preservation helper/callers,
+  planner API/payload, native_tasks minute sweep and durable replay allowlist,
+  reminder JS/template/CSS/private lifecycle. No model/migration/dependency change.
+  “Continue previous trip” now strips consent to avoid activating a new trip.
+-56 unique backend/queue cases accepted across receipts:18 reminders,9 packing,
+ 19 editor/organizer and10 durable queue. Final focused16 PASS; cursor/fresh-clock/
+  API/native-restart4 PASS and optional cache-outage/fairness2 PASS overlap those
+  cases. Earlier corrected17 and cross21 PASS preserve explicit thread races,
+  actual native task body/real Huey crash-after-DB-commit-before-ack/new-process
+  replay, and packing/document/day/stop/undo/save/reopen/clone preservation.
+-6 unique actual Chrome workflows accepted across4 initial passing, corrected auth
+  privacy1 and fold-preservation1. Covers opt-in/CRUD/auto late delivery/opt-out,
+  DST gap/fold/stale drafts at actual390px, lost-ack retry and original packing/
+  editor/organizer. Four global1440/390 light/dark Axe audits PASS,zero violations;
+  captures inspected. Native final runtime pass clean; fixtures summary-reviewed,
+  no outside model. JS/migration/dependency checks PASS; no changed dependencies.
+  AST Graphify11455 nodes/31904 edges/513 communities, no model/provider calls.
+- Repairs retained with failed receipts: test operation override/complete-trip
+  fixture; actionable DST error detail, select-change draft preservation; auth
+  revocation test now waits for earlier requests to settle; corrupt-prefix cursor
+  rotation and native cache read/write outage fallback. Cursor is only pagination,
+  never authoritative schedule/delivery. No private payload in Huey args or logs.
+- Evidence: artifacts/ci-repair-ac05515/travel-reminders-*.json and
+  artifacts/travel-reminders-20261027/{local-acceptance.json,accessibility.json}.
+  Source/hash binding is in local-acceptance.json. Source commit resolves with
+  `git log -1 --format=%H -- apps/mobility/services/travel/reminders.py`.
+- NEXT: finalize exact clean-source/privacy/checkpoint commit and normal development
+  push; dispatch newest-head CI once, recording push.json/ci.json in the reminder
+  artifacts. Then READY_FOR_NEXT for CI/full-extension gate reconciliation, followed
+  by tracker-authorized TRAVEL2-004/SCOPE-01 private itinerary export. No automatic
+  task selection in MODE NEXT; no master/Pages/deployment action.
+- CONTINUE_REQUIRED until privacy/push/CI dispatch closure is recorded. Baseline
+ 75/143,extensions0/13; full-story acceptance/new CI,independent screen-reader and
+  incomplete Axe color checks remain pending. Prior CI checked once only,not PASS.
+
+## Previous completed checkpoint — TRAVEL2-003/SCOPE-01
+
 
 - MODE NEXT. Base/local/remote at selection c521a6d, clean; canonical worktree
   F:/ALFRED_DEV/post-audit, development/alfred-integrated. Mastera2274aa external

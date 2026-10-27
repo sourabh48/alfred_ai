@@ -2,7 +2,37 @@
 
 **Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
-## Active implementation checkpoint — TRAVEL2-003/SCOPE-01,2026-10-27
+## Active implementation checkpoint — TRAVEL2-003/SCOPE-02,2026-10-27
+
+MODE NEXT recovered44f952b clean/synchronized. CI40485342191 checked once:
+in_progress, not PASS; prior packing/organizer evidence retained. Durable local
+reminders now LOCAL_VERIFIED in existing saved-plan JSON. Default OFF; explicit
+owner opt-in/out,create/edit/cancel/reschedule, IANA/local-time DST gap/fold checks,
+validated UTC,20 schedules/100 retained occurrences. Huey's existing UTC minute
+scheduler/replay helpers run a bounded rotating due sweep; atomic CAS writes one
+in-app delivery per occurrence, labels overdue delivery late and cancels pending
+occurrences on opt-out/closed trips. No email/SMS/push/cloud/global activation.
+Packing/itinerary/document data survives saves and edits; cloned trips inherit no
+reminder consent. No model/migration/dependency or financial change.
+
+56 unique backend/queue cases accepted incrementally (18 reminder,9 packing,
+19 editor/organizer,10 durable queue). Includes both real cancel/delivery races,
+real Huey crash-after-commit-before-ack and new-process replay, corrupted data,
+cursor fairness/outage,private controls,stale edits and cold persistence. Six unique
+actual Chrome workflows accepted across repairs;4 global1440/390 light/dark Axe
+audits zero violations,captures inspected. Native runtime recheck clean; tests
+summary-reviewed,no outside model. JS/migration/dependency and Graphify AST
+11455/31904/513 PASS. Counts overlap; failed receipts retained, no unrun pass claims.
+Evidence: artifacts/ci-repair-ac05515/travel-reminders-*.json and
+artifacts/travel-reminders-20261027/{local-acceptance.json,accessibility.json}.
+
+75/143 verified;0/13 extensions. Full TRAVEL2-003 acceptance requires newest-head
+CI and remaining mandatory gates; manual screen-reader/incomplete Axe color checks
+and production remain unverified. EXECUTION_STATE owns exact source and closure.
+NEXT: finalize exact-source privacy/push/CI dispatch,then READY_FOR_NEXT for CI/gate
+reconciliation and tracker-authorized TRAVEL2-004/SCOPE-01 private itinerary export.
+
+### Previous implementation checkpoint — TRAVEL2-003/SCOPE-01
 
 MODE NEXT, recovery sourcec521a6d clean/synchronized. CI40482166662 checked once:
 pending at exactc521a6d; organizer remains CI_PENDING. No repeated accepted work.

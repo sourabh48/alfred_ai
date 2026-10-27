@@ -13,13 +13,15 @@ from .editor import EditConflict
 
 KEY = "_packing_checklist"
 LIMIT = 50
+PRIVATE_PLAN_KEYS = (KEY, "_travel_reminders")
 
 
 def planning_state_with_checklist(state, plan):
     result = deepcopy(state)
-    result.pop(KEY, None)
-    if KEY in plan.planning_state:
-        result[KEY] = deepcopy(plan.planning_state[KEY])
+    for key in PRIVATE_PLAN_KEYS:
+        result.pop(key, None)
+        if key in plan.planning_state:
+            result[key] = deepcopy(plan.planning_state[key])
     return result
 
 

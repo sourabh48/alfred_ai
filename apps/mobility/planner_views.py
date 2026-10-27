@@ -26,6 +26,7 @@ from .services.travel_itinerary import build_itinerary, build_multi_stop_itinera
 from .services.travel.editor import apply_edit, editor_payload
 from .services.travel.documents import document_links, update_documents
 from .services.travel.packing import packing_payload, update_packing
+from .services.travel.reminders import reminder_payload, update_reminders
 
 
 class PlannerWriteThrottle(UserRateThrottle):
@@ -69,7 +70,7 @@ def session_payload(session):
                 "has_more": offset+3 < pool_count and (not value(session.state, "selected_destination") or bool(value(session.state, "_itinerary_stops")))},
             "map_config":map_configuration(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
-            "itinerary_editor": editor, "trip_documents": document_links(session), "packing_checklist": packing_payload(session),
+            "itinerary_editor": editor, "trip_documents": document_links(session), "packing_checklist": packing_payload(session), "travel_reminders": reminder_payload(session),
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),
             "research": ({"id": run.id, "status": run.status, "outdated": outdated,
                           "stage": "Recheck needed" if outdated else STAGES.get(run.status, run.status),
@@ -131,6 +132,11 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
             apply_edit(session, request.data)
         elif action == "packing":
             update_packing(session, request.data)
+        elif action == "reminders":
+            try:
+                update_reminders(session, request.data)
+            except ValidationError as error:
+                return Response({"detail": error.detail}, status=400)
         elif action == "trip_documents":
             choices = update_documents(session, request.data)
             return Response({**session_payload(session), **({"document_choices": choices} if choices is not None else {})})

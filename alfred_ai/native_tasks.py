@@ -15,6 +15,12 @@ from apps.ml_engine.continual.tasks import run_global_training_cycle
 from apps.mobility.tasks import research_travel, resume_travel_research, cleanup_travel_request_history
 
 
+@db_periodic_task(crontab(minute="*"))
+def native_travel_reminders():
+    from apps.mobility.services.travel.reminders import sweep_due
+    return sweep_due()
+
+
 @db_periodic_task(crontab(minute="*/15"))
 def native_travel_request_cleanup():
     return cleanup_travel_request_history()

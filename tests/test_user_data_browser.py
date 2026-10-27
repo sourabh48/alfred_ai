@@ -4625,6 +4625,120 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         session.refresh_from_db()
         return session
 
+    def reminder_fixture(self, now=None):
+        from datetime import datetime,timezone
+        from apps.mobility.services.travel import reminders
+        session=self.packing_fixture()
+        clock=self.enterContext(patch.object(reminders,'current_time',return_value=now or datetime(2035,1,1,tzinfo=timezone.utc)))
+        return session,clock
+
+    def reminder_fields(self,selector,label,zone,local_time,fold=''):
+        from selenium.webdriver.support.ui import Select
+        form=self.browser.find_element(self.By.CSS_SELECTOR,selector)
+        for name,value in (('label',label),('zone',zone)):
+            field=form.find_element(self.By.NAME,name);field.clear();field.send_keys(value)
+        self.browser.execute_script("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",form.find_element(self.By.NAME,'local_time'),local_time)
+        Select(form.find_element(self.By.NAME,'fold')).select_by_value(fold)
+
+    def test_travel_reminder_desktop_lifecycle_late_delivery_and_optout(self):
+        from datetime import datetime,timedelta
+        from selenium.webdriver.common.keys import Keys
+        from apps.mobility.services.travel import reminders
+        session,clock=self.reminder_fixture()
+        self.login();self.browser.set_window_size(1440,1200)
+        self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-consent]'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-consent]').is_selected())
+        self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-consent]').send_keys(Keys.SPACE)
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-form="create"]'))
+        self.reminder_fields('[data-reminder-form="create"]','Synthetic local <b>packing</b>','UTC','2035-01-02T10:00')
+        self.memory_click('[data-reminder-form="create"] button')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-id]'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerReminders b'))
+        identity=self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-id]').get_attribute('data-reminder-id')
+        selector=f'[data-reminder-id="{identity}"]'
+        self.memory_click(selector+' summary')
+        self.reminder_fields(selector+' form','Synthetic edited reminder','Asia/Kolkata','2035-01-02T10:00')
+        self.memory_click(selector+' form button')
+        self.wait.until(lambda _: 'Synthetic edited reminder' in self.text('plannerReminders'))
+        self.memory_click(selector+' [data-reminder-cancel]')
+        self.wait.until(lambda _: 'cancelled' in self.browser.find_element(self.By.CSS_SELECTOR,selector).text)
+        self.memory_click(selector+' summary')
+        self.reminder_fields(selector+' form','Synthetic new occurrence','UTC','2035-01-03T10:00')
+        self.memory_click(selector+' form button')
+        self.wait.until(lambda _: 'Synthetic new occurrence' in self.text('plannerReminders'))
+        session.plan.refresh_from_db();row=session.plan.planning_state[reminders.KEY]['reminders'][0]
+        late=datetime.fromisoformat(row['due_at'])+timedelta(hours=2);clock.return_value=late
+        self.assertEqual(reminders.deliver_due(session.plan_id),1)
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-delivery]'))
+        self.assertIn('Delivered late',self.text('plannerReminders'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-delivery]')),1)
+        self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-consent]').send_keys(Keys.SPACE)
+        self.wait.until(lambda _: 'Reminders OFF' in self.text('plannerReminders'))
+        self.browser.refresh()
+        self.wait.until(lambda _: 'Delivered late' in self.text('plannerReminders'))
+        self.assertIn('Reminders OFF',self.text('plannerReminders'))
+        self.capture('travel-reminders-desktop-late-delivery')
+
+    def test_travel_reminder_mobile_dst_validation_stale_draft_and_reschedule(self):
+        from datetime import datetime,timezone
+        from uuid import uuid4
+        from apps.mobility.services.travel import reminders
+        session,clock=self.reminder_fixture(datetime(2026,1,1,tzinfo=timezone.utc))
+        self.login();self.browser.set_window_size(500,1000)
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=390,height=1000,deviceScaleFactor=1,mobile=False))
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-consent]'))
+        self.memory_click('[data-reminder-consent]')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-form="create"]'))
+        self.reminder_fields('[data-reminder-form="create"]','Synthetic DST reminder','America/New_York','2026-03-08T02:30')
+        self.memory_click('[data-reminder-form="create"] button')
+        self.wait.until(lambda _: 'does not exist' in self.text('plannerAlert'))
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-form="create"] input[name="label"]').is_enabled())
+        self.reminder_fields('[data-reminder-form="create"]','Synthetic DST reminder','America/New_York','2026-11-01T01:30')
+        self.memory_click('[data-reminder-form="create"] button')
+        self.wait.until(lambda _: 'occurs twice' in self.text('plannerAlert'))
+        self.reminder_fields('[data-reminder-form="create"]','Synthetic DST reminder','America/New_York','2026-11-01T01:30','1')
+        revision=reminders.reminder_payload(session)['revision']
+        reminders.update_reminders(session,dict(action='reminders',operation='consent',enabled=True,reminder_revision=revision,request_id=str(uuid4())))
+        self.memory_click('[data-reminder-form="create"] button')
+        self.wait.until(lambda _: 'Reminders changed' in self.text('plannerAlert'))
+        self.memory_click('[data-reminder-reload]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-form="create"] input[name="label"]').is_enabled())
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-form="create"] input[name="label"]').get_attribute('value'),'Synthetic DST reminder')
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-form="create"] select[name="fold"]').get_attribute('value'),'1')
+        self.memory_click('[data-reminder-form="create"] button')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-id]'))
+        self.assertIn('2026-11-01T06:30:00+00:00',self.text('plannerReminders'))
+        self.assertEqual(self.browser.execute_script('return innerWidth'),390)
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+        self.capture('travel-reminders-mobile-dst-fold')
+
+    def test_travel_reminder_lost_ack_retry_pagehide_and_auth_privacy(self):
+        session,clock=self.reminder_fixture()
+        self.login();self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-consent]'))
+        self.memory_click('[data-reminder-consent]')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-form="create"]'))
+        self.reminder_fields('[data-reminder-form="create"]','Synthetic private reminder','UTC','2035-01-02T10:00')
+        self.browser.execute_script("""const original=window.fetch;window.fetch=(url,options)=>original(url,options).then(response=>{
+            if(options?.body&&JSON.parse(options.body).action==='reminders'&&JSON.parse(options.body).operation==='create'){window.fetch=original;throw new TypeError('Synthetic reminder acknowledgement lost');}return response;});""")
+        self.memory_click('[data-reminder-form="create"] button')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-retry]'))
+        self.memory_click('[data-reminder-retry]')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-id]'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-id]')),1)
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}))")
+        self.assertEqual(self.browser.find_element(self.By.ID,'plannerReminders').get_attribute('textContent'),'')
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: 'Synthetic private reminder' in self.text('plannerReminders'))
+        self.wait.until(lambda _: self.active_requests==0)
+        self.browser.delete_cookie('sessionid')
+        self.assertIsNone(self.browser.get_cookie('sessionid'))
+        self.memory_click('[data-reminder-reload]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerReminders').get_attribute('textContent')=='')
+
     def test_travel_packing_keyboard_crud_autosave_reopen_and_offline_retry(self):
         from selenium.webdriver.common.keys import Keys
         session=self.packing_fixture()

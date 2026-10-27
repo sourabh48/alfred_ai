@@ -40,7 +40,9 @@ def new_session(user, plan=None):
     session = TravelPlanningSession.objects.create(user=user, plan=plan, title=plan.title if plan else "Your next escape",status="draft")
     if plan:
         session.state = deepcopy(plan.planning_state)
-        session.state.pop("_packing_checklist", None)
+        from .travel.packing import PRIVATE_PLAN_KEYS
+        for key in PRIVATE_PLAN_KEYS:
+            session.state.pop(key, None)
         for key, val in {"selected_destination": plan.destination, "available_start_date": plan.start_date.isoformat() if plan.start_date else None,
                          "available_end_date": plan.end_date.isoformat() if plan.end_date else None,
                          "budget": money_float(plan.budget), "transport_mode": plan.transport_mode, "trip_duration": plan.duration_days or None}.items():
@@ -358,6 +360,9 @@ def _send_message(session, user, text):
         previous = TravelPlan.objects.filter(user=user).exclude(status="cancelled").exclude(itinerary={}).order_by("-updated_at").first()
         if previous:
             session.state = deepcopy(previous.planning_state)
+            from .travel.packing import PRIVATE_PLAN_KEYS
+            for key in PRIVATE_PLAN_KEYS:
+                session.state.pop(key, None)
             session.itinerary = deepcopy(previous.itinerary)
             session.state["selected_destination"] = fact(previous.destination,"previous_trip",True)
             session.state["requested_destination"] = fact(previous.destination,"previous_trip",True)

@@ -18,3 +18,9 @@ html[data-theme="dark"] [data-itinerary-editor] :is(.travel-fit,.travel-priority
 #plannerPacking form { display:grid; gap:.5rem; max-width:36rem; }
 #plannerPacking input { max-width:100%; }
 #plannerPacking .travel-actions { align-items:flex-start; }
+#plannerReminders { overflow-wrap:anywhere; }
+#plannerReminders form { display:grid; gap:.5rem; max-width:36rem; margin:1rem 0; }
+#plannerReminders input, #plannerReminders select { width:100%; min-width:0; }
+#plannerReminders input[type="checkbox"] { width:1.2rem; }
+.travel-reminder-list { padding:0; list-style:none; }
+.travel-reminder-list > li { border-bottom:1px solid var(--alfred-stroke); padding:.75rem 0; }
