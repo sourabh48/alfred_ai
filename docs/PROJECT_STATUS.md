@@ -24,6 +24,11 @@ production acceptance remain pending. Baseline75/143;extensions0/13 unchanged.
 NEXT: finish current source/privacy/push/CI checkpoint,then READY_FOR_NEXT.
 B2 GPX is next only on owner NEXT; no automatic module change or deployment.
 
+Verified implementation source **a0b1fdc2e8a8813bf0ee9d7d6fde4142a2733b53**; clean source/history privacy,
+dependency/migration preflight PASS,zero findings. Final tracker-only HEAD is bound
+by source-checkpoint/release.json,push.json and ci.json in the export artifact
+directory. Fresh CI remains pending; source acceptance is not release approval.
+
 ## Previous implementation checkpoint — TRAVEL2-003/SCOPE-02,2026-10-27
 
 MODE NEXT recovered44f952b clean/synchronized. CI40485342191 checked once:

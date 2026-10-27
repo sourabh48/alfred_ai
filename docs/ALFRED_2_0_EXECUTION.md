@@ -23,6 +23,11 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
   travel-export-20261027 and ci-repair-ac05515/travel-export-*.json. Source/privacy,
   commit/push/new-CI closure tracked in EXECUTION_STATE; no full-story promotion.
 
+Verified implementation source **a0b1fdc2e8a8813bf0ee9d7d6fde4142a2733b53**; clean source/history privacy,
+dependency/migration preflight PASS,zero findings. Final tracker-only HEAD is bound
+by source-checkpoint/release.json,push.json and ci.json in the export artifact
+directory. Fresh CI remains pending; source acceptance is not release approval.
+
 ## Persistent remaining Travel phases (owner instruction2026-10-27)
 
 - PhaseB/TRAVEL2-004: B1 private saved-itinerary PDF LOCAL_VERIFIED/CI_PENDING; B2 validated
