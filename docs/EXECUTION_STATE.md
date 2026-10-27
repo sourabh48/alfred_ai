@@ -1,6 +1,62 @@
 # ALFRED execution state
 
-## Active checkpoint — TRAVEL2-003/SCOPE-02 (2026-10-27)
+## Active checkpoint — TRAVEL2-004/B1 private PDF export (2026-10-27)
+
+- MODE NEXT recovered84902b7e4777948baceeaa8d5720b412b1b8b282; canonical branch
+  development/alfred-integrated,F:/ALFRED_DEV/post-audit. All interrupted changes
+  preserved. Current implementation/test/checkpoint changes are uncommitted until
+  the source/privacy preflight and normal development push below are recorded.
+- CI40491012266 exact84902b7 FAILURE: native1435 exactly2 cold-process fixture
+  failures; Linux portable SUCCESS supersedes prior40485342191 Linux21 failure;
+  Selenium CANCELLED at30m0s. Previous native1417 had the same packing fixture
+  failure; current adds the reminder replay fixture analogue. Neither cancelled
+  Selenium run is acceptance. Artifacts/annotations retained in ci-recovery.
+- CI repair LOCAL_VERIFIED: shared test-only durable_fixture_database keeps actual
+  cold-process/replay assertions, uses existing SQLite file or committed synthetic
+  in-memory fixture backup in a new private directory, closes Windows handles.
+  Default2/file-backed2 restart tests PASS; opposing default-profile races2 PASS.
+  Initial document-render wait fixes pointer/upload instability, actual Chrome1
+  PASS; Linux was already green at84902b7. Measured Selenium budget30→45m reviewed;
+  full coverage,check names,protection and cancellation rules remain unchanged.
+- B1 LOCAL_VERIFIED: explicit owner/CSRF/revision download of SAVED itinerary only,
+  no provider/corpus access, no financial writes. Existing PyMuPDF in memory and
+  source-aging helper; bounds60days/30items,5stops/100total sources,180kHTML,
+  40pages/8MiB. Per-stop source location,canonical categories,expiry and unknowns
+  preserved. Costs,packing,reminders,linked originals,chat/unrelated state excluded.
+  No invented route,booking or amount. Offline server-side generation, no new deps.
+- Focused47 backend/API/CI metadata tests PASS,including9 unique PDF cases with
+  independent strict pypdf parsing. Final layout/page-limit2 overlapping PASS
+  after visual inspection found long-word clipping; overflow-wrap fixes it and
+  rendered-text assertions prove all240-character titles are visible. First/last
+  rendered pages inspected. Earlier failed diagnostics retained,not counted PASS.
+- Three unique actual Chrome workflows PASS across first2/repaired1: stale409,
+  keyboard download/parse,late-response/auth-loss privacy and existing packing.
+  Prior statement-upload repair1 Chrome PASS separately. Four actual1440/390px
+  global light/dark Axe audits zero violations,captures inspected. Incomplete
+  contrast/manual screen-reader,real-account and production acceptance stay pending.
+- Native final runtime review CLEAN after source-location/category/wrapping fixes;
+  tests/fixtures summary-only,not an independent model. Earlier quota-interrupted
+  attempt remains incomplete; final token d19db561-31a0-406f-a540-373bdeb1e440
+  completed. No outside model/provider,private-history activation or paid AI used.
+- JS syntax,migration drift PASS. Graphify AST-only11489 nodes/32021 edges/
+  525 communities; no semantic/provider call. Inventory/source/privacy preflight
+  and commit/push closure remain the next commands. Evidence: artifacts/
+  ci-repair-ac05515/travel-export-*.json; artifacts/travel-export-20261027/
+  {local-acceptance.json,accessibility.json,native-review.json,ci-recovery/}.
+- Fetch confirmed remote development84902b7,remote mastera2274aa,0 open PRs;
+  frozen4aa7ac70 untouched. No master/Pages/deployment action. Baseline75/143,
+  extensions0/13. PhaseC only read-only same-currency development is authorized;
+  FIN-15 migration and financial writes remain gated.
+- CONTINUE_REQUIRED: run inventory check,commit this validated source and3 trackers,
+  run clean-source/history privacy preflight; bind source SHA in trackers,commit
+  documentation-only closure,preflight final SHA,push development normally and
+  dispatch exact-head Browser Regression. Save push.json/ci.json and confirm
+  clean synchronized refs. Then READY_FOR_NEXT; do not select B2 automatically.
+  NEXT selects B2 GPX after checking that final-head CI once; fix any actual failure
+  first. Pending CI never means full TRAVEL2-003/004 or extension acceptance.
+
+## Previous completed checkpoint — TRAVEL2-003/SCOPE-02
+
 
 - MODE NEXT; recovery44f952bf6bc6aa1c431a87848b6a8750d8ff0c5b clean/synchronized,
   development/alfred-integrated, F:/ALFRED_DEV/post-audit. CI40485342191 checked

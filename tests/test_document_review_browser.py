@@ -836,6 +836,8 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self.selenium.get(f"{self.live_server_url}/documents/")
         self.wait.until(self.EC.presence_of_element_located((self.By.ID, "documentCenterRoot")))
         self.wait.until(lambda driver: driver.execute_script("return Boolean(window.Alfred && window.submitDocumentCorrection);"))
+        # The initial async render changes panel positions; wait before a real pointer click.
+        self.wait.until(lambda driver: driver.find_elements(self.By.CSS_SELECTOR, '#documentCenterCards article'))
         self.selenium.execute_script("""
             window.__lastCorrectionError = "";
             const originalFetchJSON = window.Alfred.fetchJSON;

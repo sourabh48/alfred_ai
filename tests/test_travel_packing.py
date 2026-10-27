@@ -7,7 +7,6 @@ from unittest.mock import patch
 from uuid import uuid4
 
 from django.core.cache import cache
-from django.db import connection
 from django.test import Client, TestCase, TransactionTestCase
 
 from apps.mobility.models import TravelPlan, TravelPlanningSession
@@ -15,6 +14,7 @@ from apps.mobility.services.travel.packing import KEY, LIMIT, update_packing
 from apps.mobility.services.travel.editor import EditConflict
 from apps.mobility.services.travel_conversation import new_session, save_plan
 from tests import test_travel_planner as fixtures
+from tests.travel_persistence_support import durable_fixture_database
 
 
 class TravelPackingTests(TestCase):
@@ -169,8 +169,6 @@ class PackingRestartTests(TransactionTestCase):
     def test_new_python_process_reads_durable_trip_progress(self):
         item=self.payload()['items'][0]
         self.assertEqual(self.change('update',item_id=item['id'],packed=True).status_code,200)
-        database=str(connection.settings_dict['NAME'])
-        self.assertTrue(Path(database).is_file(),'Restart evidence requires the isolated file-backed test database')
         code='''import sys, os
 os.environ['DJANGO_SETTINGS_MODULE']='alfred_ai.browser_test_settings'
 from django.conf import settings
@@ -182,6 +180,8 @@ state=TravelPlan.objects.get(pk=int(sys.argv[2])).planning_state['_packing_check
 assert state['revision']==1 and any(i['id']==sys.argv[3] and i['packed'] for i in state['items'])
 print('cold-process checklist persistence PASS')
 '''
-        result=subprocess.run([sys.executable,'-c',code,database,str(self.session.plan_id),item['id']],capture_output=True,text=True,timeout=45)
+        with durable_fixture_database() as database:
+            self.assertTrue(Path(database).is_file())
+            result=subprocess.run([sys.executable,'-c',code,database,str(self.session.plan_id),item['id']],capture_output=True,text=True,timeout=45)
         self.assertEqual(result.returncode,0,result.stderr[-1200:])
         self.assertIn('persistence PASS',result.stdout)

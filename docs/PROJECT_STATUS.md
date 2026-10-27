@@ -2,7 +2,29 @@
 
 **Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
-## Active implementation checkpoint — TRAVEL2-003/SCOPE-02,2026-10-27
+## Active implementation checkpoint — TRAVEL2-004/B1,2026-10-27
+
+Private saved-itinerary PDF LOCAL_VERIFIED with explicit owner/CSRF/revision
+protection,source dates/expiry/unknowns including individual stops,Unicode/wrapping
+and bounded output. Costs,packing,reminders,linked originals and unrelated private
+state excluded; no provider call,financial write,new dependency or migration.
+Focused47 backend/API/CI tests PASS incl9 PDF cases using independent pypdf;
+final layout/page-limit2 overlapping PASS. Three actual Chrome workflows PASS;
+four1440/390 light/dark global Axe audits zero violations. Native runtime review
+CLEAN,fixtures summary-only. JS/migration PASS; Graphify AST11489/32021/525.
+Evidence: artifacts/travel-export-20261027 and ci-repair-ac05515/travel-export-*.
+Source/privacy/commit/push/new exact-head CI closure is in EXECUTION_STATE.
+
+CI40491012266 exact84902b7 FAILED: native1435 two restart-fixture assumptions,
+Linux portable PASS,Selenium CANCELLED30m. Isolated default/file cold-process
+repairs2 PASS each,opposing races2 PASS; prior upload helper Chrome1 PASS.
+Measured Selenium45m budget reviewed,full suite/checks/protection unchanged.
+Fresh exact-head CI,manual screen-reader/incomplete contrast,real-account and
+production acceptance remain pending. Baseline75/143;extensions0/13 unchanged.
+NEXT: finish current source/privacy/push/CI checkpoint,then READY_FOR_NEXT.
+B2 GPX is next only on owner NEXT; no automatic module change or deployment.
+
+## Previous implementation checkpoint — TRAVEL2-003/SCOPE-02,2026-10-27
 
 MODE NEXT recovered44f952b clean/synchronized. CI40485342191 checked once:
 in_progress, not PASS; prior packing/organizer evidence retained. Durable local

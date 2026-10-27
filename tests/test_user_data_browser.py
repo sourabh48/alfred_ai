@@ -4625,6 +4625,64 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         session.refresh_from_db()
         return session
 
+    def pdf_download_folder(self):
+        from alfred_private_storage import private_directory
+        folder=private_directory(Path(self.enterContext(TemporaryDirectory()))/'downloads')
+        self.browser.execute_cdp_cmd('Browser.setDownloadBehavior',dict(behavior='allow',downloadPath=str(folder)))
+        self.addCleanup(self.browser.execute_cdp_cmd,'Browser.setDownloadBehavior',dict(behavior='default'))
+        return folder
+
+    def test_travel_pdf_export_stale_guard_keyboard_download_and_independent_parse(self):
+        from io import BytesIO
+        from pypdf import PdfReader
+        from django.db.models import F
+        from selenium.webdriver.common.keys import Keys
+        from apps.mobility.models import TravelPlanningSession
+        session=self.packing_fixture();folder=self.pdf_download_folder()
+        self.login();self.browser.set_window_size(1440,1200)
+        self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportPDF').is_displayed())
+        TravelPlanningSession.objects.filter(pk=session.pk).update(revision=F('revision')+1)
+        self.memory_click('#plannerExportPDF')
+        self.wait.until(lambda _: 'Reload before exporting' in self.text('plannerAlert'))
+        self.assertFalse(list(folder.glob('*.pdf')))
+        self.memory_click('[data-editor-reload]')
+        session.refresh_from_db()
+        self.wait.until(lambda _: f'Trip revision {session.revision}' in self.text('plannerItinerary'))
+        self.browser.find_element(self.By.ID,'plannerExportPDF').send_keys(Keys.ENTER)
+        output=folder/'alfred-itinerary.pdf'
+        self.wait.until(lambda _: output.is_file() and output.stat().st_size>100 and not list(folder.glob('*.crdownload')))
+        reader=PdfReader(BytesIO(output.read_bytes()),strict=True)
+        text='\n'.join(page.extract_text() for page in reader.pages)
+        self.assertIn('PRIVATE SAVED ITINERARY',text);self.assertIn('Day 1:',text)
+        self.assertIn('Costs, private packing checklists',text)
+        self.wait.until(lambda _: 'PDF downloaded' in self.text('plannerAlert'))
+        self.assertEqual(len(list(folder.glob('*.pdf'))),1)
+        self.browser.execute_script("document.getElementById('plannerExport').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('travel-private-pdf-download-desktop')
+
+    def test_travel_pdf_export_late_response_and_auth_loss_do_not_download_private_data(self):
+        session=self.packing_fixture();folder=self.pdf_download_folder()
+        self.login();self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportPDF').is_displayed())
+        self.browser.execute_script("""const original=window.fetch;window.fetch=(url,options)=>{
+            if(options?.body && JSON.parse(options.body).action==='export_pdf'){
+                window.fetch=original;return original(url,{...options,signal:undefined}).then(response=>new Promise(resolve=>{window.releasePrivatePDF=()=>resolve(response);}));
+            }return original(url,options);};""")
+        self.memory_click('#plannerExportPDF')
+        self.wait.until(lambda _: self.browser.execute_script('return typeof releasePrivatePDF==="function"'))
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));releasePrivatePDF();")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerSend').is_enabled())
+        self.assertFalse(list(folder.glob('*.pdf')))
+        self.assertFalse(self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportPDF').is_displayed())
+        self.wait.until(lambda _: self.active_requests==0)
+        self.browser.delete_cookie('sessionid')
+        self.memory_click('#plannerExportPDF')
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
+        self.assertFalse(list(folder.glob('*.pdf')))
+
     def reminder_fixture(self, now=None):
         from datetime import datetime,timezone
         from apps.mobility.services.travel import reminders

@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 from django.db import transaction
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -27,6 +28,7 @@ from .services.travel.editor import apply_edit, editor_payload
 from .services.travel.documents import document_links, update_documents
 from .services.travel.packing import packing_payload, update_packing
 from .services.travel.reminders import reminder_payload, update_reminders
+from .services.travel.pdf_export import itinerary_pdf
 
 
 class PlannerWriteThrottle(UserRateThrottle):
@@ -137,6 +139,17 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
                 update_reminders(session, request.data)
             except ValidationError as error:
                 return Response({"detail": error.detail}, status=400)
+        elif action == "export_pdf":
+            if set(request.data) != {"action", "revision"}:
+                raise ValidationError({"detail": "Choose the saved-itinerary PDF export without extra fields."})
+            if type(request.data.get("revision")) is not int or request.data["revision"] != session.revision:
+                return Response({"detail": "This trip changed. Reload before exporting its saved itinerary."}, status=409)
+            plan = get_object_or_404(TravelPlan.objects.select_for_update(), pk=session.plan_id, user=request.user)
+            response = HttpResponse(itinerary_pdf(plan), content_type="application/pdf")
+            response["Content-Disposition"] = 'attachment; filename="alfred-itinerary.pdf"'
+            response["X-Content-Type-Options"] = "nosniff"
+            response["Referrer-Policy"] = "no-referrer"
+            return response
         elif action == "trip_documents":
             choices = update_documents(session, request.data)
             return Response({**session_payload(session), **({"document_choices": choices} if choices is not None else {})})

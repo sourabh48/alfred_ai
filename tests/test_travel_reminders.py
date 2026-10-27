@@ -1,9 +1,12 @@
 """Explicit local consent and atomic in-app delivery; synthetic trips only."""
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import subprocess
+import sqlite3
+import json
 import sys
 from tempfile import TemporaryDirectory
 from threading import Event
@@ -19,6 +22,7 @@ from apps.mobility.services.travel import reminders
 from apps.mobility.services.travel.editor import EditConflict
 from apps.mobility.services.travel_conversation import new_session, save_plan, send_message
 from tests import test_travel_packing as packing_fixtures
+from tests.travel_persistence_support import durable_fixture_database
 
 NOW = datetime(2035, 1, 1, 0, 0, tzinfo=timezone.utc)
 
@@ -301,8 +305,6 @@ class ReminderDurabilityTests(TransactionTestCase):
 
     def test_worker_crash_after_commit_replays_actual_native_body_once_after_restart(self):
         row=self.scheduled()
-        database=str(connection.settings_dict['NAME'])
-        self.assertTrue(Path(database).is_file())
         code='''import ast,os,sys
 from datetime import datetime,timedelta
 from pathlib import Path
@@ -340,10 +342,13 @@ with patch.object(reminders,'current_time',return_value=at):
     assert len(policy['deliveries'])==1 and policy['deliveries'][0]['late']
 print('native reminder restart replay PASS')
 '''
-        with TemporaryDirectory() as directory:
+        with durable_fixture_database() as database, TemporaryDirectory() as directory:
+            self.assertTrue(Path(database).is_file())
             queue=str(Path(directory)/'native-test-jobs.sqlite3')
             for stage in ('crash','replay'):
                 result=subprocess.run([sys.executable,'-c',code,database,stage,queue,row['due_at'],str(self.session.plan_id)],capture_output=True,text=True,timeout=45)
                 self.assertEqual(result.returncode,0,result.stderr[-1600:])
                 if stage=='replay':self.assertIn('restart replay PASS',result.stdout)
-        self.assertEqual(len(self.policy()['deliveries']),1)
+            with closing(sqlite3.connect(database)) as persisted:
+                state=json.loads(persisted.execute('SELECT planning_state FROM mobility_travelplan WHERE id=?',(self.session.plan_id,)).fetchone()[0])
+            self.assertEqual(len(state[reminders.KEY]['deliveries']),1)
