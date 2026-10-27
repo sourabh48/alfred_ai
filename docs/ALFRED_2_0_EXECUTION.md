@@ -25,7 +25,7 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
 
 Verified implementation source **a0b1fdc2e8a8813bf0ee9d7d6fde4142a2733b53**; clean source/history privacy,
 dependency/migration preflight PASS,zero findings. Final tracker-only HEAD is bound
-by source-checkpoint/release.json,push.json and ci.json in the export artifact
+by source-checkpoint/<HEAD>/release.json,push.json and ci.json in the export artifact
 directory. Fresh CI remains pending; source acceptance is not release approval.
 
 ## Persistent remaining Travel phases (owner instruction2026-10-27)
@@ -122,17 +122,17 @@ directory. Fresh CI remains pending; source acceptance is not release approval.
   source/history privacy (zero findings), dependency/migration preflight and normal
   development push. CI dispatch accepted204, pending outcome. This final checkpoint
   changes only the two trackers; runtime-identical local evidence is reused.
-  source-checkpoint/release.json, push.json and ci.json in the organizer artifacts
+  source-checkpoint/<HEAD>/release.json, push.json and ci.json in the organizer artifacts
   bind the final checkpoint HEAD's preflight/push/new exact-head CI.
 - Packing verified source6817fa863e95c34e93a9cae121100024f55d8ff7 clean source/
   history privacy/dependency/migration preflight PASS,zero findings. This final
   checkpoint changes only three trackers; passing runtime evidence is reused.
-  artifacts/travel-packing-20261027/{source-checkpoint/release.json,push.json,ci.json}
+  artifacts/travel-packing-20261027/{source-checkpoint/<HEAD>/release.json,push.json,ci.json}
   bind final checkpoint candidate/ref/CI closure. No master/deployment action.
 - Reminder sourcea799b31ec59ace8806460345c6f3de78c7274476 clean source/history
   privacy,dependency/migration preflight PASS,zero findings. This final checkpoint
   changes only three trackers; runtime evidence is reused. Reminder artifacts
-  source-checkpoint/release.json,push.json and ci.json bind final candidate/ref/CI.
+  source-checkpoint/<HEAD>/release.json,push.json and ci.json bind final candidate/ref/CI.
 - NEXT ACTION: after matching privacy/push PASS/new CI dispatch, READY_FOR_NEXT;
   check final-head ci.json once at next milestone,then reconcile full-extension
   gates and select tracker-authorized TRAVEL2-004/SCOPE-01 private export. No auto

@@ -41,7 +41,7 @@
   completed. No outside model/provider,private-history activation or paid AI used.
 - JS syntax,migration drift and inventory check PASS. Graphify AST-only11490 nodes/32022 edges/
   521 communities; no semantic/provider call. Source-preflight/release.json binds verified source/privacy.
-  Final source-checkpoint/release.json,push.json and ci.json bind the final
+  Final source-checkpoint/<HEAD>/release.json,push.json and ci.json bind the final
   checkpoint HEAD,normal development push and exact-head CI. Evidence: artifacts/
   ci-repair-ac05515/travel-export-*.json; artifacts/travel-export-20261027/
   {local-acceptance.json,accessibility.json,native-review.json,ci-recovery/}.
@@ -99,7 +99,7 @@
   **a799b31ec59ace8806460345c6f3de78c7274476**. Clean source/history privacy,
   dependency/migration preflight PASS,zero findings at source-preflight/release.json.
   This final checkpoint changes only the three trackers; reuse runtime evidence.
-  Final checkpoint HEAD's source-checkpoint/release.json,push.json and ci.json in
+  Final checkpoint HEAD's source-checkpoint/<HEAD>/release.json,push.json and ci.json in
   the reminder artifact directory bind exact-source privacy,normal push and CI.
 - NEXT COMMAND: NEXT checks ci.json's final-head run once at the next milestone;
   after push.json PASS/CI dispatch recorded, READY_FOR_NEXT for full-extension gate
@@ -146,7 +146,7 @@
 - Source6817fa8 clean source/history privacy/dependency/migration preflight PASS,
   zero findings: artifacts/travel-packing-20261027/source-preflight/release.json.
   This final checkpoint changes only the three trackers; runtime evidence is reused.
-  Final HEAD source-checkpoint/release.json, push.json and ci.json in the same
+  Final HEAD source-checkpoint/<HEAD>/release.json, push.json and ci.json in the same
   directory bind normal development push/new exact-head CI. Never inherit green
   from c521a6d or another SHA. No replacement PR/master/deployment is authorized.
 - NEXT COMMAND: NEXT selects TRAVEL2-003/SCOPE-02. First inspect final ci.json's

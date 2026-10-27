@@ -26,7 +26,7 @@ B2 GPX is next only on owner NEXT; no automatic module change or deployment.
 
 Verified implementation source **a0b1fdc2e8a8813bf0ee9d7d6fde4142a2733b53**; clean source/history privacy,
 dependency/migration preflight PASS,zero findings. Final tracker-only HEAD is bound
-by source-checkpoint/release.json,push.json and ci.json in the export artifact
+by source-checkpoint/<HEAD>/release.json,push.json and ci.json in the export artifact
 directory. Fresh CI remains pending; source acceptance is not release approval.
 
 ## Previous implementation checkpoint — TRAVEL2-003/SCOPE-02,2026-10-27
@@ -55,7 +55,7 @@ artifacts/travel-reminders-20261027/{local-acceptance.json,accessibility.json}.
 Verified source **a799b31ec59ace8806460345c6f3de78c7274476** clean source/history
 privacy,dependency/migration preflight PASS,zero findings. Final checkpoint changes
 only the three trackers; passing runtime evidence is reused. The reminder artifact
-directory's source-checkpoint/release.json,push.json and ci.json bind its final
+directory's source-checkpoint/<HEAD>/release.json,push.json and ci.json bind its final
 candidate,normal development push and new exact-head CI. No master/deployment action.
 
 75/143 verified;0/13 extensions. Full TRAVEL2-003 acceptance requires newest-head
@@ -186,7 +186,7 @@ to development. Manual CI dispatch returned204; no pass is claimed for this new
 scope. Final checkpoint changes only these two trackers: runtime source is identical,
 so passing local tests are reused. The final checkpoint HEAD's source preflight,
 normal push and exact-head CI are recorded in the organizer artifact directory's
-source-checkpoint/release.json, push.json and ci.json. No master/deployment action.
+source-checkpoint/<HEAD>/release.json, push.json and ci.json. No master/deployment action.
 
 **NEXT ACTION:** reconcile ci.json's newest exact-head run at the next milestone;
 do not repeat passing local tests. READY_FOR_NEXT: TRAVEL2-003 owner opt-in durable packing/reminder lifecycle,
