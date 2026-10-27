@@ -37,10 +37,28 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
   privacy and normal development push must be verified after this commit at the
   resolved HEAD; `artifacts/travel-editor-20261027/source-preflight/release.json`
   and push.json bind that closure. No formal extension promotion yet;0/13.
-- NEXT ACTION: finish exact-source privacy/push, then TRAVEL2-002 bounded owned
-  document linking/expiry/unlink/reopen using existing encrypted corpus and trip
-  JSON. Preserve original copies and owner/retention gates; no upload copies,
-  booking inference, provider or sharing feature. Continue existing Travel module.
+- TRAVEL2-002 bounded organizer LOCAL_VERIFIED: existing private PDF/text links,
+  fingerprint/expiry validation, original access, unlink/reopen and CAS/idempotence.
+  Originals stay in the encrypted corpus; no second copy or booking inference.
+  Undo/unrelated trip state survives link changes. No-store responses, pagehide/
+  auth-loss clearing and identity/revision guards protect private metadata; confirmed
+  chat acknowledgements survive visibility changes without duplicate retries.
+- Organizer validation:12 unique backend cases accepted across10 passing cases in
+  travel-organizer-backend-corrected.json plus2 repaired original-path cases;
+  includes real isolated DPAPI original-byte streaming/unlink preservation.
+  Final5 actual Chrome workflows PASS including editor regression;2 desktop
+  light/dark Axe audits zero violations and captures inspected. Native runtime
+  review clean; tests summary-reviewed, no outside model. JS/inventory PASS;
+  no migration/dependency changes. Graphify AST11345/31512/530 PASS. Failures retained,
+  reruns overlap; manual screen-reader/incomplete Axe checks remain unverified.
+- PR16 externally merged; no open PRs. Exact editor checkpoint1fa7449 manual
+  CI40421447655 PASS. This does not validate the new organizer HEAD. Source commit
+  resolves with `git log -1 --format=%H -- apps/mobility/services/travel/documents.py`;
+  artifacts/travel-organizer-20261027/{local-acceptance.json,source-preflight/release.json,
+  push.json,ci.json} bind final closure. Formal extensions0/13, baseline75/143.
+- NEXT ACTION: finish organizer source/privacy/push and fresh exact-head CI dispatch.
+  Then READY_FOR_NEXT: TRAVEL2-003 bounded owner opt-in packing/reminders; reuse
+  checklist/settings/durable queue after reconciling dependencies. No external send.
 - Editor6e816b1 exact source/history/privacy/dependency/migration preflight PASS,
   zero findings, and normal development push succeeded. Post-push master drift was
   detected and reconciled as above. Final reconciliation/checkpoint closure uses
@@ -84,8 +102,8 @@ synthetic evidence unless their tracker explicitly says otherwise.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | CAREER2-001 — resume-version comparison and stale JD decisions | Owned resumes, matching and outcomes | Exact owned version deltas and stale-decision invalidation | CAREER-01/02 | P2 /2–3 slices | Source/version citations and corrections remain owner-scoped; old JD decisions invalidate after changes | Backend version/owner/citation; desktop compare/correct/reopen | Existing Career tracker; full extension pending | QUEUED; inspect version comparison gap after Travel module; coaching remains baseline CAREER-07 |
 | CAREER2-002 — reviewable application workflow | Recruiter/JD/discovery/geography and owned documents | Source-backed drafts and attachment/revision review | CAREER-04/05, DOC-06, AI-15 | P2 /2–4 slices | Stale proposals/attachments rejected; no implicit sending | API owner/CSRF/stale/retry; Chrome review | Career Discovery/Geography receipts; extension pending | QUEUED; preserve no-send boundary |
-| TRAVEL2-001 — desktop itinerary editing/undo | Manual stops plus implemented desktop CRUD/reorder/undo/history and safe persistence | New exact-head CI/formal extension acceptance; broader upstream UI equivalence unclaimed | TRAVEL-03 accepted; TRAVEL-04 bounded manual slice | P1 /2–3 slices | Full bounded edit/reorder/undo/save/reopen flow; unrelated data preserved; conflicts visible; no stale route/cost claim | 180 unique backend;4 Chrome;2 global desktop Axe; JS/migration/privacy gates | artifacts/travel-editor-20261027/local-acceptance.json; current source commit via tracker history | LOCAL_VERIFIED/CI_PENDING; finalize source/privacy/push, then independent organizer |
-| TRAVEL2-002 — private booking/document organizer | Owned trip plans and general corpus | Explicit attachment/link/expiry/revocation review | TRAVEL-04, DOC-06 | P2 /2–3 slices | Owner-only originals and source dates; no inferred availability or booking writes | API ownership/path/expiry; desktop attach/revoke; privacy | DOC-06 accepted; extension pending | QUEUED; next independent Travel task after editor |
+| TRAVEL2-001 — desktop itinerary editing/undo | Manual stops plus implemented desktop CRUD/reorder/undo/history and safe persistence | Formal extension acceptance; broader upstream UI equivalence unclaimed | TRAVEL-03 accepted; TRAVEL-04 bounded manual slice | P1 /2–3 slices | Full bounded edit/reorder/undo/save/reopen flow; unrelated data preserved; conflicts visible; no stale route/cost claim | 180 unique backend;4 Chrome;2 global desktop Axe; JS/migration/privacy gates | artifacts/travel-editor-20261027/local-acceptance.json; exact1fa7449 CI40421447655 PASS | LOCAL_VERIFIED/CI_PASSED at1fa7449; no automatic full-story promotion |
+| TRAVEL2-002 — private booking/document organizer | Owned trip JSON and existing encrypted corpus now support private links/original access/expiry/unlink/reopen | Newest-head CI and formal extension acceptance; broader booking workflow unclaimed | TRAVEL-04, DOC-06 accepted slices | P2 /bounded slice complete | Owner-only originals and source dates; no inferred availability or booking writes; no private metadata after auth loss | 12 unique backend across repairs;5 Chrome incl editor regression;2 global desktop Axe; privacy | artifacts/travel-organizer-20261027/local-acceptance.json and source-preflight/release.json | LOCAL_VERIFIED; finalize source/privacy/push, dispatch newest-head CI |
 | TRAVEL2-003 — packing/reminders | Static packing and trip dates | Durable owner opt-in checklist/reminder lifecycle | TRAVEL-04; local durable queue | P2 /2 slices | Idempotent completion/timezone/cancel/offline behavior; no external sending | Backend lifecycle/timezones; Chrome opt-in/reopen | Existing itinerary packing; extension pending | QUEUED; reuse queue/settings after organizer |
 | TRAVEL2-004 — private PDF/GPX/ICS exports | Owned trip/evidence/map structures | Explicit validated source-preserving export | TRAVEL-04/17, owner export consent | P2 /2–3 slices | Correct coordinates/timezones/escaping; preserve expiry/unknowns; no public sharing | File parsers and malformed inputs; desktop export | Existing Travel evidence; extension pending | QUEUED; inspect available export helpers first |
 | TRAVEL2-005 — reserve/goal-aware affordability | Canonical baseline and Decimal trip allowances | Approved reserve/goal/scenario contract and explanations | FIN-05/06/07/15, FIN-CURRENCY | P1 /3 slices | Canonical reconciliation; no reserve double count or unapproved currency inference | Decimal edge/cutoff/owner tests; desktop explanation | Existing finance/Travel cost receipts; extension pending | BLOCKED_APPROVAL; obtain concrete contract decisions before implementation |

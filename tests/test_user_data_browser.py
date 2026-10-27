@@ -4618,6 +4618,138 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(sum(i['title']=='Synthetic preserved stale draft' for d in session.itinerary['days'] for i in d['items']),1)
         self.capture('travel-editor-stale-draft-idempotent-retry')
 
+    def test_travel_private_document_link_stale_copy_expiry_unlink_and_reopen(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.ml_engine.services.memory_key import MemoryStorageUnavailable
+        session=self.travel_editor_fixture()
+        source=dict(id='a'*32,kind='upload',document_name='Synthetic travel reference <b>literal</b>.txt',
+            source_fingerprint='1'*64,expires_at=(timezone.now()+timedelta(days=1)).isoformat())
+        self.enterContext(patch('apps.mobility.services.travel.documents.MemoryStore'))
+        listing=self.enterContext(patch('apps.mobility.services.travel.documents.DocumentCorpus.list',return_value={'documents':[source]}))
+        self.login(); self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: 'No private documents linked' in self.text('plannerDocuments'))
+        self.memory_click('[data-trip-document-list]')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-trip-document-link]'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments b'))
+        source['source_fingerprint']='2'*64
+        self.memory_click('[data-trip-document-link]')
+        self.wait.until(lambda _: 'private copy changed' in self.text('plannerAlert').lower())
+        session.refresh_from_db(); self.assertNotIn('_itinerary_documents',session.state)
+        self.memory_click('[data-trip-document-list]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR,'[data-trip-document-link]').get_attribute('data-trip-document-fingerprint')=='2'*64)
+        self.memory_click('[data-trip-document-link]')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]'))
+        link=self.browser.find_element(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]')
+        self.assertEqual(link.get_attribute('href'),self.live_server_url+f'/api/ai/document-corpus/{source["id"]}/original/')
+        self.assertIn('does not confirm a booking',self.text('plannerDocuments'))
+        self.memory_click('#plannerSave')
+        self.wait.until(lambda _: 'Travel Plan saved' in self.text('plannerAlert'))
+        session.refresh_from_db(); session.plan.refresh_from_db()
+        self.assertEqual(session.plan.planning_state['_itinerary_documents'],session.state['_itinerary_documents'])
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]'))
+        source['expires_at']=(timezone.now()-timedelta(seconds=1)).isoformat()
+        self.browser.refresh()
+        self.wait.until(lambda _: 'unavailable, changed or expired' in self.text('plannerDocuments'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]'))
+        self.browser.execute_script("document.getElementById('plannerDocuments').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('travel-documents-expired-reference-desktop')
+        self.memory_click('[data-trip-document-unlink]')
+        self.wait.until(lambda _: 'No private documents linked' in self.text('plannerDocuments'))
+        self.assertEqual(listing.return_value['documents'],[source])
+        listing.side_effect=MemoryStorageUnavailable('Synthetic private key path')
+        self.memory_click('[data-trip-document-list]')
+        self.wait.until(lambda _: 'Private document copies are unavailable' in self.text('plannerAlert'))
+        self.assertNotIn('private key path',self.text('plannerAlert'))
+
+    def test_travel_private_document_pagehide_late_response_and_auth_loss_clear_names(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel.documents import update_documents
+        session=self.travel_editor_fixture()
+        source=dict(id='a'*32,kind='upload',document_name='Synthetic private trip name',
+            source_fingerprint='1'*64,expires_at=(timezone.now()+timedelta(days=1)).isoformat())
+        self.enterContext(patch('apps.mobility.services.travel.documents.MemoryStore'))
+        self.enterContext(patch('apps.mobility.services.travel.documents.DocumentCorpus.list',return_value={'documents':[source]}))
+        update_documents(session,dict(operation='link',revision=session.revision,document_id=source['id'],fingerprint=source['source_fingerprint']))
+        self.login(); self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: source['document_name'] in self.text('plannerDocuments'))
+        self.browser.execute_script("""const original=Alfred.fetchJSON;Alfred.fetchJSON=async function(url,options){const data=await original(url,options);if(options?.body&&JSON.parse(options.body).operation==='list')return new Promise(resolve=>{window.releaseTripDocuments=()=>{window.tripDocumentsDelivered=true;resolve(data)}});return data};""")
+        self.memory_click('[data-trip-document-list]')
+        self.wait.until(lambda _: self.browser.execute_script('return Boolean(window.releaseTripDocuments)'))
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));")
+        self.assertNotIn(source['document_name'],self.browser.find_element(self.By.ID,'plannerDocuments').get_attribute('textContent'))
+        self.browser.execute_async_script('const done=arguments[0];releaseTripDocuments();requestAnimationFrame(()=>requestAnimationFrame(done));')
+        self.wait.until(lambda _: self.browser.execute_script('return Boolean(window.tripDocumentsDelivered)'))
+        self.assertNotIn(source['document_name'],self.browser.find_element(self.By.ID,'plannerDocuments').get_attribute('textContent'))
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));")
+        self.wait.until(lambda _: source['document_name'] in self.text('plannerDocuments'))
+        self.browser.delete_all_cookies()
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));")
+        self.wait.until(lambda _: self.text('plannerAlert'))
+        self.assertNotIn(source['document_name'],self.browser.find_element(self.By.ID,'plannerDocuments').get_attribute('textContent'))
+
+    def test_travel_private_document_refresh_cannot_replace_new_trip_or_new_revision(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel.documents import update_documents
+        first=self.travel_editor_fixture(); second=self.travel_editor_fixture()
+        source=dict(id='a'*32,kind='upload',document_name='Synthetic first-trip private document',
+            source_fingerprint='1'*64,expires_at=(timezone.now()+timedelta(days=1)).isoformat())
+        self.enterContext(patch('apps.mobility.services.travel.documents.MemoryStore'))
+        self.enterContext(patch('apps.mobility.services.travel.documents.DocumentCorpus.list',return_value={'documents':[source]}))
+        update_documents(first,dict(operation='link',revision=first.revision,document_id=source['id'],fingerprint=source['source_fingerprint']))
+        self.login(); self.browser.get(self.live_server_url+f'/mobility/?session={first.pk}')
+        self.wait.until(lambda _: source['document_name'] in self.text('plannerDocuments'))
+        self.browser.execute_script("""const target=arguments[0],original=Alfred.fetchJSON;let once=true;Alfred.fetchJSON=async function(url,options){const data=await original(url,options);if(once&&url===target&&!options?.method){once=false;return new Promise(resolve=>{window.releaseTripRefresh=()=>resolve(data)})}return data};""",f'/api/mobility/planner/sessions/{first.pk}/')
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));")
+        self.wait.until(lambda _: self.browser.execute_script('return Boolean(window.releaseTripRefresh)'))
+        self.memory_click('#travelPlanner details:has(#plannerSessions) > summary')
+        self.memory_click(f'#plannerSessions [data-session="{second.pk}"]')
+        self.wait.until(lambda _: self.browser.execute_script('return location.search')==f'?session={second.pk}')
+        self.browser.execute_async_script('const done=arguments[0];releaseTripRefresh();requestAnimationFrame(()=>requestAnimationFrame(done));')
+        self.assertIn(f'session={second.pk}',self.browser.current_url)
+        self.assertNotIn(source['document_name'],self.text('plannerDocuments'))
+        self.browser.execute_script("""window.releaseTripRefresh=null;const target=arguments[0],original=Alfred.fetchJSON;let once=true;Alfred.fetchJSON=async function(url,options){const data=await original(url,options);if(once&&url===target&&!options?.method){once=false;return new Promise(resolve=>{window.releaseTripRefresh=()=>resolve(data)})}return data};""",f'/api/mobility/planner/sessions/{second.pk}/')
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));")
+        self.wait.until(lambda _: self.browser.execute_script('return Boolean(window.releaseTripRefresh)'))
+        self.memory_click('[data-day="1"] details:has([data-editor-add]) > summary')
+        self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="1"] [data-editor-add] input').send_keys('Only selected trip is edited')
+        self.memory_click('[data-day="1"] [data-editor-add] button')
+        self.wait.until(lambda _: 'Only selected trip is edited' in self.text('plannerItinerary'))
+        self.browser.execute_async_script('const done=arguments[0];releaseTripRefresh();requestAnimationFrame(()=>requestAnimationFrame(done));')
+        self.assertIn('Only selected trip is edited',self.text('plannerItinerary'))
+        first.refresh_from_db();second.refresh_from_db()
+        self.assertNotIn('Only selected trip is edited',str(first.itinerary))
+        self.assertIn('Only selected trip is edited',str(second.itinerary))
+
+    def test_travel_committed_chat_survives_visibility_change_without_duplicate_retry(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.services.travel.documents import update_documents
+        session=self.travel_editor_fixture()
+        source=dict(id='a'*32,kind='upload',document_name='Synthetic pending-write private document',
+            source_fingerprint='1'*64,expires_at=(timezone.now()+timedelta(days=1)).isoformat())
+        self.enterContext(patch('apps.mobility.services.travel.documents.MemoryStore'))
+        self.enterContext(patch('apps.mobility.services.travel.documents.DocumentCorpus.list',return_value={'documents':[source]}))
+        update_documents(session,dict(operation='link',revision=session.revision,document_id=source['id'],fingerprint=source['source_fingerprint']))
+        self.login();self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: source['document_name'] in self.text('plannerDocuments'))
+        self.browser.execute_script("""const original=Alfred.fetchJSON;let once=true;Alfred.fetchJSON=async function(url,options){const data=await original(url,options);if(once&&options?.body&&JSON.parse(options.body).action==='message'){once=false;return new Promise(resolve=>{window.releaseTripWrite=()=>resolve(data)})}return data};""")
+        self.browser.find_element(self.By.ID,'plannerInput').send_keys('Add one waterfall')
+        self.memory_click('#plannerSend')
+        self.wait.until(lambda _: self.browser.execute_script('return Boolean(window.releaseTripWrite)'))
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));")
+        self.assertNotIn(source['document_name'],self.browser.find_element(self.By.ID,'plannerDocuments').get_attribute('textContent'))
+        self.browser.execute_script('releaseTripWrite()')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerInput').get_attribute('value')=='')
+        self.wait.until(lambda _: 'Waterfall visit' in self.text('plannerItinerary'))
+        self.wait.until(lambda _: source['document_name'] in self.text('plannerDocuments'))
+        session.refresh_from_db()
+        self.assertEqual(session.messages.filter(role='user',text='Add one waterfall').count(),1)
+        self.assertEqual(sum(i['title']=='Waterfall visit, subject to access and weather checks' for d in session.itinerary['days'] for i in d['items']),1)
+
     def test_travel_discovery_novelty_sources_expiry_and_offline_reference(self):
         from copy import deepcopy
         from datetime import timedelta

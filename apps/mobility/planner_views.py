@@ -24,6 +24,7 @@ from .services.travel.discovery import remember, place_key
 from .services.travel.intent import PROFILE_KEYS, validate_preference
 from .services.travel_itinerary import build_itinerary, build_multi_stop_itinerary, compare_stop_orders
 from .services.travel.editor import apply_edit, editor_payload
+from .services.travel.documents import document_links, update_documents
 
 
 class PlannerWriteThrottle(UserRateThrottle):
@@ -67,7 +68,7 @@ def session_payload(session):
                 "has_more": offset+3 < pool_count and (not value(session.state, "selected_destination") or bool(value(session.state, "_itinerary_stops")))},
             "map_config":map_configuration(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
-            "itinerary_editor": editor,
+            "itinerary_editor": editor, "trip_documents": document_links(session),
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),
             "research": ({"id": run.id, "status": run.status, "outdated": outdated,
                           "stage": "Recheck needed" if outdated else STAGES.get(run.status, run.status),
@@ -80,9 +81,17 @@ def session_payload(session):
     return restriction_context(session, payload)
 
 
-class TravelSessionList(APIView):
+class PrivateTravelSessionAPI(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [PlannerWriteThrottle]
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response["Cache-Control"] = "no-store, private"
+        return response
+
+
+class TravelSessionList(PrivateTravelSessionAPI):
 
     def get(self, request):
         sessions = TravelPlanningSession.objects.filter(user=request.user)
@@ -103,9 +112,7 @@ class TravelSessionList(APIView):
         return Response(session_payload(new_session(request.user, plan)), status=201)
 
 
-class TravelSessionDetail(APIView):
-    permission_classes = [IsAuthenticated]
-    throttle_classes = [PlannerWriteThrottle]
+class TravelSessionDetail(PrivateTravelSessionAPI):
 
     def get(self, request, pk):
         session = get_object_or_404(TravelPlanningSession, pk=pk, user=request.user)
@@ -119,6 +126,9 @@ class TravelSessionDetail(APIView):
             session = send_message(pk, request.user, request.data.get("text", ""))
         elif action == "itinerary_edit":
             apply_edit(session, request.data)
+        elif action == "trip_documents":
+            choices = update_documents(session, request.data)
+            return Response({**session_payload(session), **({"document_choices": choices} if choices is not None else {})})
         elif action in ("restriction_review", "restriction_withdraw"):
             if type(request.data.get("revision")) is not int or request.data["revision"] != session.revision:
                 return Response({"detail": "This trip changed. Reload before reviewing a route restriction."}, status=409)
@@ -206,7 +216,7 @@ class TravelSessionDetail(APIView):
             session.status = "ready" if stops else "researched"
             session.save()
         elif action == "save":
-            if value(session.state, "_itinerary_editor", {}) and (type(request.data.get("revision")) is not int or request.data["revision"] != session.revision):
+            if (value(session.state, "_itinerary_editor", {}) or "_itinerary_documents" in session.state) and (type(request.data.get("revision")) is not int or request.data["revision"] != session.revision):
                 return Response({"detail": "This trip changed. Reload before saving the edited itinerary."}, status=409)
             save_plan(session, draft=request.data.get("draft") is True)
         elif action == "vehicle":

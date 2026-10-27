@@ -58,7 +58,7 @@ def _prepared(session):
 
 def _fingerprint(session, itinerary, stops):
     context = {k: v.get("value") if isinstance(v, dict) and "value" in v else v
-               for k, v in session.state.items() if k != "_itinerary_editor"}
+               for k, v in session.state.items() if k not in {"_itinerary_editor", "_itinerary_documents"}}
     return hashlib.sha256(_json([itinerary, stops, context]).encode()).hexdigest()
 
 

@@ -56,10 +56,39 @@ publication and CI are recorded in push.json / ci.json. No source tests repeated
 for the identical-tree ancestry merge. Receipt external-master-reconciliation.json
 preserves the external actor/time/tree evidence.
 
-**NEXT ACTION:** finish privacy/push, then TRAVEL2-002 bounded owner-selected corpus
-document links, expiry/unavailability, unlink and reopen in existing Travel JSON.
-Do not duplicate files, infer bookings, activate providers or touch operator data,
-master/frozen/release branches. Both trackers own this continuation checkpoint.
+**2026-10-27 continuation: TRAVEL2-002 bounded organizer LOCAL_VERIFIED.**
+Owner-selected existing encrypted PDF/text originals can be listed, linked, opened,
+unlinked and reopened with trip JSON. Only IDs/fingerprints persist; expired,
+changed, foreign or unavailable copies reveal no original path/name. Originals
+remain under Document Center retention; no second copy or booking/permit inference.
+CAS revisions, natural idempotence, final-unlink save guards and itinerary undo
+preserve unrelated state. Private API responses are no-store; page hiding/auth
+loss clears names. Late reads cannot replace a selected trip/newer revision, and
+visibility changes retain confirmed chat acknowledgements without duplicate retry.
+
+Organizer evidence:12 unique backend cases accepted across10 passing cases in
+travel-organizer-backend-corrected.json and2 repaired original-path cases in
+travel-organizer-original-path-repaired.json (real isolated DPAPI-encrypted upload,
+exact original-byte stream and unlink preservation). Final5 Chrome workflows PASS,
+including editor drag regression;2 light/dark global Axe audits zero violations,
+captures inspected. Initial failures retained; reruns overlap. Native read-only
+runtime review clean; test evidence summary-reviewed, no outside-model disclosure.
+JS/inventory PASS; no schema/dependency change. AST Graphify11345/31512/530 PASS.
+Receipts: artifacts/ci-repair-ac05515/travel-organizer-*.json and
+artifacts/travel-organizer-20261027/{accessibility.json,local-acceptance.json}.
+Manual screen-reader and incomplete Axe checks remain unverified.
+
+PR16 remains externally merged; current GitHub open-PR array is empty. Manual
+CI40421447655 PASS at exact editor checkpoint1fa7449, not at the new organizer.
+Formal extension acceptance remains0/13; baseline75/143. Final source/privacy,
+normal development push and fresh exact-head CI are closed after this commit in
+the organizer artifact directory's source-preflight/release.json, push.json and
+ci.json. Resolve its commit with `git log -1 --format=%H -- apps/mobility/services/travel/documents.py`.
+
+**NEXT ACTION:** finish organizer source/privacy/push and dispatch newest-head CI.
+Then READY_FOR_NEXT: TRAVEL2-003 owner opt-in durable packing/reminder lifecycle,
+reusing existing checklist/settings/queue; reconcile its dependencies before edits.
+No operator data, master/frozen/release branch or deployment action is authorized.
 
 ### Previous Travel batch (accepted bounded source)
 

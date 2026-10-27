@@ -5,9 +5,40 @@ window.TravelPlanner = (() => {
     const esc = value => Alfred.escapeHtml(String(value ?? ""));
     const money = value => Alfred.formatCurrency(value || 0);
     const state = {session: null, busy: false, timer: null, comparison: false, plans: []};
+    let documentEpoch=0, documentActive=true, documentRefreshPending=false;
+    function clearDocuments() {
+        documentEpoch++; documentActive=false;
+        if (state.session) {state.session.trip_documents=[];delete state.session.document_choices;}
+        const panel=$('plannerDocuments'); if(panel){panel.replaceChildren();panel.hidden=true;}
+    }
+    async function fetchPlanner(url,options) {
+        const epoch=documentEpoch;
+        try {
+            const data=await Alfred.fetchJSON(url,options);
+            if (data?.trip_documents && (!documentActive || epoch!==documentEpoch)) {
+                data.trip_documents=[];delete data.document_choices;
+            }
+            return data;
+        } catch(error) {
+            if ([401,403].includes(error.status)) clearDocuments();
+            throw error;
+        }
+    }
+    async function refreshDocumentContext() {
+        if (state.busy) {documentRefreshPending=true;return;}
+        documentRefreshPending=false;
+        documentEpoch++;documentActive=true;
+        const epoch=documentEpoch;
+        if (!state.session) return;
+        const identity=state.session.id;
+        try {
+            const next=await fetchPlanner(api+`sessions/${identity}/`);
+            if (documentActive && epoch===documentEpoch && state.session?.id===identity && next.id===identity && next.revision>=state.session.revision) {state.session=next;render();}
+        } catch(error) {clearDocuments();alert(error.message);}
+    }
     const field = key => state.session?.state?.[key]?.value;
     function syncActionState() {
-        document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], [data-route-choice], [data-restriction-fields], [data-restriction-withdraw], [data-add-stop], [data-stop-index], #plannerCompareOrder, #plannerApplyOrder, #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button, [data-editor-control]')
+        document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], [data-route-choice], [data-restriction-fields], [data-restriction-withdraw], [data-add-stop], [data-stop-index], #plannerCompareOrder, #plannerApplyOrder, #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button, [data-editor-control], #plannerDocuments button')
             .forEach(control => { control.disabled = state.busy || control.dataset.batchUnavailable === "true"; });
     }
     function alert(message) { $("plannerAlert").textContent = message; $("plannerAlert").hidden = !message; }
@@ -18,7 +49,7 @@ window.TravelPlanner = (() => {
         return (sources || []).map(s => `<div class="travel-source"><strong>${esc(s.data_type)} · ${esc(s.confidence)}${s.freshness === "stale" ? " · STALE" : ""}</strong><div>${esc(s.finding?.summary || s.finding?.assumptions?.join(" ") || "Planning allowance")}</div><div>${link(s.source_url, s.source_name)} · ${s.retrieved_at ? `Checked ${esc(new Date(s.retrieved_at).toLocaleString())}` : "Not live-verified"}</div>${(s.finding?.reports || []).map(r=>`<p>${link(r.link,r.title)}<br>${esc(r.source)} · ${esc(r.published)}</p>`).join("")}</div>`).join("") || "No live evidence yet. Research is pending.";
     }
     async function list() {
-        const data = await Alfred.fetchJSON(api+"sessions/");
+        const data = await fetchPlanner(api+"sessions/");
         state.plans = data.plans;
         Alfred.setHTMLIfChanged("plannerPlans", data.plans.map(p=>`<button class="btn btn-sm btn-outline-primary" data-open-plan="${p.id}"><span class="travel-saved-status">${esc(p.status_label)}</span><strong class="d-block">${esc(p.title)}</strong><span class="small">${money(p.budget)} · ${p.duration_days || "Flexible"} days</span></button>`).join("") || '<p class="small">Save a draft whenever you like. No destination required.</p>');
         Alfred.setHTMLIfChanged("plannerSessions", data.sessions.map(s => `<button class="btn btn-sm btn-outline-primary" data-session="${s.id}">${esc(s.title)}<span class="d-block small">${esc(s.status.replaceAll("_", " "))}</span></button>`).join("") || "No conversations yet.");
@@ -26,15 +57,22 @@ window.TravelPlanner = (() => {
         return data;
     }
     async function open(id) {
-        if (state.busy) return;
+        if (state.busy) return false;
+        const epoch=++documentEpoch;documentActive=true;
         clearTimeout(state.timer);
-        state.session = await Alfred.fetchJSON(api+`sessions/${id}/`);
+        const next = await fetchPlanner(api+`sessions/${id}/`);
+        if (!documentActive || epoch!==documentEpoch) return false;
+        state.session = next;
         history.replaceState(null, "", `?session=${state.session.id}`);
         state.comparison = false;
         render();
+        return true;
     }
     async function create(planId) {
-        const data = await Alfred.fetchJSON(api+"sessions/", {method:"POST", body:JSON.stringify(planId ? {plan_id: planId} : {})});
+        if (state.busy) return;
+        const epoch=++documentEpoch;documentActive=true;
+        const data = await fetchPlanner(api+"sessions/", {method:"POST", body:JSON.stringify(planId ? {plan_id: planId} : {})});
+        if (!documentActive || epoch!==documentEpoch) return;
         state.session = data;
         history.replaceState(null, "", `?session=${data.id}`);
         state.comparison = false;
@@ -43,27 +81,34 @@ window.TravelPlanner = (() => {
     }
     async function action(payload) {
         if (state.busy || !state.session) return;
+        documentEpoch++;
+        const identity=state.session.id;
+        let accepted=false;
         if (payload.action === 'save') payload = {...payload,revision:state.session.revision};
         state.busy = true;
         syncActionState();
         alert("");
         try {
-            state.session = await Alfred.fetchJSON(api+`sessions/${state.session.id}/`, {method:"POST", body:JSON.stringify(payload)});
+            const next = await fetchPlanner(api+`sessions/${identity}/`, {method:"POST", body:JSON.stringify(payload)});
+            if (state.session?.id!==identity || next.id!==identity) return false;
+            accepted=true;
+            if (next.revision>=state.session.revision) state.session = next;
             render();
             await list();
+            if (state.session?.id!==identity) return accepted;
             if (state.session.plan_id) populateDetails(state.session.plan_id);
             if (payload.action === "save") {
                 await loadMobilityDashboard();
                 alert(payload.draft ? "Draft saved." : "Travel Plan saved. Open it from Your Plans below.");
             }
             return true;
-        } catch (err) { alert(err.message); return false; }
-        finally { state.busy = false; syncActionState(); schedulePoll(); }
+        } catch (err) { alert(err.message); return accepted; }
+        finally { state.busy = false; syncActionState(); schedulePoll(); if(documentRefreshPending && !document.hidden)refreshDocumentContext(); }
     }
     async function message(text) {
         const accepted = await action({action:"message", text});
         if (accepted) {
-            $("plannerInput").value = "";
+            if ($("plannerInput").value.trim() === String(text).trim()) $("plannerInput").value = "";
             if (/compare/i.test(text)) { state.comparison = true; comparison(); }
         }
     }
@@ -72,7 +117,9 @@ window.TravelPlanner = (() => {
         if (state.session?.research && !["ready", "failed", "superseded"].includes(state.session.research.status)) {
             state.timer = setTimeout(async () => {
                 if (state.busy || document.hidden) { schedulePoll(); return; }
-                try { state.session = await Alfred.fetchJSON(api+`sessions/${state.session.id}/`); render(); }
+                const identity=state.session.id, epoch=documentEpoch;
+                try { const next=await fetchPlanner(api+`sessions/${identity}/`);
+                    if(epoch===documentEpoch && state.session?.id===identity && next.id===identity && next.revision>=state.session.revision){state.session=next;render();} }
                 catch (err) { alert(`Progress could not refresh: ${err.message}. Your request is saved.`); schedulePoll(); }
             }, 2500);
         }
@@ -94,7 +141,7 @@ window.TravelPlanner = (() => {
         $("plannerSave").hidden = !session.itinerary?.days?.length;
         $("plannerRecheck").hidden = !session.candidates?.length;
         $("plannerResults").hidden = !session.candidates.length;
-        candidates(); comparison(); itinerary(); stops();
+        candidates(); comparison(); itinerary(); stops(); documents();
         window.TravelResearchPanels.render(session);
         if (session.plan_id) populateDetails(session.plan_id);
         else $("planDetails").hidden = true;
@@ -140,6 +187,12 @@ window.TravelPlanner = (() => {
         const rows = [["Expected budget",d=>money(d.budget.expected)],["One-way distance",d=>d.distance_km ? `~${d.distance_km} km (estimate)` : "Unknown"],["Weather",d=>d.weather.summary],["Photography",d=>d.factors.Photography],["Crowds",()=>"Unverified"],["Ride difficulty",()=>"Needs route verification"],["Novelty",d=>d.novelty],["Stay availability",()=>"Unverified"]];
         Alfred.setHTMLIfChanged("plannerComparison", `<h3 class="h5">Compare your options</h3><div class="travel-comparison" tabindex="0" role="region" aria-label="Scrollable destination comparison"><table class="table"><caption>Estimates and unknowns are labelled. No live availability guarantee.</caption><thead><tr><th scope="col">Factor</th>${options.map(d=>`<th scope="col">${esc(d.name)}</th>`).join("")}</tr></thead><tbody>${rows.map(([label,fn])=>`<tr><th scope="row">${label}</th>${options.map(d=>`<td>${esc(fn(d))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`);
     }
+    function documents() {
+        $('plannerDocuments').hidden=!documentActive;
+        if (!documentActive) return;
+        const linked=state.session.trip_documents || [], choices=state.session.document_choices;
+        Alfred.setHTMLIfChanged('plannerDocuments',`<h2 class="h5">Private trip documents</h2><p>Link an existing private PDF/text copy from <a href="/documents/">Document Center</a>. Originals stay in their current encrypted store and expire under their retention settings. A document link does not confirm a booking or permit.</p><button type="button" class="btn btn-outline-primary" data-trip-document-list>Review available private copies</button><ul class="mt-3">${linked.map(row=>`<li class="mb-2">${row.status==='available'?`<a href="${esc(row.original_path)}" target="_blank" rel="noopener noreferrer">${esc(row.name)}</a> · copy expires ${esc(new Date(row.expires_at).toLocaleString())}`:`<span>${esc(row.name)}</span>`} <button type="button" class="btn btn-sm btn-outline-secondary" data-trip-document-unlink="${esc(row.id)}">Unlink reference</button></li>`).join('') || '<li>No private documents linked to this trip.</li>'}</ul>${choices?`<div role="group" aria-label="Available private documents">${choices.map(row=>`<p>${esc(row.name)} · expires ${esc(new Date(row.expires_at).toLocaleString())} <button type="button" class="btn btn-sm btn-outline-primary" data-trip-document-link="${esc(row.id)}" data-trip-document-fingerprint="${esc(row.fingerprint)}">Link to this trip</button></p>`).join('') || '<p>No current uploaded private copies. Add one in Document Center with explicit consent and retention first.</p>'}</div>`:''}`);
+    }
     function itinerary() {
         const it = state.session.itinerary;
         $("plannerItinerary").hidden = !it?.days?.length;
@@ -158,7 +211,7 @@ window.TravelPlanner = (() => {
         for (const field of form.elements) if (field.name && plan[field.name] !== undefined) field.value = plan[field.name] ?? "";
     }
     async function postTrip() {
-        const [feedback, media] = await Promise.all([Alfred.fetchJSON(api+"feedback/"), Alfred.fetchJSON(api+"media-suggestions/")]);
+        const [feedback, media] = await Promise.all([fetchPlanner(api+"feedback/"), fetchPlanner(api+"media-suggestions/")]);
         $("plannerPostTrip").hidden = !feedback.due.length && !media.suggestions.length;
         Alfred.setHTMLIfChanged("plannerFeedback", feedback.due.map(p=>`<div class="mb-3"><p>How was ${esc(p.title)}? Feedback is optional.</p><details><summary>What did you like or dislike? (optional)</summary>${["liked","disliked"].map(kind=>`<fieldset class="mt-2"><legend class="h6">${kind === "liked" ? "Enjoyed" : "Could be better"}</legend><div class="travel-chips">${["photography","scenery","ride","food","stay","weather","activities","crowds","roads","distance","cost"].map(tag=>`<label class="small"><input type="checkbox" data-feedback-plan="${p.id}" data-feedback-kind="${kind}" value="${tag}"> ${tag}</label>`).join("")}</div></fieldset>`).join("")}</details><div class="travel-chips">${[["loved","Loved it"],["good","Good"],["okay","Okay"],["disliked","Didn't enjoy it"]].map(([v,l])=>`<button data-rating="${v}" data-plan="${p.id}">${l}</button>`).join("")}</div></div>`).join(""));
         Alfred.setHTMLIfChanged("plannerMedia", media.suggestions.map(s=>`<div class="mb-3"><p>Photo near ${esc(s.location)} matches ${esc(s.plan_title)}. ${esc(s.reason)}</p><details><summary>Review photo</summary><img class="travel-media-preview" src="${esc(s.photo_url)}" alt="${esc(s.caption || 'Trip photo')}"></details><button class="btn btn-sm btn-primary" data-media="add" data-photo="${s.photo_id}" data-plan="${s.plan_id}">Add to trip</button> <button class="btn btn-sm btn-outline-secondary" data-media="ignore" data-photo="${s.photo_id}" data-plan="${s.plan_id}">Ignore</button></div>`).join(""));
@@ -193,6 +246,9 @@ window.TravelPlanner = (() => {
                 if (button.dataset.session) await open(Number(button.dataset.session));
                 if (button.dataset.openPlan) await create(Number(button.dataset.openPlan));
                 if (button.dataset.reject) await action({action:"reject",destination:button.dataset.reject});
+                if (button.hasAttribute('data-trip-document-list')) await action({action:'trip_documents',operation:'list'});
+                if (button.dataset.tripDocumentLink) await action({action:'trip_documents',operation:'link',document_id:button.dataset.tripDocumentLink,fingerprint:button.dataset.tripDocumentFingerprint,revision:state.session.revision});
+                if (button.dataset.tripDocumentUnlink) await action({action:'trip_documents',operation:'unlink',document_id:button.dataset.tripDocumentUnlink,revision:state.session.revision});
                 if (button.dataset.restrictionWithdraw) await action({action:"restriction_withdraw",evidence_id:Number(button.dataset.restrictionWithdraw),revision:state.session.revision});
                 if (button.dataset.routeChoice) await action({action:"route_choice",candidate_index:Number(button.dataset.routeCandidate),route_id:button.dataset.routeChoice,revision:state.session.revision});
                 if (button.id === "plannerCompareOrder") await action({action:"itinerary_order_preview",revision:state.session.revision});
@@ -208,15 +264,15 @@ window.TravelPlanner = (() => {
                     if (button.dataset.stopMove && state.session.itinerary?.days?.length) await window.TravelItineraryEditor.orderStops(names);
                     else await action({action:"itinerary_stops",stops:names,revision:state.session.revision});
                 }
-                if (button.dataset.rating) {const tags=kind=>Array.from(document.querySelectorAll(`input[data-feedback-plan="${Number(button.dataset.plan)}"][data-feedback-kind="${kind}"]:checked`)).map(e=>e.value);await Alfred.fetchJSON(api+"feedback/",{method:"POST",body:JSON.stringify({plan_id:Number(button.dataset.plan),rating:button.dataset.rating,liked:tags("liked"),disliked:tags("disliked")})});await postTrip();}
-                if (button.dataset.media) {await Alfred.fetchJSON(api+"media-suggestions/",{method:"POST",body:JSON.stringify({plan_id:Number(button.dataset.plan),photo_id:Number(button.dataset.photo),action:button.dataset.media})});await postTrip();await loadMobilityDashboard();}
+                if (button.dataset.rating) {const tags=kind=>Array.from(document.querySelectorAll(`input[data-feedback-plan="${Number(button.dataset.plan)}"][data-feedback-kind="${kind}"]:checked`)).map(e=>e.value);await fetchPlanner(api+"feedback/",{method:"POST",body:JSON.stringify({plan_id:Number(button.dataset.plan),rating:button.dataset.rating,liked:tags("liked"),disliked:tags("disliked")})});await postTrip();}
+                if (button.dataset.media) {await fetchPlanner(api+"media-suggestions/",{method:"POST",body:JSON.stringify({plan_id:Number(button.dataset.plan),photo_id:Number(button.dataset.photo),action:button.dataset.media})});await postTrip();await loadMobilityDashboard();}
             } catch(err) { alert(err.message); }
         });
         try {
             const data = await list();
             const id = Number(new URLSearchParams(location.search).get("session")) || data.sessions[0]?.id;
             if (id) await open(id); else await create();
-            const [profiles,prefs] = await Promise.all([Alfred.fetchJSON("/api/mobility/bikes/"), Alfred.fetchJSON(api+"preferences/")]);
+            const [profiles,prefs] = await Promise.all([fetchPlanner("/api/mobility/bikes/"), fetchPlanner(api+"preferences/")]);
             $("plannerVehicle").innerHTML = '<option value="">Choose when relevant</option>'+(profiles.results || profiles).map(p=>`<option value="${p.id}">${esc(p.display_name)}</option>`).join("");
             if (field("vehicle_profile")) $("plannerVehicle").value=field("vehicle_profile");
             $("plannerStyle").innerHTML=Object.entries(prefs.preferences).filter(([,v])=>v.value === true).slice(0,6).map(([k])=>`<span class="badge text-bg-light">${esc(k)}</span>`).join("") || '<span class="small">Your style grows with choices and feedback.</span>';
@@ -224,6 +280,9 @@ window.TravelPlanner = (() => {
         } catch(err) { alert(err.message); }
     }
     document.addEventListener("DOMContentLoaded", init);
+    addEventListener('pagehide',clearDocuments);
+    addEventListener('pageshow',event=>{if(event.persisted)refreshDocumentContext();});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)clearDocuments();else if(!documentActive)refreshDocumentContext();});
     return {openPlan:async id=>{await create(id);$("travelPlanner").scrollIntoView({behavior:"smooth"});},message,refreshPostTrip:postTrip,
-        reload:async()=>{try {await open(state.session.id);return true;} catch(err){alert(err.message);return false;}}};
+        reload:async()=>{try {return await open(state.session.id);} catch(err){alert(err.message);return false;}}};
 })();

@@ -10,3 +10,4 @@ html[data-theme="dark"] .travel-candidate .travel-fit { color:var(--alfred-muted
 html:not([data-theme="dark"]) [data-itinerary-editor] .btn-outline-secondary { --bs-btn-color:#495057; --bs-btn-border-color:#495057; }
 html[data-theme="dark"] [data-itinerary-editor] .travel-day { background:var(--alfred-surface); color:var(--alfred-ink); border-color:var(--alfred-stroke); }
 html[data-theme="dark"] [data-itinerary-editor] :is(.travel-fit,.travel-priority) { color:var(--alfred-muted); }
+#plannerDocuments { overflow-wrap:anywhere; }
