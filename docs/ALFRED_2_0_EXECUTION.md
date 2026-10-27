@@ -74,9 +74,15 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
   changes only the two trackers; runtime-identical local evidence is reused.
   source-checkpoint/release.json, push.json and ci.json in the organizer artifacts
   bind the final checkpoint HEAD's preflight/push/new exact-head CI.
-- NEXT ACTION: finish packing clean-source/privacy/normal push and newest-head CI
-  dispatch, then READY_FOR_NEXT for TRAVEL2-003/SCOPE-02 local reminders below.
-  Reconcile newest exact-head CI at the next milestone; do not rerun passing scopes.
+- Packing verified source6817fa863e95c34e93a9cae121100024f55d8ff7 clean source/
+  history privacy/dependency/migration preflight PASS,zero findings. This final
+  checkpoint changes only three trackers; passing runtime evidence is reused.
+  artifacts/travel-packing-20261027/{source-checkpoint/release.json,push.json,ci.json}
+  bind final checkpoint candidate/ref/CI closure. No master/deployment action.
+- NEXT ACTION: after push.json PASS/new exact-head CI dispatch, READY_FOR_NEXT;
+  NEXT selects TRAVEL2-003/SCOPE-02 local reminders below. Reconcile newest exact-
+  head CI once at the next milestone; do not rerun passing scopes. Missing push/CI
+  evidence means CONTINUE_REQUIRED to finish closure before selecting02.
 - Editor6e816b1 exact source/history/privacy/dependency/migration preflight PASS,
   zero findings, and normal development push succeeded. Post-push master drift was
   detected and reconciled as above. Final reconciliation/checkpoint closure uses

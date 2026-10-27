@@ -14,7 +14,7 @@
 - Source: travel/packing.py, itinerary suggestion helper, conversation/planner/
   plan-detail preservation, packing JS/template/CSS/cache revision, backend profile
   and focused tests. Recovery base exactc521a6d333ae175df11636a94a95efd74f4c5ee7;
-  source commit resolves with `git log -1 --format=%H -- apps/mobility/services/travel/packing.py`.
+  verified source commit6817fa863e95c34e93a9cae121100024f55d8ff7.
 -29 unique backend cases accepted:8 initial PASS incl cold separate Python-process
   persistence; corrected motorcycle fixture + new day/stop/undo/document-preservation
   case +19 editor/organizer regressions all21 PASS. Focused malformed-operation
@@ -31,14 +31,23 @@
   artifacts/travel-packing-20261027/{local-acceptance.json,accessibility.json}.
   Failed receipts retained: wrong ride fixture, wrong Selenium callback index,
   empty quick-reply ARIA group. Source/test hash binding is in local-acceptance.json.
-- NEXT COMMAND: finalize clean exact-source privacy and commit/push checkpoint;
-  dispatch newest-head CI once, record ID/status in artifacts/travel-packing-20261027/ci.json.
-  Then READY_FOR_NEXT, MODE NEXT task ends: TRAVEL2-003/SCOPE-02 opt-in local
+- Source6817fa8 clean source/history privacy/dependency/migration preflight PASS,
+  zero findings: artifacts/travel-packing-20261027/source-preflight/release.json.
+  This final checkpoint changes only the three trackers; runtime evidence is reused.
+  Final HEAD source-checkpoint/release.json, push.json and ci.json in the same
+  directory bind normal development push/new exact-head CI. Never inherit green
+  from c521a6d or another SHA. No replacement PR/master/deployment is authorized.
+- NEXT COMMAND: NEXT selects TRAVEL2-003/SCOPE-02. First inspect final ci.json's
+  exact-head status once at the next milestone; do not repeat passing local tests.
+  READY_FOR_NEXT after push.json PASS and CI dispatch recorded; otherwise
+  CONTINUE_REQUIRED to finish that closure. MODE NEXT task ends: opt-in local
   reminders; smallest safe design is in ALFRED_2_0_EXECUTION.md. No reminders enabled.
 - Baseline75/143; extensions0/13. Manual screen-reader/production acceptance pending.
-  CONTINUE_REQUIRED until exact-source privacy/push/CI dispatch closure below.
+  Full TRAVEL2-003 acceptance remains pending SCOPE-02 and its gates.
 
-**2026-10-27:** current command MERGE EVERYTHING AND PUSH. Current combined source
+## Historical consolidation checkpoint (superseded; evidence preserved)
+
+**2026-10-27:** historical command MERGE EVERYTHING AND PUSH. Combined source
 contains both fc2a4d2 (Yahoo/Discovery/Geography) and6fc1e54 (latest Memory). Read only
 the active checkpoint in PROJECT_STATUS for current refs/tests/push/next action;
 the recovery ledger below predates this merge. PR16/18/19 are owner-closed; do not

@@ -23,14 +23,19 @@ operation and reload-error repairs; tests summary-reviewed. JS/migration checks
 PASS; AST Graphify11384/31653/522. Failed fixtures and first ARIA finding retained,
 repaired selectively; reruns overlap and are not additional cases. Source hashes,
 counts and limits: artifacts/travel-packing-20261027/local-acceptance.json;
-artifacts/ci-repair-ac05515/travel-packing-*.json. Source privacy/push/CI closure
-is recorded in that artifact directory after the clean source commit.
+artifacts/ci-repair-ac05515/travel-packing-*.json. Verified source
+**6817fa863e95c34e93a9cae121100024f55d8ff7** clean source/history privacy,
+dependency/migration preflight PASS,zero findings. This final checkpoint changes
+only the three trackers, so local runtime evidence is reused. Exact final HEAD
+privacy/push/new CI closure is in that artifact directory's source-checkpoint/
+release.json, push.json and ci.json. Require matching final candidate/ref evidence.
 
 **75/143 verified;0/13 extensions.** Scope01 local acceptance does not accept the
 whole reminder extension. Manual screen-reader/incomplete Axe color checks and
 production remain pending. EXECUTION_STATE owns exact continuation and evidence.
-NEXT: finish source/privacy/push/newest-head CI dispatch, then READY_FOR_NEXT for
+NEXT: reconcile final-head ci.json once at next milestone, then NEXT selects
 TRAVEL2-003/SCOPE-02 opt-in durable local reminders; see execution roadmap design.
+READY_FOR_NEXT after normal push PASS/CI dispatch recorded; otherwise CONTINUE_REQUIRED.
 
 ### Previous implementation checkpoint — editor and organizer
 
