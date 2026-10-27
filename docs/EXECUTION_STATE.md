@@ -47,12 +47,16 @@
   artifacts/travel-ics-20261027/{local-acceptance.json,accessibility-final.json,
   native-review-final.json,browser/,browser-repaired/}. Preserve dated evidence path.
 - Source: travel/ics_export.py,travel_calendar.js,export API/JS/templates,CI test-tool
-  setup/backend labels,ICS backend/Chrome/parser tests. Current source uncommitted.
-- CONTINUE_REQUIRED closure: inventory check,commit validated source+3 trackers,
-  immutable source-checkpoint/<HEAD>/release.json source/history privacy preflight;
-  bind source SHA in tracker-only final commit,preflight finalHEAD,push development
-  normally,dispatch exact-head Browser Regression. Save push.json/ci.json;confirm
-  clean synchronized development/master/frozen refs. Matching closure permits
+  setup/backend labels,ICS backend/Chrome/parser tests. Verified source **b7486f3e236bf42c89c66e0f4f3c01aac56b9216**.
+  Clean source/history privacy,dependency/migration preflight PASS,zero findings.
+  Source proof:artifacts/travel-ics-20261027/source-checkpoint/b7486f3e236bf42c89c66e0f4f3c01aac56b9216/release.json.
+- Final checkpoint changes only3 trackers;reuse runtime tests/native review. Final
+  source-checkpoint/<HEAD>/release.json,push.json and ci.json under artifacts/
+  travel-ics-20261027 bind exact checkpoint HEAD,normal development push and new CI.
+- Closure: commit these3 trackers,preflight final HEAD in its immutable SHA directory,
+  push development normally,dispatch exact-head Browser Regression and save matching
+  push.json/ci.json. Check clean synchronized refs/master/frozen unchanged. Missing
+  closure means CONTINUE_REQUIRED;matching push PASS/run recorded means
   READY_FOR_NEXT with CI_PENDING,never full story/extension/release acceptance.
 - NEXT COMMAND: NEXT checks artifacts/travel-ics-20261027/ci.json's final-head run
   once;fix actual failures,reconcile B3 acceptance,then B4 combined export validation.

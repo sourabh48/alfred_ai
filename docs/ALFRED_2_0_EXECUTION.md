@@ -28,10 +28,16 @@ Source/privacy/push/new exact-head CI closure lives in EXECUTION_STATE. Baseline
 75/143;extensions0/13. Full capability,manual screen-reader/incomplete contrast,
 real-account and production acceptance remain pending. B4 is next only on NEXT.
 
+Verified implementation source **b7486f3e236bf42c89c66e0f4f3c01aac56b9216**;clean source/history privacy,
+dependency/migration preflight PASS,zero findings. Final tracker-only HEAD proof:
+artifacts/travel-ics-20261027/source-checkpoint/<HEAD>/release.json,push.json and
+ci.json. Matching closure permits READY_FOR_NEXT;fresh exact-head CI remains pending
+and source acceptance does not authorize release/production.
+
 ## Persistent remaining Travel phases
 
 - [ ] B2 — Validated GPX export: LOCAL_VERIFIED;source/push proof in EXECUTION_STATE,new exact-head CI acceptance pending.
-- [ ] B3 — Timezone-safe ICS export: ACTIVE/LOCAL_VERIFIED;source/push/new exact-head CI closure pending.
+- [ ] B3 — Timezone-safe ICS export: LOCAL_VERIFIED;source/push proof in EXECUTION_STATE,new exact-head CI acceptance pending.
 - [ ] B4 — Combined PDF/GPX/ICS integration acceptance: NEXT after B3 closure.
 - [ ] C1 — Read-only canonical Decimal affordability engine.
 - [ ] C2 — Explainable affordability UI/what-if scenarios.
