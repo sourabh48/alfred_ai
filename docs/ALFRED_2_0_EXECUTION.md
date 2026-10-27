@@ -6,7 +6,27 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — TRAVEL2-004/B4 (2026-10-28)
+## Current checkpoint — TRAVEL2-005/C1 (2026-10-28)
+
+C1 read-only backend service implemented,17focused cases PASS. Exact canonical
+one-month essential/EMI split,gross owner-confirmed spendable cash,disjoint emergency
+reserve/savings/trip/extra contingency,available funds/headroom/shortfall. All seven
+amounts need explicit verified matching currency,owner completeness/disjointness and
+current owner/content/day revision. No inferred INR/FX,float money,income/asset/debt
+double count,financial writes,schema/provider change or certified recommendation.
+Unknown/unresolved/future/stale evidence fails closed;C1 conservatively requires
+today's cash sync/current-month direct living-spend evidence,with observation dates.
+Per-input existing money bound retained;derived totals are not clipped. Native
+fresh-context scoped review CLEAN,same harness/tests-summary;64affected shared
+regressions PASS.17C1+64regressions+10CI contract=91unique checks;original80-case
+batch's sole misplaced C1fixture assertion corrected,final17C1PASS,failed evidence
+retained/reruns not double-counted. Clean Axe setup/migration drift PASS. Chrome0run/1skip,
+notPASS. Graphify query/update Windows Application Control blocked,no bypass.
+CI repair57d4150 pushed;40596279652 IN_PROGRESS only. DraftPR creation403/422 blocked,
+body/URL preserved. Final source/privacy/push/CI closure in EXECUTION_STATE;75/143,
+0/13 unchanged,manual/external/formal/production gates preserved. C2–C4 not executed.
+
+## Previous checkpoint — TRAVEL2-004/B4 (2026-10-28)
 
 Latest NEXT recovery226c4f2:CI40569336516 FAIL,Windows/Linux PASS,Selenium139cases/
 oneerror missing Axe asset. Selenium setup now prepares the same pinned4.13.0
@@ -63,8 +83,8 @@ latest-head CI remains pending,no extension or production approval.
 - [x] B2 — GPX local tests and CI passed atce0f019;core evidence reused.
 - [ ] B3 — ICS local tests passed;ca66861CI observed in_progress,new UID fix needs new exact-head CI.
 - [ ] B4 — Combined exports LOCAL_VERIFIED;FORMAL_ACCEPTANCE_PENDING,closure in EXECUTION_STATE.
-- [ ] C1 — NEXT:canonical read-only Decimal affordability engine.
-- [ ] C2 — Explainable budget and what-if UI.
+- [x] C1 — LOCAL_VERIFIED deterministic backend,17focused/64regression checks;formal/CI gates pending,closure in EXECUTION_STATE.
+- [ ] C2 — NEXT after C1 closure:explainable budget and what-if UI.
 - [ ] C3 — Future-date savings scenarios.
 - [ ] C4 — Financial reconciliation and acceptance.
 - [ ] D1 — Full Travel integration tests.

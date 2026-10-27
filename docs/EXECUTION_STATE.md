@@ -1,6 +1,6 @@
 # ALFRED execution state
 
-## Active checkpoint — CI repair + TRAVEL2-005/C1 (2026-10-28)
+## Active checkpoint — TRAVEL2-005/C1 (2026-10-28)
 
 - Recovered clean/synchronized226c4f2 on development/alfred-integrated. Owner
   explicitly authorizes one draftPR and verified development pushes;no merge/deploy.
@@ -17,11 +17,48 @@
   Confirmed missing-tool rootcause addressed;full Selenium proof needs freshCI.
 - Graphify executable BLOCKED by Windows Application Control;do not bypass policy.
   Existing graph retained. No production/real-data changes. Baseline75/143,0/13.
-- CONTINUE_REQUIRED:finish focused CI repair evidence,then C1 deterministic
-  fresh-canonical/owner-confirmed matching-currency Decimal calculation only.
-  Preserve all earlier export/organizer/editor receipts;no C2–C4 implementation.
+- CI repair57d4150bb9864e72c03084b771872233d5148e8b committed/pushed after
+  clean source/history privacy preflight PASS,zero findings. Fresh exact-source
+  run40596279652 observed IN_PROGRESS,notPASS;no old green inherited.
+- C1 runtime implemented:affordability_source/calculate_affordability backend
+  service only;C2UI/API deferred. Fresh uncached canonical baseline gains exact
+  essential_monthly_outflow string,unchanged numeric contract. Owner authentication,
+  opaque owner/content/day-bound HMAC revision,explicit matching currency and all
+  seven verified amounts required. Owner completeness/disjoint allocation attestations
+  have no defaults;missing/null differs from confirmed zero. Expense HALF_UP cents,
+  no float ingress;per-input inherited bound,derived sums may exceed stored limits.
+- One-month gross spendable cash minus emergency reserve,canonical essentials
+  excluding separately counted EMI,and committed savings;trip+EXTRA contingency
+  produce available funds,signed headroom/shortfall. Investments,income,raw debt
+  principal,repayment/transfer flows never counted twice or spent automatically.
+  Investment-type bank balances excluded from canonical cap. Unknown/negative cash,
+  nonzero/unknown credit balance,unreviewed debits/loans,open unresolved debt schedule,
+  future transactions and missing exact values all fail closed. Conservative C1
+  requires current-day cash sync/current-month direct living-spend evidence;actual
+  observation dates remain explicit. No stale baseline becomes fresh evidence.
+-91unique backend/CI checks accepted:17final focused C1 +64unchanged affected
+  regressions(10canonical finance,49selected-source/owner/privacy,5combined exports)
+  +10CI contract checks.80-case batch had only1new fixture placement failure;
+  unchanged64PASS reused,corrected final17C1PASS,earlier13/reruns not double-counted.
+  Clean pinned Axe setup/migration drift PASS. Native scoped runtime review CLEAN at
+  affordability.py8d8ca842e12c473b515572741f7f3032c88bfd30ba7a465074a0ca5ee08069aa,
+  canonical mappingd92067628e0fb9c38dba5e5c235439e3641192c37d751478395af722cd20c72b.
+  Same harness,fixtures SUMMARY ONLY,no outside model/human sign-off claimed.
+- Evidence artifacts/travel-c1-20261028 and ci-repair-ac05515/travel-c1-*.json.
+  Export/organizer/editor receipts preserved;manual screen-reader/contrast,
+  real-account/production and newest-head CI acceptance remain pending. No C2–C4.
+- C1 LOCAL_VERIFIED,FORMAL_ACCEPTANCE_PENDING. Runtime files:travel/affordability.py,
+  canonical financial_intelligence.py,release_validation.py;tests/test_travel_
+  affordability.py and3trackers. No models/dependencies/JS/templates changed.
+  Final SHA-bound source-checkpoint/<HEAD>/release.json,push.json,ci.json under
+  artifacts/travel-c1-20261028 own exact commit/remote/CI closure. Missing closure
+  means CONTINUE_REQUIRED;matching source/privacyPASS+pushPASS+newrunrecord permits
+  READY_FOR_NEXT.CI_PENDING is not CI_PASSED. Do not rerun unchanged accepted tests.
+- NEXT COMMAND:NEXT checks final-head ci.json ONCE,fixes actual failures,then C2
+  explainable owner-confirmed read-only what-if UI/API using this service. Preserve
+  missingPR creation blocker;no C3/C4,master/Pages/deploy/FIN-15 or live money writes.
 
-## Active checkpoint — TRAVEL2-004/B4 combined exports (2026-10-28)
+## Previous checkpoint — TRAVEL2-004/B4 combined exports (2026-10-28)
 
 - MODE NEXT recoveredca66861f249f400433bd06ab73a105cc460ed6a8 clean/synchronized,
   development/alfred-integrated,F:/ALFRED_DEV/post-audit. ICS40561358942 checked

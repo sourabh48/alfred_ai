@@ -807,6 +807,7 @@ def _build_canonical_financial_baseline_uncached(
             "monthly_income": format(monthly_income_amount, '.2f'),
             "liquid_cash": format(liquid_cash_amount, '.2f'),
             "recurring_emi_burden": format(recurring_emi_burden_amount, '.2f'),
+            "essential_monthly_outflow": format(essential_monthly_outflow_amount, '.2f'),
             "total_assets": format(total_assets_amount, '.2f'),
             "total_liabilities": format(total_liabilities_amount, '.2f'),
             "net_worth": format(net_worth_amount, '.2f'),

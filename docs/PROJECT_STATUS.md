@@ -6,6 +6,17 @@ CI40569336516 Windows/Linux PASS,Selenium FAIL;fresh-head checks required.
 unavailable),not accepted. DraftPR creation403/422 blocked;owner URL and exact
 resume state in EXECUTION_STATE. Baseline75/143,extensions0/13 unchanged.
 
+C1 backend implemented:17focused cases PASS,canonical exact Decimal one-month
+liquidity/obligations/reserves/goals and trip+extra contingency. Explicit same-currency
+owner confirmation/current content revision;unknown/stale/unreconciled data fails
+closed,no inferred FX/INR or financial writes. Investment/credit balances and debt
+flows cannot inflate spendable funds. Conservative current-day cash/current-month
+living-spend evidence and bounded input amounts;no certified advice. Native scoped
+runtime review CLEAN(same harness/fixtures-summary),migration drift PASS;64affected
+regressions PASS.91unique C1/regression/CI checks accepted across incremental runs;
+one new fixture-placement failure retained/repaired(final17PASS),no test double count.
+Final source/push/CI closure in EXECUTION_STATE. C2UI/API deferred.
+
 **Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
 ## Active implementation checkpoint — TRAVEL2-004/B4,2026-10-28
