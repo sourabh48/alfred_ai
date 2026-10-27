@@ -25,12 +25,19 @@ summary-reviewed,no outside model. JS/migration/dependency and Graphify AST
 11455/31904/513 PASS. Counts overlap; failed receipts retained, no unrun pass claims.
 Evidence: artifacts/ci-repair-ac05515/travel-reminders-*.json and
 artifacts/travel-reminders-20261027/{local-acceptance.json,accessibility.json}.
+Verified source **a799b31ec59ace8806460345c6f3de78c7274476** clean source/history
+privacy,dependency/migration preflight PASS,zero findings. Final checkpoint changes
+only the three trackers; passing runtime evidence is reused. The reminder artifact
+directory's source-checkpoint/release.json,push.json and ci.json bind its final
+candidate,normal development push and new exact-head CI. No master/deployment action.
 
 75/143 verified;0/13 extensions. Full TRAVEL2-003 acceptance requires newest-head
 CI and remaining mandatory gates; manual screen-reader/incomplete Axe color checks
 and production remain unverified. EXECUTION_STATE owns exact source and closure.
-NEXT: finalize exact-source privacy/push/CI dispatch,then READY_FOR_NEXT for CI/gate
-reconciliation and tracker-authorized TRAVEL2-004/SCOPE-01 private itinerary export.
+NEXT: after matching privacy/push PASS and CI dispatch evidence, READY_FOR_NEXT;
+check final-head ci.json once at the next milestone,then reconcile full-story gates
+and select tracker-authorized TRAVEL2-004/SCOPE-01 private itinerary export. Missing
+closure means CONTINUE_REQUIRED; never attribute another SHA's CI to this source.
 
 ### Previous implementation checkpoint — TRAVEL2-003/SCOPE-01
 

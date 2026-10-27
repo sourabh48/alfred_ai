@@ -90,10 +90,14 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
   checkpoint changes only three trackers; passing runtime evidence is reused.
   artifacts/travel-packing-20261027/{source-checkpoint/release.json,push.json,ci.json}
   bind final checkpoint candidate/ref/CI closure. No master/deployment action.
-- NEXT ACTION: finish reminder source/privacy/normal push/newest-head CI dispatch;
-  then READY_FOR_NEXT for exact CI/full-extension gate reconciliation and tracker-
-  authorized TRAVEL2-004/SCOPE-01 private export. No automatic selection in MODE NEXT.
-  Missing closure means CONTINUE_REQUIRED; do not rerun passing scopes on recovery.
+- Reminder sourcea799b31ec59ace8806460345c6f3de78c7274476 clean source/history
+  privacy,dependency/migration preflight PASS,zero findings. This final checkpoint
+  changes only three trackers; runtime evidence is reused. Reminder artifacts
+  source-checkpoint/release.json,push.json and ci.json bind final candidate/ref/CI.
+- NEXT ACTION: after matching privacy/push PASS/new CI dispatch, READY_FOR_NEXT;
+  check final-head ci.json once at next milestone,then reconcile full-extension
+  gates and select tracker-authorized TRAVEL2-004/SCOPE-01 private export. No auto
+  task selection in MODE NEXT. Missing closure means CONTINUE_REQUIRED; no reruns.
 - Editor6e816b1 exact source/history/privacy/dependency/migration preflight PASS,
   zero findings, and normal development push succeeded. Post-push master drift was
   detected and reconciled as above. Final reconciliation/checkpoint closure uses

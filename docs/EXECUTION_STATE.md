@@ -33,14 +33,19 @@
   never authoritative schedule/delivery. No private payload in Huey args or logs.
 - Evidence: artifacts/ci-repair-ac05515/travel-reminders-*.json and
   artifacts/travel-reminders-20261027/{local-acceptance.json,accessibility.json}.
-  Source/hash binding is in local-acceptance.json. Source commit resolves with
-  `git log -1 --format=%H -- apps/mobility/services/travel/reminders.py`.
-- NEXT: finalize exact clean-source/privacy/checkpoint commit and normal development
-  push; dispatch newest-head CI once, recording push.json/ci.json in the reminder
-  artifacts. Then READY_FOR_NEXT for CI/full-extension gate reconciliation, followed
+  Source/hash binding is in local-acceptance.json. Verified implementation source
+  **a799b31ec59ace8806460345c6f3de78c7274476**. Clean source/history privacy,
+  dependency/migration preflight PASS,zero findings at source-preflight/release.json.
+  This final checkpoint changes only the three trackers; reuse runtime evidence.
+  Final checkpoint HEAD's source-checkpoint/release.json,push.json and ci.json in
+  the reminder artifact directory bind exact-source privacy,normal push and CI.
+- NEXT COMMAND: NEXT checks ci.json's final-head run once at the next milestone;
+  after push.json PASS/CI dispatch recorded, READY_FOR_NEXT for full-extension gate
+  reconciliation, followed
   by tracker-authorized TRAVEL2-004/SCOPE-01 private itinerary export. No automatic
   task selection in MODE NEXT; no master/Pages/deployment action.
-- CONTINUE_REQUIRED until privacy/push/CI dispatch closure is recorded. Baseline
+- Missing matching privacy/push/CI closure means CONTINUE_REQUIRED to finish it.
+  With that closure, MODE NEXT is complete; do not rerun accepted tests. Baseline
  75/143,extensions0/13; full-story acceptance/new CI,independent screen-reader and
   incomplete Axe color checks remain pending. Prior CI checked once only,not PASS.
 
