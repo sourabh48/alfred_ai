@@ -11,7 +11,7 @@ state excluded; no provider call,financial write,new dependency or migration.
 Focused47 backend/API/CI tests PASS incl9 PDF cases using independent pypdf;
 final layout/page-limit2 overlapping PASS. Three actual Chrome workflows PASS;
 four1440/390 light/dark global Axe audits zero violations. Native runtime review
-CLEAN,fixtures summary-only. JS/migration PASS; Graphify AST11489/32021/525.
+CLEAN,fixtures summary-only. JS/migration PASS; Graphify AST11490/32022/521.
 Evidence: artifacts/travel-export-20261027 and ci-repair-ac05515/travel-export-*.
 Source/privacy/commit/push/new exact-head CI closure is in EXECUTION_STATE.
 

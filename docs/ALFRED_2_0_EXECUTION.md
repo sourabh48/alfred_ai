@@ -19,7 +19,7 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
   source dates/unknowns. Focused47 PASS incl9 PDF cases; final layout/page-limit2
   overlapping PASS;3 unique Chrome workflows PASS;4 global1440/390 light/dark Axe
   audits zero violations; native runtime review CLEAN,fixtures summary-only.
-  JS/migration drift PASS; AST Graphify11489/32021/525. Evidence in artifacts/
+  JS/migration drift PASS; AST Graphify11490/32022/521. Evidence in artifacts/
   travel-export-20261027 and ci-repair-ac05515/travel-export-*.json. Source/privacy,
   commit/push/new-CI closure tracked in EXECUTION_STATE; no full-story promotion.
 

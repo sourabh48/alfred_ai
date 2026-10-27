@@ -39,8 +39,8 @@
   tests/fixtures summary-only,not an independent model. Earlier quota-interrupted
   attempt remains incomplete; final token d19db561-31a0-406f-a540-373bdeb1e440
   completed. No outside model/provider,private-history activation or paid AI used.
-- JS syntax,migration drift and inventory check PASS. Graphify AST-only11489 nodes/32021 edges/
-  525 communities; no semantic/provider call. Source-preflight/release.json binds verified source/privacy.
+- JS syntax,migration drift and inventory check PASS. Graphify AST-only11490 nodes/32022 edges/
+  521 communities; no semantic/provider call. Source-preflight/release.json binds verified source/privacy.
   Final source-checkpoint/release.json,push.json and ci.json bind the final
   checkpoint HEAD,normal development push and exact-head CI. Evidence: artifacts/
   ci-repair-ac05515/travel-export-*.json; artifacts/travel-export-20261027/
