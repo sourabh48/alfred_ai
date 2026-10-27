@@ -65,6 +65,13 @@ jobs:
           Invoke-WebRequest https://registry.npmjs.org/axe-core/-/axe-core-4.13.0.tgz -OutFile artifacts/tools/axe-core.tgz
           tar -xzf artifacts/tools/axe-core.tgz -C artifacts/tools package/axe.min.js package/LICENSE
           if ((Get-FileHash artifacts/tools/package/axe.min.js -Algorithm SHA256).Hash -ne 'C24F097BD2F451D4F933E8BC7D8D539F8672A2EBCB5CC9F9F3EEC8CA9470A0C1') { throw 'Unexpected axe-core hash' }
+      - name: Prepare pinned independent calendar test parser
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts/tools/ical -Force | Out-Null
+          Invoke-WebRequest https://registry.npmjs.org/ical.js/-/ical.js-2.2.1.tgz -OutFile artifacts/tools/ical/ical.js.tgz
+          if ((Get-FileHash artifacts/tools/ical/ical.js.tgz -Algorithm SHA256).Hash -ne '36482280D62CC50F0ADDDB0587612CFF32B96DF18EB9E2071EC9929C2E7B3107') { throw 'Unexpected calendar test-tool archive hash' }
+          tar -xzf artifacts/tools/ical/ical.js.tgz -C artifacts/tools/ical package/dist/ical.es5.cjs package/LICENSE
       - name: Backend and recovery regression suite
         shell: pwsh
         run: |
@@ -141,6 +148,13 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install -r requirements.txt
 
+      - name: Prepare pinned independent calendar test parser
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts/tools/ical -Force | Out-Null
+          Invoke-WebRequest https://registry.npmjs.org/ical.js/-/ical.js-2.2.1.tgz -OutFile artifacts/tools/ical/ical.js.tgz
+          if ((Get-FileHash artifacts/tools/ical/ical.js.tgz -Algorithm SHA256).Hash -ne '36482280D62CC50F0ADDDB0587612CFF32B96DF18EB9E2071EC9929C2E7B3107') { throw 'Unexpected calendar test-tool archive hash' }
+          tar -xzf artifacts/tools/ical/ical.js.tgz -C artifacts/tools/ical package/dist/ical.es5.cjs package/LICENSE
       - name: Run Selenium browser regressions
         env:
           ALFRED_RUN_BROWSER_TESTS: "true"

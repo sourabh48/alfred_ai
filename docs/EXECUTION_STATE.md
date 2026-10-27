@@ -1,6 +1,67 @@
 # ALFRED execution state
 
-## Active checkpoint — TRAVEL2-004/B2 private GPX export (2026-10-27)
+## Active checkpoint — TRAVEL2-004/B3 private ICS export (2026-10-28)
+
+- MODE NEXT recovered ce0f019378e1051ee97d2c7514c66e1a528bda39 clean/synchronized,
+  development/alfred-integrated,F:/ALFRED_DEV/post-audit. CI40556530802 checked
+  ONCE at exactce0f019:pending,not PASS. No confirmed failure requiring PDF CI
+  rediscovery. Preserve all B1/B2/editor/organizer/packing/reminder receipts.
+- B3 LOCAL_VERIFIED: explicit owner/auth/CSRF/sessionrevision saved-trip ICS export;
+  private calendar preview/contentHMAC snapshot detects saved edits even without
+  updated_at changes. Stable opaque HMACSHA256 event UIDs,using existing persistent
+  native secret;no IDs/account data in filenames/identifiers. Saved date facts must
+  be owner-confirmed;missing/unsupported dates omitted with preview/file warnings.
+- Date-only DTSTART/DTEND use exclusive ends,transparent planning references.
+  Optional explicit export-only last included date or precise start/end;no parsing
+  of freeform duration/period,no default times. IANA selection and existing pure
+  reminder schedule() validate DST gaps/folds;ambiguous occurrences require explicit
+  choice. Precise values use UTC with original local zone/time context in description;
+  overnight/multi-day supported,unknown durations never inferred. No invalid TZID.
+- RFC5545 UTF8/CRLF/text escaping/75-octet folding;bounds60days/30items per day/
+ 300activities/20overrides/100source rows/1MiB. Source dates/unknowns retained;
+  no private notes,financial/account fields,document links,invites/RSVP/alarms/
+  subscription/cloud/provider calls/DB writes. Existing private download lifecycle
+  and PDF/GPX controls reused. Matching drafts retained on explicit source reload;
+  private options cleared on hide/auth/session change;deferred preview recovery fixed.
+-61 unique backend cases accepted incrementally:10ICS,18PDF/GPX,33CI metadata.
+  Initial9:8PASS/1snapshot failure;content fingerprint fixed timestamp-only binding.
+  Repaired9PASS;combined60PASS;final4PASS includes3overlaps+1new stable-ID/max-date
+  case. Covers independent import/export roundtrip,dates/times/overnight/multi-day,
+  DST gap/fold,Unicode/CRLF/escaping/folding,owner/CSRF/stale content/malformed bounds.
+-5 unique actual Chrome workflows PASS across initial4/repaired2(one overlap):3ICS
+  keyboard download/local FileReader+ICAL import,explicit fold/snapshot/draft retention,
+  previewhide/show recovery/exportlate/auth;2affected PDF/GPX download regressions.
+  Initial fold guidance failure repaired by preserving actionable API detail.
+  Failed diagnostics retained;no passing result transferred to an unrun test.
+- Four final global1440/390 light/dark Axe audits zero violations,captures inspected.
+  Explicit group role resolves initial aria-prohibited-attr incomplete;remaining
+  color-contrast/manual screen-reader acceptance stays pending. Native final runtime
+  review CLEAN,token5fc51293-bf83-44f5-8451-9e1e97e43712,fixtures/parser helper
+  summary-only,not independent model. No outside model/private-history/paid AI.
+- Independent MPL2.0 ICAL.js2.2.1 is a pinned test-tool artifact only,license retained;
+  native/Selenium CI fetch hash-checked archive,Node helper also verifies CJS SHA256
+  02b0ab420c2b3af5bd0829b12b8becdffdc2311e62070c381cc0c60b52b0b365.
+  No application dependency/model/migration. JS3files/migration drift PASS.
+  Graphify AST11571 nodes/32325 edges/517 communities;final template no topology
+  change,no provider call. Evidence artifacts/ci-repair-ac05515/travel-ics-*.json;
+  artifacts/travel-ics-20261027/{local-acceptance.json,accessibility-final.json,
+  native-review-final.json,browser/,browser-repaired/}. Preserve dated evidence path.
+- Source: travel/ics_export.py,travel_calendar.js,export API/JS/templates,CI test-tool
+  setup/backend labels,ICS backend/Chrome/parser tests. Current source uncommitted.
+- CONTINUE_REQUIRED closure: inventory check,commit validated source+3 trackers,
+  immutable source-checkpoint/<HEAD>/release.json source/history privacy preflight;
+  bind source SHA in tracker-only final commit,preflight finalHEAD,push development
+  normally,dispatch exact-head Browser Regression. Save push.json/ci.json;confirm
+  clean synchronized development/master/frozen refs. Matching closure permits
+  READY_FOR_NEXT with CI_PENDING,never full story/extension/release acceptance.
+- NEXT COMMAND: NEXT checks artifacts/travel-ics-20261027/ci.json's final-head run
+  once;fix actual failures,reconcile B3 acceptance,then B4 combined export validation.
+  Do not select B4 in this run or repeat unchanged passing work. Baseline75/143;
+  extensions0/13. Independent real-account/production acceptance remains pending.
+  FinancialC approved READ-ONLY,same-currency only;FIN-15 migration/real writes blocked.
+  No master merge,Pages publication,deployment or production data changes.
+
+## Previous checkpoint — TRAVEL2-004/B2 private GPX export (2026-10-27)
 
 - MODE NEXT recovered d08395f1effc66889acfd5aaab1f6b375502c618 clean/synchronized,
   development/alfred-integrated,F:/ALFRED_DEV/post-audit. CI40552102098 checked

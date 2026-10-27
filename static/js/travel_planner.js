@@ -10,6 +10,7 @@ window.TravelPlanner = (() => {
     function clearDocuments() {
         exportController?.abort();
         $('plannerExport').hidden=true;
+        window.TravelCalendar.clear();
         documentEpoch++; documentActive=false;
         if (state.session) {state.session.trip_documents=[];delete state.session.document_choices;state.session.packing_checklist=null;}
         window.TravelPacking.clear();
@@ -48,6 +49,9 @@ window.TravelPlanner = (() => {
     function syncActionState() {
         $('plannerExportPDF').disabled=state.busy || !state.session?.plan_id;
         $('plannerExportGPX').disabled=state.busy || !state.session?.plan_id;
+        $('plannerPrepareICS').disabled=state.busy || !state.session?.plan_id;
+        $('plannerExportICS').disabled=state.busy || !state.session?.plan_id || !window.TravelCalendar.ready();
+        window.TravelCalendar.busy(state.busy);
         document.querySelectorAll('#plannerReminders [data-reminder-control]').forEach(control=>{control.disabled=state.busy || control.dataset.batchUnavailable==='true';});
         document.querySelectorAll('#plannerPacking [data-packing-control]').forEach(control=>{control.disabled=state.busy || control.dataset.batchUnavailable==='true';});
         document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], [data-route-choice], [data-restriction-fields], [data-restriction-withdraw], [data-add-stop], [data-stop-index], #plannerCompareOrder, #plannerApplyOrder, #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button, [data-editor-control], #plannerDocuments button')
@@ -70,6 +74,7 @@ window.TravelPlanner = (() => {
     }
     async function open(id) {
         if (state.busy) return false;
+        window.TravelCalendar.clear();
         const epoch=++documentEpoch;documentActive=true;
         clearTimeout(state.timer);
         const next = await fetchPlanner(api+`sessions/${id}/`);
@@ -82,6 +87,7 @@ window.TravelPlanner = (() => {
     }
     async function create(planId) {
         if (state.busy) return;
+        window.TravelCalendar.clear();
         const epoch=++documentEpoch;documentActive=true;
         const data = await fetchPlanner(api+"sessions/", {method:"POST", body:JSON.stringify(planId ? {plan_id: planId} : {})});
         if (!documentActive || epoch!==documentEpoch) return;
@@ -124,20 +130,32 @@ window.TravelPlanner = (() => {
             if (/compare/i.test(text)) { state.comparison = true; comparison(); }
         }
     }
+    async function prepareCalendar(){
+        if(state.busy || !documentActive || !state.session?.plan_id)return;
+        const identity=state.session.id,epoch=documentEpoch;
+        state.busy=true;syncActionState();alert('');
+        try{
+            const data=await fetchPlanner(api+`sessions/${identity}/`,{method:'POST',body:JSON.stringify({action:'calendar_preview',revision:state.session.revision})});
+            if(documentActive && epoch===documentEpoch && state.session?.id===identity)window.TravelCalendar.render(data);
+        }catch(error){alert(error.message);}
+        finally{state.busy=false;syncActionState();schedulePoll();if(documentRefreshPending&&!document.hidden)refreshDocumentContext();}
+    }
     async function exportItinerary(format) {
         if(state.busy || !documentActive || !state.session?.plan_id)return;
+        let calendar;
+        try{if(format==='ics')calendar=window.TravelCalendar.options();}catch(error){alert(error.message);return;}
         const identity=state.session.id,epoch=++documentEpoch;
         exportController=new AbortController();state.busy=true;syncActionState();alert('');
         try {
             const response=await fetch(api+`sessions/${identity}/`,{method:'POST',credentials:'same-origin',signal:exportController.signal,
-                headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},body:JSON.stringify({action:`export_${format}`,revision:state.session.revision})});
+                headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},body:JSON.stringify({action:`export_${format}`,revision:state.session.revision,...(calendar?{calendar}:{})})});
             if(!response.ok){if([401,403].includes(response.status))clearDocuments();const error=await response.json().catch(()=>({}));throw new Error(error.detail||'Export failed. Your saved trip is unchanged.');}
-            if(!response.headers.get('Content-Type')?.startsWith(format==='gpx'?'application/gpx+xml':'application/pdf'))throw new Error('Export returned an unexpected format. No file was downloaded.');
+            if(!response.headers.get('Content-Type')?.startsWith({gpx:'application/gpx+xml',ics:'text/calendar',pdf:'application/pdf'}[format]))throw new Error('Export returned an unexpected format. No file was downloaded.');
             const blob=await response.blob();
             if(!documentActive || epoch!==documentEpoch || state.session?.id!==identity)return;
             const url=URL.createObjectURL(blob),anchor=document.createElement('a');
             anchor.href=url;anchor.download=`alfred-itinerary.${format}`;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),0);
-            alert(`Saved itinerary ${format.toUpperCase()} downloaded. Keep the local copy private.${format==='gpx'?' GPX waypoints are not road navigation; see the file for route limitations.':''}`);
+            alert(`Saved itinerary ${format.toUpperCase()} downloaded. Keep the local copy private.${format==='gpx'?' GPX waypoints are not road navigation; see the file for route limitations.':''}${format==='ics'?` Date-warning count: ${response.headers.get('X-ALFRED-Calendar-Warnings')||'0'}; review calendar omissions and date-only limitations.`:''}`);
         } catch(error){if(error.name!=='AbortError')alert(error.message);}
         finally{exportController=null;state.busy=false;syncActionState();schedulePoll();if(documentRefreshPending&&!document.hidden)refreshDocumentContext();}
     }
@@ -281,6 +299,8 @@ window.TravelPlanner = (() => {
                 if (button.dataset.plannerMessage) await message(button.dataset.plannerMessage);
                 if (button.id==='plannerExportPDF')await exportItinerary('pdf');
                 if (button.id==='plannerExportGPX')await exportItinerary('gpx');
+                if (button.id==='plannerPrepareICS')await prepareCalendar();
+                if (button.id==='plannerExportICS')await exportItinerary('ics');
                 if (button.dataset.session) await open(Number(button.dataset.session));
                 if (button.dataset.openPlan) await create(Number(button.dataset.openPlan));
                 if (button.dataset.reject) await action({action:"reject",destination:button.dataset.reject});

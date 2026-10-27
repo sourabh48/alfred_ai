@@ -2,7 +2,26 @@
 
 **Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
-## Active implementation checkpoint — TRAVEL2-004/B2,2026-10-27
+## Active implementation checkpoint — TRAVEL2-004/B3,2026-10-28
+
+ICS LOCAL_VERIFIED: explicit owner/CSRF/revision+saved-content snapshot export,
+owner-confirmed dates,exclusive date-only ends,optional explicit export-only
+start/end/range,IANA DST gap/fold checks,UTC precise times/local context,stable
+opaque UIDs,RFC5545 UTF8 escaping/folding. No inferred times/durations,private
+notes/accounts/financial/doclinks,alarms/invitations/subscriptions/cloud/writes.
+Existing export privacy UI reused,stale drafts/recovery guarded. No app dependency,
+model/migration change;independent MPL2.0 ICAL.js test parser is pinned artifact only.
+61unique backend PASS(10ICS+18PDFGPX+33metadata),5uniqueactualChrome PASS(import/
+fold/stale/drafts/late/auth/recovery/PDFGPX);4final1440/390 light/dark Axe zero
+violations,remainingcontrastmanual. Native runtime CLEAN,fixtures summary-only;
+JS/migration PASS;ASTGraphify11571/32325/517. Failed diagnostics retained/repaired.
+Evidence: artifacts/travel-ics-20261027 and ci-repair-ac05515/travel-ics-*.
+CI40556530802 checkedONCE pendingexactce0f019;source/privacy/push/new exact-head
+CI closure is in EXECUTION_STATE. Baseline75/143;extensions0/13 unchanged.
+B4 combined export acceptance is NEXT after B3 closure. Manual screen-reader,
+real-account and production acceptance pending. No master,publishing or deployment.
+
+## Previous implementation checkpoint — TRAVEL2-004/B2,2026-10-27
 
 GPX LOCAL_VERIFIED: saved-owner-only explicit CSRF/revision export,ordered Decimal
 WGS84 coordinates/public source references/aged expiry,source-backed current

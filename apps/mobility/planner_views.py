@@ -30,6 +30,7 @@ from .services.travel.packing import packing_payload, update_packing
 from .services.travel.reminders import reminder_payload, update_reminders
 from .services.travel.pdf_export import itinerary_pdf
 from .services.travel.gpx_export import itinerary_gpx
+from .services.travel.ics_export import calendar_choices, itinerary_ics
 
 
 class PlannerWriteThrottle(UserRateThrottle):
@@ -140,15 +141,30 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
                 update_reminders(session, request.data)
             except ValidationError as error:
                 return Response({"detail": error.detail}, status=400)
-        elif action in ("export_pdf", "export_gpx"):
-            if set(request.data) != {"action", "revision"}:
+        elif action in ("export_pdf", "export_gpx", "calendar_preview", "export_ics"):
+            expected = {'action', 'revision'} | ({'calendar'} if action == 'export_ics' else set())
+            if set(request.data) != expected:
                 raise ValidationError({"detail": "Choose a saved-itinerary export without extra fields."})
             if type(request.data.get("revision")) is not int or request.data["revision"] != session.revision:
                 return Response({"detail": "This trip changed. Reload before exporting its saved itinerary."}, status=409)
             plan = get_object_or_404(TravelPlan.objects.select_for_update(), pk=session.plan_id, user=request.user)
-            gpx = action == "export_gpx"
-            response = HttpResponse(itinerary_gpx(plan) if gpx else itinerary_pdf(plan), content_type="application/gpx+xml" if gpx else "application/pdf")
-            response["Content-Disposition"] = 'attachment; filename="alfred-itinerary.gpx"' if gpx else 'attachment; filename="alfred-itinerary.pdf"'
+            if action == 'calendar_preview':
+                return Response(calendar_choices(plan))
+            if action == 'export_ics':
+                options = request.data.get('calendar', {})
+                if not isinstance(options, dict) or options.get('snapshot') != calendar_choices(plan)['snapshot']:
+                    return Response({'detail': 'The saved trip changed. Review calendar dates again before exporting.'}, status=409)
+                try:
+                    content, warnings = itinerary_ics(plan, options)
+                except ValidationError as error:
+                    return Response(error.detail if isinstance(error.detail, dict) else {'detail': error.detail}, status=400)
+                response = HttpResponse(content, content_type='text/calendar; charset=utf-8')
+                response['Content-Disposition'] = 'attachment; filename="alfred-itinerary.ics"'
+                response['X-ALFRED-Calendar-Warnings'] = str(warnings)
+            else:
+                gpx = action == "export_gpx"
+                response = HttpResponse(itinerary_gpx(plan) if gpx else itinerary_pdf(plan), content_type="application/gpx+xml" if gpx else "application/pdf")
+                response["Content-Disposition"] = 'attachment; filename="alfred-itinerary.gpx"' if gpx else 'attachment; filename="alfred-itinerary.pdf"'
             response["X-Content-Type-Options"] = "nosniff"
             response["Referrer-Policy"] = "no-referrer"
             return response

@@ -4632,6 +4632,108 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.addCleanup(self.browser.execute_cdp_cmd,'Browser.setDownloadBehavior',dict(behavior='default'))
         return folder
 
+    def calendar_browser(self,session):
+        self.login();self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerPrepareICS').is_displayed())
+        self.memory_click('#plannerPrepareICS')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-calendar-event]'))
+
+    def test_travel_ics_date_only_keyboard_download_local_import_and_missing_dates(self):
+        from tests.test_travel_ics_export import parse_calendar
+        from selenium.webdriver.common.keys import Keys
+        from apps.mobility.models import TravelPlan
+        session=self.packing_fixture();folder=self.pdf_download_folder();self.calendar_browser(session)
+        self.browser.find_element(self.By.ID,'plannerExportICS').send_keys(Keys.ENTER)
+        output=folder/'alfred-itinerary.ics'
+        self.wait.until(lambda _: output.is_file() and output.stat().st_size>100 and not list(folder.glob('*.crdownload')))
+        parsed=parse_calendar(output.read_bytes())
+        self.assertTrue(all(e['date'] for e in parsed['events']))
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/ical/package/dist/ical.es5.cjs').read_text(encoding='utf-8'))
+        self.browser.execute_script("""const input=document.createElement('input');input.type='file';input.id='test-reopen-ics';input.setAttribute('aria-label','Reopen test calendar');
+            input.onchange=async()=>{const data=ICAL.parse(await input.files[0].text()),component=new ICAL.Component(data);
+                window.reopenedICS={roundtrip:JSON.stringify(ICAL.parse(component.toString()))===JSON.stringify(data),
+                    ids:component.getAllSubcomponents('vevent').map(e=>e.getFirstPropertyValue('uid'))};};document.body.append(input);""")
+        self.browser.find_element(self.By.ID,'test-reopen-ics').send_keys(str(output))
+        reopened=self.wait.until(lambda _: self.browser.execute_script('return window.reopenedICS'))
+        self.assertTrue(reopened['roundtrip']);self.assertEqual(reopened['ids'],[e['uid'] for e in parsed['events']])
+        self.browser.execute_script("document.getElementById('plannerCalendar').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('travel-private-ics-download-import')
+        plan=TravelPlan.objects.get(pk=session.plan_id)
+        plan.planning_state['available_start_date']['confirmed_by_user']=False;plan.save(update_fields=['planning_state'])
+        self.memory_click('#plannerPrepareICS')
+        self.wait.until(lambda _: 'No exportable activities' in self.text('plannerCalendar'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'plannerExportICS').is_enabled())
+        self.assertEqual(len(list(folder.glob('*.ics'))),1)
+
+    def test_travel_ics_fold_selection_saved_snapshot_conflict_and_draft_preservation(self):
+        from datetime import date,timedelta
+        from selenium.webdriver.support.ui import Select
+        from apps.mobility.models import TravelPlan
+        from apps.mobility.services.travel_discovery import fact
+        from tests.test_travel_ics_export import parse_calendar
+        session=self.packing_fixture();plan=TravelPlan.objects.get(pk=session.plan_id);start=date(2025,11,2)
+        plan.start_date=start;plan.end_date=start+timedelta(days=3)
+        plan.planning_state['available_start_date']=fact(start.isoformat());plan.planning_state['available_end_date']=fact(plan.end_date.isoformat())
+        for i,day in enumerate(plan.itinerary['days']):day['date']=(start+timedelta(days=i)).isoformat()
+        plan.save(update_fields=['start_date','end_date','planning_state','itinerary'])
+        folder=self.pdf_download_folder();self.calendar_browser(session)
+        self.browser.find_element(self.By.ID,'calendarZone').send_keys('America/New_York')
+        self.memory_click('[data-calendar-event]:first-of-type summary')
+        row=self.browser.find_elements(self.By.CSS_SELECTOR,'[data-calendar-event]')[0]
+        Select(row.find_element(self.By.CSS_SELECTOR,'[data-calendar-field="mode"]')).select_by_value('timed')
+        for name,value in [('start','2025-11-02T01:15'),('end','2025-11-02T01:45')]:
+            self.browser.execute_script("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",row.find_element(self.By.CSS_SELECTOR,f'[data-calendar-field="{name}"]'),value)
+        self.memory_click('#plannerExportICS')
+        self.wait.until(lambda _: 'occurs twice' in self.text('plannerAlert'))
+        self.assertFalse(list(folder.glob('*.ics')))
+        Select(row.find_element(self.By.CSS_SELECTOR,'[data-calendar-field="start_fold"]')).select_by_value('0')
+        Select(row.find_element(self.By.CSS_SELECTOR,'[data-calendar-field="end_fold"]')).select_by_value('1')
+        plan.title+=' updated';plan.save(update_fields=['title'])
+        self.memory_click('#plannerExportICS')
+        self.wait.until(lambda _: 'Review calendar dates again' in self.text('plannerAlert'))
+        self.memory_click('#plannerPrepareICS')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportICS').is_enabled())
+        row=self.browser.find_elements(self.By.CSS_SELECTOR,'[data-calendar-event]')[0]
+        self.assertEqual(row.find_element(self.By.CSS_SELECTOR,'[data-calendar-field="start"]').get_attribute('value'),'2025-11-02T01:15')
+        self.assertEqual(row.find_element(self.By.CSS_SELECTOR,'[data-calendar-field="end_fold"]').get_attribute('value'),'1')
+        self.memory_click('#plannerExportICS');output=folder/'alfred-itinerary.ics'
+        self.wait.until(lambda _: output.is_file() and output.stat().st_size>100 and not list(folder.glob('*.crdownload')))
+        event=parse_calendar(output.read_bytes())['events'][0]
+        self.assertEqual((event['start'],event['end']),('2025-11-02T05:15:00Z','2025-11-02T06:45:00Z'))
+        self.capture('travel-private-ics-explicit-fold')
+
+    def test_travel_ics_late_response_and_auth_loss_clear_export_dates_and_downloads(self):
+        session=self.packing_fixture();folder=self.pdf_download_folder();self.calendar_browser(session)
+        self.browser.execute_script("""const original=window.fetch;window.fetch=(url,options)=>{
+            if(options?.body && JSON.parse(options.body).action==='calendar_preview'){
+                window.fetch=original;return original(url,options).then(response=>new Promise(resolve=>{window.releaseCalendarPreview=()=>resolve(response);}));
+            }return original(url,options);};""")
+        self.memory_click('#plannerPrepareICS')
+        self.wait.until(lambda _: self.browser.execute_script('return typeof releaseCalendarPreview==="function"'))
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));releaseCalendarPreview();")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerPrepareICS').is_displayed() and self.browser.find_element(self.By.ID,'plannerPrepareICS').is_enabled())
+        self.assertEqual(self.text('plannerCalendar'),'')
+        self.memory_click('#plannerPrepareICS')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-calendar-event]'))
+        self.browser.execute_script("""const original=window.fetch;window.fetch=(url,options)=>{
+            if(options?.body && JSON.parse(options.body).action==='export_ics'){
+                window.fetch=original;return original(url,{...options,signal:undefined}).then(response=>new Promise(resolve=>{window.releasePrivateICS=()=>resolve(response);}));
+            }return original(url,options);};""")
+        self.memory_click('#plannerExportICS')
+        self.wait.until(lambda _: self.browser.execute_script('return typeof releasePrivateICS==="function"'))
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));releasePrivateICS();")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerSend').is_enabled())
+        self.assertFalse(list(folder.glob('*.ics')))
+        self.assertEqual(self.text('plannerCalendar'),'')
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerPrepareICS').is_displayed())
+        self.memory_click('#plannerPrepareICS')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-calendar-event]'))
+        self.wait.until(lambda _: self.active_requests==0)
+        self.browser.delete_cookie('sessionid');self.memory_click('#plannerExportICS')
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
+        self.assertEqual(self.text('plannerCalendar'),'');self.assertFalse(list(folder.glob('*.ics')))
+
     def test_travel_gpx_export_stale_keyboard_download_local_reopen_and_empty_feedback(self):
         from lxml import etree
         from django.db.models import F
