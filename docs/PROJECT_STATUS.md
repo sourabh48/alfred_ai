@@ -2,7 +2,35 @@
 
 **Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
-## Active implementation checkpoint — TRAVEL2-004/B3,2026-10-28
+## Active implementation checkpoint — TRAVEL2-004/B4,2026-10-28
+
+Bounded combined exports LOCAL_VERIFIED using one owned saved trip and independent
+PDF/GPX/ICS parsers. Final16 backend/profile checks PASS(5B4+10affectedICS+1profile),
+2actualChrome all-format/offline/retry/stale/auth workflows PASS,4global1440/390
+light/dark Axe zero violations. Save/reopen/edit/order/undo,missing/injection/DST/
+source expiry and private packing/reminder/organizer metadata preservation covered.
+No trip/canonical financial writes,provider/corpus calls or permanent server copies;
+existing auth-session refresh only. PDF/GPX core/frontend hashes match old receipts.
+
+Combined native review found/reproduced/fixed ICS UID drift before the first manual
+edit. Read-only saved-data canonical identity preparation now retains all UIDs.
+Old id-less exported files keep old UIDs;cross-version import dedup unverified,
+originals preserved. Final native fresh-context review CLEAN,fixtures summary-only,
+same harness;no outside sign-off claimed. Migration/profile/cached official GPX
+XSD PASS;GraphifyAST11592/32422/509. Failed diagnostics retained.
+Evidence: artifacts/travel-exports-b4-20261028 and ci-repair-ac05515/travel-b4-*.
+PDF40552102098/GPX40556530802 verifiedSUCCESS on their originalSHAs;ICS40561358942
+checkedONCEin_progress atca66861,new fix/source requires fresh exact-head CI.
+LOCAL_VERIFIED YES;CI_PASSED pending latest;INDEPENDENT_REVIEWED native-only;
+FORMALLY_ACCEPTED NO;PRODUCTION_VALIDATED NO. Manual screen-reader/incomplete
+contrast and owner/live-account/packaged/production evidence remain unperformed.
+75/143 and0/13 unchanged;no TRAVEL2-004 or broader Travel promotion. Source/privacy/
+push/CI closure in EXECUTION_STATE. After safe B4 closure,NEXT may select C1 read-only
+Decimal affordability despite external acceptance gates. Matching currency only,
+no inferred FX/INR,no reserve/debt double count,no canonical writes;FIN-15 blocked.
+No master,Pages,deployment or backup deletion. Execute no C1 work in this B4 run.
+
+## Previous implementation checkpoint — TRAVEL2-004/B3,2026-10-28
 
 ICS LOCAL_VERIFIED: explicit owner/CSRF/revision+saved-content snapshot export,
 owner-confirmed dates,exclusive date-only ends,optional explicit export-only

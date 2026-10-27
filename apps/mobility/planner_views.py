@@ -149,13 +149,13 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
                 return Response({"detail": "This trip changed. Reload before exporting its saved itinerary."}, status=409)
             plan = get_object_or_404(TravelPlan.objects.select_for_update(), pk=session.plan_id, user=request.user)
             if action == 'calendar_preview':
-                return Response(calendar_choices(plan))
+                return Response(calendar_choices(plan, session.pk))
             if action == 'export_ics':
                 options = request.data.get('calendar', {})
-                if not isinstance(options, dict) or options.get('snapshot') != calendar_choices(plan)['snapshot']:
+                if not isinstance(options, dict) or options.get('snapshot') != calendar_choices(plan, session.pk)['snapshot']:
                     return Response({'detail': 'The saved trip changed. Review calendar dates again before exporting.'}, status=409)
                 try:
-                    content, warnings = itinerary_ics(plan, options)
+                    content, warnings = itinerary_ics(plan, options, session.pk)
                 except ValidationError as error:
                     return Response(error.detail if isinstance(error.detail, dict) else {'detail': error.detail}, status=400)
                 response = HttpResponse(content, content_type='text/calendar; charset=utf-8')

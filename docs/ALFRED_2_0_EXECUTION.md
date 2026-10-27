@@ -6,54 +6,64 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — TRAVEL2-004/B3 (2026-10-28)
+## Current checkpoint — TRAVEL2-004/B4 (2026-10-28)
 
-Recovered ce0f019 clean/synchronized;CI40556530802 checkedONCE pendingexactce0,
-not PASS. No confirmed failure;unchanged B1/B2 evidence preserved. B3 ICS is
-LOCAL_VERIFIED: owner/auth/CSRF/revision+contentHMAC snapshot,explicit saved calendar
-preview;confirmed dates only,exclusive date-only ends,optional export-only owner
-start/end/range,UTC precise times with IANA/DST gap/fold validation using existing
-schedule helper. No inferred times/durations,invalid TZID,alarms/invitations/
-subscription/cloud/private notes/financial/account/doclink disclosure or writes.
-Stable privacy-safe UIDs;RFC5545 escaping/UTF8 folding;bounded output.
-61 unique backend PASS(10ICS+18PDFGPX+33metadata);5uniqueactualChrome PASS including
-local parser import,fold/revision/draft/privacy/recovery and PDF/GPX regressions;
-4finalglobal1440/390 light/dark Axe audits zero violations,remaining contrast manual.
-Pinned independent MPL2.0 ICAL.js2.2.1 test-tool only,Node/Chrome structural import/
-export roundtrip PASS,no app dependency. Native runtime CLEAN,fixtures summary-only;
-JS/migration PASS;GraphifyAST11571/32325/517,no model/provider call. Initial snapshot,
-DST guidance and preview recovery failures repaired;failed diagnostics retained.
-Evidence: artifacts/travel-ics-20261027 and ci-repair-ac05515/travel-ics-*.json.
-Source/privacy/push/new exact-head CI closure lives in EXECUTION_STATE. Baseline
-75/143;extensions0/13. Full capability,manual screen-reader/incomplete contrast,
-real-account and production acceptance remain pending. B4 is next only on NEXT.
+Recoveredca66861 clean/synchronized. PDF40552102098 SUCCESS exactd08395f and
+GPX40556530802 SUCCESS exactce0f019 verified;ICS40561358942 checkedONCEin_progress
+exactca66861. Those states belong only to their SHAs. B4 new source needs freshCI.
+One same owned trip passes independent PDF/GPX/ICS parsing,expired/unknown evidence,
+stop order/supported dates,explicit DST times,save/reopen/edit/order/undo/stale/auth/
+CSRF/failed-retry/missing/injection/preservation checks. No invented GPX times,
+roads/tracks;one-off ICS timing is not a saved PDF departure. No trip/financial
+writes,external requests,private-corpus access or permanent server export copy.
+Only existing authentication-session bookkeeping writes occur;private metadata
+preserved,real-account acceptance unperformed. Earlier unit/parser/bounds evidence
+reused by source hash;PDF/GPX core and frontend unchanged.
 
-Verified implementation source **b7486f3e236bf42c89c66e0f4f3c01aac56b9216**;clean source/history privacy,
-dependency/migration preflight PASS,zero findings. Final tracker-only HEAD proof:
-artifacts/travel-ics-20261027/source-checkpoint/<HEAD>/release.json,push.json and
-ci.json. Matching closure permits READY_FOR_NEXT;fresh exact-head CI remains pending
-and source acceptance does not authorize release/production.
+Combined review reproduced/fixed real ICS first-edit UID drift. Canonical editor
+IDs are prepared read-only from saved data and owned session identity;first edit
+retains every event UID. Old id-less ICS imports have old UIDs;cross-version dedup
+unverified,originals preserved. Final16 backend/profile PASS(5B4+10ICS+1profile),
+2actualChrome workflows PASS acrossallformats/offline+WANblock/retry/auth/stale,
+4global1440/390light/dark Axe zero violations,remainingcontrastmanual. Cached
+GPXofficialXSD PASS;native fresh-context runtime CLEAN,sameharness/fixtures-summary;
+migration/profile PASS,JS reused byhash,GraphifyAST11592/32422/509. Failed fixture/
+regression evidence retained. Evidence artifacts/travel-exports-b4-20261028 and
+ci-repair-ac05515/travel-b4-*.json. Source/privacy/push/new CI closure in EXECUTION_STATE.
+
+| Acceptance state | Current evidence |
+|---|---|
+| LOCAL_VERIFIED | YES for bounded B1–B4;new B4/fix tests above |
+| CI_PASSED | Original B1/B2 only;B3 observed pending,new fix/current HEAD pending |
+| INDEPENDENT_REVIEWED | Fresh native reviewer CLEAN,same harness;no outside human/model sign-off claimed |
+| FORMALLY_ACCEPTED | NO;latest-head CI and manual screen-reader/incomplete contrast acceptance outstanding |
+| PRODUCTION_VALIDATED | NO;owner/live-account/packaged/production evidence separately unperformed |
+
+Baseline75/143;extensions0/13. TRAVEL2-004 remains unpromoted and broader Travel
+acceptance remains separate. Safe development closure permits NEXT C1 while
+external/formal gates remain pending;do not require approval for ordinary read-only coding.
 
 ## Persistent remaining Travel phases
 
-- [ ] B2 — Validated GPX export: LOCAL_VERIFIED;source/push proof in EXECUTION_STATE,new exact-head CI acceptance pending.
-- [ ] B3 — Timezone-safe ICS export: LOCAL_VERIFIED;source/push proof in EXECUTION_STATE,new exact-head CI acceptance pending.
-- [ ] B4 — Combined PDF/GPX/ICS integration acceptance: NEXT after B3 closure.
-- [ ] C1 — Read-only canonical Decimal affordability engine.
-- [ ] C2 — Explainable affordability UI/what-if scenarios.
-- [ ] C3 — Future-date savings projections.
+- [x] B1 — PDF local tests and CI passed atd08395f;core evidence reused.
+- [x] B2 — GPX local tests and CI passed atce0f019;core evidence reused.
+- [ ] B3 — ICS local tests passed;ca66861CI observed in_progress,new UID fix needs new exact-head CI.
+- [ ] B4 — Combined exports LOCAL_VERIFIED;FORMAL_ACCEPTANCE_PENDING,closure in EXECUTION_STATE.
+- [ ] C1 — NEXT:canonical read-only Decimal affordability engine.
+- [ ] C2 — Explainable budget and what-if UI.
+- [ ] C3 — Future-date savings scenarios.
 - [ ] C4 — Financial reconciliation and acceptance.
-- [ ] D1 — Full Travel integration regressions.
-- [ ] D2 — Security/privacy/accessibility acceptance.
-- [ ] D3 — Native Windows/offline/recovery acceptance.
-- [ ] D4 — Exact-head CI,independent review and roadmap reconciliation.
-- [ ] D5 — Production-readiness assessment,without deployment.
+- [ ] D1 — Full Travel integration tests.
+- [ ] D2 — Privacy/security/accessibility.
+- [ ] D3 — Native Windows/offline/recovery validation.
+- [ ] D4 — Exact-head CI and independent review.
+- [ ] D5 — Production-readiness report,without deployment.
 
-B1 PDF remains LOCAL_VERIFIED/CI_PENDING with preserved receipts. FinancialC is
-UNBLOCKED for read-only development only:verified same-currency amounts,no inferred
-INR/FX,no double count,canonical writes,historical rewrite or production migration.
-Incomplete data cannot receive certified Affordable. FIN-15 remains separately
-gated. All current security/review/protection/production gates remain unchanged.
+C1–C4 UNBLOCKED for scoped read-only development:explicit matching currency,
+Decimal calculations,no inferred currency/INR/FX,no reserve/debt double counting,
+no canonical financial writes,explicit INSUFFICIENT_DATA outcomes. FIN-15 currency
+migration and production remain separately blocked. All protection/review gates
+preserved. The checkboxes above are bounded phase evidence,not extension acceptance.
 
 ### Previous locally verified Travel work
 
@@ -193,7 +203,7 @@ synthetic evidence unless their tracker explicitly says otherwise.
 | TRAVEL2-001 — desktop itinerary editing/undo | Manual stops plus implemented desktop CRUD/reorder/undo/history and safe persistence | Formal extension acceptance; broader upstream UI equivalence unclaimed | TRAVEL-03 accepted; TRAVEL-04 bounded manual slice | P1 /2–3 slices | Full bounded edit/reorder/undo/save/reopen flow; unrelated data preserved; conflicts visible; no stale route/cost claim | 180 unique backend;4 Chrome;2 global desktop Axe; JS/migration/privacy gates | artifacts/travel-editor-20261027/local-acceptance.json; exact1fa7449 CI40421447655 PASS | LOCAL_VERIFIED/CI_PASSED at1fa7449; no automatic full-story promotion |
 | TRAVEL2-002 — private booking/document organizer | Owned trip JSON and existing encrypted corpus now support private links/original access/expiry/unlink/reopen | Newest-head CI and formal extension acceptance; broader booking workflow unclaimed | TRAVEL-04, DOC-06 accepted slices | P2 /bounded slice complete | Owner-only originals and source dates; no inferred availability or booking writes; no private metadata after auth loss | 12 unique backend across repairs;5 Chrome incl editor regression;2 global desktop Axe; privacy | Source61bd9bc; artifacts/travel-organizer-20261027/local-acceptance.json, source-preflight/release.json, push.json and ci.json | COMMITTED_PUSHED/CI_PENDING; reconcile exact final HEAD at next milestone |
 | TRAVEL2-003 — packing/reminders | Private packing plus explicit opt-in durable local reminders,UTC/DST validation,CRUD/cancel/reschedule,atomic in-app occurrence delivery and restart/replay safety | Newest-head CI and full extension mandatory acceptance; independent screen-reader remains pending | TRAVEL-04 accepted slice; existing DurableSqliteHuey/native UTC scheduler | P2 /01 and02 locally complete | Owner-only progress and delivery; stale/idempotent/cancel/late/offline/restart correctness; no external send/global activation | Current56 unique backend/queue incl affected regressions;6 Chrome;4 actual1440/390 light/dark Axe; prior packing evidence reused | artifacts/travel-reminders-20261027/local-acceptance.json and source/push/CI receipts; exact source in EXECUTION_STATE | LOCAL_VERIFIED/CI_PENDING after push; full extension UNACCEPTED,0/13 |
-| TRAVEL2-004 — private PDF/GPX/ICS exports | Owned trip/evidence/map structures | Explicit validated source-preserving export | TRAVEL-04/17, owner export consent | P2 /2–3 slices | Correct coordinates/timezones/escaping; preserve expiry/unknowns; no public sharing | File parsers and malformed inputs; desktop export | Existing Travel evidence; extension pending | B1 PDF/B2 GPX/B3 ICS LOCAL_VERIFIED; source/push/CI closure in EXECUTION_STATE. B4 combined acceptance next |
+| TRAVEL2-004 — private PDF/GPX/ICS exports | Owned trip/evidence/map structures | Explicit validated source-preserving export | TRAVEL-04/17, owner export consent | P2 /2–3 slices | Correct coordinates/timezones/escaping; preserve expiry/unknowns; no public sharing | File parsers and malformed inputs; desktop export | Existing Travel evidence; extension pending | B1–B4 LOCAL_VERIFIED;fresh CI/manual acceptance pending,FORMALLY_ACCEPTED NO. C1 read-only NEXT;no extension promotion |
 | TRAVEL2-005 — reserve/goal-aware affordability | Canonical baseline and Decimal trip allowances | C1 read-only arithmetic,C2 explainable what-if UI,C3 savings scenarios,C4 reconciliation/privacy | FIN-05/06/07 evidence; FIN-15 migration stays gated | P1 /4 bounded slices | Verified same-currency only,no inferred INR/FX,double counting or canonical writes; incomplete data never certified Affordable | Decimal edge/cutoff/owner/reconciliation and desktop explanation | Owner2026-10-27 read-only approval; existing finance receipts,extension pending | UNBLOCKED read-only; select after PhaseB; migration/financial writes remain gated |
 | INVEST2-001 — analyst/bull/bear/valuation/risk packet | Owned portfolio, AMFI/Yahoo evidence and local routing | Compatible pinned TradingAgents graph adapter and independent challenge | INV-04, AI-15/16, source/dependency/provider clearance | P2 /4–6 slices | Dated sourced arguments/unknowns; bounded tools; no private disclosure/orders | Isolated compatibility; point-in-time/leakage/cancel; desktop review | UPSTREAM_REFERENCE_MATRIX T pin; engine adoption pending | QUEUED; test component isolation, do not bulk-install conflicting dependencies |
 | INVEST2-002 — watchlist thesis/decision versions | Holdings and local review alerts | Owned research/watchlist histories separate from positions | INV-01/07; non-monetary scope first | P2 /2–3 slices | Instrument identity, stale thesis detection and explicit decisions; zero holdings writes | API history/owner/freshness; Chrome reopen | Existing investment/alert evidence; extension pending | QUEUED; select independent non-monetary scope after higher priorities |

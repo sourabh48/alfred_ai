@@ -4632,6 +4632,81 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.addCleanup(self.browser.execute_cdp_cmd,'Browser.setDownloadBehavior',dict(behavior='default'))
         return folder
 
+    def test_travel_all_exports_same_trip_offline_retry_parsers_and_accessibility(self):
+        from copy import deepcopy
+        from io import BytesIO
+        from pypdf import PdfReader
+        from lxml import etree
+        from selenium.webdriver.support.ui import Select
+        from apps.mobility.models import TravelPlan
+        from tests.test_travel_ics_export import parse_calendar
+        session=self.packing_fixture();plan=TravelPlan.objects.get(pk=session.plan_id)
+        before=deepcopy((plan.planning_state,plan.itinerary));folder=self.pdf_download_folder()
+        self.browser.execute_cdp_cmd('Network.enable',{})
+        self.browser.execute_cdp_cmd('Network.setBlockedURLs',{'urls':['https://*']})
+        self.browser.set_window_size(1440,1200);self.calendar_browser(session)
+        self.browser.execute_cdp_cmd('Network.emulateNetworkConditions',dict(offline=True,latency=0,downloadThroughput=-1,uploadThroughput=-1))
+        for kind in ('PDF','GPX','ICS'):
+            self.memory_click('#plannerExport'+kind)
+            self.wait.until(lambda _: self.text('plannerAlert') and self.browser.find_element(self.By.ID,'plannerExport'+kind).is_enabled())
+            self.assertFalse(list(folder.glob('*.'+kind.lower())))
+        self.browser.execute_cdp_cmd('Network.emulateNetworkConditions',dict(offline=False,latency=0,downloadThroughput=-1,uploadThroughput=-1))
+        self.addCleanup(self.browser.execute_cdp_cmd,'Network.emulateNetworkConditions',dict(offline=False,latency=0,downloadThroughput=-1,uploadThroughput=-1))
+        for kind in ('PDF','GPX','ICS'):
+            self.memory_click('#plannerExport'+kind)
+            output=folder/f'alfred-itinerary.{kind.lower()}'
+            self.wait.until(lambda _: output.is_file() and output.stat().st_size>100 and not list(folder.glob('*.crdownload')))
+            self.wait.until(lambda _: f'{kind} downloaded' in self.text('plannerAlert'))
+        pdf='\n'.join(p.extract_text() for p in PdfReader(BytesIO((folder/'alfred-itinerary.pdf').read_bytes()),strict=True).pages)
+        gpx=etree.parse(str(folder/'alfred-itinerary.gpx'),etree.XMLParser(resolve_entities=False,no_network=True))
+        calendar=parse_calendar((folder/'alfred-itinerary.ics').read_bytes())
+        names=[stop['name'] for stop in plan.itinerary['stops']]
+        self.assertIn(' → '.join(names),pdf)
+        self.assertEqual(gpx.xpath('//*[local-name()="wpt"]/*[local-name()="name"]/text()'),names)
+        self.assertFalse(gpx.xpath('//*[local-name()="trk" or local-name()="rte" or local-name()="time"]'))
+        self.assertEqual(calendar['events'][0]['location'],' → '.join(names))
+        self.assertEqual(calendar['events'][0]['start'],plan.itinerary['days'][0]['date'])
+        self.assertTrue(calendar['roundtrip'])
+        self.assertEqual(len(list(folder.glob('alfred-itinerary.*'))),3)
+        plan.refresh_from_db();self.assertEqual((plan.planning_state,plan.itinerary),before)
+        root=Path(__file__).resolve().parents[1]
+        self.browser.execute_script((root/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        self.memory_click('[data-calendar-event]:first-of-type summary')
+        row=self.browser.find_elements(self.By.CSS_SELECTOR,'[data-calendar-event]')[0]
+        Select(row.find_element(self.By.CSS_SELECTOR,'[data-calendar-field="mode"]')).select_by_value('timed')
+        findings=[]
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_cdp_cmd('Input.dispatchMouseEvent',dict(type='mouseMoved',x=2,y=2))
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                result=self.browser.execute_async_script("""const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),incomplete:r.incomplete.map(v=>v.id)})).catch(e=>done({error:String(e)}));""")
+                findings.append(dict(width=width,theme=theme,**result))
+                (self.artifacts/'travel-combined-exports-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(result.get('violations'),[],findings[-1])
+                self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+                self.browser.execute_script("document.getElementById('plannerExport').scrollIntoView({block:'start',behavior:'instant'})")
+                self.capture(f'travel-combined-exports-{width}-{theme}')
+
+    def test_travel_all_exports_stale_revisions_and_auth_loss_never_download(self):
+        from django.db.models import F
+        from apps.mobility.models import TravelPlanningSession
+        session=self.packing_fixture();folder=self.pdf_download_folder();self.calendar_browser(session)
+        TravelPlanningSession.objects.filter(pk=session.pk).update(revision=F('revision')+1)
+        for kind in ('PDF','GPX','ICS'):
+            self.memory_click('#plannerExport'+kind)
+            self.wait.until(lambda _: 'Reload before exporting' in self.text('plannerAlert'))
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExport'+kind).is_enabled())
+            self.assertFalse(list(folder.glob('*.'+kind.lower())))
+        for kind in ('PDF','GPX','ICS'):
+            self.calendar_browser(session)
+            self.browser.delete_cookie('sessionid');self.memory_click('#plannerExport'+kind)
+            self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
+            self.assertEqual(self.text('plannerCalendar'),'')
+            self.assertFalse(list(folder.glob('*.'+kind.lower())))
+
     def calendar_browser(self,session):
         self.login();self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerPrepareICS').is_displayed())

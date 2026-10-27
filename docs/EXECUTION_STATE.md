@@ -1,6 +1,71 @@
 # ALFRED execution state
 
-## Active checkpoint — TRAVEL2-004/B3 private ICS export (2026-10-28)
+## Active checkpoint — TRAVEL2-004/B4 combined exports (2026-10-28)
+
+- MODE NEXT recoveredca66861f249f400433bd06ab73a105cc460ed6a8 clean/synchronized,
+  development/alfred-integrated,F:/ALFRED_DEV/post-audit. ICS40561358942 checked
+  ONCE at exactca66861:in_progress,not PASS. PDF40552102098 SUCCESS exactd08395f;
+  GPX40556530802 SUCCESS exactce0f019 verified for original-source reconciliation.
+  Preserve original receipts;no CI success transferred across changed source.
+- B4 LOCAL_VERIFIED:one owned saved multi-stop trip across strict pypdf,libxml+
+  cached official GPX1.1 XSD,and independent ICAL.js import/export roundtrip.
+  Destinations/order/supported dates consistent;GPX has no invented observation
+  times or roads/tracks. PDF/ICS preserve expired/unknown source metadata. Exact
+  ICS times/DST choices are explicit export-only overrides,not PDF departures.
+- Five integration cases cover save/reopen,edit/undo/order/save,session revisions/
+  saved-content conflicts,stable eventIDs,missing/injection facts,owner/auth/CSRF,
+  failed rendering/retry. Packing/reminder/owned organizer-link metadata/unrelated
+  trip data unchanged. Private catalog mocked;unchanged encrypted-copy organizer
+  evidence reused,not real-account acceptance. Exports have no trip/financial DML,
+  HTTP/private-store access/permanent server copy. Existing auth-session refresh
+  UPDATE only is allowed by test SQL guard. Synthetic output samples are protected.
+- Fresh combined native review found/reproduced P2:ordinary id-less itinerary
+  export→first edit/save changed all calendar UIDs. FIXED:ICS read-only canonical
+  editor identity preparation over SAVED plan JSON and owned session.pk;preview/
+  snapshot/export use same context. No export writes or unsaved-data export.
+  Beforefix regression FAIL preserved;afterfix all UIDs retained across firstedit.
+  Older id-less ICS files keep old positional UIDs;cross-version importer dedup
+  remains unverified. Originals retained;no real-calendar cleanup performed.
+- Final16 backend/profile checks PASS:5B4+10affectedICS(default native settings),
+  1targeted profile-contract. Counts unique;earlier fixture/debug reruns not added.
+  Fixture corrections preserved own checklist/reminder revisions,one-session/plan,
+  immutable generated legs and existing-private-folder ACL guards. Failed evidence
+  retained;no product/security guard weakened. PDF/GPX core/frontend hash-match
+  prior receipts;changed ICS/sharedAPI refreshed by affected tests and review.
+- Final actualChrome2 PASS:all3same-trip downloads,fullyoffline failures/online
+  retries with WANHTTPS blocked,independent file parsers,unchanged saved data;
+  all3stale/authloss no downloads/private clearing. Four new global1440/390 light/
+  dark Axe audits zero violations,captures inspected;contrast/manual screen-reader
+  remains pending. Migration drift/profile contract PASS;unchanged JS/source
+  syntax acceptance reused by hash. GraphifyAST11592/32422/509,no provider calls.
+- Fresh-context native runtime review CLEAN token7898150b-1f63-411e-916e-
+  d392568d5d77;fixtures summary-only,same harness,not an outside human/model review.
+  LOCAL_VERIFIED YES;CI_PASSED NO for latest fix;INDEPENDENT_REVIEWED native-only;
+  FORMALLY_ACCEPTED NO;PRODUCTION_VALIDATED NO. No extension promotion. Manual
+  screen-reader/incomplete contrast and fresh exact-head CI are outstanding;
+  owner/live-account/packaged/production acceptance remains separately unperformed.
+- Evidence artifacts/ci-repair-ac05515/travel-b4-*.json;artifacts/travel-exports-b4-
+  20261028/{local-acceptance.json,final-source-bindings.json,prior-ci-reconciliation.
+  json,native-review-final.json,gpx-schema-validation.json,samples/,browser-final/,
+  accessibility.json}. Fresh-run artifact-path check1 PASS overlaps the2Chrome
+  workflows;the portable Axe report is browser-fresh-artifacts/user-data/
+  travel-combined-exports-accessibility.json. No app behavior changed for this test
+  portability repair. Current validated source uncommitted until closure below.
+- CONTINUE_REQUIRED closure:inventory check,commit required source/tests+3trackers,
+  immutable source-checkpoint/<HEAD>/release.json clean source/history privacy
+  preflight;bind verified source in tracker-only commit,preflight finalHEAD,push
+  development normally,dispatch new exact-head CI and save push.json/ci.json.
+  Confirm clean/synchronized refs,master/frozen untouched. Matching closure means
+  READY_FOR_NEXT despite external FORMAL_ACCEPTANCE_PENDING;not release approval.
+- NEXT COMMAND:NEXT checks final-head artifacts/travel-exports-b4-20261028/ci.json
+  once,fixes actual failures,then selects C1 canonical read-only affordability.
+  Do not repeat accepted exports or execute C1 in this B4-only run. C1–C4 approved
+  scoped read-only:explicit matching currency,Decimal,no inferred INR/FX,no reserve/
+  debt double count,no canonical writes,explicit INSUFFICIENT_DATA outcomes.
+  FIN-15 migrations and production remain separately blocked. Baseline75/143;
+  extensions0/13. No master/Pages/deployment/backup deletion or real financial change.
+
+## Previous checkpoint — TRAVEL2-004/B3 private ICS export (2026-10-28)
 
 - MODE NEXT recovered ce0f019378e1051ee97d2c7514c66e1a528bda39 clean/synchronized,
   development/alfred-integrated,F:/ALFRED_DEV/post-audit. CI40556530802 checked

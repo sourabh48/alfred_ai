@@ -2,6 +2,7 @@
 from datetime import date, datetime, timedelta, timezone as utc_timezone
 import json
 import re
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.utils import timezone
@@ -10,6 +11,7 @@ from rest_framework.exceptions import ValidationError
 
 from .presentation import age_saved_facts
 from .reminders import schedule
+from .editor import editor_payload
 
 LIMIT = 300
 NOTICE = 'Private planning references, not bookings or confirmed departures. Date-only entries do not establish an activity duration. No invitations, alarms or synchronization. Costs, private notes, linked documents and account data are excluded.'
@@ -45,11 +47,15 @@ def _confirmed(plan, key, expected):
         and fact.get('freshness') != 'ESTIMATED' and expected) else None
 
 
-def calendar_choices(plan):
+def calendar_choices(plan, session_pk):
     try:
         days = plan.itinerary.get('days', [])
         if not isinstance(days, list) or len(days) > 60:
             raise ValueError()
+        # Match first-edit identities without persisting IDs or using unsaved edits.
+        saved = SimpleNamespace(pk=session_pk, itinerary=plan.itinerary, state=plan.planning_state)
+        prepared, _ = editor_payload(saved)
+        days = prepared.get('days', [])
         start = _confirmed(plan, 'available_start_date', plan.start_date)
         end = _confirmed(plan, 'available_end_date', plan.end_date)
         rows, warnings, identities = [], [], set()
@@ -67,7 +73,7 @@ def calendar_choices(plan):
                 warnings.append(f'Day {index+1}: {len(items)} activities omitted; its saved date is missing, unsupported or not owner-confirmed.')
                 continue
             for position, item in enumerate(items):
-                identity = item.get('id', f'legacy:{index}:{position}')
+                identity = item['id']
                 if not isinstance(identity, str) or not 1 <= len(identity) <= 80 or identity in identities:
                     raise ValueError()
                 identities.add(identity)
@@ -118,9 +124,9 @@ def _fold(line):
     return '\r\n'.join([*parts, chunk])
 
 
-def itinerary_ics(plan, options):
+def itinerary_ics(plan, options, session_pk):
     try:
-        choices = calendar_choices(plan)
+        choices = calendar_choices(plan, session_pk)
         if not choices['activities']:
             raise ValidationError({'detail': 'No named activities have owner-confirmed saved dates. Confirm and save trip dates before calendar export; no dates or times were inferred.'})
         if not isinstance(options, dict) or set(options)-{'snapshot', 'zone', 'events'}:
