@@ -9,6 +9,15 @@ from scripts import release_gate as release
 
 
 class SectionCIIsolationTests(unittest.TestCase):
+    def test_selenium_prepares_the_pinned_axe_asset_before_browser_tests(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/browser-regression.yml').read_text(encoding='utf-8')
+        selenium = workflow.split('\n  selenium:', 1)[1].split('\n  linux-secure-failure:', 1)[0]
+        setup, _ = selenium.split('- name: Run Selenium browser regressions', 1)
+        self.assertIn('axe-core-4.13.0.tgz', setup)
+        self.assertIn('package/axe.min.js package/LICENSE', setup)
+        self.assertIn('C24F097BD2F451D4F933E8BC7D8D539F8672A2EBCB5CC9F9F3EEC8CA9470A0C1', setup)
+        self.assertIn("throw 'Unexpected axe-core hash'", setup)
+
     def test_distinct_section_prs_do_not_share_a_cancellation_group(self):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/browser-regression.yml').read_text(encoding='utf-8')
         concurrency = workflow.split('concurrency:\n', 1)[1].split('\njobs:', 1)[0]

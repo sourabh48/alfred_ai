@@ -1,5 +1,11 @@
 # ALFRED Project Status
 
+Current NEXT:TRAVEL2-005/C1 selected after confirmed B4CI missing-Axe setup repair.
+CI40569336516 Windows/Linux PASS,Selenium FAIL;fresh-head checks required.
+10CI contract tests/clean pinned tool setup PASS;local Chrome0run/1skip(driver
+unavailable),not accepted. DraftPR creation403/422 blocked;owner URL and exact
+resume state in EXECUTION_STATE. Baseline75/143,extensions0/13 unchanged.
+
 **Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
 ## Active implementation checkpoint — TRAVEL2-004/B4,2026-10-28

@@ -8,6 +8,14 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
 
 ## Current checkpoint — TRAVEL2-004/B4 (2026-10-28)
 
+Latest NEXT recovery226c4f2:CI40569336516 FAIL,Windows/Linux PASS,Selenium139cases/
+oneerror missing Axe asset. Selenium setup now prepares the same pinned4.13.0
+hash-checked licensed tool;10CI/profile contract tests and clean-asset setup PASS.
+Local Chrome driver unavailable(0run/1skip),not PASS;fresh exact-head CI required.
+Owner-authorized draftPR creation blocked:connector403,Git-credential API422;
+body/creation URL in EXECUTION_STATE and artifacts/travel-c1-20261028/pr.json.
+C1 selected after rootcause repair;C2–C4 deferred. Counters unchanged.
+
 Recoveredca66861 clean/synchronized. PDF40552102098 SUCCESS exactd08395f and
 GPX40556530802 SUCCESS exactce0f019 verified;ICS40561358942 checkedONCEin_progress
 exactca66861. Those states belong only to their SHAs. B4 new source needs freshCI.

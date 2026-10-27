@@ -1,5 +1,26 @@
 # ALFRED execution state
 
+## Active checkpoint — CI repair + TRAVEL2-005/C1 (2026-10-28)
+
+- Recovered clean/synchronized226c4f2 on development/alfred-integrated. Owner
+  explicitly authorizes one draftPR and verified development pushes;no merge/deploy.
+- PR creation BLOCKED:connector403 Resource not accessible by integration;existing
+  Git credential fallback422 Unprocessable Entity(no repeated creation retry).
+  No openPR for branch found. Body/blocker preserved under artifacts/travel-c1-
+  20261028/pr{.json,-body.md};owner creation URL:https://github.com/sourabh48/alfred_ai/compare/master...development/alfred-integrated?expand=1.
+- CI40569336516 exact226c4f2 FAILED:Windows/Linux PASS;Selenium139cases/oneerror,
+  missing artifacts/tools/package/axe.min.js in combined-export audit. Minimal
+  repair installs the SAME4.13.0/license/hash-checked Axe asset in Selenium job;
+  no assertions,coverage,timeouts or application code weakened. Focused actual
+  Chrome attempted:0run/1skipped,driver unavailable;NOT PASS. Fresh clean-tool
+  download/extract/hash/license check PASS;10CI/profile contract tests PASS.
+  Confirmed missing-tool rootcause addressed;full Selenium proof needs freshCI.
+- Graphify executable BLOCKED by Windows Application Control;do not bypass policy.
+  Existing graph retained. No production/real-data changes. Baseline75/143,0/13.
+- CONTINUE_REQUIRED:finish focused CI repair evidence,then C1 deterministic
+  fresh-canonical/owner-confirmed matching-currency Decimal calculation only.
+  Preserve all earlier export/organizer/editor receipts;no C2–C4 implementation.
+
 ## Active checkpoint — TRAVEL2-004/B4 combined exports (2026-10-28)
 
 - MODE NEXT recoveredca66861f249f400433bd06ab73a105cc460ed6a8 clean/synchronized,
