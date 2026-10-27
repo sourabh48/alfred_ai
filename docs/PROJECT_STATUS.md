@@ -30,6 +30,12 @@ Decimal affordability despite external acceptance gates. Matching currency only,
 no inferred FX/INR,no reserve/debt double count,no canonical writes;FIN-15 blocked.
 No master,Pages,deployment or backup deletion. Execute no C1 work in this B4 run.
 
+Verified implementation source **ebcbda32ee6dd046e290372c8c4539f54394fbf5**;clean source/history privacy,
+dependency/migration preflight PASS,zero findings. Final tracker-only HEAD proof:
+artifacts/travel-exports-b4-20261028/source-checkpoint/<HEAD>/release.json,push.json
+and ci.json. Matching closure permits NEXT C1 despite pending external/formal gates;
+latest-head CI remains pending,no extension or production approval.
+
 ## Previous implementation checkpoint — TRAVEL2-004/B3,2026-10-28
 
 ICS LOCAL_VERIFIED: explicit owner/CSRF/revision+saved-content snapshot export,

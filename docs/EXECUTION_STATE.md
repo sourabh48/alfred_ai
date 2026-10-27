@@ -50,13 +50,17 @@
   accessibility.json}. Fresh-run artifact-path check1 PASS overlaps the2Chrome
   workflows;the portable Axe report is browser-fresh-artifacts/user-data/
   travel-combined-exports-accessibility.json. No app behavior changed for this test
-  portability repair. Current validated source uncommitted until closure below.
-- CONTINUE_REQUIRED closure:inventory check,commit required source/tests+3trackers,
-  immutable source-checkpoint/<HEAD>/release.json clean source/history privacy
-  preflight;bind verified source in tracker-only commit,preflight finalHEAD,push
-  development normally,dispatch new exact-head CI and save push.json/ci.json.
-  Confirm clean/synchronized refs,master/frozen untouched. Matching closure means
-  READY_FOR_NEXT despite external FORMAL_ACCEPTANCE_PENDING;not release approval.
+  portability repair. Verified source **ebcbda32ee6dd046e290372c8c4539f54394fbf5**.
+  Clean source/history privacy,dependency/migration preflight PASS,zero findings.
+  Source proof:source-checkpoint/ebcbda32ee6dd046e290372c8c4539f54394fbf5/release.json.
+- This final checkpoint changes only3trackers;reuse runtime tests/native review.
+  Final source-checkpoint/<HEAD>/release.json,push.json and ci.json under artifacts/
+  travel-exports-b4-20261028 bind exact final HEAD,normal push and new CI run.
+- Closure:commit these3trackers,preflight finalHEAD in its immutable SHA directory,
+  push development normally,dispatch exact-head Browser Regression and save matching
+  push.json/ci.json. Confirm clean/synchronized development,master/frozen unchanged.
+  Missing matching closure means CONTINUE_REQUIRED;with pushPASS/runrecorded,
+  READY_FOR_NEXT while FORMAL_ACCEPTANCE_PENDING. No extension/release promotion.
 - NEXT COMMAND:NEXT checks final-head artifacts/travel-exports-b4-20261028/ci.json
   once,fixes actual failures,then selects C1 canonical read-only affordability.
   Do not repeat accepted exports or execute C1 in this B4-only run. C1–C4 approved

@@ -43,6 +43,12 @@ Baseline75/143;extensions0/13. TRAVEL2-004 remains unpromoted and broader Travel
 acceptance remains separate. Safe development closure permits NEXT C1 while
 external/formal gates remain pending;do not require approval for ordinary read-only coding.
 
+Verified implementation source **ebcbda32ee6dd046e290372c8c4539f54394fbf5**;clean source/history privacy,
+dependency/migration preflight PASS,zero findings. Final tracker-only HEAD proof:
+artifacts/travel-exports-b4-20261028/source-checkpoint/<HEAD>/release.json,push.json
+and ci.json. Matching closure permits NEXT C1 despite pending external/formal gates;
+latest-head CI remains pending,no extension or production approval.
+
 ## Persistent remaining Travel phases
 
 - [x] B1 — PDF local tests and CI passed atd08395f;core evidence reused.
