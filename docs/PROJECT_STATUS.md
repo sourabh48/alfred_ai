@@ -2,7 +2,27 @@
 
 **Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
-## Active implementation checkpoint — TRAVEL2-004/B1,2026-10-27
+## Active implementation checkpoint — TRAVEL2-004/B2,2026-10-27
+
+GPX LOCAL_VERIFIED: saved-owner-only explicit CSRF/revision export,ordered Decimal
+WGS84 coordinates/public source references/aged expiry,source-backed current
+selected route geometry only;otherwise waypoint-only explanation. No inferred
+roads,return legs,recorded tracks or bike legality. PDF endpoint/privacy lifecycle
+reused;private unrelated state excluded,no provider/corpus/financial writes or
+new models/migrations/dependencies. Original143 requirements/13 extensions preserved.
+51 unique backend PASS(9GPX+9PDF+33CI metadata),4actualChrome workflows PASS including
+local file reopen and PDF regressions;4global1440/390 light/dark Axe audits zero
+violations. Official GPX1.1 XSD/lxml offline validation PASS for both final sample
+files;native runtime recheck CLEAN,fixtures summary-only. JS/migration PASS;
+GraphifyAST11522/32138/524. Failed fixture/P2 metadata diagnostics retained/repaired.
+Evidence: artifacts/travel-gpx-20261027 and ci-repair-ac05515/travel-gpx-*.
+CI40552102098 checkedONCE at exactd08395f:in_progress,not PASS. Source/privacy/push/
+new exact-head CI closure is in EXECUTION_STATE. Baseline75/143;extensions0/13.
+Manual screen-reader/incomplete contrast,real-account and production acceptance
+remain pending. NEXT: finish B2 closure,then verify acceptance and select B3 ICS
+on owner NEXT only. No master,publishing,deployment or financial-policy change.
+
+## Previous implementation checkpoint — TRAVEL2-004/B1,2026-10-27
 
 Private saved-itinerary PDF LOCAL_VERIFIED with explicit owner/CSRF/revision
 protection,source dates/expiry/unknowns including individual stops,Unicode/wrapping

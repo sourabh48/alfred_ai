@@ -4632,6 +4632,66 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.addCleanup(self.browser.execute_cdp_cmd,'Browser.setDownloadBehavior',dict(behavior='default'))
         return folder
 
+    def test_travel_gpx_export_stale_keyboard_download_local_reopen_and_empty_feedback(self):
+        from lxml import etree
+        from django.db.models import F
+        from selenium.webdriver.common.keys import Keys
+        from apps.mobility.models import TravelPlanningSession, TravelPlan
+        session=self.packing_fixture();folder=self.pdf_download_folder()
+        self.login();self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportGPX').is_displayed())
+        TravelPlanningSession.objects.filter(pk=session.pk).update(revision=F('revision')+1)
+        self.memory_click('#plannerExportGPX')
+        self.wait.until(lambda _: 'Reload before exporting' in self.text('plannerAlert'))
+        self.assertFalse(list(folder.glob('*.gpx')))
+        self.memory_click('[data-editor-reload]');session.refresh_from_db()
+        self.wait.until(lambda _: f'Trip revision {session.revision}' in self.text('plannerItinerary'))
+        self.browser.find_element(self.By.ID,'plannerExportGPX').send_keys(Keys.ENTER)
+        output=folder/'alfred-itinerary.gpx'
+        self.wait.until(lambda _: output.is_file() and output.stat().st_size>100 and not list(folder.glob('*.crdownload')))
+        root=etree.parse(str(output),etree.XMLParser(resolve_entities=False,no_network=True)).getroot()
+        self.assertEqual(root.tag,'{http://www.topografix.com/GPX/1/1}gpx')
+        self.assertEqual(len(root.xpath('//*[local-name()="wpt"]')),2)
+        self.assertFalse(root.xpath('//*[local-name()="trk" or local-name()="rte"]'))
+        self.wait.until(lambda _: 'GPX downloaded' in self.text('plannerAlert'))
+        self.browser.execute_script("document.getElementById('plannerExport').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture('travel-private-gpx-download')
+        self.browser.execute_script("""const input=document.createElement('input');input.type='file';input.id='test-reopen-gpx';
+            input.onchange=async()=>{const xml=new DOMParser().parseFromString(await input.files[0].text(),'application/xml');
+                window.reopenedGPX={root:xml.documentElement.localName,namespace:xml.documentElement.namespaceURI,
+                    names:Array.from(xml.getElementsByTagNameNS('*','wpt')).map(n=>n.getElementsByTagNameNS('*','name')[0].textContent),errors:xml.getElementsByTagName('parsererror').length};};
+            document.body.append(input);""")
+        self.browser.find_element(self.By.ID,'test-reopen-gpx').send_keys(str(output))
+        reopened=self.wait.until(lambda _: self.browser.execute_script('return window.reopenedGPX'))
+        self.assertEqual(reopened['errors'],0);self.assertEqual(reopened['root'],'gpx')
+        self.assertEqual(reopened['namespace'],'http://www.topografix.com/GPX/1/1')
+        self.assertEqual(reopened['names'],[s['name'] for s in session.itinerary['stops']])
+        plan=TravelPlan.objects.get(pk=session.plan_id);plan.planning_state={};plan.save(update_fields=['planning_state'])
+        self.memory_click('#plannerExportGPX')
+        self.wait.until(lambda _: 'No valid saved' in self.text('plannerAlert'))
+        self.assertEqual(len(list(folder.glob('*.gpx'))),1)
+
+    def test_travel_gpx_late_response_and_auth_loss_preserve_private_download_boundary(self):
+        session=self.packing_fixture();folder=self.pdf_download_folder()
+        self.login();self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportGPX').is_displayed())
+        self.browser.execute_script("""const original=window.fetch;window.fetch=(url,options)=>{
+            if(options?.body && JSON.parse(options.body).action==='export_gpx'){
+                window.fetch=original;return original(url,{...options,signal:undefined}).then(response=>new Promise(resolve=>{window.releasePrivateGPX=()=>resolve(response);}));
+            }return original(url,options);};""")
+        self.memory_click('#plannerExportGPX')
+        self.wait.until(lambda _: self.browser.execute_script('return typeof releasePrivateGPX==="function"'))
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));releasePrivateGPX();")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerSend').is_enabled())
+        self.assertFalse(list(folder.glob('*.gpx')))
+        self.assertFalse(self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportGPX').is_displayed())
+        self.wait.until(lambda _: self.active_requests==0)
+        self.browser.delete_cookie('sessionid');self.memory_click('#plannerExportGPX')
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
+        self.assertFalse(list(folder.glob('*.gpx')))
+
     def test_travel_pdf_export_stale_guard_keyboard_download_and_independent_parse(self):
         from io import BytesIO
         from pypdf import PdfReader

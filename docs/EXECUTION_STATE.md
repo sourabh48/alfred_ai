@@ -1,6 +1,55 @@
 # ALFRED execution state
 
-## Active checkpoint — TRAVEL2-004/B1 private PDF export (2026-10-27)
+## Active checkpoint — TRAVEL2-004/B2 private GPX export (2026-10-27)
+
+- MODE NEXT recovered d08395f1effc66889acfd5aaab1f6b375502c618 clean/synchronized,
+  development/alfred-integrated,F:/ALFRED_DEV/post-audit. CI40552102098 checked
+  ONCE at exactd08395f:in_progress,not PASS. Preserve previous PDF/reminder/packing/
+  organizer/editor receipts. No master/publishing/deployment/financial changes.
+- B2 LOCAL_VERIFIED: explicit owner/auth/CSRF/revision saved-plan GPX1.1 download,
+  reuses PDF endpoint,private headers,format-aware download lifecycle/export card.
+  Decimal WGS84 lat/lon inclzero/negative/precision;stop order/names/source links,
+  safe XML and generic filename. Saved location fallback only,no name-based lookup.
+  Current source-backed selected provider LineString only supplies route points;
+  otherwise waypoint-only explanation,including omitted invalid coordinates.
+  No inferred road/return leg/intermediate point/recorded track/bike legality.
+  Bounds5stops/100mapfeatures/5000routepoints/1MiB;unsupported/stale/unverified
+  geometry excluded. Saved discovery/map expiry retained and aged CACHED/UNKNOWN;
+  export does not mutate trip data or call providers/corpus/external services.
+-51 unique backend cases accepted incrementally:9GPX,9affectedPDF,33CI metadata.
+  Initial17 had16 PASS/one route fixture omitted requiredrequest_parameters;
+  corrected positivecase1 PASS; final9GPX PASS adds stale waypoint metadata proof
+  and trailing-zero Decimal endpoint equivalence. Failed receipts preserved.
+- Actual Chrome4 PASS:2GPX(stale409,keyboard download,local file FileReader+
+  DOMParser reopen,empty-data feedback,late response/auth loss) and2affected PDF.
+  Four global1440/390px light/dark Axe audits zero violations,captures inspected;
+  incomplete contrast/manual screen-reader acceptance remains explicitly pending.
+- Independent lxml parsing and official Topografix GPX1.1 XSD offline validation
+  PASS for final synthetic waypoint/route files. SchemaSHA256
+  9e4d1988b862edbe556305b130f8f6f1b29864fefd0dc02d5dab04ccdd1f34d6.
+  No schema/dependency vendored;runtime uses stdlib XML,existing services only.
+- Native final runtime review CLEAN,token7baf76ea-cb37-4500-badb-29ddb01121af;
+  P2 stale waypoint metadata repaired. Fixtures summary-only,not independent model;
+  no outside provider/private-history/paid AI. JS syntax and migration drift PASS.
+  AST Graphify11522 nodes/32138 edges/524 communities;no semantic/provider call.
+- Source: travel/gpx_export.py,planner_views,travel_planner JS,planner/dashboard
+  templates,release validation labels,GPX backend and2Chrome tests. No models/
+  migrations/dependencies changed. Evidence: artifacts/ci-repair-ac05515/
+  travel-gpx-*.json; artifacts/travel-gpx-20261027/{local-acceptance.json,
+  accessibility.json,schema-validation-final.json,native-review-final.json}.
+- CONTINUE_REQUIRED closure: inventory check,commit validated source+3 trackers,
+  clean source/history privacy preflight in immutable per-HEAD directory;bind
+  verified source SHA in final tracker-only commit,preflight final HEAD,push
+  development normally,dispatch exact-head Browser Regression. Save push.json/
+  ci.json and verify clean synchronized refs/master/frozen untouched. With matching
+  closure,READY_FOR_NEXT even while CI_PENDING; no full-story/extension promotion.
+- NEXT COMMAND: NEXT checks final-head artifacts/travel-gpx-20261027/ci.json once;
+  fix actual failures before advancing,otherwise verify B2 acceptance then B3
+  timezone-safe ICS. Do not repeat unchanged passing work or select B3 in this run.
+  Baseline75/143;extensions0/13. Real-account/production acceptance remains pending.
+  FinancialC remains read-only,same-currency only;FIN-15 migration/writes gated.
+
+## Previous checkpoint — TRAVEL2-004/B1 private PDF export (2026-10-27)
 
 - MODE NEXT recovered84902b7e4777948baceeaa8d5720b412b1b8b282; canonical branch
   development/alfred-integrated,F:/ALFRED_DEV/post-audit. All interrupted changes
