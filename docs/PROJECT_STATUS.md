@@ -80,13 +80,17 @@ Manual screen-reader and incomplete Axe checks remain unverified.
 
 PR16 remains externally merged; current GitHub open-PR array is empty. Manual
 CI40421447655 PASS at exact editor checkpoint1fa7449, not at the new organizer.
-Formal extension acceptance remains0/13; baseline75/143. Final source/privacy,
-normal development push and fresh exact-head CI are closed after this commit in
-the organizer artifact directory's source-preflight/release.json, push.json and
-ci.json. Resolve its commit with `git log -1 --format=%H -- apps/mobility/services/travel/documents.py`.
+Formal extension acceptance remains0/13; baseline75/143. Organizer source
+**61bd9bc35ff3a228fa7e2ddc9b109bb11dcfc1c3** passed exact clean source/history
+privacy (zero findings), dependency and migration preflight and was pushed normally
+to development. Manual CI dispatch returned204; no pass is claimed for this new
+scope. Final checkpoint changes only these two trackers: runtime source is identical,
+so passing local tests are reused. The final checkpoint HEAD's source preflight,
+normal push and exact-head CI are recorded in the organizer artifact directory's
+source-checkpoint/release.json, push.json and ci.json. No master/deployment action.
 
-**NEXT ACTION:** finish organizer source/privacy/push and dispatch newest-head CI.
-Then READY_FOR_NEXT: TRAVEL2-003 owner opt-in durable packing/reminder lifecycle,
+**NEXT ACTION:** reconcile ci.json's newest exact-head run at the next milestone;
+do not repeat passing local tests. READY_FOR_NEXT: TRAVEL2-003 owner opt-in durable packing/reminder lifecycle,
 reusing existing checklist/settings/queue; reconcile its dependencies before edits.
 No operator data, master/frozen/release branch or deployment action is authorized.
 
