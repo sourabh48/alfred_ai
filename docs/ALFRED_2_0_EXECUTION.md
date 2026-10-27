@@ -8,6 +8,18 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
 
 ## Current checkpoint
 
+- MODE NEXT selected TRAVEL2-003/SCOPE-01 at cleanc521a6d. CI40482166662 checked
+  once/pending; TRAVEL2-002 retains CI_PENDING. Private packing is LOCAL_VERIFIED
+  in existing saved-plan JSON, automatic local persistence, UUIDs/50-item bound,
+  duplicate/owner/CSRF/CAS checks and preserved progress across both plan saves,
+  reopened/cold-process reads, itinerary/day/stop/undo and document changes.
+-29 unique backend cases (10 packing+19 affected regressions),5 unique Chrome
+  workflows and4 global Axe audits at actual1440/390 CSS pixels, light/dark,
+  zero violations. JS/migration PASS; native source review clean, tests summary-
+  reviewed. Graphify AST11384/31653/522. Failed receipts retained and repaired
+  selectively; reruns overlap. Packing artifacts bind exact source/privacy/push/CI.
+  Manual screen-reader/incomplete Axe color checks and production remain pending.
+
 - TRAVEL2-001 LOCAL_VERIFIED, formal acceptance CI_PENDING. Existing owned session/
   plan JSON and manual multi-stop API now support desktop activity CRUD, pointer/
   keyboard activity/stop moves, stable IDs, undo/history, retry/CAS revision safety,
@@ -62,9 +74,9 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
   changes only the two trackers; runtime-identical local evidence is reused.
   source-checkpoint/release.json, push.json and ci.json in the organizer artifacts
   bind the final checkpoint HEAD's preflight/push/new exact-head CI.
-- NEXT ACTION: reconcile ci.json's newest exact-head run at the next milestone;
-  do not repeat passing local tests. READY_FOR_NEXT: TRAVEL2-003 owner opt-in packing/reminders; reuse
-  checklist/settings/durable queue after reconciling dependencies. No external send.
+- NEXT ACTION: finish packing clean-source/privacy/normal push and newest-head CI
+  dispatch, then READY_FOR_NEXT for TRAVEL2-003/SCOPE-02 local reminders below.
+  Reconcile newest exact-head CI at the next milestone; do not rerun passing scopes.
 - Editor6e816b1 exact source/history/privacy/dependency/migration preflight PASS,
   zero findings, and normal development push succeeded. Post-push master drift was
   detected and reconciled as above. Final reconciliation/checkpoint closure uses
@@ -110,7 +122,7 @@ synthetic evidence unless their tracker explicitly says otherwise.
 | CAREER2-002 — reviewable application workflow | Recruiter/JD/discovery/geography and owned documents | Source-backed drafts and attachment/revision review | CAREER-04/05, DOC-06, AI-15 | P2 /2–4 slices | Stale proposals/attachments rejected; no implicit sending | API owner/CSRF/stale/retry; Chrome review | Career Discovery/Geography receipts; extension pending | QUEUED; preserve no-send boundary |
 | TRAVEL2-001 — desktop itinerary editing/undo | Manual stops plus implemented desktop CRUD/reorder/undo/history and safe persistence | Formal extension acceptance; broader upstream UI equivalence unclaimed | TRAVEL-03 accepted; TRAVEL-04 bounded manual slice | P1 /2–3 slices | Full bounded edit/reorder/undo/save/reopen flow; unrelated data preserved; conflicts visible; no stale route/cost claim | 180 unique backend;4 Chrome;2 global desktop Axe; JS/migration/privacy gates | artifacts/travel-editor-20261027/local-acceptance.json; exact1fa7449 CI40421447655 PASS | LOCAL_VERIFIED/CI_PASSED at1fa7449; no automatic full-story promotion |
 | TRAVEL2-002 — private booking/document organizer | Owned trip JSON and existing encrypted corpus now support private links/original access/expiry/unlink/reopen | Newest-head CI and formal extension acceptance; broader booking workflow unclaimed | TRAVEL-04, DOC-06 accepted slices | P2 /bounded slice complete | Owner-only originals and source dates; no inferred availability or booking writes; no private metadata after auth loss | 12 unique backend across repairs;5 Chrome incl editor regression;2 global desktop Axe; privacy | Source61bd9bc; artifacts/travel-organizer-20261027/local-acceptance.json, source-preflight/release.json, push.json and ci.json | COMMITTED_PUSHED/CI_PENDING; reconcile exact final HEAD at next milestone |
-| TRAVEL2-003 — packing/reminders | Static packing and trip dates | Durable owner opt-in checklist/reminder lifecycle | TRAVEL-04; local durable queue | P2 /2 slices | Idempotent completion/timezone/cancel/offline behavior; no external sending | Backend lifecycle/timezones; Chrome opt-in/reopen | Existing itinerary packing; extension pending | QUEUED; reuse queue/settings after organizer |
+| TRAVEL2-003 — packing/reminders | SCOPE-01 private packing CRUD/completion with UUIDs/revisions/automatic saved-trip persistence; existing suggestions reused | SCOPE-02 opt-in durable timezone-safe local reminders; newest-head CI/formal full-story acceptance | TRAVEL-04 accepted slice; local durable queue for02 | P2 /01 locally complete;02 next | Owner-only persistent progress, idempotence/duplicates/stale protection; timezone/cancel/offline reminder delivery; no external send | 29 unique backend incl19 affected regressions;5 Chrome;4 actual1440/390 light/dark Axe; reminders tests unrun | artifacts/travel-packing-20261027/local-acceptance.json and CI/source receipts; exact source in EXECUTION_STATE | SCOPE-01 LOCAL_VERIFIED; CI_PENDING after push; NEXT SCOPE-02 |
 | TRAVEL2-004 — private PDF/GPX/ICS exports | Owned trip/evidence/map structures | Explicit validated source-preserving export | TRAVEL-04/17, owner export consent | P2 /2–3 slices | Correct coordinates/timezones/escaping; preserve expiry/unknowns; no public sharing | File parsers and malformed inputs; desktop export | Existing Travel evidence; extension pending | QUEUED; inspect available export helpers first |
 | TRAVEL2-005 — reserve/goal-aware affordability | Canonical baseline and Decimal trip allowances | Approved reserve/goal/scenario contract and explanations | FIN-05/06/07/15, FIN-CURRENCY | P1 /3 slices | Canonical reconciliation; no reserve double count or unapproved currency inference | Decimal edge/cutoff/owner tests; desktop explanation | Existing finance/Travel cost receipts; extension pending | BLOCKED_APPROVAL; obtain concrete contract decisions before implementation |
 | INVEST2-001 — analyst/bull/bear/valuation/risk packet | Owned portfolio, AMFI/Yahoo evidence and local routing | Compatible pinned TradingAgents graph adapter and independent challenge | INV-04, AI-15/16, source/dependency/provider clearance | P2 /4–6 slices | Dated sourced arguments/unknowns; bounded tools; no private disclosure/orders | Isolated compatibility; point-in-time/leakage/cancel; desktop review | UPSTREAM_REFERENCE_MATRIX T pin; engine adoption pending | QUEUED; test component isolation, do not bulk-install conflicting dependencies |
@@ -122,6 +134,31 @@ synthetic evidence unless their tracker explicitly says otherwise.
 | CORE (coordination) — canonical financial intelligence | Canonical Decimal baseline/projections and accepted FIN-05 | Reserve/goal/currency/snapshot contracts once approved; shared adapters | FIN-06/07/15, FIN-CURRENCY | P1 /contract-specific | One canonical arithmetic path; read-only scenarios never actual money | Existing financial baseline/money/reconciliation suites | Baseline ID receipts own acceptance | BLOCKED_APPROVAL for missing contracts; no duplicate finance engine |
 | LOCAL (coordination) — Ollama intelligence | Existing local provider/registry, deadlines and evaluation | Genuine quality evidence and demonstrated bounded delegation, where useful | AI-15→16→12; authorized cohorts | P1 /evidence-dependent | Local default, bounded cancellation, source-grounded abstention; no invented calibration | Existing model/cohort/privacy/timeout suites; optional isolated synthetic smoke | AI-15/16 receipts; broad quality pending | PARTIAL; no model activation/promotion as a shortcut |
 | DESKTOP/RELEASE (coordination) — integration and release | Django desktop UI, Chrome/Axe, release/privacy/native gates | Per-slice desktop acceptance and separately authorized cumulative release | Domain acceptance, reviews, CI, rollback, Pages authorization | P1 /per slice | Owner/session/CSRF, keyboard/pointer, source/financial/privacy regression; exact newest HEAD; explicit release approval | Focused backend/Chrome/Axe, JS, migration, privacy; package only when selected | PR16 and per-source receipts | ACTIVE validation; never treat development integration as deployment |
+
+## TRAVEL2-003/SCOPE-02 — smallest safe reminder preparation (not implemented)
+
+Inspected native_settings.HUEY (DurableSqliteHuey,UTC,fsync,periodic threads),
+native_tasks.py's UTC db_periodic_task schedules, durable_queue.py's atomic claims/
+REPLAY_SAFE allowlist, background.py's local adapter and investment review-alert
+opt-in/revision lifecycle. Existing Django timezone.now/is_aware/make_aware helpers
+are reusable; current Travel EXIF naive conversion is not a DST scheduling policy.
+
+Reuse saved-trip private JSON for an explicit enabled=false-by-default reminder
+record: UUID,revision,owner-selected IANA zone/local time,validated UTC due instant,
+status and an in-app delivery record. Standard-library ZoneInfo round-trip validation
+must reject nonexistent local times and require an explicit choice for ambiguous
+times; do not infer a user's zone from the server or naive datetime. Persist the
+schedule before claiming success. A bounded local Huey periodic due sweep queries
+opted-in trips; atomically CAS/lock the trip and write one UUID-keyed in-app delivery
+with its delivered_at/status in the same database transaction. This gives one durable
+visible result after restart without a separate external-delivery side effect.
+Explicit cancel/reschedule uses the same revision/CAS; completed/cancelled trips
+produce no delivery. Repeat due sweeps after restart/offline must be idempotent;
+record late delivery honestly. Register/review replay safety if using the durable
+queue's recovery path. No private task arguments/logs, external notifications,
+email,SMS,paid provider or cloud. Tests must cover DST gap/fold,timezone changes,
+stale/cancel-vs-due races,duplicate/restart replay and real Chrome opt-in/reopen.
+No task is scheduled or permission inferred by this preparation; full extension0/13.
 
 ## Reference boundaries and continuation
 

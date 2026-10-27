@@ -11,6 +11,13 @@ from .travel.money import decimal_amount, rupees
 from .travel.providers.base import number
 
 
+def packing_suggestions(mode):
+    items = ["Weather-appropriate clothing", "Water and personal medicines", "ID and booking confirmations", "Power bank and offline maps"]
+    if mode == "ride":
+        items += ["Helmet and riding protection", "Rain gear and waterproof luggage", "Puncture kit", "Vehicle documents", "Check tyres, brakes and chain/lube before departure"]
+    return items
+
+
 def compare_stop_orders(state, stops):
     current = build_multi_stop_itinerary(state, stops)
     origin = value(state, "origin")
@@ -148,10 +155,9 @@ def build_itinerary(state, destination):
     if value(state, "food_preferences"):
         for day in itinerary_days:
             day["meals"] += " Your preference: " + value(state, "food_preferences") + "."
-    packing = ["Weather-appropriate clothing", "Water and personal medicines", "ID and booking confirmations", "Power bank and offline maps"]
+    packing = packing_suggestions(mode)
     bike = None
     if mode == "ride":
-        packing += ["Helmet and riding protection", "Rain gear and waterproof luggage", "Puncture kit", "Vehicle documents", "Check tyres, brakes and chain/lube before departure"]
         mileage, tank = value(state, "vehicle_mileage"), value(state, "vehicle_tank_litres")
         bike = {"profile": value(state, "vehicle_name", "No vehicle profile selected"),
                 "condition": value(state, "vehicle_condition", {}),

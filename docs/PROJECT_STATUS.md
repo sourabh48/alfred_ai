@@ -2,7 +2,37 @@
 
 **Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
-## Active implementation checkpoint — 2026-10-27
+## Active implementation checkpoint — TRAVEL2-003/SCOPE-01,2026-10-27
+
+MODE NEXT, recovery sourcec521a6d clean/synchronized. CI40482166662 checked once:
+pending at exactc521a6d; organizer remains CI_PENDING. No repeated accepted work.
+Implemented bounded private packing per owned saved trip/draft, using existing
+plan JSON. Stable UUIDs, editable existing travel/motorcycle suggestions, add/edit/
+complete/uncheck/remove,50-item limit, normalized duplicate rejection, CAS/own
+revision and natural idempotent retries. Changes auto-save locally; cold-process
+reads and reopened sessions retain progress. Both saved-plan write paths preserve
+the canonical checklist through itinerary/day/stop changes and undo. No schema,
+provider, financial, cloud or browser-storage change. No reminders enabled.
+
+29 unique backend cases accepted across receipts (10 packing,19 affected editor/
+organizer);5 unique actual Chrome workflows including keyboard CRUD, offline POST/
+reload retry, stale editing at actual390px, private clearing and original editor/
+organizer regressions. Final4 global desktop/mobile light/dark Axe audits PASS,
+zero violations; captures inspected. Native source review clean after malformed
+operation and reload-error repairs; tests summary-reviewed. JS/migration checks
+PASS; AST Graphify11384/31653/522. Failed fixtures and first ARIA finding retained,
+repaired selectively; reruns overlap and are not additional cases. Source hashes,
+counts and limits: artifacts/travel-packing-20261027/local-acceptance.json;
+artifacts/ci-repair-ac05515/travel-packing-*.json. Source privacy/push/CI closure
+is recorded in that artifact directory after the clean source commit.
+
+**75/143 verified;0/13 extensions.** Scope01 local acceptance does not accept the
+whole reminder extension. Manual screen-reader/incomplete Axe color checks and
+production remain pending. EXECUTION_STATE owns exact continuation and evidence.
+NEXT: finish source/privacy/push/newest-head CI dispatch, then READY_FOR_NEXT for
+TRAVEL2-003/SCOPE-02 opt-in durable local reminders; see execution roadmap design.
+
+### Previous implementation checkpoint — editor and organizer
 
 **Current command: recover and execute ALFRED2.0.** Recovery HEAD **4b012a2**, clean
 and synchronized at selection. PR16 was OPEN then; GitHub subsequently reports it

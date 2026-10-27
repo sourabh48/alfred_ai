@@ -675,14 +675,16 @@ class TravelPlanDetailView(RetrieveUpdateDestroyAPIView):
     def perform_update(self, serializer):
         from .services.travel_discovery import fact
         from .models import TravelPlanningSession
-        original = serializer.instance
+        from .services.travel.packing import planning_state_with_checklist
+        session = TravelPlanningSession.objects.select_for_update().filter(plan_id=serializer.instance.pk, user=self.request.user).first()
+        original = TravelPlan.objects.select_for_update().get(pk=serializer.instance.pk, user=self.request.user)
+        serializer.instance = original
         core = ("destination", "start_date", "end_date", "budget", "transport_mode", "vehicle_profile")
         changed = any(key in serializer.validated_data and getattr(original,key) != serializer.validated_data[key] for key in core)
         timing_changed = any(key in serializer.validated_data and getattr(original,key) != serializer.validated_data[key]
                              for key in ("start_date", "end_date"))
         destination_changed = "destination" in serializer.validated_data and original.destination != serializer.validated_data["destination"]
         plan = serializer.save()
-        session = TravelPlanningSession.objects.filter(plan=plan, user=self.request.user).first()
         if session:
             if changed:
                 if destination_changed:
@@ -708,7 +710,7 @@ class TravelPlanDetailView(RetrieveUpdateDestroyAPIView):
                 session.itinerary = {}
                 session.status = "destination_selected" if plan.destination else "discovery"
                 plan.itinerary = {}
-                plan.planning_state = session.state
+                plan.planning_state = planning_state_with_checklist(session.state, plan)
                 plan.save(update_fields=["itinerary","planning_state"])
             session.title = plan.title
             session.save()

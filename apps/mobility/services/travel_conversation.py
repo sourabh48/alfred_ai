@@ -40,6 +40,7 @@ def new_session(user, plan=None):
     session = TravelPlanningSession.objects.create(user=user, plan=plan, title=plan.title if plan else "Your next escape",status="draft")
     if plan:
         session.state = deepcopy(plan.planning_state)
+        session.state.pop("_packing_checklist", None)
         for key, val in {"selected_destination": plan.destination, "available_start_date": plan.start_date.isoformat() if plan.start_date else None,
                          "available_end_date": plan.end_date.isoformat() if plan.end_date else None,
                          "budget": money_float(plan.budget), "transport_mode": plan.transport_mode, "trip_duration": plan.duration_days or None}.items():
@@ -486,7 +487,8 @@ def save_plan(session, draft=False):
     start, end = value(session.state, "available_start_date"), value(session.state, "available_end_date")
     if not draft and (not selected or not session.itinerary or not start or not end):
         raise ValidationError("Choose a destination, build the itinerary and confirm dates before saving a planned trip. You can save a draft now.")
-    plan = session.plan or TravelPlan(user=session.user)
+    from .travel.packing import planning_state_with_checklist
+    plan = TravelPlan.objects.select_for_update().get(pk=session.plan_id, user=session.user) if session.plan_id else TravelPlan(user=session.user)
     if not draft:
         # Save is explicit acceptance of the displayed core plan, including the
         # clearly labelled inferred year. Destination still requires selection.
@@ -500,7 +502,7 @@ def save_plan(session, draft=False):
     plan.budget = value(session.state, "budget", 0) or session.itinerary.get("budget", {}).get("expected", 0)
     plan.transport_mode = value(session.state, "transport_mode", "mixed")
     plan.status = (session.status if session.status in {"researching","suggestions_ready"} else "draft") if draft else "planned"
-    plan.planning_state = deepcopy(session.state)
+    plan.planning_state = planning_state_with_checklist(session.state, plan)
     plan.itinerary = deepcopy(session.itinerary)
     plan.vehicle_profile = BikeProfile.objects.filter(user=session.user, pk=value(session.state, "vehicle_profile")).first()
     if session.itinerary:

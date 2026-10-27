@@ -8,7 +8,9 @@ window.TravelPlanner = (() => {
     let documentEpoch=0, documentActive=true, documentRefreshPending=false;
     function clearDocuments() {
         documentEpoch++; documentActive=false;
-        if (state.session) {state.session.trip_documents=[];delete state.session.document_choices;}
+        if (state.session) {state.session.trip_documents=[];delete state.session.document_choices;state.session.packing_checklist=null;}
+        window.TravelPacking.clear();
+        const packing=$('plannerPacking');if(packing){packing.replaceChildren();packing.hidden=true;}
         const panel=$('plannerDocuments'); if(panel){panel.replaceChildren();panel.hidden=true;}
     }
     async function fetchPlanner(url,options) {
@@ -16,7 +18,7 @@ window.TravelPlanner = (() => {
         try {
             const data=await Alfred.fetchJSON(url,options);
             if (data?.trip_documents && (!documentActive || epoch!==documentEpoch)) {
-                data.trip_documents=[];delete data.document_choices;
+                data.trip_documents=[];delete data.document_choices;data.packing_checklist=null;
             }
             return data;
         } catch(error) {
@@ -38,6 +40,7 @@ window.TravelPlanner = (() => {
     }
     const field = key => state.session?.state?.[key]?.value;
     function syncActionState() {
+        document.querySelectorAll('#plannerPacking [data-packing-control]').forEach(control=>{control.disabled=state.busy || control.dataset.batchUnavailable==='true';});
         document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], [data-route-choice], [data-restriction-fields], [data-restriction-withdraw], [data-add-stop], [data-stop-index], #plannerCompareOrder, #plannerApplyOrder, #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button, [data-editor-control], #plannerDocuments button')
             .forEach(control => { control.disabled = state.busy || control.dataset.batchUnavailable === "true"; });
     }
@@ -142,6 +145,7 @@ window.TravelPlanner = (() => {
         $("plannerRecheck").hidden = !session.candidates?.length;
         $("plannerResults").hidden = !session.candidates.length;
         candidates(); comparison(); itinerary(); stops(); documents();
+        if(documentActive)window.TravelPacking.render(session);
         window.TravelResearchPanels.render(session);
         if (session.plan_id) populateDetails(session.plan_id);
         else $("planDetails").hidden = true;
@@ -219,6 +223,7 @@ window.TravelPlanner = (() => {
     async function init() {
         if (!$("travelPlanner")) return;
         window.TravelItineraryEditor.init(action);
+        window.TravelPacking.init({current:()=>state.session,send:action,reload:()=>open(state.session.id).catch(error=>alert(error.message))});
         $("plannerComposer").addEventListener("submit", e=>{e.preventDefault(); message($("plannerInput").value);});
         $("plannerNew").addEventListener("click", ()=>create().catch(e=>alert(e.message)));
         $("plannerDraft").addEventListener("click", ()=>action({action:"save",draft:true}));

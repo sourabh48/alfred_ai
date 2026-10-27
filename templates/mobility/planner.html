@@ -6,7 +6,7 @@
         </header>
         <div id="plannerAlert" role="alert" hidden></div>
         <div id="plannerMessages" class="travel-messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Travel conversation"></div>
-        <div id="plannerChips" class="travel-chips" aria-label="Quick replies"></div>
+    <div id="plannerChips" class="travel-chips" role="group" aria-label="Quick replies"></div>
         <form id="plannerComposer" class="travel-composer">
             <label for="plannerInput" class="visually-hidden">Message Alfred about your trip</label>
             <input id="plannerInput" type="text" class="form-control" maxlength="2000" autocomplete="off" placeholder="3 days, ₹15,000, somewhere peaceful…" required>
@@ -39,6 +39,7 @@
 <section id="plannerStops" class="surface-card mb-4" aria-label="Ordered itinerary stops" aria-live="polite"></section>
 <section id="plannerItinerary" class="mb-4" hidden aria-label="Your itinerary"></section>
 <section id="plannerDocuments" class="surface-card mb-4" aria-label="Private trip documents"></section>
+<section id="plannerPacking" class="surface-card mb-4" aria-label="Private packing checklist"></section>
 <section id="plannerEvidence" class="mb-4" hidden aria-label="Travel research, map and sources">
     <h2 id="plannerEvidenceTitle" class="page-section-title">Travel research</h2>
     <div id="plannerResearchChoices" class="travel-actions mb-3" role="group" aria-label="Choose destination research"></div>

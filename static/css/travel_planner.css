@@ -11,3 +11,10 @@ html:not([data-theme="dark"]) [data-itinerary-editor] .btn-outline-secondary { -
 html[data-theme="dark"] [data-itinerary-editor] .travel-day { background:var(--alfred-surface); color:var(--alfred-ink); border-color:var(--alfred-stroke); }
 html[data-theme="dark"] [data-itinerary-editor] :is(.travel-fit,.travel-priority) { color:var(--alfred-muted); }
 #plannerDocuments { overflow-wrap:anywhere; }
+.travel-packing-list { padding:0; list-style:none; }
+.travel-packing-list > li { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; padding:.75rem 0; border-bottom:1px solid var(--alfred-stroke); overflow-wrap:anywhere; }
+.travel-packing-check { display:flex; align-items:center; gap:.6rem; flex:1 1 16rem; min-width:0; }
+.travel-packing-check input { width:1.2rem; height:1.2rem; flex-shrink:0; }
+#plannerPacking form { display:grid; gap:.5rem; max-width:36rem; }
+#plannerPacking input { max-width:100%; }
+#plannerPacking .travel-actions { align-items:flex-start; }

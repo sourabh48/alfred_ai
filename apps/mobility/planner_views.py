@@ -25,6 +25,7 @@ from .services.travel.intent import PROFILE_KEYS, validate_preference
 from .services.travel_itinerary import build_itinerary, build_multi_stop_itinerary, compare_stop_orders
 from .services.travel.editor import apply_edit, editor_payload
 from .services.travel.documents import document_links, update_documents
+from .services.travel.packing import packing_payload, update_packing
 
 
 class PlannerWriteThrottle(UserRateThrottle):
@@ -68,7 +69,7 @@ def session_payload(session):
                 "has_more": offset+3 < pool_count and (not value(session.state, "selected_destination") or bool(value(session.state, "_itinerary_stops")))},
             "map_config":map_configuration(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
-            "itinerary_editor": editor, "trip_documents": document_links(session),
+            "itinerary_editor": editor, "trip_documents": document_links(session), "packing_checklist": packing_payload(session),
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),
             "research": ({"id": run.id, "status": run.status, "outdated": outdated,
                           "stage": "Recheck needed" if outdated else STAGES.get(run.status, run.status),
@@ -120,12 +121,16 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
 
     @transaction.atomic
     def post(self, request, pk):
+        if not isinstance(request.data, dict):
+            return Response({"detail": "Choose a supported trip action."}, status=400)
         session = get_object_or_404(TravelPlanningSession.objects.select_for_update(), pk=pk, user=request.user)
         action = request.data.get("action", "message")
         if action == "message":
             session = send_message(pk, request.user, request.data.get("text", ""))
         elif action == "itinerary_edit":
             apply_edit(session, request.data)
+        elif action == "packing":
+            update_packing(session, request.data)
         elif action == "trip_documents":
             choices = update_documents(session, request.data)
             return Response({**session_payload(session), **({"document_choices": choices} if choices is not None else {})})

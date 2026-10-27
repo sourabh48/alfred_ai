@@ -4618,6 +4618,95 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(sum(i['title']=='Synthetic preserved stale draft' for d in session.itinerary['days'] for i in d['items']),1)
         self.capture('travel-editor-stale-draft-idempotent-retry')
 
+    def packing_fixture(self):
+        from apps.mobility.services.travel_conversation import save_plan
+        session=self.travel_editor_fixture()
+        save_plan(session,draft=True)
+        session.refresh_from_db()
+        return session
+
+    def test_travel_packing_keyboard_crud_autosave_reopen_and_offline_retry(self):
+        from selenium.webdriver.common.keys import Keys
+        session=self.packing_fixture()
+        self.login();self.browser.set_window_size(1440,1200)
+        self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-packing-add]'))
+        self.assertIn('Helmet and riding protection',self.text('plannerPacking'))
+        self.browser.execute_script("""const original=window.fetch;window.fetch=(url,options)=>{
+            if(options?.body && JSON.parse(options.body).action==='packing'){window.fetch=original;return Promise.reject(new TypeError('Synthetic local server unavailable'));}
+            return original(url,options);};""")
+        field=self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input')
+        field.send_keys('Synthetic <b>literal</b> gloves',Keys.ENTER)
+        self.wait.until(lambda _: 'Synthetic local server unavailable' in self.text('plannerAlert'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input').get_attribute('value'),'Synthetic <b>literal</b> gloves')
+        self.browser.execute_script("""window.packingUnhandled=0;addEventListener('unhandledrejection',()=>packingUnhandled++);
+            const original=window.fetch;window.fetch=(url,options)=>{if(String(url).endsWith(arguments[0]) && !options?.method){window.fetch=original;return Promise.reject(new TypeError('Synthetic checklist reload outage'));}return original(url,options);};""",f'/sessions/{session.pk}/')
+        self.memory_click('[data-packing-reload]')
+        self.wait.until(lambda _: 'Synthetic checklist reload outage' in self.text('plannerAlert'))
+        self.assertEqual(self.browser.execute_script('return packingUnhandled'),0)
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input').get_attribute('value'),'Synthetic <b>literal</b> gloves')
+        self.memory_click('[data-packing-add] button')
+        self.wait.until(lambda _: 'Synthetic <b>literal</b> gloves' in self.text('plannerPacking'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerPacking b'))
+        session.plan.refresh_from_db()
+        item=next(i for i in session.plan.planning_state['_packing_checklist']['items'] if i['label']=='Synthetic <b>literal</b> gloves')
+        selector=f'[data-packing-item="{item["id"]}"]'
+        toggle=self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]')
+        toggle.send_keys(Keys.SPACE)
+        self.wait.until(lambda _: '1 of' in self.text('packingStatus'))
+        self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]').send_keys(Keys.SPACE)
+        self.wait.until(lambda _: '0 of' in self.text('packingStatus'))
+        self.memory_click(selector+' summary')
+        field=self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[name="label"]')
+        field.clear();field.send_keys('Synthetic corrected gloves',Keys.ENTER)
+        self.wait.until(lambda _: 'Synthetic corrected gloves' in self.text('plannerPacking'))
+        self.browser.refresh()
+        self.wait.until(lambda _: 'Synthetic corrected gloves' in self.text('plannerPacking'))
+        session.plan.refresh_from_db()
+        self.assertEqual(sum(i['id']==item['id'] for i in session.plan.planning_state['_packing_checklist']['items']),1)
+        self.memory_click(selector+' [data-packing-remove]')
+        self.wait.until(lambda _: not self.browser.find_elements(self.By.CSS_SELECTOR,selector))
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-packing-add]'))
+        self.assertNotIn('Synthetic corrected gloves',self.text('plannerPacking'))
+        self.capture('travel-packing-desktop-persisted')
+
+    def test_travel_packing_stale_revision_keeps_draft_and_reload_mobile(self):
+        session=self.packing_fixture()
+        self.login();self.browser.set_window_size(390,1000)
+        self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=390,height=1000,deviceScaleFactor=1,mobile=False))
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-packing-add]'))
+        item=self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-item]').get_attribute('data-packing-item')
+        result=self.browser.execute_async_script("""const done=arguments[arguments.length-1];fetch(arguments[0],{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':document.cookie.split('; ').find(v=>v.startsWith('csrftoken=')).split('=')[1]},body:JSON.stringify({action:'packing',operation:'update',item_id:arguments[1],checklist_revision:0,label:'Synthetic concurrent rename'})}).then(r=>done(r.status)).catch(e=>done(String(e)));""",f'/api/mobility/planner/sessions/{session.pk}/',item)
+        self.assertEqual(result,200)
+        field=self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input');field.send_keys('Synthetic stale draft', '\ue007')
+        self.wait.until(lambda _: 'packing checklist changed' in self.text('plannerAlert'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input').get_attribute('value'),'Synthetic stale draft')
+        self.memory_click('[data-packing-reload]')
+        self.wait.until(lambda _: 'Synthetic concurrent rename' in self.text('plannerPacking'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input').get_attribute('value'),'Synthetic stale draft')
+        self.memory_click('[data-packing-add] button')
+        self.wait.until(lambda _: 'Synthetic stale draft' in self.text('plannerPacking'))
+        self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+        self.assertEqual(self.browser.execute_script('return innerWidth'),390)
+        self.capture('travel-packing-mobile-stale-repaired')
+
+    def test_travel_packing_pagehide_and_auth_loss_clear_private_labels(self):
+        session=self.packing_fixture()
+        self.login();self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-packing-add]'))
+        field=self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input');field.send_keys('Synthetic private packing label')
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}))")
+        self.assertEqual(self.browser.find_element(self.By.ID,'plannerPacking').get_attribute('textContent'),'')
+        self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-packing-add]'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input').get_attribute('value'),'')
+        self.browser.delete_cookie('sessionid')
+        self.memory_click('[data-packing-reload]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerPacking').get_attribute('textContent')=='')
+
     def test_travel_private_document_link_stale_copy_expiry_unlink_and_reopen(self):
         from datetime import timedelta
         from django.utils import timezone
