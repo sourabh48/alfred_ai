@@ -26,9 +26,15 @@ Baseline75/143;extensions0/13. Manual screen-reader/incomplete contrast,real-acc
 and production remain pending. Owner selected this Travel scope over generated
 baseline queue;original143 IDs/13 extensions remain unchanged.
 
+Verified implementation source **d4b5cf05ff29e2a7d333f2b389359692ff4dd883**;clean source/history privacy,
+dependency/migration preflight PASS,zero findings. Final tracker-only HEAD proof:
+artifacts/travel-gpx-20261027/source-checkpoint/<HEAD>/release.json,push.json and
+ci.json. Matching closure means READY_FOR_NEXT;fresh CI remains separate from local
+scope verification and release/production approval.
+
 ## Persistent remaining Travel phases
 
-- [ ] B2 — Validated GPX export: LOCAL_VERIFIED;source/push/new exact-head CI closure pending.
+- [ ] B2 — Validated GPX export: LOCAL_VERIFIED;source/push proof in EXECUTION_STATE,new exact-head CI acceptance pending.
 - [ ] B3 — Timezone-safe ICS export: NEXT after B2 closure;do not select automatically.
 - [ ] B4 — PDF/GPX/ICS integration acceptance.
 - [ ] C1 — Read-only canonical Decimal affordability engine.
