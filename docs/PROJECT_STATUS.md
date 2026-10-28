@@ -1,5 +1,13 @@
 # ALFRED Project Status
 
+Latest CONTINUE CI→C2:PR20 is DRAFT/development→master,NOT_MERGE_READY. Exactd0c15d7
+CI40599527246 Windows/LinuxPASS,Selenium3errors. All3original workflows plus new
+history-outage case PASS locally(4unique Chrome cases across repairs). Source
+picker/history outage isolation and synthetic session/form readiness repaired;
+original assertions/timeouts/security retained. Evidence artifacts/travel-c2-
+20261028,ci-repair-ac05515/travel-c2-ci-*.json. Fresh exact-head CI remains required.
+C2 UI/API next using existing C1;no C3/C4 or formal feature promotion.75/143,0/13.
+
 Current NEXT:TRAVEL2-005/C1 selected after confirmed B4CI missing-Axe setup repair.
 CI40569336516 Windows/Linux PASS,Selenium FAIL;fresh-head checks required.
 10CI contract tests/clean pinned tool setup PASS;local Chrome0run/1skip(driver

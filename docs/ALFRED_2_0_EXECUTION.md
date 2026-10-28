@@ -8,6 +8,17 @@ capabilities. Coordination rows add no requirements. Baseline75/143; extensions0
 
 ## Current checkpoint — TRAVEL2-005/C1 (2026-10-28)
 
+CONTINUE CI→C2:recovered cleand0c15d7;PR20 actual headdevelopment→master verified,
+converted to DRAFT,NOT_MERGE_READY.40599527246 Windows/LinuxPASS,Selenium3failures.
+Inspected exact logs,HTML,3screenshots. Private-history cold-vault503 no longer
+blocks canonical source browsing;one bounded read retry,failed history leaves
+questions blocked. Synthetic fixture primes vault. Auth-loss test revokes actual
+server session instead of racing renewed cookies;reminder fixture waits enabled
+final form.4unique Chrome cases PASS including new repeated-history-outage case;
+first new hidden-detail assertion corrected,failed evidence retained. No timeout/
+coverage/security weakening. Source/privacy/push/newCI closure in EXECUTION_STATE.
+C2 selected next;C3/C4,D1–D5 remain separate.75/143,0/13 unchanged.
+
 C1 read-only backend service implemented,17focused cases PASS. Exact canonical
 one-month essential/EMI split,gross owner-confirmed spendable cash,disjoint emergency
 reserve/savings/trip/extra contingency,available funds/headroom/shortfall. All seven

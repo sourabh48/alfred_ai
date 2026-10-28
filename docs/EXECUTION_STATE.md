@@ -1,6 +1,33 @@
 # ALFRED execution state
 
-## Active checkpoint — TRAVEL2-005/C1 (2026-10-28)
+## Active checkpoint — CI repair → TRAVEL2-005/C2 (2026-10-28)
+
+- Recovered clean/synchronizedd0c15d7. PR20 development/alfred-integrated→master
+  verified;converted to DRAFT using existing Git credential GraphQL after connector
+  denied integration access. NOT_MERGE_READY,no merge/Pages/deployment authorized.
+- Exact-head40599527246 Windows/Linux PASS,Selenium139cases/3errors. Original ZIP,
+  HTML,console and all3screenshots inspected/preserved:artifacts/travel-c2-20261028/
+  ci-40599527246. No assertions/security checks/timeouts weakened.
+- Financial picker:private-history cold-vault503 blocked Promise.all,even though
+  canonical sources were available. Fix:one bounded local503read retry;repeated
+  history failure leaves sources browsable but questions fail closed;auth errors
+  clear private state. Synthetic fixture primes its private vault before concurrent
+  policy reads. New repeated-outage browser regression included.
+- Export auth-loss:cookie deletion alone races in-flight SAVE_EVERY_REQUEST responses;
+  artifact shows authenticated PDFsuccess. Test now waits currentrequests then revokes
+  actual server session and browsercookie;all3no-download/privacy assertions retained.
+- Reminder DST:fixture accessed first disabled intermediate consent-render form.
+  Wait for enabled controls before typing;actual users cannot edit disabled fields.
+- Chrome works now with ordinary existing driver,no OS policy changes. First4targeted
+  browser cases:3original failures PASS,newoutage test had hidden-detail assertion
+  failure;opened actual disclosure then final2affected cases PASS.4unique Chrome
+  cases now PASS across incremental runs;no timeout/assertion/permission weakening.
+  Graphify query also now works without policy change;graphupdate due after code.
+- CONTINUE_REQUIRED:finish CI-rootcause tests/checkpoint/commit/privacy/push/newCI;
+  then implement C2 using accepted C1 only. Baseline75/143,extensions0/13 unchanged.
+  C3/C4,D1–D5 and independent/manual/production acceptance remain separate.
+
+## Previous checkpoint — TRAVEL2-005/C1 (2026-10-28)
 
 - Recovered clean/synchronized226c4f2 on development/alfred-integrated. Owner
   explicitly authorizes one draftPR and verified development pushes;no merge/deploy.

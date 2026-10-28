@@ -2082,6 +2082,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local=Mock(); local.reason.return_value='Synthetic recorded-value hypothesis. Review the owner source and limitations.'
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
         self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner',return_value=Mock()))
+        # Prepare the synthetic encrypted vault before concurrent page-policy reads.
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        MemoryStore(root/'vault',embedder=SyntheticEmbeddings())
         owner=self.scenario['user']
         rows={'expense':Expense.objects.create(user=owner,amount='12.34',source='manual',transaction_date=date(2026,9,1)),
             'budget':Budget.objects.create(user=owner,month='Jan 2025',base_budget='234.56',inflation_adjusted='245.67',spent='12.34'),
@@ -3322,6 +3325,20 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
         self.browser.execute_script("document.querySelector('#intelligenceAnswers .recorded-amount').scrollIntoView({block:'center',behavior:'instant'})")
         self.capture('canonical-corrected-record-mobile')
+
+    def test_canonical_picker_remains_browsable_during_history_outage(self):
+        from sqlite3 import OperationalError
+        rows,_=self.canonical_grounding_fixture()
+        with patch('apps.ml_engine.api.conversations.memory_store',side_effect=OperationalError('synthetic vault unavailable')):
+            self.login();self.browser.get(self.live_server_url+'/ai/insights/')
+            self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'intelligenceFinancial').find_elements(self.By.TAG_NAME,'option'))>4)
+            self.memory_click('#conversationHistoryPanel summary')
+            self.wait.until(lambda _: 'History is unavailable' in self.text('conversationHistoryFeedback'))
+            self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Synthetic unsent question')
+            self.memory_click('#intelligenceForm button')
+            self.assertIn('reload local history status',self.text('intelligenceFeedback'))
+            self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_attribute('value'),'Synthetic unsent question')
+            self.assertEqual(self.text('intelligenceAnswers'),'')
 
     def test_canonical_unsupported_stale_and_owner_only_citations_keep_drafts(self):
         from apps.investments.models import Investment
@@ -4702,7 +4719,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertFalse(list(folder.glob('*.'+kind.lower())))
         for kind in ('PDF','GPX','ICS'):
             self.calendar_browser(session)
-            self.browser.delete_cookie('sessionid');self.memory_click('#plannerExport'+kind)
+            # Revoke server-side too: an in-flight authenticated GET can renew a deleted cookie.
+            from django.contrib.sessions.models import Session
+            self.wait.until(lambda _: self.active_requests == 0)
+            cookie=self.browser.get_cookie(settings.SESSION_COOKIE_NAME)
+            self.assertIsNotNone(cookie)
+            Session.objects.filter(session_key=cookie['value']).delete()
+            self.browser.delete_cookie(settings.SESSION_COOKIE_NAME);self.memory_click('#plannerExport'+kind)
             self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
             self.assertEqual(self.text('plannerCalendar'),'')
             self.assertFalse(list(folder.glob('*.'+kind.lower())))
@@ -4929,7 +4952,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def reminder_fields(self,selector,label,zone,local_time,fold=''):
         from selenium.webdriver.support.ui import Select
-        form=self.browser.find_element(self.By.CSS_SELECTOR,selector)
+        def ready(_):
+            form=self.browser.find_element(self.By.CSS_SELECTOR,selector)
+            return form if all(field.is_enabled() for field in form.find_elements(self.By.CSS_SELECTOR,'input,select,button')) else False
+        form=self.wait.until(ready)
         for name,value in (('label',label),('zone',zone)):
             field=form.find_element(self.By.NAME,name);field.clear();field.send_keys(value)
         self.browser.execute_script("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",form.find_element(self.By.NAME,'local_time'),local_time)

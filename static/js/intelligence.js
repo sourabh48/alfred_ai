@@ -320,15 +320,25 @@ document.addEventListener("DOMContentLoaded", () => {
         // Cloud policy status must not gate independent owner-only source browsing.
         const [insights, history, policy] = await Promise.all([
             Alfred.fetchJSON("/api/ai/personal-insights/?assistant_status=1"),
-            Alfred.fetchJSON("/api/ai/conversations/"),
+            Alfred.fetchJSON("/api/ai/conversations/").catch(error => {
+                // One local read retry covers transient cold-vault contention; auth errors never retry.
+                if (active && ticket === generation && error.status === 503) return Alfred.fetchJSON("/api/ai/conversations/");
+                throw error;
+            }).then(data => ({data}), error => ({error})),
             Alfred.fetchJSON("/api/ai/memories/reason/").then(data => ({data}), error => ({error}))
         ]);
         if (!active || ticket !== generation) return;
-        if (policy.error && [401,403].includes(policy.error.status)) {
+        if ([policy.error,history.error].some(error => error && [401,403].includes(error.status))) {
             forgetPrivatePage(); feedback.textContent = "Session or policy permission is no longer available. Sign in or reload before continuing."; return;
         }
         const reasoning = policy.data;
-        applyHistory(history);
+        if (history.data) applyHistory(history.data);
+        else {
+            historyPolicy=null; historyBlocked=true; conversation=null; requestToken=null;
+            historyList.replaceChildren(); updateHistoryControls();
+            document.getElementById('conversationHistoryStatus').textContent='Unavailable · reload to recheck';
+            historyFeedback.textContent='History is unavailable. Sources remain browsable; reload before asking a question. Your draft is preserved.';
+        }
         documentChoice.replaceChildren(new Option("Choose verified evidence", ""));
         (insights.assistant_documents || []).forEach(item => documentChoice.append(new Option(item.label, item.id)));
         const selectedDocument = documentChoice.value || requestedDocument;
