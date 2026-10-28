@@ -6,7 +6,27 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — TRAVEL2-005/C4 (2026-10-28)
+## Current checkpoint — D1 integrated Travel (2026-10-28)
+
+D1 LOCAL_VERIFIED:7/7 bounded native-Windows journeys on the same owned saved trip,
+with one actual API/service integration case and one complete Chrome case. Creation/
+save/reopen,editor CRUD/order/undo/retry/conflict/source invalidation,real encrypted
+private organizer/original/unlink preservation,packing/local reminder consent/
+reschedule/cancel/late dedupe,independent PDF/GPX/ICS consistency and offline retry,
+current/future same-currency finance/correction/no-writes,cold-process persistence
+and owner/auth boundaries PASS. Two child Django processes reuse only synthetic
+persisted tripDB/vault;second sweep retains exactly one visible late occurrence.
+3unique checksPASS(backend1,Chrome1,profile1);milestones/reruns not double-counted.
+Source runtime unchanged:reuse fine-grained45b2b2b evidence and exactCI40692181959
+SUCCESS. New test/profile/docs HEAD still requires freshCI. Fixture clock models
+reading time between journeys while real rate-limit policy stays unchanged;not a
+wallclock/load benchmark. Child vault-path/readiness/envelope fixture corrections
+and failed receipts retained. No application defect/runtime change was required.
+JS/migrationPASS;GraphifyAST and source/privacy/push/CI closure in EXECUTION_STATE.
+PR20DRAFT/NOT_MERGE_READY,75/143 and0/13 unchanged. D2 NEXT afterCI;D3–D5/manual/
+independent/real-account/production acceptance remainpending. No full capability or
+live route/cost/booking acceptance,no financial writes/FX/deployment.
+## Previous checkpoint — TRAVEL2-005/C4 (2026-10-28)
 
 C4 LOCAL_VERIFIED financial reconciliation:actual imports/transfer identity/linked
 repayments,canonical same-currency Decimal/current-versus-projected funds,reserve/
@@ -157,8 +177,8 @@ latest-head CI remains pending,no extension or production approval.
 - [x] C2 — LOCAL_VERIFIED explainable saved-trip what-if UI/API;formal/CI acceptance pending.
 - [x] C3 — LOCAL_VERIFIED future-date engine/UI;exact-headCI/formal gates pending.
 - [x] C4 — LOCAL_VERIFIED reconciliation;formal/CI/manual acceptance remains pending.
-- [ ] D1 — NEXT after CI reconciliation:full Travel integration tests.
-- [ ] D2 — Privacy/security/accessibility.
+- [x] D1 — LOCAL_VERIFIED7/7 integrated native-Windows journeys;freshCI/formal gates pending.
+- [ ] D2 — NEXT after CI reconciliation:privacy/security/accessibility.
 - [ ] D3 — Native Windows/offline/recovery validation.
 - [ ] D4 — Exact-head CI and independent review.
 - [ ] D5 — Production-readiness report,without deployment.

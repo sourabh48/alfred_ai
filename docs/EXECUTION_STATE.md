@@ -1,6 +1,65 @@
 # ALFRED execution state
 
-## Active checkpoint — TRAVEL2-005/C4 local closure (2026-10-28)
+## Active checkpoint — D1 integrated Travel local closure (2026-10-28)
+
+- Recovered clean/synchronized45b2b2b142e94275395650bcbf7a745948d73a9a on
+  development/alfred-integrated;PR20DRAFT/unmerged→master. Exact40692181959
+  Windows/Linux/SeleniumSUCCESS confirmed,C4 closure receiptsPASS. Final D1 HEAD,
+  push/remote/PRdraft/newCI owned by artifacts/travel-d1-20261028/{push,pr,ci}.json
+  and source-checkpoint/<HEAD>/release.json. No inherited CI success at changed HEAD.
+- D1 LOCAL_VERIFIED:7/7 bounded native-Windows journeys on one owned saved trip,
+  through actual APIs/services and one complete Chrome user flow. J1 create/chat/
+  explicit dates/transport/budget/stop selection/save/reopen;J2 add/update/move/remove/
+  undo/activity IDs,stop add/remove/reorder,exact retry/conflicts and stale estimates;
+  J3 real encrypted document upload/consent/catalog/link/owner original/unlink/relink,
+  original retained;J4 packing completion,reminder opt-in/cancel/reschedule/late
+  delivery/deduplication and fresh-trip consentOFF;J5 PDF/GPX/ICS same-trip downloads
+  independently parsed,order/dates/source facts,waypoints only,no invented tracks,
+  stale-export rejection and actual offline→online retry;J6 explicit same-currency
+  current/future assumptions,matching backend/UI,source correction409/no canonical
+  writes;J7 two cold Django processes reopen integrated data and replay one late
+  delivery,Chrome reopen/authloss clears organizer/packing/reminder/scenario panels,foreign-owner access denied.
+- Cold-process proof uses only serialized synthetic testDB in new private test
+  directories and the SAME protected synthetic vault. Original initial failure was
+  fixture config:ALFRED_MEMORY_DIR derives from data-root,not an envoverride;explicit
+  controlled child override now restores that same isolated vault. No key/privacy/
+  OS-policy bypass. This is not packaged service/device-loss acceptance(D3 pending).
+- Only provider/weather/dispatch/embedding boundaries synthetic;real doc crypto,
+  catalog/download,Travel APIs,C1–C3,reminder CAS/sweep and persistence paths retained.
+  Non-Windows explicitly expects private upload503,not organizer acceptance there.
+-3unique local checksPASS:1backend integrated case(7journey milestones+2fresh child
+  processes),1Chrome integrated case(same7journeys),1release-profile contract. Do not
+  count7milestones as7testcases or reruns asnew tests. Add test_travel_end_to_end to
+  full BACKEND profile;targeted tests still cannot satisfy full release backend gate.
+- Earlier failed receipts preserved:packing uses ownrevision contract,exact retry
+  needs identical revision/body,ICS stale test needs valid calendar envelope,initial
+  Chrome waits rendered messages/enabled Send,not initially-enabled input. Fast
+  seven-journey browser burst hit existing quota;fixture now models90s reading time
+  between journeys with real quota logic unchanged. No assertions/skips/timeouts
+  weakened. No production application defect or runtime change was required.
+- Reuse C4runtime hashes/92backend/regressions/2Chrome/4Axe and fine-grained earlier
+  editor/organizer/packing/reminder/export evidence at exact45;no repeated passing
+  suites. All runtime/templates/JS remain unchanged. D1 adds integration tests,
+  release-profile registration and3relevant trackers only. JSsyntax/migrationPASS;
+  inventory/source-history preflight and exactcommit/push closure receipts required.
+- Evidence artifacts/travel-d1-20261028/backend-journeys.json,browser-paced/user-data/
+  d1-journeys.json,browser summaries/screenshots and ci-repair-ac05515/travel-d1-*.
+  Unchanged source assertions/privacy/isolated synthetic data only. No real financial
+  data/provider/paidAI/cloud/private-history activation,migrations,master/Pages/
+  deployment,backup/worktree deletion or frozen4aa7ac70 changes.
+-75/143 baseline,68remaining,0/13extensions unchanged. D1 integration is not formal
+  acceptance of a whole extension,live route/cost/booking accuracy or production.
+  D2security/privacy/accessibility,D3native/offline/recovery,D4cumulative independent
+  review/exact-headCI,D5productionreadiness remainpending. Manualcontrast/screen-
+  reader,real-account/cleanPC/packaged/rollback/production evidence unperformed.
+- Closure:commit validated D1 source/trackers,source-history/dependency/migration
+  preflightPASS,push normally;verify remote/PRdraft and new exactheadCI. Matching
+  closure permits READY_FOR_NEXT with CI_PENDING/FORMAL_ACCEPTANCE_PENDING.
+- NEXT:NEXT — check recorded exactheadCI once,fix confirmed failures,then D2
+  security/privacy/accessibility. No automatic D2 implementation in CONTINUE.
+  AfterD5 recommend the dependency-eligible vertical from existing queue;do not
+  erase outstanding Investment/Career/Wealth/AI or baseline/extension requirements.
+## Previous checkpoint — TRAVEL2-005/C4 local closure (2026-10-28)
 
 - Canonical development/alfred-integrated in F:/ALFRED_DEV/post-audit. Recovered
   clean/synchronizedd71b477ba1ef732317bb896d89559b90c7904081;PR20DRAFT/unmerged

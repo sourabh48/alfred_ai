@@ -1,6 +1,20 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — TRAVEL2-005/C4,2026-10-28
+## Active implementation checkpoint — D1 integrated Travel,2026-10-28
+
+D1 LOCAL_VERIFIED7/7 bounded native-Windows same-trip journeys:real creation/save/
+reopen,editor/doc organizer/packing/reminders,exports and financial reconciliation,
+cold-process replay/privacy/ownership. Real encrypted original retained through
+unlink and edits;one late delivery across two fresh Django processes;read-only
+canonical finance and source-correction invalidation preserved.3unique checksPASS:
+backend1(7milestones),Chrome1(same7),profile1. Fixtures model inter-journey reading
+time without changing quota/security logic;failed receipts retained. Runtime source
+unchanged;reuseC4/earlier tests and45b2b2b exactCI40692181959SUCCESS,newHEADneedsCI.
+JS/migrationPASS;final source/privacy/push/CI in EXECUTION_STATE and artifacts/
+travel-d1-20261028. PR20DRAFT/unmerged. D2 NEXT;D3–D5/manual/independent/real-account/
+production gates remainpending. No new capability acceptance:75/143,68remaining,
+0/13 unchanged;all other roadmap rows retained. No real finance/FX/deployment changes.
+## Previous implementation checkpoint — TRAVEL2-005/C4,2026-10-28
 
 C4 LOCAL_VERIFIED:cross-module C1/C2/C3 canonical Decimal/import-transfer/repayment
 reconciliation,full financial/user/history/fingerprint snapshots,no-DML guards and

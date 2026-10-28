@@ -4844,6 +4844,147 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 list(LoanPaymentHistory.objects.values()),list(StatementTransactionEvidence.objects.values())))
         self.capture('travel-financial-reconciliation-reopened-projection')
 
+    def test_travel_d1_same_trip_complete_browser_journey(self):
+        import time
+        from datetime import datetime,timedelta
+        from io import BytesIO
+        from selenium.webdriver.common.keys import Keys
+        from django.contrib.sessions.models import Session
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.utils import timezone
+        from lxml import etree
+        from pypdf import PdfReader
+        from apps.mobility.models import TravelPlanningSession
+        from apps.mobility.services.travel import reminders
+        from apps.mobility.services.travel_research import run_research
+        from tests import test_travel_affordability as finance
+        from tests import test_travel_financial_reconciliation as reconciliation
+        from tests.test_travel_planner import weather_fixture
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        from tests.test_travel_ics_export import parse_calendar
+        finance.TravelAffordabilityTests.setUp(self)
+        self.user.city='Bengaluru';self.user.monthly_income='3100';self.user.set_password(PASSWORD);self.user.save()
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-d1-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
+            ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        self.enterContext(patch('apps.mobility.services.travel_research.dispatch'))
+        self.enterContext(patch('apps.mobility.services.travel.research.weather_result',side_effect=weather_fixture))
+        self.enterContext(patch('apps.mobility.services.travel.providers.base.request',side_effect=AssertionError('No live provider')))
+        clock=self.enterContext(patch.object(reminders,'current_time',return_value=timezone.now()))
+        rate_clock=[time.time()]
+        self.enterContext(patch('rest_framework.throttling.SimpleRateThrottle.timer',new=staticmethod(lambda:rate_clock[0])))
+        passed=[]
+        def mark(label):
+            passed.append(label)
+            # Model user reading time between journeys; keep the production quota unchanged.
+            rate_clock[0]+=90
+            (self.artifacts/'d1-journeys.json').write_text(json.dumps(dict(passed=passed,total=7)),encoding='utf-8')
+        self.login(self.user.username);self.browser.get(self.live_server_url+'/mobility/')
+        self.wait.until(lambda _:bool(self.text('plannerMessages')))
+        self.wait.until(lambda _:self.browser.find_element(self.By.ID,'plannerSend').is_enabled() and self.active_requests==0)
+        def say(text):
+            self.wait.until(lambda _:self.browser.find_element(self.By.ID,'plannerSend').is_enabled())
+            field=self.browser.find_element(self.By.ID,'plannerInput');field.send_keys(text,Keys.ENTER)
+            self.wait.until(lambda _:self.browser.find_element(self.By.ID,'plannerInput').get_attribute('value')=='')
+            self.wait.until(lambda _:self.browser.find_element(self.By.ID,'plannerSend').is_enabled())
+        today=timezone.localdate()
+        say(f'{today+timedelta(days=2)} to {today+timedelta(days=5)}. Budget ₹15000. Bike trip, mountains and photography.')
+        say('Yes use that')
+        session=TravelPlanningSession.objects.filter(user=self.user).latest('id')
+        self.wait.until(lambda _:session.research_runs.exists());run_research(session.research_runs.first().pk)
+        self.wait.until(lambda _:len(self.browser.find_elements(self.By.CSS_SELECTOR,'[data-add-stop]'))>=2)
+        session.refresh_from_db();names=[c['name'] for c in session.candidates[:2]]
+        for count,name in enumerate(names,1):
+            self.memory_click('[data-add-stop='+json.dumps(name)+']')
+            self.wait.until(lambda _:len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops ol li'))==count)
+        self.memory_click('#plannerSave');self.wait.until(lambda _:'Travel Plan saved' in self.text('plannerAlert'))
+        session.refresh_from_db();self.assertIsNotNone(session.plan_id);mark('J1 creation/save')
+        folder=self.pdf_download_folder()
+        self.client.force_login(self.user)
+        upload=self.client.post('/api/ai/document-corpus/upload/',dict(file=SimpleUploadedFile('D1 private.txt',b'Synthetic private reference, not a booking.'),consent='true',days='7'))
+        self.assertEqual(upload.status_code,200,upload.content[:300])
+        self.memory_click('[data-trip-document-list]');self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'[data-trip-document-link]'))
+        self.memory_click('[data-trip-document-link]');self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]'))
+        self.memory_click('#plannerDocuments a[href*="/original/"]');self.wait.until(lambda _:(folder/'D1 private.txt').is_file())
+        self.assertEqual((folder/'D1 private.txt').read_bytes(),b'Synthetic private reference, not a booking.')
+        self.memory_click('[data-trip-document-unlink]');self.wait.until(lambda _:'No private documents linked' in self.text('plannerDocuments'))
+        self.memory_click('[data-trip-document-list]');self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'[data-trip-document-link]'))
+        self.memory_click('[data-trip-document-link]');self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]'));mark('J3 owner original/link/unlink')
+        self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input').send_keys('D1 packed gloves',Keys.ENTER)
+        self.wait.until(lambda _:'D1 packed gloves' in self.text('plannerPacking'))
+        session.plan.refresh_from_db();packing=next(i for i in session.plan.planning_state['_packing_checklist']['items'] if i['label']=='D1 packed gloves')
+        self.memory_click(f'[data-packing-toggle="{packing["id"]}"]')
+        self.wait.until(lambda _:'1 of' in self.text('packingStatus'))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-consent]').is_selected())
+        self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-consent]').send_keys(Keys.SPACE)
+        self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-form="create"]'))
+        local=(today+timedelta(days=1)).isoformat()+'T10:00'
+        self.reminder_fields('[data-reminder-form="create"]','D1 local pack','UTC',local);self.memory_click('[data-reminder-form="create"] button')
+        self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-id]'))
+        identity=self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-id]').get_attribute('data-reminder-id');row=f'[data-reminder-id="{identity}"]'
+        self.memory_click(row+' [data-reminder-cancel]');self.wait.until(lambda _:'cancelled' in self.browser.find_element(self.By.CSS_SELECTOR,row).text)
+        self.memory_click(row+' summary');self.reminder_fields(row+' form','D1 rescheduled pack','UTC',local)
+        self.memory_click(row+' form button');self.wait.until(lambda _:'D1 rescheduled pack' in self.text('plannerReminders'));mark('J4 packing/consent/cancel/reschedule')
+        self.memory_click('[data-day="1"] details:has([data-editor-add]) > summary')
+        self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="1"] [data-editor-add] input').send_keys('D1 browser activity',Keys.ENTER)
+        self.wait.until(lambda _:'D1 browser activity' in self.text('plannerItinerary'))
+        session.refresh_from_db();item=session.itinerary['days'][0]['items'][-1];selector=f'[data-editor-item="{item["id"]}"]'
+        self.memory_click(selector+' details > summary')
+        field=self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[name="title"]');field.clear();field.send_keys('D1 corrected browser activity',Keys.ENTER)
+        self.wait.until(lambda _:'D1 corrected browser activity' in self.text('plannerItinerary'))
+        self.memory_click(selector+' [data-editor-move="-1"]')
+        self.memory_click(selector+' [data-editor-remove]');self.wait.until(lambda _:not self.browser.find_elements(self.By.CSS_SELECTOR,selector))
+        self.memory_click('[data-editor-undo]');self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,selector))
+        self.memory_click('#plannerStops [data-stop-index="0"][data-stop-move="1"]')
+        self.wait.until(lambda _:names[1] in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li:first-child').text)
+        self.memory_click('#plannerSave');self.wait.until(lambda _:'Travel Plan saved' in self.text('plannerAlert'));mark('J2 edit/move/remove/undo/stop reorder')
+        self.browser.refresh();self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,selector))
+        self.assertIn('D1 packed gloves',self.text('plannerPacking'));self.assertIn('D1 rescheduled pack',self.text('plannerReminders'))
+        self.assertTrue(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]'))
+        self.wait.until(lambda _:self.browser.find_element(self.By.ID,'plannerPrepareICS').is_displayed());self.memory_click('#plannerPrepareICS')
+        self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'[data-calendar-event]'))
+        self.browser.execute_cdp_cmd('Network.enable',{});self.browser.execute_cdp_cmd('Network.setBlockedURLs',{'urls':['https://*']})
+        self.browser.execute_cdp_cmd('Network.emulateNetworkConditions',dict(offline=True,latency=0,downloadThroughput=-1,uploadThroughput=-1))
+        self.memory_click('#plannerExportPDF');self.wait.until(lambda _:self.text('plannerAlert') and self.browser.find_element(self.By.ID,'plannerExportPDF').is_enabled())
+        self.assertFalse((folder/'alfred-itinerary.pdf').exists())
+        self.browser.execute_cdp_cmd('Network.emulateNetworkConditions',dict(offline=False,latency=0,downloadThroughput=-1,uploadThroughput=-1))
+        self.addCleanup(self.browser.execute_cdp_cmd,'Network.emulateNetworkConditions',dict(offline=False,latency=0,downloadThroughput=-1,uploadThroughput=-1))
+        for kind in ('PDF','GPX','ICS'):
+            self.memory_click('#plannerExport'+kind);self.wait.until(lambda _:(folder/f'alfred-itinerary.{kind.lower()}').is_file() and not list(folder.glob('*.crdownload')))
+        session.refresh_from_db();session.plan.refresh_from_db();expected=[s['name'] for s in session.plan.itinerary['stops']]
+        pdf='\n'.join(p.extract_text() for p in PdfReader(BytesIO((folder/'alfred-itinerary.pdf').read_bytes()),strict=True).pages)
+        xml=etree.parse(str(folder/'alfred-itinerary.gpx'),etree.XMLParser(resolve_entities=False,no_network=True))
+        calendar=parse_calendar((folder/'alfred-itinerary.ics').read_bytes())
+        self.assertIn(' → '.join(expected),pdf);self.assertEqual(xml.xpath('//*[local-name()="wpt"]/*[local-name()="name"]/text()'),expected)
+        self.assertFalse(xml.xpath('//*[local-name()="rte" or local-name()="trk"]'));self.assertTrue(calendar['roundtrip'])
+        self.assertEqual(calendar['events'][0]['location'],' → '.join(expected));mark('J5 all downloads/offline retry/independent parsers')
+        self.memory_click('#plannerAffordabilityDetails summary');self.wait.until(lambda _:self.browser.find_elements(self.By.ID,'plannerAffordabilityForm'))
+        def currency(future=False):
+            field=self.browser.find_element(self.By.ID,'affordCurrency');field.clear();field.send_keys('INR')
+            for name in (('verified','future_confirmed') if future else ('verified',)):
+                checkbox=self.browser.find_element(self.By.CSS_SELECTOR,f'#plannerAffordabilityForm [name="{name}"]')
+                if not checkbox.is_selected():self.memory_click(f'#plannerAffordabilityForm [name="{name}"]')
+        before=reconciliation.TravelFinancialReconciliationTests.snapshot(self)
+        self.affordability_fields();currency();self.memory_click('#plannerAffordabilityForm button');self.wait.until(lambda _:'Affordable · scenario only' in self.text('plannerAffordabilityResult'))
+        self.savings_fields();currency(True);self.memory_click('#plannerAffordabilityForm button');self.wait.until(lambda _:'Future savings · projected estimates only' in self.text('plannerAffordabilityResult'))
+        self.assertEqual(before,reconciliation.TravelFinancialReconciliationTests.snapshot(self))
+        Expense.objects.filter(pk=self.expense.pk).update(amount='51')
+        self.memory_click('#plannerAffordabilityForm button');self.wait.until(lambda _:self.browser.find_element(self.By.ID,'afford_essential_expenses').get_attribute('value')=='151.00')
+        self.assertEqual(self.text('plannerAffordabilityResult'),'');mark('J6 current/future/source invalidation/no writes')
+        session.plan.refresh_from_db();due=session.plan.planning_state[reminders.KEY]['reminders'][0]['due_at']
+        clock.return_value=datetime.fromisoformat(due)+timedelta(minutes=10)
+        self.assertEqual(reminders.deliver_due(session.plan_id),1);self.assertEqual(reminders.deliver_due(session.plan_id),0)
+        self.browser.refresh();self.wait.until(lambda _:'Delivered late' in self.text('plannerReminders'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-delivery]')),1)
+        self.assertIn('D1 packed gloves',self.text('plannerPacking'));self.assertTrue(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]'))
+        self.wait.until(lambda _:self.active_requests==0)
+        cookie=self.browser.get_cookie(settings.SESSION_COOKIE_NAME);Session.objects.filter(session_key=cookie['value']).delete()
+        self.browser.delete_cookie(settings.SESSION_COOKIE_NAME);self.memory_click('[data-packing-reload]')
+        self.wait.until(lambda _:not self.browser.find_element(self.By.ID,'plannerPacking').is_displayed())
+        self.assertEqual(self.text('plannerDocuments'),'');mark('J7 reopen/late dedupe/auth clearing')
+        self.assertEqual(len(passed),7);self.capture('travel-d1-private-state-cleared')
+
     def test_travel_affordability_stale_evidence_drafts_and_auth_privacy(self):
         from apps.expenses.models import BankAccount
         from django.contrib.sessions.models import Session
