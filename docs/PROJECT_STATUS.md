@@ -1,6 +1,21 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — TRAVEL2-005/C2,2026-10-28
+## Active implementation checkpoint — TRAVEL2-005/C3,2026-10-28
+
+C3 future-date savings engine/privateAPI/dashboard LOCAL_VERIFIED;explicit owner
+income/effectiveperiod/currency/EMI schedules/goals/contribution,three documented
+scenarios,calendar partialmonths/exclusivecutoff,conservative Decimal math. Current
+cash and projections distinct;no guaranteed income,FX,financial writes or migration.
+41unique backend/profile and8unique Chrome accepted incrementally;fourglobal Axe
+views zero violations,keyboard scrollPASS. Native scoped review CLEAN after final
+EMI/draft fixes,sameharness/tests-summary. Failed receipts preserved;no doublecount.
+Linux40682997546 rootcause corrected:sharedfixture primed Windows-only private
+memory. Windows originalrunPASS,Seleniumpending;new source needs exact-head CI.
+PR20returnedDRAFT/NOT_MERGE_READY. Evidence/closure in EXECUTION_STATE and
+artifacts/travel-c3-20261028. NEXT C4 after CI reconciliation. Independent/manual
+contrast/screen-reader/real-account/production gates remain.75/143,68remaining,
+0/13extensions unchanged;localimplementation is not formal acceptance.
+## Previous implementation checkpoint — TRAVEL2-005/C2,2026-10-28
 
 C2 saved-trip dashboard/what-if UI/API implemented over unchanged C1. Explicit
 matching-currency/all7amount/completeness/disjoint confirmation;exact Decimal cash,

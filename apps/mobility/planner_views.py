@@ -33,6 +33,7 @@ from .services.travel.gpx_export import itinerary_gpx
 from .services.travel.ics_export import calendar_choices, itinerary_ics
 from .services.travel.affordability import FIELDS
 from .services.travel.affordability_ui import affordability_dashboard, affordability_scenario, trip_context
+from .services.travel.savings import calculate_savings, savings_source
 from django.utils.crypto import constant_time_compare
 
 
@@ -122,6 +123,8 @@ class TravelSessionList(PrivateTravelSessionAPI):
 
 
 class TravelAffordabilityView(PrivateTravelSessionAPI):
+    projection = False
+
     def owned(self, request, pk):
         session = get_object_or_404(TravelPlanningSession, pk=pk, user=request.user)
         if not session.plan_id:
@@ -132,13 +135,17 @@ class TravelAffordabilityView(PrivateTravelSessionAPI):
     @transaction.atomic
     def get(self, request, pk):
         session, plan = self.owned(request, pk)
-        return Response(affordability_dashboard(request.user, session, plan))
+        data = affordability_dashboard(request.user, session, plan)
+        if self.projection:
+            data['savings_source'] = savings_source(request.user)
+        return Response(data)
 
     @transaction.atomic
     def post(self, request, pk):
         session, plan = self.owned(request, pk)
         data = request.data
-        if not isinstance(data, dict) or set(data) != {'revision', 'snapshot', 'confirmation'}:
+        expected = {'revision', 'snapshot', 'confirmation'} | ({'savings'} if self.projection else set())
+        if not isinstance(data, dict) or set(data) != expected:
             raise ValidationError({'detail': 'Choose a bounded saved-trip affordability scenario.'})
         if type(data['revision']) is not int or data['revision'] != session.revision:
             return Response({'detail': 'This trip changed. Reload affordability and confirm the new evidence.', 'code':'trip_changed'}, status=409)
@@ -150,10 +157,15 @@ class TravelAffordabilityView(PrivateTravelSessionAPI):
                 set(confirmation) - set(FIELDS) - {'source_revision', 'complete', 'disjoint_allocations'} or
                 any(isinstance(confirmation.get(field), dict) and set(confirmation[field]) - {'amount', 'currency', 'verified'} for field in FIELDS)):
             raise ValidationError({'detail': 'Use only the seven financial assumptions and their confirmation fields.'})
-        result = affordability_scenario(request.user, confirmation)
+        result = (calculate_savings(request.user, confirmation, data['savings']) if self.projection
+                  else affordability_scenario(request.user, confirmation))
         if 'STALE_OR_FOREIGN_SOURCE' in result['issues']:
             return Response({'detail': 'Financial evidence changed. Reload affordability and confirm current amounts.', 'code':'source_changed'}, status=409)
         return Response(result)
+
+
+class TravelSavingsView(TravelAffordabilityView):
+    projection = True
 
 
 class TravelSessionDetail(PrivateTravelSessionAPI):

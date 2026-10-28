@@ -6,7 +6,26 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — TRAVEL2-005/C2 (2026-10-28)
+## Current checkpoint — TRAVEL2-005/C3 (2026-10-28)
+
+C3 LOCAL_VERIFIED/FORMAL_ACCEPTANCE_PENDING:read-only futuredate engine/API and
+existing dashboard integration. Explicit verified income/effectiveperiod,currency,
+unpaid monthly EMI schedule,additional goals and capped contribution;three owner
+reviewed scenarios. Tomorrow-to-exclusive-departure calendar accrual and exact
+Decimal rounding;current cash separated from uncertain projections. Protected
+reserve/existing goals once,negativecashflow retained,no FX/register/model writes.
+Required monthly saving is an estimated lower bound,not guaranteed affordability.
+Native scoped review corrected irregular final EMI omission and in-flight GET draft
+loss;final runtime CLEAN,sameharness/fixtures-summary. Actual Axe narrow-scroll
+accessibility defect fixed;keyboard scroll and fourglobal1440/390light/dark views
+PASS,contrast incomplete/manual screen-reader pending.41unique backend/profile,
+8unique Chrome accepted incrementally;failed/rerun evidence retained,no doublecount.
+Linux40682997546 fixture rootcause corrected (Windows-only memory prime);actual
+Linux rerun/newest CI pending. Windows originalrunPASS,Seleniumpending. PR20returned
+DRAFT/NOT_MERGE_READY;final source/privacy/push/CI receipts in EXECUTION_STATE.
+C4 NEXT after exact-headCI reconciliation.75/143 and0/13 unchanged;formal/manual/
+cumulative independent/real-account/production gates remain;no merge or deployment.
+## Previous checkpoint — TRAVEL2-005/C2 (2026-10-28)
 
 C2 LOCAL_VERIFIED pending finalsource/push/CI closure:owned saved-trip dashboard/
 CSRF API reuses unchanged C1. Explicit verified currency/all7amounts,completeness/
@@ -116,8 +135,8 @@ latest-head CI remains pending,no extension or production approval.
 - [x] P0 — Three Selenium failures locally repaired,4unique Chrome cases PASS.
 - [ ] P0 — Newest exact-head CI and cumulative PR review readiness;PR20 DRAFT/NOT_MERGE_READY.
 - [x] C2 — LOCAL_VERIFIED explainable saved-trip what-if UI/API;formal/CI acceptance pending.
-- [ ] C3 — NEXT after C2 closure:future-date savings scenarios.
-- [ ] C4 — Financial reconciliation and acceptance.
+- [x] C3 — LOCAL_VERIFIED future-date engine/UI;exact-headCI/formal gates pending.
+- [ ] C4 — NEXT after CI reconciliation:financial reconciliation and acceptance.
 - [ ] D1 — Full Travel integration tests.
 - [ ] D2 — Privacy/security/accessibility.
 - [ ] D3 — Native Windows/offline/recovery validation.
@@ -269,7 +288,7 @@ synthetic evidence unless their tracker explicitly says otherwise.
 | TRAVEL2-002 — private booking/document organizer | Owned trip JSON and existing encrypted corpus now support private links/original access/expiry/unlink/reopen | Newest-head CI and formal extension acceptance; broader booking workflow unclaimed | TRAVEL-04, DOC-06 accepted slices | P2 /bounded slice complete | Owner-only originals and source dates; no inferred availability or booking writes; no private metadata after auth loss | 12 unique backend across repairs;5 Chrome incl editor regression;2 global desktop Axe; privacy | Source61bd9bc; artifacts/travel-organizer-20261027/local-acceptance.json, source-preflight/release.json, push.json and ci.json | COMMITTED_PUSHED/CI_PENDING; reconcile exact final HEAD at next milestone |
 | TRAVEL2-003 — packing/reminders | Private packing plus explicit opt-in durable local reminders,UTC/DST validation,CRUD/cancel/reschedule,atomic in-app occurrence delivery and restart/replay safety | Newest-head CI and full extension mandatory acceptance; independent screen-reader remains pending | TRAVEL-04 accepted slice; existing DurableSqliteHuey/native UTC scheduler | P2 /01 and02 locally complete | Owner-only progress and delivery; stale/idempotent/cancel/late/offline/restart correctness; no external send/global activation | Current56 unique backend/queue incl affected regressions;6 Chrome;4 actual1440/390 light/dark Axe; prior packing evidence reused | artifacts/travel-reminders-20261027/local-acceptance.json and source/push/CI receipts; exact source in EXECUTION_STATE | LOCAL_VERIFIED/CI_PENDING after push; full extension UNACCEPTED,0/13 |
 | TRAVEL2-004 — private PDF/GPX/ICS exports | Owned trip/evidence/map structures | Explicit validated source-preserving export | TRAVEL-04/17, owner export consent | P2 /2–3 slices | Correct coordinates/timezones/escaping; preserve expiry/unknowns; no public sharing | File parsers and malformed inputs; desktop export | Existing Travel evidence; extension pending | B1–B4 LOCAL_VERIFIED;fresh CI/manual acceptance pending,FORMALLY_ACCEPTED NO. C1 read-only NEXT;no extension promotion |
-| TRAVEL2-005 — reserve/goal-aware affordability | Canonical baseline,C1 read-only Decimal engine,C2 saved-trip what-if UI/API | C3 future-date savings,C4 reconciliation/formal acceptance | FIN-05/06/07 evidence; FIN-15 migration stays gated | P1 /C1–C2 bounded local complete | Verified same-currency only,no inferred INR/FX,double counting or canonical writes; incomplete data never certified Affordable | 33backend/profile,4C2Chrome+2affectedTravel,4globalAxe;source/owner/Decimal/revision/privacy | artifacts/travel-c2-20261028;source/push/CI in EXECUTION_STATE | C1–C2 LOCAL_VERIFIED;newest CI/manual/formal gates pending,NEXT C3;extension0/13 |
+| TRAVEL2-005 — reserve/goal-aware affordability | Canonical baseline,C1–C3 read-only engine,saved-trip what-if and future savings UI/API | C4 reconciliation/formal acceptance | FIN-05/06/07 evidence; FIN-15 migration stays gated | P1 /C1–C3 bounded local complete | Verified same-currency only,no inferred INR/FX,double counting or canonical writes; incomplete data never certified Affordable | C3 batch41backend/profile,8uniqueChrome,4globalAxe;Decimal/calendar/revisions/owner/privacy | artifacts/travel-c3-20261028;source/push/CI in EXECUTION_STATE | C1–C3 LOCAL_VERIFIED;newest CI/manual/formal gates pending,NEXT C4;extension0/13 |
 | INVEST2-001 — analyst/bull/bear/valuation/risk packet | Owned portfolio, AMFI/Yahoo evidence and local routing | Compatible pinned TradingAgents graph adapter and independent challenge | INV-04, AI-15/16, source/dependency/provider clearance | P2 /4–6 slices | Dated sourced arguments/unknowns; bounded tools; no private disclosure/orders | Isolated compatibility; point-in-time/leakage/cancel; desktop review | UPSTREAM_REFERENCE_MATRIX T pin; engine adoption pending | QUEUED; test component isolation, do not bulk-install conflicting dependencies |
 | INVEST2-002 — watchlist thesis/decision versions | Holdings and local review alerts | Owned research/watchlist histories separate from positions | INV-01/07; non-monetary scope first | P2 /2–3 slices | Instrument identity, stale thesis detection and explicit decisions; zero holdings writes | API history/owner/freshness; Chrome reopen | Existing investment/alert evidence; extension pending | QUEUED; select independent non-monetary scope after higher priorities |
 | WEALTH2-001 — fund look-through/overlap | Canonical portfolio and dated market evidence | Shared source-dated company/sector/country/currency exposure and opaque portions | INV-01/04, FIN-15, approved instrument/source policy | P2 /3–4 slices | Reconciled weights; unknown exposure explicit; no invented price/FX | Deterministic overlap/completeness/owner; desktop drill-down | Aurelio reference map; extension pending | QUEUED; inspect approved source availability |

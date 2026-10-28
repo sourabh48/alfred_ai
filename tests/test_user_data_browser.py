@@ -2084,7 +2084,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner',return_value=Mock()))
         # Prepare the synthetic encrypted vault before concurrent page-policy reads.
         from apps.ml_engine.services.persistent_memory import MemoryStore
-        MemoryStore(root/'vault',embedder=SyntheticEmbeddings())
+        if os.name == 'nt':
+            MemoryStore(root/'vault',embedder=SyntheticEmbeddings())
         owner=self.scenario['user']
         rows={'expense':Expense.objects.create(user=owner,amount='12.34',source='manual',transaction_date=date(2026,9,1)),
             'budget':Budget.objects.create(user=owner,month='Jan 2025',base_budget='234.56',inflation_adjusted='245.67',spent='12.34'),
@@ -4702,6 +4703,94 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
                 self.wait.until(lambda _: self.browser.execute_script("const r=document.getElementById('plannerAffordability').getBoundingClientRect();return r.top<innerHeight&&r.bottom>0"))
                 self.capture(f'travel-affordability-{width}-{theme}')
+
+    def savings_fields(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        today=timezone.localdate();departure=today+timedelta(days=65)
+        self.user.monthly_income='3100';self.user.save(update_fields=['monthly_income'])
+        self.memory_click('#plannerAffordabilityReload')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'future_monthly_income').get_attribute('value')=='3100.00')
+        self.memory_click('#plannerAffordabilityForm [name="projection"]')
+        for name,value in (('departure',departure.isoformat()),('income_from',today.isoformat()),
+                           ('income_until',departure.isoformat()),('verified_on',today.isoformat()),
+                           (f'due_{self.loan.pk}',(today+timedelta(days=5)).isoformat()),
+                           ('monthly_goals','100'),('monthly_contribution','300')):
+            element=self.browser.find_element(self.By.CSS_SELECTOR,f'#plannerAffordabilityForm [name="{name}"]')
+            self.browser.execute_script("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}))",element,value)
+        self.affordability_fields()
+        self.memory_click('#plannerAffordabilityForm [name="future_confirmed"]')
+
+    def test_travel_savings_calendar_scenarios_keyboard_and_light_dark_accessibility(self):
+        from selenium.webdriver.common.keys import Keys
+        self.affordability_fixture();self.savings_fields()
+        before=(list(type(self.account).objects.values()),list(Expense.objects.values()),list(type(self.loan).objects.values()))
+        self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityForm button').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Future savings · projected estimates only' in self.text('plannerAffordabilityResult'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerAffordabilityResult table')),3)
+        self.assertIn('Available today after one month',self.text('plannerAffordabilityResult'))
+        self.assertIn('not guaranteed',self.text('plannerAffordabilityResult'))
+        self.assertEqual(before,(list(type(self.account).objects.values()),list(Expense.objects.values()),list(type(self.loan).objects.values())))
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings=[];self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_cdp_cmd('Input.dispatchMouseEvent',dict(type='mouseMoved',x=2,y=2))
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit=self.browser.execute_async_script("const done=arguments[arguments.length-1];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(done)")
+                findings.append(dict(width=width,theme=theme,violations=audit['violations'],incomplete=audit['incomplete']))
+                (self.artifacts/'travel-savings-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.browser.execute_script("document.querySelector('#affordFuture').scrollIntoView({block:'start',behavior:'instant'})")
+                self.browser.execute_async_script('requestAnimationFrame(()=>requestAnimationFrame(arguments[0]))')
+                self.capture(f'travel-savings-{width}-{theme}')
+        region=self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityResult [role="region"]')
+        self.browser.execute_script("arguments[0].scrollIntoView({block:'start',behavior:'instant'})",region)
+        region.send_keys(Keys.ARROW_RIGHT)
+        self.wait.until(lambda _: self.browser.execute_script('return arguments[0].scrollLeft>0',region))
+        self.browser.execute_async_script('requestAnimationFrame(()=>requestAnimationFrame(arguments[0]))')
+        self.capture('travel-savings-projection-keyboard-scroll')
+        field=self.browser.find_element(self.By.ID,'future_monthly_contribution');field.clear();field.send_keys('200')
+        self.assertEqual(self.text('plannerAffordabilityResult'),'')
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'[name="future_confirmed"]').is_selected())
+
+    def test_travel_savings_stale_income_retains_draft_and_auth_loss_clears_private_data(self):
+        from django.contrib.sessions.models import Session
+        self.affordability_fixture();self.savings_fields()
+        type(self.user).objects.filter(pk=self.user.pk).update(monthly_income='3000')
+        self.memory_click('#plannerAffordabilityForm button')
+        self.wait.until(lambda _: 'Evidence loaded or changed' in self.text('plannerAffordabilityStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'future_monthly_contribution').get_attribute('value'),'300')
+        self.assertEqual(self.browser.find_element(self.By.ID,'future_monthly_income').get_attribute('value'),'3000.00')
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'[name="future_confirmed"]').is_selected())
+        self.browser.execute_async_script("Promise.all(performance.getEntriesByType('resource').map(()=>Promise.resolve())).then(arguments[0])")
+        Session.objects.all().delete();self.browser.delete_cookie(settings.SESSION_COOKIE_NAME)
+        self.memory_click('#plannerAffordabilityReload')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerAffordability').get_attribute('hidden') is not None)
+        self.assertEqual(self.browser.find_element(self.By.ID,'plannerAffordabilityBody').get_attribute('textContent'),'')
+
+    def test_travel_savings_refresh_keeps_newest_inflight_draft(self):
+        self.affordability_fixture();self.savings_fields()
+        self.browser.execute_script("""
+            const original=window.fetch;window.heldSavings=false;
+            window.fetch=async(url,options)=>{
+                const response=await original(url,options);
+                if(String(url).endsWith('/savings/')&&(!options?.method||options.method==='GET')){
+                    window.heldSavings=true;await new Promise(resolve=>window.releaseSavings=resolve);
+                }
+                return response;
+            };
+        """)
+        self.memory_click('#plannerAffordabilityReload');self.wait.until(lambda _:self.browser.execute_script('return window.heldSavings'))
+        field=self.browser.find_element(self.By.ID,'future_monthly_contribution');field.clear();field.send_keys('900')
+        self.browser.execute_script('window.releaseSavings()')
+        self.wait.until(lambda _: 'Evidence loaded or changed' in self.text('plannerAffordabilityStatus'))
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'future_monthly_contribution')!=field)
+        self.assertEqual(self.browser.find_element(self.By.ID,'future_monthly_contribution').get_attribute('value'),'900')
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'[name="future_confirmed"]').is_selected())
 
     def test_travel_affordability_stale_evidence_drafts_and_auth_privacy(self):
         from apps.expenses.models import BankAccount
