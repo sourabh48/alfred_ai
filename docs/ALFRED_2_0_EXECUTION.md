@@ -6,7 +6,30 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — D2-C (2026-10-29)
+## Current checkpoint — CI-OPT (2026-10-29)
+
+P0 CI optimization overrides queue selection before D3; Travel/financial evidence
+and all143 baseline/13 extension requirements remain intact (75/143,0/13).
+CI-OPT-01: one repository workflow RETAIN, no obsolete workflow proven, none
+removed. Managed Pages stays untouched. Workflow disposition and metrics are in
+CI_PIPELINE_STATE; EXECUTION_STATE owns exact continuation.
+
+CI-OPT-02: per-test/phase measurement and deterministic3-way Windows sharding;
+151 IDs assigned49/51/51 exactly once using measured durations. Three concurrent
+bounded Chrome isolation cases, aggregate and35 focused contracts PASS. Stable selenium aggregate
+retains canonical proof names; native/Linux/financial/privacy/recovery/DPAPI and
+accessibility coverage remains required. Pip cache keys include requirements and
+constraints, no private/runtime data. CI-OPT-03 retains distinct master/PR/manual
+contexts and uses SHA/event/ref-aware non-cancelling concurrency.
+
+Before hosted Selenium36m32 (1959s tests,202s pip); local profile27m26 had one
+timeout, followed by an unchanged focused PASS; the failed receipt is preserved.
+After runtime/cache savings UNMEASURED pending hosted exact-head execution. The
+original D1 real API wait is retained, not simulated away. Independent/manual/
+production acceptance still pending. After CI-OPT reconciliation: D3-A native/
+offline, D3-B restart/crash, D3-C backup/restore/install, D4 review/CI, D5 readiness.
+
+## Previous checkpoint — D2-C (2026-10-29)
 
 Recovery/runtime source: `dff017383d16362da0313c8b16eb81eca0d5e03e`, clean and
 synchronized before this batch. PR #20 DRAFT/unmerged, submitted reviews and

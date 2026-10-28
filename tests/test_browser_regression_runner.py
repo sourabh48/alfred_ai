@@ -16,11 +16,19 @@ class BrowserRegressionRunnerTests(TestCase):
     def test_child_runtime_and_media_cannot_inherit_operator_or_cloud_configuration(self):
         with tempfile.TemporaryDirectory() as directory:
             args=SimpleNamespace(artifact_dir=directory,browser='Chrome',require_browser=True,
-                                 proof_label='synthetic',test_labels=('tests.synthetic',))
+                                 proof_label='synthetic',test_labels=('tests.synthetic',), profile_tests=False,
+                                 collect_only=False,shard_index=0,shard_count=1,durations_file=None)
             process=Mock(stdout=['Found 1 test(s).\n','Ran 1 test in 0.1s\n','OK\n'])
             process.wait.return_value=0
+
+            def child(*args, **kwargs):
+                path=next(value.split('=',1)[1] for value in args[0] if value.startswith('--browser-report='))
+                Path(path).write_text(json.dumps(dict(complete=True,inventory=['tests.synthetic'],
+                    selected=['tests.synthetic'],tests=[dict(id='tests.synthetic',status='passed',seconds=.1)])))
+                return process
+
             with patch.object(run_browser_regressions,'parse_args',return_value=args), \
-                 patch.object(run_browser_regressions.subprocess,'Popen',return_value=process) as spawn, \
+                 patch.object(run_browser_regressions.subprocess,'Popen',side_effect=child) as spawn, \
                  patch.dict(os.environ,{'ALFRED_DATA_DIR':'C:/synthetic-production',
                      'ALFRED_MEDIA_ROOT':'C:/synthetic-production/media','OPENAI_API_KEY':'synthetic-secret',
                      'ALFRED_MEMORY_CLOUD_AUTHORIZED':'true'}),redirect_stdout(StringIO()):
@@ -32,6 +40,14 @@ class BrowserRegressionRunnerTests(TestCase):
             self.assertEqual(env['ALFRED_MEMORY_OPENAI_AUTHORIZED'],'false')
             self.assertTrue(Path(env['ALFRED_DATA_DIR']).is_relative_to(Path(directory).resolve()))
             self.assertEqual(Path(env['ALFRED_MEDIA_ROOT']).parent,Path(env['ALFRED_DATA_DIR']))
+            with patch.object(run_browser_regressions,'parse_args',return_value=args), \
+                 patch.object(run_browser_regressions.subprocess,'Popen',side_effect=child) as second,redirect_stdout(StringIO()):
+                self.assertEqual(run_browser_regressions.main(),0)
+            other=second.call_args.kwargs['env']
+            self.assertNotEqual(env['ALFRED_DATA_DIR'],other['ALFRED_DATA_DIR'])
+            self.assertNotEqual(env['DATABASE_URL'],other['DATABASE_URL'])
+            self.assertNotEqual(env['ALFRED_REGISTRY_PATH'],other['ALFRED_REGISTRY_PATH'])
+            self.assertEqual(env['CACHE_BACKEND'],'django.core.cache.backends.locmem.LocMemCache')
 
     def test_summary_records_driver_backed_success_when_required_suite_runs_without_skips(self):
         summary = run_browser_regressions.build_run_summary(

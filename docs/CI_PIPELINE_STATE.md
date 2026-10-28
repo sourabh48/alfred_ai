@@ -1,5 +1,67 @@
 # Development CI and integration pipeline
 
+## CI-OPT-01 workflow disposition — 2026-10-29
+
+Source base25f028d; PR #20 DRAFT/unmerged. Exactly one file exists under
+.github/workflows. No workflow is proven obsolete; removed: NONE.
+
+| Workflow / file | Triggers | Jobs / check names | Unique responsibilities | Disposition |
+| --- | --- | --- | --- | --- |
+| Browser Regression / browser-regression.yml | master push; path-filtered PR; manual dispatch | native-windows, selenium, linux-secure-failure; three additional selenium-shards checks | Windows DPAPI/full backend+financial+privacy preflight/native HTTP/backup/recovery/accessibility; complete browser suite split across Windows; Linux fail-closed + portable browser | RETAIN; original three check identities preserved, selenium now fail-closed aggregate |
+| GitHub-managed pages-build-deployment / dynamic/pages/pages-build-deployment | GitHub Pages service; no source YAML in this checkout | Managed by GitHub, separate publication context | Existing Pages publishing | BLOCKED_REVIEW for any change; retain untouched, do not invoke/deploy |
+
+Recent runs40771632812 (SUCCESS),40754201960 (45m Selenium cutoff),40742137700
+(Selenium fixture failure),40692181959 (success) all belong to Browser Regression
+and their exact source SHAs. Detailed API/protection/run receipts are local under
+artifacts/ci-opt-20261029; no rule is changed or assumed waived when unavailable.
+The master push and PR events validate distinct integration contexts. Development
+push has no trigger, so it does not duplicate PR validation. Manual diagnostics
+remain intentional. No workflow_call or overlapping repository workflow exists.
+
+Stable native-windows/selenium/linux-secure-failure checks must remain. Any future
+Selenium shards must feed the selenium aggregate fail-closed; no missing/skipped/
+duplicate tests, stale SHA evidence or relaxed privacy/native checks are accepted.
+Pip caches explicitly hash requirements.txt and constraints/*.txt. They contain
+package downloads only, never private/runtime state. Native and Linux commands
+are unchanged. Test/tool path filters now include all tests and browser tooling.
+Concurrency includes workflow/event/ref/SHA; no in-progress cancellation, and
+manual diagnostics are distinct. No development push/PR duplicate is introduced.
+
+### Measured baseline and shard contract
+
+| Measurement | Evidence / value |
+| --- | --- |
+| Hosted unsharded before | Exact25f028d run40771632812 SUCCESS: Selenium2192s (36m32), tests1959s, pip202s, Chrome setup12s; native1816s and Linux279s |
+| Local timing baseline | Full151 collected/executed,1646.39s;150PASS/1timeout, retained. Unchanged focused financial-source recheck PASS. Passing per-case timings in tests/browser_durations.json; slowest20 in artifacts/ci-opt-20261029 |
+| Local phase observations | DB setup10.156s; browser startup2.079s; UserData login321.105s/setUp286.746s; document login16.312s; artifacts46.655s; real API-window wait60.016s. Phases overlap, not additive; lifecycle overhead is separate |
+| Deterministic assignments | 151 IDs exactly once;49/51/51. LPT uses measured durations with test-ID tie breaks; unknown/invalid durations fail closed and must be measured |
+| Executed isolation check | Three concurrent bounded Windows/Chrome cases PASS, including encrypted private original access. Separate SQLite/data/media/cache/browser processes; aggregate PASS. Not a full151 after benchmark |
+| After / saved time / cache effect | UNMEASURED until new hosted pipeline completes; no extrapolation from plan weights or smoke sample |
+| Residual critical path | Native job already1816s; D1 real rate-window wait retained. Fixture scopes/security/crypto are unchanged, no artificial integration clock or raised quotas |
+
+Every shard discovers the full intended inventory before selecting its measured
+assignment. Reports contain selected/execution IDs, outcomes, timings, checkout
+and PR-head source SHA, run/platform and isolation metadata. The aggregate verifies
+the manifest, every row exactly once, zero skips/failures, every Windows shard job
+successful, matching source/run, independent runtime/DB/media/local caches and
+matching driver-summary hashes. Incomplete/cancelled/missing artifacts fail it.
+No job can inherit another SHA's pass. Matrix fail-fast is false so evidence from
+every shard survives. Windows DPAPI semantics are exercised by the original tests.
+
+The stable selenium job emits browser_regression_summary.ci-chrome.json plus the
+generic summary in browser-regression-artifacts only after validating every shard.
+This is an explicitly aggregated proof, preserving existing readiness consumers.
+Raw screenshots/reports remain in browser-regression-artifacts-shard-{0,1,2}.
+Branch protection endpoints returned404; authenticated effective branch rules and
+rulesets are empty. No rule was changed or waived; project approval gates remain.
+actionlint is not installed; local YAML/runner contracts do not prove hosted success.
+Final focused contracts:35 PASS; three concurrent bounded Chrome cases and the
+aggregate PASS. Closure source/preflight/push/PR/new exact-head CI receipts live in
+artifacts/ci-opt-20261029; prior source SUCCESS never certifies the new pipeline.
+
+Runtime improvement/cache effects remain UNMEASURED until actual observations.
+Keep D1/D2/C1–C4 evidence and the D3-A/B/C → D4 → D5 continuation unchanged.
+
 **2026-10-27 current state:** the owner closed all PRs and explicitly directed
 development consolidation/push. The combined source now contains fc2a4d2 and6fc1e54;
 402 backend tests, nine Chrome workflows and16 affected-page Axe audits passed

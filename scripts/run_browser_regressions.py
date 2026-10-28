@@ -9,6 +9,7 @@ CI job if the suite is skipped instead of driver-backed.
 from __future__ import annotations
 
 import argparse
+from hashlib import sha256
 import json
 import os
 import re
@@ -55,11 +56,18 @@ def parse_args() -> argparse.Namespace:
         "--proof-label",
         help="Optional stable label for the browser proof summary, for example ci-chrome.",
     )
+    parser.add_argument('--profile-tests', action='store_true', help='Record browser/fixture/database phase timings.')
+    parser.add_argument('--shard-index', type=int, default=0)
+    parser.add_argument('--shard-count', type=int, default=1)
+    parser.add_argument('--durations-file')
+    parser.add_argument('--collect-only', action='store_true')
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.collect_only and args.require_browser:
+        raise ValueError('Discovery is not browser acceptance')
     artifact_dir = Path(args.artifact_dir)
     if not artifact_dir.is_absolute():
         artifact_dir = REPO_ROOT / artifact_dir
@@ -70,19 +78,29 @@ def main() -> int:
     env["ALFRED_BROWSER_ARTIFACT_DIR"] = str(artifact_dir)
     if args.browser:
         env["ALFRED_BROWSER"] = args.browser
+    env['ALFRED_CI_SOURCE_SHA'] = os.environ.get('ALFRED_CI_SOURCE_SHA', '')
 
+    run_context = current_run_context()
+    proof_label = args.proof_label or default_proof_label(args.browser or "Chrome then Edge", run_context)
+    report = artifact_dir / labeled_summary_filename(proof_label).replace('browser_regression_summary.', 'test-results.')
     command = [
         sys.executable, "manage.py", "test", *args.test_labels,
         "--settings=alfred_ai.browser_test_settings", "--noinput",
+        '--testrunner=scripts.browser_test_runner.BrowserTestRunner', '--browser-report='+str(report),
+        '--browser-shard-index='+str(args.shard_index), '--browser-shard-count='+str(args.shard_count),
     ]
+    if args.durations_file:
+        command.append('--browser-durations-file='+args.durations_file)
+    if args.collect_only:
+        command.append('--browser-collect-only')
+    if args.profile_tests:
+        command.append('--browser-profile')
     print("Running browser regression command:")
     print(" ".join(command))
     print(f"ALFRED_RUN_BROWSER_TESTS={env['ALFRED_RUN_BROWSER_TESTS']}")
     print(f"ALFRED_BROWSER={env.get('ALFRED_BROWSER', 'Chrome then Edge')}")
     print(f"ALFRED_BROWSER_ARTIFACT_DIR={env['ALFRED_BROWSER_ARTIFACT_DIR']}")
 
-    run_context = current_run_context()
-    proof_label = args.proof_label or default_proof_label(args.browser or "Chrome then Edge", run_context)
     started_at = datetime.now(timezone.utc)
     started_perf = time.monotonic()
     process = subprocess.Popen(
@@ -99,7 +117,7 @@ def main() -> int:
     assert process.stdout is not None
     for line in process.stdout:
         output_lines.append(line)
-        print(line, end="")
+        print(line, end="", flush=True)
 
     return_code = process.wait()
     output = "".join(output_lines)
@@ -120,6 +138,17 @@ def main() -> int:
         proof_label=proof_label,
         github_actions=github_actions_metadata(),
     )
+    accounting = json.loads(report.read_text(encoding='utf-8')) if report.exists() else {}
+    summary['accounting'] = dict(file=report.name, complete=accounting.get('complete', False),
+        sha256=sha256(report.read_bytes()).hexdigest() if report.exists() else '',
+        inventory_count=len(accounting.get('inventory', [])), assigned_count=len(accounting.get('selected', [])),
+        executed_count=len(accounting.get('tests', [])), shard_index=args.shard_index, shard_count=args.shard_count)
+    if args.collect_only:
+        summary.update(status='collected', collection_only=True, driver_backed_success=False)
+    elif (not accounting.get('complete') or len(accounting.get('tests', [])) != summary['tests_run_count']
+          or len(accounting.get('selected', [])) != summary['tests_run_count']):
+        summary.update(status='failed', driver_backed_success=False,
+                       runner_return_code=return_code or 2)
     summary_path = write_summary(artifact_dir, summary)
     print(f"Browser regression summary: {summary_path}")
 
@@ -222,6 +251,7 @@ def github_actions_metadata() -> dict:
         "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
         "repository": os.environ.get("GITHUB_REPOSITORY", ""),
         "sha": os.environ.get("GITHUB_SHA", ""),
+        "source_sha": os.environ.get('ALFRED_CI_SOURCE_SHA') or os.environ.get('GITHUB_SHA',''),
         "ref": os.environ.get("GITHUB_REF", ""),
         "ref_name": os.environ.get("GITHUB_REF_NAME", ""),
         "head_ref": os.environ.get("GITHUB_HEAD_REF", ""),

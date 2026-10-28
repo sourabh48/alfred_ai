@@ -1,6 +1,20 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D2-C, 2026-10-29
+## Active implementation checkpoint — CI-OPT, 2026-10-29
+
+CI-OPT-01 retains the single unique repository workflow; removed NONE, managed
+Pages untouched. CI-OPT-02 adds measured test accounting, pip dependency caching
+and3 isolated Windows Selenium shards (151 intended,49/51/51); original check names
+remain via fail-closed selenium aggregation. Three bounded concurrent Chrome
+isolation cases and35 focused contracts PASS; full hosted after-runtime is UNMEASURED. Before hosted
+Selenium36m32; local profiling collected151, with one retained timeout and unchanged
+focused PASS. No runtime/security/assertion/DPAPI/financial weakening or quota bypass.
+CI-OPT-03 preserves distinct PR/master/manual contexts with SHA/event/ref-aware
+concurrency; no dev push duplicate. Check references/metrics: CI_PIPELINE_STATE;
+exact source/tests/CI continuation: EXECUTION_STATE and artifacts/ci-opt-20261029.
+Keep75/143,68 remaining,0/13. After CI-OPT: D3-A/B/C, D4, D5; other roadmaps retained.
+
+## Previous implementation checkpoint — D2-C, 2026-10-29
 
 Recovered synchronized `dff0173`; PR #20 DRAFT/unmerged, zero reviews/approvals.
 Run 40742137700 Windows/Linux PASS, Selenium FAIL: one D1 stale-element error

@@ -11,30 +11,21 @@ on:
       - "apps/**"
       - "static/**"
       - "templates/**"
-      - "tests/test_document_review_browser.py"
-      - "tests/test_user_data_browser.py"
-      - "tests/user_acceptance_scenario.py"
-      - "tests/test_browser_regression_runner.py"
-      - "tests/test_memory_platform.py"
-      - "tests/test_source_storage.py"
-      - "tests/test_travel_planner_browser.py"
-      - "tests/test_live_ui_contracts.py"
+      - "tests/**"
       - "scripts/run_browser_regressions.py"
+      - "scripts/browser_*.py"
       - "scripts/verify_native*.py"
       - "alfred_native.py"
-      - "tests/test_durable_queue.py"
-      - "tests/test_native_runtime.py"
       - "requirements.txt"
       - "scripts/release*.py"
-      - "tests/test_release*.py"
       - "constraints/**"
 
 permissions:
   contents: read
 
 concurrency:
-  group: alfred-release-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: alfred-release-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.sha }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'validation' }}
+  cancel-in-progress: false
 
 jobs:
   native-windows:
@@ -55,6 +46,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            constraints/*.txt
       - uses: browser-actions/setup-chrome@v1
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
@@ -98,11 +92,19 @@ jobs:
             artifacts/release-ci/*.log
           if-no-files-found: warn
 
-  selenium:
+  selenium-shards:
     # The complete suite exercises real DPAPI encryption; private-memory tests remain required.
     runs-on: windows-latest
     # Run 40754201960 exceeded 45m after 136 passing markers; retain full-suite proof and artifacts.
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    env:
+      ALFRED_BROWSER_SHARD: ${{ matrix.shard }}
+      ALFRED_BROWSER_ARTIFACT_DIR: artifacts/browser/shard-${{ matrix.shard }}
+      ALFRED_CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - name: Check out repository
@@ -112,6 +114,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            constraints/*.txt
 
       - name: Set up Chrome
         uses: browser-actions/setup-chrome@v1
@@ -119,13 +125,13 @@ jobs:
       - name: Prepare browser artifact directory
         shell: bash
         run: |
-          mkdir -p artifacts/browser
+          mkdir -p "$ALFRED_BROWSER_ARTIFACT_DIR"
           python - <<'PY'
           import json
           import os
           from pathlib import Path
 
-          Path("artifacts/browser/ci-setup.json").write_text(
+          (Path(os.environ["ALFRED_BROWSER_ARTIFACT_DIR"]) / "ci-setup.json").write_text(
               json.dumps(
                   {
                       "github_actions": os.environ.get("GITHUB_ACTIONS"),
@@ -165,17 +171,21 @@ jobs:
       - name: Run Selenium browser regressions
         env:
           ALFRED_RUN_BROWSER_TESTS: "true"
-          ALFRED_BROWSER_ARTIFACT_DIR: artifacts/browser
-        run: python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome
+        run: >-
+          python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome-shard-${{ matrix.shard }}
+          --artifact-dir "$env:ALFRED_BROWSER_ARTIFACT_DIR" --profile-tests
+          --shard-count 3 --shard-index ${{ matrix.shard }} --durations-file tests/browser_durations.json
 
       - name: Validate CI browser proof summary
         shell: bash
         run: |
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
 
-          path = Path("artifacts/browser/browser_regression_summary.ci-chrome.json")
+          label = "ci-chrome-shard-" + os.environ["ALFRED_BROWSER_SHARD"]
+          path = Path(os.environ["ALFRED_BROWSER_ARTIFACT_DIR"]) / ("browser_regression_summary." + label + ".json")
           payload = json.loads(path.read_text(encoding="utf-8"))
           github = payload.get("github_actions") or {}
           contract = payload.get("artifact_contract") or {}
@@ -187,8 +197,9 @@ jobs:
           assert payload.get("tests_run_count", 0) > 0, payload
           assert payload.get("skipped_count") == 0, payload
           assert payload.get("driver_backed_success") is True, payload
-          assert payload.get("proof_label") == "ci-chrome", payload
-          assert contract.get("labeled_summary_filename") == "browser_regression_summary.ci-chrome.json", payload
+          assert payload.get("proof_label") == label, payload
+          assert contract.get("labeled_summary_filename") == path.name, payload
+          assert payload.get("accounting", {}).get("complete") is True, payload
           assert github.get("enabled") is True, payload
           assert github.get("run_id"), payload
           assert github.get("workflow"), payload
@@ -202,8 +213,35 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          name: browser-regression-artifacts-shard-${{ matrix.shard }}
+          path: ${{ env.ALFRED_BROWSER_ARTIFACT_DIR }}
+          if-no-files-found: error
+
+  selenium:
+    # Stable required check: succeeds only when every Windows shard is fully accounted.
+    if: ${{ always() }}
+    needs: selenium-shards
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ALFRED_CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: browser-regression-artifacts-shard-*
+          path: artifacts/selenium-shards
+      - name: Verify complete exact-source Windows browser coverage
+        run: |
+          python scripts/browser_test_plan.py --artifacts artifacts/selenium-shards --shards 3 --require-ci --job-result "${{ needs.selenium-shards.result }}" --checkout-sha "$GITHUB_SHA" --source-sha "$ALFRED_CI_SOURCE_SHA" --output artifacts/browser/selenium-aggregate.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
           name: browser-regression-artifacts
-          path: artifacts/browser
+          path: artifacts/browser/
           if-no-files-found: error
 
   linux-secure-failure:
@@ -215,6 +253,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            constraints/*.txt
       - uses: browser-actions/setup-chrome@v1
       - name: Install browser system dependencies
         run: |

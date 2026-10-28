@@ -1,6 +1,65 @@
 # ALFRED execution state
 
-## Active checkpoint — D2-C acceptance reconciliation (2026-10-29)
+## Active checkpoint — CI-OPT-01/02/03 (2026-10-29)
+
+- Recovered clean, synchronized `25f028dfd31f6c1f8227f2b88d53dbf63adab0cd` on
+  development/alfred-integrated. PR #20 must stay DRAFT/unmerged. D1/D2 and C1–C4
+  evidence preserved; 75/143 and 0/13 unchanged. CI optimization precedes D3-A/B/C.
+- CI-OPT-01: inspected every source workflow (only browser-regression.yml).
+  RETAIN: unique native Windows/DPAPI/backend/privacy/recovery, Linux fail-closed
+  and full Selenium coverage. No deletions justified. GitHub also lists managed
+  dynamic/pages/pages-build-deployment; leave publishing/settings untouched.
+  Push is master-only; PR and manual contexts remain distinct, no dev push duplicate.
+- Run 40771632812 at25f028d finished SUCCESS for all three original jobs.
+  No old green inherited. Protection API evidence under artifacts/ci-opt-20261029.
+- CI-OPT-02: instrumented full baseline finished in isolated local
+  Windows/DPAPI synthetic runtime. New scripts/browser_test_runner.py records exact
+  IDs/outcomes/per-test durations plus DB, browser startup, login, fixture, artifact
+  and real rate-window phases; wrappers delegate to original methods unchanged.
+  Hosted25f028d PASS: Selenium2192s total,1959s tests,202s dependency install;
+  native1816s/Linux279s. Local151-case profile1646.39s,150PASS/1timeout. The unchanged
+  financial-source case passed focused recheck (8.969s); failed baseline retained.
+  Do not claim an application fix or an entirely passing local baseline.
+- Initial measurement wrapper had a15-minute harness budget, below observed CI;
+  stopped only that owned synthetic process tree early and retained its interrupted
+  receipt. Measurement-specific harness now allows90minutes; no production change.
+  Current process receipt/log: artifacts/ci-opt-20261029/baseline-full.{json,log};
+  detailed results: baseline-full/test-results.baseline.json. Do not start another
+  full baseline. Application/browser cases remain unchanged; baseline metrics and
+  passing-recheck provenance feed tests/browser_durations.json (151 measured IDs).
+- Deterministic3-way Windows plan:49/51/51 cases, no missing/duplicate membership.
+  Three concurrent bounded real Chrome smoke shards PASS, including real private
+  upload/original/owner checks; aggregate PASS with separate runtime/DB/media and
+  local caches. This3-case smoke is not full151 after-runtime/hosted acceptance.
+- New runner records discovered/selected/executed IDs, statuses/durations, phases,
+  checkout+source SHA/run binding, platform and isolation. New aggregate fails
+  closed on any missing/failing/skipped/duplicate/stale/mixed-source/run/OS/runtime
+  proof or failed shard job. Stable selenium check and canonical ci-chrome JSON/
+  browser-regression-artifacts are preserved; native/Linux coverage unchanged.
+- CI-OPT-03: no duplicate development push trigger existed. Retain master/PR/manual
+  contexts; broaden test/tool path coverage. Concurrency now includes event/ref/SHA,
+  with no in-progress cancellation; manual runs have separate identities. Pip cache
+  keys cover requirements.txt+constraints/*.txt, never runtime/private data.
+- Local source validation/contract receipts under artifacts/ci-opt-20261029 and
+  artifacts/ci-repair-ac05515/ci-opt-*. Slowest20 and phase timings saved. Unit
+  fixture/environment/BOM setup failures retained. actionlint unavailable; actual
+  YAML parsing performed. D1 real60.016s quota wait retained; unit clock tests
+  already cover quota logic. Dense D1 actions plus1s dashboard polling caused its
+  former120/min pressure; per-test isolation was already present. No security bypass.
+- Final focused contracts:35 PASS, including strict shard accounting, isolation,
+  failed-job aggregate rejection, YAML/cache/check identities and legacy readiness
+  consumers. Receipt: artifacts/ci-repair-ac05515/ci-opt-final-contracts.json.
+- LOCAL_VERIFIED source checkpoint; closure must pass inventory/privacy preflight,
+  commit/push, verify PR20DRAFT and record new exact-head pipeline. Full hosted after-runtime,
+  cache effect and improvement remain UNMEASURED until actual run completes.
+  Final HEAD/receipts: artifacts/ci-opt-20261029/{local-acceptance,push,pr,ci}.json
+  and source-checkpoint/<HEAD>/release.json. Preserve75/143,0/13 and all prior work.
+- NEXT: reconcile that exact-head CI once (no polling); capture actual shard/cache/
+  aggregate timings or fix confirmed failures, then D3-A Windows/offline, D3-B
+  restart/crash, D3-C backup/restore/install, D4 review/CI, D5 readiness. No merge,
+  publication/deployment, real-user/financial data, backup or worktree changes.
+
+## Previous checkpoint — D2-C acceptance reconciliation (2026-10-29)
 
 - Continuation recovered clean, synchronized `84a56fdb9d1f00746fd61dac52802f3a3ebc59d0`.
   Run 40754201960: Windows/Linux SUCCESS, Selenium CANCELLED. Annotation explicitly

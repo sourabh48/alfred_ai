@@ -75,6 +75,30 @@ zero skips. Linux runs portable browser workflows and `tests.test_memory_platfor
 to verify unsupported private storage fails closed; it has no plaintext fallback.
 Linux results do not establish private-memory acceptance.
 
+CI runs the complete discovered Windows suite in three measured shards. Existing
+`native-windows`, `linux-secure-failure` and `selenium` check names remain; selenium
+is now the aggregate and fails if any shard/job/proof is incomplete. Each Windows
+job gets fresh SQLite/data/media/cache/browser state and real DPAPI semantics.
+The canonical `browser_regression_summary.ci-chrome.json` artifact stays available;
+raw artifacts are named `browser-regression-artifacts-shard-{0,1,2}`. Do not treat
+one shard, local collection, or a cancelled run as complete browser acceptance.
+
+`--profile-tests` writes per-case timings/outcomes and setup/browser/login/artifact
+phases in `test-results.<label>.json`. Use a fresh `--artifact-dir` for retained
+evidence. `--collect-only` discovers without executing and cannot be combined with
+`--require-browser`. A measured shard example is:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/run_browser_regressions.py --browser Chrome --require-browser --shard-count 3 --shard-index 0 --durations-file tests/browser_durations.json --proof-label ci-chrome-shard-0 --artifact-dir artifacts/browser/shard-0
+```
+
+All three shard reports must match the committed inventory/duration manifest,
+source and checkout SHA, run and platform; every intended test executes once with
+zero skips. Add a new browser case by measuring it in the isolated runner and
+updating `tests/browser_durations.json`; unmeasured IDs fail rather than disappear.
+Timing weights are assignment inputs, not an observed speed improvement. Pip
+caches cover requirements/constraints only. Never cache runtime, vault or user data.
+
 ## Native runtime and recovery
 
 ```powershell
