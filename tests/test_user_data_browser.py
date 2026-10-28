@@ -4792,6 +4792,58 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.ID,'future_monthly_contribution').get_attribute('value'),'900')
         self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'[name="future_confirmed"]').is_selected())
 
+    def test_travel_financial_source_revocation_reopen_and_projection_reconciliation(self):
+        from datetime import timedelta
+        from decimal import Decimal
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.utils import timezone
+        from apps.expenses.models import StatementUpload,StatementTransactionEvidence
+        from apps.expenses.services.statement_evidence import evidence,review
+        from apps.expenses.services.statement_lifecycle import _import_statement_transactions
+        from apps.loans.models import Loan,LoanPaymentHistory
+        from tests.test_expense_money_identity import parsed_fixture
+        session=self.affordability_fixture();today=timezone.localdate()
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-travel-c4-browser-synthetic-')))
+        self.enterContext(override_settings(MEDIA_ROOT=root/'media'))
+        upload=StatementUpload.objects.create(user=self.user,bank_account=self.account,account_number=self.account.account_number,
+            parser_status='parsed',file_name='synthetic.pdf',statement_start=today,statement_end=today,
+            original_file=SimpleUploadedFile('synthetic.pdf',b'%PDF synthetic financial review'))
+        parsed=parsed_fixture(amount=Decimal('25'),closing=Decimal('1000'),category='loan',account=self.account.account_number)
+        parsed.transactions[0].transaction_date=today;parsed.transactions[0].classification='loan'
+        with patch('apps.expenses.services.transaction_intelligence.alfred_engine.predict_emotional_spend',return_value={'confidence':.1,'is_emotional':False}):
+            _import_statement_transactions(user=self.user,upload=upload,bank_account=self.account,parsed=parsed)
+        row=Expense.objects.get(statement_upload=upload)
+        review(self.user,row.pk,revision=evidence(self.user,row.pk)['revision'],confirm=True)
+        old_form=self.browser.find_element(self.By.ID,'plannerAffordabilityForm')
+        self.memory_click('#plannerAffordabilityReload')
+        self.wait.until(lambda _:self.browser.find_element(self.By.ID,'plannerAffordabilityForm')!=old_form)
+        self.wait.until(lambda _: 'Evidence loaded or changed' in self.text('plannerAffordabilityStatus'))
+        self.affordability_fields();self.memory_click('#plannerAffordabilityForm button')
+        self.wait.until(lambda _: 'Affordable · scenario only' in self.text('plannerAffordabilityResult'))
+        self.assertIn('525.00 USD',self.text('plannerAffordabilityResult'))
+        review(self.user,row.pk,revision=evidence(self.user,row.pk)['revision'],confirm=True,revoke=True)
+        self.memory_click('#plannerAffordabilityForm button')
+        self.wait.until(lambda _: 'UNVERIFIED STATEMENT SOURCE' in self.text('plannerAffordabilityBody'))
+        self.assertEqual(self.text('plannerAffordabilityResult'),'')
+        self.affordability_fields();self.memory_click('#plannerAffordabilityForm button')
+        self.wait.until(lambda _: 'Insufficient Data' in self.text('plannerAffordabilityResult'))
+        review(self.user,row.pk,revision=evidence(self.user,row.pk)['revision'],confirm=True)
+        self.browser.refresh()
+        self.wait.until(lambda _:self.browser.find_element(self.By.ID,'plannerAffordabilityDetails').is_displayed())
+        self.memory_click('#plannerAffordabilityDetails summary')
+        self.wait.until(lambda _:self.browser.find_elements(self.By.ID,'plannerAffordabilityForm'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'affordCurrency').get_attribute('value'),'')
+        self.assertEqual(self.text('plannerAffordabilityResult'),'')
+        self.savings_fields()
+        before=(list(type(self.user).objects.values()),list(Expense.objects.values()),list(Loan.objects.values()),
+                list(LoanPaymentHistory.objects.values()),list(StatementTransactionEvidence.objects.values()))
+        self.memory_click('#plannerAffordabilityForm button')
+        self.wait.until(lambda _: 'Future savings · projected estimates only' in self.text('plannerAffordabilityResult'))
+        self.assertIn('Available today after one month of protected obligations: 525.00 USD',self.text('plannerAffordabilityResult'))
+        self.assertEqual(before,(list(type(self.user).objects.values()),list(Expense.objects.values()),list(Loan.objects.values()),
+                list(LoanPaymentHistory.objects.values()),list(StatementTransactionEvidence.objects.values())))
+        self.capture('travel-financial-reconciliation-reopened-projection')
+
     def test_travel_affordability_stale_evidence_drafts_and_auth_privacy(self):
         from apps.expenses.models import BankAccount
         from django.contrib.sessions.models import Session

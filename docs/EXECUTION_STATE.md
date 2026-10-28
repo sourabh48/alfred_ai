@@ -1,6 +1,62 @@
 # ALFRED execution state
 
-## Active checkpoint — TRAVEL2-005/C3 local closure (2026-10-28)
+## Active checkpoint — TRAVEL2-005/C4 local closure (2026-10-28)
+
+- Canonical development/alfred-integrated in F:/ALFRED_DEV/post-audit. Recovered
+  clean/synchronizedd71b477ba1ef732317bb896d89559b90c7904081;PR20DRAFT/unmerged
+  development→master. Final HEAD/remote/PR/newCI owned by artifacts/travel-c4-
+  20261028/{push,pr,ci}.json and source-checkpoint/<HEAD>/release.json.
+-40687948479 exactd71:LinuxSUCCESS confirms portable fixture repair. Windows and
+  Selenium last observedIN_PROGRESS,notPASS. ci-recovered.json records observation;
+  no green transferred to C4 source. No new confirmed CI failure at checkpoint.
+- C4 found/reproduced actual provenance gap:parser changes/source-review revocation
+  changed source receipts but old affordability returned200. C1 now binds existing
+  statement-evidence revision/status;unverified/missing/foreign sources abstain,
+  dependent C2/C3 old revisions409. No new evidence engine or financial calculation.
+- Reused shared ownership/parser/file/review guards. Batched owner snapshot loads
+  related parents and proofs once;local reference-amount/fingerprint indexes match
+  single-record duplicate/conflict semantics. One file hash per batch,not per row;
+  no persistent source cache. Query-growth test1vs21rowsPASS;large-history wallclock
+  remains unmeasured. Public evidence() signature/default fresh behavior unchanged.
+-92unique backend/regression PASS:64final=10C4+17C1+10C2+13C3+14statement-evidence;
+  plus28historic canonical-baseline/import-identity/relationships/loan-source tests.
+  Tests cover imported transfer identity/retry,repayment overlap,bank/investment/
+  null/zero cash,disjoint reserve/goals,Decimal/currency/negativeflow,date cutoffs,
+  corrections/parser/file/review invalidation,owner/auth/CSRF and trip revisions.
+- Whole users/expenses/loans/budgets/investments/career tables plus trip metadata
+  compared before/after;fingerprints/history unchanged. SQL no-DML guards allow
+  only existing auth-session refresh. Two fresh Django processes reopen only a
+  serialized synthetic testDB,return identical C1/C2/C3 and preserve DBhash.
+  Initial restartfixture failed private-permission guard;created new synthetic
+  private directories using existing helper,no guard/OS policy bypass. No realDB.
+-2unique finalChrome PASS:new source-revoke→InsufficientData→reconfirm→savedtrip
+  reopen→projection workflow plus affected C3/Axe/keyboard flow. Four1440/390
+  light/dark globalAxe zero violations;contrast incomplete/manualscreen-reader pending.
+  First newbrowser fixture matched oldstatus duringGET;wait replacementform fixed
+  stale-element issue. Failed2rootcause cases and setup/restart/browser failures
+  preserved;reruns not added to unique totals. No assertion/timeout weakening.
+- Native final scoped same-harness rereviewCLEAN;fixtures SUMMARY_ONLY,cumulative
+  independent/external review remainsPENDING. Unchanged UI/math evidence reused by
+  SHA;actual finalbrowser/backend bind new runtime. JS/migrationPASS;inventory,
+  immutable source/history/dependency preflight and push closure receipts required.
+- Acceptance:LOCAL_VERIFIED YES;CI_PASSED PENDING newestHEAD;INDEPENDENT_REVIEWED
+  scopednative only/full cumulative externalPENDING;FORMALLY_ACCEPTED NO;
+  PRODUCTION_VALIDATED NO. Manualcontrast/screen-reader,real-account,cleanPC,
+  packaged/rollback/production gates remain unperformed. Historical denomination
+  is not inferred;owner-verifies common currency. FIN-15/live migrations stay gated.
+- Changed:affordability.py,statement_evidence.py,releaseprofile,new financial
+  reconciliation tests,browsercase,3trackers. Evidence artifacts/travel-c4-20261028
+  and artifacts/ci-repair-ac05515/travel-c4-*. No dependency/schema/provider changes,
+  money/history/user writes,master/Pages/deploy,frozen4aa7ac70 or backup changes.
+-75/143 baseline,68remaining,0/13extensions unchanged. Preserve all other Investment,
+  Career,Wealth,AI and release roadmap rows. C1–C4local work does not accept extension.
+- Closure:commit verified changes;source/history preflightPASS then normalpush;
+  verify exact remote/PRdraft/newCI and preserve receipts. Matching closure allows
+  READY_FOR_NEXT with CI_PENDING/FORMAL_ACCEPTANCE_PENDING.
+- NEXT:NEXT — check recorded exact-headCI once,fix confirmed failures,then D1
+  integrated Travel workflows. D2security/accessibility,D3Windows/offline/recovery,
+  D4independent/exact-headCI,D5productionreadiness remainqueued. No deployment.
+## Previous checkpoint — TRAVEL2-005/C3 local closure (2026-10-28)
 
 - Branch development/alfred-integrated in F:/ALFRED_DEV/post-audit;recovered clean/
   synchronized9dd52f28aa599125f9c0e2f8003190fbf481bf47. Current final commit,

@@ -1,5 +1,6 @@
 """Owned structured statement evidence; no OCR, model output or financial writes."""
 from hashlib import sha256
+from collections import Counter, defaultdict
 import json
 from pathlib import Path
 
@@ -68,18 +69,35 @@ def _owned(user, identity, document_id=None):
         user=user, source='bank_statement', statement_upload__user=user)
     if document_id is not None: rows = rows.filter(statement_upload_id=document_id)
     row = get_object_or_404(rows, pk=identity)
+    return _owned_row(user, row)
+
+
+def _owned_row(user, row):
+    from django.http import Http404
+    if row.user_id != user.pk or row.source != 'bank_statement' or not row.statement_upload_id or row.statement_upload.user_id != user.pk:
+        raise Http404
     upload = row.statement_upload
     if ((row.bank_account is not None and row.bank_account.user_id != user.pk)
             or (upload.bank_account is not None and upload.bank_account.user_id != user.pk)):
-        from django.http import Http404
         raise Http404
     return row
 
 
-def _state(row, proof):
+def _reference_key(row):
+    return row.bank_account_id, row.transaction_date, row.direction, row.external_reference, row.raw_description
+
+
+def _state(row, proof, *, file_references=None, record_index=None):
     upload = row.statement_upload
     current = _values(row)
-    status, fingerprint, download = file_reference(upload.original_file)
+    if file_references is None:
+        status, fingerprint, download = file_reference(upload.original_file)
+    else:
+        # One calculation may validate many rows from the same retained file.
+        key = upload.original_file.name
+        if key not in file_references:
+            file_references[key] = file_reference(upload.original_file)
+        status, fingerprint, download = file_references[key]
     payload = upload.extracted_payload if isinstance(upload.extracted_payload, dict) else {}
     metadata = dict(document_id=upload.pk, document_name=document_name(upload),
         statement_start=upload.statement_start.isoformat() if upload.statement_start else None,
@@ -102,12 +120,12 @@ def _state(row, proof):
             status = 'conflicting_source'
         elif upload.source not in ('bank_statement', 'credit_card_statement') or upload.parser_status != 'parsed' or payload.get('preview_only') or (payload.get('ocr_progress') or {}).get('is_partial'):
             status = 'document_needs_review'
-        elif row.external_reference and Expense.objects.filter(user_id=row.user_id, bank_account_id=row.bank_account_id,
+        elif row.external_reference and (len(record_index[0][_reference_key(row)]) > 1 if record_index is not None else Expense.objects.filter(user_id=row.user_id, bank_account_id=row.bank_account_id,
                 transaction_date=row.transaction_date, direction=row.direction, external_reference=row.external_reference,
-                raw_description=row.raw_description).exclude(pk=row.pk).exclude(amount=row.amount).exists():
+                raw_description=row.raw_description).exclude(pk=row.pk).exclude(amount=row.amount).exists()):
             status = 'conflicting_records'
-        elif Expense.objects.filter(user_id=row.user_id, bank_account_id=row.bank_account_id,
-                transaction_fingerprint=row.transaction_fingerprint).exclude(pk=row.pk).exists() and row.transaction_fingerprint:
+        elif row.transaction_fingerprint and (record_index[1][(row.bank_account_id, row.transaction_fingerprint)] > 1 if record_index is not None else Expense.objects.filter(user_id=row.user_id, bank_account_id=row.bank_account_id,
+                transaction_fingerprint=row.transaction_fingerprint).exclude(pk=row.pk).exists()):
             status = 'duplicate_records'
         else:
             status = 'owner_confirmed' if proof and proof.reviewed_at and proof.reviewed_revision == base else 'needs_owner_review'
@@ -127,6 +145,30 @@ def evidence(user, identity, *, document_id=None):
     row = _owned(user, identity, document_id)
     proof = StatementTransactionEvidence.objects.filter(expense=row).first()
     return _state(row, proof)[0]
+
+
+def evidence_for_rows(user, rows):
+    """Validate a complete owned row snapshot without per-transaction SQL or file reads."""
+    from django.http import Http404
+    if not any(row.source == 'bank_statement' for row in rows):
+        return []
+    references, fingerprints = defaultdict(set), Counter()
+    for row in rows:
+        if row.user_id == user.pk:
+            references[_reference_key(row)].add(row.amount)
+            fingerprints[(row.bank_account_id, row.transaction_fingerprint)] += 1
+    proofs = {proof.expense_id: proof for proof in StatementTransactionEvidence.objects.filter(expense__user=user)}
+    files, result = {}, []
+    for row in rows:
+        if row.source != 'bank_statement':
+            continue
+        try:
+            _owned_row(user, row)
+            detail = _state(row, proofs.get(row.pk), file_references=files, record_index=(references, fingerprints))[0]
+            result.append((row.pk, detail['revision'], detail['verification']))
+        except Http404:
+            result.append((row.pk, None, 'source_unavailable'))
+    return result
 
 
 def review(user, identity, *, revision, confirm, revoke=False):

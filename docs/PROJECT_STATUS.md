@@ -1,6 +1,20 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — TRAVEL2-005/C3,2026-10-28
+## Active implementation checkpoint — TRAVEL2-005/C4,2026-10-28
+
+C4 LOCAL_VERIFIED:cross-module C1/C2/C3 canonical Decimal/import-transfer/repayment
+reconciliation,full financial/user/history/fingerprint snapshots,no-DML guards and
+actual fresh-process synthetic restart. Fixed reproduced parser/review/file source
+provenance invalidation gap;reused owned statement evidence with bounded SQL and
+batch-local file hashes.92unique backend/regressions,2Chrome,4globalAxe views zero
+violations,scoped native review CLEAN(sameharness,fixtures-summary),migration/JS PASS.
+Final source/privacy/push/CI in EXECUTION_STATE and artifacts/travel-c4-20261028.
+PR20DRAFT/unmerged/NOT_MERGE_READY. Recovered40687948479LinuxPASS;Windows/Selenium
+pending,new source needs ownCI. Formal/cumulative independent/manualcontrast/
+screen-reader/real-account/production gates remainpending. No inferred currency/FX,
+canonical money/history writes or financial migration.75/143,68remaining,0/13
+unchanged. NEXT D1 after CI reconciliation;all other roadmap requirements preserved.
+## Previous implementation checkpoint — TRAVEL2-005/C3,2026-10-28
 
 C3 future-date savings engine/privateAPI/dashboard LOCAL_VERIFIED;explicit owner
 income/effectiveperiod/currency/EMI schedules/goals/contribution,three documented

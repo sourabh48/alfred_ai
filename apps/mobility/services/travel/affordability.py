@@ -19,6 +19,7 @@ from apps.expenses.models import BankAccount, Expense
 from apps.expenses.money import expense_money
 from apps.expenses.services.cashflow_treatment import classify_cashflow
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+from apps.expenses.services.statement_evidence import evidence_for_rows
 from apps.loans.models import Loan
 
 
@@ -36,13 +37,16 @@ def affordability_source(user):
     if not getattr(user, 'is_authenticated', False) or not user.pk:
         raise PermissionDenied('Owner authentication required.')
     user = get_user_model().objects.get(pk=user.pk)
-    expenses = list(Expense.objects.filter(user=user).order_by('transaction_date', 'id'))
+    expenses = list(Expense.objects.select_related('bank_account', 'statement_upload__bank_account').filter(user=user).order_by('transaction_date', 'id'))
     accounts = list(BankAccount.objects.filter(user=user, is_active=True))
     cash_accounts = [a for a in accounts if a.account_type not in ('credit', 'investment')]
     loans = list(Loan.objects.filter(user=user))
     baseline = resolve_canonical_financial_baseline(user, fresh=True, expenses=expenses)
     exact = baseline.get('decimal_amounts', {})
     issues = []
+    statement_sources = evidence_for_rows(user, expenses)
+    if any(status != 'owner_confirmed' for _, _, status in statement_sources):
+        issues.append('UNVERIFIED_STATEMENT_SOURCE')
     for metric in ('liquid_cash', 'observed_average_monthly_variable_spend'):
         if baseline.get('metric_states', {}).get(metric, {}).get('status') != 'observed':
             issues.append('UNAVAILABLE_' + metric.upper())
@@ -82,7 +86,7 @@ def affordability_source(user):
         amounts = {}
         issues.append('UNAVAILABLE_EXACT_AMOUNTS')
     today = today.isoformat()
-    evidence = dict(version=1, owner=user.pk, date=today, baseline=baseline,
+    evidence = dict(version=2, owner=user.pk, date=today, baseline=baseline, statement_sources=statement_sources,
                     accounts=[(a.pk, a.current_balance, a.account_type, a.last_synced_at) for a in accounts],
                     expenses=[(e.pk, e.amount, e.category, e.classification, e.direction,
                                e.transaction_date, e.bank_account_id) for e in expenses],
