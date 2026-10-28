@@ -24,3 +24,6 @@ html[data-theme="dark"] [data-itinerary-editor] :is(.travel-fit,.travel-priority
 #plannerReminders input[type="checkbox"] { width:1.2rem; }
 .travel-reminder-list { padding:0; list-style:none; }
 .travel-reminder-list > li { border-bottom:1px solid var(--alfred-stroke); padding:.75rem 0; }
+:is(#travelPlanner,#plannerItinerary,#plannerPacking,#plannerReminders,#plannerCalendar,#plannerAffordability) :is(.form-control,.form-select) { border-color:var(--alfred-muted); }
+:is(#travelPlanner,#plannerStops,#plannerItinerary,#plannerDocuments,#plannerPacking,#plannerReminders,#plannerExport,#plannerCalendar,#plannerAffordability) :focus-visible { outline:3px solid #1858d6; outline-offset:3px; }
+html[data-theme="dark"] :is(#travelPlanner,#plannerStops,#plannerItinerary,#plannerDocuments,#plannerPacking,#plannerReminders,#plannerExport,#plannerCalendar,#plannerAffordability) :focus-visible { outline-color:#a8caff; }

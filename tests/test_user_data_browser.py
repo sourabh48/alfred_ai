@@ -4728,6 +4728,173 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.affordability_fields()
         self.memory_click('#plannerAffordabilityForm [name="future_confirmed"]')
 
+    def test_travel_d2_accessibility_all_panels_contrast(self):
+        from selenium.webdriver.common.keys import Keys
+        session=self.affordability_fixture()
+        self.savings_fields()
+        self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityForm button').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Available today after one month' in self.text('plannerAffordabilityResult'))
+        self.memory_click('[data-reminder-consent]')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-form="create"]'))
+        self.memory_click('#plannerPrepareICS')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID,'calendarZone'))
+        self.browser.execute_script("document.querySelectorAll('#plannerItinerary details,#plannerCalendar details').forEach(e=>e.open=true)")
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        panels=['plannerItinerary','plannerDocuments','plannerPacking','plannerReminders','plannerExport','plannerCalendar','plannerAffordability']
+        contrast=r'''const roots=arguments[0], failures=[], manual=[], checked=[];
+            const rgba=s=>s.match(/[\d.]+/g).map(Number);
+            const blend=(f,b)=>f.slice(0,3).map((v,i)=>v*(f[3]??1)+b[i]*(1-(f[3]??1)));
+            const lum=c=>c.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);
+            const ratio=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
+            if(Math.abs(ratio([0,0,0],[255,255,255])-21)>1e-9)throw Error('Contrast arithmetic');
+            const seen=new Set();
+            function inspect(e,text){
+                const s=getComputedStyle(e);if(!e.getClientRects().length||s.visibility!=='visible'||!text.trim())return;
+                const key=e; if(seen.has(key))return;seen.add(key);
+                const placeholder=e.matches('input,textarea')&&!e.value&&e.placeholder;
+                const ink=placeholder?getComputedStyle(e,'::placeholder'):s;
+                let bg=[255,255,255], chain=[], reason='';
+                for(let p=e;p;p=p.parentElement)chain.unshift(p);
+                for(const p of chain){const c=getComputedStyle(p);
+                    if(c.backgroundImage!=='none'||Number(c.opacity)!==1)reason='gradient/image/opacity';
+                    bg=blend(rgba(c.backgroundColor),bg);}
+                const record={panel:e.closest(roots.map(id=>'#'+id).join(','))?.id,
+                    tag:e.tagName,id:e.id,text:text.trim().slice(0,100),color:ink.color,background:bg,placeholder:!!placeholder};
+                if(reason){manual.push({...record,reason});return;}
+                const minimum=parseFloat(s.fontSize)>=24||(parseFloat(s.fontSize)>=18.666&&Number(s.fontWeight)>=700)?3:4.5;
+                const foreground=rgba(ink.color);if(placeholder)foreground[3]=(foreground[3]??1)*Number(ink.opacity);
+                const value=ratio(blend(foreground,bg),bg);
+                checked.push({...record,ratio:value,minimum});if(value+1e-6<minimum)failures.push(checked.at(-1));
+                if(e.matches('input:not([type="checkbox"]):not([type="radio"]),select,textarea')&&!e.disabled){
+                    const boundary=ratio(blend(rgba(s.borderTopColor),bg),bg);
+                    const row={...record,kind:'control boundary',ratio:boundary,minimum:3};
+                    checked.push(row);if(boundary+1e-6<3)failures.push(row);
+                }
+            }
+            for(const id of roots){const root=document.getElementById(id);if(!root)continue;
+                const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;
+                while(n=walk.nextNode())if(!['SCRIPT','STYLE','OPTION'].includes(n.parentElement.tagName))inspect(n.parentElement,n.textContent);
+                root.querySelectorAll('input,select,textarea').forEach(e=>inspect(e,e.value||e.placeholder||'[empty control]'));}
+            return {checked,failures,manual};'''
+        audits=[]
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_cdp_cmd('Input.dispatchMouseEvent',dict(type='mouseMoved',x=2,y=2))
+                self.wait.until(lambda _:self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                axe=self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                colors=self.browser.execute_script(contrast,panels)
+                audits.append(dict(width=width,theme=theme,axe=axe,contrast=colors,
+                    overflow=self.browser.execute_script('return document.documentElement.scrollWidth>innerWidth')))
+                (self.artifacts/'travel-d2-accessibility.json').write_text(json.dumps(audits,indent=2),encoding='utf-8')
+                self.browser.execute_script("document.getElementById('plannerReminders').scrollIntoView({block:'start',behavior:'instant'})")
+                self.capture(f'travel-d2-reminders-{width}-{theme}')
+        for audit in audits:
+            self.assertFalse(audit['overflow'],(audit['width'],audit['theme']))
+            self.assertEqual(audit['axe']['violations'],[],(audit['width'],audit['theme'],audit['axe']['violations']))
+            self.assertEqual(audit['contrast']['failures'],[],(audit['width'],audit['theme'],audit['contrast']['failures']))
+
+    def test_travel_d2_keyboard_focus_consent_and_error_states(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.common.action_chains import ActionChains
+        session=self.packing_fixture()
+        source=dict(id='d'*32,kind='upload',document_name='Synthetic D2 reference.txt',
+            source_fingerprint='2'*64,expires_at=(timezone.now()+timedelta(days=1)).isoformat())
+        self.enterContext(patch('apps.mobility.services.travel.documents.MemoryStore'))
+        self.enterContext(patch('apps.mobility.services.travel.documents.DocumentCorpus.list',return_value={'documents':[source]}))
+        self.login();self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-consent]') and self.active_requests==0)
+        def keyboard_to(selector):
+            target=self.browser.find_element(self.By.CSS_SELECTOR,selector)
+            steps=self.browser.execute_script('''const target=arguments[0], active=document.activeElement;
+                const order=[...document.querySelectorAll('a[href],button,input,select,textarea,summary,[tabindex]')]
+                    .filter(e=>e.tabIndex>=0&&!e.disabled&&e.getClientRects().length&&getComputedStyle(e).visibility==='visible');
+                const destination=order.indexOf(target);if(destination<0)throw Error('Target is not keyboard reachable');
+                return (destination-order.indexOf(active)+order.length)%order.length;''',target)
+            if steps:ActionChains(self.browser).send_keys(*([Keys.TAB]*steps)).perform()
+            for _ in range(400):
+                if self.browser.switch_to.active_element==target:break
+                self.browser.switch_to.active_element.send_keys(Keys.TAB)
+            self.assertEqual(self.browser.switch_to.active_element,target,selector)
+            return target
+        focus_checks=[]
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                consent=keyboard_to('[data-reminder-consent]');enabled=consent.is_selected()
+                consent.send_keys(Keys.SPACE)
+                self.wait.until(lambda _:self.active_requests==0 and self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-consent]').is_selected()!=enabled)
+                self.wait.until(lambda _:self.browser.switch_to.active_element.get_attribute('data-reminder-consent') is not None)
+                focus=self.browser.execute_script('const s=getComputedStyle(document.activeElement);return {outline:s.outlineStyle,outline_width:s.outlineWidth,color:s.outlineColor}')
+                focus_checks.append(dict(width=width,theme=theme,**focus))
+                (self.artifacts/'travel-d2-keyboard.json').write_text(json.dumps(focus_checks,indent=2),encoding='utf-8')
+                self.assertNotEqual(focus['outline'],'none');self.assertGreater(float(focus['outline_width'].replace('px','')),0)
+                self.assertIn('Local reminders',self.text('plannerAlert'))
+                self.capture(f'travel-d2-consent-focus-{width}-{theme}')
+        # Add through actual Tab/Enter; the form is retained and focus returns after save.
+        item=keyboard_to('[data-packing-add] input')
+        focused=self.browser.execute_script('const s=getComputedStyle(document.activeElement);return {outline:s.outlineStyle,width:s.outlineWidth}')
+        (self.artifacts/'travel-d2-input-focus.json').write_text(json.dumps(focused),encoding='utf-8')
+        self.assertNotEqual(focused['outline'],'none',focused)
+        item.send_keys('Synthetic D2 keyboard item',Keys.ENTER)
+        self.wait.until(lambda _: 'Synthetic D2 keyboard item' in self.text('plannerPacking') and self.active_requests==0)
+        self.wait.until(lambda _:self.browser.switch_to.active_element==self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input'))
+        self.assertIn('Packing checklist saved',self.text('plannerAlert'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'plannerAlert').get_attribute('role'),'alert')
+        keyboard_to('[data-packing-item]:last-child summary').send_keys(Keys.ENTER)
+        item=keyboard_to('[data-packing-item]:last-child [data-packing-edit] input')
+        item.send_keys(Keys.CONTROL,'a');item.send_keys('Synthetic D2 edited item',Keys.ENTER)
+        self.wait.until(lambda _: 'Synthetic D2 edited item' in self.text('plannerPacking') and self.active_requests==0)
+        keyboard_to('[data-packing-item]:last-child [data-packing-remove]').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Synthetic D2 edited item' not in self.text('plannerPacking') and self.active_requests==0)
+        self.wait.until(lambda _:self.browser.switch_to.active_element.get_attribute('data-packing-reload') is not None)
+        keyboard_to('[data-day="1"] details:has([data-editor-add]) > summary').send_keys(Keys.ENTER)
+        keyboard_to('[data-day="1"] [data-editor-add] input').send_keys('Synthetic D2 activity',Keys.ENTER)
+        self.wait.until(lambda _: 'Synthetic D2 activity' in self.text('plannerItinerary') and self.active_requests==0)
+        self.wait.until(lambda _:self.browser.switch_to.active_element==self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="1"] [data-editor-add] input'))
+        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="1"] details:has([data-editor-add])').get_attribute('open'))
+        keyboard_to('[data-editor-undo]').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Synthetic D2 activity' not in self.text('plannerItinerary') and self.active_requests==0)
+        self.wait.until(lambda _:self.browser.switch_to.active_element.get_attribute('data-editor-reload') is not None)
+        keyboard_to('[data-trip-document-list]').send_keys(Keys.ENTER)
+        self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'[data-trip-document-link]') and self.active_requests==0)
+        keyboard_to('[data-trip-document-link]').send_keys(Keys.ENTER)
+        self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'[data-trip-document-unlink]') and self.active_requests==0)
+        keyboard_to('[data-trip-document-unlink]').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'No private documents linked' in self.text('plannerDocuments') and self.active_requests==0)
+        self.wait.until(lambda _:self.browser.switch_to.active_element.get_attribute('data-trip-document-list') is not None)
+        keyboard_to('[data-reminder-consent]').send_keys(Keys.SPACE)
+        self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-form="create"]') and self.active_requests==0)
+        self.reminder_fields('[data-reminder-form="create"]','Synthetic invalid zone','Invalid/Zone','2035-01-01T12:00')
+        keyboard_to('[data-reminder-form="create"] button').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'timezone' in self.text('plannerAlert').lower() and self.active_requests==0)
+        self.wait.until(lambda _:self.browser.switch_to.active_element==self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-form="create"] button'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-form="create"] [name="label"]').get_attribute('value'),'Synthetic invalid zone')
+        self.browser.execute_script('''const original=Alfred.fetchJSON;window.d2Release=null;
+            Alfred.fetchJSON=async function(url,options){
+                if(options?.body&&JSON.parse(options.body).action==='trip_documents'){
+                    Alfred.fetchJSON=original;await new Promise(resolve=>window.d2Release=resolve);}
+                return original(url,options);};''')
+        keyboard_to('[data-trip-document-list]').send_keys(Keys.ENTER)
+        self.wait.until(lambda _:self.browser.execute_script('return window.d2Release!==null'))
+        elsewhere=keyboard_to('a[href="/settings/#travelPreferences"]')
+        self.browser.execute_script('window.d2Release()')
+        self.wait.until(lambda _: 'Private document choices updated' in self.text('plannerAlert') and self.active_requests==0)
+        self.assertEqual(self.browser.switch_to.active_element,elsewhere)
+        self.browser.execute_cdp_cmd('Emulation.setEmulatedMedia',{'features':[{'name':'prefers-reduced-motion','value':'reduce'}]})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.setEmulatedMedia',{'features':[]})
+        motion=self.browser.execute_script("const s=getComputedStyle(document.querySelector('#plannerPrepareICS'));return {reduce:matchMedia('(prefers-reduced-motion:reduce)').matches,transition:s.transitionDuration,scroll:getComputedStyle(document.documentElement).scrollBehavior}")
+        self.assertTrue(motion['reduce']);self.assertEqual(motion['scroll'],'auto')
+        self.assertTrue(all(float(v.strip().removesuffix('s'))<=.00001 for v in motion['transition'].split(',')),motion)
+        (self.artifacts/'travel-d2-keyboard-complete.json').write_text(json.dumps(dict(status='PASS',focus=focus_checks,
+            keyboard=['reminder consent','packing add/edit/remove','itinerary add/undo','document list/link/unlink','invalid timezone feedback','no focus theft during delayed document request'],motion=motion),indent=2),encoding='utf-8')
+
     def test_travel_savings_calendar_scenarios_keyboard_and_light_dark_accessibility(self):
         from selenium.webdriver.common.keys import Keys
         self.affordability_fixture();self.savings_fields()

@@ -1,6 +1,20 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D2-A,2026-10-28
+## Active implementation checkpoint — D2-B, 2026-10-28
+
+D2-B LOCAL_VERIFIED: 9 unique Chrome cases (2 new + 7 affected regressions) and
+5 backend/live-HTTP checks PASS. Four 1440/390px light/dark Axe views have zero
+violations; computed text/placeholder/control-boundary contrast checks pass.
+Fixed reproduced action focus loss, missing keyboard input outlines and inadequate
+input border contrast using the existing Travel action boundary and scoped CSS.
+Keyboard forms/consent/editor/organizer, error/draft/retry/auth states and reduced
+motion verified; no D1 rerun, canonical finance writes or backend policy changes.
+Manual NVDA/contrast sheet updated with instructions, all manual rows PENDING.
+Source/test/push/CI evidence: EXECUTION_STATE and `artifacts/travel-d2b-20261028`.
+PR #20 DRAFT/unmerged; fresh CI and cumulative review remain gates. D2-C NEXT,
+D3–D5 queued. Baseline 75/143, 68 remaining and extensions 0/13 unchanged.
+
+## Previous implementation checkpoint — D2-A,2026-10-28
 
 D2-A: 3 cross-action negatives, 23 security regressions and 1 profile check PASS.
 Ownership, auth, CSRF, revoked sessions, private errors, no-writes, replay, consent,

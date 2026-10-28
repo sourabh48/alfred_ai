@@ -6,7 +6,33 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — D2-A (2026-10-28)
+## Current checkpoint — D2-B (2026-10-28)
+
+Recovered synchronized `d877145`; PR #20 DRAFT/unmerged. Run 40736288039 Linux
+SUCCESS; Windows/Selenium IN_PROGRESS at recovery. D2-A evidence preserved.
+D2-B LOCAL_VERIFIED: 9 unique actual Chrome cases PASS (2 new + 7 affected
+regressions), 5 backend/live-HTTP checks PASS. Four 1440/390px light/dark Axe audits
+have zero violations; Axe color-contrast remains incomplete. Computed contrast
+checks include actual placeholder colors and input boundaries: 555 light / 575
+dark samples per view, zero failures. Gradient/opacity/native-widget and manual
+perceptual acceptance remain pending; disabled controls have contrast exemptions.
+
+Reproduced and corrected focus loss after reminder consent, missing input keyboard
+outlines and low-contrast input borders (examples 1.66 light / 1.01 dark). Existing
+Travel action boundary restores focus/forms after rerender, chooses reload after
+removal/disabled Undo, respects moved focus and announces successful actions.
+Three scoped CSS rules restore 3px outlines and contrast using existing colors.
+Keyboard consent/packing/editor/organizer/error flows, reduced motion, offline,
+stale revisions, auth loss and financial draft privacy passed. No backend/finance
+or provider/security policy changes; no D1 rerun. Catalog rendering uses synthetic
+boundary fixtures; real encrypted D1 evidence is retained.
+
+Closure and exact source: EXECUTION_STATE and `artifacts/travel-d2b-20261028`.
+Prior CI remains Linux SUCCESS, Windows/Selenium IN_PROGRESS; new commits require
+their own CI. Manual owner sheet below stays PENDING; no NVDA session or human
+approval invented. D2-C is NEXT; D3–D5 queued, 75/143 and 0/13 unchanged.
+
+## Previous checkpoint — D2-A (2026-10-28)
 
 D2-A security negatives LOCAL_VERIFIED: 3 cross-action matrix checks, 23 targeted
 regressions and 1 profile check PASS (27 unique backend/profile checks). Owner,
@@ -31,6 +57,17 @@ D2-C reconciliation queued. Counts stay 75/143 and 0/13; formal gates pending.
 
 No manual screen-reader session has been performed. Automated source review and
 prior Axe evidence do not fill the observed-result column below.
+
+Owner procedure: on Windows, start NVDA (normally Ctrl+Alt+N) and open an isolated
+synthetic saved trip. Use Tab/Shift+Tab, Enter/Space and arrow keys without a mouse;
+NVDA+Tab reports the focused control. Check names, states and spoken save/error/
+late-delivery updates, including after rerender, conflict and expired sessions.
+Repeat at desktop/390px in both themes and with Windows animation effects off.
+For manual contrast, inspect foreground/background at the weakest gradient/image
+position, placeholders, focus rings and input boundaries. Record normal text 4.5:1,
+large text 3:1 and active control/focus boundaries 3:1; disabled controls are exempt.
+Record the tester/date, actual observation and PASS/FAIL only after performing it.
+All rows below remain PENDING; automated Chrome evidence is recorded separately.
 
 | Screen | Action | Expected result | Observed result | Status |
 | --- | --- | --- | --- | --- |
@@ -215,7 +252,7 @@ latest-head CI remains pending,no extension or production approval.
 - [x] C3 — LOCAL_VERIFIED future-date engine/UI;exact-headCI/formal gates pending.
 - [x] C4 — LOCAL_VERIFIED reconciliation;formal/CI/manual acceptance remains pending.
 - [x] D1 — LOCAL_VERIFIED7/7 integrated native-Windows journeys;freshCI/formal gates pending.
-- [ ] D2 — ACTIVE:D2-A security negatives local;D2-B browser/accessibility NEXT,D2-C reconciliation queued.
+- [ ] D2 — ACTIVE: D2-A/D2-B LOCAL_VERIFIED; manual/formal gates pending, D2-C reconciliation NEXT.
 - [ ] D3 — Native Windows/offline/recovery validation.
 - [ ] D4 — Exact-head CI and independent review.
 - [ ] D5 — Production-readiness report,without deployment.

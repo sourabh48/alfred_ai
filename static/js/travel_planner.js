@@ -59,6 +59,27 @@ window.TravelPlanner = (() => {
             .forEach(control => { control.disabled = state.busy || control.dataset.batchUnavailable === "true"; });
     }
     function alert(message) { $("plannerAlert").textContent = message; $("plannerAlert").hidden = !message; }
+    function retainActionFocus() {
+        const origin=document.activeElement;
+        const root=origin?.closest('#plannerStops,#plannerItinerary,#plannerDocuments,#plannerPacking,#plannerReminders');
+        if(!root)return ()=>{};
+        const parts=[];
+        for(let node=origin;node!==root;node=node.parentElement){
+            const identity=[...node.attributes].find(a=>a.name.startsWith('data-')&&a.name!=='data-batch-unavailable');
+            const index=[...node.parentElement.children].filter(e=>e.localName===node.localName).indexOf(node)+1;
+            const unique=identity&&[...node.parentElement.children].filter(e=>e.localName===node.localName&&e.getAttribute(identity.name)===identity.value).length===1;
+            parts.unshift(node.localName+(identity?`[${identity.name}="${CSS.escape(identity.value)}"]`:'')+(unique?'':`:nth-of-type(${index})`));
+        }
+        return ()=>{
+            // Do not steal focus if the owner moved elsewhere while the request ran.
+            if(document.activeElement!==origin&&document.activeElement!==document.body)return;
+            let target=root.querySelector(parts.join(' > '));
+            if(!target||target.disabled)target=root.querySelector('[data-editor-reload],[data-trip-document-list],[data-packing-reload],[data-reminder-reload]');
+            if(!target||target.disabled||root.hidden)return;
+            for(let parent=target.parentElement;parent&&parent!==root;parent=parent.parentElement){if(parent.matches('details'))parent.open=true;}
+            target.focus();
+        };
+    }
     function link(url, title) {
         return window.TravelResearchPanels.link(url,title);
     }
@@ -100,6 +121,7 @@ window.TravelPlanner = (() => {
     }
     async function action(payload,onFailure) {
         if (state.busy || !state.session) return;
+        const restoreFocus=retainActionFocus();
         documentEpoch++;
         const identity=state.session.id;
         let accepted=false;
@@ -119,10 +141,14 @@ window.TravelPlanner = (() => {
             if (payload.action === "save") {
                 await loadMobilityDashboard();
                 alert(payload.draft ? "Draft saved." : "Travel Plan saved. Open it from Your Plans below.");
-            }
+            } else if(payload.action==='itinerary_edit')alert('Itinerary updated. Route and cost estimates may need recalculation.');
+            else if(payload.action==='packing')alert('Packing checklist saved.');
+            else if(payload.action==='reminders')alert(payload.operation==='consent'?(payload.enabled?'Local reminders enabled for this trip.':'Local reminders disabled; pending occurrences cancelled.'):'Local reminder change saved.');
+            else if(payload.action==='trip_documents')alert(payload.operation==='list'?'Private document choices updated.':'Private document references updated; originals are unchanged.');
             return true;
         } catch (err) { alert(err.message); if(!accepted && typeof onFailure==='function')onFailure(err);return accepted; }
-        finally { state.busy = false; syncActionState(); schedulePoll(); if(documentRefreshPending && !document.hidden)refreshDocumentContext(); }
+        finally { state.busy = false; syncActionState(); schedulePoll(); if(documentRefreshPending && !document.hidden)refreshDocumentContext();
+            requestAnimationFrame(()=>{if(documentActive&&state.session?.id===identity)restoreFocus();}); }
     }
     async function message(text) {
         const accepted = await action({action:"message", text});

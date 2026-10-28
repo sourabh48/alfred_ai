@@ -1,6 +1,54 @@
 # ALFRED execution state
 
-## Active checkpoint — D2-A CI repair/security negatives (2026-10-28)
+## Active checkpoint — D2-B browser/accessibility (2026-10-28)
+
+- Recovered clean, synchronized `d877145565cd5118233026bf498404bd1c85f3df` on
+  `development/alfred-integrated`; PR #20 DRAFT, unmerged into master.
+- CI 40736288039: Linux SUCCESS; Windows/Selenium IN_PROGRESS at recovery.
+  No confirmed new failure. D2-A 27 backend/profile + 1 Chrome PASS and D1 local
+  7/7/C1–C4 evidence retained; do not rerun unchanged journeys.
+- D2-B LOCAL_VERIFIED: 9 unique Chrome cases PASS (2 new + 7 affected regressions),
+  plus 5 backend/live-HTTP checks PASS. Reruns and four-view audit assertions are
+  not additional test cases. Four 1440/390px light/dark Axe audits: zero violations;
+  color-contrast remains an Axe incomplete item. Independent computed checks cover
+  555 light / 575 dark text, placeholder and control-boundary samples per view,
+  with zero failures. Gradient/opacity cases, native widgets and manual perception
+  remain uncertified. Visual screenshots inspected; not manual NVDA acceptance.
+- Reproduced defects: reminder consent loses focus to BODY; inputs have no visible
+  keyboard outline; input borders measure below 3:1 (example 1.66 light / 1.01 dark).
+  `travel_planner.js` now restores action focus after module rerenders, reopens its
+  form, falls back to reload after removal/disabled Undo, and announces successful
+  actions in the existing alert. Guards prevent restoration after auth/trip changes
+  or when the owner moves focus. Travel CSS restores 3px light/dark outlines and
+  uses the existing muted color for control boundaries. No new dependencies.
+- Keyboard journey PASS: four-view consent, packing add/edit/remove, itinerary
+  add/undo, private catalog list/link/unlink, invalid timezone feedback/draft/focus
+  and reduced motion. Delayed document completion preserves focus moved elsewhere.
+  Catalog boundary synthetic; unchanged real encrypted D1 evidence reused.
+  Native Tab/Enter/Space exercised; no manual NVDA claim.
+- Affected Chrome regressions PASS: editor conflict/idempotent retry, organizer
+  stale/expiry/outage/unlink, packing offline/reopen, reminder narrow DST/reschedule,
+  export stale/auth-loss, affordability stale/auth-loss and savings stale/auth-loss.
+  Backend checks: real D2-A security matrix (3) and live HTTP/assets/forms (2).
+  D1 complete journeys were not rerun. No finance/backend behavior was changed.
+- Evidence: `artifacts/travel-d2b-20261028/{baseline,boundary-baseline,keyboard-native,
+  input-focus,final-browser,contrast-final,regressions}` and
+  `artifacts/ci-repair-ac05515/travel-d2b-*`. Initial fixture tab-order/duplicate
+  receipt-key errors and wrong test-settings command retained, not application bugs.
+- Changed source: `static/js/travel_planner.js`, `static/css/travel_planner.css`,
+  `tests/test_user_data_browser.py`; three trackers. Existing owner sheet updated
+  with Windows/NVDA and manual contrast instructions; every manual row PENDING.
+- Final migration/inventory, Graphify, immutable source/privacy preflight, normal
+  commit/push and PR draft/new exact-head CI closure follow. Final HEAD/results:
+  `artifacts/travel-d2b-20261028/{local-acceptance,push,pr,ci}.json` and
+  `source-checkpoint/<HEAD>/release.json`. Matching PASS closure receipts permit
+  READY_FOR_NEXT; CI_PENDING and manual/formal gates remain explicit.
+- NEXT: check the recorded new exact-head CI once, fix confirmed failures, then
+  D2-C cumulative security/privacy/accessibility evidence reconciliation. Do not
+  start D3 or repeat unchanged passing D1/C1–C4 work.
+- D2-B only. Keep 75/143 and 0/13; D2-C next. No merge/deployment/real-data writes.
+
+## Previous checkpoint — D2-A CI repair/security negatives (2026-10-28)
 
 - Recovered clean, synchronized `2391b45362b717c6dfc522648bb2103d0ba9aaa7` on
   `development/alfred-integrated`. PR #20 remains DRAFT, unmerged into master and
