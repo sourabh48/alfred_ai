@@ -42,6 +42,15 @@
 <section id="plannerDocuments" class="surface-card mb-4" aria-label="Private trip documents"></section>
 <section id="plannerPacking" class="surface-card mb-4" aria-label="Private packing checklist"></section>
 <section id="plannerReminders" class="surface-card mb-4" aria-label="Local trip reminders"></section>
+<section id="plannerAffordability" class="surface-card mb-4" aria-label="Saved-trip affordability" hidden>
+    <details id="plannerAffordabilityDetails"><summary>Saved-trip affordability and What-if</summary>
+        <p>Current cash with one month of protected obligations. Future income and spending before departure are not projected. These are private planning scenarios, not certified financial advice.</p>
+        <button id="plannerAffordabilityReload" type="button" class="btn btn-sm btn-outline-primary">Reload financial evidence</button>
+        <p id="plannerAffordabilityStatus" role="status" aria-live="polite"></p>
+        <div id="plannerAffordabilityBody"></div>
+        <div id="plannerAffordabilityResult" role="status" aria-live="polite"></div>
+    </details>
+</section>
 <section id="plannerEvidence" class="mb-4" hidden aria-label="Travel research, map and sources">
     <h2 id="plannerEvidenceTitle" class="page-section-title">Travel research</h2>
     <div id="plannerResearchChoices" class="travel-actions mb-3" role="group" aria-label="Choose destination research"></div>

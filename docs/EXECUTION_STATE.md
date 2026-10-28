@@ -22,10 +22,55 @@
   browser cases:3original failures PASS,newoutage test had hidden-detail assertion
   failure;opened actual disclosure then final2affected cases PASS.4unique Chrome
   cases now PASS across incremental runs;no timeout/assertion/permission weakening.
-  Graphify query also now works without policy change;graphupdate due after code.
-- CONTINUE_REQUIRED:finish CI-rootcause tests/checkpoint/commit/privacy/push/newCI;
-  then implement C2 using accepted C1 only. Baseline75/143,extensions0/13 unchanged.
-  C3/C4,D1–D5 and independent/manual/production acceptance remain separate.
+  Graphify query/update now work without policy change;AST-only,no provider calls.
+- CI repair2577054d76bdf12d6f88833c619442442fd160b4 committed/pushed,source/history
+  privacy PASS zero findings. Exact-source40679418199 observed IN_PROGRESS only.
+  Final C2 HEAD needs its own CI;no green inherited. PR20 remains DRAFT/unmerged.
+- C2 implemented using unchanged accepted C1:owned saved-trip GET/POST affordability
+  endpoint,private/no-store/auth/CSRF,session revision+saved-content HMAC binding,
+  fresh financial revision check;stale trip/source409. No canonical financial writes.
+  Explicit currency/all7amount verification,completeness/disjoint allocations;
+  readonly canonical essential/EMI split. Cash/reserve/savings/trip/extra contingency
+  what-ifs expose protected/available funds,headroom/shortfall. Affordable=positive
+  headroom,Tight=exactzero,OverBudget=negative,InsufficientData=missing evidence;
+  all uncertified/currentcash+onemonth only. Future-date projections remain C3.
+- Saved planning estimate shown separately with recorded currency/unverified label,
+  never copied/converted into scenario. No defaultcurrency/INR/FX. Source observation
+  dates/completeness visible;fresh check before every calculation,existing30s visible
+  live-refresh/focus revalidation invalidates changed evidence and consent. No model/
+  migration/provider/config activation or financial/register mutation.
+- Page-only drafts clear on trip/session switch,pagehide,closed panel or authloss.
+  Same-trip source/revision changes retain inputs but clear result/confirmation.
+  Native review found/fixed cross-trip assumption carryover and disabled-field draft
+  loss;new delayed-response/revision/trip-switch Chrome regression verifies both.
+  Epoch/read-order guards discard old responses. No localStorage/private copies.
+-33unique backend/profile checks accepted incrementally:10API,17unchanged C1,
+  5combined-export regressions,1targeted-profile contract. Initial27case run had1new
+  revoked-session fixture ordering error,corrected onePASS in7affected/profile batch;
+  imported C1 duplicate discovery removed. Failed receipts retained,no double count.
+- Final6Chrome PASS:4C2what-if/stale/privacy/offline/pending-revision/trip-switch
+  workflows+2affected export/reminder regressions(overlap originalCIrepair cases).
+ 8unique Chrome overall including4CIrepair cases;initial3C2/reruns not added again.
+  Four1440/390light/dark Axe audits zero violations;contrast incomplete/manual
+  screen-reader pending. One blank narrow capture afterviewportchange prompted
+  frame/viewport readiness check;fresh capture case PASS,all4views inspected,
+  no runtime change. Capture rerun overlaps one of the4C2cases,not a new workflow.
+- JS syntax/migration drift/inventory PASS. Final API10PASS after isolated-cache
+  setup;production60/min throttle unchanged. AST Graphify11672/32686/523,noAPIcost.
+  Native C2+CIrepair runtime reviews CLEAN,sameharness/fixtures
+  SUMMARY ONLY,sourcehashes in artifacts/travel-c2-20261028/review-source.json.
+  Whole cumulative PR/independent external/manual/real-account/production gates remain
+  pending;no extension or broader Travel acceptance. Baseline75/143,extensions0/13.
+- Changed runtime:travel/affordability_ui.py,planner_views.py,urls.py,travel_affordability
+  .js,plannerJS,twoTraveltemplates,releaseprofile;newAPI/browser tests+3trackers.
+  Evidence ci-repair-ac05515/travel-c2-*.json and artifacts/travel-c2-20261028/.
+- Closure:commit C2+trackers,immutable source/history privacy preflight,push normally,
+  verify PR20draft
+  exacthead,newCI and remote match. source-checkpoint/<HEAD>/release.json,push.json,
+  ci.json own exact finalclosure. Matching PASS/runrecord permits READY_FOR_NEXT
+  with CI_PENDING/FORMAL_ACCEPTANCE_PENDING. No master/Pages/deploy/live money writes.
+- NEXT:NEXT checks final ci.json once,fixes confirmed failures,then selects C3
+  future-date savings scenarios. Do not repeat C1/C2 or originalaccepted Travel work.
 
 ## Previous checkpoint — TRAVEL2-005/C1 (2026-10-28)
 

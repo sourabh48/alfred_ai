@@ -1,6 +1,6 @@
 from django.urls import path
 from .planner_views import (TravelSessionList, TravelSessionDetail, TravelPreferencesView,
-                            TravelFeedbackView, TravelMediaSuggestionsView, TravelProviderUsage)
+                            TravelFeedbackView, TravelMediaSuggestionsView, TravelProviderUsage, TravelAffordabilityView)
 
 from .views import (
     BikeConditionSnapshotDetailView,
@@ -32,6 +32,7 @@ from .views import (
 urlpatterns = [
     path("planner/sessions/", TravelSessionList.as_view(), name="travel_sessions"),
     path("planner/sessions/<int:pk>/", TravelSessionDetail.as_view(), name="travel_session_detail"),
+    path("planner/sessions/<int:pk>/affordability/", TravelAffordabilityView.as_view(), name="travel_affordability"),
     path("planner/preferences/", TravelPreferencesView.as_view(), name="travel_preferences"),
     path("planner/providers/", TravelProviderUsage.as_view(), name="travel_provider_usage"),
     path("planner/feedback/", TravelFeedbackView.as_view(), name="travel_feedback"),

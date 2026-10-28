@@ -8,6 +8,7 @@ window.TravelPlanner = (() => {
     let documentEpoch=0, documentActive=true, documentRefreshPending=false;
     let exportController=null;
     function clearDocuments() {
+        window.TravelAffordability.clear();
         exportController?.abort();
         $('plannerExport').hidden=true;
         window.TravelCalendar.clear();
@@ -193,6 +194,7 @@ window.TravelPlanner = (() => {
         candidates(); comparison(); itinerary(); stops(); documents();
         if(documentActive)window.TravelPacking.render(session);
         if(documentActive)window.TravelReminders.render(session);
+        if(documentActive)window.TravelAffordability.sync(session);
         $('plannerExport').hidden=!documentActive || !session.plan_id;
         window.TravelResearchPanels.render(session);
         if (session.plan_id) populateDetails(session.plan_id);
@@ -273,6 +275,7 @@ window.TravelPlanner = (() => {
         window.TravelItineraryEditor.init(action);
         window.TravelPacking.init({current:()=>state.session,send:action,reload:()=>open(state.session.id).catch(error=>alert(error.message))});
         window.TravelReminders.init({current:()=>state.session,send:action,reload:()=>open(state.session.id).catch(error=>alert(error.message))});
+        window.TravelAffordability.init({current:()=>state.session,request:fetchPlanner});
         $("plannerComposer").addEventListener("submit", e=>{e.preventDefault(); message($("plannerInput").value);});
         $("plannerNew").addEventListener("click", ()=>create().catch(e=>alert(e.message)));
         $("plannerDraft").addEventListener("click", ()=>action({action:"save",draft:true}));

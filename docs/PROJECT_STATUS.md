@@ -1,6 +1,24 @@
 # ALFRED Project Status
 
-Latest CONTINUE CI→C2:PR20 is DRAFT/development→master,NOT_MERGE_READY. Exactd0c15d7
+## Active implementation checkpoint — TRAVEL2-005/C2,2026-10-28
+
+C2 saved-trip dashboard/what-if UI/API implemented over unchanged C1. Explicit
+matching-currency/all7amount/completeness/disjoint confirmation;exact Decimal cash,
+protected reserves/essential/EMI/savings and trip+extra contingency with headroom/
+shortfall. Scenario-only Affordable/Tight/OverBudget/InsufficientData;no certified
+advice,inferred INR/FX,financial writes or migration. Source dates/completeness,
+saved-content/session/source revisions,automatic visible/focus invalidation,
+same-trip draft safety and cross-trip/auth/pagehide clearing implemented/tested.
+33unique backend/profile checks PASS;final6Chrome PASS,4Axeviews zero violations,
+native scoped source review CLEAN(sameharness/fixtures-summary),JS/migration PASS.
+CIrepair2577054 pushed/privacyPASS,run40679418199 observed pending;PR20DRAFT,
+NOT_MERGE_READY. Exact C2 finalsource/privacy/push/CI closure in EXECUTION_STATE.
+Independent/manual contrast/screen-reader/real-account/production remain pending.
+All68remaining baseline IDs and13extension statuses preserved:75/143,0/13.
+
+### Previous CI-repair checkpoint (before C2)
+
+CONTINUE CI→C2:PR20 is DRAFT/development→master,NOT_MERGE_READY. Exactd0c15d7
 CI40599527246 Windows/LinuxPASS,Selenium3errors. All3original workflows plus new
 history-outage case PASS locally(4unique Chrome cases across repairs). Source
 picker/history outage isolation and synthetic session/form readiness repaired;
@@ -27,7 +45,7 @@ Final source/push/CI closure in EXECUTION_STATE. C2UI/API deferred.
 
 **Canonical original143-capability inventory and acceptance evidence. Updated2026-10-26.**
 
-## Active implementation checkpoint — TRAVEL2-004/B4,2026-10-28
+## Previous implementation checkpoint — TRAVEL2-004/B4,2026-10-28
 
 Bounded combined exports LOCAL_VERIFIED using one owned saved trip and independent
 PDF/GPX/ICS parsers. Final16 backend/profile checks PASS(5B4+10affectedICS+1profile),

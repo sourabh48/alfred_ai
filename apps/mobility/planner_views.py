@@ -31,6 +31,9 @@ from .services.travel.reminders import reminder_payload, update_reminders
 from .services.travel.pdf_export import itinerary_pdf
 from .services.travel.gpx_export import itinerary_gpx
 from .services.travel.ics_export import calendar_choices, itinerary_ics
+from .services.travel.affordability import FIELDS
+from .services.travel.affordability_ui import affordability_dashboard, affordability_scenario, trip_context
+from django.utils.crypto import constant_time_compare
 
 
 class PlannerWriteThrottle(UserRateThrottle):
@@ -116,6 +119,41 @@ class TravelSessionList(PrivateTravelSessionAPI):
                     queue_research(existing, recheck=True)
                 return Response(session_payload(existing))
         return Response(session_payload(new_session(request.user, plan)), status=201)
+
+
+class TravelAffordabilityView(PrivateTravelSessionAPI):
+    def owned(self, request, pk):
+        session = get_object_or_404(TravelPlanningSession, pk=pk, user=request.user)
+        if not session.plan_id:
+            raise ValidationError({'detail': 'Save this trip or a draft before reviewing affordability.'})
+        plan = get_object_or_404(TravelPlan, pk=session.plan_id, user=request.user)
+        return session, plan
+
+    @transaction.atomic
+    def get(self, request, pk):
+        session, plan = self.owned(request, pk)
+        return Response(affordability_dashboard(request.user, session, plan))
+
+    @transaction.atomic
+    def post(self, request, pk):
+        session, plan = self.owned(request, pk)
+        data = request.data
+        if not isinstance(data, dict) or set(data) != {'revision', 'snapshot', 'confirmation'}:
+            raise ValidationError({'detail': 'Choose a bounded saved-trip affordability scenario.'})
+        if type(data['revision']) is not int or data['revision'] != session.revision:
+            return Response({'detail': 'This trip changed. Reload affordability and confirm the new evidence.', 'code':'trip_changed'}, status=409)
+        snapshot = data['snapshot']
+        if not isinstance(snapshot, str) or len(snapshot) != 64 or not constant_time_compare(snapshot, trip_context(session, plan)['snapshot']):
+            return Response({'detail': 'The saved trip changed. Reload affordability and confirm the new evidence.', 'code':'trip_changed'}, status=409)
+        confirmation = data['confirmation']
+        if (not isinstance(confirmation, dict) or
+                set(confirmation) - set(FIELDS) - {'source_revision', 'complete', 'disjoint_allocations'} or
+                any(isinstance(confirmation.get(field), dict) and set(confirmation[field]) - {'amount', 'currency', 'verified'} for field in FIELDS)):
+            raise ValidationError({'detail': 'Use only the seven financial assumptions and their confirmation fields.'})
+        result = affordability_scenario(request.user, confirmation)
+        if 'STALE_OR_FOREIGN_SOURCE' in result['issues']:
+            return Response({'detail': 'Financial evidence changed. Reload affordability and confirm current amounts.', 'code':'source_changed'}, status=409)
+        return Response(result)
 
 
 class TravelSessionDetail(PrivateTravelSessionAPI):

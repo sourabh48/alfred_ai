@@ -4642,6 +4642,127 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         session.refresh_from_db()
         return session
 
+    def affordability_fixture(self):
+        from copy import deepcopy
+        from tests import test_travel_affordability as fixtures
+        from apps.mobility.models import TravelPlan,TravelPlanningSession
+        original=self.packing_fixture()
+        fixtures.TravelAffordabilityTests.setUp(self)
+        self.user.set_password(PASSWORD);self.user.save(update_fields=['password'])
+        plan=TravelPlan.objects.create(user=self.user,title='Synthetic affordability trip',
+            planning_state=deepcopy(original.plan.planning_state),itinerary=deepcopy(original.plan.itinerary))
+        session=TravelPlanningSession.objects.create(user=self.user,plan=plan,title=plan.title,state=plan.planning_state,itinerary=plan.itinerary)
+        self.browser.execute_cdp_cmd('Emulation.clearDeviceMetricsOverride',{})
+        self.login(self.user.username);self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerAffordabilityDetails').is_displayed())
+        from selenium.webdriver.common.keys import Keys
+        self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityDetails summary').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID,'plannerAffordabilityForm'))
+        return session
+
+    def affordability_fields(self,cost='400',cash='1000.00'):
+        for name,value in (('currency','USD'),('spendable_cash',cash),('emergency_reserve','200'),('committed_savings','100'),('trip_budget',cost),('contingency','25')):
+            field=self.browser.find_element(self.By.CSS_SELECTOR,f'#plannerAffordabilityForm [name="{name}"]')
+            field.clear();field.send_keys(value)
+        for name in ('complete','disjoint','verified'):
+            checkbox=self.browser.find_element(self.By.CSS_SELECTOR,f'#plannerAffordabilityForm [name="{name}"]')
+            if not checkbox.is_selected():self.memory_click(f'#plannerAffordabilityForm [name="{name}"]')
+
+    def test_travel_affordability_what_if_keyboard_and_light_dark_accessibility(self):
+        from selenium.webdriver.common.keys import Keys
+        from apps.expenses.models import BankAccount
+        from apps.loans.models import Loan
+        session=self.affordability_fixture()
+        self.assertEqual(self.browser.find_element(self.By.ID,'affordCurrency').get_attribute('value'),'')
+        before=(list(BankAccount.objects.values()),list(Expense.objects.values()),list(Loan.objects.values()))
+        for cost,status in (('400','Affordable'),('500','Tight'),('500.01','Over Budget')):
+            self.affordability_fields(cost)
+            self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityForm button').send_keys(Keys.ENTER)
+            self.wait.until(lambda _: status+' · scenario only' in self.text('plannerAffordabilityResult'))
+            self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityForm button').is_enabled())
+        self.memory_click('#plannerAffordabilityForm [name="complete"]')
+        self.memory_click('#plannerAffordabilityForm button')
+        self.wait.until(lambda _: 'Insufficient Data' in self.text('plannerAffordabilityResult'))
+        self.assertEqual(before,(list(BankAccount.objects.values()),list(Expense.objects.values()),list(Loan.objects.values())))
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings=[];self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_cdp_cmd('Input.dispatchMouseEvent',dict(type='mouseMoved',x=2,y=2))
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                result=self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations.map(v=>({id:v.id,targets:v.nodes.map(n=>n.target)})),incomplete:r.incomplete.map(v=>v.id)}));")
+                findings.append(dict(width=width,theme=theme,**result))
+                (self.artifacts/'travel-affordability-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(result['violations'],[],findings[-1])
+                self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth<=innerWidth'))
+                self.browser.execute_script("document.getElementById('plannerAffordability').scrollIntoView({block:'start',behavior:'instant'})")
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("const r=document.getElementById('plannerAffordability').getBoundingClientRect();return r.top<innerHeight&&r.bottom>0"))
+                self.capture(f'travel-affordability-{width}-{theme}')
+
+    def test_travel_affordability_stale_evidence_drafts_and_auth_privacy(self):
+        from apps.expenses.models import BankAccount
+        from django.contrib.sessions.models import Session
+        self.affordability_fixture();self.affordability_fields()
+        BankAccount.objects.filter(pk=self.account.pk).update(current_balance='900.00')
+        self.memory_click('#plannerAffordabilityForm button')
+        self.wait.until(lambda _: 'Observed cash cap: 900.00' in self.text('plannerAffordabilityBody'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityForm [name="trip_budget"]').get_attribute('value'),'400')
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityForm [name="verified"]').is_selected())
+        self.assertEqual(self.text('plannerAffordabilityResult'),'')
+        self.wait.until(lambda _: self.active_requests==0)
+        cookie=self.browser.get_cookie(settings.SESSION_COOKIE_NAME);self.assertIsNotNone(cookie)
+        Session.objects.filter(session_key=cookie['value']).delete()
+        self.browser.delete_cookie(settings.SESSION_COOKIE_NAME)
+        self.memory_click('#plannerAffordabilityReload')
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerAffordability').is_displayed())
+        self.assertEqual(self.browser.find_element(self.By.ID,'plannerAffordabilityBody').get_attribute('textContent'),'')
+
+    def test_travel_affordability_offline_retry_and_pagehide_keep_no_private_result(self):
+        self.affordability_fixture();self.affordability_fields()
+        self.browser.execute_cdp_cmd('Network.enable',{})
+        self.addCleanup(self.browser.execute_cdp_cmd,'Network.emulateNetworkConditions',dict(offline=False,latency=0,downloadThroughput=-1,uploadThroughput=-1))
+        self.browser.execute_cdp_cmd('Network.emulateNetworkConditions',dict(offline=True,latency=0,downloadThroughput=-1,uploadThroughput=-1))
+        self.memory_click('#plannerAffordabilityForm button')
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityForm button').is_enabled())
+        self.assertEqual(self.text('plannerAffordabilityResult'),'')
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityForm [name="trip_budget"]').get_attribute('value'),'400')
+        self.browser.execute_cdp_cmd('Network.emulateNetworkConditions',dict(offline=False,latency=0,downloadThroughput=-1,uploadThroughput=-1))
+        self.memory_click('#plannerAffordabilityForm button')
+        self.wait.until(lambda _: 'Affordable · scenario only' in self.text('plannerAffordabilityResult'))
+        self.browser.execute_script('window.dispatchEvent(new Event("pagehide"))')
+        self.assertEqual(self.browser.find_element(self.By.ID,'plannerAffordabilityBody').get_attribute('textContent'),'')
+        self.assertEqual(self.browser.find_element(self.By.ID,'plannerAffordabilityResult').get_attribute('textContent'),'')
+
+    def test_travel_affordability_pending_revision_preserves_draft_and_trip_switch_clears_it(self):
+        from copy import deepcopy
+        from apps.mobility.models import TravelPlan,TravelPlanningSession
+        session=self.affordability_fixture();self.affordability_fields()
+        self.browser.execute_script("""const original=window.fetch;window.fetch=(url,options)=>{
+            const reply=original(url,options);
+            return String(url).endsWith('/affordability/')&&options?.method==='POST'
+                ?reply.then(response=>new Promise(resolve=>window.releaseAffordability=()=>resolve(response))):reply;
+        };""")
+        self.memory_click('#plannerAffordabilityForm button')
+        self.wait.until(lambda _: self.browser.execute_script('return typeof window.releaseAffordability==="function"'))
+        TravelPlanningSession.objects.filter(pk=session.pk).update(revision=session.revision+1)
+        self.browser.execute_script('window.TravelPlanner.reload()')
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityForm button').is_enabled())
+        self.assertEqual(self.browser.find_element(self.By.ID,'afford_trip_budget').get_attribute('value'),'400')
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'#plannerAffordabilityForm [name="verified"]').is_selected())
+        self.browser.execute_script('window.releaseAffordability()')
+        self.assertEqual(self.text('plannerAffordabilityResult'),'')
+        plan=TravelPlan.objects.create(user=self.user,title='Other owned trip',
+            itinerary=deepcopy(session.plan.itinerary),planning_state=deepcopy(session.plan.planning_state))
+        self.browser.execute_script('window.TravelPlanner.openPlan(arguments[0])',plan.pk)
+        self.wait.until(lambda _: 'Other owned trip' in self.text('plannerAffordabilityBody'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'affordCurrency').get_attribute('value'),'')
+        self.assertEqual(self.browser.find_element(self.By.ID,'afford_trip_budget').get_attribute('value'),'')
+        self.assertEqual(self.text('plannerAffordabilityResult'),'')
+
     def pdf_download_folder(self):
         from alfred_private_storage import private_directory
         folder=private_directory(Path(self.enterContext(TemporaryDirectory()))/'downloads')
