@@ -13,7 +13,15 @@ synchronized before this batch. PR #20 DRAFT/unmerged, submitted reviews and
 approvals both zero. Run 40742137700: Windows/Linux SUCCESS, Selenium FAIL
 (151 cases, one stale-element error in D1 savings setup). The fixture mistook an
 already-present income value for reload completion; it now waits for the old form
-to be replaced. No application runtime, assertion or timeout change.
+to be replaced. No application runtime, assertion or per-test wait change.
+
+Continuation at `84a56fdb9d1f00746fd61dac52802f3a3ebc59d0`: run 40754201960
+Windows/Linux SUCCESS, Selenium CANCELLED. GitHub annotation confirms the 45-minute
+job limit; 136 passing progress markers and no E/F markers precede interruption,
+without final suite proof. The outer Selenium budget is now 60 minutes, justified
+by that measured cutoff. Full coverage, per-test waits, no-skip proof validation,
+quotas and other jobs are unchanged. Nine runner/workflow contract checks PASS;
+new exact-head CI is required. Cancellation is not acceptance.
 
 The first local rerun passed that point but hit the real API quota during rapid
 synthetic actions. Both quota failures are retained. D1 now allows the actual
@@ -31,7 +39,8 @@ acceptance. Fresh exact-head CI remains required; manual/review gates stay open.
 
 Runtime source for every row: exact `dff017383d16362da0313c8b16eb81eca0d5e03e`.
 The 12 backend paths in A and both JS/CSS hashes in B match the current tree.
-This batch changes tests/trackers only; a fresh commit still requires its own CI.
+This batch changes fixtures/trackers and the outer CI budget only; a fresh commit
+still requires its own CI.
 PASS means the bounded synthetic checks listed below, not complete WCAG, live
 provider/account, production or independent approval. AXE PASS means zero violations
 in the four global desktop/390px light/dark audits; its color-contrast incomplete
@@ -89,7 +98,7 @@ Provider fixtures do not prove live routing/availability or motorcycle legality.
 
 | Extension | Documented bounded contract reconciled | LOCAL_VERIFIED | CI_PASSED at current cumulative source | Remaining acceptance | FORMALLY_ACCEPTED |
 | --- | --- | --- | --- | --- | --- |
-| TRAVEL2-001 | Stable IDs, activity/stop edits/order, undo/history, CAS/retry, preserved state and stale-estimate invalidation | YES, E1+A+B+I | NO: dff0173 Selenium failed; fresh head pending | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; D3/D4 recovery/review evidence | NO |
+| TRAVEL2-001 | Stable IDs, activity/stop edits/order, undo/history, CAS/retry, preserved state and stale-estimate invalidation | YES, E1+A+B+I | NO: dff0173 failed; 84a56fd cancelled; fresh head pending | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; D3/D4 recovery/review evidence | NO |
 | TRAVEL2-002 | Owned encrypted originals, link/unlink/expiry/reopen, no false booking or metadata after auth loss | YES, E2+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; D3/D4 | NO |
 | TRAVEL2-003 | Packing CRUD/IDs/reopen plus opt-in UTC/DST/CAS/cancel/idempotent late local delivery/restart | YES, E3+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; native picker/recovery acceptance | NO |
 | TRAVEL2-004 | Private PDF, truthful GPX, date/time/DST/UID-correct ICS, independent parsers and same-trip stale/auth safeguards | YES, E4+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; full cumulative CI | NO |

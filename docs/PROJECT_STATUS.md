@@ -14,6 +14,12 @@ Final repair validation: 3 Chrome cases PASS, including D1 7/7 and two savings
 regressions; 2 real quota backend regressions PASS. Migration/inventory PASS.
 D2-C reconciliation LOCAL_VERIFIED; fresh exact-head CI remains separate.
 
+Continuation at84a56fd: run40754201960 Windows/Linux PASS, Selenium CANCELLED
+by its confirmed 45-minute job limit (136 passing markers; no final suite proof).
+Only the outer Selenium budget changes to60minutes; per-test waits, assertions,
+coverage and protection stay unchanged. Nine CI runner/wiring checks PASS.
+New source/push/CI closure remains in EXECUTION_STATE; cancellation is not a pass.
+
 Cumulative seven-feature security/privacy/keyboard/Axe/contrast/NVDA matrix and
 TRAVEL2-001–005 acceptance decisions now live in ALFRED_2_0_EXECUTION. D2-A backend
 and D2-B frontend hashes match dff0173; unchanged evidence reused. Automated Axe,

@@ -2,6 +2,18 @@
 
 ## Active checkpoint — D2-C acceptance reconciliation (2026-10-29)
 
+- Continuation recovered clean, synchronized `84a56fdb9d1f00746fd61dac52802f3a3ebc59d0`.
+  Run 40754201960: Windows/Linux SUCCESS, Selenium CANCELLED. Annotation explicitly
+  says maximum execution time 45m0s exceeded (job 123048614797; 2712s total).
+  Logs retain 136 passing progress markers, no E/F markers and no final suite proof.
+  Intentional document-test screenshots are not failure evidence. ZIP 12848280998
+  retained as selenium-cancelled.zip; SHA256
+  `6c917d56578046d72c6de7fd9195fa44d71fc82894f996ad0c9ce3779e7794c2`.
+- Minimal CI correction: Selenium outer job budget 45 -> 60 minutes, based on that
+  measured cutoff. All tests, per-test waits, assertions, no-skip proof checks,
+  quotas and other jobs unchanged. Nine runner/CI contract checks PASS; browser
+  and quota evidence reused unchanged. New commit/preflight/push/exact-head run
+  must close this handoff. No cancellation is promoted to PASS.
 - Recovered clean, synchronized `dff017383d16362da0313c8b16eb81eca0d5e03e` on
   `development/alfred-integrated`; PR #20 DRAFT/unmerged, no auto-merge or reviews.
 - Run 40742137700: Windows/Linux SUCCESS, Selenium FAILURE (151 cases / 1 error).
@@ -29,7 +41,8 @@
   PASS: per-account rejection/no mutation and atomic multi-bucket/restart behavior.
   Migration/inventory checks PASS; no D2-B audits or D1 backend suite repeated.
   No source test counts or capabilities promoted from reused evidence.
-- Changed source: `tests/test_user_data_browser.py` (5 fixture lines); no runtime
+- Changed source: `tests/test_user_data_browser.py` (5 fixture lines), Selenium
+  job budget in `.github/workflows/browser-regression.yml`; no runtime
   change. Evidence under `artifacts/travel-d2c-20261029` and targeted wrapper receipts.
   Preserve D1 local 7/7, D2-A/B, C1–C4; keep 75/143 and 0/13. D2-C only this run.
 - Final source/history privacy/dependency preflight, normal commit/push, PR draft

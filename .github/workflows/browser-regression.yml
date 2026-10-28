@@ -101,8 +101,8 @@ jobs:
   selenium:
     # The complete suite exercises real DPAPI encryption; private-memory tests remain required.
     runs-on: windows-latest
-    # Runs40485342191/40491012266 hit30m including dependency setup; retain full coverage.
-    timeout-minutes: 45
+    # Run 40754201960 exceeded 45m after 136 passing markers; retain full-suite proof and artifacts.
+    timeout-minutes: 60
 
     steps:
       - name: Check out repository
