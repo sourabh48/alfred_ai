@@ -1,6 +1,57 @@
 # ALFRED execution state
 
-## Active checkpoint — D1 integrated Travel local closure (2026-10-28)
+## Active checkpoint — D2-A CI repair/security negatives (2026-10-28)
+
+- Recovered clean, synchronized `2391b45362b717c6dfc522648bb2103d0ba9aaa7` on
+  `development/alfred-integrated`. PR #20 remains DRAFT, unmerged into master and
+  NOT MERGE READY. Preserve D1 local 7/7, C1–C4 evidence, 75/143 and 0/13.
+- CI 40730644845 at that source: Linux portable acceptance had 21 cases / 1 error
+  in Career matching abstention after reload. Final observation: Windows SUCCESS,
+  Selenium IN_PROGRESS. Trace at line 273, HTML, console and screenshot inspected.
+  Artifact 12834922854 retained at `artifacts/travel-d2a-20261028/ci-linux.zip`;
+  SHA256 `fe729984e6c51dae49b1ed84c7d4b8370a625063d93738b3e60152cabb05dae8`.
+  Screenshot shows newly entered text and the old fit score of 80.
+- Classification: test fixture resume-load readiness race. Dashboard readiness and
+  an old result can precede resume availability; production correctly refuses to
+  submit while the selector is disabled. Fixture now waits for enabled controls
+  on both loads and a new analysis row before the original abstention assertions.
+  Exact Career Chrome case PASS locally; fresh Linux CI is still required.
+  Assertions, workflow coverage, guards and timeouts unchanged; no runtime change.
+- New security matrix: 3 PASS. Owner/auth/CSRF/private errors across editor,
+  packing, reminders, documents, PDF/GPX/ICS, affordability and savings; revoked
+  server sessions reject every action without trip mutations. A real CSRF cookie
+  and header admit authorized packing. The unmodified 60/min write quota returns
+  429 with Retry-After and preserves independent user keys; GET exemption unchanged.
+  Initial quota fixture omitted setup's stop-selection POST; corrected by reading
+  consumed cache slots, without clearing the cache or changing clock/quota policy.
+- Focused security regressions: 23 PASS for document privacy/outage/original
+  ownership, packing CAS, reminder auth/corrupt/replay/revocation, export escaping,
+  financial no-writes/savings auth/CSRF and private-DNS/redirect/TLS/error boundaries.
+  One profile check PASS: 27 unique backend/profile checks total. One Career Chrome
+  case PASS. Migration, inventory and JS checks PASS; D1 journeys were not rerun.
+- Available delegated source review CLEAN: Codex same-harness agent
+  `/root/d2a_security_review`, 12 unchanged backend runtime paths; manifest digest
+  c727b8ebde114147389ffe078efe07cc6d8d935ccef54f0c86b5ac98bb8d2ed1.
+  Source-only; fixture names/statistics only, no private files/providers. This is
+  not human/external independent review, cumulative PR approval or release approval.
+- D2-B accessibility/browser corrections NOT_STARTED. No new Axe, manual contrast
+  or screen-reader acceptance. Pending owner sheet is in the execution roadmap.
+  D2-C remains queued; D3–D5 unchanged. Do not promote D2 or any requirement.
+  No real-account/financial writes, cloud activation, migrations or release changes.
+- Changed files: new `tests/test_travel_security.py`, Career browser fixture,
+  backend profile registration and three relevant trackers. Evidence is under
+  `artifacts/travel-d2a-20261028` and `artifacts/ci-repair-ac05515/travel-d2a-*`.
+  Failed quota fixture receipt retained. Graphify AST update completed.
+- Local batch complete. Final source/privacy preflight, commit, normal push,
+  PR draft verification and new exact-head CI closure remain. Matching PASS closure
+  receipts permit READY_FOR_NEXT; CI_PENDING and formal gates stay explicit.
+  Final HEAD/results: `artifacts/travel-d2a-20261028/{push,pr,ci,local-acceptance}.json`
+  and `source-checkpoint/<HEAD>/release.json` under the same artifact directory.
+- NEXT: check recorded new exact-head CI once, fix confirmed failures, then D2-B
+  actual 1440/390px light/dark browser, accessibility, contrast, reduced motion and
+  security feedback. D2-A only this run; do not repeat unchanged D1/C1–C4 tests.
+
+## Previous checkpoint — D1 integrated Travel local closure (2026-10-28)
 
 - Recovered clean/synchronized45b2b2b142e94275395650bcbf7a745948d73a9a on
   development/alfred-integrated;PR20DRAFT/unmerged→master. Exact40692181959

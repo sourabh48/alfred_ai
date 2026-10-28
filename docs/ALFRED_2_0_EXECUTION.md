@@ -6,7 +6,44 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — D1 integrated Travel (2026-10-28)
+## Current checkpoint — D2-A (2026-10-28)
+
+D2-A security negatives LOCAL_VERIFIED: 3 cross-action matrix checks, 23 targeted
+regressions and 1 profile check PASS (27 unique backend/profile checks). Owner,
+auth, CSRF, revoked session, private cache, no-write, escaping and provider
+boundaries covered. The real 60/min quota and Retry-After are enforced without
+clock/policy changes; existing GET exemption unchanged. Initial quota fixture
+miscounted setup's POST; corrected using consumed slots, failed receipt preserved.
+
+CI 40730644845: Linux Career case failed after reload; source correctly refuses
+submission until resume selection is ready. Fixture waits for enabled controls
+and a new analysis, preserving score/abstention/security assertions and timeouts.
+Exact Career Chrome case PASS locally; fresh Linux/new-head CI still required.
+Windows SUCCESS, Selenium last observed IN_PROGRESS. No runtime changes or D1 rerun.
+
+Source-only delegated Codex same-harness review of 12 backend paths CLEAN; fixture
+summary only, not human/external/cumulative independent approval. Final privacy,
+push and exact-head CI receipts are referenced by EXECUTION_STATE. PR #20 stays
+DRAFT / NOT MERGE READY. D2-B browser/Axe/contrast/reduced-motion checks are NEXT;
+D2-C reconciliation queued. Counts stay 75/143 and 0/13; formal gates pending.
+
+### Pending owner accessibility sheet — complete during D2-B/C
+
+No manual screen-reader session has been performed. Automated source review and
+prior Axe evidence do not fill the observed-result column below.
+
+| Screen | Action | Expected result | Observed result | Status |
+| --- | --- | --- | --- | --- |
+| Itinerary editor | Keyboard add/edit/move/undo and conflict recovery | Named controls,visible focus,draft retained,status announced | Not run manually | PENDING |
+| Private organizer | Tab link/open/unlink and return focus | Clear names,owner original opens,focus returns,no unrelated deletion | Not run manually | PENDING |
+| Packing | Keyboard add/check/uncheck/remove | Labels,state and save/error feedback announced | Not run manually | PENDING |
+| Reminders | Opt in/edit/cancel and hear late delivery | Consent explicit,timezone/errors readable,one delivery announced | Not run manually | PENDING |
+| PDF/GPX/ICS | Keyboard export and failed download retry | Accessible names/status,no forced subscription,focus retained | Not run manually | PENDING |
+| Affordability/savings | Read sources,edit what-if and trigger stale evidence | Current/projected distinction,errors/status announced,no certified incomplete result | Not run manually | PENDING |
+| All Travel panels | Session expiry/reload and ownership transition | Private state/error feedback handled safely,focus recoverable | Not run manually | PENDING |
+| All themes/layouts | 1440/390px light/dark, reduced motion, contrast review | No overflow, visible focus, sufficient contrast, no essential motion | Not run manually | PENDING |
+
+## Previous checkpoint — D1 integrated Travel (2026-10-28)
 
 D1 LOCAL_VERIFIED:7/7 bounded native-Windows journeys on the same owned saved trip,
 with one actual API/service integration case and one complete Chrome case. Creation/
@@ -178,7 +215,7 @@ latest-head CI remains pending,no extension or production approval.
 - [x] C3 — LOCAL_VERIFIED future-date engine/UI;exact-headCI/formal gates pending.
 - [x] C4 — LOCAL_VERIFIED reconciliation;formal/CI/manual acceptance remains pending.
 - [x] D1 — LOCAL_VERIFIED7/7 integrated native-Windows journeys;freshCI/formal gates pending.
-- [ ] D2 — NEXT after CI reconciliation:privacy/security/accessibility.
+- [ ] D2 — ACTIVE:D2-A security negatives local;D2-B browser/accessibility NEXT,D2-C reconciliation queued.
 - [ ] D3 — Native Windows/offline/recovery validation.
 - [ ] D4 — Exact-head CI and independent review.
 - [ ] D5 — Production-readiness report,without deployment.

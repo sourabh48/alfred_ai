@@ -219,6 +219,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: "career" in self.browser.title.lower())
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, "careerRoot").get_attribute("data-page-busy") == "false"
             and self.text("careerSummaryCards"))
+        def recruiter_ready(_):
+            form=self.browser.find_element(self.By.ID,'careerRecruiterForm')
+            return all(control.is_enabled() for control in form.find_elements(self.By.CSS_SELECTOR,'select,button[type="submit"]'))
+        self.wait.until(recruiter_ready)
         field = self.browser.find_element(self.By.ID, "careerRecruiterText")
         field.send_keys(JD)
         count = CareerJobAnalysis.objects.filter(user=owner).count()
@@ -267,9 +271,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture("career-matching-sources-desktop")
         self.browser.refresh()
         self.wait.until(lambda _: "Rule-based fit score 80" in self.text("careerJobMatchPanel"))
+        self.wait.until(recruiter_ready)
         field = self.browser.find_element(self.By.ID, "careerRecruiterText")
         field.send_keys("Contact the synthetic hiring team about opportunities.")
+        count=CareerJobAnalysis.objects.filter(user=owner).count()
         self.memory_click('#careerRecruiterForm button[type="submit"]')
+        self.wait.until(lambda _:CareerJobAnalysis.objects.filter(user=owner).count()==count+1)
         self.wait.until(lambda _: "Fit unavailable" in self.text("careerJobMatchPanel"))
         self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR, "#careerJobMatchPanel .metric-value").text, "Unavailable")
         self.assertIn("incomplete", self.text("careerJobMatchPanel"))

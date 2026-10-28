@@ -1,6 +1,21 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D1 integrated Travel,2026-10-28
+## Active implementation checkpoint — D2-A,2026-10-28
+
+D2-A: 3 cross-action negatives, 23 security regressions and 1 profile check PASS.
+Ownership, auth, CSRF, revoked sessions, private errors, no-writes, replay, consent,
+output/provider safety and the unchanged write quota covered. Linux CI 40730644845
+Career fixture race corrected: wait for resume/select/submit readiness and a new
+analysis before original abstention assertions. One targeted Chrome case PASS;
+fresh CI pending. Prior Windows SUCCESS; Selenium last observed IN_PROGRESS.
+No runtime changes; D1 local 7/7 and C1–C4 evidence retained. Same-harness source
+review CLEAN, not external/human/cumulative approval. D2-B accessibility NEXT,
+D2-C queued; pending manual owner sheet in ALFRED_2_0_EXECUTION.
+PR #20 DRAFT/unmerged. Closure: EXECUTION_STATE and `artifacts/travel-d2a-20261028`.
+75/143, 68 remaining and 0/13 unchanged; D2 remains unaccepted. D3–D5, manual,
+independent, real-account and production gates preserved.
+
+## Previous implementation checkpoint — D1 integrated Travel,2026-10-28
 
 D1 LOCAL_VERIFIED7/7 bounded native-Windows same-trip journeys:real creation/save/
 reopen,editor/doc organizer/packing/reminders,exports and financial reconciliation,
