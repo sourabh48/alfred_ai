@@ -6,7 +6,104 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — D2-B (2026-10-28)
+## Current checkpoint — D2-C (2026-10-29)
+
+Recovery/runtime source: `dff017383d16362da0313c8b16eb81eca0d5e03e`, clean and
+synchronized before this batch. PR #20 DRAFT/unmerged, submitted reviews and
+approvals both zero. Run 40742137700: Windows/Linux SUCCESS, Selenium FAIL
+(151 cases, one stale-element error in D1 savings setup). The fixture mistook an
+already-present income value for reload completion; it now waits for the old form
+to be replaced. No application runtime, assertion or timeout change.
+
+The first local rerun passed that point but hit the real API quota during rapid
+synthetic actions. Both quota failures are retained. D1 now allows the actual
+configured rolling API window before its financial phase, leaving background
+polling and production quotas active. This is real fixture pacing, not a timeout
+increase, cache reset or clock bypass. Final repair validation/push/CI closure is in
+EXECUTION_STATE and `artifacts/travel-d2c-20261029`.
+
+Final paced batch: 3 actual Chrome cases PASS (D1 again 7/7, plus two savings
+regressions), 2 real quota regressions PASS. Migration/inventory PASS. D2-C evidence
+reconciliation LOCAL_VERIFIED; no unchanged D2-B audit/backend rerun or new formal
+acceptance. Fresh exact-head CI remains required; manual/review gates stay open.
+
+### Cumulative D2 security/accessibility matrix
+
+Runtime source for every row: exact `dff017383d16362da0313c8b16eb81eca0d5e03e`.
+The 12 backend paths in A and both JS/CSS hashes in B match the current tree.
+This batch changes tests/trackers only; a fresh commit still requires its own CI.
+PASS means the bounded synthetic checks listed below, not complete WCAG, live
+provider/account, production or independent approval. AXE PASS means zero violations
+in the four global desktop/390px light/dark audits; its color-contrast incomplete
+item is retained. Contrast separates computed supported samples from manual work.
+
+| FEATURE | SECURITY | PRIVACY | KEYBOARD | AXE | CONTRAST | SCREEN READER | EVIDENCE | ACCEPTANCE |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Itinerary editing/undo | PASS | PASS | PASS, bounded edits/order/undo | PASS | PASS computed; PENDING manual | PENDING NVDA | A, B, I, E1 | BLOCKED |
+| Private organizer | PASS | PASS | PASS, list/link/unlink/focus | PASS | PASS computed; PENDING manual | PENDING NVDA | A, B, I, E2 | BLOCKED |
+| Packing | PASS | PASS | PASS, add/edit/check/remove | PASS | PASS computed; PENDING manual | PENDING NVDA | A, B, I, E3 | BLOCKED |
+| Opt-in local reminders | PASS | PASS | PASS, consent/forms; native widget manual PENDING | PASS | PASS computed; PENDING manual | PENDING NVDA | A, B, I, E3 | BLOCKED |
+| PDF/GPX/ICS exports | PASS | PASS | PASS, explicit download/error controls | PASS | PASS computed; PENDING manual | PENDING NVDA | A, B, I, E4 | BLOCKED |
+| Current affordability | PASS | PASS | PASS, bounded scenario controls | PASS | PASS computed; PENDING manual | PENDING NVDA | A, B, I, F | BLOCKED |
+| Future savings | PASS | PASS | PASS, scenario/scroll controls | PASS | PASS computed; PENDING manual | PENDING NVDA | A, B, I, F | BLOCKED |
+
+Evidence keys (local ignored artifacts; no private receipts uploaded):
+
+- **A:** `artifacts/travel-d2a-20261028/{local-acceptance,native-security-review}.json`;
+  backend review/source at `2391b45362b717c6dfc522648bb2103d0ba9aaa7`, unchanged
+  through dff0173. Real owner/auth/CSRF/revoked-session/private-error matrix and
+  unmodified 60/min write quota, CAS/replay/consent, sanitizer/provider regressions.
+- **B:** `artifacts/travel-d2b-20261028/local-acceptance.json`, exact dff0173;
+  `contrast-final/user-data/travel-d2-accessibility.json`,
+  `keyboard-final/user-data/travel-d2-keyboard-complete.json` and regression receipts.
+  Nine unique Chrome/five backend checks; 555 light/575 dark computed samples per
+  view, zero failures, 19 light/9 dark exclusions. Labels, focus/restoration,
+  announcements/error semantics, reduced motion, no overflow, auth/stale/offline
+  states covered. Exclusions/native widgets/manual perception remain uncertified.
+- **I:** D1 `2391b45362b717c6dfc522648bb2103d0ba9aaa7`,
+  `artifacts/travel-d1-20261028/local-acceptance.json`: seven integrated journeys,
+  real encrypted original, independent PDF/XML/ICS parsers, restart/replay and
+  finance snapshots. D2-C reruns only its confirmed failing browser case and
+  affected savings helpers; `artifacts/travel-d2c-20261029/ci-failure.json` preserves
+  the exact CI trace/artifact digest. This is not packaged/device-loss acceptance.
+- **E1/E2:** editor `1fa74491f19892cff9b8b6bc94ca9cf7924d75e3` and organizer source
+  `61bd9bc35ff3a228fa7e2ddc9b109bb11dcfc1c3`; respective
+  `artifacts/travel-{editor,organizer}-20261027/local-acceptance.json` and push receipts.
+- **E3:** packing `6817fa863e95c34e93a9cae121100024f55d8ff7`, reminders
+  `a799b31ec59ace8806460345c6f3de78c7274476`;
+  `artifacts/travel-{packing,reminders}-20261027/local-acceptance.json`.
+- **E4/F:** exports `ebcbda32ee6dd046e290372c8c4539f54394fbf5`,
+  `artifacts/travel-exports-b4-20261028/local-acceptance.json`; financial C4
+  `45b2b2b142e94275395650bcbf7a745948d73a9a`,
+  `artifacts/travel-c4-20261028/local-acceptance.json`. C1–C4 source/reconciliation
+  evidence preserves matching verified currency/Decimal arithmetic, reserve/goal/
+  EMI/transfer identity, stale-source abstention and no canonical financial writes.
+
+Across all rows, ownership/session/CSRF and explicit consent remain enforced;
+document/download responses stay private, no-store and revision-bound. Reminders
+remain opt-in/in-app only. No external private disclosure, inferred FX/currency,
+automatic booking/trading or canonical financial mutations are authorized.
+Provider fixtures do not prove live routing/availability or motorcycle legality.
+
+### TRAVEL2-001–005 acceptance decision
+
+| Extension | Documented bounded contract reconciled | LOCAL_VERIFIED | CI_PASSED at current cumulative source | Remaining acceptance | FORMALLY_ACCEPTED |
+| --- | --- | --- | --- | --- | --- |
+| TRAVEL2-001 | Stable IDs, activity/stop edits/order, undo/history, CAS/retry, preserved state and stale-estimate invalidation | YES, E1+A+B+I | NO: dff0173 Selenium failed; fresh head pending | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; D3/D4 recovery/review evidence | NO |
+| TRAVEL2-002 | Owned encrypted originals, link/unlink/expiry/reopen, no false booking or metadata after auth loss | YES, E2+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; D3/D4 | NO |
+| TRAVEL2-003 | Packing CRUD/IDs/reopen plus opt-in UTC/DST/CAS/cancel/idempotent late local delivery/restart | YES, E3+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; native picker/recovery acceptance | NO |
+| TRAVEL2-004 | Private PDF, truthful GPX, date/time/DST/UID-correct ICS, independent parsers and same-trip stale/auth safeguards | YES, E4+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; full cumulative CI | NO |
+| TRAVEL2-005 | Read-only C1–C4 current/future money reconciliation, explicit assumptions, cutoffs, stale/currency abstention | YES, F+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; D3/D4 | NO |
+
+All five also remain **PRODUCTION_PENDING**. Historical green CI (including editor
+1fa7449 and C4 45b2b2b) is source-specific, not current cumulative acceptance.
+Same-harness Codex scoped reviews are not human/genuinely independent approval;
+GitHub PR #20 has zero submitted reviews/approvals. D2-C records these blockers,
+does not self-approve or promote any extension. No baseline/extension double count:
+75/143 and 0/13 unchanged. NEXT after local closure: D3 Windows/offline/restart/
+recovery, then D4 independent review/exact-head CI and D5 readiness without deploy.
+
+## Previous checkpoint — D2-B (2026-10-28)
 
 Recovered synchronized `d877145`; PR #20 DRAFT/unmerged. Run 40736288039 Linux
 SUCCESS; Windows/Selenium IN_PROGRESS at recovery. D2-A evidence preserved.
@@ -71,12 +168,12 @@ All rows below remain PENDING; automated Chrome evidence is recorded separately.
 
 | Screen | Action | Expected result | Observed result | Status |
 | --- | --- | --- | --- | --- |
-| Itinerary editor | Keyboard add/edit/move/undo and conflict recovery | Named controls,visible focus,draft retained,status announced | Not run manually | PENDING |
-| Private organizer | Tab link/open/unlink and return focus | Clear names,owner original opens,focus returns,no unrelated deletion | Not run manually | PENDING |
-| Packing | Keyboard add/check/uncheck/remove | Labels,state and save/error feedback announced | Not run manually | PENDING |
-| Reminders | Opt in/edit/cancel and hear late delivery | Consent explicit,timezone/errors readable,one delivery announced | Not run manually | PENDING |
-| PDF/GPX/ICS | Keyboard export and failed download retry | Accessible names/status,no forced subscription,focus retained | Not run manually | PENDING |
-| Affordability/savings | Read sources,edit what-if and trigger stale evidence | Current/projected distinction,errors/status announced,no certified incomplete result | Not run manually | PENDING |
+| Itinerary editor | Keyboard add/edit/move/undo and conflict recovery | Named controls, visible focus, retained draft; NVDA announces “Itinerary updated” and recalculation warning | Not run manually | PENDING |
+| Private organizer | Tab link/open/unlink and return focus | Owner original opens; focus returns; “Private document choices updated” / “Private document references updated; originals are unchanged” announced | Not run manually | PENDING |
+| Packing | Keyboard add/check/uncheck/remove | Item labels and checkbox states; “Packing checklist saved” and changed packed count announced | Not run manually | PENDING |
+| Reminders | Opt in/edit/cancel, use native date/time picker and hear late delivery | Named consent/timezone/fold controls; “Local reminders enabled for this trip” / disabled-and-cancelled status, validation errors and “Delivered late” announced | Not run manually | PENDING |
+| PDF/GPX/ICS | Keyboard export and failed download retry | Named actions; “Saved itinerary [format] downloaded. Keep the local copy private”; stale/session errors announced, focus retained | Not run manually | PENDING |
+| Affordability/savings | Read sources, edit what-if and trigger stale evidence | Current/projected distinction; “Current evidence checked. No financial record was changed” and source-change/reconfirmation status announced | Not run manually | PENDING |
 | All Travel panels | Session expiry/reload and ownership transition | Private state/error feedback handled safely,focus recoverable | Not run manually | PENDING |
 | All themes/layouts | 1440/390px light/dark, reduced motion, contrast review | No overflow, visible focus, sufficient contrast, no essential motion | Not run manually | PENDING |
 
@@ -252,7 +349,7 @@ latest-head CI remains pending,no extension or production approval.
 - [x] C3 — LOCAL_VERIFIED future-date engine/UI;exact-headCI/formal gates pending.
 - [x] C4 — LOCAL_VERIFIED reconciliation;formal/CI/manual acceptance remains pending.
 - [x] D1 — LOCAL_VERIFIED7/7 integrated native-Windows journeys;freshCI/formal gates pending.
-- [ ] D2 — ACTIVE: D2-A/D2-B LOCAL_VERIFIED; manual/formal gates pending, D2-C reconciliation NEXT.
+- [ ] D2 — D2-A/B/C LOCAL_VERIFIED; manual/review/fresh-CI gates pending; D3 NEXT after local closure.
 - [ ] D3 — Native Windows/offline/recovery validation.
 - [ ] D4 — Exact-head CI and independent review.
 - [ ] D5 — Production-readiness report,without deployment.
@@ -398,11 +495,11 @@ synthetic evidence unless their tracker explicitly says otherwise.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | CAREER2-001 — resume-version comparison and stale JD decisions | Owned resumes, matching and outcomes | Exact owned version deltas and stale-decision invalidation | CAREER-01/02 | P2 /2–3 slices | Source/version citations and corrections remain owner-scoped; old JD decisions invalidate after changes | Backend version/owner/citation; desktop compare/correct/reopen | Existing Career tracker; full extension pending | QUEUED; inspect version comparison gap after Travel module; coaching remains baseline CAREER-07 |
 | CAREER2-002 — reviewable application workflow | Recruiter/JD/discovery/geography and owned documents | Source-backed drafts and attachment/revision review | CAREER-04/05, DOC-06, AI-15 | P2 /2–4 slices | Stale proposals/attachments rejected; no implicit sending | API owner/CSRF/stale/retry; Chrome review | Career Discovery/Geography receipts; extension pending | QUEUED; preserve no-send boundary |
-| TRAVEL2-001 — desktop itinerary editing/undo | Manual stops plus implemented desktop CRUD/reorder/undo/history and safe persistence | Formal extension acceptance; broader upstream UI equivalence unclaimed | TRAVEL-03 accepted; TRAVEL-04 bounded manual slice | P1 /2–3 slices | Full bounded edit/reorder/undo/save/reopen flow; unrelated data preserved; conflicts visible; no stale route/cost claim | 180 unique backend;4 Chrome;2 global desktop Axe; JS/migration/privacy gates | artifacts/travel-editor-20261027/local-acceptance.json; exact1fa7449 CI40421447655 PASS | LOCAL_VERIFIED/CI_PASSED at1fa7449; no automatic full-story promotion |
-| TRAVEL2-002 — private booking/document organizer | Owned trip JSON and existing encrypted corpus now support private links/original access/expiry/unlink/reopen | Newest-head CI and formal extension acceptance; broader booking workflow unclaimed | TRAVEL-04, DOC-06 accepted slices | P2 /bounded slice complete | Owner-only originals and source dates; no inferred availability or booking writes; no private metadata after auth loss | 12 unique backend across repairs;5 Chrome incl editor regression;2 global desktop Axe; privacy | Source61bd9bc; artifacts/travel-organizer-20261027/local-acceptance.json, source-preflight/release.json, push.json and ci.json | COMMITTED_PUSHED/CI_PENDING; reconcile exact final HEAD at next milestone |
-| TRAVEL2-003 — packing/reminders | Private packing plus explicit opt-in durable local reminders,UTC/DST validation,CRUD/cancel/reschedule,atomic in-app occurrence delivery and restart/replay safety | Newest-head CI and full extension mandatory acceptance; independent screen-reader remains pending | TRAVEL-04 accepted slice; existing DurableSqliteHuey/native UTC scheduler | P2 /01 and02 locally complete | Owner-only progress and delivery; stale/idempotent/cancel/late/offline/restart correctness; no external send/global activation | Current56 unique backend/queue incl affected regressions;6 Chrome;4 actual1440/390 light/dark Axe; prior packing evidence reused | artifacts/travel-reminders-20261027/local-acceptance.json and source/push/CI receipts; exact source in EXECUTION_STATE | LOCAL_VERIFIED/CI_PENDING after push; full extension UNACCEPTED,0/13 |
-| TRAVEL2-004 — private PDF/GPX/ICS exports | Owned trip/evidence/map structures | Explicit validated source-preserving export | TRAVEL-04/17, owner export consent | P2 /2–3 slices | Correct coordinates/timezones/escaping; preserve expiry/unknowns; no public sharing | File parsers and malformed inputs; desktop export | Existing Travel evidence; extension pending | B1–B4 LOCAL_VERIFIED;fresh CI/manual acceptance pending,FORMALLY_ACCEPTED NO. C1 read-only NEXT;no extension promotion |
-| TRAVEL2-005 — reserve/goal-aware affordability | Canonical baseline,C1–C4 engine/UI/future scenarios and cross-module reconciliation | Formal independent/manual/exact-headCI acceptance | FIN-05/06/07 evidence; FIN-15 migration stays gated | P1 /C1–C4 bounded local complete | Verified same-currency only,no inferred INR/FX,double counting or canonical writes; incomplete data never certified Affordable | C4 batch92backend/regressions,2Chrome,4globalAxe;canonical/import/repayment/source/owner/restart/no-writes | artifacts/travel-c4-20261028;source/push/CI in EXECUTION_STATE | C1–C4 LOCAL_VERIFIED;newest CI/manual/independent/formal gates pending,NEXT D1;extension0/13 |
+| TRAVEL2-001 — desktop itinerary editing/undo | Manual stops plus implemented desktop CRUD/reorder/undo/history and safe persistence | Formal extension acceptance; broader upstream UI equivalence unclaimed | TRAVEL-03 accepted; TRAVEL-04 bounded manual slice | P1 /2–3 slices | Full bounded edit/reorder/undo/save/reopen flow; unrelated data preserved; conflicts visible; no stale route/cost claim | 180 unique backend;4 Chrome;2 global desktop Axe; JS/migration/privacy gates | artifacts/travel-editor-20261027/local-acceptance.json; exact1fa7449 CI40421447655 PASS | LOCAL_VERIFIED; current cumulative CI/review/manual gates pending (D2-C matrix above); FORMALLY_ACCEPTED NO; NEXT D3 after local closure |
+| TRAVEL2-002 — private booking/document organizer | Owned trip JSON and existing encrypted corpus now support private links/original access/expiry/unlink/reopen | Newest-head CI and formal extension acceptance; broader booking workflow unclaimed | TRAVEL-04, DOC-06 accepted slices | P2 /bounded slice complete | Owner-only originals and source dates; no inferred availability or booking writes; no private metadata after auth loss | 12 unique backend across repairs;5 Chrome incl editor regression;2 global desktop Axe; privacy | Source61bd9bc; artifacts/travel-organizer-20261027/local-acceptance.json, source-preflight/release.json, push.json and ci.json | LOCAL_VERIFIED; current cumulative CI/review/manual gates pending (D2-C matrix above); FORMALLY_ACCEPTED NO; NEXT D3 after local closure |
+| TRAVEL2-003 — packing/reminders | Private packing plus explicit opt-in durable local reminders,UTC/DST validation,CRUD/cancel/reschedule,atomic in-app occurrence delivery and restart/replay safety | Newest-head CI and full extension mandatory acceptance; independent screen-reader remains pending | TRAVEL-04 accepted slice; existing DurableSqliteHuey/native UTC scheduler | P2 /01 and02 locally complete | Owner-only progress and delivery; stale/idempotent/cancel/late/offline/restart correctness; no external send/global activation | Current56 unique backend/queue incl affected regressions;6 Chrome;4 actual1440/390 light/dark Axe; prior packing evidence reused | artifacts/travel-reminders-20261027/local-acceptance.json and source/push/CI receipts; exact source in EXECUTION_STATE | LOCAL_VERIFIED; current cumulative CI/review/manual gates pending (D2-C matrix above); FORMALLY_ACCEPTED NO; NEXT D3 after local closure |
+| TRAVEL2-004 — private PDF/GPX/ICS exports | Owned trip/evidence/map structures | Explicit validated source-preserving export | TRAVEL-04/17, owner export consent | P2 /2–3 slices | Correct coordinates/timezones/escaping; preserve expiry/unknowns; no public sharing | File parsers and malformed inputs; desktop export | Existing Travel evidence; extension pending | LOCAL_VERIFIED; current cumulative CI/review/manual gates pending (D2-C matrix above); FORMALLY_ACCEPTED NO; NEXT D3 after local closure |
+| TRAVEL2-005 — reserve/goal-aware affordability | Canonical baseline,C1–C4 engine/UI/future scenarios and cross-module reconciliation | Formal independent/manual/exact-headCI acceptance | FIN-05/06/07 evidence; FIN-15 migration stays gated | P1 /C1–C4 bounded local complete | Verified same-currency only,no inferred INR/FX,double counting or canonical writes; incomplete data never certified Affordable | C4 batch92backend/regressions,2Chrome,4globalAxe;canonical/import/repayment/source/owner/restart/no-writes | artifacts/travel-c4-20261028;source/push/CI in EXECUTION_STATE | LOCAL_VERIFIED; current cumulative CI/review/manual gates pending (D2-C matrix above); FORMALLY_ACCEPTED NO; NEXT D3 after local closure |
 | INVEST2-001 — analyst/bull/bear/valuation/risk packet | Owned portfolio, AMFI/Yahoo evidence and local routing | Compatible pinned TradingAgents graph adapter and independent challenge | INV-04, AI-15/16, source/dependency/provider clearance | P2 /4–6 slices | Dated sourced arguments/unknowns; bounded tools; no private disclosure/orders | Isolated compatibility; point-in-time/leakage/cancel; desktop review | UPSTREAM_REFERENCE_MATRIX T pin; engine adoption pending | QUEUED; test component isolation, do not bulk-install conflicting dependencies |
 | INVEST2-002 — watchlist thesis/decision versions | Holdings and local review alerts | Owned research/watchlist histories separate from positions | INV-01/07; non-monetary scope first | P2 /2–3 slices | Instrument identity, stale thesis detection and explicit decisions; zero holdings writes | API history/owner/freshness; Chrome reopen | Existing investment/alert evidence; extension pending | QUEUED; select independent non-monetary scope after higher priorities |
 | WEALTH2-001 — fund look-through/overlap | Canonical portfolio and dated market evidence | Shared source-dated company/sector/country/currency exposure and opaque portions | INV-01/04, FIN-15, approved instrument/source policy | P2 /3–4 slices | Reconciled weights; unknown exposure explicit; no invented price/FX | Deterministic overlap/completeness/owner; desktop drill-down | Aurelio reference map; extension pending | QUEUED; inspect approved source availability |

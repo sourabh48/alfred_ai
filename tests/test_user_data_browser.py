@@ -4714,9 +4714,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def savings_fields(self):
         from datetime import timedelta
         from django.utils import timezone
+        from selenium.webdriver.support import expected_conditions as EC
         today=timezone.localdate();departure=today+timedelta(days=65)
         self.user.monthly_income='3100';self.user.save(update_fields=['monthly_income'])
+        previous=self.browser.find_element(self.By.ID,'plannerAffordabilityForm')
         self.memory_click('#plannerAffordabilityReload')
+        self.wait.until(EC.staleness_of(previous))
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'future_monthly_income').get_attribute('value')=='3100.00')
         self.memory_click('#plannerAffordabilityForm [name="projection"]')
         for name,value in (('departure',departure.isoformat()),('income_from',today.isoformat()),
@@ -5133,6 +5136,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn(' → '.join(expected),pdf);self.assertEqual(xml.xpath('//*[local-name()="wpt"]/*[local-name()="name"]/text()'),expected)
         self.assertFalse(xml.xpath('//*[local-name()="rte" or local-name()="trk"]'));self.assertTrue(calendar['roundtrip'])
         self.assertEqual(calendar['events'][0]['location'],' → '.join(expected));mark('J5 all downloads/offline retry/independent parsers')
+        # The dense fixture exhausted the real 120/min API budget; allow its rolling window, without disabling polling or protection.
+        time.sleep(settings.ALFRED_API_ACCOUNT_WINDOW_SECONDS)
         self.memory_click('#plannerAffordabilityDetails summary');self.wait.until(lambda _:self.browser.find_elements(self.By.ID,'plannerAffordabilityForm'))
         def currency(future=False):
             field=self.browser.find_element(self.By.ID,'affordCurrency');field.clear();field.send_keys('INR')

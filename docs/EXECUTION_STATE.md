@@ -1,6 +1,48 @@
 # ALFRED execution state
 
-## Active checkpoint — D2-B browser/accessibility (2026-10-28)
+## Active checkpoint — D2-C acceptance reconciliation (2026-10-29)
+
+- Recovered clean, synchronized `dff017383d16362da0313c8b16eb81eca0d5e03e` on
+  `development/alfred-integrated`; PR #20 DRAFT/unmerged, no auto-merge or reviews.
+- Run 40742137700: Windows/Linux SUCCESS, Selenium FAILURE (151 cases / 1 error).
+  Exact failing D1 journey line 5144 -> savings_fields -> affordability_fields
+  line 4674: StaleElementReferenceException during clear(). Job 123006242926.
+  Artifact 12841438385 retained at `artifacts/travel-d2c-20261029/selenium.zip`,
+  SHA256 `661ccd21d354191db2c0ab0b80c33f5e2391d59ab51ccedca01f2d1df3e7e9d6`.
+  Screenshot/HTML/console inspected; J1–J5 milestones completed, J6 interrupted.
+- Root cause: fixture reload waits for income 3100, which is ALREADY present in
+  D1. It fills old form nodes before the explicit forced refresh replaces them.
+  Helper now waits for that old form to become stale, then the required new income
+  value, before filling. App preserves drafts on redraw; no runtime defect shown.
+  Assertions, timeout, financial/CSRF/owner protections unchanged.
+- Local reruns got past the original stale-element failure, then exposed real
+  API-account quota exhaustion (120/min), with 429 in saved HTML/console. Failed
+  reruns retained. D1 now waits the actual configured rolling API window before
+  its financial phase, leaving live polling and production limits active. This
+  real fixture pacing does not change an assertion timeout, cache or quota clock.
+- Seven-feature D2 acceptance matrix, exact source/evidence keys and five-story
+  acceptance decisions are in ALFRED_2_0_EXECUTION. Backend 12-path review hashes
+  and D2-B frontend hashes match dff0173. Manual owner sheet has expected NVDA
+  announcements; all unperformed checks stay PENDING. PR reviews/approvals: zero.
+- D2-C LOCAL_VERIFIED: final paced Chrome batch 3 PASS (failing D1 case plus two
+  affected savings cases), all D1 7/7 milestones complete. Two quota regressions
+  PASS: per-account rejection/no mutation and atomic multi-bucket/restart behavior.
+  Migration/inventory checks PASS; no D2-B audits or D1 backend suite repeated.
+  No source test counts or capabilities promoted from reused evidence.
+- Changed source: `tests/test_user_data_browser.py` (5 fixture lines); no runtime
+  change. Evidence under `artifacts/travel-d2c-20261029` and targeted wrapper receipts.
+  Preserve D1 local 7/7, D2-A/B, C1–C4; keep 75/143 and 0/13. D2-C only this run.
+- Final source/history privacy/dependency preflight, normal commit/push, PR draft
+  and fresh exact-head CI closure remain. Final HEAD/results are owned by
+  `artifacts/travel-d2c-20261029/{local-acceptance,push,pr,ci,review}.json` and
+  `source-checkpoint/<HEAD>/release.json`. Matching PASS closure permits
+  READY_FOR_NEXT; CI_PENDING, REVIEW_PENDING, MANUAL_ACCEPTANCE_PENDING and
+  PRODUCTION_PENDING stay explicit. All five extensions remain unaccepted.
+- NEXT: check the recorded new exact-head CI once, fix confirmed failures, then
+  D3 Windows/native/offline/restart/recovery using isolated data. Do not repeat
+  unchanged D1/D2-A/B/C1–C4 work or start master/Pages/deployment.
+
+## Previous checkpoint — D2-B browser/accessibility (2026-10-28)
 
 - Recovered clean, synchronized `d877145565cd5118233026bf498404bd1c85f3df` on
   `development/alfred-integrated`; PR #20 DRAFT, unmerged into master.

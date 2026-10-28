@@ -1,6 +1,29 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D2-B, 2026-10-28
+## Active implementation checkpoint — D2-C, 2026-10-29
+
+Recovered synchronized `dff0173`; PR #20 DRAFT/unmerged, zero reviews/approvals.
+Run 40742137700 Windows/Linux PASS, Selenium FAIL: one D1 stale-element error
+among 151 cases. Fixture waits for the actual reloaded form, preserving assertions
+and timeouts. Local validation exposed dense-fixture 120/min API quota exhaustion;
+the fixture allows the configured real rolling window before financial actions,
+without resetting quotas, disabling polling or bypassing protection. Validation
+and source/push/CI closure are recorded in EXECUTION_STATE.
+
+Final repair validation: 3 Chrome cases PASS, including D1 7/7 and two savings
+regressions; 2 real quota backend regressions PASS. Migration/inventory PASS.
+D2-C reconciliation LOCAL_VERIFIED; fresh exact-head CI remains separate.
+
+Cumulative seven-feature security/privacy/keyboard/Axe/contrast/NVDA matrix and
+TRAVEL2-001–005 acceptance decisions now live in ALFRED_2_0_EXECUTION. D2-A backend
+and D2-B frontend hashes match dff0173; unchanged evidence reused. Automated Axe,
+computed contrast and keyboard PASS are distinct from PENDING manual NVDA/visual
+contrast and independent review. Owner sheet names actual expected announcements.
+No extension qualifies for formal promotion: 75/143, 68 remaining and 0/13 stay.
+D3 recovery follows local closure, D4/D5 remain gated. Other
+Finance/Investment/Career/Wealth/local AI requirements are unchanged.
+
+## Previous implementation checkpoint — D2-B, 2026-10-28
 
 D2-B LOCAL_VERIFIED: 9 unique Chrome cases (2 new + 7 affected regressions) and
 5 backend/live-HTTP checks PASS. Four 1440/390px light/dark Axe views have zero
