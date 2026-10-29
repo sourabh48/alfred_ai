@@ -1,6 +1,18 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — CI-OPT, 2026-10-29
+## Active implementation checkpoint — CI-OPT-04, 2026-10-29
+
+Hosted b0bf1e6 run40779797725: all151 Selenium PASS exactly once, aggregate SUCCESS;
+Windows/Linux FAIL. Browser critical path21m17 versus36m32 (41.74% one-run reduction);
+full failed workflow31m39, native31m37 remains bottleneck. Windows workflow contracts
+reproduced/repaired; Linux upload readiness fixture correction locally verified,
+hosted confirmation pending.66 contracts and22 unique Chrome cases PASS locally;
+strict hosted151-case proof revalidation PASS. Built-in native slowest20
+timing capture added without weakening privacy or test gates. Exact continuation/
+closure: EXECUTION_STATE and artifacts/ci-opt04-20261029. Keep75/143 and0/13.
+Next after CI repair checkpoint: D3-A/B/C, D4, D5; other requirements unchanged.
+
+## Previous implementation checkpoint — CI-OPT, 2026-10-29
 
 CI-OPT-01 retains the single unique repository workflow; removed NONE, managed
 Pages untouched. CI-OPT-02 adds measured test accounting, pip dependency caching

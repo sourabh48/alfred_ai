@@ -11,8 +11,10 @@ from scripts import release_gate as release
 class SectionCIIsolationTests(unittest.TestCase):
     def test_selenium_prepares_the_pinned_axe_asset_before_browser_tests(self):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/browser-regression.yml').read_text(encoding='utf-8')
-        selenium = workflow.split('\n  selenium:', 1)[1].split('\n  linux-secure-failure:', 1)[0]
+        selenium = workflow.split('\n  selenium-shards:', 1)[1].split('\n  selenium:', 1)[0]
         setup, _ = selenium.split('- name: Run Selenium browser regressions', 1)
+        self.assertIn('runs-on: windows-latest', setup)
+        self.assertIn('shard: [0, 1, 2]', setup)
         self.assertIn('axe-core-4.13.0.tgz', setup)
         self.assertIn('package/axe.min.js package/LICENSE', setup)
         self.assertIn('C24F097BD2F451D4F933E8BC7D8D539F8672A2EBCB5CC9F9F3EEC8CA9470A0C1', setup)
@@ -26,7 +28,9 @@ class SectionCIIsolationTests(unittest.TestCase):
         first = group.replace('${{ github.ref }}', 'refs/pull/16/merge')
         second = group.replace('${{ github.ref }}', 'refs/pull/17/merge')
         self.assertNotEqual(first, second)
-        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", concurrency)
+        self.assertIn('cancel-in-progress: false', concurrency)
+        for context in ('github.event_name', 'github.sha', 'github.run_id'):
+            self.assertIn(context, group)
 
 
 class ReleaseRepositoryFixture:

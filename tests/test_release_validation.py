@@ -293,6 +293,17 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.assertNotIn("secret-value", safe)
         self.assertNotIn("statement.pdf", safe)
 
+    def test_slowest_timings_retain_only_test_ids_and_numeric_durations(self):
+        raw = ("Slowest test durations\n"
+               "12.345s    test_owner (tests.synthetic.Case.test_owner)\n"
+               "1.234s test_private (tests.synthetic.Case) (document='private-account.pdf')\n"
+               "2.345s /private/statement.pdf amount=123456\n")
+        safe = validation.safe_log(raw)
+        self.assertIn('12.345s    test_owner (tests.synthetic.Case.test_owner)', safe)
+        self.assertNotIn('private-account', safe)
+        self.assertNotIn('statement.pdf', safe)
+        self.assertNotIn('123456', safe)
+
     def test_targeted_tests_do_not_satisfy_full_backend_gate(self):
         result = {"status": "PASS", "code": "suite_exit", "tests": 3, "skips": 0,
                   "log": "synthetic.log", "log_sha256": "a" * 64}

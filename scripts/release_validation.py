@@ -205,6 +205,10 @@ def safe_log(text):
             lines.append(line.strip())
         elif re.match(r"PASS [a-zA-Z0-9_]+:", line):
             lines.append(line.split(":", 1)[0])
+        elif line.strip() == 'Slowest test durations' or re.fullmatch(
+                r"[0-9]+\.[0-9]{3}s\s+[A-Za-z_][A-Za-z0-9_]* "
+                r"\((?:tests|apps)\.[A-Za-z_][A-Za-z0-9_.]*\)", line.strip()):
+            lines.append(line.strip())
     return "\n".join(lines) + "\nOther output omitted to protect diagnostic privacy.\n"
 
 
@@ -251,7 +255,7 @@ def validate(repo, manifest, output, profile, labels=(), with_ollama=False, bund
         selected = tuple(labels) if profile == "targeted" else BACKEND
         if not selected or any(not re.fullmatch(r"(?:tests|apps)\.[A-Za-z0-9_.]+", label) for label in selected):
             raise release.GateError("invalid_targeted_test_labels")
-        result = run(repo, [sys.executable, "manage.py", "test", *selected, "--noinput"], env, output, "backend-" + run_id, 1800)
+        result = run(repo, [sys.executable, "manage.py", "test", *selected, "--noinput", "--durations", "20"], env, output, "backend-" + run_id, 1800)
         if result["status"] == "PASS" and (not result["tests"] or result["skips"]):
             result["status"] = "NOT_RUN"
             result["code"] = "tests_missing_or_skipped"

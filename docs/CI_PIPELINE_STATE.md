@@ -1,5 +1,40 @@
 # Development CI and integration pipeline
 
+## CI-OPT-04 hosted reconciliation — 2026-10-29
+
+Exact b0bf1e6 run40779797725 FAILED Windows/backend and Linux/portable, while all
+three Windows Selenium shards and stable selenium aggregate succeeded.151 tests
+executed/passed once,49/51/51,zero skips; SHA-bound raw/aggregate proofs and artifact
+digests retained under artifacts/ci-opt04-20261029. Required check names, sharding,
+cache keys, Windows DPAPI/security/privacy/financial/accessibility remain intact.
+
+| Hosted measurement | Seconds / result |
+| --- | --- |
+| Shard jobs0/1/2 |1265 /886 /960; SUCCESS |
+| Aggregate job / browser critical path |10 /1277 (21m17); SUCCESS |
+| Prior unsharded Selenium |2192 (36m32);41.74% one-run browser reduction |
+| Full failed workflow / native / Linux |1899 (run start to completion) /1897 /247; no whole-pipeline PASS |
+| Native backend step / actual1542-case suite |1674 /1638.399; per-case timings absent |
+| Pip cache / installs |Restored all5 jobs; native178s, shards218/168/176s; Linux apt+pip71s. Causal cache effect UNMEASURED |
+
+Windows root cause: two stale workflow fixtures still target the old selenium
+body/cancellation policy. Reproduced one FAIL/one ERROR, then corrected contracts
+retain pinned Axe/hash/order and require all3 Windows shards plus non-cancelling
+SHA/event/ref/manual separation. Linux statement-reimport fixture timed out before
+persistence; screenshot shows selected file/no feedback, consistent with a click
+during summary hydration/form animation. Wait for actual page readiness before
+native click; keep all financial/upload assertions and timeouts. Local affected
+Chrome PASS; real Linux confirmation remains pending fresh CI.
+
+66 focused contracts and22 unique Chrome cases PASS locally (portable21 plus
+shared upload-helper regression).151-case discovery/assignment and independent
+strict validation of downloaded hosted aggregate PASS; all6 artifact hashes verified.
+Built-in Django --durations20 now records native test
+timings through strict privacy-safe ID/numeric-only logging; no full-suite slowest
+claim before rerun. Native is the measured bottleneck. No speculative optimization,
+quota bypass, assertion weakening or workflow deletion. New source/PR/CI closure
+receipts: artifacts/ci-opt04-20261029. PR20 remains DRAFT/NOT MERGE READY.
+
 ## CI-OPT-01 workflow disposition — 2026-10-29
 
 Source base25f028d; PR #20 DRAFT/unmerged. Exactly one file exists under

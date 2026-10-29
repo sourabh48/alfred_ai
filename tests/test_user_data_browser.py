@@ -3422,7 +3422,11 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('closure-metadata-only-limit')
 
     def click_upload_button(self, form_id):
+        # Summary hydration inserts cards above the form and can move its click target.
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#documentCenterCards article'))
         button = self.browser.find_element(self.By.CSS_SELECTOR, f"#{form_id} button[type=submit]")
+        self.wait.until(lambda _: self.browser.execute_script(
+            "return !document.getAnimations().some(a => a.playState === 'running' && a.effect?.target?.contains(arguments[0]))", button))
         self.browser.execute_script("arguments[0].scrollIntoView({behavior: 'instant', block: 'center'});", button)
         self.wait.until(lambda _: button.is_enabled())
         button.click()

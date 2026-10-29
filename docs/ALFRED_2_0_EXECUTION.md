@@ -6,7 +6,27 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — CI-OPT (2026-10-29)
+## Current checkpoint — CI-OPT-04 (2026-10-29)
+
+Run40779797725 atb0bf1e6:151/151 Selenium PASS,49/51/51,zero skips and aggregate
+SUCCESS; Windows/Linux required jobs FAIL. Browser critical path21m17 versus36m32
+(41.74% one-run improvement); full failed workflow31m39, native31m37, Linux4m07. Cache
+restored; causal savings UNMEASURED. Retain all coverage and check names.
+
+Reproduced Windows stale Axe-job/cancellation contracts; update to actual shards
+and safer non-cancelling identities. Linux upload readiness correction waits for
+summary hydration/animations before real click; two affected Chrome cases PASS
+locally, Linux hosted confirmation pending.66 contracts and22 unique Chrome
+cases PASS locally; actual hosted151-case aggregate independently revalidated.
+Native slowest20
+instrumentation uses built-in Django timing and private-data-safe logging; full
+suite timing detail pending new CI. EXECUTION_STATE owns exact remaining checks
+and artifacts/ci-opt04-20261029 owns closure. No formal capability promotion.
+
+Then D3-A Windows/offline, D3-B restart/crash, D3-C backup/restore/install, D4 review/
+newest-source CI, D5 readiness. Preserve every baseline/extension and manual gate.
+
+## Previous checkpoint — CI-OPT (2026-10-29)
 
 P0 CI optimization overrides queue selection before D3; Travel/financial evidence
 and all143 baseline/13 extension requirements remain intact (75/143,0/13).

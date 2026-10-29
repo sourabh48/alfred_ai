@@ -1,6 +1,54 @@
 # ALFRED execution state
 
-## Active checkpoint — CI-OPT-01/02/03 (2026-10-29)
+## Active checkpoint — CI-OPT-04 hosted failure repair (2026-10-29)
+
+- Recovered clean/synchronized b0bf1e68746bd7d30f5a58b38a6933a82129a20e;
+  PR20 remains DRAFT/unmerged. Preserve all prior evidence,75/143 and0/13.
+- Run40779797725 FAILURE: all151 Windows Selenium tests PASS exactly once,
+  zero skips;49/51/51 and aggregate SUCCESS. Artifacts/digests retained under
+  artifacts/ci-opt04-20261029. Raw proof binds PR source b0bf1e6 and GitHub merge
+  checkout acd4011233572b1f2677423b26648144daff99db; no source inherits green.
+- Hosted jobs: shards1265/886/960s; aggregate10s, Selenium critical path1277s
+  (21m17) versus2192s (36m32),41.74% one-run browser improvement. Entire failed
+  workflow1899s (run start to completion), native1897s, Linux247s. Backend step1674s includes1542 tests
+  taking1638.399s. No full-pipeline success/performance acceptance inferred.
+  Pip cache restored in all jobs; install native178s, shards218/168/176s,
+  Linux system+pip71s. Causal cache savings UNMEASURED, not a controlled comparison.
+- Windows: reproduced SectionCIIsolationTests (2 cases) locally, one FAIL/one
+  ERROR. Axe contract inspected the old selenium job instead of selenium-shards;
+  cancellation contract expected superseded PR cancellation. Updated both to
+  verify pinned Axe/hash before tests, all3 Windows shards and stronger non-cancel,
+  ref/event/SHA/manual separation. No production or browser assertion weakening.
+- Linux: statement PDF reimport timed out at test_user_data_browser.py:3526,
+  waiting for StatementUpload count. Artifact screenshot/HTML show selected file,
+  empty feedback, enabled button; console has no upload error. Readiness/layout
+  race is consistent with summary cards hydrating above an animated form. Shared
+  click helper now waits for actual summary cards and containing animations before
+  native click; upload/auth/financial assertions and timeouts unchanged. Two
+  affected Chrome cases PASS locally; Linux confirmation requires fresh hosted CI.
+- Native per-case durations were absent from the sanitized artifact. Enable
+  Django's existing --durations20; safe_log retains only strict test IDs/numeric
+  timings, rejecting paths/subtest data. Full-suite slowest20 remain unmeasured
+  until hosted rerun; no speculative native speedup or quota change. D1's real
+  API-window wait remains; isolate meaningful integration from simulated unit clocks.
+- Local focused contracts66 PASS, including failed Windows contracts, privacy,
+  Linux storage contracts, YAML, manifest/aggregate and legacy proof consumers.
+  Receipts: artifacts/ci-repair-ac05515/ci-opt04-{windows-before,upload-after,contracts}.
+- Full portable selection21 Chrome cases PASS locally plus the shared-helper
+  regression (22 unique browser cases across runs);151 discovered/assigned once,
+  49/51/51. Downloaded and hash-verified all6 hosted artifacts; local strict
+  revalidation of actual151-case hosted aggregate PASS. Hosted API wait60.000s;
+  baseline local60.016s retained unchanged. System/migration/inventory checks PASS.
+- CONTINUE_REQUIRED: finish Graphify/immutable privacy preflight, commit/push,
+  verify PR20DRAFT and fresh exact-head CI. Do not rerun unchanged passing cases.
+  Closure pointers: artifacts/ci-opt04-20261029/{local-acceptance,push,pr,ci,performance}.json
+  and source-checkpoint/<HEAD>/release.json. Verify new exact-head CI once; inspect
+  actual Windows/Linux results and native slowest20. Never promote pending CI.
+- NEXT after closure/safe checkpoint: D3-A Windows/native/offline; D3-B restart/
+  crash; D3-C backup/restore/install; D4 independent review/CI; D5 readiness.
+  PR20 DRAFT, no merge/Pages/deployment, real-user/financial writes or cleanup.
+
+## Previous checkpoint — CI-OPT-01/02/03 (2026-10-29)
 
 - Recovered clean, synchronized `25f028dfd31f6c1f8227f2b88d53dbf63adab0cd` on
   development/alfred-integrated. PR #20 must stay DRAFT/unmerged. D1/D2 and C1–C4
