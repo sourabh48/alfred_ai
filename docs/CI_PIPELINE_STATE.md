@@ -1,6 +1,33 @@
 # Development CI and integration pipeline
 
-## Current D3-C package recovery repair / D4 — 2026-10-29
+## Current D4 parser repair / review package — 2026-10-30
+
+Retained exact c28700d CI40931513318: all6 SUCCESS; six ZIP digests and source/
+merge-parent/tree binding verified; backend1562/zero skips, browser151 unique/
+49-51-51/zero skips-failures, native22/Linux21 PASS. D1–D3 and c287 portable20/
+backup8 receipts remain source-bound in artifacts/d3c-20261029; no unchanged
+suite reruns. Real corrected-source package acceptance is PENDING.
+
+D4 adds text-only JSON decoding before read and bounded8192character/64token
+Accept negotiation for two reproduced HIGH availability issues. Final27 affected
+API/session/Career/Loan/public-HTTP tests PASS, including explicit JSON parser
+overrides/route-wide pre-read rejection; earlier60-case attempt failed2 API cases/5 subcases,
+retained;49 other affected Travel/upload/UI cases passed and are not re-run.
+Runtime source changed: new HEAD requires its own six-job CI/artifact closure,
+not c287 green. Current SHA/run/state: artifacts/d4-20261030/checkpoint.json.
+Workflow PR path filters may start all six on push; do not manually repeat or
+cancel healthy coverage. Expected backend1569 must be verified from raw evidence.
+
+[Review/check identities](D4_PR20_REVIEW.md) distinguish six observed workflow
+contexts from unavailable master-protection configuration. PR20 zero reviews/
+threads, draft/unmerged; no required-check or approval waiver. Independent request
+prepared only; outside auth unavailable, PR-write403 not retried through other
+credentials. Formal release remains BLOCKED: dependency advisory triage, current
+installer/failure/rollback/clean-PC/device-loss/real-account/manual accessibility,
+protection visibility and independent acceptance.75/143,0/13 unchanged; no merge,
+Pages/deployment/production migration/operator mutation or backup deletion.
+
+## Previous D3-C package recovery repair / D4 — 2026-10-29
 
 Exact290e857/run40925777403 results remain bound to that source.139 focused cases
 and native backup8 PASS; portable290 build PASS, but real packaged restart FAILED

@@ -6,6 +6,28 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
+## Current checkpoint — D4 review package / guarded request parsing (2026-10-30)
+
+[Cumulative review package](D4_PR20_REVIEW.md), [changed-file manifest](D4_PR20_CHANGE_MANIFEST.md)
+and [owner NVDA/contrast/install worksheet](D4_OWNER_ACCEPTANCE.md) are prepared;
+independent review NOT_SENT/PENDING. Same-harness review cannot supply human
+approval; outside auth unavailable, prior GitHub write403 not bypassed.
+c28700d exact run40931513318 all6/source-bound PASS:1562 backend,151 unique Chrome,
+22 native,21 Linux. D1–D3 evidence retained; c287 backup8 and portable20 PASS.
+Two reproduced HIGH work-amplification issues now have shared JSON codec/Accept
+guards, including explicit Career/Loans/Mobility parser overrides. Seven new
+regression cases include route-wide early-rejection coverage; before-fix6 cases/
+7 failing subcases retained. Fresh corrected-source CI is required (expected1569
+backend, not inherited1562). Latest actual checks/source/run: artifacts/d4-20261030/
+checkpoint.json. Dependency advisories require independent triage; no blind upgrades.
+
+D3-C real installer/failed install-upgrade/current-package rollback/clean-PC/
+device-loss/real-account acceptance PENDING; corrected-source package PENDING.
+Manual NVDA/contrast and required-protection visibility remain open. Formal
+acceptance/production remain NO, baseline75/143 and extensions0/13 unchanged.
+No master merge/Pages/deployment/production migration/operator mutation or backup
+deletion. D5 not selected; complete external D4 acceptance first.
+
 ## Current checkpoint — D3-C package recovery repair / D4 (2026-10-29)
 
 Source290 backup8/focused139 and portable build PASS remain pinned. Actual packaged
@@ -245,13 +267,17 @@ Provider fixtures do not prove live routing/availability or motorcycle legality.
 
 | Extension | Documented bounded contract reconciled | LOCAL_VERIFIED | CI_PASSED at current cumulative source | Remaining acceptance | FORMALLY_ACCEPTED |
 | --- | --- | --- | --- | --- | --- |
-| TRAVEL2-001 | Stable IDs, activity/stop edits/order, undo/history, CAS/retry, preserved state and stale-estimate invalidation | YES, E1+A+B+I | NO: dff0173 failed; 84a56fd cancelled; fresh head pending | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; D3/D4 recovery/review evidence | NO |
-| TRAVEL2-002 | Owned encrypted originals, link/unlink/expiry/reopen, no false booking or metadata after auth loss | YES, E2+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; D3/D4 | NO |
-| TRAVEL2-003 | Packing CRUD/IDs/reopen plus opt-in UTC/DST/CAS/cancel/idempotent late local delivery/restart | YES, E3+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; native picker/recovery acceptance | NO |
-| TRAVEL2-004 | Private PDF, truthful GPX, date/time/DST/UID-correct ICS, independent parsers and same-trip stale/auth safeguards | YES, E4+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; full cumulative CI | NO |
-| TRAVEL2-005 | Read-only C1–C4 current/future money reconciliation, explicit assumptions, cutoffs, stale/currency abstention | YES, F+A+B+I | NO: same current gate | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; D3/D4 | NO |
+| TRAVEL2-001 | Stable IDs, activity/stop edits/order, undo/history, CAS/retry, preserved state and stale-estimate invalidation | YES, E1+A+B+I+D3 | YES only atc287/run40931513318; D4 candidate see checkpoint | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; installer/rollback/independent acceptance | NO |
+| TRAVEL2-002 | Owned encrypted originals, link/unlink/expiry/reopen, no false booking or metadata after auth loss | YES, E2+A+B+I+D3 | YES only atc287; corrected-source CI separately required | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; device-loss/real-account/current package | NO |
+| TRAVEL2-003 | Packing CRUD/IDs/reopen plus opt-in UTC/DST/CAS/cancel/idempotent late local delivery/restart | YES, E3+A+B+I+D3 | YES only atc287; corrected-source CI separately required | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; native picker/current installer/rollback | NO |
+| TRAVEL2-004 | Private PDF, truthful GPX, date/time/DST/UID-correct ICS, independent parsers and same-trip stale/auth safeguards | YES, E4+A+B+I+D3 | YES only atc287; corrected-source CI separately required | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; corrected-source package/independent acceptance | NO |
+| TRAVEL2-005 | Read-only C1–C4 current/future money reconciliation, explicit assumptions, cutoffs, stale/currency abstention | YES, F+A+B+I+D3 | YES only atc287; corrected-source CI separately required | REVIEW_PENDING; MANUAL_ACCEPTANCE_PENDING; real-account/independent acceptance | NO |
 
-All five also remain **PRODUCTION_PENDING**. Historical green CI (including editor
+All five also remain **PRODUCTION_PENDING**. D3 means bounded source-pinned native
+backup/recovery and c287 portable results; it excludes pending installation,
+current-package rollback and independent device-loss/real-account acceptance.
+The D4 artifact checkpoint resolves corrected-source CI; no source change inherits
+c287 green. Historical green CI (including editor
 1fa7449 and C4 45b2b2b) is source-specific, not current cumulative acceptance.
 Same-harness Codex scoped reviews are not human/genuinely independent approval;
 GitHub PR #20 has zero submitted reviews/approvals. D2-C records these blockers,
@@ -506,8 +532,8 @@ latest-head CI remains pending,no extension or production approval.
 - [x] C4 — LOCAL_VERIFIED reconciliation;formal/CI/manual acceptance remains pending.
 - [x] D1 — LOCAL_VERIFIED7/7 integrated native-Windows journeys;freshCI/formal gates pending.
 - [ ] D2 — D2-A/B/C LOCAL_VERIFIED; manual/review/fresh-CI gates pending; D3 NEXT after local closure.
-- [ ] D3 — Native Windows/offline/recovery validation.
-- [ ] D4 — Exact-head CI and independent review.
+- [ ] D3 — A/B and bounded C backup/restore/c287 portable verified; actual installer/failure/current rollback/clean-PC/device-loss/real-account PENDING.
+- [ ] D4 — Review package/checklists prepared; reproduced parser guards locally validated; corrected-source CI/source closure in checkpoint; independent/manual/dependency/protection gates BLOCKED.
 - [ ] D5 — Production-readiness report,without deployment.
 
 C1–C4 UNBLOCKED for scoped read-only development:explicit matching currency,

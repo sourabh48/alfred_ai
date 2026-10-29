@@ -2,7 +2,8 @@ import json
 
 from django.core.serializers.json import DjangoJSONEncoder
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.parsers import FormParser, MultiPartParser
+from alfred_ai.services.api_parsing import TextJSONParser as JSONParser
 from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response

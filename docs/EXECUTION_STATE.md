@@ -1,6 +1,49 @@
 # ALFRED execution state
 
-## Active checkpoint — D3-C package recovery repair / D4 review (2026-10-29)
+## Active checkpoint — D4 review package / parser guards (2026-10-30)
+
+- Owner selected D4 on clean synchronized c28700d, development/alfred-integrated,
+  F:/ALFRED_DEV/post-audit; PR20 DRAFT/open/unmerged, zero reviews/threads. Exact
+  run40931513318 all6 PASS/source+six artifact digests verified:1562 backend,
+  151 unique Chrome/22 native/21 Linux. Preserve D1–D3 receipts. c287 real backup8
+  and portable executable/launcher/Chrome20 PASS/exits0/free locks without rescue.
+  These remain c287 evidence; corrected-source CI/package cannot inherit them.
+- D4 reproduced two HIGH request-work issues: binary JSON charset codec expansion
+  (69bytes→65536 characters in real Travel dispatch, writes/throttle mocked) and
+  unbounded Accept parsing (192531characters/24tokens,1.452621s single negotiation).
+  Six before-fix tests had7 failing subcases. Shared TextJSONParser now checks
+  codec text status BEFORE read; BoundedContentNegotiation caps8192characters/
+  64tokens before media parsing. Normal text UTF-8/UTF-16, form/multipart and
+  session/CSRF/owner policy retained; no dependency/schema changes.
+  Final27 API/session/Career/Loan/public-HTTP cases PASS/zero skips, including all
+  configured API parser overrides (explicit JSON aliases now use TextJSONParser).
+  Initial affected60-case run retained:
+ 49 Travel/upload/UI cases passed; two API cases exposed the incomplete first
+  codec guard (empty decode skips validation), corrected using codec metadata.
+  Do not call that60-case run PASS or rerun unchanged suites. Fresh exact-head CI
+  must include seven new backend cases (expected1569, subject to observed receipts).
+- Complete cumulative [review package](D4_PR20_REVIEW.md), [manifest](D4_PR20_CHANGE_MANIFEST.md)
+  and [owner NVDA/contrast/install checklist](D4_OWNER_ACCEPTANCE.md) are prepared.
+  Independent request PREPARED/NOT_SENT; no reviewer identity invented. Prior
+  outside CLI authentication unavailable/zero inference; PR write403 retained.
+  No auth/permission bypass or same-harness human approval. Other dependency
+  advisories remain BLOCKED_TRIAGE:46 direct versions,12 matched packages/182
+  alias-duplicated records, not182 exploits. Critical model-artifact conditions
+  not dynamically reproduced; document/parser bounds are not CVE clearance.
+- D3-C installer,failed install/upgrade,current-package rollback,clean-PC/reboot,
+  device-loss/portable-key/off-device and real-account PENDING. c287 portable
+  predates parser guards; new package acceptance PENDING. NVDA/manual contrast,
+  independent review,required-protection visibility and production PENDING.
+  Release gate remains BLOCKED; no requirement promotion:75/143,0/13.
+- SOURCE_CLOSURE: checkpoint artifacts/d4-20261030/checkpoint.json owns exact
+  HEAD/dirty files/preflight/push/new-CI and next command. Run inventory --check,
+  system/migration checks in isolated env, AST update and exact-source privacy
+  preflight; commit/push only validated development changes; observe fresh six-job
+  CI/artifacts before accepted-source claims. No master/PR merge,Pages/deployment,
+  production migration,operator runtime/data or existing-backup deletion. Do not
+  automatically select D5 while external acceptance is unresolved.
+
+## Previous checkpoint — D3-C package recovery repair / D4 review (2026-10-29)
 
 - D3-C source290e857 pushed cleanly after139 focused contracts PASS/zero skips,
   real native backup/restore8 PASS/exits0/cleanup, migration/system/inventory/AST

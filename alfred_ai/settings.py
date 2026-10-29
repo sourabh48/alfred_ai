@@ -301,6 +301,12 @@ STORAGES = {
 # ---------------------------------------------------------
 
 REST_FRAMEWORK = {
+    "DEFAULT_CONTENT_NEGOTIATION_CLASS": "alfred_ai.services.api_parsing.BoundedContentNegotiation",
+    "DEFAULT_PARSER_CLASSES": [
+        "alfred_ai.services.api_parsing.TextJSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
+    ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],

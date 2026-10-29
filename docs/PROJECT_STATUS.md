@@ -1,6 +1,25 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D3-C package repair / D4 review, 2026-10-29
+## Active implementation checkpoint — D4 prepared / external gates blocked, 2026-10-30
+
+Read [review package](D4_PR20_REVIEW.md), [owner acceptance](D4_OWNER_ACCEPTANCE.md)
+and EXECUTION_STATE. c287 exact CI40931513318 all6 PASS:1562 backend/151 Chrome/
+22 native/21 Linux; source/artifact binding verified. D1–D3/native backup8 and
+c287 portable20 evidence retained. Two D4 HIGH request-parser work issues were
+reproduced and guarded globally without schema/dependency/auth/financial changes;
+final27 API/session/Career/Loan/public-HTTP cases PASS, zero skips, including
+explicit parser overrides and route-wide pre-read rejection. Existing affected Travel/upload/UI
+evidence retained; failed initial60-case/empty-codec-check attempt not relabelled.
+Fresh corrected-source CI is required and owned by artifacts/d4-20261030/checkpoint.json.
+Residual dependency advisory/independent approval, current installer/failure/
+rollback/clean-PC/device-loss/real-account/NVDA/manual contrast/protection visibility
+and production remain PENDING/BLOCKED. New corrected package acceptance PENDING;
+c287 binary cannot substitute. Baseline75/143,extensions0/13 unchanged; PR20
+DRAFT/unmerged. No operator data/runtime,master/Pages/deployment/production
+migration or backup deletion. Independent review request prepared, not sent;
+outside authentication and GitHub write limitations preserved without bypass.
+
+## Previous implementation checkpoint — D3-C package repair / D4 review, 2026-10-29
 
 D3-C290e857 source/privacy and139 focused contracts PASS; real native backup8 PASS;
 exact CI40925777403 remains source-bound. Portable build290 PASS/9789 inspected files.

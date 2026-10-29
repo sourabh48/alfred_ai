@@ -6,7 +6,8 @@ from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.parsers import FormParser, MultiPartParser
+from alfred_ai.services.api_parsing import TextJSONParser as JSONParser
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
