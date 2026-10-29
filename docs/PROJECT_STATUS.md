@@ -1,6 +1,30 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D3-B LOCAL_VERIFIED, 2026-10-29
+## Active implementation checkpoint — D3-C bounded local verification, 2026-10-29
+
+Exact906e187 CI40882826087 all6 PASS and D3-A/B recovery evidence are preserved.
+D3-C final isolated Windows/Waitress/Huey/SQLite/DPAPI/Chrome drill8 checks PASS,
+child/launcher exits0, stopped status/OS locks verified without rescue. Encrypted
+backup and independent same-device restore preserve3 databases/6 files, encrypted
+private originals and DPAPI keys. Actual restore-process termination leaves no
+final destination, retains staging and permits fresh retry. Missing/corrupt archives
+and keys, existing destination refusal, restored HTTP/Chrome/restart, owner/CSRF,
+SQLite integrity/FK, no duplicate originals/canonical money changes and log privacy PASS.
+
+Confirmed defect: rejected/interrupted extraction previously exposed a partial
+destination. Private retained staging plus validation/reconciliation before atomic
+no-replace publication fixes it. Regression evidence/review/commands/limitations:
+EXECUTION_STATE; artifacts/d3c-20261029; final external synthetic native-final receipt.
+Linux CI adds portable no-replace tests without removing existing gates. Fresh
+source CI and current portable build/execution stay pending until their artifacts
+prove them. Actual installer/failed installation-update/package rollback require
+missing Inno Setup/current installer and remain PENDING; unit rollback contracts
+are not actual installer acceptance. Clean-PC/real-account/device-loss/manual/
+independent release acceptance/production remain PENDING.75/143,0/13 unchanged;
+PR20 DRAFT/unmerged. D4 cumulative review/release-gate verification follows bounded
+D3-C closure. No operator data/runtime, master/Pages/deploy or backup deletion.
+
+## Previous implementation checkpoint — D3-B LOCAL_VERIFIED, 2026-10-29
 
 Exact a3f52e1 CI40873685637 all6 PASS closed before D3-B. Final isolated real
 Windows/Waitress/Huey/SQLite/DPAPI/Chrome recovery drill15 checks PASS, child AND

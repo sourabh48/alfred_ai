@@ -6,7 +6,24 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — D3-B LOCAL_VERIFIED (2026-10-29)
+## Current checkpoint — D3-C bounded local verification (2026-10-29)
+
+After exact906e187 CI40882826087 all6 PASS, actual isolated Windows native backup/
+restore drill8 checks PASS with child/launcher exits0 and owned shutdown verified.
+Three databases/six files, encrypted originals and DPAPI keys survive authenticated
+same-device restore and native/Chrome restart; actual restore termination retains
+staging while keeping final destination absent. Missing/corrupt archives/keys,
+existing destination, owner/CSRF, SQLite/FK, duplicates/money and privacy checks PASS.
+Fixed confirmed partial-destination publication using private verified staging and
+atomic no-replace rename. Tests/review/source receipts and exact continuation are
+in EXECUTION_STATE and artifacts/d3c-20261029/checkpoint.json. New exact-head CI and
+fresh portable execution must be observed, not inherited. Missing compiler/current
+installer leaves installer/failed install-update/package rollback PENDING. Bounded
+synthetic tests do not establish clean-PC/real-account/device-loss/manual/independent
+or production acceptance.75/143,0/13; PR20 DRAFT/unmerged. D4 is explicitly selected
+after D3-C closure. No master/Pages/deployment/operator-data or backup cleanup.
+
+## Previous checkpoint — D3-B LOCAL_VERIFIED (2026-10-29)
 
 After exact a3f52e1 CI40873685637 all6 PASS, actual isolated Windows native recovery
 drill15 checks PASS: child/launcher exits0 and native locks/status verified without

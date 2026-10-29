@@ -272,7 +272,7 @@ jobs:
           DATABASE_URL: sqlite:///${{ runner.temp }}/alfred-linux-secure-failure/db.sqlite3
         run: |
           python -c "import os; assert os.name == 'posix'"
-          python manage.py test tests.test_memory_platform --noinput
+          python manage.py test tests.test_memory_platform tests.test_release_recovery.RestorePublicationTests --noinput
       - name: Portable browser acceptance (private-memory acceptance runs on Windows)
         run: >-
           python scripts/run_browser_regressions.py

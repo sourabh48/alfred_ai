@@ -103,6 +103,22 @@ Do not pass a binary dump or tar archive through PowerShell text redirection or
 
 ## Native SQLite recovery set
 
+The encrypted release-recovery tool (`scripts/release_recovery.py`) verifies an
+authenticated archive, restores into a new private sibling staging directory and
+checks file hashes, SQLite integrity/foreign keys and typed row/schema snapshots
+before publishing the requested destination. Publication refuses an existing
+destination, including one created concurrently. Windows uses its non-replacing
+directory rename; Linux requires `renameat2(RENAME_NOREPLACE)`. Other unsupported
+hosts/filesystems fail closed and retain staging.
+
+If restoration fails or is interrupted, the requested destination stays absent;
+the private `<destination>.restore-incomplete-<nonce>` directory is retained as
+failure evidence. Do not start ALFRED from that directory or merge it with another
+runtime. Retry to a new destination with the retained authenticated backup and
+matching key. No automatic deletion, blind overwrite or production activation is
+part of this operation. A same-device DPAPI recovery does not prove device-loss
+or portable-key acceptance.
+
 For a native runtime configured to use SQLite, stop Django and all worker/beat
 processes before copying anything. Back up these together:
 

@@ -1,6 +1,51 @@
 # ALFRED execution state
 
-## Active checkpoint — D3-B LOCAL_VERIFIED / source closure (2026-10-29)
+## Active checkpoint — D3-C bounded local verification / source closure (2026-10-29)
+
+- Owner selected D3-C and subsequent D4; source base906e187, canonical development
+  checkout F:/ALFRED_DEV/post-audit. Initial tree clean/synchronized, PR20 DRAFT,
+  open/unmerged. Exact run40882826087 all6 SUCCESS; D3-A/D3-B receipts preserved.
+  D3-B closure: artifacts/d3b-20261029/head-ci-closure/closure.json, backend1552,
+  browser151 unique/zero skips, native22/Linux21 PASS; bounded recovery15 PASS.
+- Confirmed/fixed: failed/interrupted restore published its destination before
+  verification. Before-fix GateError and KeyboardInterrupt regressions FAIL, retained
+  at artifacts/ci-repair-ac05515/d3c-restore-publication-before.{json,log}. Restore
+  now retains private sibling staging, validates hashes/SQLite/FK/typed snapshots,
+  then atomically publishes without replacement. Unsupported atomic publication
+  fails closed; existing/concurrent destinations and failed staging remain intact.
+- Final real Windows/Waitress/Huey/SQLite/DPAPI/Chrome drill8 checks PASS, child AND
+  launcher exits0; native status/locks verified without rescue. Three databases,
+  six retained files and encrypted originals/keys match after authenticated restore.
+  Actual owned restore-process termination leaves no final destination; staging
+  survives and fresh retry succeeds. Missing/corrupt archive, missing/wrong/corrupt
+  DPAPI key, existing destination, native restart/reopen, foreign owner404/CSRF403,
+  no duplicate original/canonical money change and diagnostic privacy PASS.
+  Final receipt F:/ALFRED_DEV/d3c-synthetic-20261029/native-final/{report,child}.json.
+  Earlier fixture/PID-wrapper/current-directory failures remain retained; final
+  harness uses atomic barrier JSON, verified PID lineage and refreshed native port.
+- Focused57 recovery/rollback/ACL/provenance and56 native/release contracts PASS,
+  zero skips (113 unique cases). Receipts: artifacts/ci-repair-ac05515/
+  d3c-recovery-final.json and d3c-native-release-contracts.json; migration/system/
+  inventory checks PASS. Additional
+  reconciliation-failure and no-replace publication tests protect final publication.
+  Linux CI retains platform/browser checks and adds the3 portable publication cases.
+  Actual Linux API execution awaits fresh CI. Scoped same-harness review found no
+  residual supported defects; it is not independent-model/human release approval.
+- SOURCE_CLOSURE: artifact checkpoint artifacts/d3c-20261029/checkpoint.json owns
+  exact commit/push/preflight/package/new-CI state. Reuse unchanged D3-A/B evidence;
+  previous906e187 green never applies to this changed source. Fresh portable build
+  and actual executable checks follow the clean checkpoint commit. Inno Setup and
+  a current installer are absent: installer/failed install-update/current package
+  rollback remain PENDING; synthetic promotion contract tests are not those proofs.
+- CONTINUE_REQUIRED: inspect current artifact checkpoint, complete source/privacy/
+  inventory/AST, commit/push closure, fresh portable build/execution and exact-head
+  six-job CI; inspect failure artifacts before repair. Then execute owner-selected
+  D4 independent cumulative review/release-gate verification. Keep75/143,0/13,
+  PR20 DRAFT/unmerged. Clean-PC/real-account/device-loss/manual access/independent
+  release approval/production PENDING. No operator runtime/data, master/Pages/deploy,
+  production migration or backup deletion. All recovery copies remain retained.
+
+## Previous checkpoint — D3-B LOCAL_VERIFIED / source closure (2026-10-29)
 
 - Source base a3f52e1; exact CI40873685637 closed SUCCESS before D3-B execution.
   Six job/artifact digests and source/merge tree binding verified; backend1545,

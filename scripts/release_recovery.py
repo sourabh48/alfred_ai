@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import ExitStack, closing, contextmanager
+import errno
 import hashlib
 import json
 import os
@@ -18,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from uuid import uuid4
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +55,26 @@ def private_root(path):
     else:
         path.mkdir(parents=True, mode=0o700)
     return path
+
+
+def publish_restore(staging, destination):
+    """Publish once; an existing destination must never be replaced, even empty."""
+    try:
+        if os.name == "nt":
+            staging.rename(destination)
+        else:
+            import ctypes
+            rename = getattr(ctypes.CDLL(None, use_errno=True), "renameat2", None)
+            if rename is None:
+                raise release.GateError("atomic_restore_publication_unavailable")
+            rename.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+            rename.restype = ctypes.c_int
+            # Linux RENAME_NOREPLACE; unsupported hosts/filesystems retain staging.
+            if rename(-100, os.fsencode(staging), -100, os.fsencode(destination), 1):
+                error = ctypes.get_errno()
+                raise OSError(error, os.strerror(error))
+    except FileExistsError:
+        raise release.GateError("recovery_destination_must_be_new") from None
 
 
 def cipher_from_file(path):
@@ -228,6 +250,8 @@ def restore(backup, key_file, destination):
     backup, key_file, destination = map(no_links, (backup, key_file, destination))
     if destination == backup or destination in backup.parents or destination == ROOT or ROOT in destination.parents:
         raise release.GateError("unsafe_restore_destination")
+    if destination.exists():
+        raise release.GateError("recovery_destination_must_be_new")
     public = json.loads((backup / "backup.json").read_text(encoding="utf-8"))
     archive = backup / "recovery.zip"
     if (not public.get("complete") or archive.stat().st_size != public["archive_bytes"]
@@ -262,9 +286,10 @@ def restore(backup, key_file, destination):
                 expected_entries.add(entry)
         if set(names) != expected_entries:
             raise release.GateError("missing_or_unexpected_archive_volume")
-        destination = private_root(destination)
+        # Retain failed work privately; publish only a fully verified recovery tree.
+        staging = private_root(destination.with_name(destination.name + ".restore-incomplete-" + uuid4().hex))
         for record in records:
-            target = destination / record["backup_path"]
+            target = staging / record["backup_path"]
             target.parent.mkdir(parents=True, exist_ok=True)
             with target.open("xb") as stream:
                 for chunk in record["chunks"]:
@@ -277,11 +302,15 @@ def restore(backup, key_file, destination):
                     if len(content) != chunk["bytes"] or len(content) > CHUNK:
                         raise release.GateError("decrypted_chunk_size_failed")
                     stream.write(content)
-        write_json(destination / "manifest.json", metadata)
-        verify(destination, scratch_root=destination)
+        write_json(staging / "manifest.json", metadata)
+        verify(staging, scratch_root=staging)
         for name, expected in metadata["database_snapshots"].items():
-            if database_snapshot(destination / name) != expected:
+            if database_snapshot(staging / name) != expected:
                 raise release.GateError("financial_restore_reconciliation_failed")
+        no_links(destination)
+        if destination.exists():
+            raise release.GateError("recovery_destination_must_be_new")
+        publish_restore(staging, destination)
     return {"release_id": metadata["release_id"], "candidate_sha": metadata["candidate_sha"],
             "production_baseline_sha": metadata["production_baseline_sha"],
             "LOCAL_BACKUP_VERIFIED": "PASS", "OFF_DEVICE_COPY_VERIFIED": "NOT_RUN",

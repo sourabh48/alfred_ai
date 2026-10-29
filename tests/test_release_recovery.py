@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 import zipfile
+from types import SimpleNamespace
 
 from cryptography.fernet import Fernet, InvalidToken
 from alfred_private_storage import private_directory
@@ -179,6 +180,87 @@ class ReleaseRecoveryTests(unittest.TestCase):
                 self.create()
         self.assertTrue((self.backup / "recovery.zip").exists())
         self.assertTrue(any(self.backup.glob("capture-*")))
+
+    def test_rejected_or_interrupted_restore_never_publishes_a_runtime(self):
+        self.create()
+        for failure in (release.GateError("synthetic_validation_failure"), KeyboardInterrupt()):
+            destination = self.root / ("interrupted" if isinstance(failure, KeyboardInterrupt) else "rejected")
+            with self.subTest(failure=type(failure).__name__):
+                with patch.object(recovery, "verify", side_effect=failure):
+                    with self.assertRaises(type(failure)):
+                        recovery.restore(self.backup, self.key, destination)
+                self.assertFalse(destination.exists(), "An incomplete recovery must never be a launchable runtime")
+                retained = list(self.root.glob(destination.name + ".restore-incomplete-*"))
+                self.assertEqual(len(retained), 1)
+                self.assertEqual(recovery.database_snapshot(retained[0] / "db.sqlite3"),
+                                 recovery.database_snapshot(self.runtime / "db.sqlite3"))
+                # A fresh attempt never merges with the interrupted extraction.
+                self.assertEqual(recovery.restore(self.backup, self.key, destination)["LOCAL_BACKUP_VERIFIED"], "PASS")
+                self.assertTrue(retained[0].is_dir())
+
+    def test_restore_never_overwrites_an_existing_or_concurrently_created_destination(self):
+        self.create()
+        destination = self.root / "existing"
+        destination.mkdir()
+        retained = destination / "retained.txt"
+        retained.write_bytes(b"newer data must survive")
+        with self.assertRaisesRegex(release.GateError, "recovery_destination_must_be_new"):
+            recovery.restore(self.backup, self.key, destination)
+        original_verify = recovery.verify
+        concurrent = self.root / "concurrent"
+        def verify_and_create(*args, **kwargs):
+            result = original_verify(*args, **kwargs)
+            concurrent.mkdir()
+            (concurrent / "retained.txt").write_bytes(retained.read_bytes())
+            return result
+        with patch.object(recovery, "verify", side_effect=verify_and_create):
+            with self.assertRaisesRegex(release.GateError, "recovery_destination_must_be_new"):
+                recovery.restore(self.backup, self.key, concurrent)
+        self.assertEqual(retained.read_bytes(), b"newer data must survive")
+        self.assertEqual((concurrent / "retained.txt").read_bytes(), retained.read_bytes())
+
+    def test_failed_financial_reconciliation_never_publishes_and_retry_is_fresh(self):
+        self.create()
+        destination = self.root / "reconciliation-rejected"
+        with patch.object(recovery, "database_snapshot", return_value={}):
+            with self.assertRaisesRegex(release.GateError, "financial_restore_reconciliation_failed"):
+                recovery.restore(self.backup, self.key, destination)
+        self.assertFalse(destination.exists())
+        retained = list(self.root.glob(destination.name + ".restore-incomplete-*"))
+        self.assertEqual(len(retained), 1)
+        self.assertEqual(recovery.restore(self.backup, self.key, destination)["LOCAL_BACKUP_VERIFIED"], "PASS")
+        self.assertTrue(retained[0].is_dir())
+
+
+class RestorePublicationTests(unittest.TestCase):
+    def test_verified_tree_is_published_once(self):
+        with TemporaryDirectory() as temporary:
+            staging, destination = Path(temporary) / "staging", Path(temporary) / "final"
+            staging.mkdir()
+            (staging / "verified.txt").write_bytes(b"synthetic verified tree")
+            recovery.publish_restore(staging, destination)
+            self.assertFalse(staging.exists())
+            self.assertEqual((destination / "verified.txt").read_bytes(), b"synthetic verified tree")
+
+    def test_even_an_empty_concurrent_destination_is_never_replaced(self):
+        with TemporaryDirectory() as temporary:
+            staging, destination = Path(temporary) / "staging", Path(temporary) / "final"
+            staging.mkdir(); destination.mkdir()
+            (staging / "verified.txt").write_bytes(b"synthetic verified tree")
+            with self.assertRaisesRegex(release.GateError, "recovery_destination_must_be_new"):
+                recovery.publish_restore(staging, destination)
+            self.assertTrue(staging.is_dir())
+            self.assertEqual(list(destination.iterdir()), [])
+
+    def test_unsupported_atomic_publication_retains_staging(self):
+        with TemporaryDirectory() as temporary:
+            staging, destination = Path(temporary) / "staging", Path(temporary) / "final"
+            staging.mkdir()
+            with patch.object(recovery.os, "name", "posix"), patch("ctypes.CDLL", return_value=SimpleNamespace()):
+                with self.assertRaisesRegex(release.GateError, "atomic_restore_publication_unavailable"):
+                    recovery.publish_restore(staging, destination)
+            self.assertTrue(staging.is_dir())
+            self.assertFalse(destination.exists())
 
 
 if __name__ == "__main__":

@@ -1,6 +1,27 @@
 # Development CI and integration pipeline
 
-## Current CI closure / D3-B recovery validation — 2026-10-29
+## Current D3-C source closure — 2026-10-29
+
+Source base906e187, exact run40882826087 all6 SUCCESS; verified closure/artifacts
+in artifacts/d3b-20261029/head-ci-closure. D3-A/B evidence is preserved unchanged.
+D3-C real isolated native backup/restore8 checks PASS, child/launcher exits0,
+stopped status/locks verified without rescue. A confirmed restore-publication defect
+is fixed with private retained staging and verified atomic no-replace publication.
+Focused contracts and source/native receipts are owned by EXECUTION_STATE and
+artifacts/d3c-20261029/checkpoint.json. Linux CI retains all existing checks and adds
+the3 portable publication tests; exact new Linux execution remains pending.
+
+The new clean checkpoint requires fresh exact-head CI and a fresh portable build/
+executable proof. Do not transfer older green or package provenance. Current
+commit/push/CI/package evidence lives under artifacts/d3c-20261029; no additional
+source commit is needed merely to replace a pending receipt with observed results.
+Installer/failed install-update/package rollback remain PENDING without Inno Setup/
+current installer. Clean-PC/real-account/device-loss/manual accessibility and
+independent release approval remain distinct. Owner-selected D4 cumulative review/
+release-gate verification follows bounded D3-C closure.75/143,0/13 unchanged;
+PR20 DRAFT/unmerged,NOT MERGE READY. No master/Pages/deploy/operator-data action.
+
+## Previous CI closure / D3-B recovery validation — 2026-10-29
 
 Exact source `a3f52e1c316ffd3d921ad0ee52e48bdbd370aba8`, run40873685637,
 attempt1: all6 required jobs SUCCESS. Tested merge checkout
