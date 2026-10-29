@@ -6,7 +6,43 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — repair run40834940011 (2026-10-29)
+## Current checkpoint — D3-A LOCAL_VERIFIED (2026-10-29)
+
+Actual isolated native Windows offline Travel journey completed:11 checks PASS,
+including real Huey scheduled delivery observed before two durable-acknowledged
+duplicate sweeps, scheduler heartbeat, private DPAPI download, editor/reopen,
+parsed exports/offline retry, model-unavailable draft/retry, current/future explicit
+same-currency scenarios and whole-flow financial invariance, owner/CSRF/session
+privacy and native shutdown/OS lock release. Receipt native-journey-complete.json
+under artifacts/d3a-20261029 binds executable source hashes; failed probes retained.
+PowerShell stderr-wrapper diagnostic and exact assertions are in EXECUTION_STATE.
+Native module16 PASS; earlier30 boundary cases overlap. Config/migration/inventory/
+AST PASS. New source commit/preflight/development push and fresh CI closure remain
+separate from exact ebdc84b run40839776242 all6 PASS. No green inheritance.
+75/143,0/13 unchanged; PR20 DRAFT/unmerged. Clean-PC/manual accessibility/
+independent review/production pending; PostgreSQL untested. After source/CI closure,
+D3-A READY_FOR_NEXT; D3-B restart/crash is the next selected scope, followed by
+D3-C backup/restore/install,D4 review,D5 readiness. No release actions.
+
+## Previous checkpoint — D3-A started (2026-10-29)
+
+Source ebdc84b run40839776242 SUCCESS for all6 jobs. Downloaded raw/digest-verified
+proof independently revalidates151 Selenium cases exactly once,49/51/51,zero skips/
+failures. Backend1544 PASS. Whole workflow29m17; native29m13; Selenium critical
+path18m50. Exact receipts: artifacts/d3a-20261029/ci-closure. CI optimization closed;
+do not rerun151 locally or reopen old failures without new evidence.
+
+D3-A ACTIVE:30 focused local native/config/DPAPI/ACL/restricted-identity/corrupt/
+missing-resource checks PASS. Bounded actual native offline Travel probe is being
+validated with isolated synthetic data, existing services/UI/queues/parsers and
+test-only network fencing. Complete journey evidence remains pending. Preserve
+75/143,0/13; clean-PC/manual accessibility/independent review/production pending;
+PostgreSQL untested. EXECUTION_STATE owns exact continuation.
+
+Next D3-B restart/crash,D3-C backup/restore/installation,D4 review/CI,D5 readiness.
+No merge/master/Pages/deployment, real-account mutation or recovery-file cleanup.
+
+## Previous checkpoint — repair run40834940011 (2026-10-29)
 
 ce9c5fe run40834940011 FAILED native transport fixture and shard2 candidate
 pagination. Linux/shards0/1 PASS; aggregate correctly rejects151 executed/150 PASS/

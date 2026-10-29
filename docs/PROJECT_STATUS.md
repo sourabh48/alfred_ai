@@ -1,6 +1,31 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — repair run40834940011, 2026-10-29
+## Active implementation checkpoint — D3-A LOCAL_VERIFIED, 2026-10-29
+
+Completed actual isolated Windows/Waitress/SQLite/DPAPI/Huey/Chrome offline Travel
+journey:11 checks PASS, including real scheduled reminder delivery/deduplication,
+encrypted original and parsed exports, unavailable-model feedback, owner/session/
+CSRF boundaries, current/future scenarios with no canonical financial writes and
+owned-runtime shutdown. Native module16 PASS,zero skips; previous30 boundary cases
+overlap and are not added. Probe/fixture changes only; no application-policy change.
+Failed probe receipts preserved. Successful JSON/PowerShell stderr-wrapper detail,
+exact source binding and closure commands: EXECUTION_STATE and artifacts/d3a-20261029.
+Prior ebdc84b CI40839776242 all6 PASS; new checkpoint needs fresh exact-head CI.
+75/143,0/13 unchanged. PR20 DRAFT/unmerged; clean-PC/manual/independent/production
+gates pending,PostgreSQL untested. After source/CI closure: READY_FOR_NEXT D3-B;
+D3-C,D4,D5 remain queued. No release/master/Pages/deployment actions.
+
+## Previous implementation checkpoint — D3-A started, 2026-10-29
+
+ebdc84b exact CI40839776242 SUCCESS: all6 jobs,151 Selenium cases passed once,
+49/51/51,zero skips/failures; backend1544 PASS. Artifact digests and raw source-bound
+proof revalidated; workflow29m17, Selenium critical path18m50. No full-suite local
+rerun.30 local native/config/DPAPI/ACL/resource-boundary cases PASS; complete actual
+native offline Travel journey ACTIVE. Evidence: EXECUTION_STATE and
+artifacts/d3a-20261029.75/143,0/13 unchanged; clean-PC/manual/independent/production
+gates pending,PostgreSQL untested. D3-B/C,D4/D5 remain queued; no release actions.
+
+## Previous implementation checkpoint — repair run40834940011, 2026-10-29
 
 Recovered ce9c5fe. Exact CI FAILED native oversized-upload fixture and shard2
 candidate-pagination journey; Linux/shards0/1 PASS. Aggregate correctly rejected

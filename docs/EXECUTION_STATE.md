@@ -1,6 +1,78 @@
 # ALFRED execution state
 
-## Active checkpoint — repair run40834940011 (2026-10-29)
+## Active checkpoint — D3-A LOCAL_VERIFIED / source closure (2026-10-29)
+
+- Resumed ebdc84b in the canonical development checkout; completed the existing
+  unfinished native Travel probe without changing application code or policy.
+  Exact ebdc84b run40839776242 all6 PASS remains source-bound, not inherited by
+  this checkpoint. Full151-case local rerun was not needed.
+- D3-A LOCAL_VERIFIED: actual Windows/Waitress/SQLite/DPAPI/Huey/Chrome offline
+  journey,11 checks PASS including owned runtime shutdown. Receipt:
+  artifacts/d3a-20261029/native-journey-complete.json; saved source-file hashes
+  bind the executable probe and guard test. Synthetic runtime2c5b7f42bb only.
+  Tested saved-trip reopen, unavailable-model safe503/draft/retry, packing,
+  opt-in reminders, encrypted private-original download, editor undo/save/reopen,
+  independently parsed PDF/GPX/ICS/offline retry, same-currency current/future
+  scenarios, real scheduled delivery before duplicate sweeps, durable job-history
+  acknowledgement, scheduler heartbeat, owner/CSRF/session privacy and no canonical
+  financial writes. Browser closed; both owned native OS locks released.
+- Probe corrections preserve failed receipts: Waitress numeric wildcard lookup
+  is allowed while outbound/wildcard binds remain blocked; Windows venv PID
+  wrappers checked by actual guarded worker lineage; both amount/future consents
+  follow currency input; explicitly reopen after new-tab original download;
+  periodic Huey tasks are acknowledged through durable history, not absent result
+  entries. Cleanup always stops the isolated runtime and fails closed.
+  PowerShell's redirected stderr/CRLF diagnostics produced wrapper exit1 despite
+  the complete successful JSON and no Python traceback; child exit was not separately
+  captured. The11 assertion outcomes and stopped-runtime evidence are explicit.
+- Native module16 PASS,zero skips (includes new fence regression); earlier30
+  native/config/DPAPI/ACL boundary cases retained, overlapping counts not added.
+  System/migration-drift/inventory/AST checks PASS. Relevant receipts:
+  artifacts/ci-repair-ac05515/d3a-{native-final,config,migration}.json.
+- Finish normal source commit, immutable source/privacy preflight and development
+  push; exact refs/PR/new CI go to artifacts/d3a-20261029/{local-acceptance,push,pr,ci}.json
+  and source-checkpoint/<HEAD>/release.json. Newest-head CI remains PENDING until
+  observed PASS; never transfer previous green. PR20 must remain DRAFT/unmerged.
+- CONTINUE: inspect newest exact-source CI once; inspect artifacts before fixing
+  any failure. After green, D3-A is READY_FOR_NEXT; D3-B restart/crash requires
+  the next selected task. D3-C backup/restore/install,D4 review,D5 readiness queued.
+ 75/143 and0/13 unchanged; clean-PC/manual accessibility/independent review/
+ production PENDING; PostgreSQL untested. No master/Pages/deploy, real-account,
+ operator-runtime, cloud activation, recovery-file or financial-data action.
+
+## Previous checkpoint — D3-A started (2026-10-29)
+
+- Recovered clean/synchronized ebdc84ba8e9f38c8f03ef2f35353bb80c29ce88a.
+  Exact run40839776242: native-windows, Linux, all3 Windows Selenium shards and
+  aggregate SUCCESS. CI closure/digests/strict151-case proof and actual timings:
+  artifacts/d3a-20261029/ci-closure. No151-case local rerun or old-failure restart.
+  Strict proof:151 passed once,49/51/51,zero failures/skips;6 ZIP digests verified.
+  Backend1544 PASS,zero skips. Native1753s; shards887/913/1118s; Linux279s;
+  aggregate9s; Selenium critical path1130s; whole hosted workflow1757s.
+- D3-A ACTIVE: actual native Windows/Waitress/Huey/SQLite/DPAPI and Chrome with
+  only isolated synthetic data. Existing public-weather verify_travel_runtime
+  mode is not used for offline acceptance. Build bounded verify_native_travel
+  probe with child-process loopback-only network fencing, existing fixtures/UI/
+  queues/export parsers; no OS policy bypass, new service or app model.
+- Focused local Windows boundaries: native lifecycle/transport/config, real ACL/
+  restricted identity, encrypted journal/corrupt/missing keys and private SQLite/
+  config paths. Receipt artifacts/ci-repair-ac05515/d3a-native-boundaries.json.
+  All30 local boundary cases PASS,zero skips; these are focused host checks,
+  not the complete offline user journey or independent-PC acceptance.
+- CONTINUE_REQUIRED: finish actual native offline Travel journey, guard contracts,
+  local lifecycle/worker/scheduler/model-unavailable/SQLite and no-money-write
+  evidence; correct genuine defects only. Save exact stage, source hashes and
+  artifacts under artifacts/d3a-20261029. Do not repeat completed CI/D1/D2 work.
+- Acceptance remains separate: LOCAL_VERIFIED vs HOSTED_CI_PASSED; CLEAN_PC,
+  MANUAL_ACCESSIBILITY, INDEPENDENT_REVIEW and PRODUCTION PENDING. PostgreSQL
+  untested.75/143 and0/13 unchanged. PR20 DRAFT/unmerged; no master/Pages/deploy,
+  real-account mutation, backup deletion or existing runtime restart.
+- NEXT after D3-A local closure: D3-B process restart/crash, D3-C backup/restore/
+  installation, D4 independent review/CI, D5 readiness. Source/preflight/push/PR/
+  fresh-CI closure pointers: artifacts/d3a-20261029/{local-acceptance,push,pr,ci}.json
+  and source-checkpoint/<HEAD>/release.json.
+
+## Previous checkpoint — repair run40834940011 (2026-10-29)
 
 - Recovered clean/synchronized ce9c5fe90fdae00969057dc8e77ad6d4ad41bdb0.
   Exact run40834940011 FAILED: native/backend and shard2 failed; Linux and

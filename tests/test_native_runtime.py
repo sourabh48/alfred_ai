@@ -16,6 +16,35 @@ from scripts.verify_native_runtime import runtime_dashboard
 
 
 class NativeRuntimeBoundaryTests(SimpleTestCase):
+    def test_native_travel_fence_rejects_external_dns_connect_and_local_ollama(self):
+        import subprocess
+        import sys
+        from scripts.verify_native_travel import isolated_environment, allowed_address
+        self.assertTrue(allowed_address('127.0.0.1', 8046))
+        self.assertTrue(allowed_address('::1', 8046))
+        for host, port in (('example.invalid', 443), ('203.0.113.1', 443),
+                           ('127.0.0.1', 11434), ('localhost', 11434), (None, None)):
+            self.assertFalse(allowed_address(host, port))
+        with TemporaryDirectory() as temporary, patch.dict(os.environ,
+                {'OPENAI_API_KEY': 'synthetic-private-key', 'ALFRED_DATA_DIR': 'synthetic-operator-data'}):
+            env = isolated_environment(Path(temporary))
+            self.assertNotIn('OPENAI_API_KEY', env)
+            self.assertNotIn('synthetic-operator-data', json.dumps(env))
+            code = '''import socket
+socket.getaddrinfo('0.0.0.0', 8080, type=socket.SOCK_STREAM)
+for action in (lambda:socket.getaddrinfo('example.invalid',443),
+               lambda:socket.gethostbyname('example.invalid'),
+               lambda:socket.socket().bind(('0.0.0.0',0)),
+               lambda:socket.create_connection(('203.0.113.1',443),timeout=.1),
+               lambda:socket.create_connection(('127.0.0.1',11434),timeout=.1)):
+    try: action()
+    except PermissionError: continue
+    raise AssertionError('Unfenced network boundary')
+print('fence_pass')'''
+            result = subprocess.run([sys.executable, '-c', code], env=env, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), 'fence_pass')
+
     def test_dashboard_waits_for_one_explicit_quota_retry_within_existing_deadline(self):
         summary = {'current_month_net': 33000}
         success = Mock(status_code=200)

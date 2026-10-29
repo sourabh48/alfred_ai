@@ -1,5 +1,37 @@
 # Development CI and integration pipeline
 
+## Current CI closure / D3-A local verification — 2026-10-29
+
+Exact source `ebdc84ba8e9f38c8f03ef2f35353bb80c29ce88a`, run40839776242,
+attempt1: all6 jobs SUCCESS (native-windows, linux-secure-failure, three Windows
+Selenium shards and selenium aggregate). Tested merge checkout
+`effe5dbc695e652a4dfa0a5331ba3185f69bda98` contains the source parent and has the
+same source tree. Receipt: artifacts/d3a-20261029/ci-closure/closure.json.
+
+All6 downloaded artifact ZIP SHA-256 digests verified. Strict revalidation of the
+raw shard reports proves151 unique Selenium cases executed and passed exactly
+once,49/51/51,zero failures/skips; hosted aggregate matches revalidation. Windows
+backend1544 PASS,zero skips, suite1353.836s; hosted native verification PASS.
+Linux portable21 PASS,zero skips. No browser/backend suites were rerun for this
+CI evidence closure, and these checks apply only to the exact source above.
+
+Observed job durations: native1753s; shards0/1/2 887/913/1118s; Linux279s;
+aggregate9s. Selenium critical path1130s (18m50); workflow start through API
+completion1757s (29m17). These are one-run observations, not controlled benchmark
+results. Earlier failed-run evidence remains in the historical sections below.
+
+D3-A actual Windows native/offline Travel journey is LOCAL_VERIFIED with isolated
+synthetic data:11 checks PASS including owned shutdown; native module16 PASS,
+zero skips. Successful JSON and PowerShell stderr-wrapper diagnostics are recorded
+in EXECUTION_STATE; artifacts/d3a-20261029 owns receipts. New checkpoint source
+requires fresh CI; source/preflight/push/PR/run closure pointers are in EXECUTION_STATE.
+A changed source
+requires fresh exact-head CI; hosted success does not close local offline,
+packaged/installer, clean-PC, manual accessibility, independent review,
+real-account or production acceptance. Baseline75/143 and extensions0/13 remain
+unchanged. PR20 remains DRAFT/unmerged, NOT MERGE READY; no master, Pages,
+deployment or release action is authorized by this evidence.
+
 ## Repair run40834940011 — 2026-10-29
 
 Recovered ce9c5fe, clean/synchronized. Exact run40834940011 FAILED; Linux and
