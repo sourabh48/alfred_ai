@@ -80,22 +80,42 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=8046)
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--child', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     if os.name != 'nt':
         parser.error('This drill requires actual Windows DPAPI and the native runtime.')
+    if not args.child:
+        from scripts.native_probe_runner import run_probe
+        destination = args.report.resolve() if args.report else ROOT / 'artifacts' / 'native-travel' / uuid4().hex[:10] / 'report.json'
+        if destination.exists():
+            raise FileExistsError('Preserve the existing native probe receipt.')
+        required = ('native_loopback_waitress_sqlite_huey_and_child_fences',
+            'saved_owned_trip_reopens_on_native_http_without_public_network_or_ollama',
+            'blocked_local_model_safe_503_and_browser_draft_retry_without_cloud',
+            'packing_and_explicit_opt_in_reminder_scheduled', 'private_dpapi_original_link_and_owner_download',
+            'editor_undo_save_reopen_preserves_packing_documents_and_reminders',
+            'pdf_gpx_ics_native_download_independent_parsers_and_offline_retry',
+            'current_and_future_explicit_same_currency_scenarios_no_financial_writes',
+            'actual_durable_worker_due_delivery_deduplication_and_scheduler',
+            'owner_session_csrf_no_provider_transmission_and_financial_invariants')
+        result = run_probe(Path(__file__), destination.parent / (destination.stem + '-process-' + uuid4().hex[:10]),
+                           required, extra_args=('--port', str(args.port)))
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(result, indent=2, sort_keys=True), encoding='utf-8')
+        print(('PASS' if result['passed'] else 'FAIL') + ' native process proof: ' + str(destination), flush=True)
+        return 0 if result['passed'] else 1
     from alfred_private_storage import private_directory
-    folder = private_directory(ROOT / 'artifacts' / 'native-travel' / uuid4().hex[:10])
+    folder = private_directory(Path(os.environ.get('ALFRED_PROBE_DIRECTORY') or
+                                   ROOT / 'artifacts' / 'native-travel' / uuid4().hex[:10]))
     report_path = args.report.resolve() if args.report else folder / 'report.json'
-    report = dict(source_sha=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-                  data_dir=str(folder), passed=False, checks={}, pending=['manual_accessibility', 'independent_review',
+    report = dict(run_id=os.environ.get('ALFRED_PROBE_RUN_ID'),
+                  data_dir=str(folder / 'runtime'), passed=False, checks={}, pending=['manual_accessibility', 'independent_review',
                     'D3-B_crash_restart', 'D3-C_backup_restore_install', 'production_acceptance'])
-    changed = subprocess.check_output(['git', 'diff', '--name-only', 'HEAD'], cwd=ROOT, text=True).splitlines()
-    changed += subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'],
-                                       cwd=ROOT, text=True).splitlines()
-    report['source_files'] = {name: sha256((ROOT / name).read_bytes()).hexdigest()
-                              for name in changed if (ROOT / name).is_file()}
+    from scripts.native_probe_runner import source_binding
+    report.update(source_binding(Path(__file__)))
     env = isolated_environment(folder)
     data = folder / 'runtime'
+    (data / '.native-probe-owner.json').write_text(json.dumps({'run_id': report['run_id']}), encoding='utf-8')
     os.environ.clear(); os.environ.update(env)
     runpy.run_path(str(folder / 'network-guard' / 'sitecustomize.py'))
     stage = 'startup'
@@ -117,6 +137,7 @@ def main():
         (folder / (action + '.log')).write_text(result.stdout + result.stderr, encoding='utf-8')
         assert result.returncode == 0, 'Native lifecycle command failed: ' + action
 
+    save()
     try:
         # These probes fail before DNS/connect and never contact external services/Ollama.
         for host, port in (('example.invalid', 443), ('203.0.113.1', 443), ('127.0.0.1', 11434)):
@@ -416,4 +437,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

@@ -6,7 +6,27 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — D3-A LOCAL_VERIFIED (2026-10-29)
+## Current checkpoint — D3-B LOCAL_VERIFIED (2026-10-29)
+
+After exact a3f52e1 CI40873685637 all6 PASS, actual isolated Windows native recovery
+drill15 checks PASS: child/launcher exits0 and native locks/status verified without
+rescue. Five abrupt owned-process terminations cover both web commit boundaries,
+interrupted upload and both reminder commit/acknowledgement boundaries. Separate
+WAL readers prove0/1 committed occurrences before kill; replay/acknowledgement stays
+idempotent. Saved trip/stops/activities/editor undo/packing/private originals and
+exports survive restart; pending jobs, financial invalidation/no writes, actual
+DPAPI/vault corruption/missing handling,3 database integrity checks and Chrome
+owner/session/CSRF/diagnostic privacy PASS. Source-bound receipts and exact details:
+EXECUTION_STATE and artifacts/d3b-20261029/native-final/{report,child}.json.
+Runner7/focused125/affected fence1 tests PASS,zero skips; original D3-A exit remains
+unknown. Test-only parent instrumentation now makes false exit/cleanup PASS fail
+closed. No full unchanged D3-A or Selenium rerun; no app/schema/policy change.
+New source/preflight/development push requires fresh CI, no inherited green.
+75/143,0/13 unchanged; PR20 DRAFT/unmerged. After CI closure D3-B READY_FOR_NEXT;
+D3-C backup/restore/install,D4 independent review/CI,D5 readiness remain separate.
+Manual/clean-PC/production pending; PostgreSQL untested. No release actions.
+
+## Previous checkpoint — D3-A LOCAL_VERIFIED (2026-10-29)
 
 Actual isolated native Windows offline Travel journey completed:11 checks PASS,
 including real Huey scheduled delivery observed before two durable-acknowledged

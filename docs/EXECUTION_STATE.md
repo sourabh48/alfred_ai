@@ -1,6 +1,84 @@
 # ALFRED execution state
 
-## Active checkpoint — D3-A LOCAL_VERIFIED / source closure (2026-10-29)
+## Active checkpoint — D3-B LOCAL_VERIFIED / source closure (2026-10-29)
+
+- Source base a3f52e1; exact CI40873685637 closed SUCCESS before D3-B execution.
+  Six job/artifact digests and source/merge tree binding verified; backend1545,
+  native22,Linux21 and unique Selenium151/49-51-51 PASS/zero skips. Evidence:
+  artifacts/d3b-20261029/ci-closure/closure.json. No earlier green inherited.
+- D3-B LOCAL_VERIFIED: final real Windows/Waitress/Huey/SQLite/DPAPI/Chrome
+  drill15 checks PASS, child exit0 AND launcher exit0, stopped status and both OS
+  locks verified without rescue. Final source/run/nonce/streams/cleanup receipt:
+  artifacts/d3b-20261029/native-final/report.json; child.json retains full phases,
+  before/after hashes,5 isolated crash points and23 bounded lifecycle commands.
+  First passing candidate/source retained separately; overlapping runs not added.
+- Verified saved trips/stops/activities/editor receipts/undo/packing/documents,
+  original bytes, consent/pending jobs and independently parsed PDF/GPX/ICS after
+  offline graceful restart; duplicate start uses same instance. Web kill before
+  commit rolls back; kill after commit retains one activity, same nonce retry
+  stays idempotent; stale nonce/revision rejected. Interrupted upload adds no copy.
+- Worker kills use only guarded actual interpreter PID/parent/owned nonce.
+  Separate WAL reader sees0 committed occurrences before rollback and1 after
+  commit/before acknowledgement. Native replay completes each original task once,
+  produces exactly one occurrence, and acknowledged tasks do not replay after
+  another restart. Scheduler and unavailable-worker durable queue verified.
+- App/queue/vault SQLite integrity and foreign keys PASS. Actual native missing/
+  corrupt DPAPI key and corrupt retained vault fail closed without replacement;
+  missing whole vault gives unavailable old reference/404, then retained encrypted
+  originals restore. All faulted synthetic bytes/copies retained. Chrome desktop/
+  narrow reopen, foreign owner404, CSRF403, expired/revoked session isolation PASS;
+  stale financial source409 and unchanged canonical rows PASS. No private canary
+  or wrapped key bytes in diagnostic logs. persisted-state.json confirms2 editor
+  receipts/undo entries,2 stops,2 unique edited activities,2 deliveries/1 pending.
+- Native wrapper FIXED prospectively: parent captures child return code separately
+  from stderr, rejects stale/missing/incomplete/nonzero/source-mismatched evidence,
+  verifies cleanup and confines timeout/rescue to owned probe/runtime. Original
+  D3-A child exit remains UNKNOWN; original evidence is not relabelled. Runner7
+  real-process cases PASS/zero skips; D3-A fence1 PASS; focused125 backend/privacy/
+  queue/API cases PASS/zero skips. Receipts in artifacts/ci-repair-ac05515/d3b-*.
+  No full D3-A/151 local rerun; system/migration/inventory/AST checks PASS.
+- Test-only source/profile/tracker changes; application, money, schema, dependency,
+  quotas and policy unchanged. Closure refs/source privacy/preflight/push/PR/fresh
+  CI are recorded in artifacts/d3b-20261029/{local-acceptance,push,pr,ci}.json and
+  source-checkpoint/<HEAD>/release.json. New source CI stays PENDING until observed.
+- CONTINUE: inspect newest exact-source CI once; inspect failure artifacts before
+  repair. After green D3-B READY_FOR_NEXT; next selected phase D3-C backup/restore/
+  installation,then D4 independent review/CI,D5 readiness. Preserve75/143,0/13;
+  PR20 DRAFT/unmerged. Clean-PC/manual accessibility/independent review/production
+  remain PENDING; PostgreSQL untested. No owner action for current local closure.
+  No master/Pages/deploy, operator runtime/data, backup cleanup or real-account action.
+
+## Previous checkpoint — D3-B ACTIVE / native recovery drill (2026-10-29)
+
+- Recovered clean/synchronized a3f52e1. Exact run40873685637 SUCCESS, all6 jobs.
+  New-source proof/digests/tree binding: artifacts/d3b-20261029/ci-closure/closure.json.
+  Backend1545 PASS/zero skips/exit0; native22 checks PASS; Linux21 PASS;
+  Selenium151 unique PASS once,49/51/51,zero skips/failures. No suites rerun for closure.
+- D3-A remains LOCAL_VERIFIED with its original child-exit qualification preserved.
+  New native_probe_runner captures actual child exit separately from stderr and
+  requires nonce/source-bound assertions plus stopped runtime/OS locks. Seven
+  real-process tests PASS/zero skips; affected D3-A fence1 PASS, no whole D3-A rerun.
+- D3-B first drill completed15 checks PASS, actual child exit0, launcher exit0,
+  stopped native status/OS locks verified without rescue: native-first/{child,report}.json.
+  Five isolated terminations and23 lifecycle commands; raw source retained beside it.
+  Final-source drill ACTIVE at artifacts/d3b-20261029/native-final/{child,report}.json;
+  adds independent committed SQLite visibility at both worker fault boundaries.
+  Before another process, inspect that owned probe. Runtime only native-final/data/runtime.
+  No final D3-B acceptance claimed yet. Focused125 contracts PASS/zero skips/exit0 at
+  artifacts/ci-repair-ac05515/d3b-recovery-contracts.{json,log}.
+- Uncommitted test-only source: scripts/native_probe_runner.py,
+  scripts/verify_native_recovery.py, scripts/verify_native_travel.py,
+  tests/test_native_probe_runner.py and required backend-profile inclusion.
+  No application/money/schema/dependency/policy change. Fault hooks exist only in
+  generated isolated child sitecustomize; exact owned PID/nonce/lineage checked.
+- CONTINUE_REQUIRED: inspect final drill and its committed-state visibility evidence,
+  then finish focused native/Chrome/
+  privacy/integrity/source-exit-cleanup validation and source/preflight/push/new CI.
+  Keep original failed/incomplete evidence. Preserve75/143,0/13; PR20 DRAFT/unmerged;
+  no master/Pages/deploy, operator process/data, backup cleanup or real-account action.
+  D3-C backup/restore/install,D4 independent review/CI,D5 readiness remain queued.
+
+## Previous checkpoint — D3-A LOCAL_VERIFIED / source closure (2026-10-29)
 
 - Resumed ebdc84b in the canonical development checkout; completed the existing
   unfinished native Travel probe without changing application code or policy.

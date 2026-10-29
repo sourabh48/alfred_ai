@@ -1,6 +1,42 @@
 # Development CI and integration pipeline
 
-## Current CI closure / D3-A local verification — 2026-10-29
+## Current CI closure / D3-B recovery validation — 2026-10-29
+
+Exact source `a3f52e1c316ffd3d921ad0ee52e48bdbd370aba8`, run40873685637,
+attempt1: all6 required jobs SUCCESS. Tested merge checkout
+`9384ae6222cb70071b623fc8cc35bbfc09e52785` contains the source parent and has
+the identical tree. Receipt: artifacts/d3b-20261029/ci-closure/closure.json.
+
+All6 downloaded artifact ZIP SHA-256 digests verified before safe extraction.
+Strict raw-proof revalidation confirms151 unique Selenium cases executed and
+passed exactly once,49/51/51,zero failures/skips; hosted aggregate matches the
+revalidated JSON. Windows backend1545 PASS,exit0,zero skips,1253.774s; hosted
+native22 checks PASS. Linux portable21 PASS,zero skips. Existing suites were not
+rerun for this closure; every result above belongs only to exact source a3f52e1.
+
+Observed job durations: native1601s; shards0/1/2 985/897/869s; Linux257s;
+aggregate8s. Selenium critical path995s (16m35); workflow start through last
+completed job1603s (26m43),API update1604s. These are one-run observations;
+no controlled performance or release acceptance is inferred.
+
+D3-A local verification and exact-head hosted CI closure are retained. D3-B is
+LOCAL_VERIFIED: final native recovery15 checks PASS with child AND launcher exits0,
+owned shutdown/locks verified without rescue;5 controlled crashes and23 lifecycle
+commands. Direct WAL visibility proves0/1 occurrences at both worker boundaries;
+replay/acknowledgement,3 SQLite integrity checks,DPAPI/vault,Chrome session/owner/
+privacy and unchanged money PASS. Runner7/focused125/affected fence1 tests PASS,
+zero skips. Final evidence: artifacts/d3b-20261029/native-final and persisted-state.json.
+The first passing recovery candidate/source remains preserved separately;
+overlapping runs are not added. Final LOCAL_VERIFIED is bounded local acceptance,
+not hosted CI for the new source or formal release acceptance.
+EXECUTION_STATE owns the exact stage; artifacts/d3b-20261029 owns recovery,
+wrapper/source-binding and CI receipts. Changed development source requires fresh
+exact-head CI; do not inherit a3f52e1 green. Baseline75/143 and extensions0/13
+remain unchanged. PR20 DRAFT/unmerged,NOT MERGE READY; no master,Pages,deployment,
+release,real-account mutation or recovery-file cleanup. Clean-PC/manual/
+independent/production gates and D3-C/D4/D5 remain separate and pending.
+
+## Previous CI closure / D3-A local verification — 2026-10-29
 
 Exact source `ebdc84ba8e9f38c8f03ef2f35353bb80c29ce88a`, run40839776242,
 attempt1: all6 jobs SUCCESS (native-windows, linux-secure-failure, three Windows

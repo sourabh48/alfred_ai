@@ -30,7 +30,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_loan_related_money_runtime", "test_loan_verification", "test_loan_verification_api",
     "test_project_execution", "test_memory_checkpoint", "test_memory_cloud", "test_memory_learning", "test_knowledge_hub", "test_memory_privacy", "test_memory_platform",
     "test_memory_reasoning", "test_gemini_development", "test_investment_review_alerts", "test_serving_readiness", "test_memory_evaluation", "test_memory_sync", "test_memory_sync_runtime", "test_native_launcher", "test_retrieval_quality",
-    "test_mobility_money", "test_native_observation", "test_native_runtime", "test_native_tray", "test_operational_hardening",
+    "test_mobility_money", "test_native_observation", "test_native_runtime", "test_native_probe_runner", "test_native_tray", "test_operational_hardening",
     "test_password_security", "test_persistent_memory", "test_profile_money_boundary",
     "test_private_storage", "test_source_storage", "test_private_media_profiles", "test_local_config",
     "test_platform_hardening.EmailConnectionTokenSecurityTests", "test_remaining_public_http",

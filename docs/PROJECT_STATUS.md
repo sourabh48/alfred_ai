@@ -1,6 +1,26 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D3-A LOCAL_VERIFIED, 2026-10-29
+## Active implementation checkpoint — D3-B LOCAL_VERIFIED, 2026-10-29
+
+Exact a3f52e1 CI40873685637 all6 PASS closed before D3-B. Final isolated real
+Windows/Waitress/Huey/SQLite/DPAPI/Chrome recovery drill15 checks PASS, child AND
+launcher exits0, stopped runtime/locks verified without rescue. Five controlled
+terminations prove web rollback/committed retry, interrupted upload and worker
+reminder replay/idempotency. Independent WAL readers distinguish0 uncommitted from
+1 committed delivery; no duplicate acknowledgement/delivery/money/originals.
+Graceful saved/editor/packing/private-document/export/pending-job preservation,
+stale financial409, corrupt/missing key/vault fail-closed handling,3 SQLite integrity
+checks, owner/session/CSRF and diagnostic privacy PASS. Final persisted-state proof
+confirms2 editor receipts/undo entries,2 stops/edited activities,2 deliveries/1 pending.
+Runner7 and focused125 tests PASS/zero skips; affected D3-A fence1 PASS. Native
+wrapper now requires trustworthy process exit plus fresh source-bound assertions
+and cleanup; original D3-A unknown exit is preserved. No application-policy change.
+Evidence/continuation: EXECUTION_STATE and artifacts/d3b-20261029. New checkpoint
+requires fresh exact-head CI.75/143,0/13 unchanged; PR20 DRAFT/unmerged; D3-C next
+after source/CI closure,D4/D5 queued. Manual/clean-PC/independent/production pending;
+PostgreSQL untested. No master/Pages/deployment or operator-data/runtime action.
+
+## Previous implementation checkpoint — D3-A LOCAL_VERIFIED, 2026-10-29
 
 Completed actual isolated Windows/Waitress/SQLite/DPAPI/Huey/Chrome offline Travel
 journey:11 checks PASS, including real scheduled reminder delivery/deduplication,
