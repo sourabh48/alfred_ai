@@ -1,6 +1,49 @@
 # ALFRED execution state
 
-## Active checkpoint — D3-C bounded local verification / source closure (2026-10-29)
+## Active checkpoint — D3-C package recovery repair / D4 review (2026-10-29)
+
+- D3-C source290e857 pushed cleanly after139 focused contracts PASS/zero skips,
+  real native backup/restore8 PASS/exits0/cleanup, migration/system/inventory/AST
+  and immutable privacy PASS/zero findings. Exact CI40925777403 has its own receipts
+  under artifacts/d3c-20261029; never inherit906e187 green. Portable290 build PASS,
+  9789 files inspected,553.375s, clean-source provenance. Its actual executable/
+  desktop launcher/Chrome drill passed17 checks then failed restart: retained hot
+  SQLite DELETE journal could not recover through the vault's initial mode=ro
+  schema check. Failed runtime stopped safely; original bytes/evidence preserved.
+- Confirmed second D3-C defect by deterministic real-process crash regression:
+  abrupt SQLite writer leaves hot journal; MemoryStore construction raises the same
+  readonly error. Only existing-vault compatibility connection changes to mode=rw
+  (no create) so SQLite performs normal rollback before schema SELECT. Existing
+  key/cipher/legacy rejection, permissions and forensic readonly helpers unchanged.
+  **75 focused memory/privacy/corpus/platform tests PASS**,zero skips; includes
+  committed encrypted memory/key/owner/integrity preservation, cold legacy byte
+  preservation, hot legacy committed-data preservation then refusal, and missing
+  key non-regeneration. Protected copy of actual failed package vault now recovers
+  with fixed source. Original journal and diagnostic copies retained.
+- D4 separate-context cumulative review of41 source/config files (31 test/fixture
+  files summary-only) found one P2: planner close/reopen bypassed reminder cancellation
+  before a sweep. Reproduced both statuses delivering1 instead of0. Reused existing
+  cancel_closed_trip inside status transaction. **33 affected backend and2 actual
+  Chrome workflows PASS**,zero skips; existing151 browser IDs retained. Initial
+  33-case run lacked copied pinned ICS parser; artifact retained, hash-verified
+  existing parser restored, final33 PASS. No assertions or timeouts weakened.
+- Scoped re-reviews found no residual supported defects; source reviews use the
+  same harness, not independent-model/human approval. Existing Claude outside CLI
+  failed authentication (zero inference tokens); do not authenticate/waive silently.
+  PR20 has no approving GitHub review. Governance visibility is recorded; no merge,
+  Pages or deployment authorization exists. D4 formal release remains BLOCKED.
+- SOURCE_CLOSURE: integrate validated preparation/d4-reminder-20261029 by normal
+  fast-forward only, retaining both local commits/branches and all290 artifacts.
+  Complete final source native backup drill, current portable rebuild/executable
+  proof, system/migration/inventory/AST/privacy, development push and fresh exact-
+  head six-job CI. Exact refs/state/results live in artifacts/d3c-20261029/checkpoint.json;
+  read it before another process or test. No older green/build is final-source proof.
+  Keep baseline75/143,extensions0/13,PR20 DRAFT/unmerged. Installer/failed install/
+  update/current-installer rollback, clean-PC/real-account/device-loss/manual/
+  independent release approval/production PENDING. No operator runtime/data,
+  production migration, backup deletion, master merge, Pages or deployment.
+
+## Previous checkpoint — D3-C bounded local verification / source closure (2026-10-29)
 
 - Owner selected D3-C and subsequent D4; source base906e187, canonical development
   checkout F:/ALFRED_DEV/post-audit. Initial tree clean/synchronized, PR20 DRAFT,

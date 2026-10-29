@@ -1,6 +1,25 @@
 # Development CI and integration pipeline
 
-## Current D3-C source closure — 2026-10-29
+## Current D3-C package recovery repair / D4 — 2026-10-29
+
+Exact290e857/run40925777403 results remain bound to that source.139 focused cases
+and native backup8 PASS; portable290 build PASS, but real packaged restart FAILED
+after17 successful checks on a retained hot vault rollback journal. Original stopped
+runtime and all evidence preserved. Minimal existing-file RW schema check permits
+normal SQLite recovery;75 memory/privacy/corpus/platform tests PASS,zero skips,
+plus successful recovery of a protected failed-runtime copy.
+
+D4 cumulative source review found and reproduced planner reminder close/reopen
+revival; existing cancellation helper fixes it in the status transaction.33 backend/
+2 Chrome PASS,zero skips,151 IDs unchanged. Same-harness re-review clean; outside
+Claude authentication unavailable, human approval absent. Formal release BLOCKED.
+Latest exact source/preflight/push/package/native/new-CI pointers live in
+artifacts/d3c-20261029/checkpoint.json and EXECUTION_STATE. Newest source requires
+fresh exact-head six-job CI and portable execution;290 green/build cannot transfer.
+75/143,0/13; PR20 DRAFT/unmerged. Installer/compiler and independent/clean-PC/real-
+account/device-loss/manual/production gates remain pending. No merge/publication.
+
+## Previous D3-C source closure — 2026-10-29
 
 Source base906e187, exact run40882826087 all6 SUCCESS; verified closure/artifacts
 in artifacts/d3b-20261029/head-ci-closure. D3-A/B evidence is preserved unchanged.

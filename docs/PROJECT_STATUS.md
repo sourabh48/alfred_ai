@@ -1,6 +1,29 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D3-C bounded local verification, 2026-10-29
+## Active implementation checkpoint — D3-C package repair / D4 review, 2026-10-29
+
+D3-C290e857 source/privacy and139 focused contracts PASS; real native backup8 PASS;
+exact CI40925777403 remains source-bound. Portable build290 PASS/9789 inspected files.
+Actual executable/launcher/Chrome passed17 checks then stopped safely on restart
+because readonly vault schema inspection prevented SQLite hot-journal rollback.
+Deterministic process-crash regression reproduced it; existing-file mode=rw fixes
+recovery without key regeneration, crypto changes, legacy adoption or corruption
+replacement.75 focused memory/privacy/corpus/platform cases PASS/zero skips;
+protected copy of retained failed runtime now recovers under fixed source.
+
+D4 cumulative same-harness review found planner close/reopen reviving old reminders.
+Two before-fix failing status subcases; existing cancellation helper now runs in the
+planner transaction.33 affected backend and2 actual Chrome workflows PASS;151 IDs
+preserved. Re-review no residual supported defects. Outside Claude authentication
+unavailable and approving GitHub reviews absent: independent release approval
+remains PENDING. Exact latest refs/build/native/CI/checkpoint: EXECUTION_STATE and
+artifacts/d3c-20261029/checkpoint.json. New source requires fresh package/CI, no
+inherited green.75/143,0/13 unchanged; PR20 DRAFT/unmerged. Installer/compiler,
+failed installation-update/current-installer rollback, clean-PC/real-account/
+device-loss/manual/production remain PENDING. No operator data/runtime, master,
+Pages, deployment, production migration or backup deletion.
+
+## Previous implementation checkpoint — D3-C bounded local verification, 2026-10-29
 
 Exact906e187 CI40882826087 all6 PASS and D3-A/B recovery evidence are preserved.
 D3-C final isolated Windows/Waitress/Huey/SQLite/DPAPI/Chrome drill8 checks PASS,

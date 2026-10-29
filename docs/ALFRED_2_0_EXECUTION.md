@@ -6,7 +6,21 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — D3-C bounded local verification (2026-10-29)
+## Current checkpoint — D3-C package recovery repair / D4 (2026-10-29)
+
+Source290 backup8/focused139 and portable build PASS remain pinned. Actual packaged
+restart failed safely after17 checks: initial readonly vault inspection blocked
+SQLite hot-journal rollback. Reproduced process-crash regression; existing-file RW
+inspection fixes recovery, retaining key/legacy/corruption gates.75 privacy/storage
+tests PASS. D4 review found planner close/reopen reviving pending reminders;
+existing cancellation helper fixes it.33 backend/2 Chrome PASS,151 IDs retained;
+same-harness re-review clear. Outside Claude authentication and human approval
+missing; formal independent release remains BLOCKED. Final package/native/CI
+closure is tracked in EXECUTION_STATE and artifacts/d3c-20261029/checkpoint.json,
+with no inherited green/build.75/143,0/13; PR20 DRAFT/unmerged. Installer/clean-PC/
+real-account/device-loss/manual/production PENDING. No release or operator action.
+
+## Previous checkpoint — D3-C bounded local verification (2026-10-29)
 
 After exact906e187 CI40882826087 all6 PASS, actual isolated Windows native backup/
 restore drill8 checks PASS with child/launcher exits0 and owned shutdown verified.
