@@ -73,7 +73,8 @@ class MemoryStore:
         self.key_file = self.directory / 'journal.key'
         self.embedder = embedder if embedder is not None else OllamaEmbeddings()
         if self.database.exists():
-            with closing(sqlite3.connect(self.database.as_uri() + '?mode=ro', uri=True, timeout=max(0.001,deadline-time.monotonic()))) as old:
+            # Existing vaults need SQLite's hot-journal rollback before schema reads.
+            with closing(sqlite3.connect(self.database.as_uri() + '?mode=rw', uri=True, timeout=max(0.001,deadline-time.monotonic()))) as old:
                 previous = old.execute("SELECT sql FROM sqlite_master WHERE name='memories'").fetchone()
                 if previous and 'record TEXT' in previous[0]:
                     raise MemoryStorageUnavailable('Legacy plaintext memory vault is preserved; use a new protected vault.')

@@ -3,9 +3,12 @@ from contextlib import closing
 from contextlib import redirect_stderr
 from io import StringIO
 import json
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 import sqlite3
+import subprocess
+import sys
 import time
 
 from django.contrib.auth import get_user_model
@@ -19,6 +22,20 @@ from apps.ml_engine.services.persistent_memory import MemoryStore, RETRIEVAL_PRO
 class SyntheticEmbeddings:
     def embed(self, text, *, deadline=None):
         return ([1, 0, 0] if any(term in text.lower() for term in ('mountain', 'hiking', 'peaks')) else [0, 1, 0]), 'synthetic-model-v1'
+
+
+def leave_hot_journal(database, identity):
+    code="""import os,sqlite3,sys
+db=sqlite3.connect(sys.argv[1])
+db.execute('PRAGMA cache_size=1')
+db.execute('BEGIN IMMEDIATE')
+db.execute('UPDATE memories SET record=zeroblob(65536) WHERE id=?',(sys.argv[2],))
+os._exit(86)
+"""
+    child=subprocess.run([sys.executable,'-c',code,str(database),identity],capture_output=True,timeout=30)
+    assert child.returncode==86
+    journal=Path(str(database)+'-journal')
+    assert journal.is_file() and journal.read_bytes()[:8]!=b'\0'*8
 
 
 class PersistentMemoryTests(TestCase):
@@ -43,6 +60,20 @@ class PersistentMemoryTests(TestCase):
         self.assertEqual(result[0]['provenance']['reference'], 'synthetic-1')
         self.assertEqual(result[0]['sensitivity'], 'sensitive')
         self.assertEqual(result[0]['score'], 1)
+
+    def test_abrupt_sqlite_writer_recovers_without_losing_committed_memory_or_key(self):
+        from hashlib import sha256
+        identity=self.save()
+        key_hash=sha256(self.store.key_file.read_bytes()).hexdigest()
+        leave_hot_journal(self.store.database,identity)
+        recovered=MemoryStore(self.directory,embedder=SyntheticEmbeddings())
+        self.assertEqual(recovered.retrieve(self.alice,'mountain')[0]['id'],identity)
+        self.assertEqual(recovered.retrieve(self.bob,'mountain'),[])
+        self.assertTrue(sha256(recovered.key_file.read_bytes()).hexdigest()==key_hash)
+        with closing(sqlite3.connect(recovered.database)) as db:
+            self.assertEqual(db.execute('PRAGMA integrity_check').fetchall(),[('ok',)])
+            for table in ('memories','memory_keys','events'):
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0],1)
 
     def test_ownership_applies_to_retrieval_and_journal_restore(self):
         alice_id = self.save()

@@ -16,7 +16,7 @@ from django.test import TestCase, Client
 
 from apps.ml_engine.services.persistent_memory import MemoryStore, _owner
 from apps.ml_engine.services.memory_key import MemoryStorageUnavailable, protect_key
-from tests.test_persistent_memory import SyntheticEmbeddings
+from tests.test_persistent_memory import SyntheticEmbeddings, leave_hot_journal
 
 
 class MemoryPrivacyTests(TestCase):
@@ -144,6 +144,32 @@ class MemoryPrivacyTests(TestCase):
             with self.assertRaises(MemoryStorageUnavailable):
                 MemoryStore(root)
             self.assertEqual(database.read_bytes(), original)
+
+    def test_hot_legacy_vault_recovers_committed_data_but_still_refuses_adoption(self):
+        with TemporaryDirectory(prefix='alfred-hot-legacy-synthetic-') as root:
+            database=Path(root)/'verified.sqlite3'
+            with closing(sqlite3.connect(database)) as db,db:
+                db.execute('CREATE TABLE memories(id TEXT,owner TEXT,record TEXT)')
+                db.execute('INSERT INTO memories VALUES(?,?,?)',('synthetic','synthetic','SYNTHETIC-LEGACY-PRIVATE'))
+            leave_hot_journal(database,'synthetic')
+            with self.assertRaises(MemoryStorageUnavailable):
+                MemoryStore(root)
+            self.assertFalse((Path(root)/'journal.key').exists())
+            with closing(sqlite3.connect(database)) as db:
+                self.assertEqual(db.execute('SELECT record FROM memories').fetchall(),[('SYNTHETIC-LEGACY-PRIVATE',)])
+                self.assertEqual(db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall(),[('memories',)])
+
+    def test_hot_encrypted_vault_without_key_never_regenerates_it(self):
+        identity=self.save()
+        leave_hot_journal(self.store.database,identity)
+        retained=self.store.key_file.with_name('journal.key.retained')
+        self.store.key_file.rename(retained)
+        recovered=MemoryStore(self.directory)
+        with self.assertRaisesRegex(RuntimeError,'recovery key is missing'):
+            recovered.retrieve(self.alice,'mountain')
+        self.assertFalse(recovered.key_file.exists())
+        retained.rename(recovered.key_file)
+        self.assertEqual(recovered.retrieve(self.alice,'mountain')[0]['id'],identity)
 
     def test_family_financial_permission_never_grants_memory_access(self):
         from apps.family.models import FamilyAccountLink
