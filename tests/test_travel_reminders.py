@@ -139,6 +139,21 @@ class TravelReminderTests(TestCase):
             self.assertEqual(self.create().status_code,400)
         self.assertEqual(len(self.policy()['reminders']),1)
 
+    def test_planner_close_and_reopen_cannot_revive_pending_delivery(self):
+        plan=TravelPlan.objects.get(pk=self.session.plan_id)
+        plan.destination='Synthetic trip';plan.start_date=NOW.date();plan.end_date=(NOW+timedelta(days=2)).date()
+        plan.save(update_fields=['destination','start_date','end_date'])
+        for status in ('completed','cancelled'):
+            with self.subTest(status=status):
+                row=self.scheduled()
+                closed=self.client.post(self.url,dict(action='status',status=status),content_type='application/json')
+                self.assertEqual(closed.status_code,200,closed.content)
+                reopened=self.client.post(self.url,dict(action='status',status='planned'),content_type='application/json')
+                self.assertEqual(reopened.status_code,200,reopened.content)
+                self.assertEqual(reminders.deliver_due(self.session.plan_id,NOW+timedelta(days=10)),0)
+                self.assertFalse(self.policy()['enabled'])
+                self.assertEqual(next(r for r in self.policy()['reminders'] if r['id']==row['id'])['status'],'cancelled')
+
     def test_auth_owner_csrf_and_corrupt_data_fail_closed_without_disclosure(self):
         row=self.scheduled()
         secured=Client(enforce_csrf_checks=True);secured.force_login(self.user)

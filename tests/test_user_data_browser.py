@@ -5585,6 +5585,31 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.refresh()
         self.wait.until(lambda _: 'Delivered late' in self.text('plannerReminders'))
         self.assertIn('Reminders OFF',self.text('plannerReminders'))
+        # Closing and reopening through the planner must cancel pending occurrences
+        # immediately, even when no worker sweep runs between the two requests.
+        for status in ('completed','cancelled'):
+            self.browser.find_element(self.By.CSS_SELECTOR,'[data-reminder-consent]').send_keys(Keys.SPACE)
+            self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-form="create"]'))
+            label='Synthetic closed trip '+status
+            due=(clock.return_value+timedelta(days=1)).strftime('%Y-%m-%dT%H:%M')
+            self.reminder_fields('[data-reminder-form="create"]',label,'UTC',due)
+            self.memory_click('[data-reminder-form="create"] button')
+            self.wait.until(lambda _: label in self.text('plannerReminders'))
+            for target in (status,'planned'):
+                response=self.browser.execute_async_script("""
+                    const done=arguments[arguments.length-1];
+                    fetch(arguments[0],{method:'POST',headers:{'Content-Type':'application/json',
+                      'X-CSRFToken':document.cookie.split('; ').find(v=>v.startsWith('csrftoken=')).split('=')[1]},
+                      body:JSON.stringify({action:'status',status:arguments[1]})})
+                      .then(async r=>done({status:r.status,data:await r.json()})).catch(e=>done({error:String(e)}));
+                """,f'/api/mobility/planner/sessions/{session.pk}/',target)
+                self.assertEqual(response.get('status'),200,response)
+                self.assertFalse(response['data']['travel_reminders']['enabled'])
+            clock.return_value+=timedelta(days=2)
+            self.assertEqual(reminders.deliver_due(session.plan_id),0)
+            self.browser.refresh()
+            self.wait.until(lambda _: 'Reminders OFF' in self.text('plannerReminders'))
+            self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'[data-reminder-delivery]')),1)
         self.capture('travel-reminders-desktop-late-delivery')
 
     def test_travel_reminder_mobile_dst_validation_stale_draft_and_reschedule(self):

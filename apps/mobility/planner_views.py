@@ -27,7 +27,7 @@ from .services.travel_itinerary import build_itinerary, build_multi_stop_itinera
 from .services.travel.editor import apply_edit, editor_payload
 from .services.travel.documents import document_links, update_documents
 from .services.travel.packing import packing_payload, update_packing
-from .services.travel.reminders import reminder_payload, update_reminders
+from .services.travel.reminders import reminder_payload, update_reminders, cancel_closed_trip
 from .services.travel.pdf_export import itinerary_pdf
 from .services.travel.gpx_export import itinerary_gpx
 from .services.travel.ics_export import calendar_choices, itinerary_ics
@@ -362,6 +362,7 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
                 session.plan.status = status
                 session.plan.full_clean()
                 session.plan.save(update_fields=["status","updated_at"])
+                cancel_closed_trip(session.plan)
             if status == "completed" and value(session.state,"selected_destination"):
                 remember(request.user,{"name":value(session.state,"selected_destination")},"visited")
         else:
