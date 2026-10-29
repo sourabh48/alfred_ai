@@ -45,8 +45,10 @@ class PlannerWriteThrottle(UserRateThrottle):
         return True if request.method == "GET" else super().allow_request(request, view)
 
 
+@transaction.atomic
 def session_payload(session):
-    session.refresh_from_db()
+    # Keep the session and worker status in one snapshot; terminal status stops UI polling.
+    session = TravelPlanningSession.objects.select_for_update().get(pk=session.pk)
     run = session.research_runs.first()
     outdated = bool(run and any(value(run.request, key) != value(session.state, key)
                     for key in ("available_start_date", "available_end_date", "trip_duration")))

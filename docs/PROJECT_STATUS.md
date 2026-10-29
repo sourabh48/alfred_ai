@@ -1,6 +1,18 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — CI-OPT-04, 2026-10-29
+## Active implementation checkpoint — repair run40834940011, 2026-10-29
+
+Recovered ce9c5fe. Exact CI FAILED native oversized-upload fixture and shard2
+candidate-pagination journey; Linux/shards0/1 PASS. Aggregate correctly rejected
+150/151 PASS,zero skips; no shard-accounting defect. Real Windows early413 framing
+race reproduced and fixture corrected without changing limits/assertions. Actual
+Travel session/research torn snapshot reproduced with two SQLite threads; shared
+atomic/row-lock response fixes it.122 unique backend cases and2 unchanged Chrome
+journeys PASS; full151 IDs/49-51-51/check identities preserved. Exact evidence and
+new-source CI continuation: EXECUTION_STATE/artifacts/ci-40834940011. Keep75/143,
+0/13 and all other roadmaps. D3-A starts only after every required newest-head job PASS.
+
+## Previous implementation checkpoint — CI-OPT-04, 2026-10-29
 
 Hosted b0bf1e6 run40779797725: all151 Selenium PASS exactly once, aggregate SUCCESS;
 Windows/Linux FAIL. Browser critical path21m17 versus36m32 (41.74% one-run reduction);

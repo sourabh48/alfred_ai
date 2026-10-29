@@ -409,7 +409,12 @@ else:
                 with self.subTest(chunked=chunked):
                     connection = http.client.HTTPConnection("127.0.0.1", int(server.effective_port), timeout=5)
                     if chunked:
-                        connection.request("POST", "/upload", body=iter([b"X" * 64, b"X" * 65]), encode_chunked=True)
+                        connection.putrequest("POST", "/upload")
+                        connection.putheader("Transfer-Encoding", "chunked")
+                        connection.endheaders()
+                        for chunk in (b"X" * 64, b"X" * 65):
+                            connection.send(f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
+                        # Read the early 413; a trailing zero chunk races Connection: close on Windows.
                     else:
                         # Waitress rejects an excessive declared length before the body.
                         # Sending that body anyway races its Connection: close on Windows.

@@ -1,6 +1,46 @@
 # ALFRED execution state
 
-## Active checkpoint — CI-OPT-04 hosted failure repair (2026-10-29)
+## Active checkpoint — repair run40834940011 (2026-10-29)
+
+- Recovered clean/synchronized ce9c5fe90fdae00969057dc8e77ad6d4ad41bdb0.
+  Exact run40834940011 FAILED: native/backend and shard2 failed; Linux and
+  shards0/1 passed. All requested artifact ZIPs downloaded/digest-verified under
+  artifacts/ci-40834940011; gh unavailable, existing authenticated GitHub APIs used.
+- Native: sole1543-case backend error is UploadStreamAndResourceTests.
+  test_real_native_transport_rejects_chunked_and_content_length_oversize.
+  Hosted sanitized log retains test ID, not traceback. Focused unchanged case PASS;
+  controlled real Windows/Waitress diagnostic reproduces ConnectionAbortedError10053
+  when terminal0 follows an already-rejected129-byte chunked body. Same payload
+  without terminal frame yields413. Fixture reads early413 after sending64+65
+  actual bytes; both413 assertions, security limits and timeout unchanged.
+  All34 upload-limit regressions PASS; original failure/diagnostic receipts retained.
+- Shard2: test_travel_candidate_batches_reopen_compare_and_explicit_selection
+  times out after Previous destinations, waiting for1–3 of20. Screenshot/HTML:
+  new ready worker/messages but old4–6 batch. Real two-thread SQLite regression
+  reproduced old candidates with new ready status before fix. Shared session_payload
+  now uses transaction.atomic and select_for_update for a consistent session/worker
+  snapshot. All8 callers checked; no provider work inside lock. Existing Chrome
+  assertion/timeouts/151 IDs unchanged; no fixture pacing masks the product defect.
+- Aggregate failure is expected: all3 reports present,151 executed/150 passed/
+  1 failed/zero skips, then rejection of failed matrix job. No accounting defect
+  shown. Preserve151 IDs,49/51/51 and all check/cache/DPAPI/quota/security contracts.
+- Run wall1452s (24m12); native1347s, shards0/1/2 737/1438/1157s, Linux267s,
+  aggregate9s. Failed-run timings are observations, not a passing performance gate.
+  Native slowest20 now retained in native/release-ci/backend-*.log (suite1132.717s).
+- LOCAL_VERIFIED:34 upload,7 candidate and81 affected HTTP/security/refresh/restriction/
+  runner/YAML/aggregate contracts PASS (122 unique backend cases),2 actual Chrome
+  journeys PASS. Snapshot regression additionally PASS file-backed IMMEDIATE SQLite;
+  repeated execution is not a new case. Prior failing receipts retained; PostgreSQL
+  execution remains unperformed. Same-harness reviews do not replace human approval.
+- CONTINUE_REQUIRED: finish full151 discovery, Graphify/inventory/migration/privacy
+  preflight, then commit/push verified changes and record new exact-head CI. Closure files:
+  artifacts/ci-40834940011/{local-acceptance,push,pr,ci,performance}.json and
+  source-checkpoint/<HEAD>/release.json. Keep PR20 DRAFT/unmerged;75/143,0/13.
+- NEXT: reconcile newest exact-head CI once; fix confirmed failures. D3-A may
+  resume only when every required CI job passes at that source. No merge,
+  deployment/Pages, financial writes, cleanup or independent-review waiver.
+
+## Previous checkpoint — CI-OPT-04 hosted failure repair (2026-10-29)
 
 - Recovered clean/synchronized b0bf1e68746bd7d30f5a58b38a6933a82129a20e;
   PR20 remains DRAFT/unmerged. Preserve all prior evidence,75/143 and0/13.

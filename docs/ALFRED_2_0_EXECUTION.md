@@ -6,7 +6,24 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — CI-OPT-04 (2026-10-29)
+## Current checkpoint — repair run40834940011 (2026-10-29)
+
+ce9c5fe run40834940011 FAILED native transport fixture and shard2 candidate
+pagination. Linux/shards0/1 PASS; aggregate correctly rejects151 executed/150 PASS/
+1 error/zero skips. No accounting defect or lost coverage. Native early413/terminal
+frame Windows race reproduced; fixture retains actual oversized payload and all
+413/limit/timeout checks. Shard2 exposed a confirmed torn session/research snapshot;
+shared atomic/row-locked payload fixes it without provider work under lock.
+
+122 unique backend cases and2 unchanged Chrome journeys PASS; deterministic
+snapshot test FAIL before fix/PASS after, including file-backed IMMEDIATE SQLite.
+Full151 IDs/49-51-51 and required checks/quotas/native/privacy/financial/accessibility
+coverage preserved. Failed-run wall24m12 is not a green pipeline claim. Exact
+checkpoint/receipts: EXECUTION_STATE and artifacts/ci-40834940011.75/143,0/13.
+Only after every required newest-source CI job passes: D3-A Windows/offline,
+then D3-B restart/crash,D3-C backup/restore/install,D4 independent review,D5 readiness.
+
+## Previous checkpoint — CI-OPT-04 (2026-10-29)
 
 Run40779797725 atb0bf1e6:151/151 Selenium PASS,49/51/51,zero skips and aggregate
 SUCCESS; Windows/Linux required jobs FAIL. Browser critical path21m17 versus36m32

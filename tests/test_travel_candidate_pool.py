@@ -2,7 +2,7 @@
 from copy import deepcopy
 from unittest.mock import patch
 
-from django.test import TestCase, Client
+from django.test import TestCase, TransactionTestCase, Client
 
 from apps.mobility.models import TravelPlanningSession
 from apps.mobility.planner_views import session_payload
@@ -113,3 +113,78 @@ class TravelCandidatePoolTests(TestCase):
         self.assertEqual(session_payload(session)['destination_pool']['total'], 3)
         self.assertFalse(session_payload(session)['destination_pool']['has_more'])
         self.assertIn('No further eligible batch', session.research_runs.first().summary)
+
+
+class TravelCandidateSnapshotTests(TransactionTestCase):
+    setUp = fixtures.TravelPlannerTests.setUp
+    ready = fixtures.TravelPlannerTests.ready
+    researched = TravelCandidatePoolTests.researched
+
+    def test_worker_completion_cannot_mix_old_candidates_with_terminal_research(self):
+        from threading import Event, Thread, get_ident
+        from django.db import connection, transaction, OperationalError
+        from django.db.models.query import QuerySet
+        from apps.mobility.models import TravelResearchSession
+        from apps.mobility.services.travel_discovery import fact
+
+        if connection.vendor != 'sqlite':
+            self.skipTest('SQLite shared-memory/file snapshot interleaving fixture')
+        session = send_message(self.researched().pk, self.user, 'Show more destinations')
+        run = session.research_runs.first()
+        next_state = deepcopy(session.state)
+        next_state['_destination_offset'] = fact(3, 'requested_batch')
+        next_candidates = deepcopy(session.candidates)
+        for index, candidate in enumerate(next_candidates):
+            candidate['name'] = value(next_state, '_destination_pool')[index+3]['name']
+        settled, blocked, errors = Event(), Event(), []
+
+        def complete_worker():
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute('PRAGMA busy_timeout=0')
+                with transaction.atomic():
+                    TravelPlanningSession.objects.filter(pk=session.pk).update(
+                        state=next_state, candidates=next_candidates, status='researched')
+                    TravelResearchSession.objects.filter(pk=run.pk).update(status='ready')
+            except OperationalError as error:
+                if 'locked' in str(error).lower():
+                    blocked.set()
+                else:
+                    errors.append(type(error).__name__)
+            finally:
+                connection.close()
+                settled.set()
+
+        original_get, main_thread = QuerySet.get, get_ident()
+        worker = Thread(target=complete_worker)
+        triggered = False
+
+        def interleaved_get(queryset, *args, **kwargs):
+            nonlocal triggered
+            result = original_get(queryset, *args, **kwargs)
+            if queryset.model is TravelPlanningSession and get_ident() == main_thread and not triggered:
+                triggered = True
+                worker.start()
+                self.assertTrue(settled.wait(5), 'Synthetic worker did not reach its write boundary')
+            return result
+
+        try:
+            with patch.object(QuerySet, 'get', interleaved_get):
+                payload = session_payload(session)
+        finally:
+            if triggered:
+                worker.join(5)
+        self.assertTrue(triggered)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(errors, [])
+        self.assertIn((payload['destination_pool']['offset'], payload['research']['status']),
+                      ((0, 'queued'), (3, 'ready')))
+        if blocked.is_set():
+            settled.clear()
+            retry = Thread(target=complete_worker)
+            retry.start(); retry.join(5)
+            self.assertFalse(retry.is_alive())
+        current = session_payload(session)
+        self.assertEqual((current['destination_pool']['offset'], current['research']['status']), (3, 'ready'))
+        self.assertEqual(current['candidates'][0]['name'], next_candidates[0]['name'])
+        self.assertEqual(TravelPlanningSession.objects.get(pk=session.pk).user_id, self.user.pk)

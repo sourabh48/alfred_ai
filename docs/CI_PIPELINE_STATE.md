@@ -1,5 +1,33 @@
 # Development CI and integration pipeline
 
+## Repair run40834940011 — 2026-10-29
+
+Recovered ce9c5fe, clean/synchronized. Exact run40834940011 FAILED; Linux and
+shards0/1 PASS, native/backend and shard2 FAIL. Artifact ZIP digests verified under
+artifacts/ci-40834940011.151 tests executed:150 PASS,1 error,zero skips. Aggregate
+correctly rejected the failed matrix; all3 reports present, no accounting defect.
+
+Native sole1543-case error: oversized chunked real-transport test. Sanitized hosted
+logs omit traceback; controlled real Windows test reproduces10053 when terminal0
+follows early413. Fixture sends the same129 actual payload bytes, then reads413
+before terminal framing; declared-length/chunked413 assertions/limits/timeouts
+remain.34 upload regressions PASS. Production transport is unchanged.
+
+Shard2 candidate-pagination failure is a confirmed application snapshot race:
+session data was read before worker completion, terminal research status after it.
+Two-thread SQLite test FAIL before fix; shared atomic/select_for_update payload
+snapshot passes default and file-backed IMMEDIATE tests. No provider work under
+the lock; owner/CSRF/revision boundaries unchanged.7 candidate tests,81 affected
+HTTP/security/runner/aggregate contracts and2 Chrome journeys PASS. Backend total
+122 unique cases; repeated IMMEDIATE test is not double-counted. Full151 shards,
+49/51/51 assignment, required checks/cache/quota/DPAPI/accessibility stay intact.
+
+Failed-run timings: full1452s, native1347s (backend1543 cases1132.717s), shards
+0/1/2 737/1438/1157s, Linux267s, aggregate9s. Native slowest20 are now retained;
+observations do not certify a successful whole-pipeline performance gate.
+New source/preflight/push/PR/CI receipts: artifacts/ci-40834940011. PR20 DRAFT,
+NOT MERGE READY; D3-A waits for every required newest-source job to pass.
+
 ## CI-OPT-04 hosted reconciliation — 2026-10-29
 
 Exact b0bf1e6 run40779797725 FAILED Windows/backend and Linux/portable, while all
