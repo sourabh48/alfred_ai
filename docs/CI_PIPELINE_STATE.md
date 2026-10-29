@@ -15,6 +15,14 @@ overrides/route-wide pre-read rejection; earlier60-case attempt failed2 API case
 retained;49 other affected Travel/upload/UI cases passed and are not re-run.
 Runtime source changed: new HEAD requires its own six-job CI/artifact closure,
 not c287 green. Current SHA/run/state: artifacts/d4-20261030/checkpoint.json.
+First candidateae6e0fe/run40971199795:shard0 D1 journey errored at direct packing
+input send_keys (ElementNotInteractable); failed artifact12940099979 digest
+verified before repair. Existing enabled/visible click helper now synchronizes
+the test with the awaited document/list refresh. No assertion/timeouts/coverage
+weakened; source runtime unchanged. Successor source requires new exact-head CI;
+keep failed run/evidence and all healthy jobs rather than relabelling/retrying blindly.
+Targeted actual Chrome D1 journey PASS1/zero skips, all7 journey assertions kept;
+unchanged production API guards retain27 focused/4 native HTTP proofs atae6.
 Workflow PR path filters may start all six on push; do not manually repeat or
 cancel healthy coverage. Expected backend1569 must be verified from raw evidence.
 

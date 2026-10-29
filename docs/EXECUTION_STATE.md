@@ -30,6 +30,16 @@
   advisories remain BLOCKED_TRIAGE:46 direct versions,12 matched packages/182
   alias-duplicated records, not182 exploits. Critical model-artifact conditions
   not dynamically reproduced; document/parser bounds are not CVE clearance.
+- First corrected sourceae6e0fe/run40971199795 exposed a D1 browser readiness
+  race: packing input typed immediately after document DOM appeared, before the
+  planner's awaited list refresh/finally released disabled controls. Shard0 errored
+  1/49 with ElementNotInteractable; signed artifact12940099979/hash verified and
+  retained at artifacts/d4-20261030/failed-shard0. Source UI/guards unchanged;
+  test now uses existing memory_click visible/enabled wait before typing. No
+  sleeps, timeout/security/quota changes or removed assertions. Targeted actual
+  Chrome journey PASS1/zero skips, all7 journeys/assertions retained; fresh successor
+  CI receipts are owned by the artifact checkpoint;
+  do not call failedae6 CI PASS or transfer its healthy jobs to the successor.
 - D3-C installer,failed install/upgrade,current-package rollback,clean-PC/reboot,
   device-loss/portable-key/off-device and real-account PENDING. c287 portable
   predates parser guards; new package acceptance PENDING. NVDA/manual contrast,

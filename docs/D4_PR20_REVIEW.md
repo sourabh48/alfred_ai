@@ -67,6 +67,18 @@ or added to27 as a unique total. The final policy also replaces explicit JSON
 parser overrides; all configured JSON API routes reject a binary codec before
 reading the stream. No existing multipart/form parser was removed.
 
+First corrected candidateae6e0fe/run40971199795 exposed a D1 test readiness race:
+document-link DOM appears during the planner's awaited list refresh, before its
+finally re-enables packing controls. Direct send_keys raised ElementNotInteractable
+in shard0 (1/49); artifact12940099979/ZIP digest verified before repair. The test
+now uses existing memory_click to wait for visible/enabled input and scroll it
+into view before typing. No UI runtime change, sleep, timeout increase, quota
+change, removed assertion or browser ID change. The failed run remains failed;
+new successor CI is independently verified in the artifact checkpoint.
+The single affected actual Chrome D1 journey passed locally with all7 journey
+assertions and the existing quota/retry behaviour intact; no other unchanged
+browser case was rerun locally. Production runtime is byte-identical toae6.
+
 ## Dependency safety and residual advisory triage
 
 No requirements/constraints, package/build scripts or migrations changed from

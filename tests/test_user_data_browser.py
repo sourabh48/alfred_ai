@@ -5092,6 +5092,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('[data-trip-document-unlink]');self.wait.until(lambda _:'No private documents linked' in self.text('plannerDocuments'))
         self.memory_click('[data-trip-document-list]');self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'[data-trip-document-link]'))
         self.memory_click('[data-trip-document-link]');self.wait.until(lambda _:self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]'));mark('J3 owner original/link/unlink')
+        self.memory_click('[data-packing-add] input')
         self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input').send_keys('D1 packed gloves',Keys.ENTER)
         self.wait.until(lambda _:'D1 packed gloves' in self.text('plannerPacking'))
         session.plan.refresh_from_db();packing=next(i for i in session.plan.planning_state['_packing_checklist']['items'] if i['label']=='D1 packed gloves')
