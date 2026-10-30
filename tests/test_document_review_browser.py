@@ -658,7 +658,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
                         csp_report_only[path] = csp_report_only.get(path, 0) + 1
                     else:
                         csp_refused.append((path, message[:200]))
-            # The enforced policy must actually stop data leaving the page.
+            # The enforced policy must stop image and fetch exfiltration. Top-level navigation is not covered.
             self.selenium.get(f"{self.live_server_url}/expenses/")
             self.selenium.get_log("browser")
             self.selenium.execute_async_script(

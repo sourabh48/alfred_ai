@@ -214,11 +214,20 @@ SECURE_PROXY_SSL_HEADER = (
 USE_X_FORWARDED_HOST = env.bool("USE_X_FORWARDED_HOST", default=not LOCAL_RUNTIME)
 X_FRAME_OPTIONS = env("X_FRAME_OPTIONS", default="DENY")
 
-# Limits where an injected script could load from or send data. Inline handlers
-# are still used across the UI, so script-src allows them until they are removed;
-# the report-only policy below measures that work without breaking any page.
-_map_tiles = urlsplit(os.environ.get("TRAVEL_MAP_TILE_URL", "https://tile.openstreetmap.org/{z}/{x}/{y}.png"))
-_map_tile_host = _map_tiles.hostname if _map_tiles.scheme == "https" and re.fullmatch(r"[a-z0-9.-]+", _map_tiles.hostname or "") else ""
+def _csp_tile_host(url):
+    """Return a tile host safe to place in a policy; a bad URL only disables map tiles."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return ""
+    return parts.hostname if parts.scheme == "https" and re.fullmatch(r"[a-z0-9.-]+", parts.hostname or "") else ""
+
+
+# Blocks external scripts, plugins, framing and fetch or image exfiltration. It is not
+# an XSS defence yet: inline handlers are used across the UI, so script-src allows them,
+# and an injected handler could still call same-origin APIs or navigate away with data.
+# The report-only policy shows the inline use in the browser console; it reports nowhere.
+_map_tile_host = _csp_tile_host(os.environ.get("TRAVEL_MAP_TILE_URL", "https://tile.openstreetmap.org/{z}/{x}/{y}.png"))
 _CSP_BASE = {
     "default-src": [CSP.SELF],
     "style-src": [CSP.SELF, CSP.UNSAFE_INLINE],
