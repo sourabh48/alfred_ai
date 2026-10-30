@@ -63,33 +63,54 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
     evidence_items = planning_context.get("evidence", [])
     evidence_freshness = planning_context.get("freshness") or freshness_snapshot(evidence_items)
 
+    # Fields default to 0 and absent evidence reads as 0, so neither may be scored as a measurement.
+    income_known = monthly_income > 0
+    partner_score = float(profile.partner_financial_score or 0)
+    compatibility_input = float(profile.compatibility_score or 0)
+    inflation_value = inflation_payload.get("latest_value")
+    volatility_value = market_payload.get("india_vix")
+    planning_known = inflation_value is not None or volatility_value is not None
+    missing_inputs = [label for label, present in (
+        ("Your income", income_known), ("Partner financial score", bool(partner_score)),
+        ("Compatibility input", bool(compatibility_input)), ("External planning context", planning_known)) if not present]
+
     baseline_financial_score = round(max(25.0, min(95.0, (savings_rate * 0.55) + (100.0 - debt_pressure) * 0.45)), 2)
     user_habit_score = max(20.0, min(100.0, savings_rate))
-    financial_alignment = max(20.0, 100.0 - abs(float(profile.partner_financial_score or 0) - baseline_financial_score))
+    financial_alignment = max(20.0, 100.0 - abs(partner_score - baseline_financial_score))
     habit_alignment = max(20.0, 100.0 - abs(float((profile.partner_savings_habits or 0) * 20) - user_habit_score))
-    shared_resilience = max(20.0, min(100.0, (float(profile.compatibility_score or 0) * 0.65) + ((100.0 - debt_pressure) * 0.35)))
+    shared_resilience = max(20.0, min(100.0, (compatibility_input * 0.65) + ((100.0 - debt_pressure) * 0.35)))
     planning_pressure = max(
         15.0,
         min(
             100.0,
             100.0
             - (
-                float(inflation_payload.get("latest_value") or 0) * 4.5
-                + float(market_payload.get("india_vix") or 0) * 1.1
+                float(inflation_value or 0) * 4.5
+                + float(volatility_value or 0) * 1.1
             ),
         ),
     )
 
-    heuristic_score = round(
-        (financial_alignment * 0.32)
-        + (habit_alignment * 0.23)
-        + (shared_resilience * 0.3)
-        + (planning_pressure * 0.15),
-        2,
-    )
-    ml_prediction = relationship_model_predictor.predict_score(
+    factors = []
+    if income_known and partner_score:
+        factors.append({"label": "Financial Alignment", "score": round(financial_alignment, 2), "weight": 0.32, "detail": "Partner score vs your current financial baseline."})
+    if income_known:
+        factors.append({"label": "Savings Habit Fit", "score": round(habit_alignment, 2), "weight": 0.23, "detail": "Partner savings habit vs your observed savings capacity."})
+    if income_known and compatibility_input:
+        factors.append({"label": "Shared Resilience", "score": round(shared_resilience, 2), "weight": 0.3, "detail": "Compatibility input blended with debt and fixed-load resilience."})
+    if planning_known:
+        factors.append({"label": "Planning Pressure", "score": round(planning_pressure, 2), "weight": 0.15, "detail": "Lower inflation and volatility support easier shared planning."})
+
+    if income_known:
+        weights = {"Financial Alignment": financial_alignment, "Savings Habit Fit": habit_alignment,
+                   "Shared Resilience": shared_resilience, "Planning Pressure": planning_pressure}
+        total_weight = sum(item["weight"] for item in factors)
+        heuristic_score = round(sum(weights[item["label"]] * item["weight"] for item in factors) / total_weight, 2)
+    else:
+        heuristic_score = 0
+    ml_prediction = None if missing_inputs else relationship_model_predictor.predict_score(
         {
-            "partner_financial_score": float(profile.partner_financial_score or 0),
+            "partner_financial_score": partner_score,
             "partner_savings_habits": float(profile.partner_savings_habits or 0),
             "user_savings_rate": float(savings_rate or 0),
             "user_debt_pressure": float(debt_pressure or 0),
@@ -101,9 +122,11 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
         model_note = "A trained relationship-score regressor was available and used only as a bounded blend over the rule-based score."
     else:
         alignment_score = heuristic_score
-        model_note = "No trained relationship model was available, so Alfred used only bounded household-planning heuristics."
+        model_note = "The score uses only bounded household-planning heuristics; a trained model is blended only when every input is present."
 
-    if alignment_score >= 80:
+    if not income_known:
+        compatibility = "Unknown"
+    elif alignment_score >= 80:
         compatibility = "Strong"
     elif alignment_score >= 65:
         compatibility = "Good"
@@ -112,31 +135,38 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
     else:
         compatibility = "Fragile"
 
-    insights = [
-        f"Partner financial score is {profile.partner_financial_score:.0f} versus your current household baseline of {baseline_financial_score:.0f}.",
-        f"Savings habit alignment is {habit_alignment:.0f}/100 after comparing partner habit score with your current savings rate.",
-        f"Shared planning pressure is {100.0 - planning_pressure:.0f}/100 after considering inflation and market volatility context.",
-    ]
-    if debt_pressure >= 45:
+    insights = []
+    if income_known and partner_score:
+        insights.append(f"Partner financial score is {partner_score:.0f} versus your current household baseline of {baseline_financial_score:.0f}.")
+    if income_known:
+        insights.append(f"Savings habit alignment is {habit_alignment:.0f}/100 after comparing partner habit score with your current savings rate.")
+    if planning_known:
+        insights.append(f"Shared planning pressure is {100.0 - planning_pressure:.0f}/100 after considering inflation and market volatility context.")
+    if not income_known:
+        insights.append("Add your income so Alfred can compare household signals; no alignment is inferred without it.")
+    elif debt_pressure >= 45:
         insights.append("Debt and fixed-load pressure are elevated, so large shared commitments should be staged more carefully.")
     elif savings_rate >= 25:
         insights.append("Savings buffer is relatively healthy, which supports medium-term shared goals more safely.")
     else:
         insights.append("Savings runway is thin, so short-term affordability discussions matter more than long-horizon goals right now.")
+    if income_known:
+        message = f"Alignment is {compatibility.lower()} based on partner inputs, current household cash-flow pressure, and shared planning context."
+    else:
+        message = "Alignment is withheld until your income is available."
+    if income_known and missing_inputs:
+        message += f" Not yet available: {', '.join(missing_inputs)}."
 
     return RelationshipAlignment(
         {
             "alignment_score": alignment_score,
             "compatibility": compatibility,
-            "message": f"Alignment is {compatibility.lower()} based on partner inputs, current household cash-flow pressure, and shared planning context.",
+            "message": message,
             "insights": insights,
+            "coverage": {"status": "insufficient_data" if not income_known else ("partial" if missing_inputs else "observed"),
+                         "missing_inputs": missing_inputs},
             "financial_baseline": baseline,
-            "factors": [
-                {"label": "Financial Alignment", "score": round(financial_alignment, 2), "detail": "Partner score vs your current financial baseline."},
-                {"label": "Savings Habit Fit", "score": round(habit_alignment, 2), "detail": "Partner savings habit vs your observed savings capacity."},
-                {"label": "Shared Resilience", "score": round(shared_resilience, 2), "detail": "Compatibility input blended with debt and fixed-load resilience."},
-                {"label": "Planning Pressure", "score": round(planning_pressure, 2), "detail": "Lower inflation and volatility support easier shared planning."},
-            ],
+            "factors": factors if income_known else [],
             "grounding": {
                 "history": {
                     "monthly_income": round(monthly_income, 2),
@@ -158,6 +188,7 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
                 "notes": [
                     "Relationship output is grounded in user-owned household cash-flow signals plus verified external affordability context.",
                     "External evidence contextualizes planning pressure, not emotional compatibility.",
+                    "This is an uncalibrated planning heuristic, not a prediction of relationship outcomes.",
                     *planning_context.get("notes", []),
                     model_note,
                 ],

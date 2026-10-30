@@ -65,15 +65,15 @@ function renderRelationshipChart(profiles, alignment) {
 
     const factorMap = Object.fromEntries((alignment.factors || []).map(item => [item.label, item.score]));
     const partner = [
-        factorMap["Financial Alignment"] || latest?.partner_financial_score || 0,
-        factorMap["Savings Habit Fit"] || (latest?.partner_savings_habits || 0) * 20,
-        factorMap["Shared Resilience"] || latest?.compatibility_score || 0,
+        factorMap["Financial Alignment"] ?? 0,
+        factorMap["Savings Habit Fit"] ?? 0,
+        factorMap["Shared Resilience"] ?? 0,
         alignment.alignment_score || 0,
     ];
     const baseline = [
         alignment.alignment_score || 0,
-        factorMap["Savings Habit Fit"] || 75,
-        factorMap["Planning Pressure"] || Math.max(60, alignment.alignment_score || 0),
+        factorMap["Savings Habit Fit"] ?? 0,
+        factorMap["Planning Pressure"] ?? 0,
         80,
     ];
 

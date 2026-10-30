@@ -158,6 +158,22 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertNotIn('Average sleep 0.0h', board)
         self.assertIn('insufficient history', board)
 
+    def test_relationship_page_withholds_alignment_without_income(self):
+        from apps.relationship.models import RelationshipProfile
+
+        user = self.scenario['user']
+        RelationshipProfile.objects.filter(user=user).delete()
+        type(user).objects.filter(pk=user.pk).update(monthly_income=0)
+        RelationshipProfile.objects.create(user=user, partner_name='Synthetic', partner_financial_score=70,
+            partner_savings_habits=3, compatibility_score=75)
+        self.enterContext(patch("apps.relationship.services.relationship_intelligence.resolve_canonical_financial_baseline",
+            return_value={"monthly_income": 0, "savings_rate": 0, "debt_burden_ratio": 0}))
+        self.login(); self.browser.get(self.live_server_url + "/relationship/")
+        self.wait.until(lambda _: 'withheld' in self.text('relationshipHeroCopy'))
+        self.assertEqual(self.text('relationshipCompatibilityValue'), 'Unknown')
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#relationshipFactorCards article')), 0)
+        self.assertEqual(self.browser.find_element(self.By.ID, 'partnerFinancialScore').get_attribute('max'), '100')
+
     def test_career_discovery_marks_cached_leads_and_recovers_without_unsafe_links(self):
         from apps.career.models import CareerProfile
         from apps.career.services.job_intelligence import JobIntelligenceService, job_intelligence
