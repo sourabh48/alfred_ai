@@ -1,6 +1,26 @@
 # Development CI and integration pipeline
 
-## Current D4 parser repair / review package — 2026-10-30
+## Current D4 exact-head failure repair — 2026-10-30
+
+ad31ca3/run40973869637 FAILED: raw151 unique/149 PASS/2 errors/zero skips,
+shards49/51/51; all five available ZIP digests/source parent/tree binding verified
+before repair. Native-windows,Linux,shard2 SUCCESS; shards0/1 and aggregate FAILED.
+Undo SPACE targeted disabled control before list-refresh finally; packing test
+only deleted a cookie which an in-flight authorized response renewed. Both
+reproduced deterministically with bounded actual Windows Chrome response barriers.
+Fix tests only: visible/enabled wait before real SPACE; revoke exact server Session
+and remove configured cookie, preserving empty private DOM and revocation assertions.
+No production runtime,workflow,quota,timeout,skip or151-ID inventory change.
+Controlled before2 errors→after2 PASS; normal affected6 Chrome PASS,zero skips.
+Raw artifacts/intermediate harness failure retained; D1–D3 receipts unchanged.
+New commit requires its own six-job/raw artifact closure, not inherited ad31 green.
+Exact source/run/checkpoint: artifacts/d4-ci-repair-20261030/checkpoint.json.
+PR20 NOT_DRAFT/unmerged: OWNER_ACTION_REQUIRED, supported draft restore forbidden;
+no auth/browser workaround. Independent/manual/dependency and D3-C external gates
+remain blocked;75/143,0/13 unchanged. No merge,Pages/deploy,production mutation
+or backup deletion.
+
+## Previous D4 parser repair / review package — 2026-10-30
 
 Retained exact c28700d CI40931513318: all6 SUCCESS; six ZIP digests and source/
 merge-parent/tree binding verified; backend1562/zero skips, browser151 unique/

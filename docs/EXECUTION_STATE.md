@@ -1,6 +1,45 @@
 # ALFRED execution state
 
-## Active checkpoint — D4 review package / parser guards (2026-10-30)
+## Active checkpoint — D4 exact-head two-failure repair (2026-10-30)
+
+- Recovered clean ad31ca3, development/alfred-integrated, F:/ALFRED_DEV/post-audit.
+  Failed run40973869637 raw artifacts/source binding verified before edits:
+  merge checkoutb2053273 contains ad31 parent/identical tree;151 unique actual
+  Windows Chrome tests,149 PASS/2 errors/zero skips,shards49/51/51. Native-windows,
+  Linux and shard2 SUCCESS; shards0/1 and aggregate FAILED. Do not relabel that
+  run green or reuse its healthy jobs as successor exact-head CI.
+- Undo failure is test keyboard readiness: drag/drop DOM order appears while
+  action awaits list refresh and Undo remains disabled. Screenshot/DOM show
+  disabled Undo. Controlled Chrome response barrier reproduces visible/disabled
+  Undo and ElementNotInteractable. Wait for visible/enabled control, then send
+  actual SPACE (also for the following keyboard move); no pointer-click substitute.
+- Packing failure is invalid auth-loss simulation: SESSION_SAVE_EVERY_REQUEST
+  allows an already-authorized response to renew a removed browser cookie.
+  Controlled real Chrome/server response barrier proves200+Set-Cookie, absent
+  cookie immediately after removal, then restored cookie. Original test times
+  out with normal authenticated packing still present. Revoke the exact server
+  Session using configured cookie identity as well as removing the cookie;
+  retain exact empty-DOM/draft-clearing assertions and assert Session stays revoked.
+  The same late cookie can arrive after revocation but cannot authenticate.
+- No application regression reproduced; production runtime remains unchanged.
+  Unforced before2 Chrome PASS (flaky); controlled before2 matching errors;
+  controlled after2 PASS and normal directly affected6 Chrome PASS,zero skips.
+  First after harness erroneously held later list requests; harness-only repair
+  retained separately, not counted as app failure or passed evidence. No new test
+  IDs,quotas,timeouts,skips,auth bypass or removed assertions. D1–D3 not restarted.
+- Exact progress/commands/receipts/fresh successor CI:
+  artifacts/d4-ci-repair-20261030/checkpoint.json. Raw failure ZIPs/screenshots/DOM,
+  reproduction harness source and before/after metrics are retained there.
+  Complete inventory/system/migration,AST,dependency-policy and exact-source/history
+  privacy checks; commit/push validated test/docs changes and verify fresh six-job
+  CI/source/artifact closure before a green claim. Existing D4 checkpoint redirects
+  here; unchanged independent/manual/dependency/installer/recovery gates stay open.
+- PR20 currently NOT_DRAFT/open/unmerged; prior supported draft restoration
+  FORBIDDEN by integration. OWNER_ACTION_REQUIRED: restore Draft; no alternate
+  auth/browser bypass or repeated denied write. No merge/Pages/deployment,
+  production data/migration or backup deletion. Baseline75/143,extensions0/13.
+
+## Previous checkpoint — D4 review package / parser guards (2026-10-30)
 
 - Owner selected D4 on clean synchronized c28700d, development/alfred-integrated,
   F:/ALFRED_DEV/post-audit; PR20 DRAFT/open/unmerged, zero reviews/threads. Exact

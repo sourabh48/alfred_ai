@@ -4548,6 +4548,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def test_travel_editor_desktop_pointer_keyboard_undo_save_and_reopen(self):
         from selenium.webdriver import ActionChains
         from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support import expected_conditions as EC
         from apps.mobility.services.travel_discovery import value
         session = self.travel_editor_fixture()
         expenses = list(Expense.objects.filter(user=self.scenario['user']).values())
@@ -4586,13 +4587,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("arguments[0].scrollIntoView({block:'center',behavior:'instant'})",source)
         ActionChains(self.browser).move_to_element(source).click_and_hold().pause(.3).move_to_element(target).pause(.3).release().perform()
         self.wait.until(lambda _: names[1] in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li:first-child').text)
-        self.browser.find_element(self.By.CSS_SELECTOR,'[data-editor-undo]').send_keys(Keys.SPACE)
+        self.wait.until(EC.element_to_be_clickable((self.By.CSS_SELECTOR,'[data-editor-undo]'))).send_keys(Keys.SPACE)
         self.wait.until(lambda _: names[0] in self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li:first-child').text)
         session.refresh_from_db()
         first = session.itinerary['days'][0]
         activity = next(i for i in first['items'] if i['type']!='travel')
         old_position = first['items'].index(activity)
-        control = self.browser.find_element(self.By.CSS_SELECTOR,f'[data-editor-item="{activity["id"]}"] [data-editor-move="1"]')
+        control = self.wait.until(EC.element_to_be_clickable((self.By.CSS_SELECTOR,f'[data-editor-item="{activity["id"]}"] [data-editor-move="1"]')))
         control.send_keys(Keys.SPACE)
         def later():
             session.refresh_from_db()
@@ -5741,6 +5742,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('travel-packing-mobile-stale-repaired')
 
     def test_travel_packing_pagehide_and_auth_loss_clear_private_labels(self):
+        from django.contrib.sessions.models import Session
         session=self.packing_fixture()
         self.login();self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-packing-add]'))
@@ -5750,9 +5752,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-packing-add]'))
         self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'[data-packing-add] input').get_attribute('value'),'')
-        self.browser.delete_cookie('sessionid')
+        cookie=self.browser.get_cookie(settings.SESSION_COOKIE_NAME)
+        self.assertIsNotNone(cookie)
+        # A pending authorized response can renew a removed browser cookie.
+        Session.objects.filter(session_key=cookie['value']).delete()
+        self.browser.delete_cookie(settings.SESSION_COOKIE_NAME)
         self.memory_click('[data-packing-reload]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerPacking').get_attribute('textContent')=='')
+        self.assertFalse(Session.objects.filter(session_key=cookie['value']).exists())
 
     def test_travel_private_document_link_stale_copy_expiry_unlink_and_reopen(self):
         from datetime import timedelta

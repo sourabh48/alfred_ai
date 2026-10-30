@@ -8,6 +8,20 @@ Its exact HEAD, push, source/history preflight and fresh CI are recorded in
 `artifacts/d4-20261030/checkpoint.json`; c287 CI is never relabelled as its CI.
 Baseline **75/143**, extensions **0/13**; no formal requirements promoted.
 
+Latest continuation: artifacts/d4-ci-repair-20261030/checkpoint.json. ad31 CI
+40973869637 ran151 unique Chrome cases:149 PASS,2 errors,zero skips. Verified
+screenshots/DOM and bounded real Chrome response barriers establish two harness
+issues: Undo SPACE sent before busy controls re-enable, and cookie-only auth-loss
+simulation defeated by a previously authorized response renewing sessionid.
+Visible/enabled readiness now precedes actual SPACE; packing test revokes the
+exact server Session plus configured cookie and retains exact empty-DOM checks.
+Controlled before2 errors→after2 PASS; normal affected6 Chrome PASS,zero skips.
+No application runtime,quota,timeout,assertion,workflow or test-ID weakening.
+Native-windows,Linux,shard2 passed onad31; its aggregate correctly failed. Fresh
+successor exact-head CI is separate and owned by the continuation checkpoint.
+PR20 was observed NOT_DRAFT/unmerged; supported conversion was FORBIDDEN.
+OWNER_ACTION_REQUIRED to restore Draft; no alternate authorization/browser path.
+
 ## Review scope and identity
 
 Read the complete cumulative diff, including unchanged callers of changed code:

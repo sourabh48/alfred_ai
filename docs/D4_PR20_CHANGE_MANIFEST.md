@@ -1,7 +1,7 @@
 # PR20 cumulative change manifest
 
 Base: `a2274aa4daa514afe05ab58b4e4219ef18bb825f`. Retained tested checkpoint: `c28700d8da1e545441b1dec7e3292d71497ec6e7`.
-Candidate: the commit containing this manifest; exact source/run closure lives in `artifacts/d4-20261030/checkpoint.json`.
+Candidate: the commit containing this manifest; exact source/run closure lives in `artifacts/d4-ci-repair-20261030/checkpoint.json`.
 All cumulative changed paths are listed. SHA256 hashes use LF-normalized source bytes; documentation rows omit hashes to avoid self-reference.
 This is an inventory/review input, not independent approval or an executable test result.
 
@@ -68,15 +68,15 @@ D4 extends c287 with request-parser guards/settings, explicit parser callers and
 
 | Status | Path | SHA256 (LF bytes) |
 | --- | --- | --- |
-| A | `docs/ALFRED_2_0_EXECUTION.md` | — |
-| M | `docs/BACKUP_AND_RESTORE.md` | — |
-| M | `docs/CI_PIPELINE_STATE.md` | — |
-| A | `docs/D4_OWNER_ACCEPTANCE.md` | — |
-| A | `docs/D4_PR20_CHANGE_MANIFEST.md` | — |
-| A | `docs/D4_PR20_REVIEW.md` | — |
-| M | `docs/DEVELOPMENT.md` | — |
-| M | `docs/EXECUTION_STATE.md` | — |
-| M | `docs/PROJECT_STATUS.md` | — |
+| A | `docs/ALFRED_2_0_EXECUTION.md` | â€” |
+| M | `docs/BACKUP_AND_RESTORE.md` | â€” |
+| M | `docs/CI_PIPELINE_STATE.md` | â€” |
+| A | `docs/D4_OWNER_ACCEPTANCE.md` | â€” |
+| A | `docs/D4_PR20_CHANGE_MANIFEST.md` | â€” |
+| A | `docs/D4_PR20_REVIEW.md` | â€” |
+| M | `docs/DEVELOPMENT.md` | â€” |
+| M | `docs/EXECUTION_STATE.md` | â€” |
+| M | `docs/PROJECT_STATUS.md` | â€” |
 
 ## Tests and fixtures (34)
 
@@ -114,5 +114,5 @@ D4 extends c287 with request-parser guards/settings, explicit parser callers and
 | A | `tests/test_travel_savings.py` | `8c7931333fcb019f6054e424d34d64d5c4b9f7ed51cb9353d7f74f3d05860a48` |
 | A | `tests/test_travel_security.py` | `fffab487cb08de8a67f15bedc5d239abab637a672137f54d8d54ede4c90e2b04` |
 | M | `tests/test_upload_limits.py` | `cf1c1a7a7e797037bfea585270bc222d21bf0510f4484ddeb24206432f20ef19` |
-| M | `tests/test_user_data_browser.py` | `b8d442b1cbe3722a609a46039bfdfaff942edaefa1a3cd53b1817c3e56786702` |
+| M | `tests/test_user_data_browser.py` | `1856c0467e61d391b4bd9977e8bede22654e172d6149743bdc22a19d69ed9361` |
 | A | `tests/travel_persistence_support.py` | `ce516b0c3b2f1c9dcb5fe818139b44c0a6760102f6c818f8ef4e9cb65b9d7b11` |
