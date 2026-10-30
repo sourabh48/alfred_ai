@@ -179,6 +179,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("renderOpenings([{title:'Unsafe lead',url:'javascript:alert(1)',source_status:'unknown',tags:[]}],{filtered_candidates:0,total_candidates:1})")
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings a')), 0)
         self.assertIn('0 of 1', self.text('careerOpeningsMeta'))
+        self.browser.execute_script("renderCompensationBenchmark({available:true,currency:'USD',sample_count:1,market_min_annual:100000,market_max_annual:120000,market_mid_annual:110000})")
+        self.assertIn('$', self.text('careerCompensationPanel')); self.assertNotIn('₹', self.text('careerCompensationPanel'))
+        self.browser.execute_script("renderCompensationBenchmark({available:true,currency:'',sample_count:1,market_min_annual:100000,market_max_annual:120000,market_mid_annual:110000})")
+        self.assertIn('currency not stated', self.text('careerCompensationPanel')); self.assertNotIn('₹', self.text('careerCompensationPanel'))
         self.browser.refresh()
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status="fresh"]'))
         self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',

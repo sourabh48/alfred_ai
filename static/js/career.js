@@ -438,7 +438,7 @@ function renderJobMatchPanel(analysis) {
                             <div>Experience field: ${source.experience_years == null ? "Unavailable" : Alfred.escapeHtml(source.experience_years)} years</div>
                             ${source.excerpt ? `<blockquote class="mt-2 mb-0">${Alfred.escapeHtml(source.excerpt)}</blockquote>` : ""}</div>`).join("") || "No saved source references."}
                     </details>
-                    <div class="muted small mt-2"><strong>Compensation:</strong> ${compensation.available ? Alfred.escapeHtml(`${Alfred.formatCurrency(compensation.market_min_annual || 0)} to ${Alfred.formatCurrency(compensation.market_max_annual || compensation.market_min_annual || 0)} annual`) : "No salary-bearing evidence detected yet."}</div>
+                    <div class="muted small mt-2"><strong>Compensation:</strong> ${compensation.available ? Alfred.escapeHtml(`${formatCompensationAmount(compensation.market_min_annual, compensation.currency)} to ${formatCompensationAmount(compensation.market_max_annual || compensation.market_min_annual, compensation.currency)} annual`) : "No salary-bearing evidence detected yet."}</div>
                     <div class="muted small mt-2">${Alfred.escapeHtml(analysis.strengths || "")}</div>
                     <div class="muted small mt-2">${Alfred.escapeHtml(analysis.gaps || "")}</div>
                     <div class="mt-2">${jobHref ? `<a href="${Alfred.escapeHtml(jobHref)}" target="_blank" rel="noopener">Open job link</a>` : "Job link unavailable"}</div>
@@ -531,6 +531,16 @@ function renderCareerOutcomeForm(item) {
     });
 }
 
+function formatCompensationAmount(value, currency) {
+    const amount = Number(value || 0);
+    if (/^[A-Z]{3}$/.test(currency || "")) {
+        try {
+            return new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
+        } catch (_) { /* Unsupported code: show the amount without implying a currency. */ }
+    }
+    return `${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })} (currency not stated)`;
+}
+
 function renderCompensationBenchmark(benchmark) {
     const target = document.getElementById("careerCompensationPanel");
     if (!benchmark || !benchmark.available) {
@@ -546,11 +556,11 @@ function renderCompensationBenchmark(benchmark) {
                     <div class="muted small mt-2">${Alfred.escapeHtml(benchmark.summary || "")}</div>
                 </div>
                 <div class="text-end">
-                    <div class="metric-value" style="font-size:1.4rem;">${Alfred.formatCurrency(benchmark.market_mid_annual || benchmark.market_min_annual || 0)}</div>
+                    <div class="metric-value" style="font-size:1.4rem;">${Alfred.escapeHtml(formatCompensationAmount(benchmark.market_mid_annual || benchmark.market_min_annual, benchmark.currency))}</div>
                     <div class="muted small">Mid benchmark / year</div>
                 </div>
             </div>
-            <div class="muted small mt-3"><strong>Band:</strong> ${Alfred.formatCurrency(benchmark.market_min_annual || 0)} to ${Alfred.formatCurrency(benchmark.market_max_annual || benchmark.market_min_annual || 0)} annual</div>
+            <div class="muted small mt-3"><strong>Band:</strong> ${Alfred.escapeHtml(formatCompensationAmount(benchmark.market_min_annual, benchmark.currency))} to ${Alfred.escapeHtml(formatCompensationAmount(benchmark.market_max_annual || benchmark.market_min_annual, benchmark.currency))} annual</div>
         </div>
     `;
 }

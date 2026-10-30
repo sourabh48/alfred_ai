@@ -85,13 +85,29 @@ COUNTRY_ALIASES = {
     "worldwide": "Remote",
     "global": "Remote",
 }
+SALARY_CURRENCY_PATTERN = r"INR\b|Rs\.?(?![A-Za-z])|\u20b9|USD\b|\$|EUR\b|\u20ac|GBP\b|\u00a3"
 SALARY_BLOCK_RE = re.compile(
-    r"(?<![\w.])(?P<currency>INR\b|Rs\.?\b|\u20b9|USD\b|\$)?\s*"
+    rf"(?<![\w.])(?P<currency>{SALARY_CURRENCY_PATTERN})?\s*"
     r"(?P<first>\d[\d,]*(?:\.\d+)?)\s*(?P<first_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?"
-    r"(?:\s*(?:-|to|\u2013|\u2014)\s*(?P<second>\d[\d,]*(?:\.\d+)?)\s*(?P<second_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?)?"
-    r"\s*(?P<period>per\s+annum|per\s+year|/year|yearly|annual|annum|lpa|per\s+month|/month|monthly|month|pm|per\s+hour|/hour|hourly)?",
+    rf"(?:\s*(?:-|to|\u2013|\u2014)\s*(?P<second_currency>{SALARY_CURRENCY_PATTERN})?\s*(?P<second>\d[\d,]*(?:\.\d+)?)\s*(?P<second_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?)?"
+    r"(?:\s*(?P<trailing_currency>INR|USD|EUR|GBP)\b)?"
+    r"\s*(?P<period>(?:per\s+annum|per\s+year|/year|/yr|a\s+year|yearly|annually|annual|annum|lpa"
+    r"|per\s+month|/month|/mo|a\s+month|monthly|month|pm|per\s+hour|/hour|/hr|an\s+hour|hourly"
+    r"|per\s+week|/week|/wk|a\s+week|weekly|per\s+day|/day|a\s+day|daily)(?![A-Za-z]))?",
     re.IGNORECASE,
 )
+# Whole-page text mentions funding, revenue and audience sizes; only pay wording may become salary evidence.
+SALARY_CONTEXT_RE = re.compile(
+    r"\b(?:salary|salaries|compensation|ctc|pay|paying|pays|package|stipend|remuneration|earnings?|wages?|ote)\b",
+    re.IGNORECASE,
+)
+SALARY_CURRENCY_CODES = {"inr": "INR", "rs": "INR", "rs.": "INR", "\u20b9": "INR", "usd": "USD", "$": "USD",
+                         "eur": "EUR", "\u20ac": "EUR", "gbp": "GBP", "\u00a3": "GBP"}
+SALARY_RUPEE_UNITS = {"lpa", "lakh", "lakhs", "crore", "cr"}
+SALARY_VALUE_LIMIT = 10**12
+SALARY_ANNUAL_MULTIPLIERS = {"year": 1, "month": 12, "week": 52, "day": 260, "hour": 2080}
+SALARY_SCHEMA_PERIODS = {"year", "yearly", "annual", "annually", "month", "monthly", "week", "weekly",
+                         "day", "daily", "hour", "hourly"}
 OPPORTUNITY_OUTCOME_STATUSES = {"accepted", "rejected"}
 OPPORTUNITY_OUTCOME_VALIDATION_CONTRACT = [
     "accepted_or_rejected_decision",
@@ -541,6 +557,7 @@ class JobIntelligenceService:
             "salary_max_annual": annual_max,
             "currency": salary["currency"],
             "period": salary["period"],
+            "period_stated": salary["period_stated"],
         }
 
     def _opening_source_coverage(
@@ -815,7 +832,8 @@ class JobIntelligenceService:
                     "is_remote": location_meta["is_remote"],
                     "salary_min_annual": annual_min,
                     "salary_max_annual": annual_max,
-                    "currency": job_snapshot.salary_currency or "INR",
+                    "currency": job_snapshot.salary_currency or "",
+                    "period_stated": bool(job_snapshot.salary_period),
                     "url": job_snapshot.job_url,
                     "source_kind": job_snapshot.source_kind,
                     "feed_source": job_snapshot.source_name,
@@ -852,6 +870,7 @@ class JobIntelligenceService:
                     "salary_min_annual": annual_min,
                     "salary_max_annual": annual_max,
                     "currency": salary["currency"],
+                    "period_stated": salary["period_stated"],
                     "url": opening.get("url", ""),
                     "source_kind": "live_opening",
                     "feed_source": opening.get("aggregator_name") or opening.get("portal_name") or "Live opening",
@@ -874,22 +893,37 @@ class JobIntelligenceService:
             item for item in observations
             if self._salary_location_matches(item, location)
         ]
-        selected = filtered or observations
+        located = filtered or observations
         fallback_to_global = bool(location and not filtered and observations)
+        currency, selected = self._salary_currency_cohort(located)
+        excluded_currency_count = len(located) - len(selected)
+        if not selected:
+            return {
+                "available": False,
+                "summary": "Salary evidence is split evenly across currencies; amounts are not converted, so no benchmark is shown.",
+                "sample_count": 0,
+                "evidence": evidence,
+                "location_scope": location or "Global / Remote",
+                "geography_scope": self._salary_geography_scope(location, observations, [], fallback_to_global=fallback_to_global),
+                "salary_observations": [],
+                "evidence_contract": self._compensation_evidence_contract(
+                    observations, [], evidence, fallback_to_global=fallback_to_global,
+                    requested_location=location, currency_scope=located),
+            }
         mins = [item["salary_min_annual"] for item in selected if item["salary_min_annual"]]
         maxes = [item["salary_max_annual"] for item in selected if item["salary_max_annual"]]
         benchmark_min = round(median(mins), 2) if mins else 0.0
         benchmark_max = round(median(maxes), 2) if maxes else benchmark_min
         benchmark_mid = round((benchmark_min + benchmark_max) / 2, 2) if benchmark_max else benchmark_min
         comparison = None
-        if current_income_annual:
+        if current_income_annual and currency == "INR":
             if current_income_annual < benchmark_min:
                 comparison = "below_benchmark"
             elif benchmark_max and current_income_annual > benchmark_max:
                 comparison = "above_benchmark"
             else:
                 comparison = "within_benchmark"
-        evidence_contract = self._compensation_evidence_contract(observations, selected, evidence, fallback_to_global=fallback_to_global, requested_location=location)
+        evidence_contract = self._compensation_evidence_contract(observations, selected, evidence, fallback_to_global=fallback_to_global, requested_location=location, currency_scope=located)
         summary = (
             f"Compensation benchmark is evidence-backed from {len(selected)} salary-bearing opening signal(s) "
             f"across {evidence_contract['selected_source_count']} source(s)."
@@ -900,6 +934,12 @@ class JobIntelligenceService:
             summary += " Your current annualized income is above the current benchmark band."
         elif comparison == "within_benchmark":
             summary += " Your current annualized income sits inside the current benchmark band."
+        elif current_income_annual:
+            summary += " This benchmark is not in rupees, so your income was not compared with it."
+        if excluded_currency_count:
+            summary += f" {excluded_currency_count} signal(s) in another or unstated currency were excluded and not converted."
+        if evidence_contract["assumed_period_count"]:
+            summary += f" {evidence_contract['assumed_period_count']} signal(s) did not state a pay period and were treated as annual."
         return {
             "available": True,
             "summary": summary,
@@ -907,7 +947,7 @@ class JobIntelligenceService:
             "market_min_annual": benchmark_min,
             "market_max_annual": benchmark_max,
             "market_mid_annual": benchmark_mid,
-            "currency": next((item["currency"] for item in selected if item.get("currency")), "INR"),
+            "currency": currency,
             "location_scope": location or "Global / Remote",
             "comparison": comparison,
             "current_income_annual": round(current_income_annual or 0, 2),
@@ -1163,8 +1203,10 @@ class JobIntelligenceService:
         *,
         fallback_to_global: bool,
         requested_location: str,
+        currency_scope: list[dict] | None = None,
     ) -> dict:
         freshness = freshness_snapshot(evidence)
+        currency_scope = selected if currency_scope is None else currency_scope
         selected_sources = sorted({item.get("feed_source") or item.get("source", "") for item in selected if item.get("feed_source") or item.get("source")})
         selected_locations = sorted({item.get("location", "") for item in selected if item.get("location")})[:8]
         source_names = self._evidence_source_names(evidence)
@@ -1181,7 +1223,11 @@ class JobIntelligenceService:
             "fallback_to_global": fallback_to_global,
             "geo_match_level": self._salary_geo_match_level(requested_location, selected, fallback_to_global=fallback_to_global),
             "salary_evidence_density": self._salary_evidence_density(len(selected), len(selected_sources)),
-            "currency_breakdown": self._salary_currency_breakdown(selected),
+            "currency_breakdown": self._salary_currency_breakdown(currency_scope),
+            "mixed_currency": len(self._salary_currency_breakdown(currency_scope)) > 1,
+            "excluded_currency_count": len(currency_scope) - len(selected),
+            "assumed_period_count": sum(1 for item in selected if not item.get("period_stated")),
+            "annualization_basis": "Monthly x12, weekly x52, daily x260 and hourly x2080; no currency conversion.",
             "freshness": freshness,
             "proof_complete": bool(selected and source_names and freshness.get("proof_complete")),
         }
@@ -1217,6 +1263,16 @@ class JobIntelligenceService:
             currency = item.get("currency") or "Unknown"
             counts[currency] = counts.get(currency, 0) + 1
         return counts
+
+    def _salary_currency_cohort(self, observations: list[dict]) -> tuple[str, list[dict]]:
+        # Amounts are never converted: the band uses one currency, and an even split abstains.
+        counts = self._salary_currency_breakdown([item for item in observations if item.get("currency")])
+        if not counts:
+            return "", observations
+        ranked = sorted(counts.items(), key=lambda entry: entry[1], reverse=True)
+        if len(ranked) > 1 and ranked[0][1] == ranked[1][1]:
+            return "", []
+        return ranked[0][0], [item for item in observations if item.get("currency") == ranked[0][0]]
 
     def _salary_location_matches(self, observation: dict, requested_location: str) -> bool:
         requested = str(requested_location or "").strip()
@@ -1507,12 +1563,9 @@ class JobIntelligenceService:
         return ""
 
     def _extract_salary(self, ld_json: dict, text: str) -> tuple[float, float, str, str]:
-        salary = self._extract_salary_from_json_ld(ld_json)
+        salary = self._extract_salary_from_json_ld(ld_json) or self._parse_salary_text(text, require_context=True)
         if salary:
-            return salary["salary_min"], salary["salary_max"], salary["currency"], salary["period"]
-        salary = self._parse_salary_text(text)
-        if salary:
-            return salary["salary_min"], salary["salary_max"], salary["currency"], salary["period"]
+            return salary["salary_min"], salary["salary_max"], salary["currency"], salary["period"] if salary["period_stated"] else ""
         return 0.0, 0.0, "", ""
 
     def _extract_salary_from_json_ld(self, ld_json: dict) -> dict | None:
@@ -1521,21 +1574,34 @@ class JobIntelligenceService:
         base_salary = ld_json.get("baseSalary")
         if not isinstance(base_salary, dict):
             return None
-        currency = base_salary.get("currency", "INR")
+        raw_currency = base_salary.get("currency")
+        currency = raw_currency.strip().upper() if isinstance(raw_currency, str) else ""
+        if not re.fullmatch(r"[A-Z]{3}", currency):
+            currency = ""
         value = base_salary.get("value")
-        period = "year"
-        salary_min = 0.0
-        salary_max = 0.0
+        unit_text = ""
         if isinstance(value, dict):
-            period = str(value.get("unitText") or "year").lower()
-            salary_min = float(value.get("minValue") or value.get("value") or 0)
-            salary_max = float(value.get("maxValue") or salary_min or 0)
-        elif isinstance(value, (int, float)):
-            salary_min = float(value)
-            salary_max = float(value)
-        if not salary_min and not salary_max:
+            unit_text = str(value.get("unitText") or "").strip().lower()
+            first = self._json_salary_number(value.get("minValue")) or self._json_salary_number(value.get("value"))
+            second = self._json_salary_number(value.get("maxValue")) or first
+        else:
+            first = second = self._json_salary_number(value)
+        if not first and not second:
             return None
-        return {"salary_min": salary_min, "salary_max": salary_max or salary_min, "currency": currency.upper(), "period": self._normalize_salary_period(period)}
+        if unit_text and unit_text not in SALARY_SCHEMA_PERIODS:
+            return None
+        first = first or second
+        return {"salary_min": min(first, second), "salary_max": max(first, second), "currency": currency,
+                "period": self._normalize_salary_period(unit_text), "period_stated": bool(unit_text)}
+
+    def _json_salary_number(self, raw_value) -> float:
+        if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float, str)):
+            return 0.0
+        try:
+            value = Decimal(str(raw_value).replace(",", "").strip())
+        except DecimalException:
+            return 0.0
+        return float(value) if value.is_finite() and 0 < value <= SALARY_VALUE_LIMIT else 0.0
 
     def _outcome_salary_value(self, raw_value, unit: str | None) -> float:
         if raw_value is None or raw_value == "":
@@ -1550,23 +1616,38 @@ class JobIntelligenceService:
         except (TypeError, ValueError):
             raise ValueError('Provide finite positive salary evidence in cents within the supported range.') from None
 
-    def _parse_salary_text(self, text: str) -> dict | None:
-        match = next((item for item in SALARY_BLOCK_RE.finditer(text or "")
-                      if item.group("currency") or item.group("first_unit") or item.group("second_unit")), None)
-        if not match:
-            return None
-        fallback_unit = self._salary_unit_hint(match.group("period") or "")
-        shared_unit = match.group("first_unit") or match.group("second_unit") or fallback_unit
-        first_value = self._salary_value(match.group("first"), match.group("first_unit") or shared_unit)
-        second_value = self._salary_value(match.group("second"), match.group("second_unit") or shared_unit) if match.group("second") else first_value
-        if not first_value and not second_value:
-            return None
-        currency_raw = match.group("currency") or ""
-        currency = "USD" if "$" in currency_raw or "usd" in currency_raw.lower() else "INR"
-        period = self._normalize_salary_period(match.group("period") or match.group("first_unit") or "")
-        salary_min = min(first_value, second_value) if second_value else first_value
-        salary_max = max(first_value, second_value) if second_value else first_value
-        return {"salary_min": salary_min, "salary_max": salary_max, "currency": currency, "period": period}
+    def _parse_salary_text(self, text: str, *, require_context: bool = False) -> dict | None:
+        for match in SALARY_BLOCK_RE.finditer(text or ""):
+            units = {(match.group(name) or "").lower() for name in ("first_unit", "second_unit")} - {""}
+            currencies = {SALARY_CURRENCY_CODES[raw.strip().lower()]
+                          for raw in (match.group(name) for name in ("currency", "second_currency", "trailing_currency")) if raw}
+            if not currencies and not units:
+                continue
+            if len(currencies) > 1 or (require_context and not self._salary_match_has_context(text, match)):
+                continue
+            fallback_unit = self._salary_unit_hint(match.group("period") or "")
+            shared_unit = match.group("first_unit") or match.group("second_unit") or fallback_unit
+            first_value = self._salary_value(match.group("first"), match.group("first_unit") or shared_unit)
+            second_value = self._salary_value(match.group("second"), match.group("second_unit") or shared_unit) if match.group("second") else first_value
+            if not first_value and not second_value:
+                continue
+            if max(first_value, second_value) > SALARY_VALUE_LIMIT:
+                continue
+            currency = next(iter(currencies), "INR" if units & SALARY_RUPEE_UNITS else "")
+            period = self._normalize_salary_period(match.group("period") or match.group("first_unit") or "")
+            salary_min = min(first_value, second_value) if second_value else first_value
+            salary_max = max(first_value, second_value) if second_value else first_value
+            return {"salary_min": salary_min, "salary_max": salary_max, "currency": currency, "period": period,
+                    "period_stated": bool(match.group("period")) or "lpa" in units}
+        return None
+
+    def _salary_match_has_context(self, text: str, match) -> bool:
+        units = {(match.group(name) or "").lower() for name in ("first_unit", "second_unit")}
+        if match.group("period") or "lpa" in units:
+            return True
+        before = re.split(r"[.!?;\n]\s", text[max(0, match.start() - 60):match.start()])[-1]
+        after = re.split(r"[.!?;\n]", text[match.end():match.end() + 24])[0]
+        return bool(SALARY_CONTEXT_RE.search(before) or SALARY_CONTEXT_RE.search(after))
 
     def _salary_value(self, raw_value: str | None, unit: str | None) -> float:
         if not raw_value:
@@ -1595,18 +1676,25 @@ class JobIntelligenceService:
 
     def _normalize_salary_period(self, value: str) -> str:
         normalized = str(value or "").lower()
-        if any(token in normalized for token in ("month", "/month", "monthly", "pm")):
+        if any(token in normalized for token in ("month", "/mo", "pm")):
             return "month"
-        if any(token in normalized for token in ("hour", "/hour", "hourly")):
+        if any(token in normalized for token in ("hour", "/hr")):
             return "hour"
+        if any(token in normalized for token in ("week", "/wk")):
+            return "week"
+        if any(token in normalized for token in ("day", "daily")):
+            return "day"
         return "year"
 
     def _annualize_salary_range(self, salary_min: float, salary_max: float, period: str) -> tuple[float, float]:
-        multiplier = 12 if (period or "year").lower() == "month" else (2080 if (period or "year").lower() == "hour" else 1)
+        multiplier = SALARY_ANNUAL_MULTIPLIERS.get((period or "year").lower(), 1)
         return (money_float(Decimal(str(salary_min or 0))*multiplier),
                 money_float(Decimal(str(salary_max or salary_min or 0))*multiplier))
 
     def _median_salary_mid(self, outcomes: list[dict]) -> float:
+        # Reported outcomes are never converted, so a mixed-currency median is not meaningful.
+        if len({item.get("salary_currency") or "" for item in outcomes}) > 1:
+            return 0.0
         mids = [float(item.get("salary_mid_annual") or 0) for item in outcomes if item.get("salary_mid_annual")]
         return round(median(mids), 2) if mids else 0.0
 
