@@ -81,13 +81,14 @@ function renderRiskBoard(items) {
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
-                    <div class="fw-semibold">${Alfred.escapeHtml(item.label)} <span class="muted small">${Alfred.escapeHtml(item.trend || "stable")}</span></div>
+                    <div class="fw-semibold">${Alfred.escapeHtml(item.label)} <span class="muted small">${Alfred.escapeHtml((item.trend || "stable").replaceAll("_", " "))}</span></div>
                     <div class="muted small mt-2">${Alfred.escapeHtml(item.note || "")}</div>
                     <div class="chip-row mt-2">
                         ${(item.drivers || []).map(driver => `<span class="chip-neutral">${Alfred.escapeHtml(driver)}</span>`).join("")}
                     </div>
+                    ${(item.coverage?.missing_inputs || []).length ? `<div class="muted small mt-2">Not yet recorded: ${Alfred.escapeHtml(item.coverage.missing_inputs.join(", "))}</div>` : ""}
                 </div>
-                <span class="status-pill ${riskTone(item.level)}">${Alfred.escapeHtml(item.level)} | ${Alfred.formatNumber(item.score || 0, 0)}</span>
+                <span class="status-pill ${riskTone(item.level)}">${item.level === "insufficient_data" ? "insufficient data" : `${Alfred.escapeHtml(item.level)} | ${Alfred.formatNumber(item.score || 0, 0)}`}</span>
             </div>
         </div>
     `).join("") : `<div class="empty-state">No consolidated risk items yet.</div>`;

@@ -141,6 +141,23 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 f'#accountProfileForm [name="{field}"]').get_attribute('value'), amount)
         self.capture('user-decimal-profile-reload')
 
+    def test_risk_board_labels_missing_inputs_without_phantom_scores(self):
+        from apps.risk.models import RiskSignal
+        from apps.behavioral.models import BehavioralSignal
+        from tests.test_risk_evidence_coverage import market_payload
+
+        self.enterContext(patch("apps.risk.services.risk_intelligence.job_intelligence.market_outlook", return_value=market_payload()))
+        RiskSignal.objects.filter(user=self.scenario['user']).delete()
+        BehavioralSignal.objects.filter(user=self.scenario['user']).delete()
+        self.login(); self.browser.get(self.live_server_url + "/risk/")
+        self.wait.until(lambda _: 'Health / Burnout' in self.text('riskBoard'))
+        board = self.text('riskBoard')
+        self.assertIn('No sleep hours recorded', board)
+        self.assertIn('Not yet recorded: Manual illness snapshot, Behavior log', board)
+        self.assertIn('INSUFFICIENT DATA', board.upper())
+        self.assertNotIn('Average sleep 0.0h', board)
+        self.assertIn('insufficient history', board)
+
     def test_career_discovery_marks_cached_leads_and_recovers_without_unsafe_links(self):
         from apps.career.models import CareerProfile
         from apps.career.services.job_intelligence import JobIntelligenceService, job_intelligence

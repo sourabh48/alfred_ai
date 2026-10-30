@@ -191,5 +191,6 @@ def _build_risk_outlook_payload(user) -> dict:
         "evidence": payload["evidence"],
         "evidence_freshness": payload.get("evidence_freshness", freshness_snapshot(payload.get("evidence", []))),
         "grounding": payload.get("grounding", {}),
+        "calibration": payload.get("calibration", {}),
         "insights": payload["insights"],
     }

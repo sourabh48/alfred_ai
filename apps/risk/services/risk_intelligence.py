@@ -24,6 +24,10 @@ def _clamp(value: float, lower: float = 0.0, upper: float = 100.0) -> float:
     return max(lower, min(upper, value))
 
 
+def _covered_level(score: float, coverage: dict) -> str:
+    return "insufficient_data" if coverage["status"] == "insufficient_data" else _level(score)
+
+
 def _level(score: float) -> str:
     if score >= 75:
         return "critical"
@@ -36,7 +40,7 @@ def _level(score: float) -> str:
 
 def _trend(values: list[float]) -> str:
     if len(values) < 4:
-        return "stable"
+        return "insufficient_history"
     midpoint = len(values) // 2
     recent = mean(values[:midpoint])
     older = mean(values[midpoint:])
@@ -46,6 +50,13 @@ def _trend(values: list[float]) -> str:
     if delta <= -5:
         return "falling"
     return "stable"
+
+
+def _category_coverage(inputs: dict[str, bool]) -> dict:
+    available = [label for label, present in inputs.items() if present]
+    missing = [label for label, present in inputs.items() if not present]
+    status = "insufficient_data" if not available else ("partial" if missing else "observed")
+    return {"status": status, "available_inputs": available, "missing_inputs": missing}
 
 
 def _dedupe_evidence(items: list[dict]) -> list[dict]:
@@ -93,8 +104,11 @@ class RiskIntelligenceService:
 
         recent_behavior = list(BehavioralSignal.objects.filter(user=user).order_by("-timestamp").values_list("stress_score", "sleep_hours", "work_hours")[:7])
         avg_stress = mean(row[0] for row in recent_behavior) if recent_behavior else 0.0
-        avg_sleep = mean(row[1] for row in recent_behavior) if recent_behavior else 0.0
-        avg_work = mean(row[2] for row in recent_behavior) if recent_behavior else 0.0
+        # These model fields default to 0, which means "not logged" rather than a measured zero.
+        logged_sleep = [row[1] for row in recent_behavior if row[1] > 0]
+        logged_work = [row[2] for row in recent_behavior if row[2] > 0]
+        avg_sleep = mean(logged_sleep) if logged_sleep else 0.0
+        avg_work = mean(logged_work) if logged_work else 0.0
 
         baseline = resolve_canonical_financial_baseline(user)
         liquid_cash = float(baseline.get("liquid_cash", 0) or 0)
@@ -103,18 +117,22 @@ class RiskIntelligenceService:
         monthly_income = float(baseline.get("monthly_income", 0) or 0)
         debt_burden = float(baseline.get("debt_burden_ratio", 0) or 0)
         emergency_months = float(baseline.get("liquid_runway_months", 0) or 0)
+        runway_known = ((baseline.get("metric_states") or {}).get("liquid_runway_months") or {}).get("status", "unavailable") != "unavailable"
 
         mobility = bike_service_intelligence.risk_snapshot(user)
         mobility_summary = mobility.get("summary", {})
+        condition_score = mobility_summary.get("latest_condition_score") or 0
         mobility_risk = _clamp(
             (mobility_summary.get("critical_faults", 0) * 18)
             + (mobility_summary.get("expired_documents", 0) * 18)
             + (mobility_summary.get("expiring_documents", 0) * 8)
-            + max(0, 65 - (mobility_summary.get("latest_condition_score") or 0)) * 0.5
+            + (max(0, 65 - condition_score) * 0.5 if condition_score else 0)
         )
+        vehicle_records = bool(condition_score or mobility_summary.get("critical_faults")
+                               or mobility_summary.get("expired_documents") or mobility_summary.get("expiring_documents"))
 
         available_fit = latest_job_analysis.available_fit_score if latest_job_analysis else None
-        fit_gap = max(0.0, 100.0 - float(available_fit or 0)) if latest_job_analysis else 24.0
+        fit_gap = max(0.0, 100.0 - float(available_fit)) if available_fit is not None else 24.0
 
         career_score = _clamp(
             (manual_layoff * 0.35)
@@ -125,13 +143,13 @@ class RiskIntelligenceService:
         health_score = _clamp(
             (manual_illness * 0.45)
             + (avg_stress * 5.5)
-            + (max(0, 6 - avg_sleep) * 8)
+            + (max(0, 6 - avg_sleep) * 8 if logged_sleep else 0)
             + (max(0, avg_work - 9) * 3)
             + (max(0, inflation - 6) * 1.8)
         )
         financial_score = _clamp(
             (debt_burden * 0.7)
-            + (18 if emergency_months < 1 else (10 if emergency_months < 3 else 0))
+            + ((18 if emergency_months < 1 else (10 if emergency_months < 3 else 0)) if runway_known else 0)
             + (dependents * 3.5)
             + (max(0, unemployment - 5) * 2.8)
         )
@@ -145,18 +163,26 @@ class RiskIntelligenceService:
         career_values = [float(item.layoff_risk) for item in history]
         health_values = [float(item.illness_risk) for item in history]
         relocation_values = [float(item.relocation_risk) for item in history]
-        financial_values = [((float(item.layoff_risk) + float(item.relocation_risk)) / 2) for item in history]
+        coverage = {
+            "career": _category_coverage({"Manual layoff snapshot": bool(latest), "Job fit": available_fit is not None,
+                                          "External market evidence": bool(career_market.get("evidence"))}),
+            "financial": _category_coverage({"Income": bool(monthly_income), "Liquid runway": runway_known}),
+            "health": _category_coverage({"Manual illness snapshot": bool(latest), "Behavior log": bool(recent_behavior)}),
+            "relocation": _category_coverage({"Manual relocation snapshot": bool(latest), "Income": bool(monthly_income)}),
+            "mobility": _category_coverage({"Vehicle records": vehicle_records}),
+        }
 
         consolidated = [
             {
                 "key": "career",
                 "label": "Career / Layoff",
                 "score": round(career_score, 1),
-                "level": _level(career_score),
+                "level": _covered_level(career_score, coverage["career"]),
+                "coverage": coverage["career"],
                 "trend": _trend(career_values),
                 "note": "Role-level job market, layoffs, and fit-gap pressure combined with your latest layoff snapshot.",
                 "drivers": [
-                    f"Manual layoff snapshot {manual_layoff:.0f}/100",
+                    f"Manual layoff snapshot {manual_layoff:.0f}/100" if latest else "No manual layoff snapshot recorded",
                     f"External market risk {career_market['risk_score']:.0f}/100",
                     f"Rule-based job-fit gap {fit_gap:.0f}/100" if available_fit is not None else "Job-fit evidence unavailable; conservative risk fallback, not a measured gap",
                 ],
@@ -165,12 +191,13 @@ class RiskIntelligenceService:
                 "key": "financial",
                 "label": "Financial Pressure",
                 "score": round(financial_score, 1),
-                "level": _level(financial_score),
-                "trend": _trend(financial_values),
+                "level": _covered_level(financial_score, coverage["financial"]),
+                "coverage": coverage["financial"],
+                "trend": "not_tracked",
                 "note": "Debt burden, liquid runway, dependents, and macro labor pressure.",
                 "drivers": [
                     f"Debt burden {debt_burden:.1f}% of income" if monthly_income else "Income not set",
-                    f"Emergency runway {emergency_months:.1f} months",
+                    f"Emergency runway {emergency_months:.1f} months" if runway_known else "Emergency runway unknown",
                     f"Dependents {dependents}",
                 ],
             },
@@ -178,24 +205,26 @@ class RiskIntelligenceService:
                 "key": "health",
                 "label": "Health / Burnout",
                 "score": round(health_score, 1),
-                "level": _level(health_score),
+                "level": _covered_level(health_score, coverage["health"]),
+                "coverage": coverage["health"],
                 "trend": _trend(health_values),
                 "note": "Illness risk blended with behavioral stress, sleep, workload, and inflation pressure.",
                 "drivers": [
-                    f"Manual illness snapshot {manual_illness:.0f}/100",
-                    f"Average stress {avg_stress:.1f}/10",
-                    f"Average sleep {avg_sleep:.1f}h",
+                    f"Manual illness snapshot {manual_illness:.0f}/100" if latest else "No manual illness snapshot recorded",
+                    f"Average stress {avg_stress:.1f}/10" if recent_behavior else "No stress log recorded",
+                    f"Average sleep {avg_sleep:.1f}h" if logged_sleep else "No sleep hours recorded",
                 ],
             },
             {
                 "key": "relocation",
                 "label": "Relocation / Cost Shift",
                 "score": round(relocation_score, 1),
-                "level": _level(relocation_score),
+                "level": _covered_level(relocation_score, coverage["relocation"]),
+                "coverage": coverage["relocation"],
                 "trend": _trend(relocation_values),
                 "note": "Relocation pressure blended with rent burden, inflation, and market volatility.",
                 "drivers": [
-                    f"Manual relocation snapshot {manual_relocation:.0f}/100",
+                    f"Manual relocation snapshot {manual_relocation:.0f}/100" if latest else "No manual relocation snapshot recorded",
                     f"Rent plus EMI burden {debt_burden:.1f}%",
                     f"Inflation {inflation}",
                 ],
@@ -204,13 +233,14 @@ class RiskIntelligenceService:
                 "key": "mobility",
                 "label": "Mobility / Vehicle Readiness",
                 "score": round(mobility_risk, 1),
-                "level": _level(mobility_risk),
-                "trend": "stable",
+                "level": _covered_level(mobility_risk, coverage["mobility"]),
+                "coverage": coverage["mobility"],
+                "trend": "not_tracked",
                 "note": "Vehicle faults, expired documents, and condition score from the service dashboard.",
                 "drivers": [
                     f"Critical faults {mobility_summary.get('critical_faults', 0)}",
                     f"Expired documents {mobility_summary.get('expired_documents', 0)}",
-                    f"Condition score {mobility_summary.get('latest_condition_score', 0)}/100",
+                    f"Condition score {condition_score}/100" if condition_score else "No vehicle condition record",
                 ],
             },
         ]
@@ -219,8 +249,9 @@ class RiskIntelligenceService:
         related_news, extra_evidence = self._build_related_news(consolidated, career_market)
         evidence = _dedupe_evidence([*career_market["evidence"], *extra_evidence])
 
-        top = max(consolidated, key=lambda item: item["score"]) if consolidated else None
-        overall_average = round(mean(item["score"] for item in consolidated), 1) if consolidated else 0.0
+        rated = [item for item in consolidated if item["coverage"]["status"] != "insufficient_data"]
+        top = max(rated, key=lambda item: item["score"]) if rated else None
+        overall_average = round(mean(item["score"] for item in rated), 1) if rated else 0.0
         evidence_freshness = freshness_snapshot(evidence)
 
         return {
@@ -238,6 +269,12 @@ class RiskIntelligenceService:
                 "overall_average": overall_average,
                 "news_count": len(related_news),
                 "action_count": len(action_items),
+                "rated_category_count": len(rated),
+                "insufficient_category_count": len(consolidated) - len(rated),
+            },
+            "calibration": {
+                "calibrated": False,
+                "statement": "Scores are deterministic weighted heuristics over the listed inputs, not a calibrated prediction and not a diagnosis.",
             },
             "macro_context": macro,
             "consolidated_risks": consolidated,
@@ -254,7 +291,7 @@ class RiskIntelligenceService:
                 "mobility_condition_score": mobility_summary.get("latest_condition_score", 0),
             },
             "financial_baseline": baseline,
-            "insights": self._build_insights(consolidated, career_market, monthly_income, liquid_cash),
+            "insights": self._build_insights(rated, career_market, monthly_income, liquid_cash),
             "evidence": evidence,
             "evidence_freshness": evidence_freshness,
             "grounding": {
@@ -282,6 +319,7 @@ class RiskIntelligenceService:
                 "notes": [
                     "Risk Radar blends user-owned financial, behavioral, mobility, and manual risk snapshots with verified external context.",
                     "External evidence grounds market and macro pressure only; the final category scores remain bounded and deterministic.",
+                    "Scores are uncalibrated heuristics, not predictions or diagnoses. Inputs that were never recorded add no risk and are listed as not yet recorded.",
                 ],
             },
         }
