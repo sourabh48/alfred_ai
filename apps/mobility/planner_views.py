@@ -20,7 +20,7 @@ from .services.travel_research import STAGES, TERMINAL, evidence_payload, queue_
 from .services.travel.presentation import age_saved_facts
 from .services.travel.restrictions import KIND, record_restriction, restriction_context
 from .services.travel.mapping import map_configuration, map_features
-from .services.travel.cache import usage_summary
+from .services.travel.cache import budget_status, usage_summary
 from .services.travel.discovery import remember, place_key
 from .services.travel.intent import PROFILE_KEYS, validate_preference
 from .services.travel_itinerary import build_itinerary, build_multi_stop_itinerary, compare_stop_orders
@@ -385,7 +385,7 @@ class TravelProviderUsage(APIView):
                      DuffelAccommodation(),DuffelFlights(),IndianRailProvider(),BraveSearch(),
                      SearXNGSearch(),WikivoyageSearch(),WikivoyageDestinations()]
         return Response({"usage":usage_summary(),"configuration":[{"provider":p.name,"category":p.category,
-            "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits} for p in providers]})
+            "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits,"application_budget":budget_status(p)} for p in providers]})
 
 
 class TravelPreferencesView(APIView):

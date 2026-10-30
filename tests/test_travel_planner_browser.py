@@ -411,6 +411,8 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: "brave · web" in self.text("plannerQuotaBody"))
         self.assertIn("wikivoyage · destinations",self.text("plannerQuotaBody"))
         self.assertIn("duffel · flights",self.text("plannerQuotaBody"))
+        self.assertIn("local budget left",self.text("plannerQuotaBody"))
+        self.assertIn("per month",self.text("plannerQuotaBody"))
 
     def test_date_change_keeps_edited_days_and_does_not_resurrect_old_forecast(self):
         self.browser.get(self.live_server_url + "/mobility/")

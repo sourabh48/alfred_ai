@@ -28,6 +28,20 @@ def _cache_result(record, error=""):
     return ProviderResult(**data)
 
 
+def budget_status(provider, *, now=None):
+    """Application budgets only; a provider's own plan quota is reported separately when exposed."""
+    now = now or timezone.now()
+    calls = TravelProviderRequest.objects.filter(provider=provider.name, network_call=True)
+    starts = {"minute": now-timedelta(minutes=1), "hour": now-timedelta(hours=1),
+              "day": now.replace(hour=0, minute=0, second=0, microsecond=0),
+              "month": now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)}
+    status = {}
+    for period, limit in provider.limits.items():
+        used = calls.filter(created_at__gte=starts[period]).count()
+        status[period] = {"limit": limit, "used": used, "remaining": max(limit-used, 0), "exhausted": used >= limit}
+    return status
+
+
 def query(provider, parameters, *, force=False, cache_only=False):
     try:
         parameters = provider.parameters(parameters)
@@ -76,13 +90,8 @@ def query(provider, parameters, *, force=False, cache_only=False):
     called = False
     event = None
     try:
-        requests_qs = TravelProviderRequest.objects.filter(provider=provider.name, network_call=True)
-        starts = {"minute": now-timedelta(minutes=1), "hour": now-timedelta(hours=1),
-                  "day": now.replace(hour=0, minute=0, second=0, microsecond=0),
-                  "month": now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)}
-        for period, limit in provider.limits.items():
-            if requests_qs.filter(created_at__gte=starts[period]).count() >= limit:
-                return unavailable("local_quota_exhausted")
+        if any(item["exhausted"] for item in budget_status(provider, now=now).values()):
+            return unavailable("local_quota_exhausted")
         called = True
         event = TravelProviderRequest.objects.create(provider=provider.name, category=provider.category,
             cache_key=key, parameters=parameters, status="in_progress", network_call=True)

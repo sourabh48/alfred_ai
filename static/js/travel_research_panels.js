@@ -112,7 +112,7 @@ window.TravelResearchPanels = (() => {
             if (e.target.id === "plannerLoadQuota") {
                 try {
                     const data = await Alfred.fetchJSON("/api/mobility/planner/providers/");
-                    Alfred.setHTMLIfChanged("plannerQuotaBody",`<ul>${data.usage.map(r=>`<li>${esc(r.provider)}: ${r.calls_today} calls today · ${Math.round(r.cache_hit_ratio*100)}% cache hits · ${r.failures} failures · ${Math.round(r.average_latency_ms || 0)} ms average · remaining quota ${esc(r.quota_remaining ?? "not exposed")}</li>`).join("")}</ul><ul>${data.configuration.map(p=>`<li>${esc(p.provider)} · ${esc(p.category)}: ${esc(p.unavailable_reason?.replaceAll("_"," ") || "configured; live acceptance still required")}</li>`).join("")}</ul>`);
+                    Alfred.setHTMLIfChanged("plannerQuotaBody",`<ul>${data.usage.map(r=>`<li>${esc(r.provider)}: ${r.calls_today} calls today · ${Math.round(r.cache_hit_ratio*100)}% cache hits · ${r.failures} failures · ${Math.round(r.average_latency_ms || 0)} ms average · provider-reported quota ${esc(r.quota_remaining ?? "not exposed")}</li>`).join("")}</ul><ul>${data.configuration.map(p=>`<li>${esc(p.provider)} · ${esc(p.category)}: ${esc(p.unavailable_reason?.replaceAll("_"," ") || "configured; live acceptance still required")} · local budget left ${Object.entries(p.application_budget || {}).map(([period,b])=>`${esc(b.remaining)}/${esc(b.limit)} per ${esc(period)}`).join(", ") || "unavailable"}</li>`).join("")}</ul>`);
                 } catch (err) { $("plannerQuotaBody").textContent=err.message; }
             }
         });

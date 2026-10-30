@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from apps.integrations.models import VerifiedExternalInsight
 from apps.mobility.models import TravelProviderRequest, TravelProviderState
-from apps.mobility.services.travel.cache import query, query_with_fallback, usage_summary
+from apps.mobility.services.travel.cache import budget_status, query, query_with_fallback, usage_summary
 from apps.mobility.services.travel.providers.base import Provider, ProviderError
 from apps.mobility.services.travel.providers.geocoding import OpenMeteoGeocoding
 from apps.mobility.services.travel.providers.routing import OpenRouteService
@@ -136,6 +136,50 @@ class TravelProviderTests(TestCase):
         result = query(self.provider, {}, force=True)
         self.assertEqual(result.error, "provider_busy_or_backoff")
         self.assertEqual(self.provider.fetch.call_count, 2)
+
+    def test_budget_status_matches_enforcement_in_every_window(self):
+        now = timezone.now()
+        self.provider.min_interval = 0
+        for period, age in (("minute", timedelta(seconds=10)), ("hour", timedelta(minutes=5)),
+                            ("day", timedelta(seconds=0)), ("month", timedelta(seconds=0))):
+            with self.subTest(period):
+                TravelProviderRequest.objects.all().delete()
+                self.provider.limits = {period: 1}
+                self.assertEqual(budget_status(self.provider)[period],
+                                 {"limit": 1, "used": 0, "remaining": 1, "exhausted": False})
+                call_count = self.provider.fetch.call_count
+                self.assertTrue(query(self.provider, {}, force=True).success)
+                TravelProviderRequest.objects.update(created_at=now-age)
+                self.assertEqual(budget_status(self.provider)[period],
+                                 {"limit": 1, "used": 1, "remaining": 0, "exhausted": True})
+                self.assertEqual(query(self.provider, {}, force=True).error, "local_quota_exhausted")
+                self.assertEqual(self.provider.fetch.call_count, call_count+1)
+
+    def test_budget_windows_expire_and_ignore_other_requests(self):
+        now = timezone.now()
+        self.provider.limits = {"minute": 1, "hour": 1, "day": 3, "month": 3}
+        query(self.provider, {"latitude": 1})
+        query(self.provider, {"latitude": 1})
+        status = budget_status(self.provider)
+        self.assertEqual(status["minute"]["used"], 1)
+        TravelProviderRequest.objects.filter(network_call=True).update(created_at=now-timedelta(minutes=2))
+        status = budget_status(self.provider, now=now)
+        self.assertEqual((status["minute"]["used"], status["hour"]["used"]), (0, 1))
+        TravelProviderRequest.objects.create(provider="other", category="weather", cache_key="x", status="ok", network_call=True)
+        self.assertEqual(budget_status(self.provider, now=now)["day"]["used"], 1)
+        first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        TravelProviderRequest.objects.filter(provider=self.provider.name).update(created_at=first_of_month-timedelta(seconds=1))
+        status = budget_status(self.provider, now=now)
+        self.assertEqual((status["month"]["used"], status["month"]["remaining"]), (0, 3))
+
+    def test_exhausted_budget_keeps_cached_evidence_and_makes_no_call(self):
+        query(self.provider, {"latitude": 1})
+        self.provider.limits = {"month": 1}
+        self.provider.fetch.reset_mock()
+        result = query(self.provider, {"latitude": 1}, force=True)
+        self.assertEqual(result.error, "local_quota_exhausted")
+        self.assertTrue(result.cached)
+        self.provider.fetch.assert_not_called()
 
     def test_fallback_and_missing_configuration(self):
         missing = Provider()

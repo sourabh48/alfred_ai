@@ -116,6 +116,9 @@ class TravelContinuationTests(TestCase):
         response = self.client.get("/api/mobility/planner/providers/")
         self.assertEqual(response.status_code,200)
         self.assertIn("configuration",response.json())
+        for row in response.json()["configuration"]:
+            self.assertEqual(set(row["application_budget"]),set(row["application_limits"]))
+            self.assertTrue(all(item["remaining"]==item["limit"]-item["used"] for item in row["application_budget"].values()))
         configured = {(p["provider"], p["category"]) for p in response.json()["configuration"]}
         self.assertTrue({("open_meteo", "weather"), ("duffel", "flights"), ("brave", "web"),
                          ("searxng", "web"), ("wikivoyage", "web"), ("wikivoyage", "destinations")} <= configured)
