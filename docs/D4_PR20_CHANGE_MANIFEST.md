@@ -68,15 +68,15 @@ D4 extends c287 with request-parser guards/settings, explicit parser callers and
 
 | Status | Path | SHA256 (LF bytes) |
 | --- | --- | --- |
-| A | `docs/ALFRED_2_0_EXECUTION.md` | â€” |
-| M | `docs/BACKUP_AND_RESTORE.md` | â€” |
-| M | `docs/CI_PIPELINE_STATE.md` | â€” |
-| A | `docs/D4_OWNER_ACCEPTANCE.md` | â€” |
-| A | `docs/D4_PR20_CHANGE_MANIFEST.md` | â€” |
-| A | `docs/D4_PR20_REVIEW.md` | â€” |
-| M | `docs/DEVELOPMENT.md` | â€” |
-| M | `docs/EXECUTION_STATE.md` | â€” |
-| M | `docs/PROJECT_STATUS.md` | â€” |
+| A | `docs/ALFRED_2_0_EXECUTION.md` | — |
+| M | `docs/BACKUP_AND_RESTORE.md` | — |
+| M | `docs/CI_PIPELINE_STATE.md` | — |
+| A | `docs/D4_OWNER_ACCEPTANCE.md` | — |
+| A | `docs/D4_PR20_CHANGE_MANIFEST.md` | — |
+| A | `docs/D4_PR20_REVIEW.md` | — |
+| M | `docs/DEVELOPMENT.md` | — |
+| M | `docs/EXECUTION_STATE.md` | — |
+| M | `docs/PROJECT_STATUS.md` | — |
 
 ## Tests and fixtures (34)
 
