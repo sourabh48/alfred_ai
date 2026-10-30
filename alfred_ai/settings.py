@@ -4,11 +4,14 @@ Django settings for alfred_ai project.
 
 import environ
 import os
+import re
 import sys
 from pathlib import Path
 from datetime import timedelta
+from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.csp import CSP
 from .local_config import load_local_environment, native_secret_file
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -158,6 +161,7 @@ LOGOUT_REDIRECT_URL = "/login/"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
 
@@ -209,6 +213,25 @@ SECURE_PROXY_SSL_HEADER = (
 )
 USE_X_FORWARDED_HOST = env.bool("USE_X_FORWARDED_HOST", default=not LOCAL_RUNTIME)
 X_FRAME_OPTIONS = env("X_FRAME_OPTIONS", default="DENY")
+
+# Limits where an injected script could load from or send data. Inline handlers
+# are still used across the UI, so script-src allows them until they are removed;
+# the report-only policy below measures that work without breaking any page.
+_map_tiles = urlsplit(os.environ.get("TRAVEL_MAP_TILE_URL", "https://tile.openstreetmap.org/{z}/{x}/{y}.png"))
+_map_tile_host = _map_tiles.hostname if _map_tiles.scheme == "https" and re.fullmatch(r"[a-z0-9.-]+", _map_tiles.hostname or "") else ""
+_CSP_BASE = {
+    "default-src": [CSP.SELF],
+    "style-src": [CSP.SELF, CSP.UNSAFE_INLINE],
+    "img-src": [CSP.SELF, "data:", "blob:", *([f"https://{_map_tile_host}"] if _map_tile_host else [])],
+    "font-src": [CSP.SELF, "data:"],
+    "connect-src": [CSP.SELF],
+    "object-src": [CSP.NONE],
+    "base-uri": [CSP.SELF],
+    "form-action": [CSP.SELF],
+    "frame-ancestors": [CSP.NONE],
+}
+SECURE_CSP = {**_CSP_BASE, "script-src": [CSP.SELF, CSP.UNSAFE_INLINE]}
+SECURE_CSP_REPORT_ONLY = {**_CSP_BASE, "script-src": [CSP.SELF]}
 
 
 # ---------------------------------------------------------

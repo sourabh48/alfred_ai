@@ -392,15 +392,28 @@ function renderLatestUpload(upload) {
         : (upload.imported_count
             ? `${upload.imported_count} new row${upload.imported_count === 1 ? "" : "s"}`
             : `${upload.parser_status_label || upload.parser_status || "Review"} | metadata only`);
-    const note = upload.parser_notes ? `<div class="text-warning-emphasis small mt-1">${escapeHtml(upload.parser_notes)}</div>` : "";
-
-    target.innerHTML = `
-        <div><strong>Last import:</strong> ${upload.file_name}</div>
-        <div>${upload.source ? upload.source.replaceAll("_", " ") : "Statement"} | parser ${(Number(upload.parse_confidence || 0) * 100).toFixed(0)}%</div>
-        <div>${upload.account_holder || upload.institution_name || "Account"} ${upload.account_number ? `| ${maskAccount(upload.account_number)}` : ""}</div>
-        <div>${upload.statement_start || "?"} to ${upload.statement_end || "?"} | ${statusCopy}</div>
-        ${note}
-    `;
+    // Every value here can come from a document, so it only ever reaches textContent.
+    const line = text => {
+        const element = document.createElement("div");
+        element.textContent = text;
+        return element;
+    };
+    const fileLine = document.createElement("div");
+    const fileLabel = document.createElement("strong");
+    fileLabel.textContent = "Last import:";
+    fileLine.append(fileLabel, ` ${upload.file_name}`);
+    const lines = [
+        fileLine,
+        line(`${upload.source ? upload.source.replaceAll("_", " ") : "Statement"} | parser ${(Number(upload.parse_confidence || 0) * 100).toFixed(0)}%`),
+        line(`${upload.account_holder || upload.institution_name || "Account"} ${upload.account_number ? `| ${maskAccount(upload.account_number)}` : ""}`),
+        line(`${upload.statement_start || "?"} to ${upload.statement_end || "?"} | ${statusCopy}`),
+    ];
+    if (upload.parser_notes) {
+        const note = line(upload.parser_notes);
+        note.className = "text-warning-emphasis small mt-1";
+        lines.push(note);
+    }
+    target.replaceChildren(...lines);
 }
 
 function renderStatementUploads(items) {

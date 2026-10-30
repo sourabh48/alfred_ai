@@ -523,6 +523,9 @@ class ExpenseStatementImportView(APIView):
             return Response({"detail": "Upload a statement PDF first."}, status=status.HTTP_400_BAD_REQUEST)
         if not statement_file.name.lower().endswith(".pdf"):
             return Response({"detail": "Only PDF statements are supported right now."}, status=status.HTTP_400_BAD_REQUEST)
+        requested_kind = (request.data.get("statement_kind") or "").strip()
+        if requested_kind and requested_kind not in dict(StatementUpload.SOURCE_CHOICES):
+            return Response({"detail": "Choose a supported statement type."}, status=status.HTTP_400_BAD_REQUEST)
 
         statement_file.seek(0)
         parsed = parse_bank_statement(statement_file, user=request.user)

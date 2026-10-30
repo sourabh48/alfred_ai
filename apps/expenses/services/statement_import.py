@@ -52,6 +52,20 @@ ACCOUNT_NO_RE = re.compile(
 )
 ACCOUNT_HOLDER_RE = re.compile(r"\b(?:MR|MRS|MS)\s+([A-Z ]{3,80})")
 REFERENCE_RE = re.compile(r"\b[A-Z0-9]{10,}\b")
+# Document text is untrusted. These never occur in a real name, and ' & / . - all do.
+STATEMENT_MARKUP_RE = re.compile(r"[<>\"`\x00-\x1f\x7f]")
+
+
+def clean_statement_text(value) -> str:
+    """Treat metadata carrying markup as unknown; a blank beats a mangled name."""
+    text = str(value or "")
+    return "" if STATEMENT_MARKUP_RE.search(text) else text
+
+
+def clean_statement_file_name(value) -> str:
+    """Keep an uploaded name recognizable while removing its markup characters."""
+    cleaned = STATEMENT_MARKUP_RE.sub("", str(value or "")).strip()
+    return cleaned or "statement.pdf"
 
 HEADER_PREFIXES = (
     "Page No",
@@ -983,7 +997,7 @@ def _extract_account_holder(full_text: str) -> str:
             if len(cleaned_tokens) >= 4:
                 break
         if cleaned_tokens:
-            return _normalize_space(" ".join(cleaned_tokens).title())
+            return clean_statement_text(_normalize_space(" ".join(cleaned_tokens).title()))
 
     match = ACCOUNT_HOLDER_RE.search(full_text.upper())
     if match is None:

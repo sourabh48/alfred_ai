@@ -15,6 +15,7 @@ from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services import job_intelligence, resume_intelligence
 from apps.expenses.models import StatementUpload
 from apps.expenses.money import money_float
+from apps.expenses.services.statement_import import clean_statement_text
 from apps.expenses.services.statement_lifecycle import delete_statement_upload, queue_statement_retry, retry_statement_upload
 from apps.integrations.models import CreditReportUpload, CreditScore
 from apps.integrations.services.credit_report_parser import credit_report_parser
@@ -2574,6 +2575,11 @@ def _vehicle_document_parse_fields(document: BikeDocument, payload: dict | None,
 
 def _apply_statement_correction(user, document_id: int, corrections: dict) -> dict:
     upload = StatementUpload.objects.get(user=user, pk=document_id)
+    for field in ("bank_name", "account_holder", "account_number"):
+        if field in corrections and clean_statement_text(corrections[field]) != str(corrections[field]):
+            raise ValueError("Statement details cannot contain markup characters.")
+    if "statement_kind" in corrections and corrections["statement_kind"] not in dict(StatementUpload.SOURCE_CHOICES):
+        raise ValueError("Choose a supported statement type.")
     payload = dict(upload.extracted_payload or {})
     accepted = dict(payload.get("accepted_corrections") or {})
     accepted.update(corrections)

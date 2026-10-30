@@ -15,7 +15,7 @@ from apps.reports.services import operational_logging_service, reporting_service
 
 from ..models import Expense, StatementUpload
 from ..money import expense_money, identity_amount, identity_values
-from .statement_import import StatementParseResult, parse_bank_statement, summarize_transactions
+from .statement_import import clean_statement_file_name, clean_statement_text, StatementParseResult, parse_bank_statement, summarize_transactions
 from alfred_ai.services.upload_limits import parser_budget
 from .transaction_intelligence import (
     build_user_merchant_profiles,
@@ -60,6 +60,10 @@ class StatementLifecycleResult:
 
 def apply_parsed_statement_upload(*, user, parsed: StatementParseResult, statement_kind: str, statement_file=None, existing_upload: StatementUpload | None = None) -> StatementLifecycleResult:
     _validate_transaction_money(parsed)
+    # Retries re-apply saved corrections, so check here rather than only at parsing.
+    parsed.bank_name = clean_statement_text(parsed.bank_name)
+    parsed.account_holder = clean_statement_text(parsed.account_holder)
+    parsed.account_number = clean_statement_text(parsed.account_number)
     latest_closing = parsed.transactions[-1].closing_balance if parsed.transactions else None
     with transaction.atomic():
         bank_account = resolve_bank_account(
@@ -379,7 +383,7 @@ def _save_upload_metadata(*, user, statement_file, parsed: StatementParseResult,
         bank_account=bank_account,
         source=statement_kind,
         original_file=statement_file,
-        file_name=getattr(statement_file, "name", "statement.pdf"),
+        file_name=clean_statement_file_name(getattr(statement_file, "name", "statement.pdf")),
         bank_name=parsed.bank_name,
         account_holder=parsed.account_holder,
         account_number=parsed.account_number,
@@ -605,10 +609,12 @@ def _import_statement_transactions(*, user, upload: StatementUpload, bank_accoun
 
 def _apply_saved_corrections(parsed: StatementParseResult, extracted_payload: dict) -> None:
     corrections = dict((extracted_payload or {}).get("accepted_corrections") or {})
-    parsed.bank_name = corrections.get("bank_name") or parsed.bank_name
-    parsed.account_holder = corrections.get("account_holder") or parsed.account_holder
-    parsed.account_number = corrections.get("account_number") or parsed.account_number
-    parsed.statement_kind = corrections.get("statement_kind") or parsed.statement_kind
+    # A correction saved before validation existed must not replace a good parsed value.
+    parsed.bank_name = clean_statement_text(corrections.get("bank_name")) or parsed.bank_name
+    parsed.account_holder = clean_statement_text(corrections.get("account_holder")) or parsed.account_holder
+    parsed.account_number = clean_statement_text(corrections.get("account_number")) or parsed.account_number
+    if corrections.get("statement_kind") in dict(StatementUpload.SOURCE_CHOICES):
+        parsed.statement_kind = corrections["statement_kind"]
     for field in ('statement_start', 'statement_end'):
         if corrections.get(field):
             try:

