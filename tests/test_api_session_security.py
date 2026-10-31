@@ -110,13 +110,13 @@ class ApiParsingSecurityTests(TestCase):
         self.assertGreater(len(checked), 10)
 
     def test_large_accept_is_rejected_before_media_type_parsing(self):
-        with patch("rest_framework.negotiation.order_by_precedence",
+        with patch("rest_framework.negotiation.order_parsed_by_precedence",
                    side_effect=AssertionError("oversized Accept must not be parsed")):
             response = self.client.get("/api/users/profile/", HTTP_ACCEPT="text/x-synthetic; x=\"" + ";" * 9000 + "\"")
         self.assertEqual(response.status_code, 406)
 
     def test_excess_accept_tokens_are_rejected_before_media_type_parsing(self):
-        with patch("rest_framework.negotiation.order_by_precedence",
+        with patch("rest_framework.negotiation.order_parsed_by_precedence",
                    side_effect=AssertionError("excess Accept tokens must not be parsed")):
             response = self.client.get("/api/users/profile/", HTTP_ACCEPT=",".join(["application/json"] * 65))
         self.assertEqual(response.status_code, 406)

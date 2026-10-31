@@ -58,7 +58,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def setUp(self):
         self.browser.set_window_size(1440, 1200)
-        directory = self.enterContext(TemporaryDirectory(prefix="alfred-browser-invite-limits-"))
+        directory = self.enterContext(TemporaryDirectory(prefix="alfred-browser-invite-limits-", ignore_cleanup_errors=True))
         self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=directory,
             ALFRED_ABUSE_THROTTLE_DIR=str(Path(directory) / 'runtime-limits')))
         self.browser.get("about:blank")
