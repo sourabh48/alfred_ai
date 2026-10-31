@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import date, timedelta
 from statistics import median
 import re
+
+from django.utils import timezone
 
 from apps.expenses.models import Expense
 from apps.users.models import IncomeBasis
@@ -30,6 +33,10 @@ NON_SALARY_CREDIT_KEYWORDS = (
     "REIMB",
     "UPI",
 )
+# Older salary credits may belong to a job that has ended.
+SALARY_EVIDENCE_MAX_AGE = timedelta(days=92)
+# Take-home pay sits below gross, so only a gap beyond this band is a disagreement.
+INCOME_AGREEMENT_RATIO = (0.55, 1.8)
 EMPLOYER_NOISE_TOKENS = {
     "BANK",
     "PAYMENT",
@@ -46,7 +53,7 @@ EMPLOYER_NOISE_TOKENS = {
 }
 
 
-def build_employment_income_signals(*, user, latest_resume=None, profile=None) -> dict:
+def build_employment_income_signals(*, user, latest_resume=None, profile=None, today: date | None = None) -> dict:
     resume_payload = (latest_resume.extracted_payload or {}) if latest_resume and latest_resume.parser_status == "parsed" else {}
     resume_employer = str(
         resume_payload.get("current_company")
@@ -69,25 +76,23 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None) -
         .order_by("-transaction_date", "-id")[:240]
     )
     salary_candidates = _build_salary_credit_candidates(credits)
-    best_salary_signal = salary_candidates[0] if salary_candidates else None
+    current_salaries = _current_salary_candidates(salary_candidates, today or timezone.localdate())
+    best_salary_signal = current_salaries[0] if current_salaries else None
 
     profile_last_salary = float(getattr(profile, "last_salary", 0) or 0)
     reported_value = float(getattr(user, "monthly_income", 0) or 0) or profile_last_salary
     variable_income = float(getattr(user, "variable_income", 0) or 0)
-    salary_monthly = float(best_salary_signal.get("monthly_amount", 0) or 0) if best_salary_signal else 0.0
+    observed_salary = round(sum(item["monthly_amount"] for item in current_salaries), 2)
     reported_mode = _reported_income_mode(reported_value, user.monthly_income_basis)
     reported_monthly_equivalent = {"annual_ctc": round(reported_value / 12, 2), "monthly": round(reported_value, 2)}.get(reported_mode, 0.0)
+    income_conflict = _income_conflict(observed_salary, reported_monthly_equivalent)
+    # A confirmed income is never silently replaced by what the credits suggest.
+    salary_monthly = 0.0 if income_conflict else observed_salary
     monthly_cash_income = round(salary_monthly or reported_monthly_equivalent, 2)
 
     annualized_compensation = round(monthly_cash_income * 12, 2)
-    if reported_mode == "annual_ctc" and reported_value > 0:
-        if not salary_monthly:
-            annualized_compensation = round(reported_value, 2)
-        else:
-            salary_annual = salary_monthly * 12
-            ratio = reported_value / max(salary_annual, 1)
-            if 0.55 <= ratio <= 1.8:
-                annualized_compensation = round(max(reported_value, salary_annual), 2)
+    if reported_mode == "annual_ctc":
+        annualized_compensation = round(max(reported_value, salary_monthly * 12), 2)
 
     current_employer = resume_employer or str(best_salary_signal.get("employer", "") if best_salary_signal else "").strip()
     employer_source = "resume" if resume_employer else ("salary_credit" if best_salary_signal else "not_evidenced")
@@ -100,6 +105,8 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None) -
         salary_source=salary_source,
         salary_signal=best_salary_signal,
         reported_mode=reported_mode,
+        income_conflict=income_conflict,
+        stale_salary_signal=None if current_salaries or not salary_candidates else salary_candidates[0],
     )
 
     return {
@@ -113,8 +120,9 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None) -
             "mode": reported_mode,
             "monthly_equivalent": reported_monthly_equivalent,
         },
-        "salary_signal_count": len(salary_candidates),
+        "salary_signal_count": len(current_salaries),
         "salary_credit_signal": best_salary_signal,
+        "income_conflict": income_conflict,
         "source_summary": source_summary,
     }
 
@@ -133,7 +141,7 @@ def _build_salary_credit_candidates(credits: list[Expense]) -> list[dict]:
 
     for item in credits:
         amount = float(item.amount or 0)
-        if amount < 10000:
+        if amount < 10000 or item.category == "transfer":
             continue
         raw_text = " ".join(
             str(value or "")
@@ -198,7 +206,8 @@ def _build_salary_credit_candidates(credits: list[Expense]) -> list[dict]:
         if monthly_amount >= 25000:
             score += 1
 
-        if score < 4:
+        # One credit proves nothing unless its own text says it is salary.
+        if score < 4 or not (bucket["keyword_hits"] or months_count > 1):
             continue
 
         confidence = min(0.95, 0.35 + (0.08 * bucket["keyword_hits"]) + (0.1 * min(months_count, 4)) + (0.12 if variability <= 0.2 else 0.04))
@@ -207,6 +216,9 @@ def _build_salary_credit_candidates(credits: list[Expense]) -> list[dict]:
                 "employer": bucket["employer"],
                 "monthly_amount": round(monthly_amount, 2),
                 "months_observed": months_count,
+                "months": sorted(f"{year}-{month:02d}" for year, month in bucket["months"]),
+                "last_credit": max(item["transaction_date"] for item in bucket["items"]),
+                "described_as_salary": bool(bucket["keyword_hits"]),
                 "transactions_observed": len(amounts),
                 "confidence": round(confidence, 3),
                 "supporting_transactions": bucket["items"][:6],
@@ -222,6 +234,35 @@ def _build_salary_credit_candidates(credits: list[Expense]) -> list[dict]:
         reverse=True,
     )
     return candidates
+
+
+def _current_salary_candidates(candidates: list[dict], today: date) -> list[dict]:
+    cutoff = (today - SALARY_EVIDENCE_MAX_AGE).isoformat()
+    recent = [item for item in candidates if item["last_credit"] >= cutoff]
+    if not recent:
+        return []
+    newest = max(recent, key=lambda item: item["last_credit"])
+    # A second source counts only if it says salary and paid alongside for two months; otherwise it is a job change.
+    return [
+        item for item in recent
+        if item is newest or (item["described_as_salary"] and len(set(item["months"]) & set(newest["months"])) >= 2)
+    ]
+
+
+def _income_conflict(observed_salary: float, reported_monthly: float) -> dict | None:
+    if not observed_salary or not reported_monthly:
+        return None
+    low, high = INCOME_AGREEMENT_RATIO
+    if low <= reported_monthly / observed_salary <= high:
+        return None
+    return {
+        "salary_monthly": observed_salary,
+        "reported_monthly": reported_monthly,
+        "message": (
+            f"Recent salary credits of about \u20b9{observed_salary:,.0f} a month differ from your confirmed income of "
+            f"\u20b9{reported_monthly:,.0f} a month. ALFRED keeps using your confirmed income; update it in Settings if it has changed."
+        ),
+    }
 
 
 def _extract_employer_label(item: Expense, raw_text: str) -> str:
@@ -278,13 +319,26 @@ def _reported_income_mode(reported_value: float, basis: str) -> str:
     return "annual_ctc" if basis == IncomeBasis.ANNUAL else "monthly"
 
 
-def _build_source_summary(*, employer: str, employer_source: str, salary_source: str, salary_signal: dict | None, reported_mode: str) -> str:
+def _build_source_summary(
+    *,
+    employer: str,
+    employer_source: str,
+    salary_source: str,
+    salary_signal: dict | None,
+    reported_mode: str,
+    income_conflict: dict | None,
+    stale_salary_signal: dict | None,
+) -> str:
     parts = []
+    if income_conflict:
+        parts.append(income_conflict["message"])
+    if stale_salary_signal:
+        parts.append(f"Salary credits last seen on {stale_salary_signal['last_credit']} are too old to set your current income.")
     if employer:
         parts.append(
             f"Current employer is inferred as {employer} from {employer_source.replace('_', ' ')}."
         )
-    if salary_signal:
+    if salary_signal and not income_conflict:
         parts.append(
             f"Recurring credit history suggests monthly salary cash-in of INR {salary_signal['monthly_amount']:,.0f} across {salary_signal['months_observed']} month(s)."
         )

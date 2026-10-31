@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
+from django.utils import timezone
 
 from apps.career.models import CareerProfile, CareerResume
 from apps.expenses.models import Expense
@@ -104,7 +105,7 @@ class CareerIncomeSignalsTests(TestCase):
                 merchant="Example Analytics Payroll",
                 description="Monthly salary credit",
                 raw_description="SALARY CREDIT EXAMPLE ANALYTICS",
-                transaction_date=date(2026, index, 28),
+                transaction_date=timezone.localdate() - timedelta(days=31 * index),
                 direction="credit",
                 source="bank_statement",
                 company_name="Example Analytics",
@@ -142,7 +143,7 @@ class CareerIncomeSignalsTests(TestCase):
             merchant="Example Analytics Payroll",
             description="Salary credit",
             raw_description="SALARY CREDIT EXAMPLE ANALYTICS",
-            transaction_date=date(2026, 1, 28),
+            transaction_date=timezone.localdate() - timedelta(days=62),
             direction="credit",
             source="bank_statement",
             company_name="Example Analytics",
@@ -157,7 +158,7 @@ class CareerIncomeSignalsTests(TestCase):
             merchant="Example Analytics Payroll",
             description="Salary credit",
             raw_description="SALARY CREDIT EXAMPLE ANALYTICS",
-            transaction_date=date(2026, 2, 28),
+            transaction_date=timezone.localdate() - timedelta(days=31),
             direction="credit",
             source="bank_statement",
             company_name="Example Analytics",

@@ -40,7 +40,7 @@ TRAINING_SPECS = [
         refresh_hours=24,
         minimum_samples=8,
         fallback_mode="career salary projection uses rule-based growth when the trained artifact is absent or stale",
-        sample_counter=lambda: User.objects.filter(monthly_income__gt=0).count(),
+        sample_counter=lambda: User.objects.filter(monthly_income__gt=0).exclude(monthly_income_basis="unconfirmed").count(),
         trainer_path="apps.ml_engine.training.train_salary.train_salary_model",
         description="Learns salary patterns from stored user profile signals without leaking the target back into features.",
     ),

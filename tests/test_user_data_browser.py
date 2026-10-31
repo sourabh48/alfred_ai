@@ -175,7 +175,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.ID, 'partnerFinancialScore').get_attribute('max'), '100')
 
     def test_unconfirmed_income_is_flagged_until_the_owner_chooses_a_period(self):
+        from datetime import timedelta
         from decimal import Decimal
+        from django.utils import timezone
         from selenium.webdriver.support.ui import Select
         from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
         owner = self.scenario['user']
@@ -220,7 +222,28 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.text('taxRegimeValue').lower() == 'unavailable')
         self.assertEqual(self.text('taxAnnualValue').lower(), 'unavailable')
         self.wait.until(lambda _: 'unavailable' in self.text('taxSummaryCards').lower())
-        self.assertNotIn('INR', self.text('taxSummaryCards'))
+        self.wait.until(lambda _: 'unavailable' in self.text('taxBenefitPanel').lower())
+        for area in ('taxSummaryCards', 'taxBenefitPanel', 'taxActionList'):
+            self.assertNotIn('\u20b9', self.text(area))
+            self.assertNotIn('INR', self.text(area))
+
+        self.browser.get(self.live_server_url + '/recommendations/')
+        self.wait.until(lambda _: 'Unavailable' in self.text('recommendationSummaryCards'))
+
+        # A salary that disagrees is shown beside the confirmed income, never swapped in for it.
+        viewer = type(owner).objects.create_user('income_conflict_viewer', password=PASSWORD, monthly_income=amount, monthly_income_basis='monthly')
+        for days in (5, 36, 67):
+            Expense.objects.create(
+                user=viewer, amount=50000, classification='other', category='income', payment_mode='BANK', direction='credit',
+                merchant='Example Analytics', company_name='Example Analytics', counterparty='Example Analytics',
+                description='SALARY CREDIT', raw_description='SALARY CREDIT', source='bank_statement',
+                transaction_date=timezone.localdate() - timedelta(days=days),
+            )
+        self.browser.delete_all_cookies()
+        self.login('income_conflict_viewer')
+        self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: 'confirmed income' in self.text('careerIncomeConflict'))
+        self.assertIn('3,00,000', self.text('careerIncomeValue'))
 
     def test_career_discovery_marks_cached_leads_and_recovers_without_unsafe_links(self):
         from apps.career.models import CareerProfile

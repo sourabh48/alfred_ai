@@ -259,10 +259,10 @@ class FinancialRecommendationEngine:
         if profile['has_investments']:
             score += 2
 
-        # DTI ratio (lower is better for risk taking)
-        if profile['dti_ratio'] < 25:
+        # DTI ratio (lower is better for risk taking); a ratio without income is not a low one
+        if profile['income'] > 0 and profile['dti_ratio'] < 25:
             score += 2
-        elif profile['dti_ratio'] < 40:
+        elif profile['income'] > 0 and profile['dti_ratio'] < 40:
             score += 1
 
         if score >= 8:
@@ -294,7 +294,7 @@ class FinancialRecommendationEngine:
             personas.append('high_income')
         elif profile['income'] > 75000:
             personas.append('mid_income')
-        else:
+        elif profile['income'] > 0:
             personas.append('budget_conscious')
 
         # Life stage

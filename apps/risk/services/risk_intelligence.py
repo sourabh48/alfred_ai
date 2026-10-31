@@ -194,7 +194,7 @@ class RiskIntelligenceService:
                 "level": _covered_level(financial_score, coverage["financial"]),
                 "coverage": coverage["financial"],
                 "trend": "not_tracked",
-                "note": "Debt burden, liquid runway, dependents, and macro labor pressure.",
+                "note": "Debt burden, liquid runway, dependents, and macro labor pressure." if monthly_income else "Liquid runway, dependents, and macro labor pressure. Debt burden is left out because income is unknown.",
                 "drivers": [
                     f"Debt burden {debt_burden:.1f}% of income" if monthly_income else "Income not set",
                     f"Emergency runway {emergency_months:.1f} months" if runway_known else "Emergency runway unknown",
@@ -225,7 +225,7 @@ class RiskIntelligenceService:
                 "note": "Relocation pressure blended with rent burden, inflation, and market volatility.",
                 "drivers": [
                     f"Manual relocation snapshot {manual_relocation:.0f}/100" if latest else "No manual relocation snapshot recorded",
-                    f"Rent plus EMI burden {debt_burden:.1f}%",
+                    f"Rent plus EMI burden {debt_burden:.1f}%" if monthly_income else "Rent plus EMI burden unknown without income",
                     f"Inflation {inflation}",
                 ],
             },
@@ -283,7 +283,7 @@ class RiskIntelligenceService:
             "module_signals": {
                 "career_market_risk": round(career_market["risk_score"], 1),
                 "job_fit_score": round(available_fit, 1) if available_fit is not None else None,
-                "debt_burden_pct": round(debt_burden, 1),
+                "debt_burden_pct": round(debt_burden, 1) if monthly_income else None,
                 "emergency_months": round(emergency_months, 1),
                 "average_stress": round(avg_stress, 1),
                 "average_sleep": round(avg_sleep, 1),

@@ -622,6 +622,14 @@ class CreditScoreTrackerService:
         monthly_income = float(baseline.get("monthly_income", 0) or 0)
         dti = (total_emi / monthly_income * 100) if monthly_income > 0 else 0
 
+        if total_emi > 0 and monthly_income <= 0:
+            alerts.append({
+                'severity': 'Medium',
+                'type': 'DTI_UNAVAILABLE',
+                'message': 'Your debt-to-income ratio cannot be checked because your income is unknown or unconfirmed',
+                'action': 'Confirm your income and its period in Settings'
+            })
+
         if dti > 40:
             alerts.append({
                 'severity': 'High',

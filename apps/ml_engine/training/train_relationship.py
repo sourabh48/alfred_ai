@@ -10,7 +10,7 @@ from .simple_models import fit_linear_regression, mean_absolute_error, random_tr
 
 
 def train_relationship_model():
-    rows = [_row(item) for item in RelationshipProfile.objects.select_related("user").filter(compatibility_score__gt=0)]
+    rows = [_row(item) for item in RelationshipProfile.objects.select_related("user").filter(compatibility_score__gt=0).exclude(user__monthly_income_basis="unconfirmed")]
     sample_count = len(rows)
     if sample_count < 8:
         return _skip("Need at least 8 scored relationship profiles before relationship training is useful.", sample_count=sample_count)

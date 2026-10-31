@@ -14,6 +14,7 @@
             <p class="metric-kicker">Current Role</p>
             <div class="metric-value" id="careerRoleValue">Profile pending</div>
             <p class="metric-caption mb-1">Current income: <span id="careerIncomeValue">INR 0</span></p>
+            <p class="metric-caption text-warning mb-1 d-none" id="careerIncomeConflict" role="status"></p>
             <p class="metric-caption mb-0" id="careerGrowthCopy">Update your profile to sharpen projections.</p>
         </div>
     </div>
@@ -286,5 +287,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/career.js?v=3.5"></script>
+<script src="/static/js/career.js?v=3.6"></script>
 {% endblock %}

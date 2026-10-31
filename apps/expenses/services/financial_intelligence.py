@@ -41,7 +41,7 @@ PERCENT_QUANT = Decimal("0.01")
 
 BASELINE_FORMULAS = {
     "monthly_income": "Normalized reliable monthly income from salary credits, reported income, career salary, or observed credit inflow fallback.",
-    "annual_income": "monthly_income * 12",
+    "annual_income": "The income entered per year, otherwise monthly_income * 12",
     "recurring_emi_burden": "Sum of confirmed active loan EMIs that still report an outstanding balance.",
     "rent_burden": "User-reported monthly rent or housing obligation.",
     "fixed_obligations": "rent_burden + recurring_emi_burden",
@@ -547,6 +547,7 @@ def _empty_canonical_financial_baseline() -> dict:
         "annual_income": 0.0,
         "income_source": "not_evidenced",
         "income_basis_needs_confirmation": False,
+        "income_conflict": None,
         "income_source_summary": "ALFRED needs salary credits, a reported income baseline, or other credit history before it can set a monthly income baseline.",
         "supplemental_variable_income": 0.0,
         "observed_average_monthly_inflow": 0.0,
@@ -619,7 +620,7 @@ def _build_canonical_financial_baseline_uncached(
 
     profile = CareerProfile.objects.filter(user=user).first()
     latest_resume = CareerResume.objects.filter(user=user).order_by("-updated_at", "-id").first()
-    income_signals = build_employment_income_signals(user=user, latest_resume=latest_resume, profile=profile)
+    income_signals = build_employment_income_signals(user=user, latest_resume=latest_resume, profile=profile, today=reference_date or today)
 
     reported_income = income_signals.get("reported_income", {}) or {}
     salary_signal = income_signals.get("salary_credit_signal") or {}
@@ -628,7 +629,7 @@ def _build_canonical_financial_baseline_uncached(
     income_source = "not_evidenced"
     income_source_summary = income_signals.get("source_summary") or ""
     income_unconfirmed = reported_income.get("mode") == "unconfirmed"
-    if salary_signal:
+    if salary_signal and not income_signals.get("income_conflict"):
         income_source = "salary_credits"
     elif income_unconfirmed:
         income_source = "reported_income_unconfirmed"
@@ -644,6 +645,9 @@ def _build_canonical_financial_baseline_uncached(
 
     monthly_income_amount = monthly_income_amount.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     annual_income_amount = (monthly_income_amount * Decimal("12")).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    if income_source == "reported_annual_ctc":
+        # Monthly rounding must not change an amount the owner entered per year.
+        annual_income_amount = _decimal_amount(reported_income.get("value", 0)).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     supplemental_variable_income_amount = _decimal_amount(income_signals.get("variable_income", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     rent_burden_amount = _decimal_amount(getattr(user, "rent_or_emi", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
 
@@ -821,6 +825,7 @@ def _build_canonical_financial_baseline_uncached(
         "annual_income": _money_float(annual_income_amount),
         "income_source": income_source,
         "income_basis_needs_confirmation": income_unconfirmed,
+        "income_conflict": income_signals.get("income_conflict"),
         "income_source_summary": income_source_summary or _empty_canonical_financial_baseline()["income_source_summary"],
         "supplemental_variable_income": _money_float(supplemental_variable_income_amount),
         "observed_average_monthly_inflow": _money_float(observed_average_monthly_inflow_amount),

@@ -474,11 +474,11 @@ class CanonicalFinancialBaselineEdgeCaseTests(TestCase):
         )
 
     def test_income_fallback_order_handles_salary_reported_ctc_and_observed_credits(self):
-        salary_user = self._create_user("salary_conflict", monthly_income=960000)
+        salary_user = self._create_user("salary_agrees_with_ctc", monthly_income=960000, monthly_income_basis="annual")
         for month in (1, 2, 3):
             self._expense(salary_user, amount=70000, month=month, direction="credit", category="income", raw="SALARY ACME ANALYTICS")
 
-        salary_baseline = resolve_canonical_financial_baseline(salary_user)
+        salary_baseline = resolve_canonical_financial_baseline(salary_user, reference_date=date(2026, 3, 31))
         self.assertEqual(salary_baseline["monthly_income"], 70000.0)
         self.assertEqual(salary_baseline["annual_income"], 840000.0)
         self.assertEqual(salary_baseline["income_source"], "salary_credits")

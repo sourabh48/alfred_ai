@@ -52,6 +52,7 @@
                     <div class="col-md-3">
                         <label class="form-label" for="settingsMonthlyIncome">Income</label>
                         <input id="settingsMonthlyIncome" name="monthly_income" type="number" min="0" step="0.01" class="form-control">
+                        {% if income_conflict %}<div class="form-text text-warning" id="settingsIncomeConflict" role="status">{{ income_conflict.message }}</div>{% endif %}
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" for="settingsMonthlyIncomeBasis">Income period</label>
@@ -60,6 +61,7 @@
                             <option value="monthly">Per month</option>
                             <option value="annual">Per year</option>
                         </select>
+                        {% if career_income %}<div class="form-text" id="settingsCareerIncomeHint">Also applies to your career income of &#8377;{{ career_income|floatformat:2 }}, used because no income is entered here.</div>{% endif %}
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" for="settingsVariableIncome">Variable Income</label>

@@ -25,8 +25,8 @@ function loadTaxDashboard(queryOrOptions = taxDashboardQuery) {
             if (!live) {
                 renderTaxInputs(data.inputs);
             }
-            renderTaxActions(data.tax_savings.action_plan || []);
-            renderTaxBenefits(data.hra, data.home_loan);
+            renderTaxActions(taxIncomeUnavailable(data) ? [] : data.tax_savings.action_plan || [], taxIncomeUnavailable(data));
+            renderTaxBenefits(data.hra, data.home_loan, taxIncomeUnavailable(data));
             renderTaxDeductions(data.deduction_catalog || []);
             Alfred.clearPageAlert("taxRoot");
         })
@@ -111,15 +111,19 @@ function renderTaxInputs(inputs) {
     form.metro.value = String(inputs.metro);
 }
 
-function renderTaxActions(items) {
+function renderTaxActions(items, incomeUnavailable) {
     const target = document.getElementById("taxActionList");
     target.innerHTML = items.length
         ? items.map(item => `<li class="insight-item">${Alfred.escapeHtml(`${item.action} • ${Alfred.formatCurrency(item.amount)} • tax benefit ${Alfred.formatCurrency(item.tax_benefit)}`)}</li>`).join("")
-        : `<li class="insight-item">No tax-saving action items available.</li>`;
+        : `<li class="insight-item">${incomeUnavailable ? "Tax benefits need a confirmed income period." : "No tax-saving action items available."}</li>`;
 }
 
-function renderTaxBenefits(hra, homeLoan) {
+function renderTaxBenefits(hra, homeLoan, incomeUnavailable) {
     const panel = document.getElementById("taxBenefitPanel");
+    if (incomeUnavailable) {
+        panel.innerHTML = `<div class="data-row"><div class="data-label">Tax benefits</div><div class="data-value">Unavailable</div></div>`;
+        return;
+    }
     const rows = [
         ["HRA exemption", Alfred.formatCurrency(hra.hra_exemption || 0)],
         ["HRA tax saved", Alfred.formatCurrency(hra.tax_saved || 0)],

@@ -127,6 +127,9 @@ function renderCareerHero(profile, projection, timing) {
     const latest = (projection.projections || []).at(-1);
     document.getElementById("careerRoleValue").textContent = profile.role || "Profile pending";
     document.getElementById("careerIncomeValue").textContent = Alfred.formatCurrency(projection.current_income || 0);
+    const incomeConflict = document.getElementById("careerIncomeConflict");
+    incomeConflict.textContent = projection.income_signals?.income_conflict?.message || "";
+    incomeConflict.classList.toggle("d-none", !incomeConflict.textContent);
     if (timing?.window_start && timing?.window_end) {
         document.getElementById("careerGrowthCopy").textContent = `${timing.summary} Window ${Alfred.formatDate(timing.window_start)} to ${Alfred.formatDate(timing.window_end)}.`;
         return;

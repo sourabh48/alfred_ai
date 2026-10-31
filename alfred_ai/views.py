@@ -18,6 +18,8 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
 from apps.career.forms import CareerOpportunityOutcomeForm
+from apps.career.models import CareerProfile
+from apps.career.services import build_employment_income_signals
 from apps.integrations.services import verified_intelligence
 from apps.ml_engine.runtime_control import build_runtime_status
 from apps.reports.services import operational_logging_service
@@ -226,7 +228,11 @@ def dashboard_view(request):
 
 @login_required
 def account_settings_view(request):
-    return render(request, "settings/account.html")
+    profile = CareerProfile.objects.filter(user=request.user).first()
+    return render(request, "settings/account.html", {
+        "income_conflict": build_employment_income_signals(user=request.user, profile=profile)["income_conflict"],
+        "career_income": profile.last_salary if profile and not request.user.monthly_income else None,
+    })
 
 
 @login_required

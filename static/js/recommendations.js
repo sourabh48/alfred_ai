@@ -38,11 +38,12 @@ function renderRecommendationHero(profile) {
 
 function renderRecommendationSummary(data) {
     const profile = data.profile || {};
+    const incomeKnown = Number(profile.income) > 0;
     const cards = [
-        { title: "Income", value: Alfred.formatCurrency(profile.income || 0), copy: "Monthly income used for suitability" },
+        { title: "Income", value: incomeKnown ? Alfred.formatCurrency(profile.income) : "Unavailable", copy: incomeKnown ? "Monthly income used for suitability" : "Confirm your income in Settings" },
         { title: "Monthly Spend", value: Alfred.formatCurrency(profile.monthly_expenses || 0), copy: "Derived from recent history" },
-        { title: "Savings Rate", value: `${Alfred.formatNumber(profile.savings_rate || 0)}%`, copy: `${Alfred.formatCurrency(profile.monthly_savings || 0)} monthly savings` },
-        { title: "Debt Load", value: `${Alfred.formatNumber(profile.dti_ratio || 0)}%`, copy: `${Alfred.formatCurrency(data.insurance?.total_annual_premium || 0)} annual essential premium` },
+        { title: "Savings Rate", value: incomeKnown ? `${Alfred.formatNumber(profile.savings_rate || 0)}%` : "Unavailable", copy: `${Alfred.formatCurrency(profile.monthly_savings || 0)} monthly savings` },
+        { title: "Debt Load", value: incomeKnown ? `${Alfred.formatNumber(profile.dti_ratio || 0)}%` : "Unavailable", copy: `${Alfred.formatCurrency(data.insurance?.total_annual_premium || 0)} annual essential premium` },
     ];
 
     document.getElementById("recommendationSummaryCards").innerHTML = cards.map(card => `
