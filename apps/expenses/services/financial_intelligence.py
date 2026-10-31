@@ -663,11 +663,10 @@ def _build_canonical_financial_baseline_uncached(
     monthly_income_amount = monthly_income_amount.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     annual_income_amount = (monthly_income_amount * Decimal("12")).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     # Tax needs the income the owner confirmed: credits are take-home, and an unconfirmed figure may be per year.
-    confirmed_annual_income_amount = _decimal_amount(reported_income.get("value", 0)) * {"annual_ctc": 1, "monthly": 12}.get(reported_income.get("mode"), 0)
-    confirmed_annual_income_amount = confirmed_annual_income_amount.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    confirmed_annual_income_amount = _decimal_amount(user.confirmed_annual_income).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     if reported_income.get("mode") == "annual_ctc":
         # An income confirmed per year stands, neither rounded through a month nor replaced by take-home credits.
-        annual_income_amount = confirmed_annual_income_amount
+        annual_income_amount = _decimal_amount(reported_income.get("value", 0)).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     supplemental_variable_income_amount = _decimal_amount(income_signals.get("variable_income", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     rent_burden_amount = _decimal_amount(getattr(user, "rent_or_emi", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
 

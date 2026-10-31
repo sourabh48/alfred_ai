@@ -94,7 +94,7 @@ class InrAmountTests(SimpleTestCase):
                 self.assertEqual(value(extract({}, text)[0], "budget"), 12000.0)
         self.assertEqual(value(extract({}, "5 thousand rupees")[0], "budget"), 5000.0)
         self.assertEqual(value(extract({}, "budget in rupees, around 5000")[0], "budget"), 5000.0)
-        for text in ("USD 500/-", "$12,500/-", "ref 45/-", "$500 rupees"):
+        for text in ("USD 500/-", "$12,500/-", "ref 45/-", "$500 rupees", "$12,500 rupees", "$1,25,000 rupees", "$5k", "€2 lakh"):
             with self.subTest(text=text):
                 self.assertIsNone(value(extract({}, text)[0], "budget"))
         self.assertIsNone(value(extract({}, "stay 3 hours 20 minutes")[0], "budget"))
@@ -110,6 +110,7 @@ class InrAmountTests(SimpleTestCase):
         self.assertEqual(parse("Salary 50,000/-")["currency"], "INR")
         self.assertEqual(parse("Salary EUR 50,000/-")["currency"], "EUR")
         self.assertEqual(parse("Application fee 500/-. Salary Rs 50,000 per month")["salary_min"], 50000.0)
+        self.assertEqual(parse("Application fee 500/-, salary Rs 50,000 per month")["salary_min"], 50000.0)
         self.assertIsNone(parse("Ref 45/-"))
 
     def test_holding_names_drop_the_currency(self):
@@ -119,6 +120,7 @@ class InrAmountTests(SimpleTestCase):
                 self.assertEqual(name(f"Axis Bluechip Fund {form}"), "Axis Bluechip Fund")
         self.assertIn("Rupee Bond", name("HSBC Rupee Bond Fund 5000"))
         self.assertEqual(name("Axis Bluechip Fund 5000 Rupees"), "Axis Bluechip Fund")
+        self.assertIn("Rupee Bond", name("Nippon 2030 Rupee Bond Fund 5000"))
 
 
 class CloudBoundaryTests(SimpleTestCase):
@@ -131,6 +133,16 @@ class CloudBoundaryTests(SimpleTestCase):
 
     def test_private_words_beside_non_latin_letters_never_leave(self):
         for text in ("salaryका विवरण", "loanの情報", "私のloan情報", "कsalary", "はINR500"):
+            with self.subTest(text=text), self.assertRaises(PermissionError):
+                public_payload({"context": text})
+
+    def test_escapes_and_invisible_characters_cannot_hide_private_text(self):
+        for text in ("reports\\balance.xlsx", "c\\token", "x\\bearer", "loan\u200bdetails", "pay\u00adloan", "sal\u200bary"):
+            with self.subTest(text=text), self.assertRaises(PermissionError):
+                public_payload({"context": text})
+
+    def test_lookalike_letters_still_match_private_words(self):
+        for text in ("ſalary", "paſſword", "ıncome", "to\u212aen", "ınr 500", "500 rupeeſ"):
             with self.subTest(text=text), self.assertRaises(PermissionError):
                 public_payload({"context": text})
 

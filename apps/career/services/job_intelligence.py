@@ -1650,7 +1650,7 @@ class JobIntelligenceService:
         if match.group("period") or "lpa" in units:
             return True
         before = re.split(r"[.!?;\n]\s", text[max(0, match.start() - 60):match.start()])[-1]
-        after = re.split(r"[.!?;\n]", text[match.end():match.end() + 24])[0]
+        after = re.split(r"[.!?;,\n]", text[match.end():match.end() + 24])[0]
         return bool(SALARY_CONTEXT_RE.search(before) or SALARY_CONTEXT_RE.search(after))
 
     def _salary_value(self, raw_value: str | None, unit: str | None) -> float:

@@ -36,23 +36,26 @@ def real_reasoning_authorized():
     return settings.ALFRED_MEMORY_OPENAI_AUTHORIZED and settings.ALFRED_MEMORY_OPENAI_PRICING_DATE==datetime.now(timezone.utc).date().isoformat()
 
 
-# ASCII word edges, so a private word still counts beside a non-Latin letter.
+# Word edges mean Latin letters and digits only, so a private word still counts beside another script. Plain
+# \b would miss a word starting with a lookalike letter such as a long s.
 PRIVATE_TEXT=re.compile(
-    r'(?i)(?a:\b(?:account|loan|emi|balance|salary|income|password|secret|token|bearer|medical|diagnosis)\b)'
+    r'(?i)(?<![a-z0-9_])(?:account|loan|emi|balance|salary|income|password|secret|token|bearer|medical|diagnosis)(?![a-z0-9_])'
     r'|sk-[a-z0-9-]{8,}|AKIA[A-Z0-9]{12,}|[a-z]:[\\/]|/(?:home|users|tmp)/|\b[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\d[ -]?){6,}'
-    rf'|(?:[$€£]|{INR_SIGN})\s*\d|(?a:\b{INR_NAME}):?\s*\d'
-    r'|\d\s*(?:k|thousand|lakhs?|crores?|cr|million)?\s*(?a:(?:rupees?|inr|rs)\b)|\d\s*/-')
+    rf'|(?:[$€£]|{INR_SIGN})\s*\d|(?<![a-z0-9_]){INR_NAME}:?\s*\d'
+    r'|\d\s*(?:k|thousand|lakhs?|crores?|cr|million)?\s*(?:rupees?|inr|rs)(?![a-z0-9_])|\d\s*/-')
 
 
-def _scannable_text(payload):
-    # JSON escapes control characters, and format characters such as zero-width space can hide a match.
-    raw=re.sub(r'\\u00[01][0-9a-f]|\\[nrtfb]',' ',json.dumps(payload,ensure_ascii=False))
-    return ''.join(char for char in raw if unicodedata.category(char)!='Cf')
+def _scannable_forms(payload):
+    # JSON escapes backslashes and control characters. A format character such as zero-width space can sit inside
+    # a word or between two, so read it both ways.
+    raw=re.sub(r'\\(\\)|\\u00[01][0-9a-f]|\\[nrtfb]',lambda match: match[1] or ' ',json.dumps(payload,ensure_ascii=False))
+    return (''.join(char for char in raw if unicodedata.category(char)!='Cf'),
+            ''.join(' ' if unicodedata.category(char)=='Cf' else char for char in raw))
 
 
 def public_payload(payload):
     encoded(payload)  # refuses what cannot be encoded
-    if PRIVATE_TEXT.search(_scannable_text(payload)):
+    if any(PRIVATE_TEXT.search(text) for text in _scannable_forms(payload)):
         raise PermissionError('Potential sensitive data must remain in local processing.')
     keys=[]; pending=[payload]
     while pending:

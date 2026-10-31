@@ -1,5 +1,5 @@
 """FIN-02: bank credits count as salary only on real evidence, and unknown income is never read as zero."""
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -148,6 +148,8 @@ class WhatCountsAsSalaryTests(SalaryEvidenceBase):
         for name, amount, text in (
             ("refund", 15000, "REFUND TO SALARY A/C"), ("reversed", 50000, "NEFT SALARY REVERSED ACME"),
             ("redemption", 40000, "IMPS CR ZERODHA MF REDEMPTION"), ("advance", 500000, "NEFT CR SALARY ADVANCE LOAN DISBURSAL"),
+            ("amc", 40000, "NEFT CR ICICI PRU AMC REDEMPTION"), ("disbursal", 40000, "NEFT CR BAJAJ FINSERV DISBURSAL"),
+            ("mf_at_end", 40000, "NEFT CR AXIS MF"),
         ):
             with self.subTest(name=name):
                 user = self.user(f"never_income_{name}")
@@ -155,6 +157,20 @@ class WhatCountsAsSalaryTests(SalaryEvidenceBase):
                     self.credit(user, amount, months_ago=month, employer="Acme", text=text)
                 self.assertIsNone(self.signals(user)["salary_credit_signal"])
                 self.assertEqual(self.baseline(user)["monthly_income"], 0.0)
+
+    def test_people_employed_by_lenders_and_brokers_are_still_paid(self):
+        for name, text in (("broker", "SALARY ZERODHA BROKING"), ("recovery", "SALARY LESS LOAN RECOVERY"), ("card", "SALARY HDFC CREDIT CARD DIVISION")):
+            with self.subTest(name=name):
+                user = self.user(f"lender_staff_{name}")
+                for month in range(2):
+                    self.credit(user, 40000, months_ago=month, employer="Acme", text=text)
+                self.assertEqual(self.signals(user)["monthly_cash_income"], 40000.0)
+        for name, text in (("stockholm", "NEFT STOCKHOLM TRADERS"), ("livestock", "NEFT LIVESTOCK TRADERS")):
+            with self.subTest(name=name):
+                user = self.user(f"lookalike_{name}")
+                for month in range(3):
+                    self.credit(user, 40000, months_ago=month, employer="Acme", text=text)
+                self.assertEqual(self.signals(user)["monthly_cash_income"], 40000.0)
 
     def test_a_smaller_credit_after_payday_never_displaces_the_salary(self):
         for name, employer, text, recurring in (
@@ -236,11 +252,13 @@ class IncomeFallbackTests(SalaryEvidenceBase):
 
     def test_an_old_credit_in_the_cutoff_month_does_not_make_one_recent_credit_recur(self):
         user = self.user("fallback_cutoff_month")
-        Expense.objects.create(user=user, amount=5000, classification="other", category="income", payment_mode="BANK", merchant="A Family",
-                               description="UPI FAMILY", raw_description="UPI FAMILY", transaction_date=timezone.localdate() - timedelta(days=95),
-                               direction="credit", source="bank_statement")
-        self.credit(user, 5000, employer="A Family", text="UPI FAMILY SUPPORT")
-        self.assertEqual(self.baseline(user)["income_source"], "not_evidenced")
+        # The window from 31 October opens on 31 July, so 20 July is outside it but in the same month.
+        for day in (date(2026, 7, 20), date(2026, 10, 20)):
+            Expense.objects.create(user=user, amount=5000, classification="other", category="income", payment_mode="BANK", merchant="A Family",
+                                   description="UPI FAMILY", raw_description="UPI FAMILY", transaction_date=day,
+                                   direction="credit", source="bank_statement")
+        baseline = resolve_canonical_financial_baseline(get_user_model().objects.get(pk=user.pk), reference_date=date(2026, 10, 31))
+        self.assertEqual(baseline["income_source"], "not_evidenced")
 
     def test_recent_recurring_credits_too_small_for_salary_still_count(self):
         user = self.user("fallback_recent")
@@ -321,6 +339,7 @@ class ConfirmedIncomeTests(SalaryEvidenceBase):
         baseline = self.baseline(user)
         self.assertEqual(baseline["annual_income"], 1200000.0)
         self.assertEqual(baseline["confirmed_annual_income"], 1200000.0)
+        self.assertEqual(self.signals(user)["annualized_compensation"], 1200000.0)
 
     def test_tax_starts_from_the_confirmed_income_never_take_home(self):
         for name, amount, basis, salary, expected in (
@@ -328,10 +347,14 @@ class ConfirmedIncomeTests(SalaryEvidenceBase):
             ("annual", 1000000, "annual", 60000, 1000000.0),
             ("unconfirmed", 300000, "unconfirmed", 50000, 0.0),
             ("none", 0, "monthly", 50000, 0.0),
+            ("career_salary_only", 0, "monthly", 0, 0.0),
         ):
             with self.subTest(name=name):
                 user = self.user(f"tax_{name}", amount, basis)
-                self.paid(user, salary)
+                if name == "career_salary_only":
+                    CareerProfile.objects.create(user=user, role="Analyst", experience_years=1, skills="", last_salary=50000)
+                else:
+                    self.paid(user, salary)
                 client = Client()
                 client.force_login(user)
                 self.assertEqual(float(client.get("/api/integrations/tax/overview/").json()["annual_income"]), expected)
@@ -445,12 +468,16 @@ class UnknownIncomeIsNotZeroTests(SalaryEvidenceBase):
         self.assertIn("Confirm Your Income", [item["action"] for item in brain._generate_priority_actions(snapshot)])
 
     def test_a_projection_on_unknown_income_is_withheld_not_zero(self):
-        from apps.career.services.projection_engine import build_salary_projection
+        from apps.career.services.projection_engine import build_projection_simulation, build_salary_projection
         user = self.user("projection_none", 300000, "unconfirmed")
         profile = CareerProfile.objects.create(user=user, role="Analyst", experience_years=1, skills="", last_salary=0)
         projection = build_salary_projection(user, profile, macro={"payload": {"unemployment": {}, "inflation": {}, "market": {}}, "evidence": []})
         self.assertEqual(projection["projections"], [])
         self.assertIn("Confirm your income", projection["message"])
+        self.assertEqual(projection["insights"][0], projection["message"])
+        macro = {"payload": {"unemployment": {}, "inflation": {}, "market": {}}, "evidence": []}
+        simulation = build_projection_simulation(user=user, profile=profile, macro=macro, overrides={"monthly_income": 80000})
+        self.assertIsNone(simulation["delta"]["year_5_projected_income"])
 
     def test_salary_training_count_leaves_out_unconfirmed_income(self):
         self.user("train_unconfirmed", 300000, "unconfirmed")

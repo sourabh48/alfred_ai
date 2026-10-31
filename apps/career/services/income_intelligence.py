@@ -35,9 +35,13 @@ NON_SALARY_CREDIT_KEYWORDS = (
     "REIMB",
     "UPI",
 )
-# These credits are never pay, whatever their text says.
 NON_SALARY_CATEGORIES = {"transfer", "loan", "investment", "credit_card"}
-NEVER_SALARY_MARKERS = ("REFUND", "REVERSAL", "REVERSED", "CASHBACK", "LOAN", *INVESTMENT_KEYWORDS, *CREDIT_CARD_KEYWORDS)
+# These credits are never pay, whatever else their text says.
+NEVER_PAY_RE = re.compile(r"\b(?:REFUNDS?|REVERSAL|REVERSED|CASHBACK|REDEMPTION|DISBURS\w*)\b")
+# Lenders, brokers and card issuers can also be employers, so a credit that says salary still counts.
+NOT_PAY_UNLESS_SALARY_RE = re.compile(
+    r"\b(?:LOANS?|" + "|".join(re.escape(word.strip()) for word in (*INVESTMENT_KEYWORDS, *CREDIT_CARD_KEYWORDS)) + r")\b"
+)
 # Older salary credits may belong to a job that has ended.
 SALARY_EVIDENCE_MAX_AGE = timedelta(days=92)
 # A payer this far behind the newest credit has stopped; paydays can shift by a few days each month.
@@ -68,7 +72,9 @@ def is_never_pay(item) -> bool:
     if item.category in NON_SALARY_CATEGORIES:
         return True
     text = " ".join(str(value or "") for value in (item.company_name, item.counterparty, item.merchant, item.description, item.raw_description)).upper()
-    return any(marker in text for marker in NEVER_SALARY_MARKERS)
+    if NEVER_PAY_RE.search(text):
+        return True
+    return bool(NOT_PAY_UNLESS_SALARY_RE.search(text)) and not any(keyword in text for keyword in SALARY_KEYWORDS)
 
 
 def build_employment_income_signals(*, user, latest_resume=None, profile=None, today: date | None = None) -> dict:
@@ -114,7 +120,7 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None, t
 
     annualized_compensation = round(monthly_cash_income * 12, 2)
     if reported_mode == "annual_ctc":
-        annualized_compensation = round(max(reported_value, salary_monthly * 12), 2)
+        annualized_compensation = round(reported_value, 2)
 
     current_employer = resume_employer or str(best_salary_signal.get("employer", "") if best_salary_signal else "").strip()
     employer_source = "resume" if resume_employer else ("salary_credit" if best_salary_signal else "not_evidenced")

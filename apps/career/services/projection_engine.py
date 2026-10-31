@@ -75,6 +75,8 @@ def build_salary_projection(user, profile, *, macro: dict, latest_resume=None, o
         f"Latest tracked India unemployment signal is {growth_context['unemployment']} and inflation is {growth_context['inflation']}.",
         "Resume and job-match data can sharpen the heuristic growth inputs even when the salary-model anchor is unavailable.",
     ]
+    if not projections:
+        insights = ["Confirm your income in Settings to see a projection."]
     if growth_context["market_return"] < -5:
         insights.append("Recent market weakness can tighten hiring budgets. Keep a stronger interview and savings buffer.")
     elif growth_context["market_return"] > 5:
@@ -354,8 +356,8 @@ def build_projection_simulation(*, user, profile, macro: dict, latest_resume=Non
         "baseline": baseline,
         "scenario": scenario,
         "delta": {
-            "year_1_projected_income": round(scenario_year_1 - baseline_year_1, 2),
-            "year_5_projected_income": round(scenario_year_5 - baseline_year_5, 2),
+            "year_1_projected_income": round(scenario_year_1 - baseline_year_1, 2) if baseline["projections"] and scenario["projections"] else None,
+            "year_5_projected_income": round(scenario_year_5 - baseline_year_5, 2) if baseline["projections"] and scenario["projections"] else None,
             "baseline_mode": baseline["projection_mode"],
             "scenario_mode": scenario["projection_mode"],
         },

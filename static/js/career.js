@@ -130,6 +130,10 @@ function renderCareerHero(profile, projection, timing) {
     const incomeConflict = document.getElementById("careerIncomeConflict");
     incomeConflict.textContent = projection.income_signals?.income_conflict?.message || "";
     incomeConflict.classList.toggle("d-none", !incomeConflict.textContent);
+    if (!(projection.projections || []).length && projection.message) {
+        document.getElementById("careerGrowthCopy").textContent = projection.message;
+        return;
+    }
     if (timing?.window_start && timing?.window_end) {
         document.getElementById("careerGrowthCopy").textContent = `${timing.summary} Window ${Alfred.formatDate(timing.window_start)} to ${Alfred.formatDate(timing.window_end)}.`;
         return;
@@ -895,16 +899,16 @@ function renderSimulationPanel(simulation) {
             <div class="mini-card">
                 <div class="fw-semibold">Baseline</div>
                 <div class="muted small mt-1">${Alfred.escapeHtml(baseline.projection_mode || "heuristic")}</div>
-                <div class="mt-3">Year 1 <strong>${Alfred.formatCurrency(baselineYear1)}</strong></div>
-                <div class="mt-2">Year 5 <strong>${Alfred.formatCurrency(baselineYear5)}</strong></div>
+                <div class="mt-3">Year 1 <strong>${baselineYear1 > 0 ? Alfred.formatCurrency(baselineYear1) : "Unavailable"}</strong></div>
+                <div class="mt-2">Year 5 <strong>${baselineYear5 > 0 ? Alfred.formatCurrency(baselineYear5) : "Unavailable"}</strong></div>
                 <div class="muted small mt-3">${Alfred.escapeHtml(baseline.projection_method || "")}</div>
                 ${baselineReasoning.length ? `<div class="muted small mt-3">${baselineReasoning.map(item => Alfred.escapeHtml(item.label || "")).join(" | ")}</div>` : ""}
             </div>
             <div class="mini-card">
                 <div class="fw-semibold">Scenario</div>
                 <div class="muted small mt-1">${scenario ? Alfred.escapeHtml(scenario.projection_mode || "heuristic") : "Run a scenario"}</div>
-                <div class="mt-3">Year 1 <strong>${scenario ? Alfred.formatCurrency(scenarioYear1) : "Not simulated"}</strong></div>
-                <div class="mt-2">Year 5 <strong>${scenario ? Alfred.formatCurrency(scenarioYear5) : "Not simulated"}</strong></div>
+                <div class="mt-3">Year 1 <strong>${scenario ? (scenarioYear1 > 0 ? Alfred.formatCurrency(scenarioYear1) : "Unavailable") : "Not simulated"}</strong></div>
+                <div class="mt-2">Year 5 <strong>${scenario ? (scenarioYear5 > 0 ? Alfred.formatCurrency(scenarioYear5) : "Unavailable") : "Not simulated"}</strong></div>
                 <div class="muted small mt-3">${scenario ? Alfred.escapeHtml(scenario.projection_method || "") : "Scenario details appear here after a run."}</div>
                 ${scenarioReasoning.length ? `<div class="muted small mt-3">${scenarioReasoning.map(item => Alfred.escapeHtml(item.label || "")).join(" | ")}</div>` : ""}
             </div>
@@ -914,11 +918,11 @@ function renderSimulationPanel(simulation) {
             <div class="data-stack">
                 <div class="data-row">
                     <div class="data-label">Year 1 delta</div>
-                    <div class="data-value">${scenario ? Alfred.formatCurrency(simulation.delta?.year_1_projected_income || 0) : "Run a scenario"}</div>
+                    <div class="data-value">${scenario ? (simulation.delta?.year_1_projected_income == null ? "Unavailable" : Alfred.formatCurrency(simulation.delta.year_1_projected_income)) : "Run a scenario"}</div>
                 </div>
                 <div class="data-row">
                     <div class="data-label">Year 5 delta</div>
-                    <div class="data-value">${scenario ? Alfred.formatCurrency(simulation.delta?.year_5_projected_income || 0) : "Run a scenario"}</div>
+                    <div class="data-value">${scenario ? (simulation.delta?.year_5_projected_income == null ? "Unavailable" : Alfred.formatCurrency(simulation.delta.year_5_projected_income)) : "Run a scenario"}</div>
                 </div>
             </div>
         </div>

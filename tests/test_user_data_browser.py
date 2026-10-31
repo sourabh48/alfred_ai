@@ -173,6 +173,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('relationshipCompatibilityValue'), 'Unknown')
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#relationshipFactorCards article')), 0)
         self.assertEqual(self.browser.find_element(self.By.ID, 'partnerFinancialScore').get_attribute('max'), '100')
+        self.wait.until(lambda _: 'Debt pressure' in self.text('relationshipInsightList'))
+        details = self.text('relationshipInsightList')
+        self.assertIn('Debt pressure: unavailable', details)
+        self.assertIn('Savings rate: unavailable', details)
 
     def test_unconfirmed_income_is_flagged_until_the_owner_chooses_a_period(self):
         from datetime import timedelta
@@ -238,6 +242,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.get(self.live_server_url + '/tax-optimizer/')
         self.wait.until(lambda _: self.text('taxRegimeValue').lower() == 'unavailable')
         self.assertFalse(self.browser.execute_script("return Boolean(window.Chart && Chart.getChart('taxComparisonChart'))"))
+        self.browser.get(self.live_server_url + '/recommendations/')
+        self.wait.until(lambda _: 'savings rate unavailable' in self.text('recommendationHeroCopy'))
+
+        from apps.career.models import CareerProfile
+        CareerProfile.objects.create(user=type(owner).objects.get(username='no_income_tax_viewer'), role='Analyst', experience_years=1, skills='', last_salary=0)
+        self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: 'Confirm your income' in self.text('careerGrowthCopy'))
+        self.assertIn('Not recorded', self.text('careerProfileSnapshot'))
 
         # A salary that disagrees is shown beside the confirmed income, never swapped in for it.
         viewer = type(owner).objects.create_user('income_conflict_viewer', password=PASSWORD, monthly_income=amount, monthly_income_basis='monthly')

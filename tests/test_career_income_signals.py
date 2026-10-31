@@ -172,4 +172,4 @@ class CareerIncomeSignalsTests(TestCase):
         self.assertEqual(payload["employment_signals"]["reported_income"]["mode"], "annual_ctc")
         self.assertAlmostEqual(payload["current_income"], 151750.0, places=0)
         self.assertAlmostEqual(payload["projection_basis"]["reported_current_income"], 151750.0, places=0)
-        self.assertEqual(payload["income_signals"]["annualized_compensation"], 1821000.0)
+        self.assertEqual(payload["income_signals"]["annualized_compensation"], 1800000.0)
