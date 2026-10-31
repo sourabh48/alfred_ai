@@ -217,6 +217,49 @@ class LoanVerificationTests(TestCase):
         loan.refresh_from_db()
         self.assertEqual(loan.remaining_balance, 150000)
 
+    def applied_payment(self, *, created_after_verification, date_offset=0):
+        loan = self.loan()
+        response = self.client.patch(f"/api/loans/{loan.pk}/", self.confirmation(), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        loan.refresh_from_db()
+        verified_day = timezone.localtime(loan.verified_at).date()
+        payment = LoanPaymentHistory.objects.create(
+            loan=loan, payment_date=verified_day + timedelta(days=date_offset), amount=9000, principal_paid=5000,
+            match_status="review", loan_effect_applied=True,
+        )
+        created_at = loan.verified_at + timedelta(hours=1 if created_after_verification else -1)
+        LoanPaymentHistory.objects.filter(pk=payment.pk).update(created_at=created_at)
+        return loan, payment
+
+    def test_rejecting_a_payment_applied_after_verification_restores_the_balance_whatever_its_date(self):
+        # The former Chicago default put 00:30 IST on the previous date, so such a payment could be applied.
+        for date_offset in (0, 1):
+            with self.subTest(date_offset=date_offset):
+                Loan.objects.all().delete()
+                loan, payment = self.applied_payment(created_after_verification=True, date_offset=date_offset)
+                Loan.objects.filter(pk=loan.pk).update(remaining_balance=145000, total_paid=9000)
+                review_loan_payment_match(user=self.user, payment_id=payment.pk, decision="reject")
+                loan.refresh_from_db()
+                payment.refresh_from_db()
+                self.assertEqual(loan.remaining_balance, 150000)
+                self.assertEqual(loan.total_paid, 0)
+                self.assertFalse(payment.loan_effect_applied)
+
+    def test_rejecting_a_payment_applied_before_verification_leaves_the_verified_balance(self):
+        loan, payment = self.applied_payment(created_after_verification=False, date_offset=-1)
+        review_loan_payment_match(user=self.user, payment_id=payment.pk, decision="reject")
+        loan.refresh_from_db()
+        self.assertEqual(loan.remaining_balance, 150000)
+
+    def test_accepting_an_unapplied_payment_from_the_verification_day_keeps_the_verified_balance(self):
+        loan, payment = self.applied_payment(created_after_verification=True)
+        LoanPaymentHistory.objects.filter(pk=payment.pk).update(loan_effect_applied=False)
+        review_loan_payment_match(user=self.user, payment_id=payment.pk, decision="accept")
+        loan.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(loan.remaining_balance, 150000)
+        self.assertFalse(payment.loan_effect_applied)
+
     def test_bureau_balance_confirmation_does_not_confirm_a_guessed_emi(self):
         loan = self.loan(status="foreclosure_pending")
         report = self.report()

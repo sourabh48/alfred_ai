@@ -3,8 +3,7 @@
 ## Consolidated development candidate — 2026-10-31
 
 State LOCAL_TESTING, then COMMITTED_PUSHED/CI_PENDING after its push. Earlier runs transfer to no commit here.
-Master needs exact-head CI, review of the full diff, the published-file check and the open owner decision in
-EXECUTION_STATE.
+Master needs exact-head CI, review of the full diff, the published-file check and the owner's answer on review.
 
 Corrections to earlier entries: `artifacts/*/checkpoint.json` files cited below are local and ignored by
 Git, so they do not travel with the repository. The D4 repair they describe is `dd1822f` (`97ecd0d` rewritten with

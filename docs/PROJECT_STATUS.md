@@ -4,7 +4,7 @@
 
 Finished local work consolidated on `dd1822f`: SEC-01, SEC-02, CAREER-06, evidence labels, FIN-01, FIN-02, rupee
 text recognition without conversion, and the Asia/Kolkata default. Implemented is not accepted; no requirement is
-promoted. The loan verified-balance cutoff stays an owner decision. See EXECUTION_STATE. Baseline75/143,
+promoted. The loan verified-balance rejection defect is fixed; see EXECUTION_STATE. Baseline75/143,
 extensions0/13 unchanged.
 
 Corrections to earlier entries: `artifacts/*/checkpoint.json` files cited below are local and ignored by

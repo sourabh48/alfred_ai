@@ -114,7 +114,7 @@ def review_loan_payment_match(
         event_type = "loan_payment_review_accepted"
         message = "Loan payment review row accepted and eligible for calculation confidence."
     else:
-        if payment.loan_effect_applied and settled_payment_ids is None and not _predates_verified_balance(payment):
+        if payment.loan_effect_applied and settled_payment_ids is None and not _absorbed_by_verified_balance(payment):
             _reverse_payment_from_loan(payment.loan, payment)
         payment.loan_effect_applied = False
         payment.match_status = "rejected"
@@ -173,7 +173,7 @@ def reject_subscription_false_positive_match(
     if settled_payment_ids is not None and payment.id in settled_payment_ids:
         raise ValueError("Payments in a finalized foreclosure settlement cannot be accepted or rejected through payment review.")
 
-    if payment.loan_effect_applied and settled_payment_ids is None and not _predates_verified_balance(payment):
+    if payment.loan_effect_applied and settled_payment_ids is None and not _absorbed_by_verified_balance(payment):
         _reverse_payment_from_loan(payment.loan, payment)
     payment.loan_effect_applied = False
     payment.match_status = "rejected"
@@ -224,6 +224,13 @@ def _predates_verified_balance(payment: LoanPaymentHistory) -> bool:
     return bool(verified_at and (
         payment.created_at <= verified_at or payment.payment_date <= timezone.localtime(verified_at).date()
     ))
+
+
+def _absorbed_by_verified_balance(payment: LoanPaymentHistory) -> bool:
+    # An applied payment recorded after verification reduced that balance, even if its date now falls on the
+    # verification day: older rows were applied under a time zone that placed verification on an earlier date.
+    verified_at = payment.loan.verified_at
+    return bool(verified_at and payment.created_at <= verified_at)
 
 
 def _append_review_note(payment: LoanPaymentHistory, label: str, notes: str) -> None:

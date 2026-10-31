@@ -122,7 +122,7 @@ Residual dependency advisories require qualified reachability/upgrade triage.
 | I01-I08 installation/update/rollback/clean-PC | No current installer or independent run | PENDING |
 | R01-R04 device-loss/real-account | No independent run | PENDING |
 | Required check/review policy identity | Existing protection visibility incomplete | PENDING |
-| Runtime time zone (D4-H3) | Owner chose Asia/Kolkata; stored records unchanged; loan verified-balance cutoff still to decide | PENDING |
+| Runtime time zone (D4-H3) | Owner chose Asia/Kolkata; stored records unchanged; loan verified-balance rejection fixed before master | RESOLVED |
 | Merge and Pages | Owner instruction 2026-10-31: merge into master and publish `docs/` if checks pass | CONDITIONAL |
 | Deployment/production | Not authorized | BLOCKED |
 

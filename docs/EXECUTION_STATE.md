@@ -9,7 +9,9 @@
   evidence (FIN-02), rupee text recognition without conversion, the Asia/Kolkata default, and test stability fixes.
 - Implemented, not accepted. Reviews so far are same-harness AI reviews, not independent human approval.
   Exact-head CI decides each commit separately. Baseline75/143, extensions0/13 unchanged.
-- OWNER_DECISION open: the loan verified-balance cutoff below. Stored financial records are not migrated.
+- Loan verified-balance cutoff: owner asked for the fix before master. Rejecting a payment applied after verification
+  now always restores the balance. Accepting an unapplied payment dated the verification day records it without
+  changing the balance, the same as every other same-day payment. Stored financial records are not migrated.
 
 Corrections to earlier entries: `artifacts/*/checkpoint.json` files cited below are local and ignored by
 Git, so they do not travel with the repository. The D4 repair they describe is `dd1822f` (`97ecd0d` rewritten with
@@ -30,9 +32,8 @@ fixes were not on it. No full allow-list ran at it. GitHub shows PR #20 open and
   on both. Clock shifted to 00:30 IST: no zone-caused failure. Chrome 151: 147 PASS, 3 pass once the
   ignored axe tool exists, one packing-panel contrast failure identical on base. 13 boundary tests,
   migrations unchanged, pinned privacy scan PASS.
-- NOT reinterpreted or migrated. OWNER_DECISION remaining: loans verified from 00:00 to 10:30/11:30 IST
-  move their verified-balance date cutoff one day later, so rejecting a payment already applied for that
-  date leaves the balance reduced. Old EXIF and typed bike timestamps read 10.5/11.5 hours later.
+- NOT reinterpreted or migrated. Loans verified from 00:00 to 10:30/11:30 IST move their verified-balance date
+  cutoff one day later; the rejection effect of that is fixed in the consolidated checkpoint above. Old EXIF and typed bike timestamps read 10.5/11.5 hours later.
 - No per-user zone exists; reminders and calendar exports keep their own IANA zone. System-zone detection
   is excluded, preserved on local branch `wip/system-time-zone-detection`. Baseline75/143, extensions0/13
   unchanged. NEXT: owner reviews and authorizes push, then fresh six-job CI at the pushed HEAD.
