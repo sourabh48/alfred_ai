@@ -1,6 +1,22 @@
 # ALFRED execution state
 
-## Active checkpoint — D4 runtime time zone (2026-10-31)
+## Active checkpoint — consolidated development candidate (2026-10-31)
+
+- Owner request: merge the finished local work into development/alfred-integrated, then master. Publishing `docs/`
+  through master is approved only if checks pass. Candidate built on `dd1822f`; tooling commit `ff9b9b9` and
+  `wip/system-time-zone-detection` are left out.
+- Contents: SEC-01, SEC-02, CAREER-06, Risk, Relationship and behavioral evidence, the income basis (FIN-01), salary
+  evidence (FIN-02), rupee text recognition without conversion, the Asia/Kolkata default, and test stability fixes.
+- Implemented, not accepted. Reviews so far are same-harness AI reviews, not independent human approval.
+  Exact-head CI decides each commit separately. Baseline75/143, extensions0/13 unchanged.
+- OWNER_DECISION open: the loan verified-balance cutoff below. Stored financial records are not migrated.
+
+Corrections to earlier entries: `artifacts/*/checkpoint.json` files cited below are local and ignored by
+Git, so they do not travel with the repository. The D4 repair they describe is `dd1822f` (`97ecd0d` rewritten with
+owner approval to remove attribution, same tree). That push had no independent review, and SEC-01 and the FIN P0
+fixes were not on it. No full allow-list ran at it. GitHub shows PR #20 open and not draft.
+
+## Previous checkpoint — D4 runtime time zone (2026-10-31)
 
 - OWNER_DECISION resolved: default application zone Asia/Kolkata; UTC stays canonical for stored
   timestamps and internal scheduling. Local branch `fix/ist-time-zone` from 97ecd0d. State

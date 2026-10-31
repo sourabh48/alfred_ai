@@ -1,14 +1,17 @@
 # PR #20 independent review package
 
 Prepared 2026-10-30, updated 2026-10-31, for `development/alfred-integrated`;
-**OPEN, NOT DRAFT AS LAST OBSERVED (owner to restore), UNMERGED, NOT RELEASE READY**. Base `a2274aa4daa514afe05ab58b4e4219ef18bb825f`;
+**OPEN, NOT DRAFT, UNMERGED, NOT RELEASE READY**. Base `a2274aa4daa514afe05ab58b4e4219ef18bb825f`;
 retained tested source `c28700d8da1e545441b1dec7e3292d71497ec6e7`.
 The commit containing this package adds the D4 parser guards described below.
 Its exact HEAD, push, source/history preflight and fresh CI are recorded in
 `artifacts/d4-20261030/checkpoint.json`; c287 CI is never relabelled as its CI.
 Baseline **75/143**, extensions **0/13**; no formal requirements promoted.
 
-Latest repair: artifacts/d4-native-repair-20261031/checkpoint.json. 626c5bc run40978060971
+Scope correction: this package describes the cumulative diff up to `dd1822f`, whose own commit changed a test and
+tracker text only. Local checkpoint files cited here are ignored by Git. No independent review of that push exists.
+
+Latest repair: `dd1822f`. 626c5bc run40978060971
 FAILED native-windows through a time-of-day test defect; see Confirmed findings.
 
 Earlier continuation: artifacts/d4-ci-repair-20261030/checkpoint.json. ad31 CI
@@ -22,8 +25,7 @@ Controlled before2 errors→after2 PASS; normal affected6 Chrome PASS,zero skips
 No application runtime,quota,timeout,assertion,workflow or test-ID weakening.
 Native-windows,Linux,shard2 passed onad31; its aggregate correctly failed. Fresh
 successor exact-head CI is separate and owned by the continuation checkpoint.
-PR20 was observed NOT_DRAFT/unmerged; supported conversion was FORBIDDEN.
-OWNER_ACTION_REQUIRED to restore Draft; no alternate authorization/browser path.
+PR20 is NOT_DRAFT/unmerged. Master integration follows the owner's 2026-10-31 instruction, subject to its checks.
 
 ## Review scope and identity
 
@@ -170,7 +172,7 @@ Observed job names are not proof of configured required protection contexts.
 Recorded master protection read404/UNAVAILABLE; rulesets/effective rules empty
 in the available observation. Do not infer protection is adequate, bypass it or
 edit it. Owner must inspect required names/application identity and freshness in
-GitHub Settings. PR20 zero reviews/threads observed2026-10-30; draft/unmerged.
+GitHub Settings. PR20 zero reviews/threads observed2026-10-30; not draft, unmerged.
 
 ## Backup, restart, rollback and acceptance limits
 
@@ -207,7 +209,7 @@ formal gates, and old waivers cannot transfer. See [owner checklist](D4_OWNER_AC
 ## Prepared independent review request — NOT SENT
 
 Owner: assign a qualified reviewer who did not author this change, using existing
-project/GitHub processes. No reviewer identity has been invented. PR stays draft.
+project/GitHub processes. No reviewer identity has been invented.
 Existing outside Claude CLI authentication unavailable/zero inference tokens;
 GitHub description update denied403. No repeated auth attempts, credential
 substitution, browser bypass or fabricated human approval. Same-harness Codex

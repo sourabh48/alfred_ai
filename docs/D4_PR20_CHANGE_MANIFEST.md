@@ -1,7 +1,7 @@
 # PR20 cumulative change manifest
 
 Base: `a2274aa4daa514afe05ab58b4e4219ef18bb825f`. Retained tested checkpoint: `c28700d8da1e545441b1dec7e3292d71497ec6e7`.
-Candidate: the commit containing this manifest; exact source/run closure lives in `artifacts/d4-native-repair-20261031/checkpoint.json`.
+Candidate when written: `dd1822f` (`97ecd0d` rewritten to remove attribution, same tree). Later commits are not hashed here; recompute the diff before review.
 All cumulative changed paths are listed. SHA256 hashes use LF-normalized source bytes; documentation rows omit hashes to avoid self-reference.
 This is an inventory/review input, not independent approval or an executable test result.
 

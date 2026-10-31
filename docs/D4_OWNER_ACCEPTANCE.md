@@ -122,10 +122,10 @@ Residual dependency advisories require qualified reachability/upgrade triage.
 | I01-I08 installation/update/rollback/clean-PC | No current installer or independent run | PENDING |
 | R01-R04 device-loss/real-account | No independent run | PENDING |
 | Required check/review policy identity | Existing protection visibility incomplete | PENDING |
-| Runtime time zone (D4-H3): choose the zone, and how to treat entries made while "today" lagged | Reproduced default America/Chicago; no change made | PENDING |
-| Restore PR20 to Draft | Last observed NOT_DRAFT; supported conversion previously FORBIDDEN | PENDING |
-| Merge/Pages/deployment/production | Not authorized by D4 | BLOCKED |
+| Runtime time zone (D4-H3) | Owner chose Asia/Kolkata; stored records unchanged; loan verified-balance cutoff still to decide | PENDING |
+| Merge and Pages | Owner instruction 2026-10-31: merge into master and publish `docs/` if checks pass | CONDITIONAL |
+| Deployment/production | Not authorized | BLOCKED |
 
 Acceptance signs only the specified observations; it never authorizes deployment,
-production migration or merging draft PR20. Keep original143 requirements and13
+or production migration. Keep original143 requirements and13
 extensions unchanged until separate formal evidence supports a specific promotion.

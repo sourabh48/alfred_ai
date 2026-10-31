@@ -1,6 +1,18 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D4 runtime time zone, 2026-10-31
+## Active implementation checkpoint — consolidated development candidate, 2026-10-31
+
+Finished local work consolidated on `dd1822f`: SEC-01, SEC-02, CAREER-06, evidence labels, FIN-01, FIN-02, rupee
+text recognition without conversion, and the Asia/Kolkata default. Implemented is not accepted; no requirement is
+promoted. The loan verified-balance cutoff stays an owner decision. See EXECUTION_STATE. Baseline75/143,
+extensions0/13 unchanged.
+
+Corrections to earlier entries: `artifacts/*/checkpoint.json` files cited below are local and ignored by
+Git, so they do not travel with the repository. The D4 repair they describe is `dd1822f` (`97ecd0d` rewritten with
+owner approval to remove attribution, same tree). That push had no independent review, and SEC-01 and the FIN P0
+fixes were not on it. No full allow-list ran at it. GitHub shows PR #20 open and not draft.
+
+## Previous implementation checkpoint — D4 runtime time zone, 2026-10-31
 
 Owner decided Asia/Kolkata as the default zone with UTC storage. Fixed on local branch
 `fix/ist-time-zone`, not pushed, no exact-head CI, so implemented is not accepted. No stored date or

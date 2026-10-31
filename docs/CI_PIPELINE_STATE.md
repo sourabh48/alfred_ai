@@ -1,5 +1,16 @@
 # Development CI and integration pipeline
 
+## Consolidated development candidate — 2026-10-31
+
+State LOCAL_TESTING, then COMMITTED_PUSHED/CI_PENDING after its push. Earlier runs transfer to no commit here.
+Master needs exact-head CI, review of the full diff, the published-file check and the open owner decision in
+EXECUTION_STATE.
+
+Corrections to earlier entries: `artifacts/*/checkpoint.json` files cited below are local and ignored by
+Git, so they do not travel with the repository. The D4 repair they describe is `dd1822f` (`97ecd0d` rewritten with
+owner approval to remove attribution, same tree). That push had no independent review, and SEC-01 and the FIN P0
+fixes were not on it. No full allow-list ran at it. GitHub shows PR #20 open and not draft.
+
 ## Local D4 runtime time zone — 2026-10-31
 
 State LOCAL_ACCEPTED on local branch `fix/ist-time-zone` from 97ecd0d, source commit bd9cc5b. Not pushed,
