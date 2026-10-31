@@ -8,6 +8,8 @@
   and travel drills passed. Installer, clean PC, real providers, real account and NVDA remain PENDING.
 - Defects: Travel destination wording, repeated expense reference through the API, statement import overwriting account
   name and type, 276 dependency advisories (RUNTIME-11). Baseline75/143, extensions0/13 unchanged.
+- Candidate on development fixes the Travel wording, repeated references, statement account details and the plain refusal
+  page, with `tests/test_functional_defects_20261101.py`. RUNTIME-11 is separate and not included.
 - OWNER_DECISION: follow the Windows system time zone. `ALFRED_TIME_ZONE` overrides it; `Asia/Kolkata` is only the logged
   fallback when detection fails. UTC storage stays, and stored dates are not rewritten. A zone change applies after a restart.
   Changing the zone moves today and month boundaries for later reads, including loan verification date cutoffs.

@@ -94,7 +94,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda driver: self.text("dashboardSummaryCards"))
 
     def text(self, element_id):
-        return self.browser.find_element(self.By.ID, element_id).text
+        from selenium.common.exceptions import StaleElementReferenceException, WebDriverException
+        try:
+            return self.browser.find_element(self.By.ID, element_id).text
+        except WebDriverException as error:
+            # ChromeDriver can report a just-replaced element this way instead of as stale.
+            if "does not belong to the document" in str(error):
+                raise StaleElementReferenceException(str(error)) from error
+            raise
 
     def memory_post(self,path,payload,csrf=True):
         return self.browser.execute_async_script('''
