@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -59,8 +59,8 @@ class AdvisoryEvidenceFreshnessTests(TestCase):
                 data=json.dumps(
                     {
                         "destination": "Darjeeling",
-                        "start_date": date.today().isoformat(),
-                        "end_date": date.today().isoformat(),
+                        "start_date": timezone.localdate().isoformat(),
+                        "end_date": timezone.localdate().isoformat(),
                         "budget": 12000,
                         "transport_mode": "ride",
                         "vehicle_profile_id": profile.id,

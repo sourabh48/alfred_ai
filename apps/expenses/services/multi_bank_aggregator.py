@@ -49,7 +49,7 @@ class MultiBankAggregatorService:
             ).aggregate(last=Max("transaction_date"))["last"]
 
             # Get monthly spending from this account
-            month_start = timezone.now().date().replace(day=1)
+            month_start = timezone.localdate().replace(day=1)
             monthly_spending = Expense.objects.filter(
                 user=user,
                 bank_account=account,
@@ -94,7 +94,7 @@ class MultiBankAggregatorService:
             return {"error": "Account not found"}
 
         # Last 30 days analysis
-        thirty_days_ago = timezone.now().date() - timedelta(days=30)
+        thirty_days_ago = timezone.localdate() - timedelta(days=30)
 
         expenses = Expense.objects.filter(
             user=user,
@@ -134,8 +134,8 @@ class MultiBankAggregatorService:
         # Monthly trend (last 6 months)
         monthly_trend = []
         for i in range(6):
-            month_start = timezone.now().date() - timedelta(days=30 * (i + 1))
-            month_end = timezone.now().date() - timedelta(days=30 * i)
+            month_start = timezone.localdate() - timedelta(days=30 * (i + 1))
+            month_end = timezone.localdate() - timedelta(days=30 * i)
 
             month_debits = Expense.objects.filter(
                 user=user,
@@ -186,7 +186,7 @@ class MultiBankAggregatorService:
         Useful when transactions are imported from different sources.
         """
         # Find transactions with same amount, date, and similar description
-        thirty_days_ago = timezone.now().date() - timedelta(days=30)
+        thirty_days_ago = timezone.localdate() - timedelta(days=30)
 
         expenses = Expense.objects.filter(
             user=user,

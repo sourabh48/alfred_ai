@@ -313,6 +313,16 @@ if not DATABASE_URL:
 
 
 # ---------------------------------------------------------
+# TIME ZONE
+# ---------------------------------------------------------
+
+# Owner decision: the application default is India. Without this Django uses America/Chicago.
+# USE_TZ stays on, so stored timestamps and internal scheduling remain UTC.
+TIME_ZONE = "Asia/Kolkata"
+USE_TZ = True
+
+
+# ---------------------------------------------------------
 # STATIC & MEDIA
 # ---------------------------------------------------------
 

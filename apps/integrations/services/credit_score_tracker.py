@@ -598,7 +598,7 @@ class CreditScoreTrackerService:
             'improvement_plan': self.get_improvement_plan(user),
             'peer_comparison': self.compare_with_peers(user),
             'alerts': self._generate_alerts(user),
-            'next_update': (timezone.now() + timedelta(days=30)).date().isoformat(),
+            'next_update': (timezone.localdate() + timedelta(days=30)).isoformat(),
             'bureau_status': 'uploaded_report_active' if latest_official is not None else 'official_integration_required',
             'active_score_source': {
                 'bureau': latest_official.bureau,

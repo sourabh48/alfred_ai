@@ -1,9 +1,10 @@
 import json
-from datetime import date, timedelta
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
+from django.utils import timezone
 
 
 class ApplicationSmokeTests(TestCase):
@@ -133,8 +134,8 @@ class ApplicationSmokeTests(TestCase):
                 "vehicle_profile": bike_response.json()["id"],
                 "title": "Smoke Ride",
                 "destination": "Mysuru",
-                "start_date": date.today().isoformat(),
-                "end_date": (date.today() + timedelta(days=1)).isoformat(),
+                "start_date": timezone.localdate().isoformat(),
+                "end_date": (timezone.localdate() + timedelta(days=1)).isoformat(),
                 "budget": 4500,
                 "transport_mode": "ride",
                 "status": "planned",

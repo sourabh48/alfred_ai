@@ -34,7 +34,7 @@ def bike_context(bike, *, end_date=None, distance_km=None):
         for part in ("overall", "engine", "brake", "tyre", "battery"):
             status = getattr(snapshot, part+"_status")
             if status != "good":
-                warnings.append(f"Latest recorded {part} condition: {status} ({snapshot.captured_at.date()}).")
+                warnings.append(f"Latest recorded {part} condition: {status} ({timezone.localtime(snapshot.captured_at).date()}).")
     return {"freshness": "USER_PROVIDED", "warnings": warnings, "known_issues": issues,
             "condition_recorded_at": snapshot.captured_at.isoformat() if snapshot else None,
             "fuel_price_per_litre": format((decimal_amount(refill.total_cost)/decimal_amount(refill.fuel_liters)).quantize(Decimal("0.01"),rounding=ROUND_HALF_UP),"f") if refill else None,

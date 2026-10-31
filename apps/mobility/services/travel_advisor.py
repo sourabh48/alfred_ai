@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from django.utils import timezone
+
 from apps.mobility.models import BikeProfile
 from apps.mobility.services.bike_service_intelligence import bike_service_intelligence
 from apps.integrations.services import verified_intelligence
@@ -61,7 +63,7 @@ class TravelAdvisorService:
         }
 
     def _weather(self, location: dict, start_date: date, end_date: date, evidence: list[dict]) -> dict:
-        today = date.today()
+        today = timezone.localdate()
         if (start_date - today).days > 15:
             return {
                 "status": "seasonal_only",

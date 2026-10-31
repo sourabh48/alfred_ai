@@ -127,7 +127,7 @@ class ExpenseForecasterService:
         from apps.expenses.models import Expense
 
         # Fetch expense history
-        start_date = timezone.now().date() - timedelta(days=lookback_days)
+        start_date = timezone.localdate() - timedelta(days=lookback_days)
         expenses = Expense.objects.filter(
             user=user,
             transaction_date__gte=start_date
@@ -321,7 +321,7 @@ class ExpenseForecasterService:
         # Get last 7 days of data for prediction
         last_7_days = []
         for i in range(7, 0, -1):
-            date = timezone.now().date() - timedelta(days=i)
+            date = timezone.localdate() - timedelta(days=i)
             day_expense = Expense.objects.filter(
                 user=user,
                 date=date
@@ -358,7 +358,7 @@ class ExpenseForecasterService:
             predicted_amount = self.target_scaler.inverse_transform(prediction)[0][0]
 
             # Get prediction date
-            pred_date = timezone.now().date() + timedelta(days=day+1)
+            pred_date = timezone.localdate() + timedelta(days=day+1)
 
             predictions.append({
                 'date': pred_date.isoformat(),
@@ -404,7 +404,7 @@ class ExpenseForecasterService:
         # Get historical monthly data
         monthly_data = []
         for i in range(12, 0, -1):
-            start_date = (timezone.now().date().replace(day=1) -
+            start_date = (timezone.localdate().replace(day=1) -
                          timedelta(days=30*i))
             end_date = (start_date + timedelta(days=30))
 
@@ -425,7 +425,7 @@ class ExpenseForecasterService:
 
         predictions = []
         for month in range(1, months_ahead + 1):
-            pred_date = timezone.now().date() + timedelta(days=30*month)
+            pred_date = timezone.localdate() + timedelta(days=30*month)
             predicted_amount = recent_avg + (trend * month)
 
             predictions.append({
@@ -447,7 +447,7 @@ class ExpenseForecasterService:
         from apps.expenses.models import Expense
 
         # Calculate average daily expense from last 30 days
-        last_30_days = timezone.now().date() - timedelta(days=30)
+        last_30_days = timezone.localdate() - timedelta(days=30)
         avg_daily = Expense.objects.filter(
             user=user,
             transaction_date__gte=last_30_days
@@ -457,7 +457,7 @@ class ExpenseForecasterService:
 
         predictions = []
         for day in range(1, days_ahead + 1):
-            pred_date = timezone.now().date() + timedelta(days=day)
+            pred_date = timezone.localdate() + timedelta(days=day)
             predictions.append({
                 'date': pred_date.isoformat(),
                 'predicted_amount': round(float(avg_daily), 2),
@@ -487,7 +487,7 @@ class ExpenseForecasterService:
 
         predictions = []
         for month in range(1, months_ahead + 1):
-            pred_date = timezone.now().date() + timedelta(days=30*month)
+            pred_date = timezone.localdate() + timedelta(days=30*month)
             predictions.append({
                 'month': pred_date.strftime('%b %Y'),
                 'predicted_amount': round(float(avg_monthly), 2),

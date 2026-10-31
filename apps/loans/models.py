@@ -107,7 +107,7 @@ class Loan(models.Model):
     def months_remaining(self) -> int:
         if not self.is_active or self.closed_on:
             return 0
-        today = timezone.now().date()
+        today = timezone.localdate()
         end_date = self.start_date + timedelta(days=self.tenure_months * 30)
         return max(0, (end_date.year - today.year) * 12 + (end_date.month - today.month))
 

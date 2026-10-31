@@ -1038,7 +1038,7 @@ class JobIntelligenceService:
 
         now = timezone.now()
         decided_at=payload.get('decided_at')
-        if decided_at is None or decided_at=='': decided_at=now.date().isoformat()
+        if decided_at is None or decided_at=='': decided_at=timezone.localdate(now).isoformat()
         try:
             valid_date=isinstance(decided_at,str) and date.fromisoformat(decided_at).isoformat()==decided_at
         except ValueError:

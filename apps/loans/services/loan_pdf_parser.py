@@ -6,6 +6,8 @@ import re
 from datetime import datetime
 from typing import List, Dict, BinaryIO
 
+from django.utils import timezone
+
 from alfred_ai.services import apply_parser_learning, extract_document_text
 from alfred_ai.services.currency import INR_LABEL_TOKEN
 from alfred_ai.services.upload_limits import document_source
@@ -311,7 +313,7 @@ class LoanPDFParser:
                     pass
 
         # Default to current date if not found
-        return datetime.now().strftime("%Y-%m-%d")
+        return timezone.localdate().isoformat()
 
 
 # Singleton instance

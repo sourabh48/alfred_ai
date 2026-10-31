@@ -228,7 +228,7 @@ def _predates_verified_balance(payment: LoanPaymentHistory) -> bool:
 
 def _append_review_note(payment: LoanPaymentHistory, label: str, notes: str) -> None:
     cleaned = " ".join(str(notes or "").split())
-    suffix = f"{label} on {timezone.now().date().isoformat()}"
+    suffix = f"{label} on {timezone.localdate().isoformat()}"
     if cleaned:
         suffix = f"{suffix}: {cleaned}"
     base = payment.detection_reason or ""

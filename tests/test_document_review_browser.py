@@ -62,9 +62,13 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         errors = []
         for browser_name, options in cls._browser_options():
             try:
-                return getattr(webdriver, browser_name)(options=options)
+                driver = getattr(webdriver, browser_name)(options=options)
             except Exception as exc:
                 errors.append(f"{browser_name}: {exc}")
+                continue
+            # CI machines run on UTC, and forms take "today" from the browser, so match the server.
+            driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {"timezoneId": settings.TIME_ZONE})
+            return driver
         raise unittest.SkipTest(f"No Selenium browser driver available. Tried {'; '.join(errors)}")
 
     @classmethod

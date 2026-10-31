@@ -192,7 +192,7 @@ class AlfredFinancialBrain:
         from apps.expenses.models import Expense
         from datetime import timedelta
 
-        thirty_days_ago = timezone.now().date() - timedelta(days=30)
+        thirty_days_ago = timezone.localdate() - timedelta(days=30)
 
         total_expenses = Expense.objects.filter(
             user=user,

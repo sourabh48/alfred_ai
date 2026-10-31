@@ -191,7 +191,7 @@ class FinancialRecommendationEngine:
         profile['income'] = baseline.get('monthly_income', 0) or 0
 
         # Spending analysis (last 90 days)
-        last_90_days = timezone.now().date() - timedelta(days=90)
+        last_90_days = timezone.localdate() - timedelta(days=90)
         expenses = Expense.objects.filter(
             user=user,
             direction='debit',
