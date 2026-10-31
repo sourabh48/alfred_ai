@@ -1,5 +1,10 @@
 # Development CI and integration pipeline
 
+## Local D4 runtime time zone — 2026-10-31
+
+State LOCAL_ACCEPTED on local branch `fix/ist-time-zone` from 97ecd0d, source commit bd9cc5b. Not pushed,
+push not authorized, no CI run. Evidence and remaining owner decision are in EXECUTION_STATE.
+
 ## Current D4 native-windows repair — 2026-10-31
 
 State COMMITTED_PUSHED/CI_PENDING after push; closure in

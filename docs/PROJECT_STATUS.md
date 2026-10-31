@@ -1,6 +1,13 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D4 native-windows repair, 2026-10-31
+## Active implementation checkpoint — D4 runtime time zone, 2026-10-31
+
+Owner decided Asia/Kolkata as the default zone with UTC storage. Fixed on local branch
+`fix/ist-time-zone`, not pushed, no exact-head CI, so implemented is not accepted. No stored date or
+financial record changed. See EXECUTION_STATE for evidence and the remaining owner decision on loan
+verified-balance cutoffs. Baseline75/143, extensions0/13 unchanged.
+
+## Previous implementation checkpoint — D4 native-windows repair, 2026-10-31
 
 Exact 626c5bc run40978060971 FAILED native-windows. Reproduced a time-of-day test defect, repaired
 test-only; fresh exact-head CI is owned by artifacts/d4-native-repair-20261031/checkpoint.json. New

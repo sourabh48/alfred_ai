@@ -1,6 +1,27 @@
 # ALFRED execution state
 
-## Active checkpoint — D4 native-windows time-of-day repair (2026-10-31)
+## Active checkpoint — D4 runtime time zone (2026-10-31)
+
+- OWNER_DECISION resolved: default application zone Asia/Kolkata; UTC stays canonical for stored
+  timestamps and internal scheduling. Local branch `fix/ist-time-zone` from 97ecd0d. State
+  LOCAL_ACCEPTED, not pushed; PUSH NOT AUTHORIZED. Source commit bd9cc5b; this checkpoint is the
+  commit after it. No exact-head CI exists.
+- Reproduced on 97ecd0d: `localdate()` lagged the India date for 10.5 hours from 00:00 IST in Chicago
+  daylight time and 11.5 in standard time. Setting TIME_ZONE alone left `timezone.now().date()` call
+  sites on the UTC date from 00:00 to 05:30 IST, so those and two OS-clock call sites use `localdate()`.
+- Local evidence on the same tree as bd9cc5b: release allow-list 1582 PASS, zero failures. Full discovery
+  2284 cases: the same 34 test IDs fail as base 2271, 33 pass alone on both, one README contract fails
+  on both. Clock shifted to 00:30 IST: no zone-caused failure. Chrome 151: 147 PASS, 3 pass once the
+  ignored axe tool exists, one packing-panel contrast failure identical on base. 13 boundary tests,
+  migrations unchanged, pinned privacy scan PASS.
+- NOT reinterpreted or migrated. OWNER_DECISION remaining: loans verified from 00:00 to 10:30/11:30 IST
+  move their verified-balance date cutoff one day later, so rejecting a payment already applied for that
+  date leaves the balance reduced. Old EXIF and typed bike timestamps read 10.5/11.5 hours later.
+- No per-user zone exists; reminders and calendar exports keep their own IANA zone. System-zone detection
+  is excluded, preserved on local branch `wip/system-time-zone-detection`. Baseline75/143, extensions0/13
+  unchanged. NEXT: owner reviews and authorizes push, then fresh six-job CI at the pushed HEAD.
+
+## Previous checkpoint — D4 native-windows time-of-day repair (2026-10-31)
 
 - Owner D4 brief expected c28700d and a draft PR. Actual base: development/alfred-integrated
   626c5bc, four commits later, with the review package already prepared; PR20 open,
