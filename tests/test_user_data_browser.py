@@ -173,8 +173,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('relationshipCompatibilityValue'), 'Unknown')
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#relationshipFactorCards article')), 0)
         self.assertEqual(self.browser.find_element(self.By.ID, 'partnerFinancialScore').get_attribute('max'), '100')
-        self.wait.until(lambda _: 'Debt pressure' in self.text('relationshipInsightList'))
-        details = self.text('relationshipInsightList')
+        self.wait.until(lambda _: 'Debt pressure' in self.browser.find_element(self.By.ID, 'relationshipGroundingList').get_attribute('textContent'))
+        details = self.browser.find_element(self.By.ID, 'relationshipGroundingList').get_attribute('textContent')
         self.assertIn('Debt pressure: unavailable', details)
         self.assertIn('Savings rate: unavailable', details)
 
