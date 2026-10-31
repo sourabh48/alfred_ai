@@ -1242,7 +1242,7 @@ class PortfolioIntelligenceService:
         return investments[:30]
 
     def _extract_asset_name(self, line: str) -> str:
-        cleaned = re.sub(r"\b(?:INR|RS\.?|NAV|UNITS|SHARES?|QTY|VALUE|HOLDINGS?)\b", " ", line, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\b(?:INR|RUPEES?|RS\.?|NAV|UNITS|SHARES?|QTY|VALUE|HOLDINGS?)\b|\u20b9", " ", line, flags=re.IGNORECASE)
         cleaned = re.sub(r"\b\d[\d,]*(?:\.\d{1,2})?\b", " ", cleaned)
         cleaned = " ".join(cleaned.split(" - ")[0].split())
         words = [word for word in cleaned.split() if len(word) > 2]

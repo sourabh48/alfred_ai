@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from alfred_ai.services.currency import INR_TOKEN
 from apps.expenses.money import money_float
 from apps.mobility.models import BikeProfile, TravelMessage, TravelPlan, TravelPlanningSession
 from .travel_catalog import ALIASES, CITIES, DESTINATIONS, lookup
@@ -80,9 +81,11 @@ def extract(state, text):
     notes = []
     def put(k, v, source="user_message", confirmed=True, confidence=1):
         state[k] = fact(v, source, confirmed, confidence)
-    money = re.search(r"(?:₹|inr\s*|rs\.?\s*|budget(?:\s+is|\s+of)?\s*|under\s+|around\s+)([\d,]+(?:\.\d+)?)\s*(k|thousand|lakh)?", lower)
+    money = re.search(rf"(?:{INR_TOKEN}\s*|budget(?:\s+is|\s+of)?\s*|under\s+|around\s+)([\d,]+(?:\.\d+)?)\s*(k|thousand|lakh)?", lower, re.IGNORECASE)
     if not money:
         money = re.search(r"\b(\d+(?:\.\d+)?)\s*(k|thousand|lakh)\b", lower)
+    if not money:
+        money = re.search(r"\b([\d,]+(?:\.\d+)?)()\s*(?:rupees?\b|inr\b|rs\b|/-)", lower)
     if money:
         amount = float(money[1].replace(",", "")) * ({"k": 1000, "thousand": 1000, "lakh": 100000}.get(money[2], 1))
         if not 0 < amount <= 100000000:

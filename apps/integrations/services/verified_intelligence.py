@@ -15,6 +15,7 @@ from urllib.parse import quote_plus, unquote
 
 import feedparser
 from alfred_ai.services import public_http
+from alfred_ai.services.currency import INR_TOKEN
 from alfred_ai.services.api_errors import safe_error_details
 from django.conf import settings
 from django.core.cache import cache
@@ -39,11 +40,11 @@ EVIDENCE_REFRESH_PROOF_SOURCE = "verified_evidence_refresh_probe"
 
 
 JOB_SALARY_SNIPPET_RE = re.compile(
-    r"(?:(?:INR|RS\.?|USD|\$)\s*)?\d[\d,]*(?:\.\d+)?\s*"
+    rf"(?:(?:{INR_TOKEN}|USD|\$)\s*)?\d[\d,]*(?:\.\d+)?\s*"
     r"(?:k|lpa|lakh|lakhs|crore|cr|million|m)?"
-    r"(?:\s*(?:-|to)\s*(?:(?:INR|RS\.?|USD|\$)\s*)?\d[\d,]*(?:\.\d+)?\s*"
+    rf"(?:\s*(?:-|to)\s*(?:(?:{INR_TOKEN}|USD|\$)\s*)?\d[\d,]*(?:\.\d+)?\s*"
     r"(?:k|lpa|lakh|lakhs|crore|cr|million|m)?)?"
-    r"\s*(?:per\s+annum|per\s+year|/year|yearly|annual|annum|lpa|per\s+month|/month|monthly|month|pm)?",
+    r"\s*(?:rupees?\s*)?(?:per\s+annum|per\s+year|/year|yearly|annual|annum|lpa|per\s+month|/month|monthly|month|pm)?",
     re.IGNORECASE,
 )
 
@@ -1611,7 +1612,7 @@ class VerifiedIntelligenceService:
             if not candidate:
                 continue
             lowered = candidate.lower()
-            if any(token in lowered for token in ("lpa", "lakh", "crore", "cr", "inr", "rs", "usd", "$", "per", "annual", "year", "month")):
+            if any(token in lowered for token in ("lpa", "lakh", "crore", "cr", "inr", "rs", "rupee", "\u20b9", "usd", "$", "per", "annual", "year", "month")):
                 return candidate[:80]
         return ""
 

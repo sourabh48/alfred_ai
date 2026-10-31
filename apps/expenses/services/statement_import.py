@@ -20,6 +20,7 @@ from typing import BinaryIO
 from pypdf import PdfReader
 
 from alfred_ai.services import apply_parser_learning
+from alfred_ai.services.currency import INR_TOKEN
 from alfred_ai.services.pdf_recovery import rebuild_orphaned_pdf
 from alfred_ai.services.ocr_process import ocr_command, hidden_process_options, private_ocr_input
 from alfred_ai.services.api_errors import safe_error_details
@@ -1042,7 +1043,7 @@ def _extract_loan_hints(full_text: str) -> dict:
             break
 
     lender = _extract_bank_name(full_text)
-    match = re.search(r"(?:EMI|INSTALLMENT)\s+(?:AMOUNT|AMT)?\s*[:.]?\s*(?:INR|RS\.?)?\s*([0-9,]+(?:\.\d{2})?)", text)
+    match = re.search(rf"(?:EMI|INSTALLMENT)\s+(?:AMOUNT|AMT)?\s*[:.]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)", text, re.IGNORECASE)
     emi_amount = float(match.group(1).replace(",", "")) if match else 0.0
 
     return {

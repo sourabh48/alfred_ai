@@ -1,5 +1,6 @@
 """Optional public-context reasoning; cloud contact is disabled unless authorized."""
 from datetime import datetime, timezone
+import json
 import re
 import time
 
@@ -34,8 +35,8 @@ def real_reasoning_authorized():
 
 
 def public_payload(payload):
-    text=encoded(payload).decode()
-    if re.search(r'(?i)(?:\b(?:account|loan|emi|balance|salary|income|password|secret|token|bearer|medical|diagnosis)\b|sk-[a-z0-9-]{8,}|AKIA[A-Z0-9]{12,}|[a-z]:[\\/]|/(?:home|users|tmp)/|\b[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\d[ -]?){6,}|[$₹€£]\s*\d)',text):
+    text=json.dumps(payload,ensure_ascii=False)
+    if re.search(r'(?i)(?:\b(?:account|loan|emi|balance|salary|income|password|secret|token|bearer|medical|diagnosis)\b|sk-[a-z0-9-]{8,}|AKIA[A-Z0-9]{12,}|[a-z]:[\\/]|/(?:home|users|tmp)/|\b[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\d[ -]?){6,}|[$₹€£]\s*\d|\b(?:inr|rs\.?|rupees?)\s*\d|\d\s*(?:rupees?|inr)\b)',text):
         raise PermissionError('Potential sensitive data must remain in local processing.')
     keys=[]; pending=[payload]
     while pending:

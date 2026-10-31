@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from django.utils import timezone
 
 from alfred_ai.services import extract_document_text
+from alfred_ai.services.currency import INR_TOKEN
 from alfred_ai.services.upload_limits import document_source
 from alfred_ai.services import public_http
 from apps.integrations.services import verified_intelligence
@@ -85,12 +86,12 @@ COUNTRY_ALIASES = {
     "worldwide": "Remote",
     "global": "Remote",
 }
-SALARY_CURRENCY_PATTERN = r"INR\b|Rs\.?(?![A-Za-z])|\u20b9|USD\b|\$|EUR\b|\u20ac|GBP\b|\u00a3"
+SALARY_CURRENCY_PATTERN = rf"{INR_TOKEN}|USD\b|\$|EUR\b|\u20ac|GBP\b|\u00a3"
 SALARY_BLOCK_RE = re.compile(
     rf"(?<![\w.])(?P<currency>{SALARY_CURRENCY_PATTERN})?\s*"
     r"(?P<first>\d[\d,]*(?:\.\d+)?)\s*(?P<first_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?"
     rf"(?:\s*(?:-|to|\u2013|\u2014)\s*(?P<second_currency>{SALARY_CURRENCY_PATTERN})?\s*(?P<second>\d[\d,]*(?:\.\d+)?)\s*(?P<second_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?)?"
-    r"(?:\s*(?P<trailing_currency>INR|USD|EUR|GBP)\b)?"
+    r"(?:\s*(?P<trailing_currency>(?:INR|USD|EUR|GBP|RUPEES?|RS)\b))?(?P<rupee_dash>\s*/-)?"
     r"\s*(?P<period>(?:per\s+annum|per\s+year|/year|/yr|a\s+year|yearly|annually|annual|annum|lpa"
     r"|per\s+month|/month|/mo|a\s+month|monthly|month|pm|per\s+hour|/hour|/hr|an\s+hour|hourly"
     r"|per\s+week|/week|/wk|a\s+week|weekly|per\s+day|/day|a\s+day|daily)(?![A-Za-z]))?",
@@ -101,7 +102,8 @@ SALARY_CONTEXT_RE = re.compile(
     r"\b(?:salary|salaries|compensation|ctc|pay|paying|pays|package|stipend|remuneration|earnings?|wages?|ote)\b",
     re.IGNORECASE,
 )
-SALARY_CURRENCY_CODES = {"inr": "INR", "rs": "INR", "rs.": "INR", "\u20b9": "INR", "usd": "USD", "$": "USD",
+SALARY_CURRENCY_CODES = {"inr": "INR", "inr.": "INR", "rs": "INR", "rs.": "INR", "rs/-": "INR", "rupee": "INR", "rupees": "INR",
+                         "\u20b9": "INR", "\u20a8": "INR", "\u00e2\u201a\u00b9": "INR", "usd": "USD", "$": "USD",
                          "eur": "EUR", "\u20ac": "EUR", "gbp": "GBP", "\u00a3": "GBP"}
 SALARY_RUPEE_UNITS = {"lpa", "lakh", "lakhs", "crore", "cr"}
 SALARY_VALUE_LIMIT = 10**12
@@ -1621,7 +1623,8 @@ class JobIntelligenceService:
             units = {(match.group(name) or "").lower() for name in ("first_unit", "second_unit")} - {""}
             currencies = {SALARY_CURRENCY_CODES[raw.strip().lower()]
                           for raw in (match.group(name) for name in ("currency", "second_currency", "trailing_currency")) if raw}
-            if not currencies and not units:
+            rupee_dash = bool(match.group("rupee_dash"))
+            if not currencies and not units and not rupee_dash:
                 continue
             if len(currencies) > 1 or (require_context and not self._salary_match_has_context(text, match)):
                 continue
@@ -1633,7 +1636,7 @@ class JobIntelligenceService:
                 continue
             if max(first_value, second_value) > SALARY_VALUE_LIMIT:
                 continue
-            currency = next(iter(currencies), "INR" if units & SALARY_RUPEE_UNITS else "")
+            currency = next(iter(currencies), "INR" if rupee_dash or units & SALARY_RUPEE_UNITS else "")
             period = self._normalize_salary_period(match.group("period") or match.group("first_unit") or "")
             salary_min = min(first_value, second_value) if second_value else first_value
             salary_max = max(first_value, second_value) if second_value else first_value

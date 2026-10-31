@@ -22,6 +22,7 @@ import zipfile
 from pypdf import PdfReader
 from .upload_limits import upload_deadline
 
+from alfred_ai.services.currency import INR_AMOUNT
 from alfred_ai.services.pdf_recovery import rebuild_orphaned_pdf
 from alfred_ai.services.ocr_process import ocr_command, hidden_process_options, private_ocr_input
 from alfred_ai.services.api_errors import safe_error_details
@@ -44,7 +45,7 @@ ARCHIVE_TEXT_EXTENSIONS = {".docx", ".odt"}
 
 WORD_RE = re.compile(r"[A-Za-z]{3,}")
 DATE_RE = re.compile(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b")
-MONEY_RE = re.compile(r"(?:INR|RS\.?|₹)\s*[0-9,]+(?:\.\d{1,2})?", re.IGNORECASE)
+MONEY_RE = re.compile(INR_AMOUNT, re.IGNORECASE)
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?91[\s-]?)?[6-9]\d{9}(?!\d)")
 VEHICLE_NUMBER_RE = re.compile(r"\b(?:[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?\d{4}|\d{2}[\s-]?BH[\s-]?\d{4}[\s-]?[A-Z]{2})\b", re.IGNORECASE)

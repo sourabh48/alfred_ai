@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import BinaryIO
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
+from alfred_ai.services.currency import INR_TOKEN
 from alfred_ai.services.upload_limits import document_source
 from apps.loans.money import loan_money
 
@@ -132,7 +133,7 @@ class LoanClosureParser:
         return ""
 
     def _extract_amount_for_labels(self, text: str, labels: list[str]) -> float:
-        amount_pattern = r"(?:INR|RS\.?|₹)?\s*([0-9,]+(?:\.\d+)?)"
+        amount_pattern = rf"{INR_TOKEN}?\s*([0-9,]+(?:\.\d+)?)"
         for label in labels:
             pattern = rf"{re.escape(label)}\s*[:.]?\s*{amount_pattern}"
             match = re.search(pattern, text, re.IGNORECASE)
@@ -142,8 +143,8 @@ class LoanClosureParser:
 
     def _extract_total_amount(self, text: str) -> float:
         patterns = [
-            r"(?:TOTAL|FINAL|FULL\s+AND\s+FINAL|TOTAL\s+AMOUNT\s+PAYABLE|AMOUNT\s+PAYABLE)\s*(?:AMOUNT|AMT)?\s*[:.]?\s*(?:INR|RS\.?|₹)?\s*([0-9,]+(?:\.\d+)?)",
-            r"(?:FORECLOSURE|CLOSURE|SETTLEMENT)\s+(?:AMOUNT|AMT)\s*[:.]?\s*(?:INR|RS\.?|₹)?\s*([0-9,]+(?:\.\d+)?)",
+            rf"(?:TOTAL|FINAL|FULL\s+AND\s+FINAL|TOTAL\s+AMOUNT\s+PAYABLE|AMOUNT\s+PAYABLE)\s*(?:AMOUNT|AMT)?\s*[:.]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
+            rf"(?:FORECLOSURE|CLOSURE|SETTLEMENT)\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
