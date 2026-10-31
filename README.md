@@ -65,6 +65,11 @@ For users: [Windows installation](docs/INSTALLATION.md), [package guide](docs/WI
 and [native runtime/recovery](docs/NATIVE_WINDOWS.md). Existing downloadable previews
 are historical artifacts; they do not contain every current development feature.
 Never promote a package or modify production based only on this README.
+On a checkout, double-click `Start ALFRED.cmd` to start and `Stop ALFRED.cmd` to stop.
+
+ALFRED is local or LAN-hosted and should not be exposed to the public internet.
+See [local hosting](docs/LOCAL_HOSTING.md) and
+[data privacy and storage](docs/DATA_PRIVACY_AND_STORAGE.md).
 
 For developers: [development setup](docs/DEVELOPMENT.md), [repository map](docs/REPOSITORY.md),
 [Travel providers](docs/TRAVEL_PROVIDERS.md) and [project instructions](AGENTS.md).
