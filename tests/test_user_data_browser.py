@@ -3001,7 +3001,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.refresh(); self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
         self.memory_click('#documentCorpusRefresh')
         self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
-        self.assertIn('Synthetic local notes.txt',self.text('documentCorpusList'))
+        self.wait.until(lambda _: 'Synthetic local notes.txt' in self.text('documentCorpusList'))
         self.browser.find_element(self.By.ID,'documentCorpusFile').send_keys(str(pdf_file))
         self.memory_click('#documentCorpusUploadConsent'); self.memory_click('#documentCorpusUpload button')
         self.wait.until(lambda _: 'Original and searchable extraction stored encrypted' in self.text('documentCorpusStatus'))
