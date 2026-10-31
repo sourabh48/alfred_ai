@@ -1,7 +1,7 @@
 # PR20 cumulative change manifest
 
 Base: `a2274aa4daa514afe05ab58b4e4219ef18bb825f`. Retained tested checkpoint: `c28700d8da1e545441b1dec7e3292d71497ec6e7`.
-Candidate: the commit containing this manifest; exact source/run closure lives in `artifacts/d4-ci-repair-20261030/checkpoint.json`.
+Candidate: the commit containing this manifest; exact source/run closure lives in `artifacts/d4-native-repair-20261031/checkpoint.json`.
 All cumulative changed paths are listed. SHA256 hashes use LF-normalized source bytes; documentation rows omit hashes to avoid self-reference.
 This is an inventory/review input, not independent approval or an executable test result.
 
@@ -101,7 +101,7 @@ D4 extends c287 with request-parser guards/settings, explicit parser callers and
 | A | `tests/test_travel_affordability_ui.py` | `2e6dd54db6eda6e8beaf7eee7e64309962265b6b6b0558749e680bf6f5875d2c` |
 | M | `tests/test_travel_candidate_pool.py` | `b51a9636d67b4ed71e37dd0413e64cdfa75ee680b40e057130820e5f71574923` |
 | A | `tests/test_travel_documents.py` | `d8e7854bef3d6505d92e6355a7a6f69dc4e438e6f51d45abaa209aeeefabfff4` |
-| A | `tests/test_travel_end_to_end.py` | `8d2605360b136f032f9ee22059a7fa92baaba0acd1583bb8ae74219fc0f74562` |
+| A | `tests/test_travel_end_to_end.py` | `f3519231c79f2a1b3afdafe63dcbb87b2db01477061d2d2022deab15a4bc0225` |
 | A | `tests/test_travel_export_integration.py` | `34a6f7b02b4cb62df829f05f6746154b703fcbcfd4a865e05b145ef86dc8c3b7` |
 | A | `tests/test_travel_financial_reconciliation.py` | `9ff409846cf2ad0695acb4d7a85881c114523c6f0be9d57d92bbfa51c39af7c7` |
 | A | `tests/test_travel_gpx_export.py` | `d7792ce9e76c98603e4add874773a9c5de29e97f4ca2aa6ea2aad1ffdcda135a` |

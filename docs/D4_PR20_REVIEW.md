@@ -1,14 +1,17 @@
 # PR #20 independent review package
 
-Prepared 2026-10-30 for `development/alfred-integrated`; **DRAFT, UNMERGED,
-NOT RELEASE READY**. Base `a2274aa4daa514afe05ab58b4e4219ef18bb825f`;
+Prepared 2026-10-30, updated 2026-10-31, for `development/alfred-integrated`;
+**OPEN, NOT DRAFT AS LAST OBSERVED (owner to restore), UNMERGED, NOT RELEASE READY**. Base `a2274aa4daa514afe05ab58b4e4219ef18bb825f`;
 retained tested source `c28700d8da1e545441b1dec7e3292d71497ec6e7`.
 The commit containing this package adds the D4 parser guards described below.
 Its exact HEAD, push, source/history preflight and fresh CI are recorded in
 `artifacts/d4-20261030/checkpoint.json`; c287 CI is never relabelled as its CI.
 Baseline **75/143**, extensions **0/13**; no formal requirements promoted.
 
-Latest continuation: artifacts/d4-ci-repair-20261030/checkpoint.json. ad31 CI
+Latest repair: artifacts/d4-native-repair-20261031/checkpoint.json. 626c5bc run40978060971
+FAILED native-windows through a time-of-day test defect; see Confirmed findings.
+
+Earlier continuation: artifacts/d4-ci-repair-20261030/checkpoint.json. ad31 CI
 40973869637 ran151 unique Chrome cases:149 PASS,2 errors,zero skips. Verified
 screenshots/DOM and bounded real Chrome response barriers establish two harness
 issues: Undo SPACE sent before busy controls re-enable, and cookie-only auth-loss
@@ -67,6 +70,9 @@ Unchanged `alfred_private_storage.py`, `alfred_native.py`, `services/upload_limi
 | Planner close/reopen revives pending reminders | Fixed5d49fb8: existing `cancel_closed_trip` in owner status transaction.33 backend/2 Chrome affected cases passed; formal human review still absent |
 | D4-H1 binary JSON codec amplification | Confirmed atc287:69 compressed bytes yielded65536 characters through real TravelSessionList dispatch (synthetic identity; writes/throttle mocked). Before-fix regression allowed binary codecs/profile mutation. Shared text-only JSON parser rejects before read. No actual large-memory attack performed |
 | D4-H2 unbounded Accept negotiation | Confirmed bounded probe:24 distinct tokens/192531 characters took1.452621s for one negotiation, before error renegotiation. High availability risk on reachable local/LAN API; timing is one-host evidence. Cap applied before media parsing; tests assert early rejection without timing thresholds |
+| D4-H3 runtime time zone | **Open, owner decision.** Reproduced: no setting overrides Django's default America/Chicago; at 01:51 UTC on 31 Oct `timezone.localdate()` returned 30 Oct. For an India-based owner "today" lags from 00:00 to 10:30 IST (11:30 in winter) across 64 call sites, including the Expense `transaction_date` default, budgets, loans and month windows. Reviewer should assess severity; entries made in that window are ambiguous and must not be silently migrated |
+| D4 Travel journey time-of-day test | Fixed test-only. Reminder at midnight UTC on the local date plus one is past from 00:00 to 05:00 UTC (06:00 in winter), so the API correctly returned 400. Failed run40978060971 ran in that window; the11 native successes in the last14 runs did not. Before1 failure at 01:50 UTC, after20 PASS at 01:52 UTC. The job log needs authentication, so that run's test ID is unverified by log |
+| Backend gate coverage | Not a release blocker alone; reviewer should assess. `manage.py test` discovers2271 cases, the gate runs1569. Outside it, a README contract fails and combined runs hit EXPENSIVE_GLOBAL429s; inside it the budget reached113 of120/hour |
 
 `artifacts/d4-20261030/parser-before.json`:6 cases,7 failing subcases,zero skips.
 `parser-reachability.json` preserves pre-fix metrics and exact scope. Only the
@@ -212,7 +218,8 @@ Request text:
 > Please independently review PR20 from the pinned master base through the exact
 > current development HEAD. Use this package/manifest and the source-bound CI
 > receipts. Prioritize auth/CSRF/owner boundaries, the two D4 request-parser guards and explicit parser overrides,
-> Decimal/currency/stale-source invariants, encrypted originals/DPAPI, transactional
+> Decimal/currency/stale-source invariants, the runtime time-zone finding,
+> encrypted originals/DPAPI, transactional
 > replay and restore publication. Reconcile the residual dependency advisories and
 > unperformed installer/recovery/manual gates. Report reproducible findings with
 > file/line, severity, exact preconditions and minimal repro; otherwise state scope

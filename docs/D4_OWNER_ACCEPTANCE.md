@@ -122,6 +122,8 @@ Residual dependency advisories require qualified reachability/upgrade triage.
 | I01-I08 installation/update/rollback/clean-PC | No current installer or independent run | PENDING |
 | R01-R04 device-loss/real-account | No independent run | PENDING |
 | Required check/review policy identity | Existing protection visibility incomplete | PENDING |
+| Runtime time zone (D4-H3): choose the zone, and how to treat entries made while "today" lagged | Reproduced default America/Chicago; no change made | PENDING |
+| Restore PR20 to Draft | Last observed NOT_DRAFT; supported conversion previously FORBIDDEN | PENDING |
 | Merge/Pages/deployment/production | Not authorized by D4 | BLOCKED |
 
 Acceptance signs only the specified observations; it never authorizes deployment,

@@ -6,7 +6,14 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
-## Current checkpoint — D4 review package / guarded request parsing (2026-10-30)
+## Current checkpoint — D4 native-windows time-of-day repair (2026-10-31)
+
+626c5bc exact run40978060971 FAILED native-windows, so D4 is not green; root cause and repair are in
+EXECUTION_STATE. Acceptance rows are unchanged and bound to their recorded sources; every D3-C,
+manual and independent gate stays PENDING. New HIGH runtime time-zone finding awaits an owner
+decision. Baseline75/143; extensions0/13; no promotion.
+
+## Previous checkpoint — D4 review package / guarded request parsing (2026-10-30)
 
 [Cumulative review package](D4_PR20_REVIEW.md), [changed-file manifest](D4_PR20_CHANGE_MANIFEST.md)
 and [owner NVDA/contrast/install worksheet](D4_OWNER_ACCEPTANCE.md) are prepared;

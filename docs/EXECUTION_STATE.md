@@ -1,6 +1,48 @@
 # ALFRED execution state
 
-## Active checkpoint — D4 exact-head two-failure repair (2026-10-30)
+## Active checkpoint — D4 native-windows time-of-day repair (2026-10-31)
+
+- Owner D4 brief expected c28700d and a draft PR. Actual base: development/alfred-integrated
+  626c5bc, four commits later, with the review package already prepared; PR20 open,
+  NOT_DRAFT, unmerged, zero reviews. D1-D3 and c287 evidence preserved, not rerun. Work in
+  worktree F:/ALFRED_DEV/d4-review-20261031 because post-audit holds a separate tooling branch.
+- Exact run40978060971 at 626c5bc FAILED: native-windows step "Backend and recovery"
+  (00:13:44-00:30:55 UTC); five other jobs SUCCESS. It is not green, and its healthy jobs
+  transfer to no successor. Job log and proof artifact need authentication, which was
+  not available or bypassed, so the failing test ID at that run stays UNVERIFIED by log.
+- Root cause reproduced at exact 626c5bc: `test_seven_integrated_journeys` set its reminder
+  to midnight UTC on the local date plus one. Effective TIME_ZONE is Django's default
+  America/Chicago, so that instant is already past from 00:00 to 05:00 UTC (06:00 in
+  winter) and the API correctly returns 400. The failing CI step ran inside that window;
+  the 11 native successes in the last 14 runs did not (ad31 ended 37 seconds into it). The
+  application was correct; the test depended on time of day.
+- Repair is test-only: anchor the reminder to the current instant, and do not start within
+  two minutes of local midnight. Before: 1 failure at 01:50 UTC. After: 20 Travel journey and
+  reminder cases PASS at 01:52 UTC, inside the window, zero skips. Same change as sibling
+  branch `fix/two-backend-tests-20261031` (015e714); that branch itself is not merged.
+- Local exact-source allow-list 1569 ran while other suites loaded the host: 12 not passing,
+  so NOT a green local gate. The Travel case above; 10 KnowledgeGit errors at the 5s Git
+  deadline; one probe-runner timeout. Those 11 passed when rerun alone (14 cases, Travel the
+  only failure). Fresh CI owns the gate result.
+- NEW HIGH, reproduced, NOT fixed, OWNER_DECISION: no setting overrides America/Chicago.
+  At 01:51 UTC on 31 Oct `timezone.localdate()` returned 30 Oct. For an India-based owner
+  "today" is a day behind from 00:00 to 10:30 IST (11:30 in winter) across 64 call sites,
+  including the Expense `transaction_date` default, budgets, loans and month windows. Changing
+  it moves financial date boundaries; entries already made in that window are ambiguous and
+  must not be silently reinterpreted or migrated.
+- Lower gate risks retained: EXPENSIVE_GLOBAL reached 113 of its 120/hour test budget in the
+  allow-list; `manage.py test` discovers 2271 cases against 1569 in the gate, and cases outside
+  the gate include a real README contract failure and more 429s when run together.
+- Independent review remains PREPARED/NOT_SENT; same-harness work is not independent approval.
+  D3-C installer, failed update, current-package rollback, clean-PC, device-loss and real-account
+  gates, manual NVDA/contrast and corrected-source package all remain PENDING. Dependency advisories
+  remain BLOCKED_TRIAGE. Baseline75/143, extensions0/13. No merge, Pages, deployment, production
+  data or backup deletion.
+- Exact candidate/run/closure: artifacts/d4-native-repair-20261031/checkpoint.json. NEXT: verify
+  the fresh six-job run for the commit containing this checkpoint; owner restores Draft, assigns the
+  reviewer and decides the runtime time zone.
+
+## Previous checkpoint — D4 exact-head two-failure repair (2026-10-30)
 
 - Recovered clean ad31ca3, development/alfred-integrated, F:/ALFRED_DEV/post-audit.
   Failed run40973869637 raw artifacts/source binding verified before edits:

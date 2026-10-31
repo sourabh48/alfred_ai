@@ -1,6 +1,14 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — D4 prepared / external gates blocked, 2026-10-30
+## Active implementation checkpoint — D4 native-windows repair, 2026-10-31
+
+Exact 626c5bc run40978060971 FAILED native-windows. Reproduced a time-of-day test defect, repaired
+test-only; fresh exact-head CI is owned by artifacts/d4-native-repair-20261031/checkpoint.json. New
+HIGH: runtime TIME_ZONE is Django's default America/Chicago, so "today" lags for an India-based owner
+across 64 call sites; reproduced, unfixed, owner decision required. See EXECUTION_STATE. PR20 open,
+NOT_DRAFT, unmerged, zero reviews. Baseline75/143, extensions0/13 unchanged.
+
+## Previous implementation checkpoint — D4 prepared / external gates blocked, 2026-10-30
 
 Read [review package](D4_PR20_REVIEW.md), [owner acceptance](D4_OWNER_ACCEPTANCE.md)
 and EXECUTION_STATE. c287 exact CI40931513318 all6 PASS:1562 backend/151 Chrome/

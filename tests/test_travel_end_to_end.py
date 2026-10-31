@@ -1,6 +1,6 @@
 """One owned synthetic trip through the seven integrated Travel journeys."""
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone as utc
+from datetime import timedelta, timezone as utc
 from io import BytesIO
 import json
 import os
@@ -39,6 +39,9 @@ from tests.test_persistent_memory import SyntheticEmbeddings
 
 class TravelEndToEndTests(TestCase):
     def setUp(self):
+        # Parent and cold child must share one local date, so never start just before local midnight.
+        now=timezone.localtime();left=(now.replace(hour=0,minute=0,second=0,microsecond=0)+timedelta(days=1)-now).total_seconds()
+        if left<120:time.sleep(left+1)
         cache.clear();self.addCleanup(cache.clear)
         planner.TravelPlannerTests.setUp(self)
         self.directory=Path(self.enterContext(TemporaryDirectory(prefix='alfred-d1-synthetic-')))
@@ -129,7 +132,8 @@ class TravelEndToEndTests(TestCase):
         self.ok(self.post('packing',operation='update',checklist_revision=packing['revision'],item_id=item['id'],label='D1 helmet and gloves',packed=True))
         self.assertFalse(self.client.get(self.url).json()['travel_reminders']['enabled'])
         self.ok(self.reminder('consent',enabled=True));identity=str(uuid4())
-        self.due=datetime.combine(self.today+timedelta(days=1),datetime.min.time(),tzinfo=utc.utc)
+        # Anchored to the instant: midnight UTC on a local date is already past for part of each day.
+        self.due=(timezone.now()+timedelta(days=1)).astimezone(utc.utc).replace(second=0,microsecond=0)
         fields=dict(reminder_id=identity,label='D1 pack before departure',zone='UTC',local_time=self.due.strftime('%Y-%m-%dT%H:%M'))
         self.ok(self.reminder('create',**fields));self.ok(self.reminder('cancel',reminder_id=identity))
         self.ok(self.reminder('reschedule',**fields))
