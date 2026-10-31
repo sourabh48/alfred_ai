@@ -3047,8 +3047,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         query=self.browser.find_element(self.By.ID,'documentKnowledgeQuery'); query.send_keys('maintenance waiver')
         self.memory_click('#documentKnowledgeForm button[type="submit"]')
         self.wait.until(lambda _: '1 extraction excerpt' in self.text('documentKnowledgeStatus'))
-        self.assertIn('Original PDF text layer',self.text('documentKnowledgeResults'))
-        self.assertIn('Annual maintenance waiver applies.',self.text('documentKnowledgeResults'))
+        # The new card fades in from opacity 0, and .text omits it until the first animation frame.
+        results=self.wait.until(lambda _: text if 'Original PDF text layer' in (text:=self.text('documentKnowledgeResults')) else False)
+        self.assertIn('Annual maintenance waiver applies.',results)
         self.browser.execute_script("document.getElementById('documentKnowledgeForm').scrollIntoView({block:'center',behavior:'instant'})")
         self.capture('bank-text-layer-search-desktop')
         self.browser.set_window_size(390,844)
@@ -3060,7 +3061,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'linked records' in self.text('documentSourcesStatus') and query.is_displayed())
         query.send_keys('maintenance waiver'); self.memory_click('#documentKnowledgeForm button[type="submit"]')
         self.wait.until(lambda _: 'No searchable extraction' in self.text('documentKnowledgeStatus'))
-        self.assertNotIn('Annual maintenance waiver applies.',self.text('documentKnowledgeResults'))
+        # textContent, because .text would also pass while a leaked card was still at opacity 0.
+        self.assertNotIn('Annual maintenance waiver applies.',self.browser.find_element(self.By.ID,'documentKnowledgeResults').get_attribute('textContent'))
         self.assertEqual(list(Expense.objects.order_by('pk').values()),before)
         document.refresh_from_db(); self.assertEqual(document.extracted_payload,{})
 
