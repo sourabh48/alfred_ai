@@ -132,6 +132,12 @@ class ExpenseSerializer(serializers.ModelSerializer):
                 initial_data=getattr(self, "initial_data", {}),
                 instance=self.instance,
             )
+            reference = attrs.get("external_reference")
+            # shortcut: no database constraint, so simultaneous requests can both pass; add one with a reviewed migration.
+            if self.instance is None and reference and Expense.objects.filter(
+                    user=user, bank_account=attrs.get("bank_account"), external_reference=reference, direction=attrs.get("direction"),
+                    transaction_date=attrs.get("transaction_date"), amount=attrs.get("amount")).exists():
+                raise serializers.ValidationError({"external_reference": "This transaction is already saved."})
         return attrs
 
     def validate_bank_account(self, value):

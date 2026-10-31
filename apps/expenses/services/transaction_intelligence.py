@@ -451,13 +451,14 @@ def resolve_bank_account(
     )
 
     changed_fields: list[str] = []
-    if bank_name and account.bank_name != bank_name:
+    # A statement fills gaps; what the owner entered stays. New accounts already took these as defaults.
+    if bank_name and not account.bank_name:
         account.bank_name = bank_name
         changed_fields.append("bank_name")
-    if account_holder and account.account_holder != account_holder:
+    if account_holder and not account.account_holder:
         account.account_holder = account_holder
         changed_fields.append("account_holder")
-    if account_type and account.account_type != account_type:
+    if account_type and account.account_type == "other":
         account.account_type = account_type
         changed_fields.append("account_type")
     if current_balance is not None and account.current_balance != current_balance:

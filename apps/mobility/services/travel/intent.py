@@ -3,7 +3,7 @@ import re
 import math
 from rest_framework.exceptions import ValidationError
 
-from ..travel_catalog import lookup
+from ..travel_catalog import CITIES, lookup
 from ..travel_discovery import fact, value
 
 
@@ -11,6 +11,11 @@ PROFILE_KEYS = {"origin", "transport_mode", "pillion", "maximum_daily_driving", 
     "avoid_expressways", "avoid_tolls", "highway_tolerance", "budget_type", "preferred_accommodation",
     "camping_interest", "trekking_interest", "food_preferences", "adventure_interest", "nightlife_interest",
     "weather_tolerance", "trip_pace", "preferred_trip_style", "luggage", "favorite_routes"}
+
+
+# Where a place name stops: date and budget words, as in "Coorg next month", are not part of it.
+PLACE_END = (r"(?=\s+(?:(?:for|on|with|under|and|by|from|during|starting|next|this|budget|tomorrow|today)\b"
+             r"|in\s+(?:\d|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next|this))|[.,;!?]|$)")
 
 
 def validate_preference(key, val):
@@ -60,12 +65,24 @@ def augment(state, text):
     def put(key, val):
         state[key] = fact(val)
     # Explicit destination, including names outside the curated catalogue.
-    match = re.search(r"\b(?:trip\s+(?:from\s+.+?\s+)?to|travel\s+to|visit|going\s+to|destination(?:\s+is)?|around|near)\s+([a-z][a-z .,'-]{1,100}?)(?=\s+(?:for|on|with|under|and|by|from|in\s+\d)\b|[.!?]|$)", lower)
+    match = re.search(rf"\b(?:trip\s+(?:from\s+.+?\s+)?to|travel\s+to|visit|going\s+to|go\s+to|destination(?:\s+is)?|around|near)\s+([a-z][a-z .'-]{{1,100}}?){PLACE_END}", lower)
     if not match:
-        match = re.search(r"\bfrom\s+[a-z .'-]+?\s+to\s+([a-z][a-z .,'-]{1,100}?)(?=\s+(?:for|on|with|under|and|by)\b|[.!?]|$)", lower)
+        match = re.search(rf"\bfrom\s+[a-z .'-]+?\s+to\s+([a-z][a-z .'-]{{1,100}}?){PLACE_END}", lower)
+    if not match:
+        # "Bengaluru to Coorg": only a known start, so "2 October to 5 October" and "hello to you" stay out.
+        start = re.match(rf"([a-z][a-z .'-]{{1,70}}?)\s+to\s+([a-z][a-z .'-]{{1,100}}?){PLACE_END}", lower)
+        if start and start[1].strip() in CITIES:
+            match = re.match(r"(.*)", start[2])
+            put("origin", start[1].strip().title())
+    if not match:
+        named = re.match(r"([a-z][a-z '-]{1,70}?)\s+(?:trip|getaway|holiday|vacation|ride)\b", lower)
+        if named and lookup(named[1]):
+            match = named
+    if not match and value(state, "origin") and value(state, "pending_question") != "origin" and lookup(lower):
+        match = re.match(r"(.*)", lower)
     if match:
         name = match[1].strip(" ,")
-        if name not in {"me", "that", "there", "home"}:
+        if name.split()[0] not in {"me", "that", "there", "home", "next", "the", "this", "my", "a", "an", "it", "back"}:
             put("requested_destination", (lookup(name) or {}).get("name", name.title()))
     permit = re.search(r"\b(?:is|check)\s+([a-z][a-z '-]{2,80}?)\s+(?:open|closed|accessible)", lower)
     if permit:
