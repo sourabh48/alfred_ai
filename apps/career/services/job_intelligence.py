@@ -90,8 +90,8 @@ COUNTRY_ALIASES = {
 SALARY_CURRENCY_PATTERN = rf"{INR_TOKEN}|USD\b|\$|EUR\b|\u20ac|GBP\b|\u00a3"
 SALARY_BLOCK_RE = re.compile(
     rf"(?<![\w.])(?P<currency>{SALARY_CURRENCY_PATTERN})?\s*"
-    r"(?P<first>\d[\d,]*(?:\.\d+)?)\s*(?P<first_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?"
-    rf"(?:\s*(?:-|to|\u2013|\u2014)\s*(?P<second_currency>{SALARY_CURRENCY_PATTERN})?\s*(?P<second>\d[\d,]*(?:\.\d+)?)\s*(?P<second_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?)?"
+    r"(?P<first>\d(?:[\d,]*\d)?(?:\.\d+)?)\s*(?P<first_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?"
+    rf"(?:\s*(?:-|to|\u2013|\u2014)\s*(?P<second_currency>{SALARY_CURRENCY_PATTERN})?\s*(?P<second>\d(?:[\d,]*\d)?(?:\.\d+)?)\s*(?P<second_unit>(?:k|lpa|lakhs?|crore|cr|million|m)(?![A-Za-z]))?)?"
     r"(?:\s*(?P<trailing_currency>(?:INR|USD|EUR|GBP|RUPEES?|RS)\b))?(?P<rupee_dash>\s*/-)?"
     r"\s*(?P<period>(?:per\s+annum|per\s+year|/year|/yr|a\s+year|yearly|annually|annual|annum|lpa"
     r"|per\s+month|/month|/mo|a\s+month|monthly|month|pm|per\s+hour|/hour|/hr|an\s+hour|hourly"
@@ -1655,9 +1655,7 @@ class JobIntelligenceService:
             return True
         before = re.split(r"[.!?;\n]\s", text[max(0, match.start() - 60):match.start()])[-1]
         # A dot before a digit belongs to the next amount, as in "Rs. 50,000", and does not end the sentence.
-        # The number pattern can swallow a trailing comma, which still ends this amount's clause.
-        swallowed_comma = "," if match.group(0).rstrip().endswith(",") else ""
-        first_clause, *later_clauses = re.split(r"[!?;\n]|\.(?!\s*\d)", swallowed_comma + text[match.end():match.end() + 40])[0].split(",")
+        first_clause, *later_clauses = re.split(r"[!?;\n]|\.(?!\s*\d)", text[match.end():match.end() + 40])[0].split(",")
         # A pay word in a later clause with its own number describes that number, not this amount.
         return bool(SALARY_CONTEXT_RE.search(before) or SALARY_CONTEXT_RE.search(first_clause) or any(
             SALARY_CONTEXT_RE.search(clause) and not re.search(r"\d", clause) for clause in later_clauses))
