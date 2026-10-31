@@ -1,13 +1,15 @@
 from io import BytesIO
 from decimal import Decimal
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import fitz
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 
 from alfred_ai.services.pdf_recovery import RecoveredPdf
+from alfred_private_storage import private_directory
 from apps.career.models import CareerJobAnalysis, CareerResume
 from apps.expenses.models import BankAccount, Expense, StatementUpload
 from apps.expenses.services.statement_import import parse_bank_statement
@@ -22,6 +24,9 @@ from apps.reports.models import OperationalLog, SystemTicket
 
 class DocumentReviewAndRetryTests(TestCase):
     def setUp(self):
+        limits = self.enterContext(TemporaryDirectory(prefix="alfred-review-limits-"))
+        private_directory(limits)
+        self.enterContext(override_settings(ALFRED_ABUSE_THROTTLE_DIR=limits))
         user_model = get_user_model()
         self.user = user_model.objects.create_user(username="review_user", password="Pass12345!")
         self.client = Client()

@@ -14,6 +14,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
+from alfred_private_storage import private_directory
 from apps.behavioral.models import BehavioralSignal
 from apps.expenses.models import Expense
 from apps.ml_engine.auto_training import bootstrap_startup_training, should_bootstrap_training
@@ -87,6 +88,9 @@ class TrainingSampleBootstrapCommandTests(TestCase):
 
 class MLTrainingOrchestratorTests(TestCase):
     def setUp(self):
+        limits = self.enterContext(tempfile.TemporaryDirectory(prefix="alfred-ml-limits-"))
+        private_directory(limits)
+        self.enterContext(override_settings(ALFRED_ABUSE_THROTTLE_DIR=limits))
         self.artifact_root = Path(tempfile.mkdtemp(prefix="alfred-ml-tests-"))
         self.addCleanup(lambda: shutil.rmtree(self.artifact_root, ignore_errors=True))
         self.registry = _InMemoryModelRegistry()

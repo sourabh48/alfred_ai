@@ -1,12 +1,14 @@
 import json
 import socket
 from datetime import date, timedelta
+from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
-from django.test import Client, SimpleTestCase, TestCase
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 from alfred_ai.services.url_safety import validate_public_http_url
+from alfred_private_storage import private_directory
 from apps.career.services.job_intelligence import job_intelligence
 from apps.expenses.models import BankAccount, Expense
 from apps.integrations.models import EmailConnection
@@ -53,6 +55,9 @@ class SettingsHardeningTests(SimpleTestCase):
 
 class OutboundUrlSafetyTests(TestCase):
     def setUp(self):
+        limits = self.enterContext(TemporaryDirectory(prefix="alfred-outbound-limits-"))
+        private_directory(limits)
+        self.enterContext(override_settings(ALFRED_ABUSE_THROTTLE_DIR=limits))
         user_model = get_user_model()
         self.user = user_model.objects.create_user(username="career_user", password="Pass12345!")
         self.client = Client()

@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, TransactionTestCase, override_settings
 
+from alfred_private_storage import private_directory
 from apps.mobility.models import BikeDocument, BikeProfile, BikeServiceRecord
 from apps.mobility.services.bike_document_ai import ParsedDocument
 
@@ -25,7 +26,10 @@ def synthetic_service_pdf():
 class ServiceImportReceiptTests(TestCase):
     def setUp(self):
         self.media = Path(self.enterContext(TemporaryDirectory(prefix="alfred-invoice-test-")))
-        self.enterContext(override_settings(MEDIA_ROOT=str(self.media), ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=True))
+        limits = self.enterContext(TemporaryDirectory(prefix="alfred-invoice-limits-"))
+        private_directory(limits)
+        self.enterContext(override_settings(MEDIA_ROOT=str(self.media), ALFRED_ABUSE_THROTTLE_DIR=limits,
+            ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=True))
         self.owner = get_user_model().objects.create_user(username="invoice_receipt_owner")
         self.other = get_user_model().objects.create_user(username="invoice_receipt_private")
         self.profile = BikeProfile.objects.create(user=self.owner, display_name="Synthetic Scooter", vehicle_number="KA05MN4321")
@@ -152,7 +156,7 @@ class ServiceImportConcurrencyTests(TransactionTestCase):
     def test_simultaneous_imports_post_one_log_and_can_replay_after_conflict(self):
         from concurrent.futures import ThreadPoolExecutor
         from threading import Barrier
-        from django.db import close_old_connections
+        from django.db import close_old_connections, connection
         from rest_framework.test import APIRequestFactory, force_authenticate
         from apps.mobility.views import BikeServiceImportView
         barrier=Barrier(2)
@@ -163,6 +167,10 @@ class ServiceImportConcurrencyTests(TransactionTestCase):
         def send():
             close_old_connections()
             try:
+                # Shared-cache memory SQLite fails a read of a table another connection is writing, at once
+                # and without the busy timeout. The WAL file ALFRED runs on never blocks that read.
+                with connection.cursor() as cursor:
+                    cursor.execute("PRAGMA read_uncommitted=ON")
                 request=APIRequestFactory().post("/api/mobility/bike-services/import/", {
                     "bike_profile_id":self.profile.pk,
                     "service_file":SimpleUploadedFile("same.pdf",b"%PDF-1.4 same concurrent source",content_type="application/pdf"),

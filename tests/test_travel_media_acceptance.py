@@ -12,6 +12,7 @@ from django.utils import timezone
 from PIL import Image
 from PIL.TiffImagePlugin import IFDRational
 
+from alfred_private_storage import private_directory
 from apps.mobility.models import TravelPlan, TravelPreferenceProfile, TripPhoto
 
 
@@ -29,7 +30,9 @@ def synthetic_trip_jpeg(date, *, timestamp=None, latitude_ref="N", latitude=(12,
 class TravelMediaAcceptanceTests(TestCase):
     def setUp(self):
         self.media = Path(self.enterContext(TemporaryDirectory(prefix="alfred-synthetic-media-")))
-        self.enterContext(override_settings(MEDIA_ROOT=str(self.media)))
+        limits = self.enterContext(TemporaryDirectory(prefix="alfred-synthetic-media-limits-"))
+        private_directory(limits)
+        self.enterContext(override_settings(MEDIA_ROOT=str(self.media), ALFRED_ABUSE_THROTTLE_DIR=limits))
         self.enterContext(patch("apps.mobility.services.travel.providers.base.request", side_effect=AssertionError("Private media must stay local")))
         self.user = get_user_model().objects.create_user("synthetic_media_owner")
         self.other = get_user_model().objects.create_user("synthetic_media_other")

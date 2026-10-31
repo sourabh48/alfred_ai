@@ -1,9 +1,11 @@
 """Real subprocess exits must agree with source-bound native assertion receipts."""
 import json
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 import threading
 import time
+from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
@@ -119,8 +121,19 @@ class NativeProbeRunnerTests(SimpleTestCase):
         self.assertFalse(thread.is_alive())
 
     def test_timeout_never_accepts_early_passed_json(self):
-        result = self.run_mode('timeout', timeout=2)
+        # The deadline must expire after the early report, however slowly a loaded machine starts the child.
+        report = self.folder / 'run-timeout' / 'child.json'
+        real_wait = subprocess.Popen.wait
+
+        def wait_after_report(process, timeout=None):
+            while str(self.script) in process.args and not report.exists() and process.poll() is None:
+                time.sleep(.05)
+            return real_wait(process, timeout)
+
+        with patch.object(subprocess.Popen, 'wait', wait_after_report):
+            result = self.run_mode('timeout', timeout=2)
         self.assertFalse(result['passed'])
+        self.assertEqual(result['failure'], 'child_timeout')
         self.assertTrue(result['process']['timed_out'])
         self.assertIsNotNone(result['process']['exit'])
         self.assertTrue(result['cleanup']['verified'])

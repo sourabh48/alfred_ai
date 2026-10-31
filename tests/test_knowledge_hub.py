@@ -210,6 +210,9 @@ class KnowledgeHubTests(KnowledgeFixture, TestCase):
 class KnowledgeGitTests(KnowledgeFixture, TestCase):
     def setUp(self):
         super().setUp()
+        # Real Git on a loaded machine must not race the 5s production budget; these tests check content, not time.
+        for module in ('knowledge_git', 'knowledge_hub'):
+            self.enterContext(patch(f'apps.ml_engine.services.{module}.remaining', return_value=60))
         self.remote = self.root / 'synthetic-existing.git'
         subprocess.run(['git', 'init', '--bare', str(self.remote)], check=True, capture_output=True)
         self.provider = GitKnowledgeProvider(self.root / 'git-cache', str(self.remote), authorized=True, local_fixture=True)

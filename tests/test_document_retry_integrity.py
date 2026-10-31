@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
+from alfred_private_storage import private_directory
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services.resume_intelligence import ParsedResume
 from apps.expenses.models import StatementUpload
@@ -22,7 +23,9 @@ class DocumentRetryIntegrityTests(TestCase):
     def setUp(self):
         media = TemporaryDirectory()
         self.addCleanup(media.cleanup)
-        settings = override_settings(MEDIA_ROOT=media.name)
+        limits = self.enterContext(TemporaryDirectory(prefix="alfred-retry-limits-"))
+        private_directory(limits)
+        settings = override_settings(MEDIA_ROOT=media.name, ALFRED_ABUSE_THROTTLE_DIR=limits)
         settings.enable()
         self.addCleanup(settings.disable)
         self.user = get_user_model().objects.create_user(username="retry-integrity")

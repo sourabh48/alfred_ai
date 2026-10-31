@@ -38,7 +38,9 @@ class LoanDiagnosticTests(TestCase):
         self.directory = Path(directory)
         from alfred_private_storage import private_directory
         private_directory(self.directory)
+        limits = private_directory(self.directory / "limits")
         self.enterContext(override_settings(MEDIA_ROOT=directory, FILE_UPLOAD_TEMP_DIR=directory,
+                                           ALFRED_ABUSE_THROTTLE_DIR=str(limits),
                                            ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=False))
         self.user = get_user_model().objects.create_user(username="m14f", password="Synthetic-X8!Lantern")
         self.client.force_login(self.user)

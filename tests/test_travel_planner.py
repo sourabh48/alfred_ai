@@ -1,14 +1,16 @@
 import json
 from copy import deepcopy
 from datetime import date, datetime, timedelta
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as ModelValidationError
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
+from alfred_private_storage import private_directory
 from apps.mobility.models import (BikeProfile, TravelPlan, TravelPlanningSession, TravelPreferenceProfile,
                                   TravelResearchEvidence, TravelResearchSession, TripLog, TripPhoto)
 from apps.mobility.services.travel_conversation import extract, new_session, save_plan, send_message
@@ -27,6 +29,9 @@ def weather_fixture(*args, **kwargs):
 
 class TravelPlannerTests(TestCase):
     def setUp(self):
+        limits = self.enterContext(TemporaryDirectory(prefix="alfred-travel-limits-"))
+        private_directory(limits)
+        self.enterContext(override_settings(ALFRED_ABUSE_THROTTLE_DIR=limits))
         self.user = get_user_model().objects.create_user("travel_test", password="Test12345!", city="Bengaluru")
         self.other = get_user_model().objects.create_user("other_traveller", password="Test12345!")
         self.client.force_login(self.user)
@@ -443,6 +448,9 @@ class TravelMigrationTests(TransactionTestCase):
         before=("mobility","0008_bikeservicerecord_source_document")
         after=("mobility","0012_travel_bus_mode")
         executor=MigrationExecutor(connection)
+        # Later TransactionTestCases need the current schema, and "after" is no longer the leaf.
+        leaves=executor.loader.graph.leaf_nodes()
+        self.addCleanup(lambda:MigrationExecutor(connection).migrate(leaves))
         executor.migrate([before])
         old=executor.loader.project_state([before]).apps
         try:

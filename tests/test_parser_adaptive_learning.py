@@ -1,15 +1,21 @@
+from tempfile import TemporaryDirectory
+
 import fitz
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 
 from alfred_ai.services.parser_learning import apply_parser_learning, record_parser_learning
+from alfred_private_storage import private_directory
 from apps.ml_engine.models import DocumentParserLearningMemory
 
 
 class ParserAdaptiveLearningTests(TestCase):
     def setUp(self):
+        limits = self.enterContext(TemporaryDirectory(prefix="alfred-parser-limits-"))
+        private_directory(limits)
+        self.enterContext(override_settings(ALFRED_ABUSE_THROTTLE_DIR=limits))
         user_model = get_user_model()
         self.user = user_model.objects.create_user(username="parser_user", password="Pass12345!")
         self.client = Client()

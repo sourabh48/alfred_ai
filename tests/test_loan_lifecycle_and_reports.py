@@ -2,12 +2,14 @@ import json
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
+from tempfile import TemporaryDirectory
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
+from alfred_private_storage import private_directory
 from apps.expenses.models import BankAccount, Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
 from apps.investments.models import Investment
@@ -22,6 +24,9 @@ from apps.reports.models import OperationalLog, SystemTicket
 
 class LoanLifecycleTests(TestCase):
     def setUp(self):
+        limits = self.enterContext(TemporaryDirectory(prefix="alfred-loan-lifecycle-limits-"))
+        private_directory(limits)
+        self.enterContext(override_settings(ALFRED_ABUSE_THROTTLE_DIR=limits))
         user_model = get_user_model()
         self.user = user_model.objects.create_user(username="loan_user", password="Pass12345!")
         self.user.monthly_income = 100000

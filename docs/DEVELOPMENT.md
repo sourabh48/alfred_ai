@@ -58,6 +58,12 @@ Use a disposable checkout/data folder for wider integration work. Browser tests
 are intentionally separate from the normal backend run; skipped browser cases
 in that run are not browser verification.
 
+Travel calendar tests skip until the pinned independent ICAL.js parser is present.
+It is a test tool, ignored by Git and never loaded by ALFRED. Install it once per
+checkout, from a network-enabled machine, with the commands in the "Prepare pinned
+independent calendar test parser" step of `.github/workflows/browser-regression.yml`.
+The release gate rejects skipped backend tests, so a skip here is not verification.
+
 ## Browser checks
 
 ```powershell

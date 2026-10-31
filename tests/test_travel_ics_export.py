@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+from unittest import SkipTest
 
 from django.test import Client, TestCase
 
@@ -15,6 +16,9 @@ from tests import test_travel_pdf_export as fixtures
 
 
 def parse_calendar(content):
+    # Never fetched from a test. The release gate rejects skips, so CI cannot pass without the tool.
+    if not Path(__file__).resolve().parents[1].joinpath('artifacts/tools/ical/package/dist/ical.es5.cjs').is_file():
+        raise SkipTest('Calendar test parser is not installed; see Backend checks in docs/DEVELOPMENT.md.')
     result=subprocess.run(['node',str(Path(__file__).with_name('ics_parser.cjs'))],input=content,
         capture_output=True,timeout=30)
     if result.returncode:

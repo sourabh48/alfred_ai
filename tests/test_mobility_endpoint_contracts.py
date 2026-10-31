@@ -1,18 +1,23 @@
 import json
 from datetime import date, datetime
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
+from alfred_private_storage import private_directory
 from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto
 from apps.mobility.services.bike_document_ai import ParsedDocument
 
 
 class MobilityEndpointContractTests(TestCase):
     def setUp(self):
+        limits = self.enterContext(TemporaryDirectory(prefix="alfred-mobility-limits-"))
+        private_directory(limits)
+        self.enterContext(override_settings(ALFRED_ABUSE_THROTTLE_DIR=limits))
         user_model = get_user_model()
         self.user = user_model.objects.create_user(username="mobility_contract", password="Pass12345!")
         self.client = Client()
