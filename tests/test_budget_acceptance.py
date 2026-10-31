@@ -15,7 +15,7 @@ from apps.expenses.models import Expense
 class BudgetAcceptanceTests(TestCase):
     def setUp(self):
         cache.clear()
-        self.owner = get_user_model().objects.create_user("budget_acceptance_owner", monthly_income="1200000", rent_or_emi="10000")
+        self.owner = get_user_model().objects.create_user("budget_acceptance_owner", monthly_income="1200000", monthly_income_basis="annual", rent_or_emi="10000")
         self.other = get_user_model().objects.create_user("budget_acceptance_other")
         self.owner.refresh_from_db()
         self.other.refresh_from_db()

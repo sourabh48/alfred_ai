@@ -39,7 +39,7 @@ def _get_profile(user):
             "role": "Profile pending",
             "experience_years": 0,
             "skills": "",
-            "last_salary": getattr(user, "monthly_income", 0) or 0,
+            "last_salary": user.confirmed_monthly_income,
         },
     )
     return profile

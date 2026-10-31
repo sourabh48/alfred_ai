@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import User
+from .models import IncomeBasis, User
 from apps.expenses.money import LIMIT
 
 
@@ -12,6 +12,10 @@ class AlfredSignUpForm(UserCreationForm):
     city = forms.CharField(required=False, max_length=100)
     country = forms.CharField(required=False, max_length=100)
     monthly_income = forms.DecimalField(required=False, min_value=0, max_value=LIMIT, max_digits=14, decimal_places=2)
+    monthly_income_basis = forms.ChoiceField(
+        required=False, initial=IncomeBasis.MONTHLY,
+        choices=[(IncomeBasis.MONTHLY, IncomeBasis.MONTHLY.label), (IncomeBasis.ANNUAL, IncomeBasis.ANNUAL.label)],
+    )
     variable_income = forms.DecimalField(required=False, min_value=0, max_value=LIMIT, max_digits=14, decimal_places=2)
     rent_or_emi = forms.DecimalField(required=False, min_value=0, max_value=LIMIT, max_digits=14, decimal_places=2)
 
@@ -25,6 +29,7 @@ class AlfredSignUpForm(UserCreationForm):
             "city",
             "country",
             "monthly_income",
+            "monthly_income_basis",
             "variable_income",
             "rent_or_emi",
             "password1",
@@ -34,7 +39,7 @@ class AlfredSignUpForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name, field in self.fields.items():
-            css_class = "form-control"
+            css_class = "form-select" if name == "monthly_income_basis" else "form-control"
             if name in {"password1", "password2"}:
                 field.help_text = ""
             field.widget.attrs["class"] = css_class
@@ -48,6 +53,7 @@ class AlfredSignUpForm(UserCreationForm):
         user.city = self.cleaned_data.get("city", "")
         user.country = self.cleaned_data.get("country", "")
         user.monthly_income = self.cleaned_data.get("monthly_income") or 0
+        user.monthly_income_basis = self.cleaned_data.get("monthly_income_basis") or IncomeBasis.MONTHLY
         user.variable_income = self.cleaned_data.get("variable_income") or 0
         user.rent_or_emi = self.cleaned_data.get("rent_or_emi") or 0
         if commit:

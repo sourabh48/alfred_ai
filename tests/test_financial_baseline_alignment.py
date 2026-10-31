@@ -42,6 +42,7 @@ class FinancialBaselineAlignmentTests(TestCase):
             username="baseline_user",
             password="Pass12345!",
             monthly_income=1200000,
+            monthly_income_basis="annual",
             variable_income=60000,
             rent_or_emi=25000,
             city="Bengaluru",
@@ -433,11 +434,12 @@ class CanonicalFinancialBaselineEdgeCaseTests(TestCase):
         cache.clear()
         self.user_model = get_user_model()
 
-    def _create_user(self, username: str, *, monthly_income=0, rent_or_emi=0):
+    def _create_user(self, username: str, *, monthly_income=0, rent_or_emi=0, monthly_income_basis="monthly"):
         return self.user_model.objects.create_user(
             username=username,
             password="Pass12345!",
             monthly_income=monthly_income,
+            monthly_income_basis=monthly_income_basis,
             rent_or_emi=rent_or_emi,
         )
 
@@ -482,7 +484,7 @@ class CanonicalFinancialBaselineEdgeCaseTests(TestCase):
         self.assertEqual(salary_baseline["income_source"], "salary_credits")
         self.assertEqual(salary_baseline["metric_states"]["monthly_income"]["status"], "observed")
 
-        ctc_user = self._create_user("annual_ctc_only", monthly_income=720000)
+        ctc_user = self._create_user("annual_ctc_only", monthly_income=720000, monthly_income_basis="annual")
         ctc_baseline = resolve_canonical_financial_baseline(ctc_user)
         self.assertEqual(ctc_baseline["monthly_income"], 60000.0)
         self.assertEqual(ctc_baseline["annual_income"], 720000.0)
@@ -539,7 +541,7 @@ class CanonicalFinancialBaselineEdgeCaseTests(TestCase):
         self.assertEqual(baseline["metric_states"]["debt_burden_ratio"]["status"], "unavailable")
 
     def test_rent_multiple_emis_negative_savings_and_zero_liquidity_use_one_formula(self):
-        user = self._create_user("negative_savings", monthly_income=720000, rent_or_emi=20000)
+        user = self._create_user("negative_savings", monthly_income=720000, rent_or_emi=20000, monthly_income_basis="annual")
         self._loan(user, emi=12000, balance=240000)
         self._loan(user, emi=10000, balance=180000)
         BankAccount.objects.create(
@@ -565,7 +567,7 @@ class CanonicalFinancialBaselineEdgeCaseTests(TestCase):
         self.assertEqual(baseline["liquid_runway_months"], 0.0)
 
     def test_debt_free_zero_liabilities_and_asset_liability_changes_stay_consistent(self):
-        user = self._create_user("debt_free_assets", monthly_income=600000)
+        user = self._create_user("debt_free_assets", monthly_income=600000, monthly_income_basis="annual")
         BankAccount.objects.create(
             user=user,
             bank_name="Cash Bank",

@@ -35,7 +35,7 @@ from apps.mobility.models import (
 from apps.relationship.models import RelationshipProfile
 from apps.reports.models import ChatGPTImport, GeneratedReport, OperationalLog, SystemTicket
 from apps.risk.models import RiskSignal
-from .models import UserMoneySnapshot
+from .models import IncomeBasis, UserMoneySnapshot
 
 
 logger = logging.getLogger(__name__)
@@ -200,7 +200,8 @@ def clear_user_fed_data(user) -> dict:
         user.rent_or_emi = 0
         user.city = ""
         user.country = ""
-        user.save(update_fields=["monthly_income", "variable_income", "rent_or_emi", "city", "country"])
+        user.monthly_income_basis = IncomeBasis.MONTHLY
+        user.save(update_fields=["monthly_income", "monthly_income_basis", "variable_income", "rent_or_emi", "city", "country"])
 
     _delete_storage_files(file_names)
     _delete_generated_report_paths(generated_paths)

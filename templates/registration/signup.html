@@ -100,8 +100,12 @@
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label" for="{{ form.monthly_income.id_for_label }}">Monthly income</label>
+                    <label class="form-label" for="{{ form.monthly_income.id_for_label }}">Income</label>
                     {{ form.monthly_income }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="{{ form.monthly_income_basis.id_for_label }}">Income period</label>
+                    {{ form.monthly_income_basis }}
                 </div>
                 <div class="col-md-4">
                     <label class="form-label" for="{{ form.variable_income.id_for_label }}">Variable income</label>

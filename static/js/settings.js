@@ -51,6 +51,7 @@ function renderSettingsProfile(profile = {}) {
         "variable_income",
         "rent_or_emi",
     ];
+    form.elements.monthly_income_basis.value = profile.monthly_income_basis === "unconfirmed" ? "" : profile.monthly_income_basis ?? "";
     fields.forEach(field => {
         if (form.elements[field]) {
             form.elements[field].value = profile[field] ?? "";
@@ -67,6 +68,9 @@ function submitProfileForm(event) {
     ["monthly_income", "variable_income", "rent_or_emi"].forEach(field => {
         payload[field] = Number(payload[field] || 0);
     });
+    if (!payload.monthly_income_basis) {
+        delete payload.monthly_income_basis;
+    }
 
     Alfred.fetchJSON("/api/users/profile/", {
         method: "PATCH",

@@ -49,15 +49,23 @@
                         <label class="form-label" for="settingsCountry">Country</label>
                         <input id="settingsCountry" name="country" class="form-control" autocomplete="country-name">
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="settingsMonthlyIncome">Monthly Income</label>
+                    <div class="col-md-3">
+                        <label class="form-label" for="settingsMonthlyIncome">Income</label>
                         <input id="settingsMonthlyIncome" name="monthly_income" type="number" min="0" step="0.01" class="form-control">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <label class="form-label" for="settingsMonthlyIncomeBasis">Income period</label>
+                        <select id="settingsMonthlyIncomeBasis" name="monthly_income_basis" class="form-select">
+                            <option value="">Choose a period</option>
+                            <option value="monthly">Per month</option>
+                            <option value="annual">Per year</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label" for="settingsVariableIncome">Variable Income</label>
                         <input id="settingsVariableIncome" name="variable_income" type="number" min="0" step="0.01" class="form-control">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label" for="settingsRentOrEmi">Monthly Housing Cost</label>
                         <input id="settingsRentOrEmi" name="rent_or_emi" type="number" min="0" step="0.01" class="form-control">
                         <div class="form-text">Exclude EMIs already recorded under Loans; those are counted separately.</div>
@@ -124,7 +132,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/settings.js?v=1.3"></script>
+<script src="/static/js/settings.js?v=1.4"></script>
 <script src="/static/js/memory.js?v=5"></script>
 <link rel="stylesheet" href="/static/css/travel_planner.css?v=1">
 <script src="/static/js/travel_preferences.js?v=2"></script>

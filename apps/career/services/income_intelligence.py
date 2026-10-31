@@ -5,6 +5,7 @@ from statistics import median
 import re
 
 from apps.expenses.models import Expense
+from apps.users.models import IncomeBasis
 
 
 SALARY_KEYWORDS = (
@@ -71,12 +72,13 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None) -
     best_salary_signal = salary_candidates[0] if salary_candidates else None
 
     profile_last_salary = float(getattr(profile, "last_salary", 0) or 0)
-    reported_value = float(getattr(user, "monthly_income", 0) or profile_last_salary or 0)
+    entered_income = float(getattr(user, "monthly_income", 0) or 0)
+    reported_value = entered_income or profile_last_salary
     variable_income = float(getattr(user, "variable_income", 0) or 0)
     salary_monthly = float(best_salary_signal.get("monthly_amount", 0) or 0) if best_salary_signal else 0.0
-    reported_mode = _infer_reported_income_mode(reported_value, salary_monthly)
-    reported_monthly_equivalent = round(reported_value / 12, 2) if reported_mode == "annual_ctc" else round(reported_value, 2)
-    monthly_cash_income = round(salary_monthly or reported_monthly_equivalent or profile_last_salary, 2)
+    reported_mode = _reported_income_mode(reported_value, entered_income, user.monthly_income_basis)
+    reported_monthly_equivalent = {"annual_ctc": round(reported_value / 12, 2), "monthly": round(reported_value, 2)}.get(reported_mode, 0.0)
+    monthly_cash_income = round(salary_monthly or reported_monthly_equivalent, 2)
 
     annualized_compensation = round(monthly_cash_income * 12, 2)
     if reported_mode == "annual_ctc" and reported_value > 0:
@@ -90,7 +92,9 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None) -
 
     current_employer = resume_employer or str(best_salary_signal.get("employer", "") if best_salary_signal else "").strip()
     employer_source = "resume" if resume_employer else ("salary_credit" if best_salary_signal else "not_evidenced")
-    salary_source = "salary_credits" if salary_monthly else ("reported_annual_ctc" if reported_mode == "annual_ctc" else ("reported_monthly_income" if reported_value else "not_evidenced"))
+    salary_source = "salary_credits" if salary_monthly else {
+        "annual_ctc": "reported_annual_ctc", "monthly": "reported_monthly_income", "unconfirmed": "reported_income_unconfirmed",
+    }.get(reported_mode, "not_evidenced")
     source_summary = _build_source_summary(
         employer=current_employer,
         employer_source=employer_source,
@@ -265,16 +269,14 @@ def _normalize_employer_key(value: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9 ]", " ", str(value or "").upper())).strip()
 
 
-def _infer_reported_income_mode(reported_value: float, salary_monthly: float) -> str:
+def _reported_income_mode(reported_value: float, entered_income: float, basis: str) -> str:
+    """The owner states the period; an amount's size never decides it."""
     if reported_value <= 0:
         return "absent"
-    if salary_monthly > 0:
-        monthly_gap = abs(reported_value - salary_monthly) / max(salary_monthly, 1)
-        annual_gap = abs((reported_value / 12) - salary_monthly) / max(salary_monthly, 1)
-        if reported_value >= 300000 and annual_gap < monthly_gap:
-            return "annual_ctc"
-        return "monthly"
-    return "annual_ctc" if reported_value >= 300000 else "monthly"
+    if basis == IncomeBasis.UNCONFIRMED:
+        return "unconfirmed"
+    # The basis describes the entered income. A career profile's current income is monthly.
+    return "annual_ctc" if entered_income and basis == IncomeBasis.ANNUAL else "monthly"
 
 
 def _build_source_summary(*, employer: str, employer_source: str, salary_source: str, salary_signal: dict | None, reported_mode: str) -> str:
@@ -291,6 +293,8 @@ def _build_source_summary(*, employer: str, employer_source: str, salary_source:
         parts.append("Monthly cash income falls back to the reported annual CTC because no recurring salary credit pattern is evidenced yet.")
     elif salary_source == "reported_monthly_income":
         parts.append("Monthly cash income falls back to the reported income field because no recurring salary credit pattern is evidenced yet.")
+    if reported_mode == "unconfirmed":
+        parts.append("The entered income is not used until you confirm in Settings whether it is per month or per year.")
     if reported_mode == "annual_ctc":
         parts.append("The reported income input is being treated as annual CTC, not monthly take-home.")
     return " ".join(parts[:3]).strip()

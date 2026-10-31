@@ -89,6 +89,7 @@ def _integration_dashboard_revision(user) -> str:
             getattr(user, "city", ""),
             getattr(user, "city_type", ""),
             getattr(user, "monthly_income", ""),
+            getattr(user, "monthly_income_basis", ""),
             getattr(user, "rent_or_emi", ""),
         )
     )

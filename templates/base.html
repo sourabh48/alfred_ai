@@ -46,6 +46,9 @@
         {% else %}
         <main class="col-12 px-3 px-lg-4 py-4 alfred-main alfred-main-wide" id="alfredMainScroll" tabindex="-1">
         {% endif %}
+            {% if user.is_authenticated and user.income_basis_needs_confirmation %}
+            <div class="alert alert-warning" role="status" id="incomeBasisNotice">Your entered income is unverified and is not used until you confirm whether it is per month or per year. <a href="/settings/" class="alert-link">Confirm in Settings</a></div>
+            {% endif %}
             {% block content %}{% endblock %}
             <footer class="mt-4 pt-3 border-top small text-muted">
                 Alfred - Finance Assistant · © 2026 Life on our Trails. All rights reserved.

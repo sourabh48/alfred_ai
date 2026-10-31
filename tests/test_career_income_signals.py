@@ -16,6 +16,7 @@ class CareerIncomeSignalsTests(TestCase):
             username="career_income_user",
             password="Pass12345!",
             monthly_income=1800000,
+            monthly_income_basis="annual",
             variable_income=60000,
             city="Bengaluru",
         )

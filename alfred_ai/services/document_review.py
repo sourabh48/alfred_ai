@@ -521,7 +521,7 @@ def _apply_resume_profile(user, parsed) -> None:
             "role": "Profile pending",
             "experience_years": 0,
             "skills": "",
-            "last_salary": getattr(user, "monthly_income", 0) or 0,
+            "last_salary": user.confirmed_monthly_income,
         },
     )
     resume_intelligence.apply_to_profile(profile, parsed)

@@ -42,7 +42,7 @@ def train_relationship_model():
 
 
 def _row(item: RelationshipProfile) -> dict:
-    monthly_income = float(getattr(item.user, "monthly_income", 0) or 0)
+    monthly_income = float(item.user.confirmed_monthly_income)
     return {
         "partner_financial_score": float(item.partner_financial_score or 0),
         "partner_savings_habits": float(item.partner_savings_habits or 0),

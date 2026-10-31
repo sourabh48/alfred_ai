@@ -91,7 +91,8 @@ class UserMoneyMigrationTests(TransactionTestCase):
     def test_existing_account_password_groups_session_and_original_values_survive(self):
         group = self.old.get_model('auth', 'Group').objects.create(name='synthetic-owner-role')
         self.owner.groups.add(group)
-        self.client.force_login(get_user_model().objects.get(pk=self.owner.pk))
+        # The live model has fields newer than this historical schema.
+        self.client.force_login(get_user_model().objects.defer('monthly_income_basis').get(pk=self.owner.pk))
         key = self.client.session.session_key
         before = self.old.get_model('users', 'User').objects.values().get(pk=self.owner.pk)
         apps = self.upgrade()
@@ -107,7 +108,7 @@ class UserMoneyMigrationTests(TransactionTestCase):
         self.assertIsNotNone(snapshot.applied_at)
         after = apps.get_model('users', 'User').objects.values().get(pk=row.pk)
         self.assertEqual({field: value for field, value in before.items() if field not in FIELDS},
-                         {field: value for field, value in after.items() if field not in FIELDS})
+                         {field: value for field, value in after.items() if field not in (*FIELDS, 'monthly_income_basis')})
         MigrationExecutor(connection).migrate(self.old_targets)
         restored = self.old.get_model('users', 'User').objects.get(pk=row.pk)
         self.assertEqual(tuple(getattr(restored, field) for field in FIELDS), tuple(before[field] for field in FIELDS))
@@ -155,8 +156,12 @@ class UserMoneyMigrationTests(TransactionTestCase):
 
     def test_cent_history_financial_baseline_has_zero_mismatches(self):
         self.old.get_model('users', 'User').objects.filter(pk=self.owner.pk).update(monthly_income=10000.01, variable_income=200.02, rent_or_emi=1000.03)
-        before = resolve_canonical_financial_baseline(get_user_model().objects.get(pk=self.owner.pk))
+        # The live model has fields newer than this historical schema.
+        old_owner = get_user_model().objects.defer('monthly_income_basis').get(pk=self.owner.pk)
+        old_owner.monthly_income_basis = 'monthly'
+        before = resolve_canonical_financial_baseline(old_owner)
         self.upgrade(); cache.clear()
+        get_user_model().objects.filter(pk=self.owner.pk).update(monthly_income_basis='monthly')
         after = resolve_canonical_financial_baseline(get_user_model().objects.get(pk=self.owner.pk))
         self.assertEqual(before, after)
 

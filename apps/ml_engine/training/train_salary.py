@@ -30,6 +30,8 @@ def train_salary_model() -> dict:
         return _skip("No user profiles exist yet.", sample_count=0)
 
     df = df.fillna({"monthly_income": 0, "variable_income": 0, "rent_or_emi": 0, "city": ""}).copy()
+    df = df[df["monthly_income_basis"] != "unconfirmed"].copy()
+    df["monthly_income"] = df["monthly_income"].astype(float).where(df["monthly_income_basis"] != "annual", df["monthly_income"].astype(float) / 12)
     df = df[df["monthly_income"] > 0]
     sample_count = len(df)
     if sample_count < 8:

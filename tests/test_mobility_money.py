@@ -268,7 +268,7 @@ class MobilityMoneyMigrationTests(TransactionTestCase):
                 db.settings_dict['NAME'] = str(candidate)
                 executor = MigrationExecutor(db)
                 self.assertEqual(sorted((migration.app_label, migration.name, reverse) for migration, reverse in executor.migration_plan(self.leaves)),
-                    [('career', '0005_career_salary_decimal', False), ('mobility', '0013_mobility_money_decimal', False), ('users', '0003_user_money_decimal', False)])
+                    [('career', '0005_career_salary_decimal', False), ('mobility', '0013_mobility_money_decimal', False), ('users', '0003_user_money_decimal', False), ('users', '0004_user_monthly_income_basis', False)])
                 executor.migrate(self.leaves); db.close()
                 after, _ = read_database(candidate)
                 profile_fields = {'users_user': ('monthly_income', 'variable_income', 'rent_or_emi'),
@@ -282,7 +282,7 @@ class MobilityMoneyMigrationTests(TransactionTestCase):
                     for original in before[table]:
                         updated = current[original['id']]
                         self.assertEqual(table_digest([{k:v for k,v in original.items() if k not in fields}]),
-                                         table_digest([{k:v for k,v in updated.items() if k not in fields}]))
+                                         table_digest([{k:v for k,v in updated.items() if k not in fields and k != 'monthly_income_basis'}]))
                         for field in fields:
                             self.assertEqual(Decimal(str(original[field])), Decimal(str(updated[field])))
                 for name, fields in FIELDS.items():

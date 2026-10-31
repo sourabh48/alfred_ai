@@ -125,7 +125,7 @@ class TaxOptimizerService:
         """
         policy = get_policy('old', **policy_options)
         if annual_income is None:
-            annual_income = (getattr(user, 'monthly_income', 0) or 0) * 12
+            annual_income = user.confirmed_annual_income
 
         # Calculate current deductions
         current_deductions = deductions if deductions is not None else self._calculate_current_deductions(

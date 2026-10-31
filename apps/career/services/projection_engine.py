@@ -135,8 +135,6 @@ def build_projection_inputs(user, profile, *, latest_resume=None, overrides: dic
         overrides.get(
             "monthly_income",
             resolved_income_signals.get("monthly_cash_income")
-            or getattr(user, "monthly_income", 0)
-            or profile.last_salary
             or 0,
         )
         or 0

@@ -312,7 +312,7 @@ def _financial_revision(user) -> str:
         str(value or "")
         for value in [
             "expense-bank-money-v2-safe-loan-diagnostics",
-            user.monthly_income, user.variable_income, user.rent_or_emi, user.city,
+            user.monthly_income, user.monthly_income_basis, user.variable_income, user.rent_or_emi, user.city,
             expense_meta["count"], expense_meta["max_id"], expense_meta["max_date"],
             loan_meta["count"], loan_meta["max_id"], loan_meta["max_updated"],
             payment_meta["count"], payment_meta["max_id"], payment_meta["max_date"], payment_meta["max_created"],
@@ -546,6 +546,7 @@ def _empty_canonical_financial_baseline() -> dict:
         "monthly_income": 0.0,
         "annual_income": 0.0,
         "income_source": "not_evidenced",
+        "income_basis_needs_confirmation": False,
         "income_source_summary": "ALFRED needs salary credits, a reported income baseline, or other credit history before it can set a monthly income baseline.",
         "supplemental_variable_income": 0.0,
         "observed_average_monthly_inflow": 0.0,
@@ -626,8 +627,11 @@ def _build_canonical_financial_baseline_uncached(
     monthly_income_amount = _decimal_amount(income_signals.get("monthly_cash_income", 0) or 0)
     income_source = "not_evidenced"
     income_source_summary = income_signals.get("source_summary") or ""
+    income_unconfirmed = reported_income.get("mode") == "unconfirmed"
     if salary_signal:
         income_source = "salary_credits"
+    elif income_unconfirmed:
+        income_source = "reported_income_unconfirmed"
     elif _decimal_amount(reported_income.get("value", 0) or 0) > 0:
         income_source = "reported_annual_ctc" if reported_income.get("mode") == "annual_ctc" else "reported_monthly_income"
     elif profile_last_salary > 0:
@@ -816,6 +820,7 @@ def _build_canonical_financial_baseline_uncached(
         "monthly_income": _money_float(monthly_income_amount),
         "annual_income": _money_float(annual_income_amount),
         "income_source": income_source,
+        "income_basis_needs_confirmation": income_unconfirmed,
         "income_source_summary": income_source_summary or _empty_canonical_financial_baseline()["income_source_summary"],
         "supplemental_variable_income": _money_float(supplemental_variable_income_amount),
         "observed_average_monthly_inflow": _money_float(observed_average_monthly_inflow_amount),

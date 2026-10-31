@@ -44,6 +44,7 @@ class UserProfileApiTests(TestCase):
                 "last_name",
                 "email",
                 "monthly_income",
+                "monthly_income_basis",
                 "variable_income",
                 "rent_or_emi",
                 "city",

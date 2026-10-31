@@ -174,6 +174,44 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#relationshipFactorCards article')), 0)
         self.assertEqual(self.browser.find_element(self.By.ID, 'partnerFinancialScore').get_attribute('max'), '100')
 
+    def test_unconfirmed_income_is_flagged_until_the_owner_chooses_a_period(self):
+        from decimal import Decimal
+        from selenium.webdriver.support.ui import Select
+        from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+        owner = self.scenario['user']
+        amount = Decimal('300000.00')
+        type(owner).objects.filter(pk=owner.pk).update(monthly_income=amount, monthly_income_basis='unconfirmed')
+        self.login()
+        self.browser.get(self.live_server_url + '/settings/')
+        self.wait.until(lambda _: self.text('settingsProfileStatus') == 'Synced')
+        self.assertIn('unverified', self.text('incomeBasisNotice'))
+        period = Select(self.browser.find_element(self.By.ID, 'settingsMonthlyIncomeBasis'))
+        self.assertEqual(period.first_selected_option.get_attribute('value'), '')
+
+        # Saving other details without a period must not confirm it.
+        self.memory_click('#accountProfileForm button[type=submit]')
+        self.wait.until(lambda _: 'Profile saved' in self.text('settingsProfileFeedback'))
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('settingsProfileStatus') == 'Synced')
+        self.assertIn('unverified', self.text('incomeBasisNotice'))
+
+        period = Select(self.browser.find_element(self.By.ID, 'settingsMonthlyIncomeBasis'))
+        period.select_by_value('annual')
+        self.memory_click('#accountProfileForm button[type=submit]')
+        self.wait.until(lambda _: 'Profile saved' in self.text('settingsProfileFeedback'))
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('settingsProfileStatus') == 'Synced')
+        self.assertFalse(self.browser.find_elements(self.By.ID, 'incomeBasisNotice'))
+        period = Select(self.browser.find_element(self.By.ID, 'settingsMonthlyIncomeBasis'))
+        self.assertEqual(period.first_selected_option.get_attribute('value'), 'annual')
+        self.assertEqual(Decimal(self.browser.find_element(self.By.ID, 'settingsMonthlyIncome').get_attribute('value')), amount)
+        self.capture('income-basis-confirmed')
+        self.browser.get('about:blank')
+        owner.refresh_from_db()
+        self.assertEqual((owner.monthly_income, owner.monthly_income_basis), (amount, 'annual'))
+        baseline = resolve_canonical_financial_baseline(owner)
+        self.assertFalse(baseline['income_basis_needs_confirmation'])
+
     def test_career_discovery_marks_cached_leads_and_recovers_without_unsafe_links(self):
         from apps.career.models import CareerProfile
         from apps.career.services.job_intelligence import JobIntelligenceService, job_intelligence
@@ -3648,7 +3686,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda driver: driver.find_elements(self.By.CSS_SELECTOR, selector))
         self.assertIn("Share my financial summary", self.text("settingsLinkedAccountsList"))
         self.assertEqual(family_financial_user_ids(member), [member.pk])
-        self.browser.find_element(self.By.CSS_SELECTOR, selector).click()
+        self.memory_click(selector)
         self.wait.until(lambda driver: driver.switch_to.alert)
         self.assertIn("monthly income", self.browser.switch_to.alert.text)
         self.browser.switch_to.alert.dismiss()
@@ -3670,7 +3708,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login()
         self.browser.get(self.live_server_url + "/settings/")
         self.wait.until(lambda _: "Stop sharing my financial summary" in self.text("settingsLinkedAccountsList"))
-        self.browser.find_element(self.By.CSS_SELECTOR, selector).click()
+        self.memory_click(selector)
         self.wait.until(lambda _: "Share my financial summary" in self.text("settingsLinkedAccountsList"))
         self.assertEqual(family_financial_user_ids(member), [member.pk])
         self.assertIn("Connected", self.text("settingsLinkedAccountsList"))
