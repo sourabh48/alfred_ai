@@ -101,7 +101,7 @@ function renderTravelAdvice(data) {
         </div>
         <div class="detail-item">
             <div class="fw-semibold mb-2">Evidence</div>
-            ${evidence.length ? evidence.map(item => `<div class="muted small mb-2">${Alfred.escapeHtml(item.source_name || "Source")} | refreshed ${Alfred.formatDateTime(item.verified_at)} | <a href="${item.source_url}" target="_blank" rel="noopener">open</a></div>`).join("") : `<div class="muted">No external evidence captured yet.</div>`}
+            ${evidence.length ? evidence.map(item => `<div class="muted small mb-2">${Alfred.escapeHtml(item.source_name || "Source")} | refreshed ${Alfred.formatDateTime(item.verified_at)} | <a href="${Alfred.safeHref(item.source_url)}" target="_blank" rel="noopener">open</a></div>`).join("") : `<div class="muted">No external evidence captured yet.</div>`}
         </div>
     `);
 }
@@ -153,7 +153,7 @@ function renderPhotoGallery(items) {
     const target = document.getElementById("tripPhotoGallery");
     Alfred.setHTMLIfChanged(target, items.length ? items.map(item => `
         <article class="photo-card">
-            <img src="${item.photo_url}" alt="${Alfred.escapeHtml(item.caption || item.travel_plan_title)}" loading="lazy">
+            <img src="${Alfred.escapeHtml(item.photo_url)}" alt="${Alfred.escapeHtml(item.caption || item.travel_plan_title)}" loading="lazy">
             <div class="photo-card-body">
                 <div class="fw-semibold">${Alfred.escapeHtml(item.caption || item.travel_plan_title)}</div>
                 <div class="muted small">${Alfred.escapeHtml(item.location_name || item.travel_plan_title)}</div>

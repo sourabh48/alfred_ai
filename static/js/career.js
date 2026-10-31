@@ -280,7 +280,7 @@ function renderCareerEvidence(items) {
             <div class="fw-semibold">${Alfred.escapeHtml(item.title || item.source_name)}</div>
             <div class="muted small">${Alfred.escapeHtml(item.source_name || "Source")} | refreshed ${Alfred.formatDateTime(item.verified_at)}</div>
             <div class="muted small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
-            <div class="mt-2"><a href="${item.source_url}" target="_blank" rel="noopener">Open source</a></div>
+            <div class="mt-2"><a href="${Alfred.safeHref(item.source_url)}" target="_blank" rel="noopener">Open source</a></div>
         </div>
     `).join("") : `<div class="empty-state">No evidence records available yet.</div>`;
 }
@@ -360,7 +360,7 @@ function renderResumePanel(resume) {
         ? `<div class="d-flex flex-wrap gap-2 mt-2">${payload.skills.slice(0, 16).map(skill => `<span class="status-pill neutral">${Alfred.escapeHtml(skill)}</span>`).join("")}</div>`
         : `<div class="muted small mt-2">No skill list extracted.</div>`;
     const linksBlock = (payload.links || []).length
-        ? `<div class="mt-3">${payload.links.slice(0, 4).map(link => `<div><a href="${link}" target="_blank" rel="noopener">${Alfred.escapeHtml(link)}</a></div>`).join("")}</div>`
+        ? `<div class="mt-3">${payload.links.slice(0, 4).map(link => `<div><a href="${Alfred.safeHref(link)}" target="_blank" rel="noopener">${Alfred.escapeHtml(link)}</a></div>`).join("")}</div>`
         : `<div class="muted small mt-3">No portfolio, LinkedIn, or project link detected.</div>`;
     const extractionMethod = payload.extraction_method
         ? payload.extraction_method.replaceAll("_", " ")
@@ -595,7 +595,7 @@ function renderLayoffNews(items) {
         <div class="mini-card">
             <div class="fw-semibold">${Alfred.escapeHtml(item.title || "News item")}</div>
             <div class="muted small">${Alfred.escapeHtml(item.source || "Unknown source")} | ${Alfred.escapeHtml(item.published || "No publish time")}</div>
-            <div class="mt-2"><a href="${item.link}" target="_blank" rel="noopener">Open article</a></div>
+            <div class="mt-2"><a href="${Alfred.safeHref(item.link)}" target="_blank" rel="noopener">Open article</a></div>
         </div>
     `).join("") : `<div class="empty-state">No layoff news items were pulled from the configured feed right now.</div>`;
 }

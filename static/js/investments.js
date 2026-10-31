@@ -224,7 +224,7 @@ function renderInvestmentGrounding(grounding) {
             return `<li class="insight-item">${Alfred.escapeHtml(item.note)}</li>`;
         }
         const proof = item.proof || {};
-        return `<li class="insight-item"><strong>${Alfred.escapeHtml(proof.source_name || proof.title || "Evidence")}</strong>: ${Alfred.escapeHtml(proof.summary || "")}${proof.source_url ? ` <a href="${proof.source_url}" target="_blank" rel="noopener">Proof</a>` : ""}</li>`;
+        return `<li class="insight-item"><strong>${Alfred.escapeHtml(proof.source_name || proof.title || "Evidence")}</strong>: ${Alfred.escapeHtml(proof.summary || "")}${proof.source_url ? ` <a href="${Alfred.safeHref(proof.source_url)}" target="_blank" rel="noopener">Proof</a>` : ""}</li>`;
     }).join("");
 }
 
@@ -306,7 +306,7 @@ function renderInvestmentWatchlist(watchlist) {
             <li class="insight-item">
                 <strong>${Alfred.escapeHtml(item.source_name || item.title || "Evidence")}</strong>:
                 ${Alfred.escapeHtml(item.summary || "")}
-                ${item.source_url ? ` <a href="${item.source_url}" target="_blank" rel="noopener">Proof</a>` : ""}
+                ${item.source_url ? ` <a href="${Alfred.safeHref(item.source_url)}" target="_blank" rel="noopener">Proof</a>` : ""}
             </li>
         `).join("")
         : `<li class="insight-item">No external proof items are available right now.</li>`;

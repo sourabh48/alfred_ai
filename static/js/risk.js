@@ -169,7 +169,7 @@ function renderRiskEvidence(items) {
             <div class="muted small">${Alfred.escapeHtml(item.source_name || "Source")} | ${Alfred.escapeHtml(item.status || "unknown")}${item.verified_at ? ` | refreshed ${Alfred.formatDateTime(item.verified_at)}` : ""}</div>
             <div class="muted small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
             ${item.stale_after ? `<div class="muted small mt-2">Next stale after ${Alfred.formatDateTime(item.stale_after)}</div>` : ""}
-            ${item.source_url ? `<div class="mt-2"><a href="${item.source_url}" target="_blank" rel="noopener">Open source</a></div>` : ""}
+            ${item.source_url ? `<div class="mt-2"><a href="${Alfred.safeHref(item.source_url)}" target="_blank" rel="noopener">Open source</a></div>` : ""}
         </div>
     `).join("") : `<div class="empty-state">No external evidence cached yet.</div>`;
 }
@@ -264,7 +264,7 @@ function renderRiskNews(items) {
                     <div class="muted small">${Alfred.escapeHtml(item.bucket || "Risk")} | ${Alfred.escapeHtml(item.source || "Unknown source")}</div>
                     <div class="muted small">${Alfred.escapeHtml(item.published || "No publish date")}</div>
                 </div>
-                <a href="${item.link}" target="_blank" rel="noopener">Open</a>
+                <a href="${Alfred.safeHref(item.link)}" target="_blank" rel="noopener">Open</a>
             </div>
         </div>
     `).join("") : `<div class="empty-state">No related news was returned right now.</div>`;

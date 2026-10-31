@@ -65,7 +65,7 @@ Server fetches additionally validate DNS and pin the socket target below.
     if not isinstance(raw_url, str) or len(raw_url) > 2048:
         return ""
     url = raw_url.strip()
-    if any(ord(c) <= 32 or ord(c) == 127 for c in url) or "\\" in url:
+    if any(ord(c) <= 32 or ord(c) == 127 or c in '\\"<>' for c in url):
         return ""
     try:
         parts = urlsplit(url)

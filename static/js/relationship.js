@@ -162,7 +162,7 @@ function renderRelationshipGrounding(alignment) {
                     <div class="muted small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
                     ${item.stale_after ? `<div class="muted small mt-2">Next stale after ${Alfred.formatDateTime(item.stale_after)}</div>` : ""}
                 </div>
-                ${item.source_url ? `<a href="${item.source_url}" target="_blank" rel="noopener">Proof</a>` : ""}
+                ${item.source_url ? `<a href="${Alfred.safeHref(item.source_url)}" target="_blank" rel="noopener">Proof</a>` : ""}
             </div>
         </div>
     `).join("") : `<div class="empty-state">No external proof items are attached yet.</div>`;

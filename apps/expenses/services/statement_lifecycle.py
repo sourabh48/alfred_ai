@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+import hashlib
 import logging
 
 from django.db import transaction
@@ -459,6 +460,19 @@ def _compact_statement_excerpt(parsed: StatementParseResult) -> str:
     return excerpt[:char_limit]
 
 
+def _same_stored_bytes(first, second) -> bool:
+    if not (first and second):
+        return False
+    digests = []
+    for stored in (first, second):
+        try:
+            with stored.storage.open(stored.name, "rb") as stream:
+                digests.append(hashlib.file_digest(stream, "sha256").digest())
+        except OSError:
+            return False
+    return digests[0] == digests[1]
+
+
 def _cleanup_redundant_statement_uploads(upload: StatementUpload) -> None:
     duplicate_candidates = StatementUpload.objects.filter(
         user=upload.user,
@@ -476,9 +490,24 @@ def _cleanup_redundant_statement_uploads(upload: StatementUpload) -> None:
         duplicate_quality = (1000 if int(duplicate.imported_count or 0) else 0) + float(duplicate.parse_confidence or 0)
         if current_quality < duplicate_quality:
             continue
-        if duplicate.original_file:
-            duplicate.original_file.delete(save=False)
+        # Matching metadata can be blank or spoofed; only the same file is redundant.
+        if not _same_stored_bytes(upload.original_file, duplicate.original_file):
+            continue
+        removed_id, removed_name = duplicate.id, duplicate.file_name
+        duplicate.original_file.delete(save=False)
         duplicate.delete()
+        operational_logging_service.log(
+            user=upload.user,
+            module="expenses",
+            category="document",
+            scope="statement_document",
+            event_type="redundant_upload_removed",
+            severity="info",
+            document_id=upload.id,
+            file_name=upload.file_name,
+            message="An earlier upload of the same file was removed because this one replaced it.",
+            payload={"removed_upload_id": removed_id, "removed_file_name": removed_name},
+        )
 
 
 def _validate_transaction_money(parsed):

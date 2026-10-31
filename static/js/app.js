@@ -362,6 +362,17 @@ function escapeHtml(value) {
         .replaceAll("'", "&#39;");
 }
 
+// For a double-quoted href only: anything but a plain web link stays inert.
+function safeHref(value) {
+    try {
+        const url = new URL(value);
+        if ((url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password) {
+            return escapeHtml(url.href);
+        }
+    } catch (_) { /* Untrusted links stay inert. */ }
+    return "#";
+}
+
 const clientIssueRegistry = new Map();
 const SESSION_REFRESH_THROTTLE_MS = 60000;
 
@@ -1185,6 +1196,7 @@ window.Alfred = {
     formatDateTime,
     formatNumber,
     escapeHtml,
+    safeHref,
     enableLiveRefresh,
     disableLiveRefresh,
     upsertPageAlert,

@@ -72,6 +72,8 @@ class TravelHTTPTests(SimpleTestCase):
 
     def test_display_links_reject_unsafe_schemes_without_network(self):
         self.assertEqual(normalized_link("data:hello"), "")
+        self.assertEqual(normalized_link('https://example.org/a"onmouseover="x'), "")
+        self.assertEqual(normalized_link('https://example.org/a"><svg/onload=x>'), "")
         self.assertEqual(normalized_link("https://example.org/page#entry"), "https://example.org/page#entry")
         self.dns.assert_not_called()
 
