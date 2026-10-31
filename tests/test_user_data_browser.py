@@ -3907,6 +3907,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def test_investment_pdf_upload_keeps_accounts_receipts_and_reimport_identity(self):
         from decimal import Decimal
+        from selenium.webdriver.support.ui import WebDriverWait
         from apps.investments.models import Investment, InvestmentImportDocument
         from tests.test_investment_import_acceptance import ASSET, portfolio_pdf
 
@@ -3923,7 +3924,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         for count in (1, 2):
             self.browser.find_element(self.By.ID, 'investmentPdfFiles').send_keys(str(pdf))
             self.memory_click('#uploadInvestmentPdfBtn')
-            self.wait.until(lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=pdf.name).count() == count)
+            # The parser may take up to its configured limit on a busy machine.
+            WebDriverWait(self.browser, settings.ALFRED_UPLOAD_PARSER_SECONDS + 10).until(lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=pdf.name).count() == count)
             self.wait.until(lambda _: '2 investment record(s)' in self.text('investmentImportStatus'))
             self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'uploadInvestmentPdfBtn').is_enabled())
             self.wait.until(lambda _: pdf.name in self.text('investmentImportList'))
