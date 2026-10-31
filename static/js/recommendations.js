@@ -33,7 +33,7 @@ function loadRecommendations(queryOrOptions = recommendationQuery) {
 function renderRecommendationHero(profile) {
     document.getElementById("recommendationPersonaValue").textContent = (profile.persona || [])[0] || "Unknown";
     document.getElementById("recommendationRiskValue").textContent = profile.risk_appetite || "Unknown";
-    document.getElementById("recommendationHeroCopy").textContent = `Top spending category ${profile.top_category || "other"} | savings rate ${Alfred.formatNumber(profile.savings_rate || 0)}%`;
+    document.getElementById("recommendationHeroCopy").textContent = `Top spending category ${profile.top_category || "other"} | savings rate ${Number(profile.income) > 0 ? `${Alfred.formatNumber(profile.savings_rate || 0)}%` : "unavailable"}`;
 }
 
 function renderRecommendationSummary(data) {

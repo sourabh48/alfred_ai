@@ -796,7 +796,7 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
     policy = get_policy(financial_year=request.query_params.get("financial_year"),
                         assessment_year=request.query_params.get("assessment_year"))
     financial_baseline = resolve_canonical_financial_baseline(request.user)
-    annual_income = amount(request.query_params.get("annual_income", financial_baseline.get("annual_income", 0) or 0), "Annual income")
+    annual_income = amount(request.query_params.get("annual_income", financial_baseline.get("confirmed_annual_income", 0) or 0), "Annual income")
     deductions = tax_optimizer._calculate_current_deductions(request.user, financial_year=policy.financial_year)
     basic_salary = _query_float(request, "basic_salary", annual_income / 24 if annual_income else 0)
     hra_received = _query_float(request, "hra_received", basic_salary * 0.4)

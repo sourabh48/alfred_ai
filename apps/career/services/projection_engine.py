@@ -44,7 +44,8 @@ def build_salary_projection(user, profile, *, macro: dict, latest_resume=None, o
     )
     yearly_multiplier = 1 + growth_context["annual_growth"]
     projections = []
-    for year in range(1, 6):
+    # Growth on an unknown income would only draw a row of zeros.
+    for year in range(1, 6) if base_income > 0 else ():
         if model_runtime["available"]:
             projected_income = base_income * (yearly_multiplier ** year)
         else:
@@ -88,6 +89,7 @@ def build_salary_projection(user, profile, *, macro: dict, latest_resume=None, o
     return {
         "current_income": inputs["current_income"],
         "projections": projections,
+        "message": "" if projections else "Confirm your income in Settings to see a projection.",
         "projection_mode": projection_mode,
         "projection_method": projection_method,
         "projection_basis": {

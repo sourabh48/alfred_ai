@@ -198,7 +198,7 @@ function renderCareerSnapshot(profile) {
         ["Role", profile.role || "Profile pending"],
         ["Experience", `${Alfred.formatNumber(profile.experience_years, 1)} years`],
         ["Skills", profile.skills || "No skills listed yet."],
-        ["Current income", Alfred.formatCurrency(profile.last_salary || 0)],
+        ["Current income", Number(profile.last_salary) > 0 ? Alfred.formatCurrency(profile.last_salary) : "Not recorded"],
     ].map(([label, value]) => `
         <div class="data-row">
             <div class="data-label">${label}</div>

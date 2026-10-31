@@ -145,8 +145,8 @@ function renderRelationshipGrounding(alignment) {
 
     const details = [
         `Monthly EMI grounding: ${Alfred.formatCurrency(history.monthly_emi || 0)}`,
-        `Debt pressure: ${Alfred.formatNumber(history.debt_pressure || 0, 0)}/100`,
-        `Savings rate: ${Alfred.formatNumber(history.savings_rate || 0, 0)}%`,
+        `Debt pressure: ${Number(history.monthly_income) > 0 ? `${Alfred.formatNumber(history.debt_pressure || 0, 0)}/100` : "unavailable"}`,
+        `Savings rate: ${Number(history.monthly_income) > 0 ? `${Alfred.formatNumber(history.savings_rate || 0, 0)}%` : "unavailable"}`,
         freshness.next_stale_after ? `Next evidence refresh due after ${Alfred.formatDateTime(freshness.next_stale_after)}` : "No external refresh deadline attached yet.",
         ...((grounding.notes || []).map(item => item)),
     ];

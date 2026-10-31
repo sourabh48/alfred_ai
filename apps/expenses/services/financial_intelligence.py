@@ -521,12 +521,15 @@ def _baseline_metric_state(status: str, source: str, formula_key: str, *, inputs
     }
 
 
-def _income_credits_are_current(monthly_buckets: dict, as_of: date) -> bool:
+def _current_income_credits_amount(expenses, as_of: date) -> Decimal:
     """Recorded income stands in for salary only if it recurs and has not stopped."""
-    from apps.career.services.income_intelligence import SALARY_EVIDENCE_MAX_AGE
-    cutoff = as_of - SALARY_EVIDENCE_MAX_AGE
-    months = [key for key, bucket in monthly_buckets.items() if bucket["income"] > 0 and key >= (cutoff.year, cutoff.month) and key <= (as_of.year, as_of.month)]
-    return len(months) >= 2
+    from apps.career.services.income_intelligence import SALARY_EVIDENCE_MAX_AGE, is_never_pay
+    earliest = as_of - SALARY_EVIDENCE_MAX_AGE
+    months = defaultdict(lambda: Decimal("0"))
+    for item in expenses:
+        if earliest <= item.transaction_date <= as_of and classify_cashflow(item).counts_income and not is_never_pay(item):
+            months[(item.transaction_date.year, item.transaction_date.month)] += _decimal_amount(item.amount)
+    return _decimal_average(months.values()) if len(months) >= 2 else Decimal("0")
 
 
 def _income_metric_status(income_source: str) -> str:
@@ -557,6 +560,7 @@ def _empty_canonical_financial_baseline() -> dict:
         "income_source": "not_evidenced",
         "income_basis_needs_confirmation": False,
         "income_conflict": None,
+        "confirmed_annual_income": 0.0,
         "income_source_summary": "ALFRED needs salary credits, a reported income baseline, or other credit history before it can set a monthly income baseline.",
         "supplemental_variable_income": 0.0,
         "observed_average_monthly_inflow": 0.0,
@@ -618,6 +622,7 @@ def _build_canonical_financial_baseline_uncached(
     current_bucket = monthly_buckets.get(current_key, _empty_month_bucket())
 
     observed_average_monthly_inflow_amount = _decimal_average(bucket["income"] for bucket in recent_buckets)
+    current_income_credits_amount = _current_income_credits_amount(expenses, income_as_of)
     variable_by_month = defaultdict(lambda: Decimal("0"))
     for expense, amount in variable_spend_rows(expenses, monthly_housing=getattr(user, "rent_or_emi", 0)):
         variable_by_month[(expense.transaction_date.year, expense.transaction_date.month)] += amount
@@ -650,16 +655,19 @@ def _build_canonical_financial_baseline_uncached(
     elif profile_last_salary > 0:
         income_source = "career_profile_last_salary"
         income_source_summary = "Monthly income falls back to the last salary stored in the career profile because stronger salary signals are not available yet."
-    elif _income_credits_are_current(monthly_buckets, income_as_of):
-        monthly_income_amount = observed_average_monthly_inflow_amount
+    elif current_income_credits_amount > 0:
+        monthly_income_amount = current_income_credits_amount
         income_source = "observed_credit_inflow"
         income_source_summary = "Monthly income falls back to the recent average of observed credit inflows because a cleaner salary signal is not evidenced yet."
 
     monthly_income_amount = monthly_income_amount.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     annual_income_amount = (monthly_income_amount * Decimal("12")).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    # Tax needs the income the owner confirmed: credits are take-home, and an unconfirmed figure may be per year.
+    confirmed_annual_income_amount = _decimal_amount(reported_income.get("value", 0)) * {"annual_ctc": 1, "monthly": 12}.get(reported_income.get("mode"), 0)
+    confirmed_annual_income_amount = confirmed_annual_income_amount.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     if reported_income.get("mode") == "annual_ctc":
         # An income confirmed per year stands, neither rounded through a month nor replaced by take-home credits.
-        annual_income_amount = _decimal_amount(income_signals.get("annualized_compensation", 0)).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+        annual_income_amount = confirmed_annual_income_amount
     supplemental_variable_income_amount = _decimal_amount(income_signals.get("variable_income", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     rent_burden_amount = _decimal_amount(getattr(user, "rent_or_emi", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
 
@@ -838,6 +846,7 @@ def _build_canonical_financial_baseline_uncached(
         "income_source": income_source,
         "income_basis_needs_confirmation": income_unconfirmed,
         "income_conflict": income_signals.get("income_conflict"),
+        "confirmed_annual_income": float(confirmed_annual_income_amount),
         "income_source_summary": income_source_summary or _empty_canonical_financial_baseline()["income_source_summary"],
         "supplemental_variable_income": _money_float(supplemental_variable_income_amount),
         "observed_average_monthly_inflow": _money_float(observed_average_monthly_inflow_amount),

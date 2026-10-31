@@ -9,6 +9,7 @@ import re
 from django.utils import timezone
 
 from apps.expenses.models import Expense
+from apps.expenses.services.statement_import import CREDIT_CARD_KEYWORDS, INVESTMENT_KEYWORDS
 from apps.users.models import IncomeBasis
 
 
@@ -36,7 +37,7 @@ NON_SALARY_CREDIT_KEYWORDS = (
 )
 # These credits are never pay, whatever their text says.
 NON_SALARY_CATEGORIES = {"transfer", "loan", "investment", "credit_card"}
-NEVER_SALARY_MARKERS = ("REFUND", "REVERSAL", "CASHBACK")
+NEVER_SALARY_MARKERS = ("REFUND", "REVERSAL", "REVERSED", "CASHBACK", "LOAN", *INVESTMENT_KEYWORDS, *CREDIT_CARD_KEYWORDS)
 # Older salary credits may belong to a job that has ended.
 SALARY_EVIDENCE_MAX_AGE = timedelta(days=92)
 # A payer this far behind the newest credit has stopped; paydays can shift by a few days each month.
@@ -62,7 +63,16 @@ EMPLOYER_NOISE_TOKENS = {
 }
 
 
+def is_never_pay(item) -> bool:
+    """Statement import files refunds and redemptions as income too, so read the text as well as the category."""
+    if item.category in NON_SALARY_CATEGORIES:
+        return True
+    text = " ".join(str(value or "") for value in (item.company_name, item.counterparty, item.merchant, item.description, item.raw_description)).upper()
+    return any(marker in text for marker in NEVER_SALARY_MARKERS)
+
+
 def build_employment_income_signals(*, user, latest_resume=None, profile=None, today: date | None = None) -> dict:
+    today = today or timezone.localdate()
     resume_payload = (latest_resume.extracted_payload or {}) if latest_resume and latest_resume.parser_status == "parsed" else {}
     resume_employer = str(
         resume_payload.get("current_company")
@@ -70,7 +80,7 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None, t
         or ""
     ).strip()
     credits = list(
-        Expense.objects.filter(user=user, direction="credit")
+        Expense.objects.filter(user=user, direction="credit", transaction_date__lte=today)
         .only(
             "id",
             "amount",
@@ -85,7 +95,7 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None, t
         .order_by("-transaction_date", "-id")[:240]
     )
     salary_candidates = _build_salary_credit_candidates(credits)
-    current_salaries = _current_salary_candidates(salary_candidates, today or timezone.localdate())
+    current_salaries = _current_salary_candidates(salary_candidates, today)
     best_salary_signal = current_salaries[0] if current_salaries else None
 
     profile_last_salary = float(getattr(profile, "last_salary", 0) or 0)
@@ -153,7 +163,7 @@ def _build_salary_credit_candidates(credits: list[Expense]) -> list[dict]:
 
     for item in credits:
         amount = float(item.amount or 0)
-        if amount < 10000 or item.category in NON_SALARY_CATEGORIES:
+        if amount < 10000 or is_never_pay(item):
             continue
         raw_text = " ".join(
             str(value or "")
@@ -167,8 +177,6 @@ def _build_salary_credit_candidates(credits: list[Expense]) -> list[dict]:
             if value
         ).upper()
         if not raw_text:
-            continue
-        if any(marker in raw_text for marker in NEVER_SALARY_MARKERS):
             continue
         has_salary_keyword = any(keyword in raw_text for keyword in SALARY_KEYWORDS)
         has_non_salary_marker = any(keyword in raw_text for keyword in NON_SALARY_CREDIT_KEYWORDS)
@@ -257,11 +265,10 @@ def _current_salary_candidates(candidates: list[dict], today: date) -> list[dict
         return []
     newest = max(date.fromisoformat(item["last_credit"]) for item in recent)
     active = [item for item in recent if newest - date.fromisoformat(item["last_credit"]) <= ACTIVE_PAYER_GAP]
-    payers = [item for item in active if item["described_as_salary"]] or active
+    # A lone credit may be a bonus or stipend, so it waits until any recurring pay has stopped.
+    pool = [item for item in active if item["months_observed"] > 1] or active
+    payers = [item for item in pool if item["described_as_salary"]] or pool
     primary = max(payers, key=lambda item: item["monthly_amount"])
-    # A lone credit does not outweigh a larger recurring one, but a new job can still replace a smaller old one.
-    if primary["months_observed"] == 1:
-        primary = max(active, key=lambda item: item["monthly_amount"])
     return [primary, *(
         item for item in active
         if item is not primary and item["described_as_salary"]
