@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Not Available | Alfred{% endblock %}
+
+{% block content %}
+<section class="status-shell alfred-fade-up">
+    <div class="status-card">
+        <div class="status-code">403</div>
+        <h1 class="status-title">This page is not available to your account</h1>
+        <p class="status-copy">Your data is unchanged. Go back to your dashboard to continue.</p>
+        <div class="d-flex flex-wrap gap-3 justify-content-center mt-4">
+            <a class="btn btn-dark rounded-pill px-4" href="{% url 'dashboard' %}">Go to dashboard</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

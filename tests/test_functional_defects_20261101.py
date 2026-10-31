@@ -89,6 +89,15 @@ class RepeatedReferenceTests(TestCase):
         self.assertEqual(edited.status_code, 200)
 
 
+class RefusedPageTests(TestCase):
+    def test_a_refused_page_explains_itself_and_keeps_the_exception_private(self):
+        self.client.force_login(get_user_model().objects.create_user("refused_owner", password="Synthetic-Pass-1"))
+        response = self.client.get("/reports/")
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, "not available to your account", status_code=403)
+        self.assertNotContains(response, "superusers", status_code=403)
+
+
 class StatementAccountDetailsTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("account_owner", password="Synthetic-Pass-1")
