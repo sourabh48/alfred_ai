@@ -72,11 +72,10 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None) -
     best_salary_signal = salary_candidates[0] if salary_candidates else None
 
     profile_last_salary = float(getattr(profile, "last_salary", 0) or 0)
-    entered_income = float(getattr(user, "monthly_income", 0) or 0)
-    reported_value = entered_income or profile_last_salary
+    reported_value = float(getattr(user, "monthly_income", 0) or 0) or profile_last_salary
     variable_income = float(getattr(user, "variable_income", 0) or 0)
     salary_monthly = float(best_salary_signal.get("monthly_amount", 0) or 0) if best_salary_signal else 0.0
-    reported_mode = _reported_income_mode(reported_value, entered_income, user.monthly_income_basis)
+    reported_mode = _reported_income_mode(reported_value, user.monthly_income_basis)
     reported_monthly_equivalent = {"annual_ctc": round(reported_value / 12, 2), "monthly": round(reported_value, 2)}.get(reported_mode, 0.0)
     monthly_cash_income = round(salary_monthly or reported_monthly_equivalent, 2)
 
@@ -269,14 +268,14 @@ def _normalize_employer_key(value: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9 ]", " ", str(value or "").upper())).strip()
 
 
-def _reported_income_mode(reported_value: float, entered_income: float, basis: str) -> str:
+def _reported_income_mode(reported_value: float, basis: str) -> str:
     """The owner states the period; an amount's size never decides it."""
     if reported_value <= 0:
         return "absent"
     if basis == IncomeBasis.UNCONFIRMED:
         return "unconfirmed"
-    # The basis describes the entered income. A career profile's current income is monthly.
-    return "annual_ctc" if entered_income and basis == IncomeBasis.ANNUAL else "monthly"
+    # The period also covers a career-profile income used when no income is entered in Settings.
+    return "annual_ctc" if basis == IncomeBasis.ANNUAL else "monthly"
 
 
 def _build_source_summary(*, employer: str, employer_source: str, salary_source: str, salary_signal: dict | None, reported_mode: str) -> str:

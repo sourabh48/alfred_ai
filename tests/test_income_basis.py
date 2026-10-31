@@ -63,6 +63,32 @@ class IncomeBasisTests(TestCase):
         self.assertEqual(signals["reported_income"]["mode"], "unconfirmed")
         self.assertEqual(self.baseline(user)["monthly_income"], 0.0)
 
+    def test_chosen_period_also_covers_a_career_profile_income(self):
+        user = self.user("salary_only_annual", 0, "annual")
+        CareerProfile.objects.create(user=user, role="Analyst", experience_years=1, skills="", last_salary=1200000)
+        baseline = self.baseline(user)
+        self.assertEqual(baseline["monthly_income"], 100000.0)
+        self.assertEqual(baseline["annual_income"], 1200000.0)
+        self.assertEqual(baseline["income_source"], "reported_annual_ctc")
+
+        user.monthly_income_basis = "monthly"
+        user.save(update_fields=["monthly_income_basis"])
+        self.assertEqual(self.baseline(user)["monthly_income"], 1200000.0)
+
+    def test_projection_does_not_fall_back_to_unconfirmed_income(self):
+        from apps.career.services.projection_engine import build_projection_inputs
+        user = self.user("unconfirmed_projection", 300000, "unconfirmed")
+        profile = CareerProfile.objects.create(user=user, role="Analyst", experience_years=1, skills="", last_salary=300000)
+        self.assertEqual(build_projection_inputs(user=user, profile=profile)["current_income"], 0.0)
+
+    def test_tax_overview_flags_unconfirmed_income_instead_of_a_real_zero(self):
+        user = self.user("unconfirmed_tax", 300000, "unconfirmed")
+        client = APIClient()
+        client.force_login(user)
+        payload = client.get("/api/integrations/tax/overview/").json()
+        self.assertEqual(float(payload["annual_income"]), 0.0)
+        self.assertTrue(payload["financial_baseline"]["income_basis_needs_confirmation"])
+
     def test_career_salary_alone_on_an_unconfirmed_account_is_flagged(self):
         user = self.user("unconfirmed_salary_only", 0, "unconfirmed")
         self.assertFalse(user.income_basis_needs_confirmation)

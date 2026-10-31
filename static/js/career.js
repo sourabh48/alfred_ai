@@ -126,7 +126,7 @@ function renderOpeningFilters(filters, active) {
 function renderCareerHero(profile, projection, timing) {
     const latest = (projection.projections || []).at(-1);
     document.getElementById("careerRoleValue").textContent = profile.role || "Profile pending";
-    document.getElementById("careerIncomeValue").textContent = Alfred.formatCurrency(projection.current_income || profile.last_salary || 0);
+    document.getElementById("careerIncomeValue").textContent = Alfred.formatCurrency(projection.current_income || 0);
     if (timing?.window_start && timing?.window_end) {
         document.getElementById("careerGrowthCopy").textContent = `${timing.summary} Window ${Alfred.formatDate(timing.window_start)} to ${Alfred.formatDate(timing.window_end)}.`;
         return;
@@ -813,7 +813,7 @@ function submitCareerRecruiterLead(event) {
 
 function hydrateSimulationForm(profile, projection) {
     const form = document.getElementById("careerSimulationForm");
-    form.monthly_income.value = projection.current_income || profile.last_salary || "";
+    form.monthly_income.value = projection.current_income || "";
     form.variable_income.value = "";
     form.rent_or_emi.value = "";
     form.city.value = "";

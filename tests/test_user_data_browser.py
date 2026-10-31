@@ -212,6 +212,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         baseline = resolve_canonical_financial_baseline(owner)
         self.assertFalse(baseline['income_basis_needs_confirmation'])
 
+        # Without other evidence the tax page says unavailable, not a real-looking zero.
+        type(owner).objects.create_user('unconfirmed_tax_viewer', password=PASSWORD, monthly_income=amount, monthly_income_basis='unconfirmed')
+        self.browser.delete_all_cookies()
+        self.login('unconfirmed_tax_viewer')
+        self.browser.get(self.live_server_url + '/tax-optimizer/')
+        self.wait.until(lambda _: self.text('taxRegimeValue').lower() == 'unavailable')
+        self.assertEqual(self.text('taxAnnualValue').lower(), 'unavailable')
+
     def test_career_discovery_marks_cached_leads_and_recovers_without_unsafe_links(self):
         from apps.career.models import CareerProfile
         from apps.career.services.job_intelligence import JobIntelligenceService, job_intelligence

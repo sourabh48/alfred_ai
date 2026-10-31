@@ -44,6 +44,11 @@ function renderTaxHero(data) {
     document.getElementById("taxRegimeValue").textContent = String(comparison.recommendation || "either").toUpperCase();
     document.getElementById("taxAnnualValue").textContent = Alfred.formatCurrency(recommendedTax || 0);
     document.getElementById("taxHeroCopy").textContent = comparison.message || "Tax comparison ready.";
+    if (data.financial_baseline?.income_basis_needs_confirmation && !data.annual_income) {
+        document.getElementById("taxRegimeValue").textContent = "Unavailable";
+        document.getElementById("taxAnnualValue").textContent = "Unavailable";
+        document.getElementById("taxHeroCopy").textContent = "Confirm your income period in Settings, or enter an annual income here, to estimate tax.";
+    }
     const policy = data.tax_policy;
     document.getElementById("taxPolicyCopy").textContent = `FY ${policy.financial_year} · AY ${policy.assessment_year}. Official-source rules verified ${policy.verified_at}; salary planning estimate before return-filing rounding.`;
 }
