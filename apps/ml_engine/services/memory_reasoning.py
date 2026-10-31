@@ -41,7 +41,7 @@ def real_reasoning_authorized():
 WORD_START=r'(?<!(?-i:[a-zA-Z0-9]))'
 WORD_END=r'(?!(?-i:[a-zA-Z0-9]))'
 PRIVATE_TEXT=re.compile(
-    rf'(?i){WORD_START}(?:(?:account|loan|emi|balance|income|password|secret|token|bearer)s?|salary|salaries|medical|diagnosis){WORD_END}'
+    rf'(?i){WORD_START}(?:(?:account|loan|emi|balance|income|password|secret|token|bearer)s?|salary|salaries|medical|diagnosis|diagnoses){WORD_END}'
     r'|sk-[a-z0-9-]{8,}|AKIA[A-Z0-9]{12,}|[a-z]:[\\/]|/(?:home|users|tmp)/|\b[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\d[ -]?){6,}'
     rf'|(?:[$€£]|{INR_SIGN})\s*\d|{WORD_START}{INR_NAME}:?\s*\d'
     rf'|\d\s*(?:k|thousand|lakhs?|crores?|cr|million)?\s*(?:rupees?|inr|rs){WORD_END}|\d\s*/-')
@@ -57,15 +57,17 @@ def _scannable_forms(payload):
 
 def public_payload(payload):
     encoded(payload)  # refuses what cannot be encoded
-    forms=_scannable_forms(payload)
-    # Invisible format characters can hide any word, so text carrying them stays local.
-    if any(unicodedata.category(char)=='Cf' for char in forms[0]) or any(PRIVATE_TEXT.search(text) for text in forms):
+    if any(PRIVATE_TEXT.search(text) for text in _scannable_forms(payload)):
         raise PermissionError('Potential sensitive data must remain in local processing.')
-    keys=[]; pending=[payload]
+    keys=[]; strings=[]; pending=[payload]
     while pending:
         value=pending.pop()
         if isinstance(value,dict): keys.extend(value); pending.extend(value.values())
-        elif isinstance(value,list): pending.extend(value)
+        elif isinstance(value,(list,tuple)): pending.extend(value)
+        elif isinstance(value,str): strings.append(value)
+    # Invisible and control characters can hide any word, so text carrying them stays local.
+    if any(unicodedata.category(char) in {'Cf','Cc'} and char not in '\t\n\r' for text in (*keys,*strings) for char in str(text)):
+        raise PermissionError('Potential sensitive data must remain in local processing.')
     if any(re.search(r'(?i)(account|loan|password|secret|token|balance|amount|phone|email|address|birth|medical|salary|income)',key) for key in keys):
         raise PermissionError('Potential sensitive fields must remain in local processing.')
 

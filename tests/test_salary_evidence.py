@@ -24,7 +24,8 @@ class NeverPayTextTests(SimpleTestCase):
         return is_never_pay(SimpleNamespace(category="income", company_name="", counterparty="", merchant="", description=text, raw_description=""))
 
     def test_loans_and_investments_that_mention_salary_are_not_pay(self):
-        for text in ("NEFT CR SALARY LOAN HDFC", "PAYDAY LOAN XYZ", "LOAN AGAINST SALARY", "LOAN FROM EMPLOYER", "ZERODHA MF PROCEEDS TO SALARY A/C", "HOME LOAN DISBURSAL"):
+        for text in ("NEFT CR SALARY LOAN HDFC", "PAYDAY LOAN XYZ", "LOAN AGAINST SALARY", "LOAN FROM EMPLOYER", "ZERODHA MF PROCEEDS TO SALARY A/C",
+                     "HOME LOAN DISBURSAL", "ZERODHA MF PROCEEDS TO SALARY ACCT", "PERSONAL LOAN TO SALARY-A/C", "BAJAJ FINSERV DISBURSAL"):
             with self.subTest(text=text):
                 self.assertTrue(self.never_pay(text))
 
@@ -34,7 +35,9 @@ class NeverPayTextTests(SimpleTestCase):
                 self.assertTrue(self.never_pay(text))
 
     def test_pay_from_lenders_and_payroll_disbursals_still_count(self):
-        for text in ("SALARY DISBURSEMENT ACME", "PAYROLL DISBURSED", "SALARY HDFC LOAN SERVICES LTD", "NEFT CR STOCKHOLM TRADING"):
+        for text in ("SALARY DISBURSEMENT ACME", "PAYROLL DISBURSED", "SALARY HDFC LOAN SERVICES LTD", "NEFT CR STOCKHOLM TRADING",
+                     "NEFT CR SALARY LOANTAP TECHNOLOGIES", "SALARY LOAN RECOVERY ACME", "SALARY - LOAN EMI DEDUCTED",
+                     "NEFT CR EPFO PENSION DISBURSEMENT", "COMMISSION DISBURSED"):
             with self.subTest(text=text):
                 self.assertFalse(self.never_pay(text))
 

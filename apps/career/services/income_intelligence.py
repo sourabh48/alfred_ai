@@ -38,17 +38,19 @@ NON_SALARY_CREDIT_KEYWORDS = (
 NON_SALARY_CATEGORIES = {"transfer", "loan", "investment", "credit_card"}
 # These credits are never pay, whatever else their text says.
 NEVER_PAY_RE = re.compile(
-    r"REFUND|REVERSAL|REVERSED|CASHBACK|REDEMPTION|LOANS?\W+DISBURS|SALARY\W+(?:ADVANCE\W+)?LOAN|PAYDAY\W+LOAN"
+    r"REFUND|REVERSAL|REVERSED|CASHBACK|REDEMPTION|LOANS?\W+DISBURS|SALARY\W+(?:ADVANCE\W+)?LOANS?\b(?!\W+(?:RECOVERY|DEDUCT|EMI|ADJ))|PAYDAY\W+LOAN"
     r"|LOANS?\W+(?:AGAINST|ON|FROM)\W+(?:SALARY|EMPLOYER)"
 )
 # Lenders, brokers and card issuers can also be employers, so a credit that says salary still counts.
 # Statement text runs words together, so only STOCK and MF need edges.
 NOT_PAY_UNLESS_SALARY_RE = re.compile(
-    r"LOAN|DISBURS|\bSTOCKS?\b|MF\b|"
+    r"LOAN|\bSTOCKS?\b|MF\b|"
     + "|".join(re.escape(word) for word in (*INVESTMENT_KEYWORDS, *CREDIT_CARD_KEYWORDS) if word.strip() not in {"STOCK", "MF"})
 )
 # Money sent to a salary account says where it landed, not what it was.
-SALARY_ACCOUNT_RE = re.compile(r"SALARY\s*(?:A/?C|ACCOUNT)\b")
+SALARY_ACCOUNT_RE = re.compile(r"SALARY\W*(?:A/?C|ACC(?:OUN)?T)\b")
+# A lender's disbursal is not pay, but pensions and commissions are paid out in the same words.
+PAID_OUT_INCOME_RE = re.compile(r"PENSION|COMMISSION|INCENTIVE|HONORARIUM")
 # Older salary credits may belong to a job that has ended.
 SALARY_EVIDENCE_MAX_AGE = timedelta(days=92)
 # A payer this far behind the newest credit has stopped; paydays can shift by a few days each month.
@@ -82,7 +84,8 @@ def is_never_pay(item) -> bool:
     if NEVER_PAY_RE.search(text):
         return True
     described = SALARY_ACCOUNT_RE.sub(" ", text)
-    return bool(NOT_PAY_UNLESS_SALARY_RE.search(text)) and not any(keyword in described for keyword in SALARY_KEYWORDS)
+    lender_text = NOT_PAY_UNLESS_SALARY_RE.search(text) or ("DISBURS" in text and not PAID_OUT_INCOME_RE.search(text))
+    return bool(lender_text) and not any(keyword in described for keyword in SALARY_KEYWORDS)
 
 
 def build_employment_income_signals(*, user, latest_resume=None, profile=None, today: date | None = None) -> dict:

@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import re
+import unicodedata
 from statistics import median
 from urllib.parse import quote_plus, urlparse
 
@@ -101,11 +102,6 @@ SALARY_BLOCK_RE = re.compile(
 # Whole-page text mentions funding, revenue and audience sizes; only pay wording may become salary evidence.
 SALARY_CONTEXT_RE = re.compile(
     r"\b(?:salary|salaries|compensation|ctc|pay|paying|pays|package|stipend|remuneration|earnings?|wages?|ote)\b",
-    re.IGNORECASE,
-)
-# A pay word right before an amount introduces that amount, not the one before it.
-SALARY_CONTEXT_AFTER_RE = re.compile(
-    SALARY_CONTEXT_RE.pattern + rf"(?![\s:=-]*(?:(?:is|of)\s+)?(?:{SALARY_CURRENCY_PATTERN})?\s*\d)",
     re.IGNORECASE,
 )
 SALARY_CURRENCY_CODES = {"inr": "INR", "inr.": "INR", "rs": "INR", "rs.": "INR", "rs/-": "INR", "rs./-": "INR", "rupee": "INR", "rupees": "INR",
@@ -1625,8 +1621,8 @@ class JobIntelligenceService:
             raise ValueError('Provide finite positive salary evidence in cents within the supported range.') from None
 
     def _parse_salary_text(self, text: str, *, require_context: bool = False) -> dict | None:
-        # Pages put no-break spaces inside amounts; same length, so match positions still fit.
-        text = re.sub(r"[^\S\n]", " ", text or "")
+        # Pages put no-break spaces and other scripts' digits inside amounts; same length, so positions still fit.
+        text = re.sub(r"\d", lambda digit: str(unicodedata.digit(digit[0])), re.sub(r"[^\S\n]", " ", text or ""))
         for match in SALARY_BLOCK_RE.finditer(text):
             units = {(match.group(name) or "").lower() for name in ("first_unit", "second_unit")} - {""}
             currencies = {SALARY_CURRENCY_CODES[raw.strip().lower()]
@@ -1658,8 +1654,13 @@ class JobIntelligenceService:
         if match.group("period") or "lpa" in units:
             return True
         before = re.split(r"[.!?;\n]\s", text[max(0, match.start() - 60):match.start()])[-1]
-        after = re.split(r"[.!?;\n]", text[match.end():match.end() + 24])[0]
-        return bool(SALARY_CONTEXT_RE.search(before) or SALARY_CONTEXT_AFTER_RE.search(after))
+        # A dot before a digit belongs to the next amount, as in "Rs. 50,000", and does not end the sentence.
+        # The number pattern can swallow a trailing comma, which still ends this amount's clause.
+        swallowed_comma = "," if match.group(0).rstrip().endswith(",") else ""
+        first_clause, *later_clauses = re.split(r"[!?;\n]|\.(?!\s*\d)", swallowed_comma + text[match.end():match.end() + 40])[0].split(",")
+        # A pay word in a later clause with its own number describes that number, not this amount.
+        return bool(SALARY_CONTEXT_RE.search(before) or SALARY_CONTEXT_RE.search(first_clause) or any(
+            SALARY_CONTEXT_RE.search(clause) and not re.search(r"\d", clause) for clause in later_clauses))
 
     def _salary_value(self, raw_value: str | None, unit: str | None) -> float:
         if not raw_value:

@@ -113,17 +113,22 @@ class InrAmountTests(SimpleTestCase):
     def test_unusual_currency_spellings_in_job_text_never_crash(self):
         parse = JobIntelligenceService()._parse_salary_text
         self.assertEqual(parse("Salary Rs./- 50,000")["currency"], "INR")
-        self.assertEqual(parse("Salary ₹ 50,000 per month")["salary_min"], 50000.0)
+        self.assertEqual(parse("Salary \u20b9\u00a050,000 per month")["salary_min"], 50000.0)
+        self.assertEqual(parse("Salary \u20b9\u096b\u0966,\u0966\u0966\u0966 per month")["salary_min"], 50000.0)
         for text in ("ınr 500", "Rupeeſ 500", "uſd 500", "5 lakhſ", "2 mıllıon", "5K"):
             with self.subTest(text=text):
                 parse(f"Salary {text}")
 
     def test_a_pay_word_belongs_to_its_own_amount(self):
         parse = JobIntelligenceService()._parse_salary_text
-        for text in ("Application fee Rs 500, salary Rs 50,000 per month", "Fee Rs 500, salary is Rs 50,000 per month"):
+        for text in ("Application fee Rs 500, salary Rs 50,000 per month", "Fee Rs 500, salary is Rs 50,000 per month",
+                     "Application fee Rs 500, salary Rs. 50,000 per month", "Fee Rs 500, salary around Rs 50,000",
+                     "Fee Rs 500, monthly compensation Rs 50,000"):
             with self.subTest(text=text):
                 self.assertEqual(parse(text, require_context=True)["salary_min"], 50000.0)
-        for text, amount in (("₹18 lakhs, CTC negotiable", 1800000.0), ("50,000 rupees, salary negotiable", 50000.0), ("Rs 50,000/-, salary negotiable", 50000.0)):
+        self.assertEqual(parse("Application fee Rs 500, salary range Rs 30,000-50,000 per month", require_context=True)["salary_min"], 30000.0)
+        for text, amount in (("\u20b918 lakhs, CTC negotiable", 1800000.0), ("50,000 rupees, salary negotiable", 50000.0), ("Rs 50,000/-, salary negotiable", 50000.0),
+                             ("\u20b918 lakh CTC 3 years experience", 1800000.0), ("INR 40,000 stipend 6 months", 40000.0)):
             with self.subTest(text=text):
                 self.assertEqual(parse(text, require_context=True)["salary_min"], amount)
         self.assertEqual(parse("Application fee 500/-. Salary Rs 50,000 per month")["salary_min"], 50000.0)
@@ -131,10 +136,11 @@ class InrAmountTests(SimpleTestCase):
         self.assertIsNone(parse("Ref 45/-"))
 
     def test_travel_budget_ignores_other_currencies_with_a_space(self):
-        for text in ("Goa trip $ 5k", "Goa trip € 2 lakh", "Goa trip 1,5k"):
+        for text in ("Goa trip $ 5k", "Goa trip \u20ac 2 lakh", "Goa trip 1,5k", ".5 lakh", "$.5k"):
             with self.subTest(text=text):
                 self.assertIsNone(value(extract({}, text)[0], "budget"))
         self.assertEqual(value(extract({}, "goa,5k")[0], "budget"), 5000.0)
+        self.assertEqual(value(extract({}, "1.5 lakh")[0], "budget"), 150000.0)
 
     def test_holding_names_drop_the_currency(self):
         name = PortfolioIntelligenceService()._extract_asset_name
@@ -165,17 +171,17 @@ class CloudBoundaryTests(SimpleTestCase):
                 public_payload({"context": text})
 
     def test_literal_escapes_cannot_hide_the_next_word(self):
-        for text in ("line\nsalary 50k", "a\tpassword", "x\rtoken", "\u000asalary"):
+        for text in ("line\\nsalary 50k", "a\\tpassword", "x\\rtoken", "\\u000asalary"):
             with self.subTest(text=text), self.assertRaises(PermissionError):
                 public_payload({"context": text})
 
-    def test_any_invisible_character_stays_local(self):
-        for text in ("sal​ary​details", "routes‍near Munnar"):
+    def test_any_invisible_or_control_character_stays_local(self):
+        for text in ("sal\u200bary\u200bdetails", "routes\u200dnear Munnar", "sal\x01ary", "sal\x08ary", "sal\x7fary", "sal\x85ary"):
             with self.subTest(text=text), self.assertRaises(PermissionError):
                 public_payload({"context": text})
 
     def test_word_edges_ignore_lookalike_neighbours_plurals_and_underscores(self):
-        for text in ("salaryſ", "loanı", "ısalary", "Ksecret", "my home loans", "passwords", "salary_slip.pdf", "salaries"):
+        for text in ("salary\u017f", "loan\u0131", "\u0131salary", "\u212asecret", "my home loans", "passwords", "salary_slip.pdf", "salaries", "my diagnoses"):
             with self.subTest(text=text), self.assertRaises(PermissionError):
                 public_payload({"context": text})
 
@@ -189,6 +195,6 @@ class CloudBoundaryTests(SimpleTestCase):
             public_payload({"context": float("nan")})
 
     def test_plain_public_text_still_passes(self):
-        for text in ("monsoon routes near Munnar", "सन 2024 के मार्ग", "नाम:राम"):
+        for text in ("monsoon routes near Munnar", "सन 2024 के मार्ग", "नाम:राम", "monsoon\nroutes\tnear\rMunnar"):
             with self.subTest(text=text):
                 public_payload({"context": text})
