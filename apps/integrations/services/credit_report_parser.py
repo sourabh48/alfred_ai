@@ -11,7 +11,7 @@ import re
 from typing import BinaryIO
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
-from alfred_ai.services.currency import INR_AMOUNT, INR_TOKEN
+from alfred_ai.services.currency import INR_AMOUNT, INR_LABEL_TOKEN
 from alfred_ai.services.upload_limits import document_source, upload_deadline
 from pypdf import PdfReader
 
@@ -454,7 +454,7 @@ class CreditReportParser:
     def _extract_optional_amount_from_line(self, line: str, labels: list[str]) -> float | None:
         for label in labels:
             pattern = re.compile(
-                rf"{re.escape(label)}\s*[:#-]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d{{1,2}})?)",
+                rf"{re.escape(label)}\s*[:#-]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{1,2}})?)",
                 re.IGNORECASE,
             )
             match = pattern.search(line)
@@ -526,7 +526,7 @@ class CreditReportParser:
     def _extract_amount(self, text: str, labels: list[str], *, allow_generic_fallback: bool = True) -> float:
         for label in labels:
             pattern = re.compile(
-                rf"{re.escape(label)}\s*[:#-]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d{{1,2}})?)",
+                rf"{re.escape(label)}\s*[:#-]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{1,2}})?)",
                 re.IGNORECASE,
             )
             match = pattern.search(text)

@@ -35,8 +35,9 @@ def real_reasoning_authorized():
 
 
 def public_payload(payload):
-    text=json.dumps(payload,ensure_ascii=False)
-    if re.search(r'(?i)(?:\b(?:account|loan|emi|balance|salary|income|password|secret|token|bearer|medical|diagnosis)\b|sk-[a-z0-9-]{8,}|AKIA[A-Z0-9]{12,}|[a-z]:[\\/]|/(?:home|users|tmp)/|\b[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\d[ -]?){6,}|[$₹€£]\s*\d|\b(?:inr|rs\.?|rupees?)\s*\d|\d\s*(?:rupees?|inr)\b)',text):
+    # The escaped form sees word edges beside non-Latin letters; the raw form sees symbols and whitespace.
+    forms=(encoded(payload).decode(),re.sub(r'\\[nrtfb]',' ',json.dumps(payload,ensure_ascii=False)))
+    if any(re.search(r'(?i)(?:\b(?:account|loan|emi|balance|salary|income|password|secret|token|bearer|medical|diagnosis)\b|sk-[a-z0-9-]{8,}|AKIA[A-Z0-9]{12,}|[a-z]:[\\/]|/(?:home|users|tmp)/|\b[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\d[ -]?){6,}|[$₹€£₨]\s*\d|\b(?:inr|rs(?:\.|/-)?|rupees?)\s*\d|\d\s*(?:rupees?|inr|rs)\b|\d\s*/-)',text) for text in forms):
         raise PermissionError('Potential sensitive data must remain in local processing.')
     keys=[]; pending=[payload]
     while pending:

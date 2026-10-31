@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Dict, BinaryIO
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
-from alfred_ai.services.currency import INR_TOKEN
+from alfred_ai.services.currency import INR_LABEL_TOKEN
 from alfred_ai.services.upload_limits import document_source
 
 
@@ -214,9 +214,9 @@ class LoanPDFParser:
     def _extract_principal(self, text: str) -> float:
         """Extract principal/loan amount."""
         patterns = [
-            rf"(?:PRINCIPAL|LOAN)\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
-            rf"SANCTIONED\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
-            rf"DISBURSED\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
+            rf"(?:PRINCIPAL|LOAN)\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
+            rf"SANCTIONED\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
+            rf"DISBURSED\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
         ]
 
         for pattern in patterns:
@@ -244,8 +244,8 @@ class LoanPDFParser:
     def _extract_emi(self, text: str) -> float:
         """Extract EMI amount."""
         patterns = [
-            rf"EMI\s+(?:AMOUNT|AMT)?\s*[:.]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
-            rf"(?:MONTHLY|INSTALLMENT)\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
+            rf"EMI\s+(?:AMOUNT|AMT)?\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
+            rf"(?:MONTHLY|INSTALLMENT)\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
         ]
 
         for pattern in patterns:
@@ -277,8 +277,8 @@ class LoanPDFParser:
     def _extract_outstanding(self, text: str) -> float:
         """Extract outstanding/remaining balance."""
         patterns = [
-            rf"(?:OUTSTANDING|BALANCE)\s+(?:AMOUNT|AMT|PRINCIPAL)?\s*[:.]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
-            rf"(?:REMAINING|CURRENT)\s+(?:BALANCE|PRINCIPAL)\s*[:.]?\s*{INR_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
+            rf"(?:OUTSTANDING|BALANCE)\s+(?:AMOUNT|AMT|PRINCIPAL)?\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
+            rf"(?:REMAINING|CURRENT)\s+(?:BALANCE|PRINCIPAL)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
         ]
 
         for pattern in patterns:

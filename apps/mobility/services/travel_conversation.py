@@ -81,11 +81,11 @@ def extract(state, text):
     notes = []
     def put(k, v, source="user_message", confirmed=True, confidence=1):
         state[k] = fact(v, source, confirmed, confidence)
-    money = re.search(rf"(?:{INR_TOKEN}\s*|budget(?:\s+is|\s+of)?\s*|under\s+|around\s+)([\d,]+(?:\.\d+)?)\s*(k|thousand|lakh)?", lower, re.IGNORECASE)
+    money = re.search(rf"(?:{INR_TOKEN}\s*|budget(?:\s+is|\s+of)?\s*|under\s+|around\s+)(\d[\d,]*(?:\.\d+)?)\s*(k|thousand|lakh)?", lower, re.IGNORECASE)
     if not money:
         money = re.search(r"\b(\d+(?:\.\d+)?)\s*(k|thousand|lakh)\b", lower)
     if not money:
-        money = re.search(r"\b([\d,]+(?:\.\d+)?)()\s*(?:rupees?\b|inr\b|rs\b|/-)", lower)
+        money = re.search(r"\b(\d[\d,]*(?:\.\d+)?)()\s*(?:rupees?\b|inr\b|rs\b|/-)", lower)
     if money:
         amount = float(money[1].replace(",", "")) * ({"k": 1000, "thousand": 1000, "lakh": 100000}.get(money[2], 1))
         if not 0 < amount <= 100000000:

@@ -12,7 +12,7 @@ import re
 from typing import BinaryIO
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
-from alfred_ai.services.currency import INR_AMOUNT, INR_TOKEN
+from alfred_ai.services.currency import INR_AMOUNT, INR_LABEL_TOKEN
 from alfred_ai.services.upload_limits import document_source, upload_deadline
 import pdfplumber
 from pypdf import PdfReader
@@ -28,9 +28,9 @@ DATE_FORMATS = (
 )
 
 VEHICLE_NUMBER_RE = re.compile(r"\b([A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}|\d{2}BH\d{4}[A-Z]{2})\b")
-CURRENCY_TOKEN_RE = INR_TOKEN
+CURRENCY_TOKEN_RE = INR_LABEL_TOKEN
 MONEY_RE = re.compile(INR_AMOUNT, re.IGNORECASE)
-NUMERIC_TOKEN_RE = re.compile(rf"^(?:{CURRENCY_TOKEN_RE}\s*)?([0-9,]+(?:\.\d{{1,2}})?)$", re.IGNORECASE)
+NUMERIC_TOKEN_RE = re.compile(rf"^(?:{CURRENCY_TOKEN_RE}\s*)?([0-9,]+(?:\.\d{{1,2}})?)(?:\s*/-)?$", re.IGNORECASE)
 TABLE_CODE_RE = re.compile(r"^[A-Z0-9][A-Z0-9/-]{0,30}$")
 
 DOCUMENT_KEYWORDS = {
