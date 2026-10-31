@@ -37,11 +37,18 @@ NON_SALARY_CREDIT_KEYWORDS = (
 )
 NON_SALARY_CATEGORIES = {"transfer", "loan", "investment", "credit_card"}
 # These credits are never pay, whatever else their text says.
-NEVER_PAY_RE = re.compile(r"\b(?:REFUNDS?|REVERSAL|REVERSED|CASHBACK|REDEMPTION|DISBURS\w*)\b")
-# Lenders, brokers and card issuers can also be employers, so a credit that says salary still counts.
-NOT_PAY_UNLESS_SALARY_RE = re.compile(
-    r"\b(?:LOANS?|" + "|".join(re.escape(word.strip()) for word in (*INVESTMENT_KEYWORDS, *CREDIT_CARD_KEYWORDS)) + r")\b"
+NEVER_PAY_RE = re.compile(
+    r"REFUND|REVERSAL|REVERSED|CASHBACK|REDEMPTION|LOANS?\W+DISBURS|SALARY\W+(?:ADVANCE\W+)?LOAN|PAYDAY\W+LOAN"
+    r"|LOANS?\W+(?:AGAINST|ON|FROM)\W+(?:SALARY|EMPLOYER)"
 )
+# Lenders, brokers and card issuers can also be employers, so a credit that says salary still counts.
+# Statement text runs words together, so only STOCK and MF need edges.
+NOT_PAY_UNLESS_SALARY_RE = re.compile(
+    r"LOAN|DISBURS|\bSTOCKS?\b|MF\b|"
+    + "|".join(re.escape(word) for word in (*INVESTMENT_KEYWORDS, *CREDIT_CARD_KEYWORDS) if word.strip() not in {"STOCK", "MF"})
+)
+# Money sent to a salary account says where it landed, not what it was.
+SALARY_ACCOUNT_RE = re.compile(r"SALARY\s*(?:A/?C|ACCOUNT)\b")
 # Older salary credits may belong to a job that has ended.
 SALARY_EVIDENCE_MAX_AGE = timedelta(days=92)
 # A payer this far behind the newest credit has stopped; paydays can shift by a few days each month.
@@ -74,7 +81,8 @@ def is_never_pay(item) -> bool:
     text = " ".join(str(value or "") for value in (item.company_name, item.counterparty, item.merchant, item.description, item.raw_description)).upper()
     if NEVER_PAY_RE.search(text):
         return True
-    return bool(NOT_PAY_UNLESS_SALARY_RE.search(text)) and not any(keyword in text for keyword in SALARY_KEYWORDS)
+    described = SALARY_ACCOUNT_RE.sub(" ", text)
+    return bool(NOT_PAY_UNLESS_SALARY_RE.search(text)) and not any(keyword in described for keyword in SALARY_KEYWORDS)
 
 
 def build_employment_income_signals(*, user, latest_resume=None, profile=None, today: date | None = None) -> dict:

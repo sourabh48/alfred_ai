@@ -95,14 +95,20 @@ SALARY_BLOCK_RE = re.compile(
     r"\s*(?P<period>(?:per\s+annum|per\s+year|/year|/yr|a\s+year|yearly|annually|annual|annum|lpa"
     r"|per\s+month|/month|/mo|a\s+month|monthly|month|pm|per\s+hour|/hour|/hr|an\s+hour|hourly"
     r"|per\s+week|/week|/wk|a\s+week|weekly|per\s+day|/day|a\s+day|daily)(?![A-Za-z]))?",
-    re.IGNORECASE,
+    # ASCII, or case folding captures lookalike letters that no currency or unit table knows.
+    re.IGNORECASE | re.ASCII,
 )
 # Whole-page text mentions funding, revenue and audience sizes; only pay wording may become salary evidence.
 SALARY_CONTEXT_RE = re.compile(
     r"\b(?:salary|salaries|compensation|ctc|pay|paying|pays|package|stipend|remuneration|earnings?|wages?|ote)\b",
     re.IGNORECASE,
 )
-SALARY_CURRENCY_CODES = {"inr": "INR", "inr.": "INR", "rs": "INR", "rs.": "INR", "rs/-": "INR", "rupee": "INR", "rupees": "INR",
+# A pay word right before an amount introduces that amount, not the one before it.
+SALARY_CONTEXT_AFTER_RE = re.compile(
+    SALARY_CONTEXT_RE.pattern + rf"(?![\s:=-]*(?:(?:is|of)\s+)?(?:{SALARY_CURRENCY_PATTERN})?\s*\d)",
+    re.IGNORECASE,
+)
+SALARY_CURRENCY_CODES = {"inr": "INR", "inr.": "INR", "rs": "INR", "rs.": "INR", "rs/-": "INR", "rs./-": "INR", "rupee": "INR", "rupees": "INR",
                          "\u20b9": "INR", "\u20a8": "INR", "\u00e2\u201a\u00b9": "INR", "usd": "USD", "$": "USD",
                          "eur": "EUR", "\u20ac": "EUR", "gbp": "GBP", "\u00a3": "GBP"}
 SALARY_RUPEE_UNITS = {"lpa", "lakh", "lakhs", "crore", "cr"}
@@ -1619,7 +1625,9 @@ class JobIntelligenceService:
             raise ValueError('Provide finite positive salary evidence in cents within the supported range.') from None
 
     def _parse_salary_text(self, text: str, *, require_context: bool = False) -> dict | None:
-        for match in SALARY_BLOCK_RE.finditer(text or ""):
+        # Pages put no-break spaces inside amounts; same length, so match positions still fit.
+        text = re.sub(r"[^\S\n]", " ", text or "")
+        for match in SALARY_BLOCK_RE.finditer(text):
             units = {(match.group(name) or "").lower() for name in ("first_unit", "second_unit")} - {""}
             currencies = {SALARY_CURRENCY_CODES[raw.strip().lower()]
                           for raw in (match.group(name) for name in ("currency", "second_currency", "trailing_currency")) if raw}
@@ -1650,8 +1658,8 @@ class JobIntelligenceService:
         if match.group("period") or "lpa" in units:
             return True
         before = re.split(r"[.!?;\n]\s", text[max(0, match.start() - 60):match.start()])[-1]
-        after = re.split(r"[.!?;,\n]", text[match.end():match.end() + 24])[0]
-        return bool(SALARY_CONTEXT_RE.search(before) or SALARY_CONTEXT_RE.search(after))
+        after = re.split(r"[.!?;\n]", text[match.end():match.end() + 24])[0]
+        return bool(SALARY_CONTEXT_RE.search(before) or SALARY_CONTEXT_AFTER_RE.search(after))
 
     def _salary_value(self, raw_value: str | None, unit: str | None) -> float:
         if not raw_value:

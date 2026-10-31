@@ -1,20 +1,42 @@
 """FIN-02: bank credits count as salary only on real evidence, and unknown income is never read as zero."""
 from datetime import date, timedelta
+from types import SimpleNamespace
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import Client, TestCase
+from django.test import Client, SimpleTestCase, TestCase
 from django.utils import timezone
 
 from apps.career.models import CareerProfile
-from apps.career.services.income_intelligence import build_employment_income_signals
+from apps.career.services.income_intelligence import build_employment_income_signals, is_never_pay
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence, resolve_canonical_financial_baseline
 from apps.integrations.services.credit_score_tracker import CreditScoreTrackerService
 from apps.loans.models import Loan
 from apps.ml_engine.services.recommendation_engine import FinancialRecommendationEngine
 from apps.ml_engine.training.orchestrator import TRAINING_SPECS
+from apps.risk.services.risk_intelligence import RiskIntelligenceService
+
+
+class NeverPayTextTests(SimpleTestCase):
+    def never_pay(self, text):
+        return is_never_pay(SimpleNamespace(category="income", company_name="", counterparty="", merchant="", description=text, raw_description=""))
+
+    def test_loans_and_investments_that_mention_salary_are_not_pay(self):
+        for text in ("NEFT CR SALARY LOAN HDFC", "PAYDAY LOAN XYZ", "LOAN AGAINST SALARY", "LOAN FROM EMPLOYER", "ZERODHA MF PROCEEDS TO SALARY A/C", "HOME LOAN DISBURSAL"):
+            with self.subTest(text=text):
+                self.assertTrue(self.never_pay(text))
+
+    def test_words_inside_longer_tokens_still_count(self):
+        for text in ("SALARY AMT REFUNDED ACME", "NEFT CR AXISMF SWP", "GROWWPAY", "HDFCLOAN", "HOMELOAN", "LOAN_123", "DISBURSEMENT ACME"):
+            with self.subTest(text=text):
+                self.assertTrue(self.never_pay(text))
+
+    def test_pay_from_lenders_and_payroll_disbursals_still_count(self):
+        for text in ("SALARY DISBURSEMENT ACME", "PAYROLL DISBURSED", "SALARY HDFC LOAN SERVICES LTD", "NEFT CR STOCKHOLM TRADING"):
+            with self.subTest(text=text):
+                self.assertFalse(self.never_pay(text))
 
 
 class SalaryEvidenceBase(TestCase):
@@ -420,6 +442,15 @@ class ConfirmedIncomeTests(SalaryEvidenceBase):
 
 
 class UnknownIncomeIsNotZeroTests(SalaryEvidenceBase):
+    def test_risk_signals_with_no_data_are_unknown_not_zero(self):
+        outlook = RiskIntelligenceService().build_outlook(self.user("risk_blank"))
+        signals = outlook["module_signals"]
+        self.assertIsNone(signals["emergency_months"])
+        self.assertIsNone(signals["average_stress"])
+        self.assertIsNone(signals["average_sleep"])
+        relocation = next(item for item in outlook["consolidated_risks"] if item["key"] == "relocation")
+        self.assertNotIn("rent burden", relocation["note"])
+
     def with_loan(self, user):
         Loan.objects.create(user=user, loan_type="personal", lender="Synthetic", principal=500000, interest_rate=10,
                             tenure_months=60, emi=20000, remaining_balance=400000, start_date=timezone.localdate() - timedelta(days=60))

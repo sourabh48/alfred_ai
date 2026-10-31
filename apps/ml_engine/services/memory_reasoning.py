@@ -36,26 +36,30 @@ def real_reasoning_authorized():
     return settings.ALFRED_MEMORY_OPENAI_AUTHORIZED and settings.ALFRED_MEMORY_OPENAI_PRICING_DATE==datetime.now(timezone.utc).date().isoformat()
 
 
-# Word edges mean Latin letters and digits only, so a private word still counts beside another script. Plain
-# \b would miss a word starting with a lookalike letter such as a long s.
+# Word edges mean Latin letters and digits only, so a private word still counts beside another script or an
+# underscore. Plain \b would miss a word starting with a lookalike letter, and case folding makes [a-z] match some.
+WORD_START=r'(?<!(?-i:[a-zA-Z0-9]))'
+WORD_END=r'(?!(?-i:[a-zA-Z0-9]))'
 PRIVATE_TEXT=re.compile(
-    r'(?i)(?<![a-z0-9_])(?:account|loan|emi|balance|salary|income|password|secret|token|bearer|medical|diagnosis)(?![a-z0-9_])'
+    rf'(?i){WORD_START}(?:(?:account|loan|emi|balance|income|password|secret|token|bearer)s?|salary|salaries|medical|diagnosis){WORD_END}'
     r'|sk-[a-z0-9-]{8,}|AKIA[A-Z0-9]{12,}|[a-z]:[\\/]|/(?:home|users|tmp)/|\b[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\d[ -]?){6,}'
-    rf'|(?:[$€£]|{INR_SIGN})\s*\d|(?<![a-z0-9_]){INR_NAME}:?\s*\d'
-    r'|\d\s*(?:k|thousand|lakhs?|crores?|cr|million)?\s*(?:rupees?|inr|rs)(?![a-z0-9_])|\d\s*/-')
+    rf'|(?:[$€£]|{INR_SIGN})\s*\d|{WORD_START}{INR_NAME}:?\s*\d'
+    rf'|\d\s*(?:k|thousand|lakhs?|crores?|cr|million)?\s*(?:rupees?|inr|rs){WORD_END}|\d\s*/-')
 
 
 def _scannable_forms(payload):
-    # JSON escapes backslashes and control characters. A format character such as zero-width space can sit inside
-    # a word or between two, so read it both ways.
-    raw=re.sub(r'\\(\\)|\\u00[01][0-9a-f]|\\[nrtfb]',lambda match: match[1] or ' ',json.dumps(payload,ensure_ascii=False))
-    return (''.join(char for char in raw if unicodedata.category(char)!='Cf'),
-            ''.join(' ' if unicodedata.category(char)=='Cf' else char for char in raw))
+    # JSON escapes backslashes and control characters. Text holding a literal \n reads as a space too, or its letter
+    # would hide the next word.
+    dumped=json.dumps(payload,ensure_ascii=False)
+    return (re.sub(r'\\(\\)|\\u00[01][0-9a-f]|\\[nrtfb]',lambda match: match[1] or ' ',dumped),
+            re.sub(r'\\+(?:u00[01][0-9a-f]|[nrtfb])',' ',dumped))
 
 
 def public_payload(payload):
     encoded(payload)  # refuses what cannot be encoded
-    if any(PRIVATE_TEXT.search(text) for text in _scannable_forms(payload)):
+    forms=_scannable_forms(payload)
+    # Invisible format characters can hide any word, so text carrying them stays local.
+    if any(unicodedata.category(char)=='Cf' for char in forms[0]) or any(PRIVATE_TEXT.search(text) for text in forms):
         raise PermissionError('Potential sensitive data must remain in local processing.')
     keys=[]; pending=[payload]
     while pending:

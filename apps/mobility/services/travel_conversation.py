@@ -83,9 +83,9 @@ def extract(state, text):
         state[k] = fact(v, source, confirmed, confidence)
     money = re.search(rf"(?:{INR_TOKEN}\s*|budget(?:\s+is|\s+of)?\s*|under\s+|around\s+)(\d[\d,]*(?:\.\d+)?)\s*(k|thousand|lakh)?", lower, re.IGNORECASE)
     if not money:
-        money = re.search(r"(?<![$\u20ac\u00a3\d,.])\b(\d+(?:\.\d+)?)\s*(k|thousand|lakh)\b", lower)
+        money = re.search(r"(?<![$\u20ac\u00a3])(?<![$\u20ac\u00a3]\s)(?<!\d[,.])\b(\d+(?:\.\d+)?)\s*(k|thousand|lakh)\b", lower)
     if not money:
-        money = re.search(r"(?<![$\u20ac\u00a3\d,.])\b(\d[\d,]*(?:\.\d+)?)()\s*(?:rupees?|inr|rs)\b", lower) or re.fullmatch(r"(\d[\d,]*(?:\.\d+)?)()\s*/-", lower)
+        money = re.search(r"(?<![$\u20ac\u00a3])(?<![$\u20ac\u00a3]\s)(?<!\d[,.])\b(\d[\d,]*(?:\.\d+)?)()\s*(?:rupees?|inr|rs)\b", lower) or re.fullmatch(r"(\d[\d,]*(?:\.\d+)?)()\s*/-", lower)
     if money:
         amount = float(money[1].replace(",", "")) * ({"k": 1000, "thousand": 1000, "lakh": 100000}.get(money[2], 1))
         if not 0 < amount <= 100000000:
