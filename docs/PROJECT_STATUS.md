@@ -1,6 +1,12 @@
 # ALFRED Project Status
 
-## Active implementation checkpoint — consolidated development candidate, 2026-10-31
+## Active implementation checkpoint — owner decisions after master functional testing, 2026-11-01
+
+The application follows the Windows system time zone, with `ALFRED_TIME_ZONE` as an override and `Asia/Kolkata` as the logged
+fallback. No live bookings and no paid AI for now: TRAVEL-11, TRAVEL-12, TRAVEL-13, TRAVEL-14 and OPENAI-07 are deferred by the
+owner, not accepted, and Travel links to verified websites. See EXECUTION_STATE. Baseline75/143, extensions0/13 unchanged.
+
+## Previous implementation checkpoint — consolidated development candidate, 2026-10-31
 
 Finished local work consolidated on `dd1822f`: SEC-01, SEC-02, CAREER-06, evidence labels, FIN-01, FIN-02, rupee
 text recognition without conversion, and the Asia/Kolkata default. Implemented is not accepted; no requirement is

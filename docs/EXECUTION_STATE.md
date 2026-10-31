@@ -1,6 +1,21 @@
 # ALFRED execution state
 
-## Active checkpoint — consolidated development candidate (2026-10-31)
+## Active checkpoint — post-master functional results and owner decisions (2026-11-01)
+
+- Master `96d4637` functional verdict: FUNCTIONAL FAILURES FOUND. Exact-SHA results: Chrome 156/156; backend 2457 run,
+  2 failed from a local test shell setting and passing without it, 176 skipped (156 browser, 20 local AI); local AI 19/20,
+  with one benchmark refusing because the memory code changed after it was frozen; native runtime, memory, backup, recovery
+  and travel drills passed. Installer, clean PC, real providers, real account and NVDA remain PENDING.
+- Defects: Travel destination wording, repeated expense reference through the API, statement import overwriting account
+  name and type, 276 dependency advisories (RUNTIME-11). Baseline75/143, extensions0/13 unchanged.
+- OWNER_DECISION: follow the Windows system time zone. `ALFRED_TIME_ZONE` overrides it; `Asia/Kolkata` is only the logged
+  fallback when detection fails. UTC storage stays, and stored dates are not rewritten. A zone change applies after a restart.
+  Changing the zone moves today and month boundaries for later reads, including loan verification date cutoffs.
+- OWNER_DECISION: no live bookings and no paid AI now. Travel gives links to verified websites. TRAVEL-11, TRAVEL-12,
+  TRAVEL-13, TRAVEL-14 and OPENAI-07 are deferred by the owner, not accepted. AI booking after the owner's selection and
+  approval is a new feature after the app is finished.
+
+## Previous checkpoint — consolidated development candidate (2026-10-31)
 
 - Owner request: merge the finished local work into development/alfred-integrated, then master. Publishing `docs/`
   through master is approved only if checks pass. Candidate built on `dd1822f`; tooling commit `ff9b9b9` and
@@ -20,7 +35,7 @@ fixes were not on it. No full allow-list ran at it. GitHub shows PR #20 open and
 
 ## Previous checkpoint — D4 runtime time zone (2026-10-31)
 
-- OWNER_DECISION resolved: default application zone Asia/Kolkata; UTC stays canonical for stored
+- OWNER_DECISION at the time, since replaced by system zone detection: default application zone Asia/Kolkata; UTC stays canonical for stored
   timestamps and internal scheduling. Local branch `fix/ist-time-zone` from 97ecd0d. State
   LOCAL_ACCEPTED, not pushed; PUSH NOT AUTHORIZED. Source commit bd9cc5b; this checkpoint is the
   commit after it. No exact-head CI exists.
