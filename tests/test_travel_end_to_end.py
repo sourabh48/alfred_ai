@@ -222,7 +222,7 @@ class TravelEndToEndTests(TestCase):
             owner=self.user.pk,due=self.due.isoformat(),documents=bool(raw))),encoding='utf-8')
         env=environment(root/'runtime');env.update(DATABASE_URL='sqlite:///'+database.as_posix(),
             D1_VAULT=str(settings.ALFRED_MEMORY_DIR),DJANGO_SECRET_KEY=settings.SECRET_KEY,
-            DJANGO_SETTINGS_MODULE='alfred_ai.settings',D1_ROOT=str(root))
+            DJANGO_SETTINGS_MODULE='alfred_ai.settings',D1_ROOT=str(root),ALFRED_TIME_ZONE=settings.TIME_ZONE)
         program='''
 import json,os
 from datetime import datetime,timedelta
