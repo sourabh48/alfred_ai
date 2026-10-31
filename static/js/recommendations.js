@@ -42,7 +42,7 @@ function renderRecommendationSummary(data) {
     const cards = [
         { title: "Income", value: incomeKnown ? Alfred.formatCurrency(profile.income) : "Unavailable", copy: incomeKnown ? "Monthly income used for suitability" : "Confirm your income in Settings" },
         { title: "Monthly Spend", value: Alfred.formatCurrency(profile.monthly_expenses || 0), copy: "Derived from recent history" },
-        { title: "Savings Rate", value: incomeKnown ? `${Alfred.formatNumber(profile.savings_rate || 0)}%` : "Unavailable", copy: `${Alfred.formatCurrency(profile.monthly_savings || 0)} monthly savings` },
+        { title: "Savings Rate", value: incomeKnown ? `${Alfred.formatNumber(profile.savings_rate || 0)}%` : "Unavailable", copy: incomeKnown ? `${Alfred.formatCurrency(profile.monthly_savings || 0)} monthly savings` : "Needs a confirmed income" },
         { title: "Debt Load", value: incomeKnown ? `${Alfred.formatNumber(profile.dti_ratio || 0)}%` : "Unavailable", copy: `${Alfred.formatCurrency(data.insurance?.total_annual_premium || 0)} annual essential premium` },
     ];
 
@@ -132,7 +132,7 @@ function renderGrounding(grounding) {
     const freshness = grounding.freshness || {};
     const modules = grounding.modules || [];
     const cards = [
-        { title: "Monthly Income", value: Alfred.formatCurrency(history.monthly_income || 0), copy: "Current income basis" },
+        { title: "Monthly Income", value: Number(history.monthly_income) > 0 ? Alfred.formatCurrency(history.monthly_income) : "Unavailable", copy: "Current income basis" },
         { title: "Monthly Spend", value: Alfred.formatCurrency(history.monthly_expenses || 0), copy: "Recent history basis" },
         { title: "Tracked Personas", value: Alfred.formatNumber((history.tracked_personas || []).length, 0), copy: "Behavior personas influencing the stack" },
         { title: "Fresh Evidence", value: Alfred.formatNumber(freshness.fresh_records || 0, 0), copy: `${Alfred.formatNumber(freshness.tracked_records || 0, 0)} evidence records attached` },

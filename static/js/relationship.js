@@ -131,7 +131,7 @@ function renderRelationshipGrounding(alignment) {
     `).join("");
 
     metaTarget.innerHTML = [
-        ["Monthly income", Alfred.formatCurrency(history.monthly_income || 0), "Household income basis"],
+        ["Monthly income", Number(history.monthly_income) > 0 ? Alfred.formatCurrency(history.monthly_income) : "Unavailable", "Household income basis"],
         ["Monthly spend", Alfred.formatCurrency(history.monthly_expenses || 0), "Recent spend basis"],
         ["Fixed load", Alfred.formatCurrency(history.fixed_load || 0), "Rent plus EMI pressure"],
         ["Fresh evidence", Alfred.formatNumber(freshness.fresh_records || 0, 0), `${Alfred.formatNumber(freshness.tracked_records || 0, 0)} records tracked`],

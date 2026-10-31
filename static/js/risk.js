@@ -185,7 +185,7 @@ function renderRiskGrounding(grounding, freshness) {
     cardsTarget.innerHTML = [
         ["Evidence tracked", Alfred.formatNumber(activeFreshness.tracked_records || 0, 0), "Verified records attached"],
         ["Fresh now", Alfred.formatNumber(activeFreshness.fresh_records || 0, 0), activeFreshness.next_stale_after ? `Next stale after ${Alfred.formatDateTime(activeFreshness.next_stale_after)}` : "No stale deadline attached"],
-        ["Snapshots", Alfred.formatNumber(history.tracked_snapshots || 0, 0), `${Alfred.formatCurrency(history.monthly_income || 0)} income basis`],
+        ["Snapshots", Alfred.formatNumber(history.tracked_snapshots || 0, 0), Number(history.monthly_income) > 0 ? `${Alfred.formatCurrency(history.monthly_income)} income basis` : "Income unavailable"],
     ].map(([label, value, copy]) => `
         <article class="metric-card metric-card--compact">
             <p class="metric-kicker">${Alfred.escapeHtml(label)}</p>

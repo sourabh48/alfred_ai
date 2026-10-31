@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from statistics import median
 import re
 
@@ -33,10 +34,18 @@ NON_SALARY_CREDIT_KEYWORDS = (
     "REIMB",
     "UPI",
 )
+# These credits are never pay, whatever their text says.
+NON_SALARY_CATEGORIES = {"transfer", "loan", "investment", "credit_card"}
+NEVER_SALARY_MARKERS = ("REFUND", "REVERSAL", "CASHBACK")
 # Older salary credits may belong to a job that has ended.
 SALARY_EVIDENCE_MAX_AGE = timedelta(days=92)
-# Take-home pay sits below gross, so only a gap beyond this band is a disagreement.
-INCOME_AGREEMENT_RATIO = (0.55, 1.8)
+# A payer this far behind the newest credit has stopped; paydays can shift by a few days each month.
+ACTIVE_PAYER_GAP = timedelta(days=45)
+# Pay from an old and a new job overlaps for a month or two, so real second jobs need longer.
+CONCURRENT_JOB_MONTHS = 3
+# Confirmed income divided by salary credits. Take-home sits well below gross, but credits
+# far above a confirmed income are not explained by deductions, so that side is narrow.
+INCOME_AGREEMENT_RATIO = (0.9, 1.8)
 EMPLOYER_NOISE_TOKENS = {
     "BANK",
     "PAYMENT",
@@ -84,7 +93,10 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None, t
     variable_income = float(getattr(user, "variable_income", 0) or 0)
     observed_salary = round(sum(item["monthly_amount"] for item in current_salaries), 2)
     reported_mode = _reported_income_mode(reported_value, user.monthly_income_basis)
-    reported_monthly_equivalent = {"annual_ctc": round(reported_value / 12, 2), "monthly": round(reported_value, 2)}.get(reported_mode, 0.0)
+    reported_monthly_equivalent = {
+        "annual_ctc": float((Decimal(str(reported_value)) / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)),
+        "monthly": round(reported_value, 2),
+    }.get(reported_mode, 0.0)
     income_conflict = _income_conflict(observed_salary, reported_monthly_equivalent)
     # A confirmed income is never silently replaced by what the credits suggest.
     salary_monthly = 0.0 if income_conflict else observed_salary
@@ -141,7 +153,7 @@ def _build_salary_credit_candidates(credits: list[Expense]) -> list[dict]:
 
     for item in credits:
         amount = float(item.amount or 0)
-        if amount < 10000 or item.category == "transfer":
+        if amount < 10000 or item.category in NON_SALARY_CATEGORIES:
             continue
         raw_text = " ".join(
             str(value or "")
@@ -155,6 +167,8 @@ def _build_salary_credit_candidates(credits: list[Expense]) -> list[dict]:
             if value
         ).upper()
         if not raw_text:
+            continue
+        if any(marker in raw_text for marker in NEVER_SALARY_MARKERS):
             continue
         has_salary_keyword = any(keyword in raw_text for keyword in SALARY_KEYWORDS)
         has_non_salary_marker = any(keyword in raw_text for keyword in NON_SALARY_CREDIT_KEYWORDS)
@@ -241,12 +255,18 @@ def _current_salary_candidates(candidates: list[dict], today: date) -> list[dict
     recent = [item for item in candidates if item["last_credit"] >= cutoff]
     if not recent:
         return []
-    newest = max(recent, key=lambda item: item["last_credit"])
-    # A second source counts only if it says salary and paid alongside for two months; otherwise it is a job change.
-    return [
-        item for item in recent
-        if item is newest or (item["described_as_salary"] and len(set(item["months"]) & set(newest["months"])) >= 2)
-    ]
+    newest = max(date.fromisoformat(item["last_credit"]) for item in recent)
+    active = [item for item in recent if newest - date.fromisoformat(item["last_credit"]) <= ACTIVE_PAYER_GAP]
+    payers = [item for item in active if item["described_as_salary"]] or active
+    primary = max(payers, key=lambda item: item["monthly_amount"])
+    # A lone credit does not outweigh a larger recurring one, but a new job can still replace a smaller old one.
+    if primary["months_observed"] == 1:
+        primary = max(active, key=lambda item: item["monthly_amount"])
+    return [primary, *(
+        item for item in active
+        if item is not primary and item["described_as_salary"]
+        and len(set(item["months"]) & set(primary["months"])) >= CONCURRENT_JOB_MONTHS
+    )]
 
 
 def _income_conflict(observed_salary: float, reported_monthly: float) -> dict | None:
@@ -342,6 +362,8 @@ def _build_source_summary(
         parts.append(
             f"Recurring credit history suggests monthly salary cash-in of INR {salary_signal['monthly_amount']:,.0f} across {salary_signal['months_observed']} month(s)."
         )
+    elif income_conflict:
+        pass  # Its message above already says which income is in use.
     elif salary_source == "reported_annual_ctc":
         parts.append("Monthly cash income falls back to the reported annual CTC because no recurring salary credit pattern is evidenced yet.")
     elif salary_source == "reported_monthly_income":

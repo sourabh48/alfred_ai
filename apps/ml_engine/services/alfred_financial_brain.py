@@ -242,6 +242,10 @@ class AlfredFinancialBrain:
             "insights": insights,
         }
 
+    @staticmethod
+    def _debt_load_unknown(baseline: Dict) -> bool:
+        return float(baseline.get("monthly_income", 1) or 0) <= 0 and float(baseline.get("fixed_obligations", 0) or 0) > 0
+
     def _calculate_financial_health_score(self, snapshot: Dict) -> Dict[str, Any]:
         """
         Calculate overall financial health score (0-100) based on multiple factors.
@@ -268,7 +272,9 @@ class AlfredFinancialBrain:
         baseline = snapshot.get("financial_baseline", {})
         loans = snapshot.get("loans", {})
         dti = float(baseline.get("debt_burden_ratio", loans.get("debt_to_income_ratio", 0)) or 0)
-        if dti == 0:
+        if self._debt_load_unknown(baseline):
+            factors.append("Debt load unknown until income is confirmed")
+        elif dti == 0:
             score += 20
             factors.append("Debt-free lifestyle")
         elif dti < 25:
@@ -369,6 +375,12 @@ class AlfredFinancialBrain:
         baseline = snapshot.get("financial_baseline", {})
         loans = snapshot.get("loans", {})
         dti = float(baseline.get("debt_burden_ratio", loans.get("debt_to_income_ratio", 0)) or 0)
+        if self._debt_load_unknown(baseline):
+            actions.append({
+                "priority": "MEDIUM",
+                "action": "Confirm Your Income",
+                "description": "You have fixed obligations but no confirmed income, so your debt burden cannot be checked."
+            })
         if dti > 40:
             actions.append({
                 "priority": "HIGH",

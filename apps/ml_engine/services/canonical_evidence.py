@@ -362,7 +362,8 @@ def baseline_source(user):
     data=dict(record_type='baseline',record_id=owner.pk,applicable_date=timezone.localdate().isoformat(),
         provenance='resolve_canonical_financial_baseline (fresh)',verification='user_recorded',
         limitations=['Legacy totals require approved matching currency evidence and are withheld.',
-            'Reported income and housing are not independently verified.'],amounts={},metric_states={})
+            'Reported income and housing are not independently verified.',
+            *(['Recent salary credits disagree with the confirmed income.'] if baseline.get('income_conflict') else [])],amounts={},metric_states={})
     for key in (*BASELINE_KEYS,'rent_burden'):
         state=baseline['metric_states'][key]
         supported=(key=='rent_burden' or (key=='monthly_income' and baseline['income_source']=='reported_monthly_income'

@@ -41,7 +41,7 @@ PERCENT_QUANT = Decimal("0.01")
 
 BASELINE_FORMULAS = {
     "monthly_income": "Normalized reliable monthly income from salary credits, reported income, career salary, or observed credit inflow fallback.",
-    "annual_income": "The income entered per year, otherwise monthly_income * 12",
+    "annual_income": "The income confirmed per year, otherwise monthly_income * 12",
     "recurring_emi_burden": "Sum of confirmed active loan EMIs that still report an outstanding balance.",
     "rent_burden": "User-reported monthly rent or housing obligation.",
     "fixed_obligations": "rent_burden + recurring_emi_burden",
@@ -107,6 +107,7 @@ def _build_financial_intelligence_uncached(user) -> dict:
         balance_sheet=balance_sheet,
         monthly_buckets=monthly_buckets,
         reference_date=reference_date,
+        income_as_of=today,
     )
     financial_relationships, transaction_relationships = build_financial_relationships(user=user, expenses=expenses, loans=loans)
     intelligence["financial_relationships"] = financial_relationships
@@ -520,6 +521,14 @@ def _baseline_metric_state(status: str, source: str, formula_key: str, *, inputs
     }
 
 
+def _income_credits_are_current(monthly_buckets: dict, as_of: date) -> bool:
+    """Recorded income stands in for salary only if it recurs and has not stopped."""
+    from apps.career.services.income_intelligence import SALARY_EVIDENCE_MAX_AGE
+    cutoff = as_of - SALARY_EVIDENCE_MAX_AGE
+    months = [key for key, bucket in monthly_buckets.items() if bucket["income"] > 0 and key >= (cutoff.year, cutoff.month) and key <= (as_of.year, as_of.month)]
+    return len(months) >= 2
+
+
 def _income_metric_status(income_source: str) -> str:
     if income_source == "salary_credits":
         return "observed"
@@ -587,6 +596,7 @@ def _build_canonical_financial_baseline_uncached(
     balance_sheet: dict | None = None,
     monthly_buckets: dict[tuple[int, int], dict] | None = None,
     reference_date: date | None = None,
+    income_as_of: date | None = None,
 ) -> dict:
     from apps.career.models import CareerProfile, CareerResume
     from apps.career.services import build_employment_income_signals
@@ -598,6 +608,8 @@ def _build_canonical_financial_baseline_uncached(
         payment_rows = fetch_payment_history_rows(user=user)
 
     today = timezone.localdate()
+    # Whether income evidence is current depends on the real date unless a historical date was asked for.
+    income_as_of = income_as_of or reference_date or today
     resolved_reference_date = reference_date or max([item.transaction_date for item in expenses], default=today)
     monthly_buckets = monthly_buckets or _build_monthly_buckets(expenses)
     recent_month_keys = sorted(monthly_buckets.keys())[-3:]
@@ -620,7 +632,7 @@ def _build_canonical_financial_baseline_uncached(
 
     profile = CareerProfile.objects.filter(user=user).first()
     latest_resume = CareerResume.objects.filter(user=user).order_by("-updated_at", "-id").first()
-    income_signals = build_employment_income_signals(user=user, latest_resume=latest_resume, profile=profile, today=reference_date or today)
+    income_signals = build_employment_income_signals(user=user, latest_resume=latest_resume, profile=profile, today=income_as_of)
 
     reported_income = income_signals.get("reported_income", {}) or {}
     salary_signal = income_signals.get("salary_credit_signal") or {}
@@ -638,16 +650,16 @@ def _build_canonical_financial_baseline_uncached(
     elif profile_last_salary > 0:
         income_source = "career_profile_last_salary"
         income_source_summary = "Monthly income falls back to the last salary stored in the career profile because stronger salary signals are not available yet."
-    elif observed_average_monthly_inflow_amount > 0:
+    elif _income_credits_are_current(monthly_buckets, income_as_of):
         monthly_income_amount = observed_average_monthly_inflow_amount
         income_source = "observed_credit_inflow"
         income_source_summary = "Monthly income falls back to the recent average of observed credit inflows because a cleaner salary signal is not evidenced yet."
 
     monthly_income_amount = monthly_income_amount.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     annual_income_amount = (monthly_income_amount * Decimal("12")).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
-    if income_source == "reported_annual_ctc":
-        # Monthly rounding must not change an amount the owner entered per year.
-        annual_income_amount = _decimal_amount(reported_income.get("value", 0)).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    if reported_income.get("mode") == "annual_ctc":
+        # An income confirmed per year stands, neither rounded through a month nor replaced by take-home credits.
+        annual_income_amount = _decimal_amount(income_signals.get("annualized_compensation", 0)).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     supplemental_variable_income_amount = _decimal_amount(income_signals.get("variable_income", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     rent_burden_amount = _decimal_amount(getattr(user, "rent_or_emi", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
 

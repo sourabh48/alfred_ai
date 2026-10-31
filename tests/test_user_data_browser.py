@@ -229,6 +229,15 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
         self.browser.get(self.live_server_url + '/recommendations/')
         self.wait.until(lambda _: 'Unavailable' in self.text('recommendationSummaryCards'))
+        self.assertIn('needs a confirmed income', self.text('recommendationSummaryCards').lower())
+
+        # No income at all reads the same way as an unconfirmed one.
+        type(owner).objects.create_user('no_income_tax_viewer', password=PASSWORD, monthly_income=0, monthly_income_basis='monthly')
+        self.browser.delete_all_cookies()
+        self.login('no_income_tax_viewer')
+        self.browser.get(self.live_server_url + '/tax-optimizer/')
+        self.wait.until(lambda _: self.text('taxRegimeValue').lower() == 'unavailable')
+        self.assertFalse(self.browser.execute_script("return Boolean(window.Chart && Chart.getChart('taxComparisonChart'))"))
 
         # A salary that disagrees is shown beside the confirmed income, never swapped in for it.
         viewer = type(owner).objects.create_user('income_conflict_viewer', password=PASSWORD, monthly_income=amount, monthly_income_basis='monthly')

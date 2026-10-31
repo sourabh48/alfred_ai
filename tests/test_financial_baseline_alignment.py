@@ -480,7 +480,7 @@ class CanonicalFinancialBaselineEdgeCaseTests(TestCase):
 
         salary_baseline = resolve_canonical_financial_baseline(salary_user, reference_date=date(2026, 3, 31))
         self.assertEqual(salary_baseline["monthly_income"], 70000.0)
-        self.assertEqual(salary_baseline["annual_income"], 840000.0)
+        self.assertEqual(salary_baseline["annual_income"], 960000.0)
         self.assertEqual(salary_baseline["income_source"], "salary_credits")
         self.assertEqual(salary_baseline["metric_states"]["monthly_income"]["status"], "observed")
 
@@ -495,7 +495,7 @@ class CanonicalFinancialBaselineEdgeCaseTests(TestCase):
         for month in (1, 2, 3):
             self._expense(observed_user, amount=42000, month=month, direction="credit", category="income", raw="UPI TRANSFER FAMILY SUPPORT")
 
-        observed_baseline = resolve_canonical_financial_baseline(observed_user)
+        observed_baseline = resolve_canonical_financial_baseline(observed_user, reference_date=date(2026, 3, 31))
         self.assertEqual(observed_baseline["monthly_income"], 42000.0)
         self.assertEqual(observed_baseline["income_source"], "observed_credit_inflow")
         self.assertEqual(observed_baseline["metric_states"]["monthly_income"]["status"], "observed")
@@ -512,7 +512,7 @@ class CanonicalFinancialBaselineEdgeCaseTests(TestCase):
             self._expense(user, amount=3000, month=month, classification="other", category="investment", raw="SIP INVESTMENT")
             self._expense(user, amount=80000, month=month, category="other", raw="SELF CHQ PAID")
 
-        baseline = resolve_canonical_financial_baseline(user)
+        baseline = resolve_canonical_financial_baseline(user, reference_date=date(2026, 3, 31))
         intelligence = build_financial_intelligence(user)
 
         self.assertEqual(baseline["monthly_income"], 50000.0)

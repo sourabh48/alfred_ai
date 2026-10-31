@@ -95,6 +95,18 @@ class IncomeBasisTests(TestCase):
         self.assertEqual(summary["monthly_income"], 90000.0)
         self.assertEqual(summary["income_unverified_member_count"], 1)
 
+    def test_family_summary_ignores_income_a_member_did_not_agree_to_share(self):
+        from apps.family.services import accept_family_link_code, create_family_link_invite
+        from apps.family.views import _family_financial_summary
+        owner = self.user("family_no_consent_viewer", 90000, "monthly")
+        for name, basis in (("family_private_confirmed", "monthly"), ("family_private_unverified", "unconfirmed")):
+            link, code = create_family_link_invite(self.user(name, 300000, basis))
+            accept_family_link_code(owner, code)
+            type(link).objects.filter(pk=link.pk).update(share_financial_summary=False)
+        summary = _family_financial_summary(owner, own_baseline=self.baseline(owner))["family_financial_baseline"]
+        self.assertEqual(summary["monthly_income"], 90000.0)
+        self.assertEqual(summary["income_unverified_member_count"], 0)
+
     def test_projection_does_not_fall_back_to_unconfirmed_income(self):
         from apps.career.services.projection_engine import build_projection_inputs
         user = self.user("unconfirmed_projection", 300000, "unconfirmed")

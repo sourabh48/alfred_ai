@@ -126,7 +126,7 @@ function renderOpeningFilters(filters, active) {
 function renderCareerHero(profile, projection, timing) {
     const latest = (projection.projections || []).at(-1);
     document.getElementById("careerRoleValue").textContent = profile.role || "Profile pending";
-    document.getElementById("careerIncomeValue").textContent = Alfred.formatCurrency(projection.current_income || 0);
+    document.getElementById("careerIncomeValue").textContent = Number(projection.current_income) > 0 ? Alfred.formatCurrency(projection.current_income) : "Unavailable";
     const incomeConflict = document.getElementById("careerIncomeConflict");
     incomeConflict.textContent = projection.income_signals?.income_conflict?.message || "";
     incomeConflict.classList.toggle("d-none", !incomeConflict.textContent);

@@ -21,7 +21,7 @@ function loadTaxDashboard(queryOrOptions = taxDashboardQuery) {
         .then(data => {
             renderTaxHero(data);
             renderTaxSummary(data);
-            renderTaxChart(data.regime_comparison);
+            renderTaxChart(data.regime_comparison, taxIncomeUnavailable(data));
             if (!live) {
                 renderTaxInputs(data.inputs);
             }
@@ -36,7 +36,7 @@ function loadTaxDashboard(queryOrOptions = taxDashboardQuery) {
 }
 
 function taxIncomeUnavailable(data) {
-    return data.financial_baseline?.income_basis_needs_confirmation && !Number(data.annual_income);
+    return !Number(data.annual_income);
 }
 
 function renderTaxHero(data) {
@@ -51,7 +51,7 @@ function renderTaxHero(data) {
     if (taxIncomeUnavailable(data)) {
         document.getElementById("taxRegimeValue").textContent = "Unavailable";
         document.getElementById("taxAnnualValue").textContent = "Unavailable";
-        document.getElementById("taxHeroCopy").textContent = "Confirm your income period in Settings, or enter an annual income here, to estimate tax.";
+        document.getElementById("taxHeroCopy").textContent = "Confirm your income in Settings, or enter an annual income here, to estimate tax.";
     }
     const policy = data.tax_policy;
     document.getElementById("taxPolicyCopy").textContent = `FY ${policy.financial_year} · AY ${policy.assessment_year}. Official-source rules verified ${policy.verified_at}; salary planning estimate before return-filing rounding.`;
@@ -67,7 +67,7 @@ function renderTaxSummary(data) {
     ];
 
     const shown = taxIncomeUnavailable(data)
-        ? cards.map(card => ({ ...card, value: "Unavailable", copy: "Needs a confirmed income period." }))
+        ? cards.map(card => ({ ...card, value: "Unavailable", copy: "Needs a confirmed income." }))
         : cards;
     document.getElementById("taxSummaryCards").innerHTML = shown.map(card => `
         <article class="metric-card">
@@ -78,10 +78,14 @@ function renderTaxSummary(data) {
     `).join("");
 }
 
-function renderTaxChart(comparison) {
+function renderTaxChart(comparison, incomeUnavailable) {
     const canvas = document.getElementById("taxComparisonChart");
     if (taxComparisonChart) {
         taxComparisonChart.destroy();
+        taxComparisonChart = null;
+    }
+    if (incomeUnavailable) {
+        return;
     }
 
     taxComparisonChart = new Chart(canvas, {
@@ -115,7 +119,7 @@ function renderTaxActions(items, incomeUnavailable) {
     const target = document.getElementById("taxActionList");
     target.innerHTML = items.length
         ? items.map(item => `<li class="insight-item">${Alfred.escapeHtml(`${item.action} • ${Alfred.formatCurrency(item.amount)} • tax benefit ${Alfred.formatCurrency(item.tax_benefit)}`)}</li>`).join("")
-        : `<li class="insight-item">${incomeUnavailable ? "Tax benefits need a confirmed income period." : "No tax-saving action items available."}</li>`;
+        : `<li class="insight-item">${incomeUnavailable ? "Tax benefits need a confirmed income." : "No tax-saving action items available."}</li>`;
 }
 
 function renderTaxBenefits(hra, homeLoan, incomeUnavailable) {

@@ -3,13 +3,14 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 
 from apps.career.models import CareerProfile
 from apps.career.services.income_intelligence import build_employment_income_signals
 from apps.expenses.models import Expense
-from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+from apps.expenses.services.financial_intelligence import build_financial_intelligence, resolve_canonical_financial_baseline
 from apps.integrations.services.credit_score_tracker import CreditScoreTrackerService
 from apps.loans.models import Loan
 from apps.ml_engine.services.recommendation_engine import FinancialRecommendationEngine
@@ -17,15 +18,19 @@ from apps.ml_engine.training.orchestrator import TRAINING_SPECS
 
 
 class SalaryEvidenceBase(TestCase):
+    def setUp(self):
+        # Rolled-back tests reuse primary keys, and baselines are cached by user.
+        cache.clear()
+
     def user(self, name, amount=0, basis="monthly"):
         return get_user_model().objects.create_user(name, password="Synthetic-Pass-1", monthly_income=amount, monthly_income_basis=basis)
 
-    def credit(self, user, amount, *, months_ago=0, employer="Example Analytics", text="SALARY CREDIT", category="income"):
-        # Whole 30-day steps keep each credit in its own calendar month closely enough for these fixtures.
+    def credit(self, user, amount, *, months_ago=0, employer="Example Analytics", text="SALARY CREDIT", category="income", days_later=0):
+        # Steps of 31 days always land in different calendar months.
         Expense.objects.create(
             user=user, amount=amount, classification="other", category=category, payment_mode="BANK",
             merchant=employer, company_name=employer, counterparty=employer, description=text, raw_description=text,
-            transaction_date=timezone.localdate() - timedelta(days=31 * months_ago + 1),
+            transaction_date=timezone.localdate() - timedelta(days=31 * months_ago + 4 - days_later),
             direction="credit", source="bank_statement",
         )
 
@@ -96,12 +101,104 @@ class WhatCountsAsSalaryTests(SalaryEvidenceBase):
         self.assertEqual(signals["annualized_compensation"], 1320000.0)
         self.assertEqual(signals["salary_signal_count"], 2)
 
+    def test_credits_that_are_never_pay_stay_out_whatever_their_text_says(self):
+        for name, category, text in (("loan", "loan", "HDFC LOAN TRANCHE"), ("invest", "investment", "SALARY MF REDEMPTION"), ("card", "credit_card", "SALARY CARD")):
+            with self.subTest(name=name):
+                user = self.user(f"never_{name}")
+                for month in range(2):
+                    self.credit(user, 40000, months_ago=month, employer="Lender", text=text, category=category)
+                self.assertIsNone(self.signals(user)["salary_credit_signal"])
+        refund = self.user("never_refund")
+        self.credit(refund, 15000, employer="Acme", text="REFUND TO SALARY A/C")
+        self.assertIsNone(self.signals(refund)["salary_credit_signal"])
+
+    def test_a_smaller_credit_after_payday_never_displaces_the_salary(self):
+        for name, employer, text, recurring in (
+            ("tenant", "A Tenant", "NEFT A TENANT", True),
+            ("stipend", "Other Payer", "STIPEND", False),
+        ):
+            with self.subTest(name=name):
+                user = self.user(f"after_{name}")
+                for month in range(3):
+                    self.credit(user, 80000, months_ago=month)
+                    if recurring or not month:
+                        self.credit(user, 20000, months_ago=month, employer=employer, text=text, days_later=1)
+                signals = self.signals(user)
+                self.assertEqual(signals["monthly_cash_income"], 80000.0)
+                self.assertEqual(signals["current_employer"], "Example Analytics")
+
+    def test_a_larger_recurring_credit_outweighs_one_described_credit(self):
+        user = self.user("undescribed_salary")
+        for month in range(3):
+            self.credit(user, 80000, months_ago=month, employer="Acme Traders", text="NEFT ACME TRADERS")
+        self.credit(user, 20000, employer="Other Payer", text="STIPEND", days_later=2)
+        self.assertEqual(self.signals(user)["monthly_cash_income"], 80000.0)
+
+    def test_overlapping_paydays_in_a_job_change_are_not_two_jobs(self):
+        user = self.user("payday_overlap")
+        for month in range(2):
+            self.credit(user, 90000, months_ago=month + 1, employer="Oldco Systems", text="SALARY OLDCO")
+            self.credit(user, 120000, months_ago=month, employer="Newco Systems", text="SALARY NEWCO")
+        self.assertEqual(self.signals(user)["monthly_cash_income"], 120000.0)
+
+    def test_a_pay_cut_at_a_new_employer_takes_over_once_the_old_one_stops(self):
+        user = self.user("pay_cut")
+        for month in (2, 3):
+            self.credit(user, 120000, months_ago=month, employer="Oldco Systems", text="SALARY OLDCO")
+        self.credit(user, 90000, employer="Newco Systems", text="SALARY NEWCO")
+        self.assertEqual(self.signals(user)["monthly_cash_income"], 90000.0)
+
     def test_recurring_credits_not_described_as_salary_are_not_added_to_salary(self):
         user = self.user("tenant")
         for month in range(3):
             self.credit(user, 80000, months_ago=month, employer="First Employer")
             self.credit(user, 20000, months_ago=month, employer="A Tenant", text="NEFT A TENANT")
         self.assertEqual(self.signals(user)["monthly_cash_income"], 80000.0)
+
+
+class IncomeFallbackTests(SalaryEvidenceBase):
+    def test_old_income_credits_cannot_return_through_the_fallback(self):
+        user = self.user("fallback_stale")
+        for month in range(4, 8):
+            self.credit(user, 150000, months_ago=month)
+        baseline = self.baseline(user)
+        self.assertEqual(baseline["monthly_income"], 0.0)
+        self.assertEqual(baseline["annual_income"], 0.0)
+        self.assertEqual(baseline["income_source"], "not_evidenced")
+        self.assertEqual(baseline["metric_states"]["monthly_income"]["status"], "unavailable")
+
+    def test_one_income_credit_is_not_a_monthly_income(self):
+        user = self.user("fallback_single")
+        self.credit(user, 30000, employer="Acme Traders", text="NEFT ACME TRADERS")
+        baseline = self.baseline(user)
+        self.assertEqual(baseline["monthly_income"], 0.0)
+        self.assertEqual(baseline["income_source"], "not_evidenced")
+
+    def test_recent_recurring_credits_too_small_for_salary_still_count(self):
+        user = self.user("fallback_recent")
+        for month in range(2):
+            self.credit(user, 5000, months_ago=month, employer="A Family", text="UPI FAMILY SUPPORT")
+        baseline = self.baseline(user)
+        self.assertEqual(baseline["income_source"], "observed_credit_inflow")
+        self.assertEqual(baseline["monthly_income"], 5000.0)
+
+    def test_dashboard_and_canonical_baseline_agree_about_old_salary(self):
+        user = self.user("dashboard_agrees", 300000, "unconfirmed")
+        for month in range(6, 9):
+            self.credit(user, 50000, months_ago=month)
+        canonical = self.baseline(user)
+        dashboard = build_financial_intelligence(get_user_model().objects.get(pk=user.pk))["baseline"]
+        self.assertEqual(canonical["income_source"], "reported_income_unconfirmed")
+        self.assertEqual((dashboard["income_source"], dashboard["monthly_income"]), (canonical["income_source"], canonical["monthly_income"]))
+
+    def test_a_future_dated_expense_does_not_age_out_current_salary(self):
+        user = self.user("future_dated")
+        for month in range(2):
+            self.credit(user, 50000, months_ago=month)
+        Expense.objects.create(user=user, amount=100, classification="expense", category="food", payment_mode="CASH", merchant="Shop",
+                               transaction_date=timezone.localdate() + timedelta(days=200), direction="debit", source="manual")
+        dashboard = build_financial_intelligence(get_user_model().objects.get(pk=user.pk))["baseline"]
+        self.assertEqual(dashboard["income_source"], "salary_credits")
 
 
 class ConfirmedIncomeTests(SalaryEvidenceBase):
@@ -132,6 +229,38 @@ class ConfirmedIncomeTests(SalaryEvidenceBase):
         self.assertEqual(baseline["monthly_income"], 80000.0)
         self.assertEqual(baseline["income_source"], "salary_credits")
         self.assertIsNone(baseline["income_conflict"])
+
+    def test_the_agreement_band_edges(self):
+        for name, salary, conflict in (("above_edge", 112000, True), ("above_ok", 110000, False), ("below_ok", 56000, False), ("below_edge", 55000, True)):
+            with self.subTest(name=name):
+                user = self.user(f"band_{name}", 100000, "monthly")
+                self.paid(user, salary)
+                baseline = self.baseline(user)
+                self.assertEqual(bool(baseline["income_conflict"]), conflict)
+                self.assertEqual(baseline["monthly_income"], 100000.0 if conflict else float(salary))
+
+    def test_take_home_credits_do_not_replace_an_income_confirmed_per_year(self):
+        user = self.user("annual_take_home", Decimal("1000000.00"), "annual")
+        self.paid(user, 60000)
+        baseline = self.baseline(user)
+        self.assertEqual(baseline["monthly_income"], 60000.0)
+        self.assertEqual(baseline["annual_income"], 1000000.0)
+        self.assertEqual(self.signals(user)["annualized_compensation"], 1000000.0)
+
+    def test_the_conflict_summary_does_not_also_deny_the_credits_exist(self):
+        user = self.user("summary", 300000, "monthly")
+        self.paid(user, 50000)
+        self.assertNotIn("no recurring salary", self.signals(user)["source_summary"])
+
+    def test_monthly_equivalent_rounds_like_the_stored_decimal(self):
+        user = self.user("rounding", Decimal("1200001.50"), "annual")
+        self.assertEqual(self.signals(user)["reported_income"]["monthly_equivalent"], float(user.confirmed_monthly_income))
+
+    def test_evidence_for_the_ai_discloses_the_conflict(self):
+        from apps.ml_engine.services.canonical_evidence import baseline_source
+        user = self.user("evidence", 300000, "monthly")
+        self.paid(user, 50000)
+        self.assertIn("disagree", str(baseline_source(get_user_model().objects.get(pk=user.pk))))
 
     def test_an_unconfirmed_income_cannot_conflict(self):
         user = self.user("unconfirmed", 300000, "unconfirmed")
@@ -209,6 +338,17 @@ class UnknownIncomeIsNotZeroTests(SalaryEvidenceBase):
         known = {**base, "income": 50000}
         self.assertEqual(engine._assess_risk_appetite(unknown), "conservative")
         self.assertEqual(engine._assess_risk_appetite(known), "moderate")
+        personas = {"spending_categories": {}, "dependents": 0, "age": 35, "savings_rate": 10, "has_investments": True}
+        self.assertNotIn("budget_conscious", engine._determine_persona({**personas, "income": 0}))
+        self.assertIn("budget_conscious", engine._determine_persona({**personas, "income": 50000}))
+
+    def test_financial_brain_does_not_call_unknown_debt_load_debt_free(self):
+        from apps.ml_engine.services.alfred_financial_brain import AlfredFinancialBrain
+        brain = AlfredFinancialBrain()
+        self.assertTrue(brain._debt_load_unknown({"monthly_income": 0, "fixed_obligations": 20000}))
+        self.assertFalse(brain._debt_load_unknown({"monthly_income": 0, "fixed_obligations": 0}))
+        self.assertFalse(brain._debt_load_unknown({"monthly_income": 50000, "fixed_obligations": 20000}))
+        self.assertFalse(brain._debt_load_unknown({}))
 
     def test_salary_training_count_leaves_out_unconfirmed_income(self):
         self.user("train_unconfirmed", 300000, "unconfirmed")
