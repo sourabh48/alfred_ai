@@ -3,8 +3,10 @@ from datetime import datetime, timezone
 import json
 import re
 import time
+import unicodedata
 
 from django.conf import settings
+from alfred_ai.services.currency import INR_NAME, INR_SIGN
 from alfred_ai.services.public_http import request
 from alfred_ai.services.api_errors import safe_error_details
 
@@ -34,10 +36,23 @@ def real_reasoning_authorized():
     return settings.ALFRED_MEMORY_OPENAI_AUTHORIZED and settings.ALFRED_MEMORY_OPENAI_PRICING_DATE==datetime.now(timezone.utc).date().isoformat()
 
 
+# ASCII word edges, so a private word still counts beside a non-Latin letter.
+PRIVATE_TEXT=re.compile(
+    r'(?i)(?a:\b(?:account|loan|emi|balance|salary|income|password|secret|token|bearer|medical|diagnosis)\b)'
+    r'|sk-[a-z0-9-]{8,}|AKIA[A-Z0-9]{12,}|[a-z]:[\\/]|/(?:home|users|tmp)/|\b[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\d[ -]?){6,}'
+    rf'|(?:[$€£]|{INR_SIGN})\s*\d|(?a:\b{INR_NAME}):?\s*\d'
+    r'|\d\s*(?:k|thousand|lakhs?|crores?|cr|million)?\s*(?a:(?:rupees?|inr|rs)\b)|\d\s*/-')
+
+
+def _scannable_text(payload):
+    # JSON escapes control characters, and format characters such as zero-width space can hide a match.
+    raw=re.sub(r'\\u00[01][0-9a-f]|\\[nrtfb]',' ',json.dumps(payload,ensure_ascii=False))
+    return ''.join(char for char in raw if unicodedata.category(char)!='Cf')
+
+
 def public_payload(payload):
-    # The escaped form sees word edges beside non-Latin letters; the raw form sees symbols and whitespace.
-    forms=(encoded(payload).decode(),re.sub(r'\\[nrtfb]',' ',json.dumps(payload,ensure_ascii=False)))
-    if any(re.search(r'(?i)(?:\b(?:account|loan|emi|balance|salary|income|password|secret|token|bearer|medical|diagnosis)\b|sk-[a-z0-9-]{8,}|AKIA[A-Z0-9]{12,}|[a-z]:[\\/]|/(?:home|users|tmp)/|\b[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\d[ -]?){6,}|[$₹€£₨]\s*\d|\b(?:inr|rs(?:\.|/-)?|rupees?)\s*\d|\d\s*(?:rupees?|inr|rs)\b|\d\s*/-)',text) for text in forms):
+    encoded(payload)  # refuses what cannot be encoded
+    if PRIVATE_TEXT.search(_scannable_text(payload)):
         raise PermissionError('Potential sensitive data must remain in local processing.')
     keys=[]; pending=[payload]
     while pending:

@@ -18,7 +18,7 @@ SUFFIXED = ("12,500.00 rupees", "12,500.00 INR", "12,500.00 Rs", "Rs. 12,500.00/
 GENERIC_FORMS = PREFIXED + SUFFIXED
 # A bare "/-" says rupees only beside a label; anywhere else it also ends other currencies and references.
 ALL_FORMS = GENERIC_FORMS + ("12,500.00/-",)
-NOT_RUPEES = ("USD 500/-", "$12,500/-", "EUR 500", "RS-232", "Ref 45/-", "INV12500/-", "12.345 rs", "Rs.-5,000", "$12,500 rupees", "Mirrors 500")
+NOT_RUPEES = ("USD 500/-", "$12,500/-", "EUR 500", "RS-232", "Ref 45/-", "INV12500/-", "12.345 rs", "Rs.-5,000", "$12,500 rupees", "Mirrors 500", "Rs 12.345")
 
 
 class InrAmountTests(SimpleTestCase):
@@ -34,6 +34,7 @@ class InrAmountTests(SimpleTestCase):
                 self.assertEqual(parser._extract_principal(f"Loan Amount: {form}"), 12500.0)
                 self.assertEqual(parser._extract_emi(f"EMI Amount: {form}"), 12500.0)
                 self.assertEqual(parser._extract_outstanding(f"Outstanding Amount: {form}"), 12500.0)
+        self.assertEqual(parser._extract_principal("Loan Amount: Rs./- 12,500"), 12500.0)
 
     def test_loan_closure_amounts(self):
         parser = LoanClosureParser()
@@ -93,6 +94,9 @@ class InrAmountTests(SimpleTestCase):
                 self.assertEqual(value(extract({}, text)[0], "budget"), 12000.0)
         self.assertEqual(value(extract({}, "5 thousand rupees")[0], "budget"), 5000.0)
         self.assertEqual(value(extract({}, "budget in rupees, around 5000")[0], "budget"), 5000.0)
+        for text in ("USD 500/-", "$12,500/-", "ref 45/-", "$500 rupees"):
+            with self.subTest(text=text):
+                self.assertIsNone(value(extract({}, text)[0], "budget"))
         self.assertIsNone(value(extract({}, "stay 3 hours 20 minutes")[0], "budget"))
 
     def test_job_salary_text(self):
@@ -103,6 +107,10 @@ class InrAmountTests(SimpleTestCase):
                 self.assertEqual(parsed["salary_min"], 50000.0)
                 self.assertEqual(parsed["currency"], "INR")
         self.assertEqual(parse("Salary $50,000 per year")["currency"], "USD")
+        self.assertEqual(parse("Salary 50,000/-")["currency"], "INR")
+        self.assertEqual(parse("Salary EUR 50,000/-")["currency"], "EUR")
+        self.assertEqual(parse("Application fee 500/-. Salary Rs 50,000 per month")["salary_min"], 50000.0)
+        self.assertIsNone(parse("Ref 45/-"))
 
     def test_holding_names_drop_the_currency(self):
         name = PortfolioIntelligenceService()._extract_asset_name
@@ -110,17 +118,19 @@ class InrAmountTests(SimpleTestCase):
             with self.subTest(form=form):
                 self.assertEqual(name(f"Axis Bluechip Fund {form}"), "Axis Bluechip Fund")
         self.assertIn("Rupee Bond", name("HSBC Rupee Bond Fund 5000"))
+        self.assertEqual(name("Axis Bluechip Fund 5000 Rupees"), "Axis Bluechip Fund")
 
 
 class CloudBoundaryTests(SimpleTestCase):
     def test_rupee_amounts_never_leave_in_any_form(self):
         for text in ("paid ₹500", "paid ₨500", "paid € 500", "paid £500", "paid Rs. 500", "paid INR 500", "paid rupees 500", "paid 500 rupees", "paid 500 INR",
-                     "paid 500 Rs", "paid 500/-", "paid Rs/- 500", "paid ₹\n500", "500\trupees"):
+                     "paid 500 Rs", "paid 500/-", "paid Rs/- 500", "paid ₹\n500", "500\trupees",
+                     "paid ₹\x0b500", "500\x1frupees", "paid â‚¹500", "paid INR.500", "paid Rs./- 500", "paid Rs: 500", "5 lakh rupees", "50k rs", "paid ₹\u200b500"):
             with self.subTest(text=text), self.assertRaises(PermissionError):
                 public_payload({"context": text})
 
     def test_private_words_beside_non_latin_letters_never_leave(self):
-        for text in ("salaryका विवरण", "loanの情報"):
+        for text in ("salaryका विवरण", "loanの情報", "私のloan情報", "कsalary", "はINR500"):
             with self.subTest(text=text), self.assertRaises(PermissionError):
                 public_payload({"context": text})
 
@@ -129,4 +139,6 @@ class CloudBoundaryTests(SimpleTestCase):
             public_payload({"context": float("nan")})
 
     def test_plain_public_text_still_passes(self):
-        public_payload({"context": "monsoon routes near Munnar"})
+        for text in ("monsoon routes near Munnar", "सन 2024 के मार्ग", "नाम:राम"):
+            with self.subTest(text=text):
+                public_payload({"context": text})

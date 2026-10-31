@@ -85,7 +85,7 @@ def extract(state, text):
     if not money:
         money = re.search(r"\b(\d+(?:\.\d+)?)\s*(k|thousand|lakh)\b", lower)
     if not money:
-        money = re.search(r"\b(\d[\d,]*(?:\.\d+)?)()\s*(?:rupees?\b|inr\b|rs\b|/-)", lower)
+        money = re.search(r"(?<![$\u20ac\u00a3])\b(\d[\d,]*(?:\.\d+)?)()\s*(?:rupees?|inr|rs)\b", lower) or re.fullmatch(r"(\d[\d,]*(?:\.\d+)?)()\s*/-", lower)
     if money:
         amount = float(money[1].replace(",", "")) * ({"k": 1000, "thousand": 1000, "lakh": 100000}.get(money[2], 1))
         if not 0 < amount <= 100000000:

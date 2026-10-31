@@ -44,7 +44,7 @@ JOB_SALARY_SNIPPET_RE = re.compile(
     r"(?:k|lpa|lakh|lakhs|crore|cr|million|m)?"
     rf"(?:\s*(?:-|to)\s*(?:(?:{INR_TOKEN}|USD|\$)\s*)?\d[\d,]*(?:\.\d+)?\s*"
     r"(?:k|lpa|lakh|lakhs|crore|cr|million|m)?)?"
-    r"\s*(?:rupees?\s*)?(?:per\s+annum|per\s+year|/year|yearly|annual|annum|lpa|per\s+month|/month|monthly|month|pm)?",
+    r"\s*(?:(?:(?:rupees?|rs|inr)\b|/-)\s*)?(?:per\s+annum|per\s+year|/year|yearly|annual|annum|lpa|per\s+month|/month|monthly|month|pm)?",
     re.IGNORECASE,
 )
 

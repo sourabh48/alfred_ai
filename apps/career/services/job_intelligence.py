@@ -1623,7 +1623,8 @@ class JobIntelligenceService:
             units = {(match.group(name) or "").lower() for name in ("first_unit", "second_unit")} - {""}
             currencies = {SALARY_CURRENCY_CODES[raw.strip().lower()]
                           for raw in (match.group(name) for name in ("currency", "second_currency", "trailing_currency")) if raw}
-            rupee_dash = bool(match.group("rupee_dash"))
+            # "/-" also ends fees and references, so it says salary only beside a salary word or period.
+            rupee_dash = bool(match.group("rupee_dash")) and self._salary_match_has_context(text, match)
             if not currencies and not units and not rupee_dash:
                 continue
             if len(currencies) > 1 or (require_context and not self._salary_match_has_context(text, match)):
