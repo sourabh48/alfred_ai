@@ -277,6 +277,7 @@ def _family_financial_summary(user, *, own_baseline: dict) -> dict:
         "net_worth": 0.0,
     }
     members = []
+    income_unverified_members = 0
 
     for user_id in family_financial_user_ids(user):
         member = users_by_id.get(user_id)
@@ -289,12 +290,14 @@ def _family_financial_summary(user, *, own_baseline: dict) -> dict:
             baseline=member_baseline,
         )
         members.append(member_summary)
+        income_unverified_members += bool(member_baseline.get("income_basis_needs_confirmation"))
         for key in totals:
             totals[key] += float(member_summary.get(key, 0) or 0)
 
     family_baseline = {
         "scope": "accepted_family_financial_summary",
         "member_count": len(members),
+        "income_unverified_member_count": income_unverified_members,
         "monthly_income": round(totals["monthly_income"], 2),
         "savings_capacity": round(totals["savings_capacity"], 2),
         "total_assets": round(totals["total_assets"], 2),

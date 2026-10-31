@@ -76,7 +76,8 @@
                     </div>
                     <div class="col-12">
                         <label class="form-label" for="careerSalary">Current Income</label>
-                        <input id="careerSalary" name="last_salary" type="number" step="0.01" class="form-control" required>
+                        <input id="careerSalary" name="last_salary" type="number" step="0.01" class="form-control" required aria-describedby="careerSalaryHint">
+                        <div id="careerSalaryHint" class="form-text">Per month unless you chose per year under Income period in Settings.</div>
                     </div>
                 </div>
                 <div id="careerFormFeedback" class="d-none alert mb-0"></div>
@@ -285,5 +286,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/career.js?v=3.4"></script>
+<script src="/static/js/career.js?v=3.5"></script>
 {% endblock %}

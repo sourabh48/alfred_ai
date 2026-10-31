@@ -75,6 +75,26 @@ class IncomeBasisTests(TestCase):
         user.save(update_fields=["monthly_income_basis"])
         self.assertEqual(self.baseline(user)["monthly_income"], 1200000.0)
 
+    def test_career_profile_seeded_from_annual_income_keeps_its_period(self):
+        from apps.career.views import _get_profile
+        user = self.user("annual_seed", 1200000, "annual")
+        self.assertEqual(_get_profile(user).last_salary, Decimal("1200000.00"))
+        get_user_model().objects.filter(pk=user.pk).update(monthly_income=0)
+        self.assertEqual(self.baseline(user)["monthly_income"], 100000.0)
+
+    def test_family_summary_counts_members_with_unverified_income(self):
+        from apps.family.services import accept_family_link_code, create_family_link_invite
+        from apps.family.views import _family_financial_summary
+        owner = self.user("family_viewer", 90000, "monthly")
+        member = self.user("family_unverified", 300000, "unconfirmed")
+        link, code = create_family_link_invite(member)
+        accept_family_link_code(owner, code)
+        link.refresh_from_db()
+        type(link).objects.filter(pk=link.pk).update(share_financial_summary=True)
+        summary = _family_financial_summary(owner, own_baseline=self.baseline(owner))["family_financial_baseline"]
+        self.assertEqual(summary["monthly_income"], 90000.0)
+        self.assertEqual(summary["income_unverified_member_count"], 1)
+
     def test_projection_does_not_fall_back_to_unconfirmed_income(self):
         from apps.career.services.projection_engine import build_projection_inputs
         user = self.user("unconfirmed_projection", 300000, "unconfirmed")

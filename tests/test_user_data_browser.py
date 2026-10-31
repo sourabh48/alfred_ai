@@ -219,6 +219,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.get(self.live_server_url + '/tax-optimizer/')
         self.wait.until(lambda _: self.text('taxRegimeValue').lower() == 'unavailable')
         self.assertEqual(self.text('taxAnnualValue').lower(), 'unavailable')
+        self.wait.until(lambda _: 'unavailable' in self.text('taxSummaryCards').lower())
+        self.assertNotIn('INR', self.text('taxSummaryCards'))
 
     def test_career_discovery_marks_cached_leads_and_recovers_without_unsafe_links(self):
         from apps.career.models import CareerProfile

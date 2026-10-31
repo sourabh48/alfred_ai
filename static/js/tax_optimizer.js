@@ -35,6 +35,10 @@ function loadTaxDashboard(queryOrOptions = taxDashboardQuery) {
         });
 }
 
+function taxIncomeUnavailable(data) {
+    return data.financial_baseline?.income_basis_needs_confirmation && !Number(data.annual_income);
+}
+
 function renderTaxHero(data) {
     const comparison = data.regime_comparison;
     const recommendedTax = comparison.recommendation === "old"
@@ -44,7 +48,7 @@ function renderTaxHero(data) {
     document.getElementById("taxRegimeValue").textContent = String(comparison.recommendation || "either").toUpperCase();
     document.getElementById("taxAnnualValue").textContent = Alfred.formatCurrency(recommendedTax || 0);
     document.getElementById("taxHeroCopy").textContent = comparison.message || "Tax comparison ready.";
-    if (data.financial_baseline?.income_basis_needs_confirmation && !data.annual_income) {
+    if (taxIncomeUnavailable(data)) {
         document.getElementById("taxRegimeValue").textContent = "Unavailable";
         document.getElementById("taxAnnualValue").textContent = "Unavailable";
         document.getElementById("taxHeroCopy").textContent = "Confirm your income period in Settings, or enter an annual income here, to estimate tax.";
@@ -62,7 +66,10 @@ function renderTaxSummary(data) {
         { title: "Optimization Potential", value: Alfred.formatCurrency(data.tax_savings.potential_savings || 0), copy: `${Alfred.formatNumber(data.tax_savings.roi_on_tax_savings || 0, 1)}% ROI on tax-saving capital` },
     ];
 
-    document.getElementById("taxSummaryCards").innerHTML = cards.map(card => `
+    const shown = taxIncomeUnavailable(data)
+        ? cards.map(card => ({ ...card, value: "Unavailable", copy: "Needs a confirmed income period." }))
+        : cards;
+    document.getElementById("taxSummaryCards").innerHTML = shown.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
