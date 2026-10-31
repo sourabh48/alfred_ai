@@ -219,7 +219,7 @@ def _build_linked_behavior_data(user) -> dict:
         "intelligence": intelligence,
         "manual_signal_objects": manual_signal_objects,
         "manual_series": manual_series,
-        "derived_pressure_scores": [item["score"] for item in derived_pressure],
+        "derived_pressure_scores": [item["score"] if item["has_activity"] else None for item in derived_pressure],
         "derived_pressure": derived_pressure,
         "pressure_map": _build_pressure_map(intelligence, derived_pressure),
         "linked_data": {
@@ -295,6 +295,9 @@ def _build_derived_pressure_series(user, *, windows: int = 7) -> list[dict]:
 
     results = []
     for item in window_payloads:
+        if "outflow_total" not in item:
+            results.append({**item, "outflow_total": 0.0, "has_activity": False})
+            continue
         outflow_total = float(item.get("outflow_total") or 0)
         spend_intensity = _safe_ratio(outflow_total, average_outflow or outflow_total or 1)
         loan_ratio = float(item.get("loan_ratio") or 0)
@@ -320,6 +323,7 @@ def _build_derived_pressure_series(user, *, windows: int = 7) -> list[dict]:
                 "score": round(score, 2),
                 "driver": driver,
                 "outflow_total": round(outflow_total, 2),
+                "has_activity": True,
             }
         )
 
@@ -343,7 +347,8 @@ def _build_pressure_map(intelligence: dict, derived_pressure: list[dict]) -> lis
     behavior = intelligence["behavior"]
     recurring_commitments = intelligence.get("recurring_commitments", []) or []
     spike_days = intelligence.get("spike_days", []) or []
-    avg_pressure = round(mean(item["score"] for item in derived_pressure), 2) if derived_pressure else round(
+    active_pressure = [item["score"] for item in derived_pressure if item["has_activity"]]
+    avg_pressure = round(mean(active_pressure), 2) if active_pressure else round(
         float(summary.get("stress_score") or 0) / 10,
         2,
     )
@@ -372,8 +377,8 @@ def _build_pressure_map(intelligence: dict, derived_pressure: list[dict]) -> lis
     ]
 
 
-def _build_combined_stress_series(*, manual_series: list[float], derived_scores: list[float], fallback_stress: float) -> list[float]:
-    series_length = max(len(manual_series), len(derived_scores), 1)
+def _build_combined_stress_series(*, manual_series: list[float], derived_scores: list[float | None], fallback_stress: float) -> list[float]:
+    series_length = max(len(manual_series), len(derived_scores))
     combined = []
     for index in range(series_length):
         manual_value = manual_series[index] if index < len(manual_series) else None
@@ -384,9 +389,7 @@ def _build_combined_stress_series(*, manual_series: list[float], derived_scores:
             combined.append(round(manual_value, 2))
         elif derived_value is not None:
             combined.append(round(derived_value, 2))
-        else:
-            combined.append(round(float(fallback_stress or 0) / 10, 2))
-    return combined
+    return combined or [round(float(fallback_stress or 0) / 10, 2)]
 
 
 def _blend_current_stress(manual_series: list[float], derived_scores: list[float], fallback_stress: float) -> float:

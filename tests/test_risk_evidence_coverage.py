@@ -7,6 +7,7 @@ from django.test import TestCase
 from apps.behavioral.models import BehavioralSignal
 from apps.career.models import CareerJobAnalysis
 from apps.risk.models import RiskSignal
+from apps.risk.serializers import RiskSignalSerializer
 from apps.risk.services.risk_intelligence import risk_intelligence
 
 
@@ -14,6 +15,43 @@ def market_payload(risk_score=0, evidence=()):
     return {"risk_score": risk_score, "layoff_news": [], "job_market_news": [], "insights": [], "evidence": list(evidence),
             "macro_context": {"unemployment": {"latest_value": None}, "inflation": {"latest_value": None},
                               "market": {"one_month_return_pct": None, "india_vix": None}}}
+
+
+class RiskSignalValidationTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("risk_valid", password="synthetic-pass-123")
+        self.client.force_login(self.user)
+
+    def post(self, **changes):
+        body = {"layoff_risk": 10, "illness_risk": 20, "relocation_risk": 30, **changes}
+        raw = "{" + ",".join(f'"{key}":{value}' for key, value in body.items()) + "}"
+        return self.client.post("/api/risk/", raw, content_type="application/json")
+
+    def test_out_of_range_and_non_finite_values_are_rejected_without_a_record(self):
+        for field in ("layoff_risk", "illness_risk", "relocation_risk"):
+            for value in ("-1", "100.5", "5000", "NaN", "Infinity", "-Infinity", '"NaN"'):
+                with self.subTest(field=field, value=value):
+                    self.assertEqual(self.post(**{field: value}).status_code, 400)
+        self.assertFalse(RiskSignal.objects.exists())
+
+    def test_boundaries_are_accepted_and_owner_is_server_assigned(self):
+        other = get_user_model().objects.create_user("risk_valid_other", password="synthetic-pass-123")
+        response = self.post(layoff_risk=0, illness_risk=100, relocation_risk=99.5, user=other.pk)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(RiskSignal.objects.get().user, self.user)
+
+    def test_omitted_fields_keep_the_model_default(self):
+        response = self.client.post("/api/risk/", {"layoff_risk": 5}, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(RiskSignal.objects.get().illness_risk, 0)
+
+    def test_legacy_out_of_range_record_stays_readable_and_unrewritten(self):
+        row = RiskSignal.objects.create(user=self.user, layoff_risk=500, illness_risk=-5, relocation_risk=300)
+        self.assertEqual(RiskSignalSerializer(row).data["layoff_risk"], 500)
+        response = self.client.get("/api/risk/")
+        self.assertEqual(response.status_code, 200)
+        row.refresh_from_db()
+        self.assertEqual((row.layoff_risk, row.illness_risk, row.relocation_risk), (500, -5, 300))
 
 
 class RiskEvidenceCoverageTests(TestCase):
