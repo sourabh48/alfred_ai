@@ -1,13 +1,77 @@
+from datetime import date, datetime, timezone as utc_timezone
 import hashlib
 import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest import TestCase
+import sys
+from unittest import TestCase, skipUnless
 from unittest.mock import patch
 
+from django.apps import apps
+from django.test import override_settings
+from django.utils import timezone
+
+from alfred_ai import system_time_zone
 from alfred_ai.local_config import is_public_default_secret, load_local_environment, native_secret_file
+from alfred_ai.system_time_zone import FALLBACK_TIME_ZONE, iana_for_windows_zone, resolve_time_zone
 from alfred_private_storage import private_directory
+from apps.loans.models import Loan
+
+
+class RuntimeTimeZoneTests(TestCase):
+    def detected(self, windows_name, zone="", override=""):
+        with patch.object(system_time_zone, "windows_zone_name", return_value=windows_name), patch.object(
+                system_time_zone, "iana_for_windows_zone", return_value=zone) as mapping:
+            return resolve_time_zone(override), mapping
+
+    @override_settings(TIME_ZONE="Asia/Kolkata")
+    def test_early_morning_in_india_already_has_the_india_date(self):
+        # 00:30 IST on 1 November, while it is still 31 October in UTC and Chicago.
+        with patch("django.utils.timezone.now", return_value=datetime(2026, 10, 31, 19, 0, tzinfo=utc_timezone.utc)):
+            self.assertEqual(timezone.localdate(), date(2026, 11, 1))
+            # A money path that used the UTC date would still count from October and report 2.
+            self.assertEqual(Loan(start_date=date(2026, 11, 1), tenure_months=1).months_remaining, 1)
+
+    def test_detected_system_zone_is_used_without_a_warning(self):
+        (zone, warning), _ = self.detected("India Standard Time", "Asia/Calcutta")
+        self.assertEqual((zone, warning), ("Asia/Calcutta", ""))
+
+    @skipUnless(sys.platform == "win32", "Windows ICU holds the mapping")
+    def test_windows_icu_maps_known_names_and_rejects_unknown_ones(self):
+        self.assertEqual(iana_for_windows_zone("India Standard Time"), "Asia/Calcutta")
+        self.assertEqual(iana_for_windows_zone("Synthetic Unknown Zone"), "")
+
+    def test_unknown_windows_name_falls_back_with_a_warning(self):
+        (zone, warning), _ = self.detected("Synthetic Unknown Zone")
+        self.assertEqual(zone, FALLBACK_TIME_ZONE)
+        self.assertNotEqual(zone, "America/Chicago")
+        self.assertIn("Synthetic Unknown Zone", warning)
+        self.assertIn(FALLBACK_TIME_ZONE, warning)
+
+    def test_detection_failure_falls_back_with_a_warning(self):
+        with patch.object(system_time_zone, "windows_zone_name", side_effect=ImportError):
+            zone, warning = resolve_time_zone()
+        self.assertEqual(zone, FALLBACK_TIME_ZONE)
+        self.assertIn("ImportError", warning)
+
+    def test_valid_override_wins_over_detection(self):
+        (zone, warning), mapping = self.detected("India Standard Time", "Asia/Calcutta", override="Europe/London")
+        self.assertEqual((zone, warning), ("Europe/London", ""))
+        mapping.assert_not_called()
+
+    def test_invalid_override_warns_and_uses_detection(self):
+        for override in ("Synthetic/Unknown", "../secret", "Asia"):
+            with self.subTest(override=override):
+                (zone, warning), _ = self.detected("India Standard Time", "Asia/Calcutta", override=override)
+                self.assertEqual(zone, "Asia/Calcutta")
+                self.assertIn(repr(override), warning)
+
+    @override_settings(TIME_ZONE_WARNING="Synthetic time zone warning")
+    def test_startup_logs_the_fallback_warning(self):
+        with self.assertLogs("apps.users.apps", "WARNING") as logs:
+            apps.get_app_config("users").ready()
+        self.assertIn("Synthetic time zone warning", logs.output[0])
 
 
 class LocalEnvironmentTests(TestCase):

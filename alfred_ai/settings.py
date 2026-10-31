@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
 from .local_config import load_local_environment, native_secret_file
+from .system_time_zone import resolve_time_zone
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -316,9 +317,10 @@ if not DATABASE_URL:
 # TIME ZONE
 # ---------------------------------------------------------
 
-# Owner decision: the application default is India. Without this Django uses America/Chicago.
+# Owner decision: follow the Windows system zone, with ALFRED_TIME_ZONE as an override and India as the logged
+# fallback. Without this Django uses America/Chicago. apps.users logs TIME_ZONE_WARNING at startup.
 # USE_TZ stays on, so stored timestamps and internal scheduling remain UTC.
-TIME_ZONE = "Asia/Kolkata"
+TIME_ZONE, TIME_ZONE_WARNING = resolve_time_zone(env("ALFRED_TIME_ZONE", default=""))
 USE_TZ = True
 
 

@@ -2,6 +2,7 @@ from django.apps import AppConfig
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from pathlib import Path
+import logging
 import os
 
 from alfred_private_storage import guard_sqlite_storage, private_directory, PrivateStorageUnavailable
@@ -21,3 +22,5 @@ class UsersConfig(AppConfig):
                         private_directory(Path(config["LOCATION"]).absolute())
         except (OSError, ValueError, PrivateStorageUnavailable):
             raise ImproperlyConfigured("Private storage requires verified owner permissions; review the authorized repair procedure.") from None
+        if settings.TIME_ZONE_WARNING:
+            logging.getLogger(__name__).warning(settings.TIME_ZONE_WARNING)

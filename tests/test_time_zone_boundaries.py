@@ -33,14 +33,14 @@ def frozen(instant):
     return patch("django.utils.timezone.now", return_value=instant)
 
 
+@override_settings(TIME_ZONE="Asia/Kolkata")
 class DefaultZoneTests(SimpleTestCase):
-    def test_default_is_india_and_now_stays_utc(self):
-        self.assertEqual(settings.TIME_ZONE, "Asia/Kolkata")
+    def test_now_stays_utc_in_any_application_zone(self):
         self.assertTrue(settings.USE_TZ)
-        self.assertEqual(timezone.get_default_timezone_name(), "Asia/Kolkata")
         self.assertEqual(timezone.now().utcoffset(), timedelta(0))
 
 
+@override_settings(TIME_ZONE="Asia/Kolkata")
 class DateBoundaryTests(SimpleTestCase):
     # Label, instant, India date, Chicago date.
     BOUNDARIES = (
@@ -84,6 +84,7 @@ class DateBoundaryTests(SimpleTestCase):
                     self.assertEqual(self.lag_hours(day), hours)
 
 
+@override_settings(TIME_ZONE="Asia/Kolkata")
 class FinancialConsumerBoundaryTests(SimpleTestCase):
     FIRST_MINUTE_OF_NOVEMBER = utc(2026, 10, 31, 18, 30)
     LAST_SECOND_OF_OCTOBER = utc(2026, 10, 31, 18, 29, 59)
@@ -127,6 +128,7 @@ class FinancialConsumerBoundaryTests(SimpleTestCase):
             self.assertFalse(predates(date(2026, 11, 1)))
 
 
+@override_settings(TIME_ZONE="Asia/Kolkata")
 class StoredValueTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username="time_zone_boundary", password="Pass12345!")
@@ -163,6 +165,7 @@ class StoredValueTests(TestCase):
                 self.assertTrue(stored("timestamp").startswith("2026-10-31 19:00:00"))
 
 
+@override_settings(TIME_ZONE="Asia/Kolkata")
 class ExplicitZoneTests(SimpleTestCase):
     def test_reminder_uses_its_own_zone_whatever_the_application_default(self):
         cases = (
