@@ -3821,7 +3821,6 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def test_inferred_loan_requires_explicit_confirmation_on_real_page(self):
         from django.utils import timezone
         from apps.loans.models import Loan
-        from selenium.common.exceptions import StaleElementReferenceException
 
         user = get_user_model().objects.get(username="acceptance_demo")
         loan = Loan.objects.create(
@@ -3837,26 +3836,18 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertNotIn("3,40,000", self.text("loanSummaryCards"))
         self.assertIn("Excluded from financial totals", self.text("loanTableBody"))
         self.capture("loan-estimate-excluded")
-        def open_review(driver):
-            # The table redraws every second and only a real press holds it, which comes after locating the button.
-            driver.execute_script("document.getElementById('loanPlannerRoot').dataset.liveRefreshLockedUntil = String(Date.now() + 5000)")
-            try:
-                driver.find_element(self.By.CSS_SELECTOR, f'button[onclick="editLoan({loan.pk})"]').click()
-                return True
-            except StaleElementReferenceException:
-                return False
-
-        self.wait.until(open_review)
+        # The table redraws every second and the page scrolls smoothly, so the click retries from an instant scroll.
+        self.memory_click(f'button[onclick="editLoan({loan.pk})"]')
         self.assertFalse(self.browser.find_element(self.By.ID, "loanConfirmEstimate").is_selected())
         for field_id, value in (("manualLoanPrincipal", "200000"), ("manualLoanInterest", "8"),
                                 ("manualLoanEmi", "9000"), ("manualLoanBalance", "150000")):
             field = self.browser.find_element(self.By.ID, field_id)
             field.clear()
             field.send_keys(value)
-        self.browser.find_element(self.By.ID, "loanConfirmEstimate").click()
+        self.memory_click("#loanConfirmEstimate")
         self.browser.execute_script("document.getElementById('loanVerificationFields').scrollIntoView({behavior: 'instant', block: 'center'});")
         self.capture("loan-terms-review")
-        self.browser.find_element(self.By.ID, "loanSubmitButton").click()
+        self.memory_click("#loanSubmitButton")
         self.wait.until(lambda _: "2,50,000" in self.text("loanSummaryCards"))
         self.assertIn("19,000", self.text("loanSummaryCards"))
         self.assertFalse(self.browser.find_element(self.By.ID, "loanVerificationNotice").is_displayed())
