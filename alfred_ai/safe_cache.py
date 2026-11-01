@@ -8,7 +8,7 @@ import base64
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 import json
-import os.path as op
+import re
 from uuid import UUID
 
 from diskcache import Disk
@@ -16,6 +16,8 @@ from diskcache.core import MODE_BINARY, MODE_RAW, MODE_TEXT, UNKNOWN
 
 TAG = "__alfred_cache__"
 SQLITE_INTEGER = range(-(2 ** 63), 2 ** 63)
+# The only names Disk.filename creates. Windows also treats forms like ".. " and "C:x" as paths, so nothing else is tried.
+CACHE_FILE = re.compile(r"[0-9a-f]{2}[\\/][0-9a-f]{2}[\\/][0-9a-f]{28}\.val")
 
 
 class UnsafeCacheEntry(OSError):
@@ -89,9 +91,7 @@ def decode(value):
 
 
 def _inside_cache(filename):
-    if not isinstance(filename, str) or op.isabs(filename) or op.splitdrive(filename)[0]:
-        return False
-    return not filename.replace("\\", "/").startswith("../") and ".." not in filename.replace("\\", "/").split("/")
+    return isinstance(filename, str) and CACHE_FILE.fullmatch(filename) is not None
 
 
 class SafeDisk(Disk):
@@ -120,12 +120,10 @@ class SafeDisk(Disk):
             raise self.error("A cache entry in an unsupported format was refused without decoding it.")
         if mode != MODE_RAW and not _inside_cache(filename):
             raise self.error("A cache entry pointing outside its folder was refused.")
-        data = super().fetch(mode, filename, value, False)
-        if not isinstance(data, str):
-            return data
         try:
-            return decode(json.loads(data))
-        except (ValueError, KeyError, TypeError, ArithmeticError) as error:
+            data = super().fetch(mode, filename, value, False)
+            return decode(json.loads(data)) if isinstance(data, str) else data
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, ArithmeticError, RecursionError) as error:
             raise self.error("A corrupt cache entry was refused.") from error
 
     def remove(self, file_path):

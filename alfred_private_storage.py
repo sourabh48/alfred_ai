@@ -118,6 +118,17 @@ def acl_snapshot(path):
         kernel.LocalFree(descriptor)
 
 
+def owner_sid(path):
+    api, kernel = windows()
+    owner, descriptor = ctypes.c_void_p(), ctypes.c_void_p()
+    if api.GetNamedSecurityInfoW(str(path), 1, 1, ctypes.byref(owner), None, None, None, ctypes.byref(descriptor)):
+        raise PrivateStorageUnavailable("Private storage ownership cannot be inspected.")
+    try:
+        return sid_string(owner.value)
+    finally:
+        kernel.LocalFree(descriptor)
+
+
 def replace_acl(path, sddl):
     api, kernel = windows()
     descriptor, dacl = ctypes.c_void_p(), ctypes.c_void_p()
@@ -141,6 +152,9 @@ def verify_private(path):
     path = safe_path(path)
     if os.name != "nt":
         return path.stat().st_uid == os.getuid() and not stat.S_IMODE(path.stat().st_mode) & 0o077
+    # An owner can always rewrite the permissions; Administrators can take ownership regardless.
+    if owner_sid(path) not in {current_sid(), "S-1-5-18", "S-1-5-32-544"}:
+        return False
     snapshot = acl_snapshot(path)
     allowed = {current_sid(), "S-1-5-18"}
     entries = snapshot["entries"]
@@ -172,6 +186,16 @@ def private_directory(path, *, deadline=None):
     elif not verify_private(path):
         raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
     return path
+
+
+def verify_cache_storage(path):
+    """Refuse a cache folder if a shard or a database was loosened, since each has permissions of its own."""
+    if os.name != "nt":
+        return
+    for folder in (path, *(item for item in path.iterdir() if item.is_dir())):
+        database = folder / "cache.db"
+        if not verify_private(folder) or database.exists() and not verify_private(database):
+            raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
 
 
 def permission_plan(root):

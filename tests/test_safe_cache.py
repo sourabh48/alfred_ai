@@ -23,7 +23,7 @@ from django.utils import timezone
 
 from alfred_ai.safe_cache import CacheIntegrityError, SafeDisk, StrictDisk
 from alfred_ai.services.throttling import STORE, reserve_attempts
-from alfred_private_storage import PrivateStorageUnavailable, private_directory, replace_acl, verify_private
+from alfred_private_storage import PrivateStorageUnavailable, current_sid, owner_sid, private_directory, replace_acl, verify_private
 
 
 class Planted:
@@ -142,6 +142,51 @@ class SafeDiskTests(Base):
             store.delete("escape")
         self.assertEqual(outside.read_text(encoding="utf-8"), '"secret"')
 
+    def test_only_the_file_names_diskcache_writes_are_opened_or_deleted(self):
+        outside = self.root / "outside.txt"
+        outside.write_text('"secret"', encoding="utf-8")
+        names = ("../outside.txt", "..\\outside.txt", "aa/.. /outside.txt", "aa/bb/../../../outside.txt", str(outside),
+                 "/outside.txt", "\\outside.txt", "C:outside.txt", "\\\\server\\share\\x.val", "\\\\.\\NUL", "aa/bb/CON", "aa/bb/x.txt")
+        with self.cache() as store:
+            for number, name in enumerate(names):
+                with self.subTest(name=name):
+                    self.plant(self.root / "cache" / "cache.db", f"path{number}", mode=MODE_TEXT, filename=name, value=None)
+                    self.assertEqual(store.get(f"path{number}", "default"), "default")
+                    self.assertTrue(store.delete(f"path{number}"))
+        self.assertEqual(outside.read_text(encoding="utf-8"), '"secret"')
+
+    def test_a_value_too_large_for_the_database_still_round_trips_through_a_file(self):
+        value = {"text": "x" * 100000, "amount": Decimal("1.10")}
+        with self.cache() as store:
+            store.set("large", value)
+            self.assertEqual(store.get("large"), value)
+            self.assertTrue(store.delete("large"))
+        self.assertEqual(list((self.root / "cache").rglob("*.val")), [])
+
+    def test_hostile_json_is_a_miss(self):
+        tag = '{"__alfred_cache__":"%s","v":%s}'
+        rows = ("[" * 200000, tag % ("bytes", "5"), tag % ("uuid", "5"), tag % ("set", "[[1]]"), tag % ("dict", "[[[1],2]]"),
+                tag % ("timedelta", "[1000000000000,0,0]"), tag % ("decimal", "[]"), tag % ("tuple", "5"), '{"__alfred_cache__":[]}')
+        with self.cache() as store:
+            for number, text in enumerate(rows):
+                with self.subTest(row=text[:40]):
+                    self.plant(self.root / "cache" / "cache.db", f"json{number}", mode=1, value=text)
+                    self.assertEqual(store.get(f"json{number}", "default"), "default")
+
+    def test_a_damaged_file_is_a_miss_and_strict_reads_report_it(self):
+        target = self.root / "cache" / "aa" / "bb" / ("c" * 28 + ".val")
+        with self.cache() as store:
+            target.parent.mkdir(parents=True)
+            target.write_bytes(b"\xff\xfe not text")
+            self.plant(self.root / "cache" / "cache.db", "damaged", mode=MODE_TEXT, filename=f"aa/bb/{target.name}", value=None)
+            self.plant(self.root / "cache" / "cache.db", "missing", mode=MODE_TEXT, filename=f"aa/bb/{'d' * 28}.val", value=None)
+            self.assertEqual(store.get("damaged", "default"), "default")
+            self.assertEqual(store.get("missing", "default"), "default")
+        with Cache(str(self.root / "cache"), disk=StrictDisk) as store:
+            for key in ("damaged", "missing"):
+                with self.subTest(key=key), self.assertRaises(CacheIntegrityError):
+                    store.get(key)
+
     def test_corrupt_text_is_a_miss(self):
         with self.cache() as store:
             for number, text in enumerate(("{not json", '{"__alfred_cache__":"unknown","v":1}', '{"__alfred_cache__":"decimal","v":"x"}')):
@@ -207,13 +252,12 @@ class ThrottlingStoreTests(Base):
                 self.assertEqual(self.reserve(), 60)
 
     def test_older_pickled_rows_beside_the_new_folder_are_never_opened(self):
-        (self.root / "limits").mkdir()
+        private_directory(self.root / "limits")
         with Cache(str(self.root / "limits")) as legacy:
             legacy.set(("scope", "user"), [1.0])
         self.plant(self.root / "limits" / "cache.db", "evil")
         before = (self.root / "limits" / "cache.db").read_bytes()
-        with patch("alfred_ai.services.throttling.private_directory", side_effect=lambda path: Path(path).mkdir(exist_ok=True) or Path(path)):
-            self.assertEqual(self.reserve(), 0)
+        self.assertEqual(self.reserve(), 0)
         self.assertEqual((self.root / "limits" / "cache.db").read_bytes(), before)
         self.assert_nothing_ran()
 
@@ -230,6 +274,23 @@ class ThrottlingStoreTests(Base):
         later = timezone.now() + timedelta(seconds=61)
         with patch("alfred_ai.services.throttling.timezone.now", return_value=later):
             self.assertEqual(self.reserve(), 0)
+
+    def test_separate_processes_share_one_limit(self):
+        code = ("import os,django;os.environ['DJANGO_SETTINGS_MODULE']='alfred_ai.settings';django.setup();"
+                "from alfred_ai.services.throttling import reserve_attempts;"
+                f"print(sum(reserve_attempts({str(self.root / 'shared-limit')!r},[('key',6,600)])==0 for _ in range(4)))")
+        reserve_attempts(str(self.root / "shared-limit"), [("other", 1, 600)])
+        started = [subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                    cwd=str(Path(__file__).resolve().parents[1])) for _ in range(4)]
+        results = [process.communicate(timeout=180) for process in started]
+        self.assertEqual([process.returncode for process in started], [0, 0, 0, 0], results[0][1][-500:])
+        self.assertEqual(sum(int(out.strip().splitlines()[-1]) for out, _ in results), 6)
+
+    def test_a_record_pointing_at_a_missing_file_fails_closed(self):
+        path = self.root / "limits"
+        self.assertEqual(reserve_attempts(str(path), [("key", 5, 60)]), 0)
+        self.plant(path / STORE / "cache.db", json.dumps("key"), mode=MODE_TEXT, filename=f"aa/bb/{'d' * 28}.val", value=None)
+        self.assertGreater(reserve_attempts(str(path), [("key", 5, 60)]), 0)
 
     def test_a_corrupt_store_fails_closed(self):
         self.assertEqual(self.reserve(), 0)
@@ -275,6 +336,36 @@ class CachePermissionTests(SimpleTestCase):
         for setting in ("ALFRED_ABUSE_THROTTLE_DIR", "ALFRED_FAMILY_INVITE_THROTTLE_DIR"):
             with self.subTest(setting=setting), override_settings(**{setting: str(self.loose(setting))}), self.assertRaises(ImproperlyConfigured):
                 config.ready()
+
+    def test_a_folder_owned_by_another_account_is_refused(self):
+        path = private_directory(self.root / "owned")
+        self.assertIn(owner_sid(path), {current_sid(), "S-1-5-18", "S-1-5-32-544"})
+        self.assertTrue(verify_private(path))
+        with patch("alfred_private_storage.owner_sid", return_value="S-1-5-21-1-2-3-1001"):
+            self.assertFalse(verify_private(path))
+            with self.assertRaises(PrivateStorageUnavailable):
+                reserve_attempts(str(path), [("key", 1, 60)])
+
+    def test_loosening_the_throttle_database_is_refused(self):
+        path = self.root / "limits"
+        self.assertEqual(reserve_attempts(str(path), [("key", 2, 60)]), 0)
+        replace_acl(path / STORE / "cache.db", self.LOOSE)
+        with self.assertRaises(PrivateStorageUnavailable):
+            reserve_attempts(str(path), [("key", 2, 60)])
+
+    def test_startup_refuses_a_loosened_cache_shard_or_database(self):
+        for target in ("000", "000/cache.db"):
+            path = self.root / target.replace("/", "-")
+            private_directory(path)
+            cache = FanoutCache(str(path), shards=2, disk=SafeDisk)
+            cache.set("key", "value")
+            cache.close()
+            caches = {"default": {"BACKEND": "diskcache.DjangoCache", "LOCATION": str(path)}}
+            with self.subTest(target=target), override_settings(CACHES=caches):
+                apps.get_app_config("users").ready()
+                replace_acl(path / target, self.LOOSE)
+                with self.assertRaises(ImproperlyConfigured):
+                    apps.get_app_config("users").ready()
 
     def test_shared_cache_shards_are_private(self):
         path = self.root / "shared"

@@ -8,7 +8,7 @@ from diskcache import Cache
 from django.utils import timezone
 
 from alfred_ai.safe_cache import CacheIntegrityError, StrictDisk
-from alfred_private_storage import private_directory
+from alfred_private_storage import private_directory, verify_cache_storage
 
 logger = logging.getLogger(__name__)
 # A new folder: rows written before this format are pickled, and are never opened.
@@ -32,6 +32,7 @@ def reserve_attempts(directory, buckets):
         raise ValueError('Limits must be positive')
     # Refuses a location other accounts can write to, including a configured external one.
     store_path = private_directory(private_directory(Path(directory)) / STORE)
+    verify_cache_storage(store_path)
     with Cache(str(store_path), disk=StrictDisk, timeout=5, eviction_policy='none', cull_limit=0) as store, store.transact():
         now = timezone.now().timestamp()
         store.expire()
