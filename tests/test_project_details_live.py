@@ -571,7 +571,7 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertFalse(browser_coverage["full_ui_mature"])
         self.assertEqual(browser_coverage["execution_command"], "python scripts/run_browser_regressions.py --browser Chrome --require-browser")
         self.assertEqual(browser_coverage["edge_execution_command"], "python scripts/run_browser_regressions.py --browser Edge --require-browser")
-        self.assertEqual(browser_coverage["ci_execution_command"], "python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome")
+        self.assertEqual(browser_coverage["ci_execution_command"], "python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome-shard-<n> --shard-count 3 --shard-index <n>")
         self.assertEqual(browser_coverage["ci_workflow"], ".github/workflows/browser-regression.yml")
         self.assertEqual(browser_coverage["artifact_dir"], "artifacts/browser")
         self.assertEqual(len(browser_coverage["local_proofs"]), 2)
