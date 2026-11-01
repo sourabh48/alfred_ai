@@ -1,5 +1,21 @@
 # ALFRED execution state
 
+## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-01)
+
+- Branch `security/runtime-11-dependencies`. Not merged to development or master, nothing deployed. Implemented, not
+  accepted. Baseline75/143, extensions0/13 unchanged. Evidence and residual risk: `docs/RUNTIME_11_EVIDENCE.md`.
+- Results: Chrome 156/156 at `338ad27`. At `d2a9601`: backend 2521 run, 0 failed, 176 skipped; local AI 19/20 with the one
+  stale benchmark; cryptography 43.0.3 to 50.0.2 14/14; installer 6/6 and lifecycle 37/37; operator database hashes identical.
+- Advisories 276 to 1. `diskcache` CVE-2025-69872 stays open and visible, with no upstream fix.
+- OWNER_DECISION: mitigate diskcache in ALFRED and do not rely only on folder permissions. Residual risk is not formally
+  accepted.
+- Pending: exact-head CI, independent review, owner decision on residual risk, separate-user install, clean PC, a new
+  independent held-out set for the stale benchmark.
+- Findings to carry: an interrupted upgrade needs Setup rerun; the installer is unsigned and Smart App Control can block it.
+  The D-02 regression fixed here in `b634a88` is still on development `1d9df25`.
+- Next: the owner opens the draft PR so CI runs. The system time zone work, verified booking links and the 14 approved items
+  wait until this candidate is stable.
+
 ## Active checkpoint — post-master functional results and owner decisions (2026-11-01)
 
 - Master `96d4637` functional verdict: FUNCTIONAL FAILURES FOUND. Exact-SHA results: Chrome 156/156; backend 2457 run,

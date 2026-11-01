@@ -1,5 +1,14 @@
 # Development CI and integration pipeline
 
+## RUNTIME-11 security branch — 2026-11-01
+
+State COMMITTED_PUSHED/CI_PENDING after its push. Nothing here is a green claim. Base `development/alfred-integrated`
+`1d9df25`, and it also contains master `96d4637`. Local evidence is in `docs/RUNTIME_11_EVIDENCE.md`, on `d2a9601` and
+`338ad27`; the head adds only documentation. CI starts when the owner opens the draft PR, since no GitHub login is available
+here. It tests the dependency changes through `requirements.txt` and `constraints/**`, and preflight pins
+`f40190e7ed31401405ecf7f529c521fb450d7864` as reviewed. Blockers for acceptance: exact-head CI, independent review, the owner's
+residual-risk decision, separate-user install and clean PC.
+
 ## Consolidated development candidate — 2026-10-31
 
 State LOCAL_TESTING, then COMMITTED_PUSHED/CI_PENDING after its push. Earlier runs transfer to no commit here.
