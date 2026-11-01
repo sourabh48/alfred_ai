@@ -20,6 +20,9 @@ class UsersConfig(AppConfig):
                 for config in settings.CACHES.values():
                     if config["BACKEND"] in {"diskcache.DjangoCache", "django.core.cache.backends.filebased.FileBasedCache"}:
                         private_directory(Path(config["LOCATION"]).absolute())
+                for directory in (settings.ALFRED_ABUSE_THROTTLE_DIR, settings.ALFRED_FAMILY_INVITE_THROTTLE_DIR):
+                    if directory and Path(directory).is_absolute():
+                        private_directory(Path(directory))
         except (OSError, ValueError, PrivateStorageUnavailable):
             raise ImproperlyConfigured("Private storage requires verified owner permissions; review the authorized repair procedure.") from None
         if settings.TIME_ZONE_WARNING:

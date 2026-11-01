@@ -90,7 +90,7 @@ All writable state stays in the selected data folder:
 | `config/native.env` | Automatically generated local secret; keep private |
 | `config/alfred_ui.json` | Optional UI overrides |
 | `artifacts/native/jobs.sqlite3` | Persistent background queue and results |
-| `artifacts/native/cache` | Shared local cache |
+| `artifacts/native/cache/json-v1` | Shared local cache, JSON only; older rows beside it are never opened |
 | `artifacts/native/server.log`, `worker.log` | Startup and background diagnostics |
 
 First adoption of an existing database records the previous Django signing key

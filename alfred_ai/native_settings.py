@@ -28,14 +28,17 @@ DATABASES = {"default": {
 }}
 MEDIA_ROOT = BASE_DIR / "media"
 STATIC_ROOT = BASE_DIR / "artifacts" / "native" / "static"
+from alfred_ai.safe_cache import SafeDisk
+
 CACHES = {"default": {
     "BACKEND": "diskcache.DjangoCache",
-    "LOCATION": str(BASE_DIR / "artifacts" / "native" / "cache"),
+    # A new folder: rows written before this format are pickled, and are never opened.
+    "LOCATION": str(BASE_DIR / "artifacts" / "native" / "cache" / "json-v1"),
     "DATABASE_TIMEOUT": 10,
     "SHARDS": 4,
     "KEY_PREFIX": "alfred",
     "TIMEOUT": 300,
-    "OPTIONS": {"size_limit": 256 * 1024 * 1024},
+    "OPTIONS": {"size_limit": 256 * 1024 * 1024, "disk": SafeDisk},
 }}
 INSTALLED_APPS = [*INSTALLED_APPS, "huey.contrib.djhuey"]
 HUEY = {
