@@ -4101,7 +4101,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn(transport.end.isoformat(), evidence)
         self.assertIn('30-day lookback', evidence)
         self.assertIn('not independently verified exchange closing prices', evidence)
-        self.assertTrue(any('finance.yahoo.com' in link.get_attribute('href')
+        # A later page redraw can replace the links between finding and reading them.
+        self.wait.until(lambda _: any('finance.yahoo.com' in link.get_attribute('href')
             for link in self.browser.find_elements(self.By.CSS_SELECTOR, '#investmentWatchlistEvidence a')))
         self.browser.execute_script("document.getElementById('investmentWatchlistEvidence').scrollIntoView({block:'center',behavior:'instant'})")
         self.capture('yahoo-market-observations-desktop')
@@ -6350,7 +6351,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login()
         self.browser.get(self.live_server_url + '/career/')
         self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings > .mini-card')) == 8)
-        self.assertIn('Location not specified', self.text('careerOpenings'))
+        # Cards read as empty text while they fade in, after the count above is already right.
+        self.wait.until(lambda _: 'Location not specified' in self.text('careerOpenings'))
         self.assertIn('Remote work does not confirm country eligibility', self.browser.find_element(self.By.ID, 'careerRoot').text)
         self.browser.execute_script("document.querySelector('#careerProfileForm [name=role]').value = 'Unsaved local draft';")
 
@@ -6361,11 +6363,11 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR, '#careerProfileForm [name=role]').get_attribute('value'), 'Unsaved local draft')
         Select(self.browser.find_element(self.By.ID, 'careerOpeningStateFilter')).select_by_value('Karnataka')
         self.wait.until(lambda _: '1 of 8' in self.text('careerOpeningsMeta'))
-        self.assertIn('Remote - Bengaluru, Karnataka, India', self.text('careerOpenings'))
+        self.wait.until(lambda _: 'Remote - Bengaluru, Karnataka, India' in self.text('careerOpenings'))
 
         Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('United States')
         self.wait.until(lambda _: '2 of 8' in self.text('careerOpeningsMeta'))
-        self.assertIn('Remote (US only)', self.text('careerOpenings'))
+        self.wait.until(lambda _: 'Remote (US only)' in self.text('careerOpenings'))
         self.assertNotIn('except United States', self.text('careerOpenings'))
         Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('Remote')
         self.wait.until(lambda _: '5 of 8' in self.text('careerOpeningsMeta'))
