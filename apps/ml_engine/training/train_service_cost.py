@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import os
 from collections import defaultdict
 
-import joblib
-
+from apps.ml_engine.inference_adapters.artifacts import dump_artifact
 from apps.ml_engine.inference_adapters.service_cost_predictor import (
     MODEL_PATH,
     ServiceCostPredictor,
@@ -48,8 +46,7 @@ def train_service_cost_model():
     coverage_score = min(100.0, (len(rows) / 50.0) * 100.0)
     confidence_estimate = round(max(18.0, (quality_score * 0.65) + (coverage_score * 0.35)), 2)
 
-    os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    joblib.dump({"model": model, "feature_names": feature_names}, MODEL_PATH)
+    dump_artifact({"model": model, "feature_names": feature_names}, MODEL_PATH)
 
     return {
         "status": "ready",

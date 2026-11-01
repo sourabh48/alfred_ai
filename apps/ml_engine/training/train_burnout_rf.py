@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import os
-
-import joblib
-
 from apps.ml_engine.data_extractors.user_behavior import load_behavior_data
-from apps.ml_engine.inference_adapters.burnout_rf import MODEL_PATH
+from apps.ml_engine.inference_adapters.artifacts import dump_artifact
+from apps.ml_engine.inference_adapters.burnout_rf import MODEL_PATH, BurnoutRF
 from .simple_models import fit_linear_regression, mean_absolute_error, random_train_test_split
 
 
@@ -33,8 +30,7 @@ def train_burnout_model() -> dict:
     coverage_score = min(100.0, (sample_count / 60.0) * 100.0)
     confidence_estimate = round(max(20.0, (quality_score * 0.65) + (coverage_score * 0.35)), 2)
 
-    os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    joblib.dump(model, MODEL_PATH)
+    dump_artifact({"model": model, "feature_names": BurnoutRF.FEATURE_NAMES}, MODEL_PATH)
 
     return {
         "status": "ready",

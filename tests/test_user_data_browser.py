@@ -1306,6 +1306,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         state=AdaptiveModelState.objects.update_or_create(model_key='expense_forecaster',defaults=dict(
             display_name='SYNTHETIC-PRIVATE-DISPLAY',status='ready',sample_count=80,quality_score=80,
             confidence_estimate=80,artifact_path=str(artifact),notes='SYNTHETIC-PRIVATE-NOTE',
+            artifact_evidence=dict(role='expense_forecaster',sha256='0'*64),
             next_refresh_due_at=timezone.now()+timedelta(hours=12)))[0]
         with patch('apps.ml_engine.api.views.run_training_cycle') as train, patch('joblib.load') as load:
             self.login(); self.browser.get(self.live_server_url+'/ai/insights/')

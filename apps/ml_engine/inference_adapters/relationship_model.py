@@ -7,7 +7,7 @@ import math
 from .artifacts import load_inference_artifact
 
 
-MODEL_PATH = os.path.join("ml_models", "alfred", "relationship_model", "model.pkl")
+MODEL_PATH = os.path.join("ml_models", "alfred", "relationship_model", "model.json")
 
 
 class RelationshipModelPredictor:
@@ -23,7 +23,7 @@ class RelationshipModelPredictor:
         self._artifact = None
 
     def predict_score(self, features: dict) -> float | None:
-        self._artifact = load_inference_artifact("relationship_model")
+        self._artifact = load_inference_artifact("relationship_model", schema=self.FEATURE_NAMES)
         if self._artifact is None:
             return None
         model = self._artifact.get("model")

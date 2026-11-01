@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -271,13 +273,17 @@ class CalculationRiskSnapshotTests(TestCase):
         self.assertNotIn(invalid.job_url, snapshot["salary_outcome_summary"]["source_urls"])
 
     def test_salary_projection_progress_moves_only_after_valid_outcome_minimum_and_fresh_model(self):
-        AdaptiveModelState.objects.create(
+        artifact = Path(self.enterContext(TemporaryDirectory(prefix="alfred-synthetic-salary-"))) / "model.json"
+        artifact.write_text("{}", encoding="utf-8")
+        state = AdaptiveModelState.objects.create(
             model_key="salary_predictor",
             display_name="Salary Predictor",
             status="ready",
-            sample_count=8,
+            sample_count=40,
             quality_score=81,
             confidence_estimate=78,
+            artifact_path=str(artifact),
+            artifact_evidence={"role": "salary_predictor", "sha256": "0" * 64},
             next_refresh_due_at=timezone.now() + timedelta(hours=12),
         )
         for index in range(7):
@@ -354,6 +360,12 @@ class CalculationRiskSnapshotTests(TestCase):
         self.assertEqual(after["salary_outcome_summary"]["rejected_count"], 5)
         self.assertEqual(after["salary_outcome_summary"]["maturity_status"], "mature")
         self.assertEqual(after["critical_path_progress"]["career_salary_projection"], 88)
+
+        state.artifact_evidence = {}
+        state.save(update_fields=["artifact_evidence"])
+        unevidenced = calculation_risk_snapshot(guardrails=_guardrails())
+        self.assertEqual(unevidenced["critical_path_progress"]["career_salary_projection"], 72)
+        self.assertIn("salary predictor is not fresh and ready", " ".join(unevidenced["blockers"]))
 
     def test_stale_evidence_marks_external_data_sensitive_calculations(self):
         now = timezone.now()

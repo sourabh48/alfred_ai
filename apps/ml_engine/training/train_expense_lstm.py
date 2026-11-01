@@ -1,11 +1,11 @@
 ﻿from __future__ import annotations
 
-import joblib
 import numpy as np
 import pandas as pd
 from django.utils import timezone
 
 from apps.ml_engine.data_extractors.user_expenses import load_user_expense_history
+from apps.ml_engine.inference_adapters.artifacts import dump_artifact
 from apps.ml_engine.inference_adapters.expense_lstm import MODEL_PATH, ExpenseLSTMAdapter
 from .simple_models import fit_linear_regression, mean_absolute_error
 from .quality import resolve_artifact_path, validation_blockers
@@ -94,14 +94,12 @@ def train_expense_lstm() -> dict:
         "evaluation": evaluation,
     }
     if passes:
-        artifact_path = resolve_artifact_path(MODEL_PATH)
-        artifact_path.parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump({
-            "model": model, "window_size": window, "transform": "log1p",
+        dump_artifact({
+            "model": model, "feature_names": ExpenseLSTMAdapter.FEATURE_NAMES, "window_size": window, "transform": "log1p",
             "trained_at": timezone.now().isoformat(), "freshness_hours": 12,
             "sample_count": sample_count, "quality_score": quality_score,
             "confidence_estimate": confidence, "evaluation": evaluation,
-        }, artifact_path)
+        }, MODEL_PATH)
     else:
         resolve_artifact_path(MODEL_PATH).unlink(missing_ok=True)
     return result

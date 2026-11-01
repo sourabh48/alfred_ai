@@ -19,6 +19,8 @@ ROLE_MODEL_KEYS = {
     "parser-confidence": "parser_confidence_calibrator",
 }
 PLANNED_ROLES = {"invest-rl": "rl_agent"}
+# Its label is a work-hours threshold, so it stays off even if its scores ever pass: it cannot support "layoff risk".
+UNVALIDATED_LABEL_ROLES = {"risk"}
 PREDICT_METHODS = {
     "relationship": "predict_score",
     "service-cost": "predict_cost",
@@ -75,11 +77,11 @@ class AlfredRouter:
             adapter.load()
             return adapter.predict(payload)
 
-        state = AdaptiveModelState.objects.filter(model_key=model_key).first()
-        ready = state is not None and state.inference_ready
+        # This adapter verifies its own evidence and owns the median fallback.
         if canonical_task == "expense-forecast":
-            return adapter.predict(payload, use_model=ready)
-        if not ready:
+            return adapter.predict(payload)
+        state = AdaptiveModelState.objects.filter(model_key=model_key).first()
+        if state is None or not state.inference_ready or canonical_task in UNVALIDATED_LABEL_ROLES:
             return _unavailable(canonical_task, "not_inference_ready")
         try:
             if canonical_task == "salary":

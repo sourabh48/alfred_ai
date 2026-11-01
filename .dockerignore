@@ -23,6 +23,8 @@ staticfiles
 ml_models/**/model.pt
 ml_models/**/model.bin
 ml_models/**/model.pkl
+ml_models/**/model.json
+ml_models/**/model.safetensors
 ml_models/**/weights
 ml_models/**/checkpoints
 python-installer.exe

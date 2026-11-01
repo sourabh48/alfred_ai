@@ -105,7 +105,7 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
     career_resume_review_count = CareerResume.objects.filter(parser_status__in=PARSER_REVIEW_STATUSES).count()
     career_outcome_summary = career_opportunity_outcome_summary(CareerJobAnalysis.objects.all())
     salary_model_state = AdaptiveModelState.objects.filter(model_key="salary_predictor").first()
-    salary_model_ready = bool(salary_model_state and salary_model_state.is_fresh)
+    salary_model_ready = bool(salary_model_state and salary_model_state.inference_ready)
     salary_outcomes_ready = bool(career_outcome_summary.get("maturity_status") == "mature")
 
     credit_report_review_count = CreditReportUpload.objects.filter(parser_status__in=PARSER_REVIEW_STATUSES).count()

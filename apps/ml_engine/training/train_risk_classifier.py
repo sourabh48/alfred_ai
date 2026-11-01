@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import os
-
-import joblib
-
 from apps.ml_engine.data_extractors.user_behavior import load_behavior_data
-from apps.ml_engine.inference_adapters.risk_classifier import MODEL_PATH
+from apps.ml_engine.inference_adapters.artifacts import dump_artifact
+from apps.ml_engine.inference_adapters.risk_classifier import MODEL_PATH, RiskClassifier
 from .simple_models import accuracy_score, fit_binary_logistic_regression, random_train_test_split
 
 
@@ -40,8 +37,7 @@ def train_risk_classifier() -> dict:
     coverage_score = min(100.0, (sample_count / 60.0) * 100.0)
     confidence_estimate = round(max(20.0, (quality_score * 0.7) + (coverage_score * 0.3)), 2)
 
-    os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    joblib.dump(model, MODEL_PATH)
+    dump_artifact({"model": model, "feature_names": RiskClassifier.FEATURE_NAMES}, MODEL_PATH)
 
     return {
         "status": "ready",

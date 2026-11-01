@@ -15,6 +15,7 @@ from apps.behavioral.models import BehavioralSignal
 from apps.expenses.models import Expense
 from apps.mobility.models import BikeServiceRecord
 from apps.ml_engine.core.alfred_registry import model_registry
+from apps.ml_engine.inference_adapters.artifacts import build_artifact_evidence
 from apps.ml_engine.models import AdaptiveModelState, AdaptiveTrainingRun, DocumentParserLearningMemory
 from apps.relationship.models import RelationshipProfile
 from apps.users.models import User
@@ -311,6 +312,8 @@ def _model_maturity_payload(state: AdaptiveModelState, spec: TrainingSpec | None
         blockers.extend(validation_blockers(state.model_key, state.sample_count, state.quality_score, state.confidence_estimate))
         if not state.artifact_path or not resolve_artifact_path(state.artifact_path).is_file():
             blockers.append("The recorded model artifact is missing.")
+        if not state.has_artifact_evidence:
+            blockers.append("No artifact evidence is recorded; a new approved training run is required.")
 
     return {
         "model_key": state.model_key,
@@ -406,6 +409,10 @@ def _run_training_spec(spec: TrainingSpec, *, trigger: str, force: bool, now) ->
     state.quality_score = quality_score
     state.confidence_estimate = confidence_estimate
     state.artifact_path = result.get("artifact_path", "") or ""
+    state.artifact_evidence = (
+        build_artifact_evidence(spec.key, state.artifact_path, finished.isoformat())
+        if status_value == "ready" and state.artifact_path else {}
+    )
     state.notes = result.get("notes", spec.description)
     state.last_finished_at = finished
     state.last_trigger = trigger
@@ -433,6 +440,7 @@ def _run_training_spec(spec: TrainingSpec, *, trigger: str, force: bool, now) ->
                 "confidence_estimate": round(confidence_estimate, 2),
                 "sample_count": state.sample_count,
                 "artifact_path": state.artifact_path,
+                "artifact_evidence": state.artifact_evidence,
                 "notes": state.notes,
                 "evaluation": result.get("evaluation", {}),
             },
