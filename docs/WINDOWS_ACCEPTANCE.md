@@ -6,6 +6,8 @@ Use a separate Windows x64 computer with no project checkout, Python or Docker.
 Extract `ALFRED-Windows-x64.zip` or install `ALFRED-Setup.exe` from the
 release folder first.
 An isolated folder on the development PC does not establish clean-PC acceptance.
+For Smart App Control evidence on a signed release, also follow
+[Windows code signing](WINDOWS_CODE_SIGNING.md#smart-app-control-test).
 
 The release folder contains the installer, both phase launchers, instructions
 and an acceptance manifest. Copy the complete folder. Its manifest rejects
