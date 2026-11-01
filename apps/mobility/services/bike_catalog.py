@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from collections import Counter
 from copy import deepcopy
+from datetime import date
 from difflib import SequenceMatcher
 import re
+
+from django.utils import timezone
 
 
 CLASS_DEFAULTS = {
@@ -1510,7 +1513,7 @@ EXTENDED_OFFICIAL_BIKE_CATALOG = [
         85,
         "Suzuki Motorcycle India",
         "https://www.suzukimotorcycle.co.in/product-details/gixxer-sf-250",
-        ["gixxer sf 250", "suzuki gixxer 250", "gixxer 250"],
+        ["gixxer sf 250", "suzuki gixxer sf 250"],
         maintenance_highlights=[
             {"label": "Oil-Cooling And Tyre Edge Review", "interval": "Before highway or spirited rides", "note": "Quarter-liter sport use benefits from oil, air-filter, brake-pad, tyre, and chain checks before long runs."},
         ],
@@ -2940,13 +2943,29 @@ def best_catalog_match(name: str) -> tuple[dict | None, float]:
     for item in _catalog_items():
         candidates = [item["display_name"], item["model_name"], *item.get("aliases", [])]
         for candidate in candidates:
-            score = SequenceMatcher(None, normalized, normalize_bike_name(candidate)).ratio()
-            if normalized in normalize_bike_name(candidate) or normalize_bike_name(candidate) in normalized:
+            candidate_name = normalize_bike_name(candidate)
+            if not _same_model(normalized, candidate_name, normalize_bike_name(item["make"])):
+                continue
+            score = SequenceMatcher(None, normalized, candidate_name).ratio()
+            if normalized in candidate_name or candidate_name in normalized:
                 score += 0.08
             if score > best_score:
                 best_item = item
                 best_score = score
     return (deepcopy(apply_class_defaults(best_item)), min(best_score, 1.0)) if best_item else (None, 0.0)
+
+
+def _same_model(name: str, candidate: str, make: str) -> bool:
+    # A shared make or a near-identical spelling must not lend one model's specs to another.
+    numbers = {number for number in re.findall(r"\d+", name) if not re.fullmatch(r"(?:19|20)\d\d", number)}
+    candidate_numbers = set(re.findall(r"\d+", candidate))
+    if numbers and not (candidate_numbers and candidate_numbers <= numbers):
+        return False
+    model = name.removeprefix(make).strip()
+    candidate_model = candidate.removeprefix(make).strip()
+    if not model or not candidate_model:
+        return False
+    return candidate_model in model or SequenceMatcher(None, model, candidate_model).ratio() >= 0.78
 
 
 def catalog_coverage_summary() -> dict:
@@ -2961,6 +2980,7 @@ def catalog_coverage_summary() -> dict:
     missing_manufacturers = sorted(required_manufacturers - supported_manufacturers)
     missing_vehicle_types = sorted(SUPPORTED_CATALOG_SCOPE["required_vehicle_types"] - set(vehicle_type_counts))
     model_count = len(items)
+    source_age_days = (timezone.localdate() - date.fromisoformat(CATALOG_SOURCE_REFRESHED_ON)).days
     completion_ready = (
         model_count >= SUPPORTED_CATALOG_SCOPE["minimum_models"]
         and len(supported_manufacturers) >= SUPPORTED_CATALOG_SCOPE["minimum_manufacturers"]
@@ -2983,6 +3003,8 @@ def catalog_coverage_summary() -> dict:
         "source_refresh": {
             "last_checked_on": CATALOG_SOURCE_REFRESHED_ON,
             "refresh_policy_days": CATALOG_SOURCE_REFRESH_POLICY_DAYS,
+            "age_days": source_age_days,
+            "stale": source_age_days > CATALOG_SOURCE_REFRESH_POLICY_DAYS,
             "official_source_count": source_ready,
             "source_checked_count": source_checked_ready,
         },

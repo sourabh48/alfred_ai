@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+# Set on an imported service record whose read cost waits for the owner's review.
+COST_HELD_FOR_REVIEW = "cost_held_for_review"
+
 
 def merge_nested_payload(existing: dict | None, incoming: dict | None) -> dict:
     merged = deepcopy(existing or {})

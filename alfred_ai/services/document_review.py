@@ -14,7 +14,7 @@ from .upload_limits import parser_budget
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services import job_intelligence, resume_intelligence
 from apps.expenses.models import StatementUpload
-from apps.expenses.money import money_float
+from apps.expenses.money import expense_money, money_float
 from apps.expenses.services.statement_import import clean_statement_text
 from apps.expenses.services.statement_lifecycle import delete_statement_upload, queue_statement_retry, retry_statement_upload
 from apps.integrations.models import CreditReportUpload, CreditScore
@@ -31,6 +31,7 @@ from apps.loans.services import loan_foreclosure_service
 from apps.loans.services.loan_closure_parser import loan_closure_parser
 from apps.mobility.models import BikeDocument, BikeServiceRecord
 from apps.mobility.services import bike_document_ai, bike_service_intelligence, build_document_payload, build_service_record_payload, merge_nested_payload
+from apps.mobility.services.payload_contracts import COST_HELD_FOR_REVIEW
 from apps.reports.models import SystemTicket
 from apps.reports.services import operational_logging_service, reporting_service
 
@@ -1294,7 +1295,7 @@ def _retry_vehicle_document(user, document_id: int) -> dict:
         ]
     )
     bike_service_intelligence.hydrate_document(document)
-    _refresh_imported_service_records(document, parsed)
+    _refresh_imported_service_records(document, parsed, cost_accepted="cost" in service_corrections, release_hold=parsed.parser_status == "parsed")
     record_parser_learning(
         user=user,
         scope="vehicle_document",
@@ -1768,7 +1769,7 @@ def _delete_orphan_investments(previous_investments: list[Investment], current_i
         investment.delete()
 
 
-def _refresh_imported_service_records(document: BikeDocument, parsed) -> None:
+def _refresh_imported_service_records(document: BikeDocument, parsed, *, cost_accepted: bool = False, release_hold: bool = False) -> None:
     service_payload = parsed.service_payload or {}
     records = list(document.imported_service_records.all())
     if not service_payload and not records:
@@ -1777,15 +1778,17 @@ def _refresh_imported_service_records(document: BikeDocument, parsed) -> None:
     issue_date = _parse_date(service_payload.get("service_date"))
     for record in records:
         update_fields = ["parsed_payload"]
+        release = release_hold and (record.parsed_payload or {}).get(COST_HELD_FOR_REVIEW)
         if service_payload:
             record.service_date = issue_date or record.service_date
             odometer_km = _parse_float(service_payload.get("odometer_km"))
             if odometer_km is not None:
                 record.odometer_km = int(odometer_km)
             record.service_type = service_payload.get("service_type") or record.service_type
+            # A re-read is evidence. Posted money moves only on acceptance or when a hold ends.
             cost = _parse_float(service_payload.get("cost"))
-            if cost is not None:
-                record.cost = cost
+            if cost is not None and (cost_accepted or release):
+                record.cost = expense_money(cost)
             record.service_center = service_payload.get("service_center") or record.service_center
             record.next_service_date = _parse_date(service_payload.get("next_service_date")) or record.next_service_date
             record.next_service_km = service_payload.get("next_service_km") or record.next_service_km
@@ -1809,7 +1812,20 @@ def _refresh_imported_service_records(document: BikeDocument, parsed) -> None:
             document=document,
             document_payload=document.extracted_payload,
         )
+        if cost_accepted or release:
+            record.parsed_payload.pop(COST_HELD_FOR_REVIEW, None)
         record.save(update_fields=update_fields)
+    if records:
+        # An imported invoice's amount mirrors its posted log.
+        document.premium_amount = records[0].cost
+        document.save(update_fields=["premium_amount"])
+
+
+def _review_km(value) -> int:
+    km = int(expense_money(value))
+    if km < 0:
+        raise ValueError("Odometer values cannot be negative.")
+    return km
 
 
 def _parse_jsonish_correction(value):
@@ -2834,6 +2850,7 @@ def _apply_investment_correction(user, document_id: int, corrections: dict) -> d
     return _serialize_investment(document)
 
 
+@transaction.atomic
 def _apply_vehicle_correction(user, document_id: int, corrections: dict) -> dict:
     document = BikeDocument.objects.get(user=user, pk=document_id)
     payload = dict(document.extracted_payload or {})
@@ -2855,13 +2872,16 @@ def _apply_vehicle_correction(user, document_id: int, corrections: dict) -> dict
     if corrections.get("service_type"):
         service_payload["service_type"] = corrections.get("service_type")
     if corrections.get("odometer_km") not in ("", None):
-        service_payload["odometer_km"] = int(float(corrections.get("odometer_km") or 0))
+        service_payload["odometer_km"] = _review_km(corrections.get("odometer_km"))
     if corrections.get("cost") not in ("", None):
-        service_payload["cost"] = float(corrections.get("cost") or 0)
+        cost = expense_money(corrections.get("cost"))
+        if cost < 0:
+            raise ValueError("Service cost cannot be negative.")
+        service_payload["cost"] = float(cost)
     if corrections.get("next_service_date"):
         service_payload["next_service_date"] = corrections.get("next_service_date")
     if corrections.get("next_service_km") not in ("", None):
-        service_payload["next_service_km"] = int(float(corrections.get("next_service_km") or 0))
+        service_payload["next_service_km"] = _review_km(corrections.get("next_service_km"))
     if corrections.get("extracted_work_summary"):
         service_payload["extracted_work_summary"] = corrections.get("extracted_work_summary")
     service_payload = _apply_vehicle_service_payload_corrections(service_payload, corrections)
@@ -2912,6 +2932,8 @@ def _apply_vehicle_correction(user, document_id: int, corrections: dict) -> dict
             confidence=document.parse_confidence,
             parser_notes=document.parser_notes,
         ),
+        cost_accepted="cost" in corrections,
+        release_hold=True,
     )
     record_parser_correction(
         user=user,
