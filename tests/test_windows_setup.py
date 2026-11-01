@@ -42,7 +42,7 @@ class WindowsSetupTests(unittest.TestCase):
                  mock.patch("django.core.management.execute_from_command_line", side_effect=lambda argv: probe(tuple(argv[1:]))):
                 exec(compile(code, str(SCRIPT), "exec"), {})
             self.assertEqual(phases, [
-                ("install", "--upgrade", "pip"),
+                ("install", "pip==26.2.2"),
                 ("install", "-r", str(SCRIPT.parents[1] / "requirements.txt")),
                 ("check",), "configure", ("check",), ("migrate", "--noinput"),
             ])

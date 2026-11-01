@@ -77,7 +77,7 @@ with ExitStack() as locks:
     except OSError:
         raise SystemExit("Stop ALFRED and let its worker finish before installing dependencies.")
     guard_retained_data()
-    for arguments in (("install", "--upgrade", "pip"),
+    for arguments in (("install", "pip==26.2.2"),
                       ("install", "-r", str(repo / "requirements.txt")), ("check",)):
         subprocess.run([sys.executable, "-m", "pip", *arguments], check=True)
     local_config = data / "config/local.env"

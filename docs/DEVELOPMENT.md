@@ -23,6 +23,7 @@ Run these commands from the repository root in PowerShell.
 
 ```powershell
 py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install pip==26.2.2
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 $env:ALFRED_DATA_DIR = Join-Path $env:LOCALAPPDATA 'ALFRED-Development'
 $env:DATABASE_URL = 'sqlite:///' + (Join-Path $env:ALFRED_DATA_DIR 'db.sqlite3').Replace('\', '/')
