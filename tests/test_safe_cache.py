@@ -1,4 +1,5 @@
 """CVE-2025-69872: a row planted in a cache file must not reach pickle, in throttling or the shared cache."""
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from datetime import date, datetime, time, timedelta, timezone as utc
 from decimal import Decimal
@@ -285,6 +286,14 @@ class ThrottlingStoreTests(Base):
         results = [process.communicate(timeout=180) for process in started]
         self.assertEqual([process.returncode for process in started], [0, 0, 0, 0], results[0][1][-500:])
         self.assertEqual(sum(int(out.strip().splitlines()[-1]) for out, _ in results), 6)
+
+    def test_simultaneous_first_requests_to_a_new_store_all_succeed(self):
+        # A page load sends several requests at once, and the first ones after an upgrade find no store yet.
+        for round_number in range(10):
+            path = str(self.root / f"new{round_number}" / "limits")
+            with ThreadPoolExecutor(8) as pool:
+                results = list(pool.map(lambda number: reserve_attempts(path, [(f"key{number}", 5, 60)]), range(8)))
+            self.assertEqual(results, [0] * 8)
 
     def test_a_record_pointing_at_a_missing_file_fails_closed(self):
         path = self.root / "limits"

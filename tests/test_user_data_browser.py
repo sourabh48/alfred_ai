@@ -59,7 +59,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def setUp(self):
         self.browser.set_window_size(1440, 1200)
         directory = self.enterContext(TemporaryDirectory(prefix="alfred-browser-invite-limits-", ignore_cleanup_errors=True))
-        self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=directory,
+        # Sibling stores, as in settings.py: the temporary parent is not private, so it cannot itself be a store.
+        self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=str(Path(directory) / 'family-invites'),
             ALFRED_ABUSE_THROTTLE_DIR=str(Path(directory) / 'runtime-limits')))
         self.browser.get("about:blank")
         cache.clear()

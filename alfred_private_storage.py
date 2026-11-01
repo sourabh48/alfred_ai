@@ -10,8 +10,12 @@ import json
 import os
 from pathlib import Path
 import stat
+import threading
 import time
 from urllib.parse import parse_qs, urlsplit
+
+# Replacing a folder's permissions briefly breaks path lookups in other threads, which then wrongly refuse the folder.
+STORAGE_LOCK = threading.Lock()
 
 
 class PrivateStorageUnavailable(RuntimeError):
@@ -176,15 +180,18 @@ def protect(path):
 
 
 def private_directory(path, *, deadline=None):
-    path = safe_path(path)
-    if deadline is not None and time.monotonic() >= deadline:
-        raise PrivateStorageUnavailable("Private storage protection deadline expired.")
-    fresh = not path.exists() or path.is_dir() and not any(path.iterdir())
-    path.mkdir(parents=True, exist_ok=True)
-    if fresh:
+    with STORAGE_LOCK:
+        path = safe_path(path)
+        if deadline is not None and time.monotonic() >= deadline:
+            raise PrivateStorageUnavailable("Private storage protection deadline expired.")
+        fresh = not path.exists() or path.is_dir() and not any(path.iterdir())
+        path.mkdir(parents=True, exist_ok=True)
+        # Already private needs no rewrite, which could disturb a request already using the folder.
+        if verify_private(path):
+            return path
+        if not fresh:
+            raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
         protect(path)
-    elif not verify_private(path):
-        raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
     return path
 
 
@@ -192,10 +199,11 @@ def verify_cache_storage(path):
     """Refuse a cache folder if a shard or a database was loosened, since each has permissions of its own."""
     if os.name != "nt":
         return
-    for folder in (path, *(item for item in path.iterdir() if item.is_dir())):
-        database = folder / "cache.db"
-        if not verify_private(folder) or database.exists() and not verify_private(database):
-            raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
+    with STORAGE_LOCK:
+        for folder in (path, *(item for item in path.iterdir() if item.is_dir())):
+            database = folder / "cache.db"
+            if not verify_private(folder) or database.exists() and not verify_private(database):
+                raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
 
 
 def permission_plan(root):
