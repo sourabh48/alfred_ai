@@ -1,10 +1,18 @@
 """Model files stay local, and loading one must not run code embedded in it."""
+import os
 from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
 
 from apps.ml_engine.inference_adapters import relationship_siamese, transaction_classifier as classifier_module
 from apps.ml_engine.inference_adapters.transaction_classifier import TransactionClassifierAdapter
+
+
+class OfflineDefaultTests(SimpleTestCase):
+    def test_model_libraries_stay_offline_without_telemetry(self):
+        for name in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_HUB_DISABLE_TELEMETRY"):
+            with self.subTest(name=name):
+                self.assertEqual(os.environ[name], "1")
 
 
 class TransactionClassifierLoadingTests(SimpleTestCase):

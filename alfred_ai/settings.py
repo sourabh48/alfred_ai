@@ -20,6 +20,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 load_local_environment(Path(os.environ.get("ALFRED_DATA_DIR") or BASE_DIR))
 
+# ALFRED is offline-first: model libraries never reach Hugging Face on their own.
+for _offline_setting in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_HUB_DISABLE_TELEMETRY"):
+    os.environ.setdefault(_offline_setting, "1")
+
 
 def _is_local_runtime(argv: list[str] | None = None) -> bool:
     argv = list(argv or sys.argv)
