@@ -477,7 +477,7 @@ class JobIntelligenceService:
 
     def current_openings_evidence(self, evidence: dict) -> dict:
         # Owner caching cannot keep merged feed evidence fresh past its earliest source expiry.
-        if evidence.get("status") != "fresh":
+        if not isinstance(evidence, dict) or evidence.get("status") != "fresh":
             return evidence
         try:
             expires = datetime.fromisoformat((evidence.get("freshness") or {}).get("next_stale_after") or evidence.get("stale_after", ""))
