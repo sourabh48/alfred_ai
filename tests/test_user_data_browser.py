@@ -1,4 +1,5 @@
 """Real-page acceptance of synthetic financial data and its explanations."""
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
@@ -32,13 +33,17 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         cls.By = By
         cls.active_requests = 0
         cls.request_lock = threading.Lock()
+        # The live server shares one in-memory SQLite connection between threads, unlike the real runtime.
+        # A page's burst of requests could empty another request's session read and sign the browser out.
+        cls.request_turn = threading.Lock()
         original_get_response = BaseHandler.get_response
 
         def tracked_response(handler, request):
             with cls.request_lock:
                 cls.active_requests += 1
             try:
-                return original_get_response(handler, request)
+                with cls.request_turn:
+                    return original_get_response(handler, request)
             finally:
                 with cls.request_lock:
                     cls.active_requests -= 1
@@ -93,6 +98,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda driver: driver.find_elements(self.By.ID, "dashboardPeriodNote"))
         self.wait.until(lambda driver: self.text("dashboardPeriodNote") and "Loading" not in self.text("dashboardPeriodNote"))
         self.wait.until(lambda driver: self.text("dashboardSummaryCards"))
+
+    def allow_simultaneous_requests(self):
+        # For a test that holds one request open while another completes.
+        self.enterContext(patch.object(type(self), 'request_turn', nullcontext()))
 
     def lose_session(self):
         from django.contrib.sessions.models import Session
@@ -764,6 +773,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.ID,'memoryEvaluationQuery').get_property('value'),'')
 
     def test_reviewed_synthetic_model_comparison_verdict_metrics_outage_and_mobile(self):
+        self.allow_simultaneous_requests()
         # This tests rendered synthetic reports; current-source eligibility is tested separately.
         from apps.ml_engine.services.retrieval_holdout import RAW
         self.enterContext(patch('apps.ml_engine.services.retrieval_holdout.cohort',return_value=json.loads(RAW)))
@@ -891,6 +901,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('memory-evaluation-stale-source-and-retry')
 
     def test_memory_evaluation_pending_pagehide_discards_late_response_and_over_limit_preserves_cases(self):
+        self.allow_simultaneous_requests()
         from apps.ml_engine.services.persistent_memory import MemoryStore
         from apps.ml_engine.services.memory_learning import MemoryLearning
         store,owner,identities=self.memory_evaluation_fixture()
@@ -2418,6 +2429,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('document-field-questions-reviewed-current-values')
 
     def test_financial_document_questions_stale_outage_retry_and_no_history(self):
+        self.allow_simultaneous_requests()
         from selenium.webdriver.support.ui import Select
         from uuid import uuid4
         from apps.ml_engine.services.conversation_history import ConversationHistory
@@ -2899,6 +2911,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(question.get_property('value'),'')
 
     def test_initial_catalog_response_does_not_cancel_independent_private_vault_requests(self):
+        self.allow_simultaneous_requests()
         from threading import Event
         from selenium.webdriver.support.ui import Select
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -5689,13 +5702,6 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         clock=self.enterContext(patch.object(reminders,'current_time',return_value=now or datetime(2035,1,1,tzinfo=timezone.utc)))
         # These journeys reload the planner often, and the budget they spend depends on machine speed.
         self.enterContext(override_settings(ALFRED_API_ACCOUNT_LIMIT=10**6,ALFRED_API_GLOBAL_LIMIT=10**6))
-        # The live server shares one in-memory SQLite connection between threads, unlike the real runtime.
-        # A page's burst of requests could empty another request's session read and sign the browser out.
-        turn,tracked=threading.Lock(),BaseHandler.get_response
-        def one_at_a_time(handler,request):
-            with turn:
-                return tracked(handler,request)
-        self.enterContext(patch.object(BaseHandler,'get_response',one_at_a_time))
         return session,clock
 
     def reminder_fields(self,selector,label,zone,local_time,fold=''):
