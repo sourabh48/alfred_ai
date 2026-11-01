@@ -75,7 +75,7 @@ def _study_recommendations_payload(profile, latest_resume=None, latest_analysis=
 def _compensation_benchmark_payload(user, profile, *, openings=None, openings_evidence=None, latest_analysis=None, latest_resume=None, income_signals: dict | None = None, country: str = "", state: str = "") -> dict:
     role = profile.role if profile.role and profile.role != "Profile pending" else ((latest_resume.extracted_payload.get("role", "") if latest_resume else "") or "analyst")
     filter_location = ", ".join(part for part in [state, country] if part)
-    location = getattr(user, "city", "") or getattr(latest_analysis, "location", "") or filter_location
+    location = filter_location or getattr(user, "city", "") or getattr(latest_analysis, "location", "")
     resolved_income_signals = income_signals or build_employment_income_signals(user=user, latest_resume=latest_resume, profile=profile)
     snapshot_payload = ((getattr(latest_analysis, "extracted_payload", {}) or {}).get("job_snapshot", {}) if latest_analysis else {}) or {}
     job_snapshot = None
@@ -111,6 +111,7 @@ def _compensation_benchmark_payload(user, profile, *, openings=None, openings_ev
         job_snapshot=job_snapshot,
         openings_evidence=openings_evidence,
         current_income_annual=float(resolved_income_signals.get("annualized_compensation", 0) or 0),
+        snapshot_observed_at=latest_analysis.created_at if job_snapshot else None,
     )
 
 
@@ -791,6 +792,7 @@ def career_dashboard(request):
     # Owner caching cannot extend a job feed's evidence lifetime.
     payload["openings"] = [{**item, "source_status": (source_status := job_intelligence.opening_evidence_status(item.get("source_evidence") or {})),
         "verified_source": source_status == "fresh"} for item in payload.get("openings", [])]
+    payload["openings_evidence"] = job_intelligence.current_openings_evidence(payload.get("openings_evidence") or {})
     return Response(payload)
 
 
@@ -803,7 +805,8 @@ def _career_dashboard_payload(request) -> dict:
     country, state = _opening_filter_params(request)
     projection = _career_projection_payload(request.user, profile, macro=macro, latest_resume=latest_resume, income_signals=income_signals)
     role = profile.role if profile.role and profile.role != "Profile pending" else ((latest_resume.extracted_payload.get("role", "") if latest_resume else "") or "analyst")
-    skills = latest_resume.extracted_payload.get("skills", []) if latest_resume else [item.strip() for item in (profile.skills or "").split(",") if item.strip()]
+    # Uploads merge resume skills into the profile, so the owner's saved list is the configured search.
+    skills = _resume_payload_from_profile(profile)["skills"] or (latest_resume.extracted_payload.get("skills", []) if latest_resume else [])
     market = job_intelligence.market_outlook(role, macro=macro)
     openings = job_intelligence.suggest_openings(role, skills, country=country, state=state)
     career_timing = _career_timing_payload(request.user, profile, market, latest_analysis, latest_resume=latest_resume, income_signals=income_signals)

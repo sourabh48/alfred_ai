@@ -74,6 +74,20 @@ class CareerLocationRulesTests(SimpleTestCase):
         self.assertEqual(self.opening('Remote, Bengaluru, Maharashtra, India')['country'], '')
         self.assertEqual(self.opening('Austinville')['country'], '')
 
+    def test_negative_restrictions_never_name_the_excluded_place_as_eligible(self):
+        for location in ['Remote (non-US)', 'Remote, ex-US', 'Remote, not India', 'Remote - excludes Mumbai',
+                         'India excluded', 'Bengaluru excluded', 'Remote, no US']:
+            with self.subTest(location=location):
+                opening = self.opening(location)
+                self.assertEqual((opening['country'], opening['state'], opening['city']), ('', '', ''))
+                for country in ('India', 'USA'):
+                    self.assertFalse(job_intelligence._opening_matches_location(opening, country=country))
+
+    def test_negated_remote_wording_keeps_the_stated_place(self):
+        for location in ['Non-remote, Mumbai, India', 'Mumbai, India (not remote)', 'Mumbai, India, no remote']:
+            with self.subTest(location=location):
+                self.assertEqual(self.opening(location)['country'], 'India')
+
     def test_country_and_remote_filters_keep_restricted_roles_distinct(self):
         with patch.object(job_intelligence, '_live_job_feed_results', side_effect=location_feed_results):
             india = job_intelligence.suggest_openings('Developer', ['Python'], country='India')

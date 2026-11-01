@@ -73,7 +73,7 @@ def build_salary_projection(user, profile, *, macro: dict, latest_resume=None, o
             else f"Projection uses a heuristic annual growth rate of {growth_context['annual_growth'] * 100:.1f}% because no live salary model anchor is available."
         ),
         f"Latest tracked India unemployment signal is {growth_context['unemployment']} and inflation is {growth_context['inflation']}.",
-        "Resume and job-match data can sharpen the heuristic growth inputs even when the salary-model anchor is unavailable.",
+        "Resume skills and profile experience adjust the heuristic growth inputs even when the salary-model anchor is unavailable.",
     ]
     if not projections:
         insights = ["Confirm your income in Settings to see a projection."]

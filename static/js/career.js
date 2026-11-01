@@ -488,7 +488,7 @@ function renderCareerOutcomeForm(item) {
     const value = key => Alfred.escapeHtml(String(saved[key] ?? evidence[key] ?? ""));
     target.innerHTML = `
         <form id="careerOutcomeForm" data-live-refresh-hold="true">
-            <p class="small muted">Annual comparisons assume 12 months or 2,080 hours. They are estimates, not predicted pay.</p>
+            <p class="small muted">Annual comparisons assume 12 months, 52 weeks, 260 days or 2,080 hours. They are estimates, not predicted pay.</p>
             <div class="row g-3">
                 <div class="col-md-6"><label class="form-label" for="careerOutcomeDecision">Your decision</label>
                     <select class="form-select" id="careerOutcomeDecision" name="outcome" required>
@@ -504,7 +504,7 @@ function renderCareerOutcomeForm(item) {
                     <input class="form-control" id="careerOutcomeCurrency" name="salary_currency" maxlength="3" pattern="[A-Za-z]{3}" value="${value("salary_currency")}" required></div>
                 <div class="col-md-6"><label class="form-label" for="careerOutcomePeriod">Salary period</label>
                     <select class="form-select" id="careerOutcomePeriod" name="salary_period" required>
-                        <option value="year">Per year</option><option value="month">Per month</option><option value="hour">Per hour</option>
+                        <option value="year">Per year</option><option value="month">Per month</option><option value="week">Per week</option><option value="day">Per day</option><option value="hour">Per hour</option>
                     </select></div>
                 <div class="col-12"><label class="form-label" for="careerOutcomeSource">Reviewed source URL</label>
                     <input class="form-control" id="careerOutcomeSource" name="source_url" type="url" value="${Alfred.escapeHtml(saved.source_url || item.job_url || "")}" required></div>
@@ -554,6 +554,11 @@ function renderCompensationBenchmark(benchmark) {
         target.innerHTML = `<div class="mini-card"><div class="fw-semibold">Compensation Benchmark</div><div class="muted small mt-2">${Alfred.escapeHtml(benchmark?.summary || "Salary evidence will appear when Alfred finds pay-bearing job signals.")}</div></div>`;
         return;
     }
+    const observations = (benchmark.salary_observations || []).map(item => {
+        const link = openingSourceLink(item.url);
+        const band = `${formatCompensationAmount(item.salary_min_annual, item.currency)} to ${formatCompensationAmount(item.salary_max_annual || item.salary_min_annual, item.currency)} annual`;
+        return `<li class="insight-item surface-card">${Alfred.escapeHtml(item.source || "Source")} | ${Alfred.escapeHtml(item.location || "Location not specified")} | ${Alfred.escapeHtml(band)} | ${item.observed_at ? `Checked ${Alfred.escapeHtml(Alfred.formatDate(item.observed_at))}` : "Check date unavailable"}${link ? ` · <a href="${Alfred.escapeHtml(link)}" target="_blank" rel="noopener">Source</a>` : ""}</li>`;
+    }).join("");
     target.innerHTML = `
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
@@ -568,6 +573,7 @@ function renderCompensationBenchmark(benchmark) {
                 </div>
             </div>
             <div class="muted small mt-3"><strong>Band:</strong> ${Alfred.escapeHtml(formatCompensationAmount(benchmark.market_min_annual, benchmark.currency))} to ${Alfred.escapeHtml(formatCompensationAmount(benchmark.market_max_annual || benchmark.market_min_annual, benchmark.currency))} annual</div>
+            ${observations ? `<ul class="insight-list mb-0 mt-3">${observations}</ul>` : ""}
         </div>
     `;
 }
@@ -646,7 +652,8 @@ function renderOpenings(items, counts = {}) {
             <div class="muted small mt-2">${item.tags?.length ? Alfred.escapeHtml(item.tags.join(", ")) : ""}</div>
             <div class="muted small mt-2">${Alfred.escapeHtml(item.portal_name || "Source")} | rule-based relevance ${Alfred.formatNumber(item.relevance_score || 0, 0)}/100; not a hiring probability</div>
             <div class="muted small mt-2" data-opening-source-status="${Alfred.escapeHtml(item.source_status || "unknown")}">${Alfred.escapeHtml(labels[item.source_status] || labels.unknown)} ${item.source_evidence?.verified_at ? `Checked ${Alfred.escapeHtml(item.source_evidence.verified_at)}.` : ""} ${item.source_evidence?.stale_after ? `Evidence expires ${Alfred.escapeHtml(item.source_evidence.stale_after)}.` : ""}</div>
-            <div class="muted small mt-2">${(item.match_reasons || []).length ? Alfred.escapeHtml(item.match_reasons.join(" ")) : "Matched from your role and tracked skills."}</div>
+            <div class="muted small mt-2">${item.publication_date ? `Posted ${Alfred.escapeHtml(item.publication_date)}.` : "Posting date not stated."}</div>
+            <div class="muted small mt-2">${(item.match_reasons || []).length ? Alfred.escapeHtml(item.match_reasons.join(" ")) : "No direct title or skill overlap with your role and tracked skills."}</div>
             <div class="mt-2">${link ? `<a href="${Alfred.escapeHtml(link)}" target="_blank" rel="noopener">View posting</a>` : "Posting link unavailable"}${proof ? ` · <a href="${Alfred.escapeHtml(proof)}" target="_blank" rel="noopener">Source feed</a>` : ""}</div>
         </div>
     `; }).join("") : `<div class="empty-state">No source-backed job leads are available for this search.</div>`;

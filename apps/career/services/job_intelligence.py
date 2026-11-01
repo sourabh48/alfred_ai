@@ -9,7 +9,7 @@ import math
 import re
 import unicodedata
 from statistics import median
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import parse_qsl, quote_plus, urlencode, urlparse
 
 from bs4 import BeautifulSoup
 from django.utils import timezone
@@ -44,6 +44,8 @@ ROLE_HINTS = [
     "data analyst", "business analyst", "financial analyst", "data scientist",
     "machine learning engineer", "product manager", "program manager", "finance manager",
 ]
+# Shared by every job family, so they say nothing about whether a title matches the role.
+ROLE_SENIORITY_WORDS = {"senior", "junior", "lead", "staff", "principal", "associate", "head", "chief"}
 LINK_RE = re.compile(r"https?://[^\s<>\"]+", re.IGNORECASE)
 CITY_TO_STATE_COUNTRY = {
     "bengaluru": ("Karnataka", "India"),
@@ -74,6 +76,10 @@ STATE_TO_COUNTRY = {
     "new york": "United States",
     "texas": "United States",
 }
+# Wording that excludes a place; "not remote" is about the work model, so it still names the place.
+LOCATION_EXCLUSION_RE = re.compile(r"\b(?:except|exclud\w*|outside|ex|(?:not|non|no)(?![ -]+remote\b))\b", re.IGNORECASE)
+# Campaign and referral parameters say how a link was found, not which posting it is.
+TRACKING_QUERY_RE = re.compile(r"utm_.*|ref|referrer|source|src|gh_src|lever-source|lever-origin|gclid|fbclid|trk", re.IGNORECASE)
 COUNTRY_ALIASES = {
     "india": "India",
     "usa": "United States",
@@ -384,13 +390,13 @@ class JobIntelligenceService:
         }
 
     def suggest_openings(self, role: str, skills: list[str], *, country: str = "", state: str = "") -> dict:
+        skills = [item for item in skills if isinstance(item, str) and item.strip()]
         search_terms = [
             " ".join([role, *skills[:2]]).strip(),
             role.strip(),
             skills[0] if skills else "",
             "developer" if "engineer" in role.lower() else "",
             "analyst" if "analyst" in role.lower() else "",
-            "python",
         ]
         unique_terms = []
         for term in [item.strip() for item in search_terms if item and item.strip()]:
@@ -416,8 +422,9 @@ class JobIntelligenceService:
                     tags = item.get("tags") or []
                     item["tags"] = [tag for tag in (tags if isinstance(tags, list) else [tags]) if isinstance(tag, str)][:8]
                     opening = self._normalize_opening(item, role=role, skills=skills, evidence=feed_result["evidence"])
-                    if url not in by_url or (opening["verified_source"] and not by_url[url]["verified_source"]):
-                        by_url[url] = opening
+                    identity = self._opening_identity(url)
+                    if identity not in by_url or (opening["verified_source"] and not by_url[identity]["verified_source"]):
+                        by_url[identity] = opening
         jobs = list(by_url.values())
         evidence = self._combine_evidence(
             evidence_records,
@@ -461,6 +468,21 @@ class JobIntelligenceService:
             "total_candidates": len(jobs),
             "filtered_candidates": len(filtered_jobs),
         }
+
+    def _opening_identity(self, url: str) -> str:
+        parts = urlparse(url)
+        query = sorted(item for item in parse_qsl(parts.query, keep_blank_values=True) if not TRACKING_QUERY_RE.fullmatch(item[0]))
+        return parts._replace(path=parts.path.rstrip("/"), query=urlencode(query), fragment="").geturl()
+
+    def current_openings_evidence(self, evidence: dict) -> dict:
+        # Owner caching cannot keep merged feed evidence fresh past its earliest source expiry.
+        if evidence.get("status") != "fresh":
+            return evidence
+        try:
+            expires = datetime.fromisoformat((evidence.get("freshness") or {}).get("next_stale_after") or evidence.get("stale_after", ""))
+            return evidence if expires > timezone.now() else {**evidence, "status": "stale"}
+        except (ValueError, TypeError):
+            return {**evidence, "status": "stale"}
 
     def _live_job_feed_results(self, term: str) -> list[dict]:
         results = []
@@ -547,6 +569,7 @@ class JobIntelligenceService:
             "verified_at": evidence.get("verified_at", ""),
             "relevance_score": relevance["score"],
             "match_reasons": relevance["reasons"],
+            "role_matched": relevance["role_matched"],
         }
 
     def _salary_signal_payload(self, salary_text: str) -> dict:
@@ -715,20 +738,27 @@ class JobIntelligenceService:
         score = 25.0
         reasons = []
         normalized_role = str(role or "").strip().lower()
-        if normalized_role and normalized_role in title:
+        # Whole words only, or a Java search also claims every JavaScript role.
+        mentions = lambda term, text: bool(re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text))
+        role_matched = False
+        if normalized_role and mentions(normalized_role, title):
             score += 38
+            role_matched = True
             reasons.append("Job title directly matches your tracked role.")
-        elif normalized_role and any(token in title for token in normalized_role.split() if len(token) > 2):
+        elif normalized_role and any(mentions(token, title) for token in normalized_role.split() if len(token) > 2 and token not in ROLE_SENIORITY_WORDS):
             score += 22
+            role_matched = True
             reasons.append("Job title overlaps with your tracked role.")
-        skill_hits = [skill for skill in skills if str(skill or "").lower() in tags or str(skill or "").lower() in title or str(skill or "").lower() in category]
+        skill_hits = [skill for skill in skills if (term := str(skill or "").strip().lower())
+                      and (term in tags or mentions(term, title) or mentions(term, category))]
         if skill_hits:
             score += min(len(skill_hits) * 9, 27)
+            role_matched = True
             reasons.append(f"Role tags align with {', '.join(skill_hits[:3])}.")
         if self._location_hierarchy(opening.get("location", ""))["is_remote"]:
             score += 4
             reasons.append("Remote work is mentioned; check geographic eligibility.")
-        return {"score": round(min(score, 99), 1), "reasons": reasons[:3]}
+        return {"score": round(min(score, 99), 1), "reasons": reasons[:3], "role_matched": role_matched}
 
     def _opening_matches_location(self, opening: dict, *, country: str = "", state: str = "") -> bool:
         normalized_country = self._normalize_country(country)
@@ -800,7 +830,7 @@ class JobIntelligenceService:
                     countries.add(mapped_country)
                     break
         # Composite/negative restrictions need review, not a guessed eligible country.
-        if len(countries) > 1 or len(states) > 1 or re.search(r"\b(?:except|excluding|outside|not in)\b", normalized):
+        if len(countries) > 1 or len(states) > 1 or LOCATION_EXCLUSION_RE.search(normalized):
             country, state, city = "", "", ""
         elif not country and is_remote:
             country = "Remote"
@@ -819,11 +849,14 @@ class JobIntelligenceService:
         job_snapshot: JobPostingSnapshot | None = None,
         openings_evidence: dict | list[dict] | None = None,
         current_income_annual: float = 0.0,
+        snapshot_observed_at: datetime | None = None,
     ) -> dict:
         observations = []
         evidence = self._normalize_evidence_collection(openings_evidence)
         if job_snapshot and (job_snapshot.salary_min or job_snapshot.salary_max):
-            now = timezone.now()
+            # A saved analysis keeps the date it was read; reading it again does not renew its evidence.
+            observed_at = snapshot_observed_at or timezone.now()
+            stale_after = observed_at + timedelta(hours=24)
             annual_min, annual_max = self._annualize_salary_range(job_snapshot.salary_min, job_snapshot.salary_max, job_snapshot.salary_period)
             location_meta = self._location_hierarchy(job_snapshot.location)
             observations.append(
@@ -838,9 +871,12 @@ class JobIntelligenceService:
                     "salary_max_annual": annual_max,
                     "currency": job_snapshot.salary_currency or "",
                     "period_stated": bool(job_snapshot.salary_period),
-                    "url": job_snapshot.job_url,
+                    # Pasted recruiter text gets a placeholder address that opens nothing.
+                    "url": public_http.normalized_link(job_snapshot.job_url),
                     "source_kind": job_snapshot.source_kind,
                     "feed_source": job_snapshot.source_name,
+                    "observed_at": observed_at.isoformat(),
+                    "published_at": "",
                 }
             )
             evidence.append(
@@ -849,17 +885,18 @@ class JobIntelligenceService:
                     "source_name": job_snapshot.source_name,
                     "source_url": job_snapshot.job_url,
                     "summary": f"Salary signal extracted from the current {job_snapshot.source_kind.replace('_', ' ')}.",
-                    "status": "fresh",
-                    "fetched_at": now.isoformat(),
-                    "verified_at": now.isoformat(),
-                    "stale_after": (now + timedelta(hours=24)).isoformat(),
+                    "status": "fresh" if stale_after > timezone.now() else "stale",
+                    "fetched_at": observed_at.isoformat(),
+                    "verified_at": observed_at.isoformat(),
+                    "stale_after": stale_after.isoformat(),
                     "query": role,
                     "notes": "Compensation was read directly from the active role text or JSON-LD when the page exposed it.",
                 }
             )
         for opening in openings or []:
             salary = self._parse_salary_text(opening.get("salary", ""))
-            if not salary:
+            # A feed also returns other jobs; their pay says nothing about this role.
+            if not salary or opening.get("role_matched") is False:
                 continue
             annual_min, annual_max = self._annualize_salary_range(salary["salary_min"], salary["salary_max"], salary["period"])
             location_meta = self._location_hierarchy(opening.get("location", ""))
@@ -878,6 +915,8 @@ class JobIntelligenceService:
                     "url": opening.get("url", ""),
                     "source_kind": "live_opening",
                     "feed_source": opening.get("aggregator_name") or opening.get("portal_name") or "Live opening",
+                    "observed_at": opening.get("verified_at") or "",
+                    "published_at": opening.get("publication_date") or "",
                 }
             )
         if not observations:
@@ -920,7 +959,7 @@ class JobIntelligenceService:
         benchmark_max = round(median(maxes), 2) if maxes else benchmark_min
         benchmark_mid = round((benchmark_min + benchmark_max) / 2, 2) if benchmark_max else benchmark_min
         comparison = None
-        if current_income_annual and currency == "INR":
+        if current_income_annual and currency == "INR" and not fallback_to_global:
             if current_income_annual < benchmark_min:
                 comparison = "below_benchmark"
             elif benchmark_max and current_income_annual > benchmark_max:
@@ -938,12 +977,19 @@ class JobIntelligenceService:
             summary += " Your current annualized income is above the current benchmark band."
         elif comparison == "within_benchmark":
             summary += " Your current annualized income sits inside the current benchmark band."
-        elif current_income_annual:
+        elif current_income_annual and currency != "INR":
             summary += " This benchmark is not in rupees, so your income was not compared with it."
+        if fallback_to_global:
+            summary += f" No salary signal matched {location}, so this band comes from other locations"
+            summary += " and your income was not compared with it." if current_income_annual else "."
         if excluded_currency_count:
             summary += f" {excluded_currency_count} signal(s) in another or unstated currency were excluded and not converted."
         if evidence_contract["assumed_period_count"]:
             summary += f" {evidence_contract['assumed_period_count']} signal(s) did not state a pay period and were treated as annual."
+        if evidence_contract["observed_from"]:
+            summary += f" Sources were last checked between {evidence_contract['observed_from']} and {evidence_contract['observed_to']}."
+        if evidence_contract["undated_count"]:
+            summary += f" {evidence_contract['undated_count']} signal(s) have no source check date."
         return {
             "available": True,
             "summary": summary,
@@ -952,7 +998,7 @@ class JobIntelligenceService:
             "market_max_annual": benchmark_max,
             "market_mid_annual": benchmark_mid,
             "currency": currency,
-            "location_scope": location or "Global / Remote",
+            "location_scope": f"Other locations; nothing matched {location}" if fallback_to_global else (location or "Global / Remote"),
             "comparison": comparison,
             "current_income_annual": round(current_income_annual or 0, 2),
             "geography_scope": self._salary_geography_scope(location, observations, selected, fallback_to_global=fallback_to_global),
@@ -969,6 +1015,8 @@ class JobIntelligenceService:
                     "country": item.get("country", ""),
                     "state": item.get("state", ""),
                     "city": item.get("city", ""),
+                    "observed_at": item.get("observed_at", ""),
+                    "published_at": item.get("published_at", ""),
                 }
                 for item in selected[:6]
             ],
@@ -999,8 +1047,9 @@ class JobIntelligenceService:
         )
         if not isinstance(period,str) or period.strip().lower() not in {
                 'year','yearly','annual','annually','per year','/year','month','monthly','per month','/month','pm',
+                'week','weekly','per week','/week','day','daily','per day','/day',
                 'hour','hourly','per hour','/hour','lpa'}:
-            raise ValueError('Choose a supported salary period: year, month or hour.')
+            raise ValueError('Choose a supported salary period: year, month, week, day or hour.')
         salary_unit = payload.get("salary_unit") or payload.get("salary_scale") or self._salary_unit_hint(str(period))
         salary_min = self._outcome_salary_value(payload.get("salary_min"), salary_unit)
         salary_max = self._outcome_salary_value(payload.get("salary_max"), salary_unit)
@@ -1215,7 +1264,11 @@ class JobIntelligenceService:
         selected_locations = sorted({item.get("location", "") for item in selected if item.get("location")})[:8]
         source_names = self._evidence_source_names(evidence)
         source_urls = self._evidence_source_urls(evidence)
+        observed_dates = sorted(filter(None, (self._observed_date(item.get("observed_at")) for item in selected)))
         return {
+            "observed_from": observed_dates[0] if observed_dates else "",
+            "observed_to": observed_dates[-1] if observed_dates else "",
+            "undated_count": len(selected) - len(observed_dates),
             "observed_salary_count": len(observations),
             "selected_salary_count": len(selected),
             "selected_source_count": len(selected_sources),
@@ -1235,6 +1288,12 @@ class JobIntelligenceService:
             "freshness": freshness,
             "proof_complete": bool(selected and source_names and freshness.get("proof_complete")),
         }
+
+    def _observed_date(self, value) -> str:
+        try:
+            return timezone.localdate(datetime.fromisoformat(value)).isoformat()
+        except (ValueError, TypeError):
+            return ""
 
     def _salary_geo_match_level(self, requested_location: str, selected: list[dict], *, fallback_to_global: bool) -> str:
         if not selected:
@@ -1284,16 +1343,16 @@ class JobIntelligenceService:
             return True
         requested_meta = self._location_hierarchy(requested)
         observation_location = str(observation.get("location", "") or "").lower()
-        if requested.lower() in observation_location or observation.get("is_remote"):
+        if requested_meta["country"] == "Remote":
+            return bool(observation.get("is_remote"))
+        # "Remote (US only)" is US evidence; only remote with no stated limit counts for any place.
+        if observation.get("is_remote") and not re.sub(r"\b(?:remote|worldwide|global|anywhere)\b|\W", "", observation_location):
             return True
-        if requested_meta["country"] and observation.get("country") == requested_meta["country"]:
-            if not requested_meta["state"] or observation.get("state") == requested_meta["state"]:
-                return True
-        if requested_meta["state"] and observation.get("state") == requested_meta["state"]:
-            return True
-        if requested_meta["city"] and observation.get("city") == requested_meta["city"]:
-            return True
-        return False
+        if requested_meta["country"]:
+            return observation.get("country") == requested_meta["country"] and (
+                not requested_meta["state"] or observation.get("state") == requested_meta["state"])
+        # A place outside the known tables can only match by name, and never where the text excludes it.
+        return bool(re.search(r"(?<!\w)" + re.escape(requested.lower()) + r"(?!\w)", observation_location)) and not LOCATION_EXCLUSION_RE.search(observation_location)
 
     def _salary_geography_scope(self, requested_location: str, observations: list[dict], selected: list[dict], *, fallback_to_global: bool) -> dict:
         requested_meta = self._location_hierarchy(requested_location)
