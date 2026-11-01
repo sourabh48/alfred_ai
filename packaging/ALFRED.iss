@@ -35,7 +35,7 @@ SignedUninstaller=yes
 ; The callback retries transient timestamp failures itself.
 SignToolRetryCount=0
 #else
-AppVerName=ALFRED 1.1.0 (UNSIGNED DEVELOPMENT BUILD)
+AppVerName=ALFRED {#SetupSetting("AppVersion")} (UNSIGNED DEVELOPMENT BUILD)
 VersionInfoDescription=ALFRED Setup - UNSIGNED DEVELOPMENT BUILD
 #endif
 

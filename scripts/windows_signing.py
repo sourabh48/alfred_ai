@@ -37,6 +37,12 @@ UNSIGNABLE = {".cmd", ".bat"}
 UNSUPPORTED = {".msi", ".msp", ".msix", ".appx", ".cab", ".cat", ".hta", ".jar", ".vbs", ".vbe",
                ".wsf", ".wsh", ".jse", ".com", ".pif", ".reg", ".application", ".gadget"}
 SMART_APP_CONTROL_STATUS = "NOT_OBSERVED: run scripts/verify_smart_app_control.ps1 on a clean PC"
+# A valid build still cannot be accepted until these are observed on a protected PC.
+ACCEPTANCE_BLOCKERS = (
+    "Smart App Control has not been observed running this exact release on a clean PC.",
+    "Inno Setup 6.7.3 extracts an unsigned helper, _isetup/_setup64.tmp, that SignTool does not reach. "
+    "Confirm from CodeIntegrity events that it is not blocked.",
+)
 
 
 class SigningError(RuntimeError):
@@ -454,7 +460,7 @@ def write_signing_manifest(bundle, output, plan, config, source, inno_log):
         "not_authenticode": [{"path": archive.name, "sha256": digest(archive), "bytes": archive.stat().st_size,
                               "reason": "ZIP cannot carry Authenticode; its PE contents are signed"}],
         "uninstaller": "Signed by Inno Setup at compile time; run verify-installed after an install.",
-        "smart_app_control": SMART_APP_CONTROL_STATUS,
+        "smart_app_control": SMART_APP_CONTROL_STATUS, "acceptance_blockers": list(ACCEPTANCE_BLOCKERS),
     }
     path = output / "signing-manifest.json"
     path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

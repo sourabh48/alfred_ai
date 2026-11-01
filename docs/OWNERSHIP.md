@@ -12,7 +12,7 @@ Each release includes `SHA256SUMS.txt` and `release-manifest.json`. Compare a
 download's SHA-256 value with the official GitHub release to detect altered
 files. The manifest also records the source commit and whether tracked source
 files had uncommitted changes when packaged. These hashes are not digital
-signatures. Windows code signing is not configured for the preview installer.
+signatures. Windows code signing is not configured for the preview installer; see [Windows code signing](WINDOWS_CODE_SIGNING.md).
 
 A public repository can be viewed and forked under GitHub's terms. Copyright
 notices, checksums and attribution cannot make public code impossible to copy,

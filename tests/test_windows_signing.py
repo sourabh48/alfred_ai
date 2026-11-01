@@ -331,6 +331,7 @@ class VerificationTests(SigningCase):
         self.assertEqual(rows["_internal/vendor.dll"]["role"], "vendor_preserved")
         self.assertEqual(rows["Start ALFRED.cmd"]["signing_status"], "cannot_carry_authenticode")
         self.assertIn("NOT_OBSERVED", manifest["smart_app_control"])
+        self.assertTrue(any("_setup64.tmp" in blocker for blocker in manifest["acceptance_blockers"]))
         for word in ("password", "private_key", "pfx", "pin\""):
             self.assertNotIn(word, text.lower())
         self.assertEqual(signing.verify_release(path, self.bundle)["verified"], True)
@@ -664,6 +665,8 @@ class RealAuthenticodeTests(unittest.TestCase):
 
         refused = compile_release()
         self.assertNotEqual(refused.returncode, 0, "signcheck must refuse unsigned ALFRED executables")
+        self.assertIn("ALFRED.exe", refused.stdout + refused.stderr)
+        self.assertIn("sign", (refused.stdout + refused.stderr).lower())
         self.assertFalse((out / signing.SETUP).exists())
         calls.unlink(missing_ok=True)
         for name in signing.OWNED:
