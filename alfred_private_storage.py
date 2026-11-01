@@ -22,9 +22,14 @@ class PrivateStorageUnavailable(RuntimeError):
     pass
 
 
+def network_drive(path):
+    # A mapped drive looks local, but its server decides who can read it, whatever permissions it reports.
+    return os.name == "nt" and windows()[1].GetDriveTypeW(path.anchor) == 4  # DRIVE_REMOTE
+
+
 def safe_path(value):
     path = Path(value)
-    if not path.is_absolute() or path.drive.startswith("\\\\"):
+    if not path.is_absolute() or path.drive.startswith("\\\\") or network_drive(path):
         raise PrivateStorageUnavailable("Private storage requires an absolute local directory.")
     if any(p.is_symlink() or p.is_junction() for p in (path, *path.parents)):
         raise PrivateStorageUnavailable("Linked private storage is not supported.")
@@ -53,6 +58,8 @@ def windows():
     api.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
     api.GetTokenInformation.argtypes = [wintypes.HANDLE, wintypes.DWORD, pointer, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
     kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel.GetDriveTypeW.argtypes = [wintypes.LPCWSTR]
+    kernel.GetDriveTypeW.restype = wintypes.UINT
     kernel.CloseHandle.argtypes = [wintypes.HANDLE]
     kernel.LocalFree.argtypes = [pointer]
     return api, kernel
@@ -206,13 +213,7 @@ def verify_cache_storage(path):
                 raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
 
 
-def verify_pickle_storage(queue, models):
-    """Refuse a loosened job queue or model file: both are read through pickle, and each file has its own permissions."""
-    if os.name != "nt":
-        return
-    paths = [queue.with_name(queue.name + suffix) for suffix in ("", "-wal", "-shm")]
-    if models.exists():
-        paths += [models, *models.rglob("*")]
+def refuse_loosened(paths):
     with STORAGE_LOCK:
         for path in paths:
             try:
@@ -222,6 +223,57 @@ def verify_pickle_storage(queue, models):
             # SQLite removes its side files as connections close, so only a path still there can fail.
             if not private and path.exists():
                 raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
+
+
+def verify_pickle_storage(queue, models):
+    """Refuse a loosened job queue or model file: both are read through pickle, and each file has its own permissions."""
+    if os.name != "nt":
+        return
+    paths = [queue.with_name(queue.name + suffix) for suffix in ("", "-wal", "-shm")]
+    if models.exists():
+        paths += [models, *models.rglob("*")]
+    refuse_loosened(paths)
+
+
+SENSITIVE_PATHS = ("config", "config/native.env", "config/local.env", ".env", "db.sqlite3", "db.sqlite3-wal", "db.sqlite3-shm",
+    "db.sqlite3-journal", "media", "ml_models", "artifacts/native", "artifacts/native/jobs.sqlite3",
+    "artifacts/native/jobs.sqlite3-wal", "artifacts/native/jobs.sqlite3-shm", "artifacts/native/cache",
+    "artifacts/security", "artifacts/private-memory-v2", "backups")
+
+
+def inspect_storage(root):
+    """Read permissions only: open no file, change nothing, and name only the well-known paths above."""
+    root = safe_path(root)
+    allowed = {current_sid(), "S-1-5-18"} if os.name == "nt" else set()
+    counts = {"private": 0, "loose": 0, "linked": 0, "unreadable": 0}
+    outside = {}
+
+    def state(path):
+        if path.is_symlink() or path.is_junction():
+            return "linked"
+        try:
+            if verify_private(path):
+                return "private"
+            for entry in acl_snapshot(path)["entries"] if os.name == "nt" else ():
+                sid = entry.get("sid", "non-allow entry")
+                if sid not in allowed:
+                    outside[sid] = outside.get(sid, 0) + 1
+            return "loose"
+        except (OSError, PrivateStorageUnavailable):
+            return "unreadable"
+
+    sensitive = {name: "absent" for name in SENSITIVE_PATHS}
+    # os.walk does not enter a junction or link, so nothing outside the root is reported.
+    for folder, directories, files in os.walk(root):
+        names = [Path(folder) / name for name in (*directories, *files)]
+        for path in ([root, *names] if Path(folder) == root else names):
+            result = state(path)
+            counts[result] += 1
+            relative = path.relative_to(root).as_posix()
+            if relative in sensitive:
+                sensitive[relative] = result
+    return {"status": "PRIVATE" if counts["private"] == sum(counts.values()) else "NEEDS_REPAIR", "counts": counts,
+        "outside_access_sids": outside, "sensitive": sensitive}
 
 
 def permission_plan(root):
@@ -255,8 +307,8 @@ def guard_sqlite_storage(databases):
                 raise PrivateStorageUnavailable("Use a local path for private SQLite storage.")
             path = safe_path(Path(name).absolute())
             private_directory(path.parent)
-            if path.exists() and not verify_private(path):
-                raise PrivateStorageUnavailable("Existing SQLite permissions need explicitly authorized repair.")
+            # The side files hold recent rows and each has permissions of its own.
+            refuse_loosened(path.with_name(path.name + suffix) for suffix in ("", "-wal", "-shm", "-journal"))
 
 
 def apply_plan(plan, *, authorization_reference, quiesced=False):
@@ -292,8 +344,14 @@ def main():
     parser.add_argument("--expected-sha256")
     parser.add_argument("--authorization-reference")
     parser.add_argument("--quiesced", action="store_true")
+    parser.add_argument("--inspect", action="store_true", help="Report permissions only; writes nothing.")
     args = parser.parse_args()
     try:
+        if args.inspect:
+            if args.plan or args.apply or args.rollback:
+                raise PrivateStorageUnavailable("Inspection writes nothing; run it alone.")
+            print(json.dumps(inspect_storage(args.root)))
+            return 0
         if args.apply and args.rollback:
             raise PrivateStorageUnavailable("Choose repair or rollback, not both.")
         if args.apply or args.rollback:

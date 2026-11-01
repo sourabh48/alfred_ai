@@ -23,6 +23,13 @@ if (-not (Test-Path config\local.env)) {
 }
 ```
 
+The image runs as the non-root user `alfred` (UID 10001). A volume created by an
+older image is owned by root, so run this once after rebuilding:
+
+```powershell
+docker compose --env-file config/local.env -f docker-compose.local.yml run --rm --no-deps --user root --entrypoint chown web -R 10001:10001 /app/media /app/artifacts /app/staticfiles /app/ml_models
+```
+
 Edit `config/local.env` before using real data:
 
 - Replace `DJANGO_SECRET_KEY` and `DB_PASSWORD` with long random values.

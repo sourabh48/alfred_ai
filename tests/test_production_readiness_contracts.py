@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -193,6 +194,30 @@ class ProductionReadinessContractTests(SimpleTestCase):
         compose = (REPO_ROOT / "docker-compose.local.yml").read_text(encoding="utf-8")
         self.assertEqual(compose.count("ports:"), 1)
         self.assertIn('- "${ALFRED_BIND_ADDRESS:-127.0.0.1}:${ALFRED_WEB_PORT:-8000}:8000"', compose)
+
+    def test_image_runs_as_non_root_on_pinned_inputs(self):
+        dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+        compose = (REPO_ROOT / "docker-compose.local.yml").read_text(encoding="utf-8")
+        self.assertRegex(dockerfile, r"(?m)^FROM python:3\.12-slim@sha256:[0-9a-f]{64}$")
+        self.assertIn("pip==26.2.2", dockerfile)
+        self.assertIn("-c /app/linux-py312.txt", dockerfile)
+        # Nothing may run as root after the last privileged step.
+        self.assertRegex(dockerfile, r"(?s)\nUSER alfred\n(?:(?!\n(?:RUN|USER) ).)*$")
+        owned = re.search(r"chown -R alfred:alfred ([^\n]+)", dockerfile).group(1).split()
+        for target in re.findall(r"alfred_local_\w+:(/app/\w+)", compose):
+            with self.subTest(volume=target):
+                self.assertIn(target, owned)
+
+    def test_linux_constraints_cover_every_pinned_requirement(self):
+        def pins(text):
+            return {m[0].lower().replace("_", "-"): m[1] for m in re.findall(r"(?m)^([A-Za-z0-9._-]+)(?:\[[^\]]*\])?==([^\s;]+)(?!.*win32)", text)}
+        wanted = pins((REPO_ROOT / "requirements.txt").read_text(encoding="utf-8"))
+        locked = pins((REPO_ROOT / "constraints" / "linux-py312.txt").read_text(encoding="utf-8"))
+        self.assertIn("gunicorn", locked)
+        for name, version in wanted.items():
+            with self.subTest(name=name):
+                # PyTorch's CPU index adds a local suffix to the same release.
+                self.assertEqual(locked.get(name, "").split("+")[0], version)
 
     def test_image_excludes_private_files_at_any_depth(self):
         patterns = (REPO_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()

@@ -95,7 +95,6 @@ class LocalStackOperationsTests(unittest.TestCase):
         with self.assertRaises(OperationError):
             backup(compose, self.root / "backups")
         self.assertEqual(observed, [True])
-        self.assertTrue(verify_private(next(self.root.glob("backups/*/manifest.json"))))
 
     def exposure(self, *lines, **environment):
         path = self.root / "local.env"

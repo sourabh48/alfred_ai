@@ -6,6 +6,7 @@ import socket
 import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest import skipUnless
 from unittest.mock import Mock, patch
 
 from django.conf import settings
@@ -20,6 +21,7 @@ from scripts.verify_native_runtime import runtime_dashboard
 
 
 class OfflineStartupTests(TestCase):
+    @skipUnless(os.name == 'nt', 'The private memory vault requires Windows key protection')
     def test_startup_maintenance_makes_no_connection_on_a_machine_without_network(self):
         from apps.ml_engine.services.persistent_memory import MemoryStore
         get_user_model().objects.create_user(username='synthetic-offline-owner')
@@ -48,7 +50,7 @@ class OfflineStartupTests(TestCase):
     def test_operator_guides_name_the_models_the_code_requires(self):
         from apps.ml_engine.services.local_embeddings import OllamaEmbeddings
         root = Path(__file__).resolve().parents[1]
-        for guide in ('docs/NATIVE_WINDOWS.md', 'packaging/windows/READ ME.txt'):
+        for guide in ('docs/NATIVE_WINDOWS.md', 'docs/WINDOWS_ACCEPTANCE.md', 'packaging/windows/READ ME.txt'):
             text = (root / guide).read_text(encoding='utf-8')
             for model in (OllamaEmbeddings.model, settings.ALFRED_MEMORY_OLLAMA_MODEL):
                 with self.subTest(guide=guide, model=model):
