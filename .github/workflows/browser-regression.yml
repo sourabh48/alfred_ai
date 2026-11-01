@@ -74,7 +74,7 @@ jobs:
           $baseline = $env:BASELINE_SHA
           if ($baseline -match '^0+$') { $baseline = $env:GITHUB_SHA }
           # Reviewed consolidated dependency/migration contents; later changes still fail closed.
-          python scripts/release_gate.py preflight --release-id "ci-$env:GITHUB_RUN_ID" --candidate $env:GITHUB_SHA --baseline $baseline --reviewed-source 180ea999dc3f1010f382cb51561f87a65172cc6b --output artifacts/release-ci
+          python scripts/release_gate.py preflight --release-id "ci-$env:GITHUB_RUN_ID" --candidate $env:GITHUB_SHA --baseline $baseline --reviewed-source f40190e7ed31401405ecf7f529c521fb450d7864 --output artifacts/release-ci
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/release_gate.py validate --output artifacts/release-ci --profile backend
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
