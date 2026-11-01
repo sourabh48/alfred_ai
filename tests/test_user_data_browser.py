@@ -447,7 +447,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#budgetForecastEvidence summary')
         self.assertNotIn(month_start(1).strftime("%Y-%m"), self.text("budgetForecastEvidence"))
         self.browser.execute_async_script("loadBudgetDashboard({live:true}).then(arguments[0]);")
-        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR, '#budgetForecastEvidence details').get_attribute('open'))
+        # The live refresh can replace the panel between finding it and reading it; the open state must still survive.
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, '#budgetForecastEvidence details').get_attribute('open'))
         self.browser.execute_script("document.getElementById('budgetForecastEvidence').scrollIntoView({behavior:'instant',block:'start'});")
         self.wait.until(lambda _: self.browser.execute_script("return !document.getAnimations().some(a=>a.playState==='running');"))
         self.capture("cashflow-forecast-evidence-desktop")
@@ -5842,7 +5843,16 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         toggle=self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]')
         toggle.send_keys(Keys.SPACE)
         self.wait.until(lambda _: '1 of' in self.text('packingStatus'))
-        self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]').send_keys(Keys.SPACE)
+        from selenium.common.exceptions import ElementNotInteractableException
+
+        def toggle_again(_):
+            # The checklist redraws after saving, so its new checkbox can be briefly not ready for keys.
+            try:
+                self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]').send_keys(Keys.SPACE)
+                return True
+            except ElementNotInteractableException:
+                return False
+        self.wait.until(toggle_again)
         self.wait.until(lambda _: '0 of' in self.text('packingStatus'))
         self.memory_click(selector+' summary')
         field=self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[name="label"]')
