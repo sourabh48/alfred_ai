@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 # A new folder: rows written before this format are pickled, and are never opened.
 STORE = "json-v1"
 # Every API request passes here and a permission check costs tens of milliseconds, so a process rechecks a store only
-# this often, and startup always checks. shortcut: a folder loosened meanwhile is refused up to this much later,
-# which is fine while planted rows cannot run code; shorten it if the store ever guards more than request counts.
+# this often, and startup always checks. shortcut: a folder loosened, or replaced by a link or a new folder, passes
+# for up to this long, which is fine while planted rows cannot run code; shorten it if the store guards more than counts.
 CHECK_SECONDS = 30
 _checked = {}
 
@@ -33,13 +33,14 @@ def _private_store(directory):
     return store_path
 
 
-def _history(store, key):
+def _history(store, key, latest):
     """Return the recorded times, or None if the row is not what this code writes."""
     try:
         history = store.get(key, [])
     except CacheIntegrityError:
         return None
-    valid = isinstance(history, list) and all(type(stamp) in (int, float) and isfinite(stamp) for stamp in history)
+    # A time further ahead than one window is forged, not clock drift, and would otherwise block for as long as it says.
+    valid = isinstance(history, list) and all(type(stamp) is float and isfinite(stamp) and stamp <= latest for stamp in history)
     return history if valid else None
 
 
@@ -54,7 +55,7 @@ def reserve_attempts(directory, buckets):
         reservations, retry = [], 0
         for key, limit, window in buckets:
             key = json.dumps(key, sort_keys=True)
-            history = _history(store, key)
+            history = _history(store, key, now + window)
             if history is None:
                 # Fail closed for this window, and drop the row so the quota can recover.
                 logger.warning('A rate limit record was unreadable and has been reset.')

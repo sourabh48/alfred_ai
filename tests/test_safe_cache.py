@@ -247,7 +247,8 @@ class ThrottlingStoreTests(Base):
         self.assertEqual(self.reserve(), 0)
 
     def test_a_record_of_the_wrong_shape_fails_closed(self):
-        for text in ('"text"', '{"a":1}', '["text"]', "[NaN]", "{bad"):
+        # An enormous integer, an integer time and a time far ahead would otherwise raise or block for as long as they say.
+        for text in ('"text"', '{"a":1}', '["text"]', "[NaN]", "{bad", "[1" + "0" * 400 + "]", "[1]", "[9e15]"):
             with self.subTest(text=text):
                 self.assertIs(self.reserve() >= 0, True)
                 self.plant(self.database(), self.key(), mode=1, value=text)
@@ -355,6 +356,23 @@ class CachePermissionTests(SimpleTestCase):
         for setting in ("ALFRED_ABUSE_THROTTLE_DIR", "ALFRED_FAMILY_INVITE_THROTTLE_DIR"):
             with self.subTest(setting=setting), override_settings(**{setting: str(self.loose(setting))}), self.assertRaises(ImproperlyConfigured):
                 config.ready()
+
+    def test_startup_refuses_a_loose_job_queue_or_model_file(self):
+        data = private_directory(self.root / "data")
+        queue, model = data / "artifacts" / "native" / "jobs.sqlite3", data / "ml_models" / "alfred" / "model.joblib"
+        for path in (queue, queue.with_name("jobs.sqlite3-wal"), model):
+            private_directory(path.parent)
+            path.write_bytes(b"synthetic")
+        config = apps.get_app_config("users")
+        with override_settings(BASE_DIR=data, HUEY={"filename": str(queue)}):
+            config.ready()
+            for target in (model, queue.with_name("jobs.sqlite3-wal"), queue):
+                with self.subTest(target=target.name):
+                    replace_acl(target, self.LOOSE)
+                    with self.assertRaises(ImproperlyConfigured):
+                        config.ready()
+                    target.unlink()
+            config.ready()
 
     def test_a_folder_owned_by_another_account_is_refused(self):
         path = private_directory(self.root / "owned")

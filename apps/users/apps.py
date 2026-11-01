@@ -5,7 +5,7 @@ from pathlib import Path
 import logging
 import os
 
-from alfred_private_storage import guard_sqlite_storage, private_directory, PrivateStorageUnavailable, verify_cache_storage
+from alfred_private_storage import guard_sqlite_storage, private_directory, PrivateStorageUnavailable, verify_cache_storage, verify_pickle_storage
 
 class UsersConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
@@ -23,6 +23,9 @@ class UsersConfig(AppConfig):
                 for directory in (settings.ALFRED_ABUSE_THROTTLE_DIR, settings.ALFRED_FAMILY_INVITE_THROTTLE_DIR):
                     if directory and Path(directory).is_absolute():
                         verify_cache_storage(private_directory(Path(directory)))
+                # Only the native runtime has this queue; a source checkout keeps models beside the code.
+                if huey := getattr(settings, "HUEY", None):
+                    verify_pickle_storage(Path(huey["filename"]), Path(settings.BASE_DIR) / "ml_models")
         except (OSError, ValueError, PrivateStorageUnavailable):
             raise ImproperlyConfigured("Private storage requires verified owner permissions; review the authorized repair procedure.") from None
         if settings.TIME_ZONE_WARNING:

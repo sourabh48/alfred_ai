@@ -206,6 +206,24 @@ def verify_cache_storage(path):
                 raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
 
 
+def verify_pickle_storage(queue, models):
+    """Refuse a loosened job queue or model file: both are read through pickle, and each file has its own permissions."""
+    if os.name != "nt":
+        return
+    paths = [queue.with_name(queue.name + suffix) for suffix in ("", "-wal", "-shm")]
+    if models.exists():
+        paths += [models, *models.rglob("*")]
+    with STORAGE_LOCK:
+        for path in paths:
+            try:
+                private = verify_private(path)
+            except (OSError, PrivateStorageUnavailable):
+                private = False
+            # SQLite removes its side files as connections close, so only a path still there can fail.
+            if not private and path.exists():
+                raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
+
+
 def permission_plan(root):
     root = safe_path(root)
     paths = [root, *sorted(root.rglob("*"))]
