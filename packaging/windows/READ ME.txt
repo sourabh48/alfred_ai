@@ -29,6 +29,15 @@ Closing the browser alone does not stop scheduled work. Schedules only run
 while the app and computer are on. Internet access is needed for live external
 sources; the bundled interface and local data work without internet access.
 
+LOCAL AI (OPTIONAL)
+Assistant answers, private memory and document questions use Ollama on this
+computer. ALFRED never downloads a model. Install Ollama and run these while
+online; they then work offline:
+  ollama pull all-minilm:latest
+  ollama pull qwen3.5:4b
+Without them the rest of ALFRED keeps working and the assistant reports that
+the local model is unavailable.
+
 INSTALLER
 ALFRED-Setup.exe installs this same bundle for the current Windows user and
 creates desktop and Start menu shortcuts. Administrator access is not required.

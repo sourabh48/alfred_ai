@@ -42,6 +42,9 @@ def native_secret_file(data_dir):
                     output.write(f"DJANGO_SECRET_KEY_FALLBACKS={json.dumps([previous])}\n")
         except FileExistsError:
             pass
+    # A private folder does not cover a file holding permissions of its own, such as a restored copy.
+    if os.name == "nt" and not verify_private(path.absolute()):
+        raise PermissionError("Private configuration requires authorized permission repair.")
     return path
 
 

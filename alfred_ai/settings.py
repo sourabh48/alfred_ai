@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
-from .local_config import load_local_environment, native_secret_file
+from .local_config import is_public_default_secret, load_local_environment, native_secret_file
 from .system_time_zone import resolve_time_zone
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -105,6 +105,11 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", default=_default_secret_key(LOCAL_RUNTIME)
 SECRET_KEY_FALLBACKS = env.json("DJANGO_SECRET_KEY_FALLBACKS", default=[])
 if not SECRET_KEY:
     raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when local runtime mode is disabled.")
+# These values are published, so anyone on the LAN could forge a session signed with them.
+_require_production(
+    SECRET_KEY != "replace-this-local-hosting-secret" and not is_public_default_secret(SECRET_KEY),
+    "Replace DJANGO_SECRET_KEY with a long random value; the configured key is public.",
+)
 
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=_default_allowed_hosts(LOCAL_RUNTIME))
 
