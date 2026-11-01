@@ -20,7 +20,7 @@ function loadBehavioralDashboard() {
             showBehavioralAlert("", "secondary");
             renderBehavioralHero(stress, fingerprint);
             renderBehavioralSummary(history, stress, fingerprint);
-            renderStressChart(stress.weekly_data || []);
+            renderStressChart(stress.weekly_data || [], stress.weekly_labels || []);
             renderBehavioralInsights(stress, fingerprint);
             renderFingerprintPanel(stress, fingerprint);
             renderPressureMap(stress, fingerprint);
@@ -70,17 +70,19 @@ function renderBehavioralSummary(history, stress, fingerprint) {
     `).join("");
 }
 
-function renderStressChart(values) {
+function renderStressChart(values, windowLabels) {
     const canvas = document.getElementById("stressChart");
     if (stressChart) {
         stressChart.destroy();
     }
 
     const ordered = values.length ? [...values].reverse() : [0];
+    // The single fallback point has no weekly window behind it.
+    const labels = windowLabels.length === values.length ? [...windowLabels].reverse() : ordered.map(() => "Current");
     stressChart = new Chart(canvas, {
         type: "line",
         data: {
-            labels: values.length ? ordered.map((_, index) => `T-${ordered.length - index - 1}`) : ["No data"],
+            labels: values.length ? labels : ["No data"],
             datasets: [{
                 label: "Stress",
                 data: ordered,

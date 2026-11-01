@@ -46,8 +46,8 @@ function renderRiskSummary(summary, outlook, consolidated, items) {
     const cards = [
         {
             title: "Overall Risk",
-            value: `${Alfred.formatNumber(outlook.average || 0, 0)}/100`,
-            copy: `${consolidated.length} consolidated categories tracked`,
+            value: summary.rated_category_count === 0 ? "N/A" : `${Alfred.formatNumber(outlook.average || 0, 0)}/100`,
+            copy: `${summary.rated_category_count ?? consolidated.length} of ${consolidated.length} categories have enough data`,
         },
         {
             title: "Highest Pressure",
@@ -114,9 +114,12 @@ function renderRiskChart(items) {
         return;
     }
 
-    meta.textContent = "Current category spread from live consolidated risk items only.";
+    const insufficient = items.filter(item => item.coverage?.status === "insufficient_data").length;
+    meta.textContent = insufficient
+        ? `Current category spread from live consolidated risk items. ${insufficient} with insufficient data ${insufficient === 1 ? "is" : "are"} not plotted.`
+        : "Current category spread from live consolidated risk items only.";
     const labels = items.map(item => item.label);
-    const values = items.map(item => item.score || 0);
+    const values = items.map(item => item.coverage?.status === "insufficient_data" ? null : (item.score || 0));
 
     riskChart = new Chart(canvas, {
         type: "radar",

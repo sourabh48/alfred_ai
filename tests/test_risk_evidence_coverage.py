@@ -1,8 +1,10 @@
 """FAMILY-07 synthetic contracts: missing inputs are labelled, never scored as measured risk."""
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
 from apps.behavioral.models import BehavioralSignal
 from apps.career.models import CareerJobAnalysis
@@ -103,6 +105,14 @@ class RiskEvidenceCoverageTests(TestCase):
         self.assertEqual(items["health"]["score"], 2*5.5)
         self.assertIn("No sleep hours recorded", items["health"]["drivers"])
 
+    def test_behavior_log_older_than_the_window_is_not_current_health_evidence(self):
+        signal = BehavioralSignal.objects.create(user=self.user, stress_score=9, sleep_hours=3, work_hours=14)
+        BehavioralSignal.objects.filter(pk=signal.pk).update(timestamp=timezone.now() - timedelta(days=70))
+        result, items = self.outlook()
+        self.assertEqual(items["health"]["score"], 0)
+        self.assertEqual(items["health"]["coverage"]["status"], "insufficient_data")
+        self.assertIsNone(result["module_signals"]["average_stress"])
+
     def test_manual_snapshot_is_observed_and_explicit_zero_counts(self):
         RiskSignal.objects.create(user=self.user, layoff_risk=0, illness_risk=0, relocation_risk=0)
         BehavioralSignal.objects.create(user=self.user, stress_score=1, sleep_hours=8, work_hours=8)
@@ -110,12 +120,60 @@ class RiskEvidenceCoverageTests(TestCase):
         self.assertEqual(items["health"]["coverage"]["status"], "observed")
         self.assertIn("Manual illness snapshot 0/100", items["health"]["drivers"])
 
-    def test_abstained_job_fit_uses_the_labelled_fallback_not_a_full_gap(self):
+    def test_abstained_job_fit_is_not_scored_as_a_gap(self):
         CareerJobAnalysis.objects.create(user=self.user, job_url="https://example.test/a", fit_score=0,
                                          extracted_payload={"fit": {"score_status": "UNAVAILABLE"}})
         _, items = self.outlook()
-        self.assertEqual(items["career"]["score"], round(24*0.15, 1))
+        self.assertEqual(items["career"]["score"], 0)
         self.assertIn("Job fit", items["career"]["coverage"]["missing_inputs"])
+
+    def test_missing_job_fit_adds_no_career_risk(self):
+        _, items = self.outlook()
+        self.assertEqual(items["career"]["score"], 0)
+        self.assertIn("Job-fit evidence unavailable; not scored", items["career"]["drivers"])
+
+    def test_failed_feeds_are_not_market_evidence(self):
+        failed = {"title": "Synthetic feed", "source_url": "https://example.test/failed", "status": "failed"}
+        market = {**market_payload(evidence=[failed]), "insights": ["No strong external layoff spike was found."]}
+        result, items = self.outlook(market=market)
+        self.assertEqual(items["career"]["coverage"]["status"], "insufficient_data")
+        self.assertIn("External market evidence unavailable", items["career"]["drivers"])
+        self.assertEqual(result["summary"]["highest_label"], "No data")
+        self.assertFalse(any("layoff spike" in line for line in result["insights"]))
+
+    def test_stale_feed_still_counts_as_market_evidence(self):
+        stale = {"title": "Synthetic feed", "source_url": "https://example.test/stale", "status": "stale"}
+        _, items = self.outlook(market=market_payload(risk_score=20, evidence=[stale]))
+        self.assertIn("External market evidence", items["career"]["coverage"]["available_inputs"])
+        self.assertIn("External market risk 20/100", items["career"]["drivers"])
+
+    def test_unavailable_inflation_is_not_reported_as_zero(self):
+        _, items = self.outlook()
+        self.assertIn("Inflation evidence unavailable", items["relocation"]["drivers"])
+        market = market_payload()
+        market["macro_context"]["inflation"]["latest_value"] = 5.649
+        _, items = self.outlook(market=market)
+        self.assertIn("Inflation 5.6%", items["relocation"]["drivers"])
+
+    def test_no_vehicle_reports_unknown_not_zero_compliance(self):
+        result, _ = self.outlook()
+        self.assertIsNone(result["module_signals"]["mobility_document_compliance"])
+        self.assertIsNone(result["module_signals"]["mobility_condition_score"])
+
+    def test_valid_documents_are_vehicle_evidence_and_a_vehicle_without_them_is_a_real_zero(self):
+        summary = {"critical_faults": 0, "expired_documents": 0, "expiring_documents": 0, "latest_condition_score": 0,
+                   "document_compliance_score": 100, "managed_vehicle_count": 1}
+        with patch("apps.risk.services.risk_intelligence.bike_service_intelligence.risk_snapshot",
+                   return_value={"summary": summary, "pending_tasks": []}):
+            result, items = self.outlook()
+        self.assertEqual(items["mobility"]["coverage"]["status"], "observed")
+        self.assertEqual(result["module_signals"]["mobility_document_compliance"], 100)
+        summary["document_compliance_score"] = 0
+        with patch("apps.risk.services.risk_intelligence.bike_service_intelligence.risk_snapshot",
+                   return_value={"summary": summary, "pending_tasks": []}):
+            result, items = self.outlook()
+        self.assertEqual(items["mobility"]["coverage"]["status"], "insufficient_data")
+        self.assertEqual(result["module_signals"]["mobility_document_compliance"], 0)
 
     def test_vehicle_condition_counts_when_present(self):
         snapshot = {"summary": {"critical_faults": 0, "expired_documents": 0, "expiring_documents": 0,

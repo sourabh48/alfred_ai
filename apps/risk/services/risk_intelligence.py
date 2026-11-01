@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from statistics import mean
 
+from django.utils import timezone
+
 from apps.behavioral.models import BehavioralSignal
+from apps.behavioral.services import STRESS_WINDOWS
 from apps.career.models import CareerJobAnalysis, CareerProfile
 from apps.career.services import job_intelligence
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
@@ -59,6 +63,10 @@ def _category_coverage(inputs: dict[str, bool]) -> dict:
     return {"status": status, "available_inputs": available, "missing_inputs": missing}
 
 
+def _usable_evidence(items: list[dict]) -> bool:
+    return any(item.get("status") in {"fresh", "stale"} for item in items if item)
+
+
 def _dedupe_evidence(items: list[dict]) -> list[dict]:
     seen = set()
     result = []
@@ -102,7 +110,11 @@ class RiskIntelligenceService:
         manual_illness = float(latest.illness_risk) if latest else 0.0
         manual_relocation = float(latest.relocation_risk) if latest else 0.0
 
-        recent_behavior = list(BehavioralSignal.objects.filter(user=user).order_by("-timestamp").values_list("stress_score", "sleep_hours", "work_hours")[:7])
+        # The same window as the Behavioral page, so a months-old log cannot read as current burnout.
+        recent_behavior = list(
+            BehavioralSignal.objects.filter(user=user, timestamp__date__gte=timezone.localdate() - timedelta(days=(STRESS_WINDOWS * 7) - 1))
+            .order_by("-timestamp", "-id").values_list("stress_score", "sleep_hours", "work_hours")[:7]
+        )
         avg_stress = mean(row[0] for row in recent_behavior) if recent_behavior else 0.0
         # These model fields default to 0, which means "not logged" rather than a measured zero.
         logged_sleep = [row[1] for row in recent_behavior if row[1] > 0]
@@ -128,11 +140,13 @@ class RiskIntelligenceService:
             + (mobility_summary.get("expiring_documents", 0) * 8)
             + (max(0, 65 - condition_score) * 0.5 if condition_score else 0)
         )
-        vehicle_records = bool(condition_score or mobility_summary.get("critical_faults")
+        document_compliance = mobility_summary.get("document_compliance_score", 0)
+        vehicle_records = bool(condition_score or document_compliance or mobility_summary.get("critical_faults")
                                or mobility_summary.get("expired_documents") or mobility_summary.get("expiring_documents"))
+        market_usable = _usable_evidence(career_market.get("evidence", []))
 
         available_fit = latest_job_analysis.available_fit_score if latest_job_analysis else None
-        fit_gap = max(0.0, 100.0 - float(available_fit)) if available_fit is not None else 24.0
+        fit_gap = max(0.0, 100.0 - float(available_fit)) if available_fit is not None else 0.0
 
         career_score = _clamp(
             (manual_layoff * 0.35)
@@ -165,7 +179,7 @@ class RiskIntelligenceService:
         relocation_values = [float(item.relocation_risk) for item in history]
         coverage = {
             "career": _category_coverage({"Manual layoff snapshot": bool(latest), "Job fit": available_fit is not None,
-                                          "External market evidence": bool(career_market.get("evidence"))}),
+                                          "External market evidence": market_usable}),
             "financial": _category_coverage({"Income": bool(monthly_income), "Liquid runway": runway_known}),
             "health": _category_coverage({"Manual illness snapshot": bool(latest), "Behavior log": bool(recent_behavior)}),
             "relocation": _category_coverage({"Manual relocation snapshot": bool(latest), "Income": bool(monthly_income)}),
@@ -183,8 +197,8 @@ class RiskIntelligenceService:
                 "note": "Role-level job market, layoffs, and fit-gap pressure combined with your latest layoff snapshot.",
                 "drivers": [
                     f"Manual layoff snapshot {manual_layoff:.0f}/100" if latest else "No manual layoff snapshot recorded",
-                    f"External market risk {career_market['risk_score']:.0f}/100",
-                    f"Rule-based job-fit gap {fit_gap:.0f}/100" if available_fit is not None else "Job-fit evidence unavailable; conservative risk fallback, not a measured gap",
+                    f"External market risk {career_market['risk_score']:.0f}/100" if market_usable else "External market evidence unavailable",
+                    f"Rule-based job-fit gap {fit_gap:.0f}/100" if available_fit is not None else "Job-fit evidence unavailable; not scored",
                 ],
             },
             {
@@ -226,7 +240,7 @@ class RiskIntelligenceService:
                 "drivers": [
                     f"Manual relocation snapshot {manual_relocation:.0f}/100" if latest else "No manual relocation snapshot recorded",
                     f"Rent plus EMI burden {debt_burden:.1f}%" if monthly_income else "Rent plus EMI burden unknown without income",
-                    f"Inflation {inflation}",
+                    f"Inflation {inflation:.1f}%" if inflation else "Inflation evidence unavailable",
                 ],
             },
             {
@@ -287,11 +301,11 @@ class RiskIntelligenceService:
                 "emergency_months": round(emergency_months, 1) if runway_known else None,
                 "average_stress": round(avg_stress, 1) if recent_behavior else None,
                 "average_sleep": round(avg_sleep, 1) if logged_sleep else None,
-                "mobility_document_compliance": mobility_summary.get("document_compliance_score", 0),
-                "mobility_condition_score": mobility_summary.get("latest_condition_score", 0),
+                "mobility_document_compliance": document_compliance if vehicle_records or mobility_summary.get("managed_vehicle_count") else None,
+                "mobility_condition_score": condition_score or None,
             },
             "financial_baseline": baseline,
-            "insights": self._build_insights(rated, career_market, monthly_income, liquid_cash),
+            "insights": self._build_insights(rated, career_market if market_usable else {}, monthly_income, liquid_cash),
             "evidence": evidence,
             "evidence_freshness": evidence_freshness,
             "grounding": {

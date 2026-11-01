@@ -11,7 +11,7 @@ class FamilyFinancialSharingSerializer(serializers.Serializer):
 
 
 class DependentSerializer(serializers.ModelSerializer):
-    age = serializers.IntegerField(min_value=0)
+    age = serializers.IntegerField(min_value=0, max_value=130)
     name = serializers.CharField(max_length=50, allow_blank=False, trim_whitespace=True)
     relation = serializers.CharField(max_length=50, allow_blank=False, trim_whitespace=True)
 
