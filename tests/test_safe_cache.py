@@ -247,12 +247,24 @@ class ThrottlingStoreTests(Base):
         self.assertEqual(self.reserve(), 0)
 
     def test_a_record_of_the_wrong_shape_fails_closed(self):
-        # An enormous integer, an integer time and a time far ahead would otherwise raise or block for as long as they say.
-        for text in ('"text"', '{"a":1}', '["text"]', "[NaN]", "{bad", "[1" + "0" * 400 + "]", "[1]", "[9e15]"):
+        # An enormous integer would otherwise raise when it is compared.
+        for text in ('"text"', '{"a":1}', '["text"]', "[NaN]", "{bad", "[1" + "0" * 400 + "]", "[1]"):
             with self.subTest(text=text):
                 self.assertIs(self.reserve() >= 0, True)
                 self.plant(self.database(), self.key(), mode=1, value=text)
                 self.assertEqual(self.reserve(), 60)
+
+    def test_a_time_far_ahead_does_not_block(self):
+        self.assertEqual(self.reserve(), 0)
+        self.plant(self.database(), self.key(), mode=1, value="[9e15, 9e15]")
+        self.assertEqual(self.reserve(), 0)
+
+    def test_moving_the_clock_back_does_not_refuse_a_request(self):
+        buckets = [(("scope", "user"), 5, 60)]
+        self.assertEqual(self.reserve(buckets), 0)
+        with patch("django.utils.timezone.now", return_value=timezone.now() - timedelta(days=2)):
+            self.assertEqual(self.reserve(buckets), 0)
+        self.assertEqual(self.reserve(buckets), 0)
 
     def test_older_pickled_rows_beside_the_new_folder_are_never_opened(self):
         private_directory(self.root / "limits")

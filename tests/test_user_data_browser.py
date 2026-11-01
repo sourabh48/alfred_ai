@@ -3838,11 +3838,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn("Excluded from financial totals", self.text("loanTableBody"))
         self.capture("loan-estimate-excluded")
         def open_review(driver):
+            # The table redraws every second and only a real press holds it, which comes after locating the button.
+            driver.execute_script("document.getElementById('loanPlannerRoot').dataset.liveRefreshLockedUntil = String(Date.now() + 5000)")
             try:
                 driver.find_element(self.By.CSS_SELECTOR, f'button[onclick="editLoan({loan.pk})"]').click()
                 return True
             except StaleElementReferenceException:
-                # The live summary may replace a row between locating and clicking it.
                 return False
 
         self.wait.until(open_review)
@@ -6367,22 +6368,26 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         # Cards read as empty text while they fade in, after the count above is already right.
         self.wait.until(lambda _: 'Location not specified' in self.text('careerOpenings'))
         self.assertIn('Remote work does not confirm country eligibility', self.browser.find_element(self.By.ID, 'careerRoot').text)
+        def choose(filter_id, value):
+            # A refresh rebuilds the options, so selecting retries instead of holding an old one.
+            self.wait.until(lambda _: Select(self.browser.find_element(self.By.ID, filter_id)).select_by_value(value) or True)
+
         self.browser.execute_script("document.querySelector('#careerProfileForm [name=role]').value = 'Unsaved local draft';")
 
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('India')
+        choose('careerOpeningCountryFilter', 'India')
         self.wait.until(lambda _: '3 of 8' in self.text('careerOpeningsMeta'))
         self.assertNotIn('US only', self.text('careerOpenings'))
         self.assertNotIn('India / United States', self.text('careerOpenings'))
         self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR, '#careerProfileForm [name=role]').get_attribute('value'), 'Unsaved local draft')
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningStateFilter')).select_by_value('Karnataka')
+        choose('careerOpeningStateFilter', 'Karnataka')
         self.wait.until(lambda _: '1 of 8' in self.text('careerOpeningsMeta'))
         self.wait.until(lambda _: 'Remote - Bengaluru, Karnataka, India' in self.text('careerOpenings'))
 
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('United States')
+        choose('careerOpeningCountryFilter', 'United States')
         self.wait.until(lambda _: '2 of 8' in self.text('careerOpeningsMeta'))
         self.wait.until(lambda _: 'Remote (US only)' in self.text('careerOpenings'))
         self.assertNotIn('except United States', self.text('careerOpenings'))
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('Remote')
+        choose('careerOpeningCountryFilter', 'Remote')
         self.wait.until(lambda _: '5 of 8' in self.text('careerOpeningsMeta'))
         self.assertNotIn('Non-remote', self.text('careerOpenings'))
         self.browser.execute_script("""const fetch = window.fetch;
@@ -6392,9 +6397,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 }
                 return response;
             }); window.restoreCountryFetch = () => {window.fetch = fetch;};""")
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('India')
+        choose('careerOpeningCountryFilter', 'India')
         self.wait.until(lambda _: self.browser.execute_script("return typeof window.releaseCountryResponse === 'function'"))
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('United States')
+        choose('careerOpeningCountryFilter', 'United States')
         self.wait.until(lambda _: '2 of 8' in self.text('careerOpeningsMeta'))
         self.browser.execute_async_script("window.restoreCountryFetch(); window.releaseCountryResponse(); requestAnimationFrame(()=>requestAnimationFrame(arguments[arguments.length-1]));")
         self.assertIn('2 of 8', self.text('careerOpeningsMeta'))
