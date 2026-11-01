@@ -5678,18 +5678,30 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.mobility.services.travel import reminders
         session=self.packing_fixture()
         clock=self.enterContext(patch.object(reminders,'current_time',return_value=now or datetime(2035,1,1,tzinfo=timezone.utc)))
+        # These journeys reload the planner often, and the budget they spend depends on machine speed.
+        self.enterContext(override_settings(ALFRED_API_ACCOUNT_LIMIT=10**6,ALFRED_API_GLOBAL_LIMIT=10**6))
+        # The live server shares one in-memory SQLite connection between threads, unlike the real runtime.
+        # A page's burst of requests could empty another request's session read and sign the browser out.
+        turn,tracked=threading.Lock(),BaseHandler.get_response
+        def one_at_a_time(handler,request):
+            with turn:
+                return tracked(handler,request)
+        self.enterContext(patch.object(BaseHandler,'get_response',one_at_a_time))
         return session,clock
 
     def reminder_fields(self,selector,label,zone,local_time,fold=''):
         from selenium.webdriver.support.ui import Select
-        def ready(_):
+        def fill(_):
             form=self.browser.find_element(self.By.CSS_SELECTOR,selector)
-            return form if all(field.is_enabled() for field in form.find_elements(self.By.CSS_SELECTOR,'input,select,button')) else False
-        form=self.wait.until(ready)
-        for name,value in (('label',label),('zone',zone)):
-            field=form.find_element(self.By.NAME,name);field.clear();field.send_keys(value)
-        self.browser.execute_script("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",form.find_element(self.By.NAME,'local_time'),local_time)
-        Select(form.find_element(self.By.NAME,'fold')).select_by_value(fold)
+            if not all(field.is_enabled() for field in form.find_elements(self.By.CSS_SELECTOR,'input,select,button')):
+                return False
+            for name,value in (('label',label),('zone',zone)):
+                field=form.find_element(self.By.NAME,name);field.clear();field.send_keys(value)
+            self.browser.execute_script("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",form.find_element(self.By.NAME,'local_time'),local_time)
+            Select(form.find_element(self.By.NAME,'fold')).select_by_value(fold)
+            return True
+        # A planner redraw can replace the form while it is being filled; the wait then starts over on the new one.
+        self.wait.until(fill)
 
     def test_travel_reminder_desktop_lifecycle_late_delivery_and_optout(self):
         from datetime import datetime,timedelta
