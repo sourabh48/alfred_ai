@@ -45,10 +45,8 @@ class TransactionClassifierAdapter(BaseModelAdapter):
             return
 
         try:
-            self.model = SentenceTransformer(
-                "all-MiniLM-L6-v2",
-                local_files_only=self._should_force_local_files_only(),
-            )
+            # ALFRED is offline-first: use a model already on this machine, or fall back to the rules. Never download.
+            self.model = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
             self._precompute_category_embeddings()
             print("✓ Sentence transformer model loaded successfully")
         except Exception as e:
@@ -57,9 +55,6 @@ class TransactionClassifierAdapter(BaseModelAdapter):
 
     def _offline_model_loading_disabled(self) -> bool:
         return any(arg == "test" for arg in sys.argv[1:]) or os.getenv("ALFRED_OFFLINE_TESTS", "0") == "1"
-
-    def _should_force_local_files_only(self) -> bool:
-        return self._offline_model_loading_disabled() or os.getenv("ALFRED_LOCAL_MODELS_ONLY", "0") == "1"
 
     def _precompute_category_embeddings(self):
         """Precompute embeddings for each expense category."""

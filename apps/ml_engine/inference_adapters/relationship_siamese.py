@@ -26,7 +26,7 @@ class RelationshipSiameseAdapter(BaseModelAdapter):
 
     def load(self):
         self.model = SiameseNet()
-        self.model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+        self.model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu", weights_only=True))
         self.model.eval()
 
     def predict(self, personA, personB):
