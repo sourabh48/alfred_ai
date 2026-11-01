@@ -126,3 +126,9 @@ config/*.env
 !config/*.env.example
 # Claude aliases here are absolute junctions into this machine's skill directory.
 /.claude/skills/
+
+# Code-signing material and local signing configuration never enter the repository
+*.pfx
+*.p12
+*.snk
+signing-config*.json
