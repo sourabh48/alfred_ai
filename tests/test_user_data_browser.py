@@ -3862,9 +3862,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login()
         self.browser.get(self.live_server_url + "/expenses/")
         self.wait.until(lambda _: "Personal Test Scooter" in self.text("balanceSheetPanel"))
-        cards = self.text("balanceSheetCards")
-        self.assertIn("2,10,000", cards)
-        self.assertIn("1,00,000", cards)
+        # The cards fade in, and WebDriver reads a transparent card as empty.
+        self.wait.until(lambda _: "2,10,000" in self.text("balanceSheetCards"))
+        self.assertIn("1,00,000", self.text("balanceSheetCards"))
         panel = self.text("balanceSheetPanel")
         self.assertIn("Estimated asset ₹50,000", panel)
         self.assertIn("Recorded running costs ₹6,000", panel)
