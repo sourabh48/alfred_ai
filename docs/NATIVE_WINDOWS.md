@@ -184,8 +184,24 @@ flags jobs awaiting review. Job outcomes and timing are retained for 30 days in
 copied into the operational history. Unfinished claims are never aged out.
 
 Schedules do not run while the application/computer is off. External source
-refreshes still need internet access. Charts and controls use bundled assets;
-optional Google fonts fall back to system fonts offline.
+refreshes and Travel map tiles still need internet access. Pages, charts,
+controls and fonts use bundled assets, so ALFRED starts and opens offline.
+
+## Local AI prerequisites
+
+Assistant answers, private memory and document questions use Ollama on this
+computer at the fixed address `127.0.0.1:11434`. ALFRED never downloads a model.
+Install Ollama and these two models while online; they then work offline:
+
+```powershell
+ollama pull all-minilm:latest
+ollama pull qwen3.5:4b
+```
+
+`ollama list` shows what is installed. `ALFRED_MEMORY_OLLAMA_MODEL` selects a
+different local reasoning model; cloud-hosted Ollama models are refused. Startup
+does not depend on either model. Without them the rest of ALFRED keeps working
+and the assistant reports that the local model is unavailable.
 
 ## Backup and restore
 

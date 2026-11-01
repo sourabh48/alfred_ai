@@ -186,6 +186,30 @@ class ProductionReadinessContractTests(SimpleTestCase):
         self.assertIn("ALFRED_PRODUCTION_DEPLOYMENT_PROOF=artifacts/ops/local_readiness_summary.json", local_env)
         self.assertIn("ALFRED_MATERIALIZED_CACHE_TRAFFIC_PROOF", local_env)
         self.assertIn("ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true", local_env)
+        self.assertIn("SECURE_PROXY_SSL_HEADER_ENABLED=false", local_env)
+        self.assertIn("USE_X_FORWARDED_HOST=false", local_env)
+
+    def test_compose_publishes_only_web_and_defaults_to_this_computer(self):
+        compose = (REPO_ROOT / "docker-compose.local.yml").read_text(encoding="utf-8")
+        self.assertEqual(compose.count("ports:"), 1)
+        self.assertIn('- "${ALFRED_BIND_ADDRESS:-127.0.0.1}:${ALFRED_WEB_PORT:-8000}:8000"', compose)
+
+    def test_image_excludes_private_files_at_any_depth(self):
+        patterns = (REPO_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+        for pattern in (".claude", "**/.env", "**/.env.*", "**/*.sqlite3", "**/*.sqlite3-wal", "**/*.key", "**/*.pem",
+                        "**/*.log", "config/*.env", "artifacts", "media", "backups", "ml_models/alfred/memory"):
+            with self.subTest(pattern=pattern):
+                self.assertIn(pattern, patterns)
+
+    def test_production_settings_refuse_the_published_example_key(self):
+        example = (REPO_ROOT / "config" / "local.env.example").read_text(encoding="utf-8")
+        key = next(line.split("=", 1)[1] for line in example.splitlines() if line.startswith("DJANGO_SECRET_KEY="))
+        env = {**os.environ, "PYTHONPATH": str(REPO_ROOT), "ALFRED_LOCAL_RUNTIME": "false", "DEBUG": "false",
+               "DJANGO_SECRET_KEY": key}
+        result = subprocess.run([sys.executable, "-c", "import alfred_ai.settings"], cwd=REPO_ROOT, env=env,
+                                text=True, capture_output=True, timeout=20)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("the configured key is public", result.stderr)
 
     def test_production_settings_reject_sqlite_and_local_cache_fallbacks(self):
         env = {

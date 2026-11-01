@@ -206,6 +206,21 @@ class PrivateStorageTests(TestCase):
             self.assertEqual(permission_plan(root), before)
             self.assertFalse((root / "config/native.env").exists())
 
+    def test_loosened_signing_key_is_refused_without_changing_it(self):
+        from alfred_ai.local_config import native_secret_file
+        with TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
+            root = private_directory(Path(directory))
+            secret = native_secret_file(root)
+            self.assertTrue(verify_private(secret))
+            content = secret.read_bytes()
+            self.assertEqual(native_secret_file(root), secret)
+            replace_acl(secret, f"D:P(A;;FA;;;{current_sid()})(A;;FA;;;SY)(A;;FR;;;AU)")
+            before = acl_snapshot(secret)
+            with self.assertRaises(PermissionError):
+                native_secret_file(root)
+            self.assertEqual(acl_snapshot(secret), before)
+            self.assertEqual(secret.read_bytes(), content)
+
     def test_parser_and_ocr_temporary_data_are_private_before_worker_access(self):
         from alfred_ai.services import bounded_parser, document_extraction
         from apps.expenses.services import statement_import
