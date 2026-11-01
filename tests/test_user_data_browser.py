@@ -94,6 +94,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda driver: self.text("dashboardPeriodNote") and "Loading" not in self.text("dashboardPeriodNote"))
         self.wait.until(lambda driver: self.text("dashboardSummaryCards"))
 
+    def lose_session(self):
+        from django.contrib.sessions.models import Session
+        cookie=self.browser.get_cookie(settings.SESSION_COOKIE_NAME)
+        # A pending authorized response can renew a removed browser cookie, so end the session itself too.
+        Session.objects.filter(session_key=cookie['value']).delete()
+        self.browser.delete_cookie(settings.SESSION_COOKIE_NAME)
+
     def text(self, element_id):
         from selenium.common.exceptions import StaleElementReferenceException, WebDriverException
         try:
@@ -5560,7 +5567,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#plannerPrepareICS')
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-calendar-event]'))
         self.wait.until(lambda _: self.active_requests==0)
-        self.browser.delete_cookie('sessionid');self.memory_click('#plannerExportICS')
+        self.lose_session();self.memory_click('#plannerExportICS')
         self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
         self.assertEqual(self.text('plannerCalendar'),'');self.assertFalse(list(folder.glob('*.ics')))
 
@@ -5620,7 +5627,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportGPX').is_displayed())
         self.wait.until(lambda _: self.active_requests==0)
-        self.browser.delete_cookie('sessionid');self.memory_click('#plannerExportGPX')
+        self.lose_session();self.memory_click('#plannerExportGPX')
         self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
         self.assertFalse(list(folder.glob('*.gpx')))
 
@@ -5670,7 +5677,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportPDF').is_displayed())
         self.wait.until(lambda _: self.active_requests==0)
-        self.browser.delete_cookie('sessionid')
+        self.lose_session()
         self.memory_click('#plannerExportPDF')
         self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
         self.assertFalse(list(folder.glob('*.pdf')))
@@ -5824,8 +5831,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
         self.wait.until(lambda _: 'Synthetic private reminder' in self.text('plannerReminders'))
         self.wait.until(lambda _: self.active_requests==0)
-        self.browser.delete_cookie('sessionid')
-        self.assertIsNone(self.browser.get_cookie('sessionid'))
+        self.lose_session()
         self.memory_click('[data-reminder-reload]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerReminders').get_attribute('textContent')=='')
 
