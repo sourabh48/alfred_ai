@@ -71,9 +71,32 @@ certificate's name. Keep one stable identity, and decide whether `AppPublisher` 
 
 SignTool comes with the [Windows SDK](https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool).
 Install only its "Windows SDK Signing Tools for Desktop Apps" feature. It is typically at
-`C:\Program Files (x86)\Windows Kits\10\bin\<version>\x64\signtool.exe`. It is **not installed on
-this PC today**, so real `signtool` output parsing is covered only by recorded samples in tests,
-and it must be proved by the first real signing run. The preflight refuses a SignTool that is not validly signed by Microsoft.
+`C:\Program Files (x86)\Windows Kits\10\bin\<version>\x64\signtool.exe`. The preflight refuses a
+SignTool that is not validly signed by Microsoft. Take it from Microsoft and not from third-party
+repackaged copies. SignTool applies a signature but gives no certificate or trust, so it does not change `BLOCKED_CERTIFICATE`.
+
+**Tested with real SignTool on 2026-11-02.** Version 10.0.28000 x64 came from Microsoft's Visual Studio
+channel (one MSI and three cabs, 5 MB, hash-checked and Microsoft-signed), and was unpacked with
+`msiexec /a` into a temporary folder without being installed. With a throwaway untrusted certificate
+and synthetic files, these results were observed:
+
+| Case | Observed |
+|---|---|
+| Sign with `/fd SHA256 /tr /td SHA256` and DigiCert's public timestamp service | Signed and timestamped. Refused only because the test root is untrusted |
+| Trusted vendor files (`ISCC.exe`, `python312.dll`) through `signtool verify /pa /v /tw` | Parsed cleanly, with SHA-256 digest and timestamp |
+| Self-signed certificate at preflight | Refused: self-signed, `UntrustedRoot`, root not Microsoft-distributed |
+| Unreachable timestamp service | Signing failed, and the file stayed unsigned |
+| Wrong thumbprint | Signing failed, and the file stayed unsigned |
+| Changed byte after signing | `HashMismatch`, and verify failed |
+| Unsigned file | Verify failed |
+| Inno compile using the real callback | Stopped at the first signature, with no Setup and no signing record |
+
+Not covered: a signature that chains to a trusted root through this pipeline, which needs a real
+certificate, and the `/dlib` remote provider. No trusted file without a timestamp was available, so
+that case was checked through Windows' signature fields and recorded text only.
+
+To repeat this, set `ALFRED_SIGNING_E2E=1` and `ALFRED_SIGNTOOL=<path>`, and optionally
+`ALFRED_TEST_TIMESTAMP_URL=<url>`, then run `python -m unittest tests.test_windows_signing`.
 
 ## Signing configuration
 

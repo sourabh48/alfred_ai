@@ -27,6 +27,7 @@ UNINSTALLER = "unins000.exe"
 SETUP = "ALFRED-Setup.exe"
 OWNED_SCRIPTS = ("verify_windows_acceptance.ps1", "verify_smart_app_control.ps1")
 CODE_SIGNING_EKU = "1.3.6.1.5.5.7.3.3"
+MICROSOFT_PUBLISHER = "O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
 CONFIG_KEYS = {"schema", "provider", "publisher_subject", "timestamp_url", "signtool",
                "certificate_sha1", "machine_store", "dlib", "dmdf"}
 SIGNABLE_SCRIPTS = {".ps1", ".psm1", ".psd1"}
@@ -160,7 +161,8 @@ def inspect_signatures(paths):
         return {}
     rows = _powershell(_INSPECT, paths)
     rows = rows if type(rows) is list else [rows]
-    return {row["path"]: row for row in rows}
+    # PowerShell 5.1 serializes an empty pipeline value as {}.
+    return {row["path"]: {key: None if value == {} else value for key, value in row.items()} for row in rows}
 
 
 def inspect_certificate(config):
@@ -208,7 +210,7 @@ def prepare_release(config_path, authorization, source_commit):
         raise SigningError("Production signing needs --authorize-production-signing with the exact source commit.")
     config = load_config(config_path)
     tool = inspect_signatures([config["signtool"]])[config["signtool"]]
-    if tool["status"] != "Valid" or "Microsoft" not in str(tool.get("subject")):
+    if tool["status"] != "Valid" or not normalized_subject(tool.get("subject")).endswith(MICROSOFT_PUBLISHER):
         raise SigningError("signtool.exe is not validly signed by Microsoft.")
     if config["provider"] == "certificate_store":
         if problems := certificate_problems(inspect_certificate(config), config):

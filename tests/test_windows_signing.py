@@ -132,9 +132,12 @@ class ConfigurationTests(SigningCase):
         with mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": ""}):
             with self.assertRaisesRegex(signing.SigningError, "signed by Microsoft"):
                 signing.prepare_release(self.config_file(), "0" * 40, "0" * 40)
+            self.status["signtool.exe"] = signed_record(subject="CN=Not Microsoft LLC, O=Not Microsoft LLC, C=US")
+            with self.assertRaisesRegex(signing.SigningError, "signed by Microsoft"):
+                signing.prepare_release(self.config_file(), "0" * 40, "0" * 40)
 
     def test_invalid_certificate_is_refused_before_any_file_changes(self):
-        self.status["signtool.exe"] = signed_record(subject="CN=Microsoft Corporation")
+        self.status["signtool.exe"] = signed_record(subject=f"CN=Microsoft Corporation, {signing.MICROSOFT_PUBLISHER}")
         with mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": ""}), \
                 mock.patch.object(signing, "inspect_certificate", return_value={"thumbprint": THUMBPRINT, "subject": PUBLISHER, "issuer": PUBLISHER}):
             with self.assertRaisesRegex(signing.SigningError, "self-signed"):
@@ -622,6 +625,7 @@ class RealAuthenticodeTests(unittest.TestCase):
         path.write_bytes(tiny_pe())
         record = signing.inspect_signatures([path])[str(path)]
         self.assertEqual(record["status"], "NotSigned")
+        self.assertIsNone(record["thumbprint"])
         self.sign(path)
         record = signing.inspect_signatures([path])[str(path)]
         self.assertEqual(record["thumbprint"], self.thumbprint)
@@ -641,6 +645,35 @@ class RealAuthenticodeTests(unittest.TestCase):
         problems = signing.certificate_problems(record, self.identity)
         self.assertIn("certificate is self-signed", problems)
         self.assertTrue(any("chain failed" in problem for problem in problems))
+
+    @unittest.skipUnless(os.environ.get("ALFRED_SIGNTOOL"), "Set ALFRED_SIGNTOOL to use real signtool.exe")
+    def test_real_signtool_results(self):
+        tool = os.environ["ALFRED_SIGNTOOL"]
+        config = {**self.identity, "provider": "certificate_store", "signtool": tool,
+                  "timestamp_url": "http://127.0.0.1:9/rfc3161"}
+        self.assertTrue(signing.normalized_subject(signing.inspect_signatures([tool])[tool]["subject"]).endswith(signing.MICROSOFT_PUBLISHER))
+        problems, timestamp = signing.signtool_verification(tool, tool)
+        self.assertEqual(problems, [], "a trusted, timestamped Microsoft file must parse cleanly")
+        self.assertTrue(timestamp)
+        path = self.work / "app.exe"
+        path.write_bytes(tiny_pe())
+        self.assertIn("signtool found no timestamp", signing.signtool_verification(tool, path)[0])
+        with mock.patch.object(signing.time, "sleep"), self.assertRaisesRegex(signing.SigningError, "timestamp server"):
+            signing.sign_file(config, path)
+        self.assertEqual(signing.inspect_signatures([path])[str(path)]["status"], "NotSigned", "a failed timestamp leaves no signature")
+        with self.assertRaisesRegex(signing.SigningError, "No certificates"):
+            signing.sign_file({**config, "certificate_sha1": "0" * 40}, path, attempts=1)
+        if url := os.environ.get("ALFRED_TEST_TIMESTAMP_URL"):  # Online: sends only a synthetic file's hash.
+            signing.sign_file({**config, "timestamp_url": url}, path)
+            record = signing.inspect_signatures([path])[str(path)]
+            self.assertTrue(record["timestamp_subject"])
+            self.assertEqual(signing.signature_problems(record, self.identity), ["signature status is UnknownError"],
+                             "only the untrusted test root may fail")
+            self.assertEqual(signing.signtool_verification(tool, path)[0], ["signtool verify exit code 1"])
+            data = bytearray(path.read_bytes())
+            data[0x300] ^= 0xFF
+            path.write_bytes(data)
+            self.assertEqual(signing.inspect_signatures([path])[str(path)]["status"], "HashMismatch")
 
     @unittest.skipUnless(iscc.is_file(), "Inno Setup compiler is not available")
     def test_real_inno_script_signs_uninstaller_and_setup_and_signcheck_blocks_unsigned(self):
