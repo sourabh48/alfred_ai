@@ -2,6 +2,7 @@ import os
 
 from .base_adapter import BaseModelAdapter
 from apps.ml_engine.core.alfred_inference import alfred_engine
+from apps.ml_engine.models import AdaptiveModelState
 
 MODEL_PATH = "ml_models/alfred/emotional_bert/"
 
@@ -12,9 +13,13 @@ class EmotionalBERT(BaseModelAdapter):
         self._torch = None
         self._load_attempted = False
         self._model_available = False
+        self._evidence_ready = False
 
     def load(self):
-        if self._load_attempted:
+        # Nothing in ALFRED trains this model, so a folder alone must not change a verdict.
+        state = AdaptiveModelState.objects.filter(model_key="emotional_bert").first()
+        self._evidence_ready = state is not None and state.inference_ready
+        if self._load_attempted or not self._evidence_ready:
             return
 
         self._load_attempted = True
@@ -127,7 +132,7 @@ class EmotionalBERT(BaseModelAdapter):
         }
 
     def _predict_text_probability(self, description: str) -> float | None:
-        if not self._model_available or not description:
+        if not self._evidence_ready or not self._model_available or not description:
             return None
 
         inputs = self.tokenizer(description, return_tensors="pt", truncation=True)

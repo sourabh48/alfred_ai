@@ -53,8 +53,11 @@ class ExpenseLSTMAdapter(BaseModelAdapter):
             return [float(math.log1p(max(item, 0.0))) for item in window]
         return window
 
-    def predict(self, seq):
-        self.load()
+    def predict(self, seq, *, use_model=True):
+        if use_model:
+            self.load()
+        else:
+            self.window_size, self.model = self.WINDOW_SIZE, None
         values = []
         for item in seq if seq is not None else []:
             try:

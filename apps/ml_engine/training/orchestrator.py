@@ -423,19 +423,23 @@ def _run_training_spec(spec: TrainingSpec, *, trigger: str, force: bool, now) ->
         state.status = "skipped"
         state.next_refresh_due_at = finished + timedelta(hours=max(6, spec.refresh_hours))
 
-    model_registry.update(
-        spec.key,
-        version=finished.isoformat(),
-        metadata={
-            "status": state.status,
-            "quality_score": round(quality_score, 2),
-            "confidence_estimate": round(confidence_estimate, 2),
-            "sample_count": state.sample_count,
-            "artifact_path": state.artifact_path,
-            "notes": state.notes,
-            "evaluation": result.get("evaluation", {}),
-        },
-    )
+    try:
+        model_registry.update(
+            spec.key,
+            version=finished.isoformat(),
+            metadata={
+                "status": state.status,
+                "quality_score": round(quality_score, 2),
+                "confidence_estimate": round(confidence_estimate, 2),
+                "sample_count": state.sample_count,
+                "artifact_path": state.artifact_path,
+                "notes": state.notes,
+                "evaluation": result.get("evaluation", {}),
+            },
+        )
+    except (OSError, TypeError, ValueError):
+        # The receipt is metadata; a bad file stays for review but must not strand this model in "training".
+        state.notes = f"{state.notes} The registry receipt could not be saved.".strip()
 
     with transaction.atomic():
         state.save()
