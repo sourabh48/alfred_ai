@@ -11,6 +11,7 @@ from django.utils import timezone
 from alfred_ai.services.public_http import PublicHTTPError
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services.job_intelligence import JOB_FEED_ADAPTERS, job_intelligence, verified_intelligence
+from apps.career.services.resume_intelligence import SKILL_CATALOG, extract_skill_terms
 
 
 def lead(**changes):
@@ -118,6 +119,11 @@ class CareerDiscoveryRulesTests(SimpleTestCase):
         job_intelligence.suggest_openings("Java Developer", ["Java", "Spring Boot", "AWS"])
         self.assertEqual({call.args[0] for call in mocks[0].call_args_list},
             {"Java Developer Java Spring Boot", "Java Developer", "Java"})
+
+    def test_configured_java_stack_is_extracted_from_postings_and_resumes(self):
+        text = "Java developer with Spring Boot and AWS; laws and draws are not skills."
+        self.assertEqual(set(job_intelligence._extract_skills(text)), {"Java", "Spring Boot", "Aws"})
+        self.assertLessEqual({"Java", "Spring Boot", "Aws"}, set(extract_skill_terms(text, SKILL_CATALOG)))
 
     def test_non_text_saved_skills_do_not_break_discovery(self):
         feeds(self, [feed(), feed(1, jobs=[]), feed(2, jobs=[])])

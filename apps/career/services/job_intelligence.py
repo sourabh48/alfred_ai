@@ -29,6 +29,7 @@ JOB_SKILLS = {
     "docker", "kubernetes", "machine learning", "data analysis", "statistics", "forecasting", "finance",
     "risk", "operations", "analytics", "etl", "airflow", "product management", "strategy", "communication",
     "java", "javascript", "typescript", "spark", "pandas", "scikit-learn", "fastapi", "postgresql",
+    "spring boot", "aws",
 }
 EXPERIENCE_RE = re.compile(r"(\d+(?:\.\d+)?)\+?\s+(?:years?|yrs?)", re.IGNORECASE)
 ROLE_STUDY_TRACKS = {
