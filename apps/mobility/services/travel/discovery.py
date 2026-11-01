@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.mobility.models import UserDestinationHistory
+from ..travel_discovery import destination_name
 
 
 def place_key(place):
@@ -46,7 +47,7 @@ def rank_places(user, places, *, interests=(), route=None, visited_names=(), wea
         seen_places.append(place)
         record = memory.get(key) or by_name.get(place["name"].casefold())
         events = record.events if record else {}
-        if "rejected" in events or (only_new and ("visited" in events or place["name"].casefold() in visited)):
+        if "rejected" in events or (only_new and ("visited" in events or destination_name(place["name"]).casefold() in visited)):
             continue
         if place.get("access") in {"no", "private"}:
             continue
