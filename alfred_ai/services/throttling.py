@@ -3,6 +3,7 @@ import json
 import logging
 from math import isfinite
 from pathlib import Path
+import time
 
 from diskcache import Cache
 from django.utils import timezone
@@ -13,6 +14,23 @@ from alfred_private_storage import private_directory, verify_cache_storage
 logger = logging.getLogger(__name__)
 # A new folder: rows written before this format are pickled, and are never opened.
 STORE = "json-v1"
+# Every API request passes here and a permission check costs tens of milliseconds, so a process rechecks a store only
+# this often, and startup always checks. shortcut: a folder loosened meanwhile is refused up to this much later,
+# which is fine while planted rows cannot run code; shorten it if the store ever guards more than request counts.
+CHECK_SECONDS = 30
+_checked = {}
+
+
+def _private_store(directory):
+    store_path = Path(directory) / STORE
+    last = _checked.get(store_path)
+    if last is not None and time.monotonic() - last < CHECK_SECONDS and store_path.is_dir():
+        return store_path
+    # Refuses a location other accounts can write to, including a configured external one.
+    private_directory(private_directory(Path(directory)) / STORE)
+    verify_cache_storage(store_path)
+    _checked[store_path] = time.monotonic()
+    return store_path
 
 
 def _history(store, key):
@@ -30,10 +48,7 @@ def reserve_attempts(directory, buckets):
         raise ValueError('Protection requires an absolute persistent directory')
     if any(limit < 1 or window < 1 for _, limit, window in buckets):
         raise ValueError('Limits must be positive')
-    # Refuses a location other accounts can write to, including a configured external one.
-    store_path = private_directory(private_directory(Path(directory)) / STORE)
-    verify_cache_storage(store_path)
-    with Cache(str(store_path), disk=StrictDisk, timeout=5, eviction_policy='none', cull_limit=0) as store, store.transact():
+    with Cache(str(_private_store(directory)), disk=StrictDisk, timeout=5, eviction_policy='none', cull_limit=0) as store, store.transact():
         now = timezone.now().timestamp()
         store.expire()
         reservations, retry = [], 0

@@ -298,7 +298,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Source-backed job leads matched', self.browser.find_element(self.By.ID, 'careerRoot').text)
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings img')), 0)
         self.assertFalse(self.browser.execute_script('return Boolean(window.discoveryLeak)'))
-        self.assertTrue(all(a.get_attribute('href').startswith('https://')
+        # A later page redraw can replace the links between finding and reading them.
+        self.wait.until(lambda _: all(a.get_attribute('href').startswith('https://')
             for a in self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings a')))
         self.browser.execute_script("document.getElementById('careerOpenings').scrollIntoView({block:'center',behavior:'instant'})")
         self.capture('career-discovery-desktop')

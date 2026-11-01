@@ -11,6 +11,7 @@ import sqlite3
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
+from time import monotonic
 from unittest import skipUnless
 from unittest.mock import patch
 from uuid import UUID
@@ -23,7 +24,7 @@ from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 
 from alfred_ai.safe_cache import CacheIntegrityError, SafeDisk, StrictDisk
-from alfred_ai.services.throttling import STORE, reserve_attempts
+from alfred_ai.services.throttling import CHECK_SECONDS, STORE, reserve_attempts
 from alfred_private_storage import PrivateStorageUnavailable, current_sid, owner_sid, private_directory, replace_acl, verify_private
 
 
@@ -337,8 +338,17 @@ class CachePermissionTests(SimpleTestCase):
         path = self.root / "limits"
         self.assertEqual(reserve_attempts(str(path), [("key", 2, 60)]), 0)
         replace_acl(path / STORE, self.LOOSE)
-        with self.assertRaises(PrivateStorageUnavailable):
+        with patch("alfred_ai.services.throttling.CHECK_SECONDS", 0), self.assertRaises(PrivateStorageUnavailable):
             reserve_attempts(str(path), [("key", 2, 60)])
+
+    def test_a_store_is_rechecked_only_once_the_check_window_has_passed(self):
+        path = self.root / "limits"
+        self.assertEqual(reserve_attempts(str(path), [("key", 3, 60)]), 0)
+        replace_acl(path / STORE, self.LOOSE)
+        self.assertEqual(reserve_attempts(str(path), [("key", 3, 60)]), 0)
+        later = monotonic() + CHECK_SECONDS + 1
+        with patch("alfred_ai.services.throttling.time.monotonic", return_value=later), self.assertRaises(PrivateStorageUnavailable):
+            reserve_attempts(str(path), [("key", 3, 60)])
 
     def test_startup_refuses_a_loose_throttle_or_invitation_folder(self):
         config = apps.get_app_config("users")
@@ -359,7 +369,7 @@ class CachePermissionTests(SimpleTestCase):
         path = self.root / "limits"
         self.assertEqual(reserve_attempts(str(path), [("key", 2, 60)]), 0)
         replace_acl(path / STORE / "cache.db", self.LOOSE)
-        with self.assertRaises(PrivateStorageUnavailable):
+        with patch("alfred_ai.services.throttling.CHECK_SECONDS", 0), self.assertRaises(PrivateStorageUnavailable):
             reserve_attempts(str(path), [("key", 2, 60)])
 
     def test_startup_refuses_a_loosened_cache_shard_or_database(self):
