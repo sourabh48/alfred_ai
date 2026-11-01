@@ -326,6 +326,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         mocks[0].side_effect = None; mocks[0].return_value = feed(); cache.clear(); self.browser.refresh()
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings [data-opening-source-status="fresh"]'))
         self.assertEqual(list(CareerProfile.objects.order_by('pk').values()), before)
+        # A live refresh landing between these direct draws and their checks would replace them.
+        self.browser.execute_script("document.getElementById('careerRoot').dataset.liveRefreshLockedUntil = String(Date.now() + 15000)")
         self.browser.execute_script("renderOpenings([{title:'Unsafe lead',url:'javascript:alert(1)',source_status:'unknown',tags:[]}],{filtered_candidates:0,total_candidates:1})")
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings a')), 0)
         self.assertIn('0 of 1', self.text('careerOpeningsMeta'))
