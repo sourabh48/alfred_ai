@@ -83,6 +83,8 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--window-size=1440,1200",
+            # Fades read as empty text and smooth scrolling misplaces clicks, each failing a different test per run.
+            "--force-prefers-reduced-motion",
         ):
             chrome.add_argument(argument)
         chrome_binary = cls._first_existing(
@@ -101,6 +103,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--window-size=1440,1200",
+            "--force-prefers-reduced-motion",
         ):
             edge.add_argument(argument)
         edge_binary = cls._first_existing(

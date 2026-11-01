@@ -436,7 +436,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn("incomplete", self.text("careerJobMatchPanel"))
         self.assertEqual(before, [list(model.objects.values()) for model in models])
         self.browser.set_window_size(390,844)
-        if not self.browser.find_element(self.By.CSS_SELECTOR, '[data-fit-sources]').get_attribute('open'):
+        # In a list because the attribute is empty when closed, and the wait retries if a refresh replaces the panel.
+        if not self.wait.until(lambda _: [self.browser.find_element(self.By.CSS_SELECTOR, '[data-fit-sources]').get_attribute('open')])[0]:
             self.memory_click('[data-fit-sources] summary')
         self.browser.execute_script("document.getElementById('careerJobMatchPanel').scrollIntoView({behavior:'instant',block:'start'});")
         self.capture("career-matching-unavailable-mobile")
@@ -5321,7 +5322,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('D1 packed gloves',self.text('plannerPacking'));self.assertTrue(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]'))
         self.wait.until(lambda _:self.active_requests==0)
         cookie=self.browser.get_cookie(settings.SESSION_COOKIE_NAME);Session.objects.filter(session_key=cookie['value']).delete()
-        self.browser.delete_cookie(settings.SESSION_COOKIE_NAME);self.memory_click('[data-packing-reload]')
+        # A background request can see the lost session first and clear the panel, which removes this button.
+        self.browser.delete_cookie(settings.SESSION_COOKIE_NAME);self.browser.execute_script("document.querySelector('[data-packing-reload]')?.click()")
         self.wait.until(lambda _:not self.browser.find_element(self.By.ID,'plannerPacking').is_displayed())
         self.assertEqual(self.text('plannerDocuments'),'');mark('J7 reopen/late dedupe/auth clearing')
         self.assertEqual(len(passed),7);self.capture('travel-d1-private-state-cleared')
