@@ -10,8 +10,13 @@ to run without `--signing-mode`, and it never falls back from signed to unsigned
 | Smart App Control | Nothing is claimed. Windows may block it. Never disable Windows security for it | Needs a separate clean-PC observation |
 | Failure | Unchanged behaviour | Stops, and removes that run's Setup, ZIP and manifests |
 
-**Current status: `BLOCKED_CERTIFICATE`.** No public-CA certificate is configured,
-so no build is publicly trusted and final trusted-signature acceptance is open.
+**Current status: `BLOCKED_CERTIFICATE`.** Owner decision, 2026-11-02: no paid certificate
+will be bought ("i dont wanna pay for a cert"). No public-CA certificate is configured, so no
+build is publicly trusted and final trusted-signature acceptance stays blocked.
+
+Unsigned development builds are the working mode. Windows, including Smart App Control on the
+owner's PC, may block them, and that block is never bypassed. Release mode stays in place and
+refuses to run without a certificate. It can be used only if this decision changes.
 
 ## What Smart App Control needs
 
@@ -21,11 +26,12 @@ both RSA and ECC. A self-signed certificate is never presented as publicly trust
 the preflight refuses one. A valid signature does not prove that Smart App Control
 or SmartScreen will allow every execution, so the result must be observed.
 
-## Certificate the owner must obtain
+## Certificate requirements, if the decision changes
 
-Obtain an **individual-validated (IV) code-signing certificate** from a CA in the
-Microsoft Trusted Root Program. Do not put a private key, PFX, password, PIN or
-token in chat, in a file in this repository, or in the signing configuration.
+**Nothing here is planned: the owner declined a paid certificate on 2026-11-02.** This section
+is reference only. A release would need an **individual-validated (IV) code-signing
+certificate** from a CA in the Microsoft Trusted Root Program. Do not put a private key, PFX,
+password, PIN or token in chat, in a file in this repository, or in the signing configuration.
 
 **Prerequisites for an individual developer in India, as far as checked on 2026-11-02:**
 
@@ -193,7 +199,7 @@ native background processes, restart, uninstaller launch and completion, plus [C
 Run `-Phase Install -Interactive` on one pass to observe the wizard, and save screenshots of any prompt in the evidence folder.
 The JSON records what happened. It is not a pass for anything it did not observe.
 
-**Status: `NOT_OBSERVED`.**
+**Status: `NOT_OBSERVED`.** This test needs a signed release, so it cannot run while the certificate is declined.
 
 **Evidence from Inno Setup 6.7.3 on 2026-11-02, using a synthetic Setup and a throwaway untrusted
 certificate on this PC, with no ALFRED code or data.** The compiler asked to sign `uninst.e32.tmp`, then the finished Setup. At
