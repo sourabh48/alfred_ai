@@ -7,7 +7,7 @@ import math
 from .artifacts import load_inference_artifact
 
 
-MODEL_PATH = os.path.join("ml_models", "alfred", "parser_confidence", "model.pkl")
+MODEL_PATH = os.path.join("ml_models", "alfred", "parser_confidence", "model.json")
 
 
 class ParserConfidenceCalibrator:
@@ -30,7 +30,7 @@ class ParserConfidenceCalibrator:
         self._artifact = None
 
     def predict_probability(self, features: dict) -> float | None:
-        self._artifact = load_inference_artifact("parser_confidence_calibrator")
+        self._artifact = load_inference_artifact("parser_confidence_calibrator", schema=self.FEATURE_NAMES)
         if self._artifact is None:
             return None
         model = self._artifact.get("model")

@@ -1,32 +1,38 @@
-import os
-
+from .artifacts import verified_model_file
 from .base_adapter import BaseModelAdapter
 from apps.ml_engine.core.alfred_inference import alfred_engine
+from apps.ml_engine.models import AdaptiveModelState
 
-MODEL_PATH = "ml_models/alfred/emotional_bert/"
+MODEL_PATH = "ml_models/alfred/emotional_bert/model.safetensors"
+TEXT_SCHEMA = ["description"]
 
 class EmotionalBERT(BaseModelAdapter):
     def __init__(self):
         super().__init__()
         self.tokenizer = None
         self._torch = None
-        self._load_attempted = False
+        self._digest = None
         self._model_available = False
 
     def load(self):
-        if self._load_attempted:
+        # Nothing in ALFRED trains this model, so a folder alone must not change a verdict.
+        state = AdaptiveModelState.objects.filter(model_key="emotional_bert").first()
+        digest = state.artifact_evidence["sha256"] if state is not None and state.inference_ready else None
+        if digest == self._digest:
             return
 
-        self._load_attempted = True
-        if not os.path.isdir(MODEL_PATH):
+        self._digest, self._model_available = digest, False
+        self.tokenizer = self.model = self._torch = None
+        path = digest and verified_model_file(state, "safetensors", TEXT_SCHEMA)
+        if not path:
             return
 
         try:
             from transformers import BertTokenizer, BertForSequenceClassification
             import torch
 
-            self.tokenizer = BertTokenizer.from_pretrained(MODEL_PATH)
-            self.model = BertForSequenceClassification.from_pretrained(MODEL_PATH)
+            self.tokenizer = BertTokenizer.from_pretrained(path.parent, local_files_only=True)
+            self.model = BertForSequenceClassification.from_pretrained(path.parent, local_files_only=True, use_safetensors=True)
             self.model.eval()
             self._torch = torch
             self._model_available = True

@@ -19,6 +19,7 @@ class AdaptiveModelState(models.Model):
     quality_score = models.FloatField(default=0)
     confidence_estimate = models.FloatField(default=0)
     artifact_path = models.CharField(max_length=255, blank=True)
+    artifact_evidence = models.JSONField(default=dict, blank=True)
     notes = models.TextField(blank=True)
     freshness_hours = models.PositiveIntegerField(default=24)
     last_started_at = models.DateTimeField(null=True, blank=True)
@@ -45,12 +46,18 @@ class AdaptiveModelState(models.Model):
         return (self.last_finished_at is None or self.last_finished_at<=now) and now<self.next_refresh_due_at
 
     @property
+    def has_artifact_evidence(self) -> bool:
+        evidence = self.artifact_evidence
+        return isinstance(evidence, dict) and evidence.get("role") == self.model_key and bool(evidence.get("sha256"))
+
+    @property
     def inference_ready(self) -> bool:
         from apps.ml_engine.training.quality import resolve_artifact_path, validation_blockers
 
         return bool(
             self.is_fresh
             and self.artifact_path
+            and self.has_artifact_evidence
             and resolve_artifact_path(self.artifact_path).is_file()
             and not validation_blockers(self.model_key, self.sample_count, self.quality_score, self.confidence_estimate)
         )

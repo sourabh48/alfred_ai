@@ -2,17 +2,17 @@ import math
 from datetime import datetime, timedelta, timezone
 from statistics import median
 
-import joblib
-
-from apps.ml_engine.training.quality import resolve_artifact_path, validation_blockers
+from apps.ml_engine.training.quality import validation_blockers
+from .artifacts import load_inference_artifact
 from .base_adapter import BaseModelAdapter
 
 
-MODEL_PATH = "ml_models/alfred/expense_lstm/model.pkl"
+MODEL_PATH = "ml_models/alfred/expense_lstm/model.json"
 
 
 class ExpenseLSTMAdapter(BaseModelAdapter):
     WINDOW_SIZE = 10
+    FEATURE_NAMES = [f"log1p_amount_lag_{lag}" for lag in range(10, 0, -1)]
 
     def load(self):
         self.window_size = self.WINDOW_SIZE
@@ -20,7 +20,7 @@ class ExpenseLSTMAdapter(BaseModelAdapter):
         self.model = None
         self.fallback_reason = "missing_or_unvalidated_artifact"
         try:
-            payload = joblib.load(resolve_artifact_path(MODEL_PATH))
+            payload = load_inference_artifact("expense_forecaster", schema=self.FEATURE_NAMES)
             trained_at = datetime.fromisoformat(payload.get("trained_at", ""))
             now = datetime.now(timezone.utc)
             freshness_hours = float(payload.get("freshness_hours", 12))

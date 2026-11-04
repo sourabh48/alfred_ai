@@ -3,12 +3,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
-import joblib
 import numpy as np
 import pandas as pd
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
+from apps.ml_engine.inference_adapters.artifacts import _parse_artifact
 from apps.ml_engine.inference_adapters.expense_lstm import ExpenseLSTMAdapter
 from apps.ml_engine.inference_adapters.salary_predictor import SalaryPredictor
 from apps.ml_engine.inference_adapters.parser_confidence_calibrator import ParserConfidenceCalibrator
@@ -55,9 +55,9 @@ class ExpenseValidationTests(SimpleTestCase):
             self.assertLessEqual(evaluation["mae"], evaluation["baseline_mae"] * 0.95)
             self.assertTrue(evaluation["passed"])
             self.assertGreaterEqual(result["confidence_estimate"], 55)
-            payload = joblib.load(model_path)
+            payload = _parse_artifact(model_path.read_bytes())
             self.assertEqual(payload["sample_count"], 80)
-            with patch("apps.ml_engine.inference_adapters.expense_lstm.MODEL_PATH", str(model_path)):
+            with patch("apps.ml_engine.inference_adapters.expense_lstm.load_inference_artifact", return_value=payload):
                 adapter = ExpenseLSTMAdapter()
                 prediction = adapter.predict(self.history()["amount"].tolist())
             self.assertIsNotNone(adapter.model)
@@ -94,18 +94,18 @@ class ExpenseValidationTests(SimpleTestCase):
         ]
         for payload in payloads:
             with self.subTest(payload=payload), patch(
-                "apps.ml_engine.inference_adapters.expense_lstm.joblib.load", return_value=payload,
+                "apps.ml_engine.inference_adapters.expense_lstm.load_inference_artifact", return_value=payload,
             ):
                 self.assertEqual(ExpenseLSTMAdapter().predict(range(1, 11)), 5.5)
         for error in [FileNotFoundError(), EOFError(), ValueError("corrupt artifact")]:
             with self.subTest(error=error), patch(
-                "apps.ml_engine.inference_adapters.expense_lstm.joblib.load", side_effect=error,
+                "apps.ml_engine.inference_adapters.expense_lstm.load_inference_artifact", side_effect=error,
             ):
                 self.assertEqual(ExpenseLSTMAdapter().predict([None, "bad", np.nan, np.inf, -1, 10, 20]), 15)
 
     def test_valid_artifact_predicts_but_invalid_model_output_falls_back(self):
         payload = self.valid_payload()
-        with patch("apps.ml_engine.inference_adapters.expense_lstm.joblib.load", return_value=payload):
+        with patch("apps.ml_engine.inference_adapters.expense_lstm.load_inference_artifact", return_value=payload):
             adapter = ExpenseLSTMAdapter()
             self.assertEqual(adapter.predict(range(1, 11)), 123)
             payload["model"].predict.return_value = [np.nan]
@@ -115,9 +115,8 @@ class ExpenseValidationTests(SimpleTestCase):
         with TemporaryDirectory() as directory:
             model_path = Path(directory) / "salary.pkl"
             model_path.write_bytes(b"artifact")
-            with patch("apps.ml_engine.inference_adapters.salary_predictor.joblib.load", return_value={
-                "model": Mock(), "feature_names": SalaryPredictor.FEATURE_NAMES + ["income_variability_ratio"],
-            }):
+            # The real schema comparison is exercised in tests.test_ml_artifact_trust.
+            with patch("apps.ml_engine.inference_adapters.salary_predictor.load_inference_artifact", return_value=None):
                 with self.assertRaisesRegex(ValueError, "obsolete"):
                     SalaryPredictor().load(model_path=str(model_path))
 
@@ -141,6 +140,7 @@ class ModelEvidenceTests(TestCase):
         state = AdaptiveModelState(
             model_key="salary_predictor", status="ready", sample_count=40,
             quality_score=75, confidence_estimate=70, artifact_path="test-artifact.pkl",
+            artifact_evidence={"role": "salary_predictor", "sha256": "0" * 64},
             next_refresh_due_at=timezone.now() + timedelta(hours=12),
         )
         with TemporaryDirectory() as directory, self.settings(BASE_DIR=Path(directory)):
@@ -153,6 +153,7 @@ class ModelEvidenceTests(TestCase):
         state = AdaptiveModelState.objects.create(
             model_key="salary_predictor", status="ready", sample_count=40,
             quality_score=75, confidence_estimate=70, artifact_path="README.md",
+            artifact_evidence={"role": "salary_predictor", "sha256": "0" * 64},
             next_refresh_due_at=timezone.now() + timedelta(hours=12),
         )
         spec = next(item for item in TRAINING_SPECS if item.key == "salary_predictor")
@@ -171,11 +172,12 @@ class ModelEvidenceTests(TestCase):
             ("service_cost_predictor", ServiceCostPredictor().predict_cost),
         ]
         for key, predict in cases:
-            with self.subTest(model=key), patch("apps.ml_engine.inference_adapters.artifacts.joblib.load") as load:
+            with self.subTest(model=key), patch("apps.ml_engine.inference_adapters.artifacts._verified_payload") as load:
                 self.assertIsNone(predict({}))
                 state = AdaptiveModelState.objects.create(
                     model_key=key, status="ready", sample_count=100,
                     quality_score=80, confidence_estimate=80, artifact_path="README.md",
+                    artifact_evidence={"role": key, "sha256": "0" * 64},
                     next_refresh_due_at=timezone.now() - timedelta(hours=1),
                 )
                 self.assertIsNone(predict({}))
@@ -199,10 +201,11 @@ class ModelEvidenceTests(TestCase):
                 state = AdaptiveModelState.objects.create(
                     model_key=key, status="ready", sample_count=100,
                     quality_score=80, confidence_estimate=80, artifact_path="README.md",
+                    artifact_evidence={"role": key, "sha256": "0" * 64},
                     next_refresh_due_at=timezone.now() + timedelta(hours=12),
                 )
                 model = Mock(predict=Mock(return_value=[75]))
-                with patch("apps.ml_engine.inference_adapters.artifacts.joblib.load", return_value={"model": model}):
+                with patch("apps.ml_engine.inference_adapters.artifacts._verified_payload", return_value={"model": model}):
                     self.assertEqual(predict({}), 75)
                     model.predict.return_value = [80]
                     self.assertEqual(predict({}), 80)

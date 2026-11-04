@@ -23,6 +23,7 @@ class ServingReadinessTests(TestCase):
     def state(self,**changes):
         values=dict(display_name='SYNTHETIC-PRIVATE-NAME',status='ready',sample_count=80,quality_score=80,
             confidence_estimate=80,artifact_path=str(self.artifact),notes='SYNTHETIC-PRIVATE-NOTE',
+            artifact_evidence=dict(role='expense_forecaster',sha256='0'*64),
             next_refresh_due_at=timezone.now()+timedelta(hours=12),last_finished_at=None)
         values.update(changes)
         return AdaptiveModelState.objects.update_or_create(model_key='expense_forecaster',defaults=values)[0]
@@ -46,7 +47,8 @@ class ServingReadinessTests(TestCase):
         cases=[dict(artifact_path=''),dict(artifact_path=str(self.root/'missing.pkl')),
             dict(next_refresh_due_at=timezone.now()-timedelta(seconds=1)),dict(sample_count=1),
             dict(quality_score=49),dict(confidence_estimate=54),dict(status='failed'),
-            dict(last_finished_at=timezone.now()+timedelta(hours=1))]
+            dict(last_finished_at=timezone.now()+timedelta(hours=1)),dict(artifact_evidence={}),
+            dict(artifact_evidence=dict(role='salary_predictor',sha256='0'*64))]
         for changes in cases:
             with self.subTest(fields=sorted(changes)):
                 self.state(**changes); result=self.expense()
@@ -56,6 +58,7 @@ class ServingReadinessTests(TestCase):
     def test_proxy_targets_are_never_presented_as_validated_serving(self):
         AdaptiveModelState.objects.create(model_key='burnout_rf',display_name='Synthetic',status='ready',
             sample_count=100,quality_score=99,confidence_estimate=99,artifact_path=str(self.artifact),
+            artifact_evidence=dict(role='burnout_rf',sha256='0'*64),
             next_refresh_due_at=timezone.now()+timedelta(hours=12))
         result=next(item for item in self.client.get(self.URL).json()['models'] if item['key']=='burnout_rf')
         self.assertFalse(result['registry_eligible']); self.assertEqual(result['status'],'fallback')
@@ -81,7 +84,7 @@ class ServingReadinessTests(TestCase):
                 payload=dict(model=model,trained_at=timezone.now().isoformat(),freshness_hours=12,
                     evaluation={'passed':True},sample_count=80,quality_score=80,confidence_estimate=80,window_size=10)
                 payload.update(changes)
-                with patch('apps.ml_engine.inference_adapters.expense_lstm.joblib.load',return_value=payload):
+                with patch('apps.ml_engine.inference_adapters.expense_lstm.load_inference_artifact',return_value=payload):
                     self.assertEqual(ExpenseLSTMAdapter().predict([10,20]),15)
                 model.predict.assert_not_called()
 

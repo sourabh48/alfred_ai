@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import json
 import os
 import tempfile
@@ -6,6 +7,26 @@ from threading import RLock
 
 _registry_lock = RLock()
 
+
+@contextmanager
+def _exclusive(directory):
+    """The OS releases this lock if a process dies; a waiter gives up after about ten seconds."""
+    with _registry_lock, open(os.path.join(directory, ".registry.lock"), "a+b") as handle:
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            yield
+
+
 class AlfredModelRegistry:
 
     def __init__(self):
@@ -13,16 +34,16 @@ class AlfredModelRegistry:
         self.registry_path = os.path.join(base, "registry.json")
         os.makedirs(base, exist_ok=True)
 
-        with _registry_lock:
-            try:
-                with open(self.registry_path, "x", encoding="utf-8") as f:
-                    json.dump({}, f)
-            except FileExistsError:
-                pass
-            try:
+        try:
+            with _exclusive(base):
+                try:
+                    with open(self.registry_path, "x", encoding="utf-8") as f:
+                        json.dump({}, f)
+                except FileExistsError:
+                    pass
                 self.registry = self._load()
-            except (ValueError, FileNotFoundError):
-                self.registry = {}
+        except (ValueError, OSError):
+            self.registry = {}
 
     def _load(self):
         with open(self.registry_path, "r", encoding="utf-8") as f:
@@ -35,8 +56,7 @@ class AlfredModelRegistry:
         return self.registry.get(model_name)
 
     def update(self, model_name, version, metadata=None):
-        # shortcut: process-local coordination; add an external writer lock before multi-process training.
-        with _registry_lock:
+        with _exclusive(os.path.dirname(self.registry_path)):
             registry = self._load()
             registry[model_name] = {"version": version, "metadata": metadata or {}}
             payload = json.dumps(registry, indent=4, allow_nan=False)

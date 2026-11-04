@@ -5,7 +5,7 @@ import math
 from .artifacts import load_inference_artifact
 
 
-MODEL_PATH = "ml_models/alfred/service_cost_predictor/model.pkl"
+MODEL_PATH = "ml_models/alfred/service_cost_predictor/model.json"
 
 VEHICLE_TYPE_SCORES = {
     "motorcycle": 1.0,
@@ -49,7 +49,7 @@ class ServiceCostPredictor:
         self._artifact = None
 
     def load(self, *, model_path: str | None = None, force_reload: bool = False):
-        self._artifact = load_inference_artifact("service_cost_predictor", model_path)
+        self._artifact = load_inference_artifact("service_cost_predictor", model_path, schema=self.FEATURE_NAMES)
 
     def predict_cost(self, features: dict, *, model_path: str | None = None, force_reload: bool = False) -> float | None:
         self.load(model_path=model_path, force_reload=force_reload)
