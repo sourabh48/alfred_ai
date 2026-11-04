@@ -7,12 +7,12 @@ from django.test import TestCase
 from django.utils import timezone
 
 from apps.mobility.models import TravelPlan, TripLog, TripPhoto
-from apps.mobility.services.travel.discovery import remember
+from apps.mobility.services.travel.discovery import rank_places, remember
 from apps.mobility.services.travel.providers.base import ProviderResult
 from apps.mobility.services.travel.presentation import age_saved_facts
 from apps.mobility.services.travel.research import discover_destinations
 from apps.mobility.services.travel_catalog import DESTINATIONS
-from apps.mobility.services.travel_discovery import candidates_for, fact
+from apps.mobility.services.travel_discovery import candidates_for, fact, history_for
 from apps.mobility.services.travel_conversation import new_session
 from tests import test_travel_planner as fixtures
 
@@ -63,7 +63,35 @@ class TravelDiscoveryAcceptanceTests(TestCase):
             TravelPlan.objects.create(user=self.user, title="Synthetic trip", destination=name, status="completed",
                 start_date=self.today-timedelta(days=3), end_date=self.today-timedelta(days=1))
         option = self.options("SYNTHETIC VALLEY")[0]
-        self.assertIn("2 recorded visit(s), 2 within the last year", " ".join(option["why"]))
+        self.assertIn("2 recorded visit(s), 2 dated within the last year", " ".join(option["why"]))
+
+    def test_location_labels_match_a_guide_name_and_dated_logs_and_photos_count_as_recent(self):
+        plan = TravelPlan.objects.create(user=self.user, title="Synthetic trip", destination="Somewhere else")
+        TripLog.objects.create(user=self.user, travel_plan=plan, log_date=self.today-timedelta(days=30),
+            title="Synthetic log", location_name="Log Valley, Synthetic State")
+        TripLog.objects.create(user=self.user, travel_plan=plan, log_date=self.today-timedelta(days=800),
+            title="Old log", location_name="Old Valley")
+        TripPhoto.objects.create(user=self.user, image="synthetic-unwritten.jpg", location_name="Photo Valley",
+            taken_at=timezone.now()-timedelta(days=30))
+        TripPhoto.objects.create(user=self.user, image="synthetic-unwritten.jpg", location_name="Undated Valley")
+        for name, recent in (("Log Valley", 1), ("Photo Valley", 1), ("Old Valley", 0), ("Undated Valley", 0)):
+            with self.subTest(name=name):
+                self.assertIn(f"1 recorded visit(s), {recent} dated within the last year", " ".join(self.options(name)[0]["why"]))
+                self.assertEqual(self.options(name, only_new_places=fact(True)), [])
+        self.assertEqual(self.options("Log Valley, Synthetic State")[0]["novelty"], "Previously recorded")
+
+    def test_catalog_location_inside_longer_text_keeps_visit_and_gains_recency(self):
+        plan = TravelPlan.objects.create(user=self.user, title="Synthetic trip", destination="Somewhere else")
+        name = DESTINATIONS[1]["name"]
+        TripLog.objects.create(user=self.user, travel_plan=plan, log_date=self.today-timedelta(days=30),
+            title="Synthetic log", location_name=f"Camp near {name}")
+        history = history_for(self.user)
+        self.assertEqual((history["visits"][name], history["recent"][name]), (1, 1))
+
+    def test_visited_place_filter_uses_the_same_place_name_rules(self):
+        place = {"id": "osm:node:1", "name": "Synthetic  Valley, Synthetic State", "lat": 12.0, "lon": 77.0, "category": "attraction"}
+        self.assertEqual(rank_places(self.user, [place], visited_names={"synthetic valley": 1}, only_new=True), [])
+        self.assertEqual(len(rank_places(self.user, [place], visited_names={"other valley": 1}, only_new=True)), 1)
 
     def test_failed_dynamic_payload_is_not_used_as_successful_destination_evidence(self):
         preliminary = self.options("Offline reference")

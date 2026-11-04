@@ -5,10 +5,13 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from apps.mobility.services.travel.providers.base import ProviderResult
-from apps.mobility.services.travel.providers.web import BraveSearch, WikivoyageDestinations, WikivoyageSearch, source_type
+from alfred_ai.services.public_http import normalized_link
+from apps.mobility.services.travel.providers.places import OverpassPlaces
+from apps.mobility.services.travel.providers.web import BraveSearch, SearXNGSearch, WikivoyageDestinations, WikivoyageSearch, source_type
 from apps.mobility.services.travel.research import research_candidates, quality_contract
-from apps.mobility.services.travel.links import external_links
+from apps.mobility.services.travel.links import BOOKING_SITES, booking_sites, external_links
 from apps.mobility.services.travel.discovery import remember
+from apps.mobility.services.travel_conversation import new_session
 from apps.mobility.services.travel_discovery import fact
 
 
@@ -88,6 +91,66 @@ class TravelWebTests(TestCase):
         self.assertTrue(all(x["availability"] == "UNKNOWN" and x["verified_at"] is None for x in links))
         self.assertTrue(all(x["url"].startswith("https://") for x in links))
         self.assertNotIn(self.user.email,str(links))
+
+    def test_booking_sites_are_plain_reviewed_https_home_pages(self):
+        sites = booking_sites()
+        self.assertEqual(len(sites),len(BOOKING_SITES))
+        self.assertEqual({s["category"] for s in sites},{"hotels","flights","buses"})
+        for site in sites:
+            with self.subTest(site=site["label"]):
+                parts = urlsplit(site["url"])
+                self.assertEqual((parts.scheme,parts.path,parts.query,parts.fragment),("https","/","",""))
+                self.assertEqual(normalized_link(site["url"]),site["url"])
+
+    def test_unsafe_booking_site_entries_are_dropped(self):
+        unsafe = [("hotels","Bad",url) for url in ("http://example.org/","javascript:alert(1)","https://user:pw@example.org/",
+            "https://example.org/?ss=Coorg","https://example.org/#Coorg","https://localhost/","https://HOST.example.org/")]
+        with patch("apps.mobility.services.travel.links.BOOKING_SITES",unsafe):
+            self.assertEqual(booking_sites(),[])
+
+    def test_session_payload_offers_booking_sites_with_no_trip_data(self):
+        session = new_session(self.user)
+        session.state = self.state
+        session.save()
+        self.client.force_login(self.user)
+        sites = self.client.get(f"/api/mobility/planner/sessions/{session.pk}/").json()["booking_sites"]
+        self.assertEqual([s["url"] for s in sites],[u for _,_,u in BOOKING_SITES])
+        for private in ("Bengaluru","2026-10-02","2026-10-05","15000",self.user.email):
+            self.assertNotIn(private,str(sites))
+
+    def test_search_link_labels_name_the_trip_details_in_the_url(self):
+        def by_path(state):
+            links = external_links(state,{"name":"Coorg"})
+            return {urlsplit(x["url"]).path:x for x in links}
+        full = by_path(self.state)
+        self.assertEqual(full["/searchresults.html"]["label"],"Search Booking.com with your traveller and room counts and dates")
+        self.assertEqual(full["/travel/flights"]["label"],"Search Google Flights with your start city and dates")
+        self.assertEqual(parse_qs(urlsplit(full["/travel/flights"]["url"]).query)["q"],["Flights from Bengaluru to Coorg 2026-10-02 2026-10-05"])
+        self.assertEqual(full["/maps/dir/"]["label"],"Check route on Google Maps from your start city")
+        bare = by_path({"number_of_travelers":fact(1),"origin":fact("My family private@example.org")})
+        self.assertEqual(bare["/searchresults.html"]["label"],"Search Booking.com with your traveller and room counts")
+        self.assertNotIn("checkin",bare["/searchresults.html"]["url"])
+        self.assertEqual(bare["/travel/flights"]["label"],"Search Google Flights")
+        self.assertEqual(parse_qs(urlsplit(bare["/travel/flights"]["url"]).query)["q"],["Flights to Coorg"])
+        self.assertNotIn("/maps/dir/",bare)
+        self.assertNotIn("private",str(bare))
+
+    def test_overpass_status_matches_what_the_https_transport_accepts(self):
+        for url, reason in (("http://overpass.example.org/api/interpreter","invalid_TRAVEL_OVERPASS_URL"),
+                ("https://user:pw@overpass.example.org/api/interpreter","invalid_TRAVEL_OVERPASS_URL"),
+                ("https://overpass.example.org/api/interpreter#x","invalid_TRAVEL_OVERPASS_URL"),
+                ("https://localhost/api/interpreter","invalid_TRAVEL_OVERPASS_URL"),
+                ("https://overpass-api.de./api/interpreter","public_overpass_backend_not_enabled_use_authorized_instance"),
+                ("https://LZ4.Overpass-API.de/api/interpreter","public_overpass_backend_not_enabled_use_authorized_instance"),
+                ("https://overpass.example.org/api/interpreter","")):
+            with self.subTest(url=url), patch.dict("os.environ",{"TRAVEL_OVERPASS_URL":url}):
+                self.assertEqual(OverpassPlaces().unavailable_reason(),reason)
+
+    def test_withdrawing_searxng_terms_isolates_results_cached_under_them(self):
+        with patch.dict("os.environ",{"TRAVEL_SEARXNG_URL":"https://search.example.org/search","TRAVEL_SEARXNG_TERMS_CONFIRMED":"true"}):
+            confirmed = SearXNGSearch().cache_partition
+        with patch.dict("os.environ",{"TRAVEL_SEARXNG_URL":"https://search.example.org/search","TRAVEL_SEARXNG_TERMS_CONFIRMED":"false"}):
+            self.assertNotEqual(SearXNGSearch().cache_partition,confirmed)
 
     def test_wiki_search_is_labeled_as_community_reference(self):
         provider = WikivoyageSearch()

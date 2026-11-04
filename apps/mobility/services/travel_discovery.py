@@ -36,7 +36,8 @@ def learn(user, key, val, source, confidence=0.6, confirmed=False):
 
 
 def destination_name(name):
-    name = " ".join(str(name).split())
+    # A log's "Talakadu, Karnataka" is the guide's "Talakadu".
+    name = " ".join(str(name).split()).split(",")[0].strip()
     return (lookup(name) or {}).get("name", name.casefold())
 
 
@@ -45,25 +46,32 @@ def history_for(user):
     recent = Counter()
     ratings = {}
     now = timezone.localdate()
+    def within_year(day):
+        return bool(day) and 0 <= (now - day).days <= 365
     for p in TravelPlan.objects.filter(user=user).prefetch_related("logs").select_related("feedback"):
         if p.destination and (p.status == "completed" or p.logs.exists()):
             name = destination_name(p.destination)
             visits[name] += 1
-            if p.end_date and 0 <= (now - p.end_date).days <= 365:
+            if within_year(p.end_date):
                 recent[name] += 1
         try:
             ratings[destination_name(p.destination)] = p.feedback.rating
         except TravelPlan.feedback.RelatedObjectDoesNotExist:
             pass
-    locations = list(TripLog.objects.filter(user=user).exclude(location_name="").values_list("location_name", flat=True))
-    locations += list(TripPhoto.objects.filter(user=user).exclude(location_name="").values_list("location_name", flat=True))
-    for location in locations:
+    located = list(TripLog.objects.filter(user=user).exclude(location_name="").values_list("location_name", "log_date"))
+    located += [(location, taken and timezone.localdate(taken)) for location, taken in
+                TripPhoto.objects.filter(user=user).exclude(location_name="").values_list("location_name", "taken_at")]
+    def record_location(name, day):
+        visits[name] = max(visits[name], 1)
+        if within_year(day):
+            recent[name] = max(recent[name], 1)
+    for location, day in located:
         name = destination_name(location)
         if name:
-            visits[name] = max(visits[name], 1)
-    for d in DESTINATIONS:
-        if not visits[d["name"]] and any(d["name"].lower() in loc.lower() for loc in locations):
-            visits[d["name"]] = 1
+            record_location(name, day)
+        for d in DESTINATIONS:
+            if d["name"].lower() in location.lower():
+                record_location(d["name"], day)
     for row in UserDestinationHistory.objects.filter(user=user):
         if "visited" in row.events:
             name = destination_name(row.name)
@@ -153,7 +161,7 @@ def candidates_for(user, state, limit=3, *, destinations=None, origin_coordinate
         if match:
             reasons.append("Matches: " + ", ".join(match) + ".")
         if visits:
-            reasons.append(f"You have {visits} recorded visit(s), {recent} within the last year; novelty setting: {novelty.replace('_', ' ')}.")
+            reasons.append(f"You have {visits} recorded visit(s), {recent} dated within the last year; novelty setting: {novelty.replace('_', ' ')}.")
         else:
             reasons.append("No visit found in your saved trips, logs or photo locations; this is not proof you have never been.")
         d.update(score=round(score), fit="Strong fit" if score >= 75 else "Worth considering" if score >= 55 else "Needs adjustments",

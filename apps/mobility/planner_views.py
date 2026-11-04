@@ -19,6 +19,7 @@ from .services.travel_discovery import budget_for, fact, learn, profile_for, val
 from .services.travel_research import STAGES, TERMINAL, evidence_payload, queue_research
 from .services.travel.presentation import age_saved_facts
 from .services.travel.restrictions import KIND, record_restriction, restriction_context
+from .services.travel.links import booking_sites
 from .services.travel.mapping import map_configuration, map_features
 from .services.travel.cache import budget_status, usage_summary
 from .services.travel.discovery import remember, place_key
@@ -78,7 +79,7 @@ def session_payload(session):
             "destination_pool": {"total": pool_count, "offset": offset,
                 "has_previous": offset > 0 and (not value(session.state, "selected_destination") or bool(value(session.state, "_itinerary_stops"))),
                 "has_more": offset+3 < pool_count and (not value(session.state, "selected_destination") or bool(value(session.state, "_itinerary_stops")))},
-            "map_config":map_configuration(), "can_view_provider_usage":session.user.is_staff,
+            "map_config":map_configuration(), "booking_sites":booking_sites(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
             "itinerary_editor": editor, "trip_documents": document_links(session), "packing_checklist": packing_payload(session), "travel_reminders": reminder_payload(session),
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),

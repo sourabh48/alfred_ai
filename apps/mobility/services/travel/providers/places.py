@@ -1,8 +1,9 @@
 from datetime import timedelta
 import os
 import hashlib
-from urllib.parse import urlparse
+from urllib.parse import urlsplit
 
+from alfred_ai.services.public_http import normalized_link
 from .base import Provider, ProviderError, number, request_json
 
 
@@ -26,11 +27,13 @@ class OverpassPlaces(Provider):
         endpoint = os.getenv("TRAVEL_OVERPASS_URL", "")
         if not endpoint:
             return "missing_TRAVEL_OVERPASS_URL_authorized_instance"
-        parsed = urlparse(endpoint)
-        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+        # The same check as the transport, so status can't say configured for a URL it refuses.
+        safe = normalized_link(endpoint)
+        if not safe or urlsplit(safe).fragment:
             return "invalid_TRAVEL_OVERPASS_URL"
+        host = urlsplit(safe).hostname
         # Shared public instances explicitly discourage being an application's backend.
-        if parsed.hostname == "overpass-api.de" or parsed.hostname.endswith(".overpass-api.de"):
+        if host == "overpass-api.de" or host.endswith(".overpass-api.de"):
             return "public_overpass_backend_not_enabled_use_authorized_instance"
         return ""
 

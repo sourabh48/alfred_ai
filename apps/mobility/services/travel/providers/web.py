@@ -133,7 +133,8 @@ class SearXNGSearch(WebSearchProvider):
 
     @property
     def cache_partition(self):
-        return hashlib.sha256(os.getenv("TRAVEL_SEARXNG_URL", "").encode()).hexdigest()
+        # As with Brave, withdrawing the terms confirmation isolates what was stored under it.
+        return hashlib.sha256((os.getenv("TRAVEL_SEARXNG_URL", "")+os.getenv("TRAVEL_SEARXNG_TERMS_CONFIRMED", "")).encode()).hexdigest()
 
     def unavailable_reason(self):
         endpoint = os.getenv("TRAVEL_SEARXNG_URL", "")

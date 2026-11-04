@@ -64,6 +64,37 @@ updates roll back together if invalidation fails. These changes do not activate 
 provider, create a booking, alter canonical financial records or migrate a schema.
 Current validation and release limitations are in [Project Status](PROJECT_STATUS.md).
 
+## Verified booking links
+
+ALFRED researches; the owner books on the external site. The planner shows the
+`BOOKING_SITES` allow-list in `services/travel/links.py` for hotels, flights and
+buses. Each entry is an HTTPS home page, so opening it sends nothing from the
+trip. `booking_sites()` drops any entry that fails `normalized_link` or carries a
+query or fragment. The list is static, so it also appears on saved and multi-stop
+plans. Search links are separate: each label names the trip details in its URL
+(dates, traveller and room counts, start city), and opening one is the owner's
+choice. No inventory, price or availability is checked, and nothing is booked.
+
+Reviewed 2 November 2026 with automated page reads, not a real browser:
+
+| Site | Operator evidence |
+| --- | --- |
+| `www.ktdc.com` | Own page: "Official Website", book only through it. Booking runs on `booking.ktdcbooking.com` |
+| `kstdc.co` | Linked from the Government of Karnataka's `karnatakatourism.org`, as a related link |
+| `www.booking.com` | Wikipedia infobox only. Host answered over valid TLS with an empty 202, so its content was not read |
+| `www.akasaair.com` | Own page: Akasa Air, flight booking |
+| `www.airindiaexpress.com`, `www.spicejet.com` | Page title only; the body did not render for the reader |
+| `www.ksrtc.in` | Linked for booking from the Government of Karnataka's `ksrtc.karnataka.gov.in` |
+| `www.keralartc.com` | Own page: "Official Website of Kerala State Road Transport Corporation". Booking runs on `onlineksrtcswift.com` |
+| `www.tnstc.in`, `www.tgsrtcbus.in` | Own page names the operator and offers booking; no government page confirmed it |
+
+Left out until a person opens them in a real browser, because automated reads
+timed out: `www.airindia.com`, `www.goindigo.in`, `www.makemytrip.com` and
+`www.redbus.in`. Their domains match their Wikipedia infoboxes (`redbus.com` for
+redBus). `www.apsrtconline.in` is left out because it redirected to plain HTTP.
+`online.keralartc.com` refused the connection. Add a site only after the same
+review.
+
 **Provider status — 2026-10-15:** Code/fixture success is separate from configured and real-live-tested. No new provider credentials/calls were used in this audit. Open-Meteo current published free limits and Brave/Duffel/OpenAI pricing/retention are in the [current register](ALFRED_EXTERNAL_INTEGRATIONS.md); ORS account quotas and all contract-specific limits remain unverified. Keep old dated limits below as historical guidance. Never treat wiki/POIs/link-outs as booking or road-legality evidence.
 
 Policy review: 29 September 2026. ALFRED remains a local/LAN application. The
@@ -102,7 +133,7 @@ selected quotes remain separate evidence and never replace estimated allowances.
 | Hotels | Duffel Stays | 15 minutes, capped by offer expiry | Live account and Stays access required; search result needs rate confirmation |
 | Flights | Duffel Flights | 15 minutes, capped by offer expiry | Participating airline offers; recheck before purchase |
 | Indian rail | Unavailable boundary | None | Authorized agreement/API required; timetable never implies seats, waitlist or fare |
-| Bus | External operator/search links | None | No live inventory integration; availability unknown |
+| Bus | Reviewed state-operator links and a search link | None | No live inventory integration; availability unknown; other states and private operators not listed |
 | Destination discovery | Wikivoyage | 14 days | Geotagged community guides, incomplete coverage; seed catalogue fallback |
 | Web research | Brave / authorized SearXNG / Wikivoyage fallback | 6 hours; 30 minutes for inventory-related leads | Search snippets are unverified leads, not current rules or availability |
 
@@ -209,7 +240,9 @@ See [usage policy](https://operations.osmfoundation.org/policies/nominatim/).
 
 Shared public Overpass instances are not a default ALFRED backend. The operator's
 [commons policy](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html)
-discourages that use. Published broad guidelines (~10,000 calls and 1 GB/day)
+discourages that use. `TRAVEL_OVERPASS_URL` must pass the same public HTTPS check
+as the transport; a plain HTTP or local instance reports invalid rather than
+configured. Published broad guidelines (~10,000 calls and 1 GB/day)
 are not a reserved quota or service guarantee. OSM data is global, unevenly
 mapped, and ODbL licensed. Arrange an authorized endpoint or self-host locally.
 
