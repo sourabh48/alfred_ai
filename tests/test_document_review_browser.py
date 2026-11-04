@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import tempfile
 import unittest
 from datetime import date, datetime, timezone
@@ -924,6 +925,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         except Exception as exc:
             notes.append(f"page source failed: {exc}")
 
+        browser_logs = []
         try:
             browser_logs = driver.get_log("browser")
             (artifact_dir / f"{stem}.browser.log").write_text(
@@ -945,6 +947,19 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
             metadata["title"] = driver.title
         except Exception as exc:
             metadata["notes"].append(f"metadata failed: {exc}")
+        # CI artifacts are hard to retrieve, so the job log also gets a short synthetic-data summary.
+        try:
+            calls = driver.execute_script(
+                "return performance.getEntriesByType('resource').filter(e=>e.name.includes('/api/'))"
+                ".map(e=>Math.round(e.startTime)+'+'+Math.round(e.duration)+'ms '+new URL(e.name).pathname)")
+            text = driver.execute_script("return (document.querySelector('main')||document.body).innerText.slice(0,1500)")
+        except Exception as exc:
+            calls, text = [], f"page summary failed: {exc}"
+        print(f"\nBROWSER FAILURE {self.id()} url={metadata['current_url']} "
+              f"open_server_requests={getattr(self, 'active_requests', 'n/a')}\n"
+              f"console: {[item.get('message') for item in browser_logs if item.get('level') == 'SEVERE']}\n"
+              f"completed api calls: {calls}\npage text: {text}\n", file=sys.stderr, flush=True)
+
         try:
             (artifact_dir / f"{stem}.json").write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
         except Exception:

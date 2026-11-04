@@ -37,6 +37,10 @@
   click fires. The test now waits for the cards. Failure capture also missed sub-test failures (which is why the `ca3a4f8`
   failure left no evidence); fixed in the document-review and user-data browser suites. The cloud-policy sub-test cause is
   still unknown; the next CI failure will now save its screenshot, page and console.
+- Master CI on `c6fba01`: one Selenium shard failed (`test_currency_source_cards_and_exact_decimal_formatting`, the AI insights
+  page's first load timed out). It is the third failure on that page's first load, and no server error was logged in the window.
+  Locally the page loads in under 2 s with Ollama down. The CI artifact could not be retrieved, so browser failures now also print
+  the URL, open server requests, console errors, completed API calls and page text into the job log (synthetic data only).
 - Next: exact-head master CI on the flake-fix commit (re-run only a failed flaky shard on the same SHA), then FAMILY-05.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
