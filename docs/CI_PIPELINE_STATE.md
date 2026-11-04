@@ -1,5 +1,23 @@
 # Development CI and integration pipeline
 
+## Consolidation to master — 2026-11-04
+
+State MERGED, POST_MERGE_VERIFYING. The owner asked for one tested batch to master.
+
+- PR #21, `security/runtime-11-dependencies` at `ca49831`, passed all six checks on that exact head and was merged into
+  development as `7ab0572`. CI there has no vulnerability scan or packaging job; those results are local only.
+- The batch added RUNTIME-06/09/15 hardening, BIKE-01/04, CAREER-03/06, COUNCIL-01, FAMILY-05/06/07, TRAVEL-02/23 with
+  verified booking links, the Windows signing tooling, the project dashboard and the Claude tooling. Older fix branches
+  were left out because the batch already holds newer versions of the same commits; all branches are kept in a local bundle.
+- Batch tree `192cf9d` (`f8a5ad2`, then `0defab2` with an identical tree): Chrome 156/156 with complete accounting, backend
+  2719 run, 0 failures, 196 skipped, no migration changes pending. Not rerun on the batch: SafeDisk backend, drills,
+  journeys, local AI and packaging.
+- `0defab2` was pushed to development and master as fast-forwards. Pages redeployed the docs Markdown only.
+- Post-merge CI on `0defab2`: preflight refused `apps/ml_engine/migrations/0005_adaptivemodelstate_artifact_evidence.py`
+  and `constraints/linux-py312.txt`, which the earlier pin did not cover. With the owner's approval both were reviewed:
+  the migration only adds an optional JSON field and reverses cleanly; the Linux lock scanned 145 packages with the same
+  single open advisory, diskcache PYSEC-2026-2447, and `torch +cpu` not resolvable. The pin now names `0defab2`.
+
 ## RUNTIME-11 security branch — 2026-11-04
 
 State COMMITTED_PUSHED/CI_PENDING after its push. Nothing here is a green claim. Base `development/alfred-integrated`
