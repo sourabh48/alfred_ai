@@ -196,12 +196,14 @@ def _family_growth_payload(user, baseline: dict) -> dict:
     evidence_freshness = freshness_snapshot(evidence)
 
     projections = []
-    for year in range(1, 11):
-        projected_value = current_net_worth * (1.08 ** year)
-        projections.append({
-            "year": year,
-            "projected_net_worth": round(projected_value, 2),
-        })
+    # Compounding a debt position would present deeper debt as growth.
+    if current_net_worth > 0:
+        for year in range(1, 11):
+            projected_value = current_net_worth * (1.08 ** year)
+            projections.append({
+                "year": year,
+                "projected_net_worth": round(projected_value, 2),
+            })
 
     grounding = {
         "history": {
@@ -246,7 +248,7 @@ def _family_growth_payload(user, baseline: dict) -> dict:
             "financial_baseline_scope": "accepted_family_financial_summary",
         },
         "growth_rate": 8.0,
-        "projection_basis": "heuristic_8_percent_compound_projection",
+        "projection_basis": "heuristic_8_percent_compound_projection" if projections else "unavailable_non_positive_net_worth",
         "financial_baseline": family_baseline,
         "own_financial_baseline": baseline,
         "family_financial_members": financial_summary["members"],
@@ -256,8 +258,9 @@ def _family_growth_payload(user, baseline: dict) -> dict:
         "insights": [
             f"Current family net worth from canonical balance sheet: INR {current_net_worth:,.0f}",
             f"Supporting {dependents.count()} dependents",
-            "Projection uses a simple 8% annual heuristic, not a guaranteed forecast",
-            "Consider increasing SIP investments for faster growth",
+            *(["Projection uses a simple 8% annual heuristic, not a guaranteed forecast",
+               "Consider increasing SIP investments for faster growth"] if projections
+              else ["No growth projection is shown until net worth is positive"]),
             "Emergency fund should cover 6 months of expenses",
         ],
     }

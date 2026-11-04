@@ -1,9 +1,11 @@
 from django.db.models import Count, Max, Sum
+from rest_framework import status
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
+from alfred_ai.services.api_errors import safe_error_response
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.models import Expense
 
@@ -35,8 +37,11 @@ def behavioral_fingerprint(request):
             builder=lambda: build_behavioral_fingerprint(request.user),
         )
         return Response(payload)
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
+    except Exception as exc:
+        return safe_error_response(
+            exc, "Behavioral fingerprint is temporarily unavailable. Please try again.",
+            logger_name=__name__, field="error", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(['GET'])
@@ -52,8 +57,11 @@ def behavioral_stress(request):
             builder=lambda: build_behavioral_stress(request.user),
         )
         return Response(payload)
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
+    except Exception as exc:
+        return safe_error_response(
+            exc, "Stress analysis is temporarily unavailable. Please try again.",
+            logger_name=__name__, field="error", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 def _behavioral_dashboard_revision(user) -> str:

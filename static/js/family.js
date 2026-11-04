@@ -34,16 +34,17 @@ function renderFamilyHero(growth) {
     const linkedAccounts = Number(growth.linked_family_account_count || 0);
     document.getElementById("familyHeroCopy").textContent = linkedAccounts
         ? `${Alfred.formatNumber(linkedAccounts, 0)} linked account${linkedAccounts === 1 ? "" : "s"} in family context`
-        : `Projected growth rate ${Alfred.formatNumber(growth.growth_rate || 0)}%`;
+        : (growth.projections || []).length ? `Projected growth rate ${Alfred.formatNumber(growth.growth_rate || 0)}%` : "No growth projection until net worth is positive";
 }
 
 function renderFamilySummary(dependents, growth) {
     const yearTen = (growth.projections || []).at(-1);
+    const sharedAccounts = Number(growth.linked_family_financial_account_count || 0);
     const cards = [
         { title: "Dependents", value: Alfred.formatNumber(growth.dependents_count || dependents.length, 0), copy: "Household members tracked" },
         { title: "Linked Accounts", value: Alfred.formatNumber(growth.linked_family_account_count || 0, 0), copy: "Accepted family links" },
-        { title: "Current Net Worth", value: Alfred.formatCurrency(growth.current_net_worth || 0), copy: "Assets minus active debt" },
-        { title: "10-Year Projection", value: Alfred.formatCurrency(yearTen?.projected_net_worth || 0), copy: "Projected household base in year 10" },
+        { title: "Current Net Worth", value: Alfred.formatCurrency(growth.current_net_worth || 0), copy: sharedAccounts ? `Assets minus active debt, including ${Alfred.formatNumber(sharedAccounts, 0)} consenting linked account${sharedAccounts === 1 ? "" : "s"}` : "Assets minus active debt" },
+        { title: "10-Year Projection", value: yearTen ? Alfred.formatCurrency(yearTen.projected_net_worth) : "N/A", copy: yearTen ? "Projected household base in year 10" : "Needs a positive net worth" },
     ];
 
     document.getElementById("familySummaryCards").innerHTML = cards.map(card => `

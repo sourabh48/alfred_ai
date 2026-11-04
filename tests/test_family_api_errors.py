@@ -15,7 +15,7 @@ from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import materialize_payload
-from apps.family.models import FamilyAccountLink
+from apps.family.models import Dependent, FamilyAccountLink
 from apps.family.views import _family_growth_revision
 from tests.test_family_account_links import _fresh_evidence
 
@@ -151,6 +151,36 @@ class FamilyApiErrorTests(TestCase):
         self.assertEqual(payload["current_net_worth"], 90000)
         self.assertEqual(len(payload["projections"]), 10)
         self.assertNotIn("error_id", payload)
+
+    def test_positive_net_worth_keeps_the_labelled_projection(self):
+        payload = self.client.get("/api/family/growth/").json()
+        self.assertEqual(payload["projections"][0]["projected_net_worth"], round(90000*1.08, 2))
+        self.assertEqual(payload["projection_basis"], "heuristic_8_percent_compound_projection")
+        self.assertTrue(any("not a guaranteed forecast" in line for line in payload["insights"]))
+
+    def test_debt_or_empty_position_is_not_compounded_as_growth(self):
+        for assets, liabilities in ((10000, 60000), (0, 0)):
+            with self.subTest(assets=assets, liabilities=liabilities):
+                cache.clear()
+                self.baseline.update(total_assets=assets, total_liabilities=liabilities, net_worth=assets - liabilities)
+                payload = self.client.get("/api/family/growth/").json()
+                self.assertEqual(payload["current_net_worth"], assets - liabilities)
+                self.assertEqual(payload["projections"], [])
+                self.assertEqual(payload["projection_basis"], "unavailable_non_positive_net_worth")
+                self.assertFalse(any("SIP" in line for line in payload["insights"]))
+                self.assertTrue(any("positive" in line for line in payload["insights"]))
+
+    def test_dependent_age_is_bounded_and_legacy_rows_stay_editable(self):
+        for age in (-1, 131, 99999999999):
+            response = self.client.post("/api/family/", json.dumps({"name": "Synthetic", "age": age, "relation": "Child"}), content_type="application/json")
+            self.assertEqual(response.status_code, 400)
+        response = self.client.post("/api/family/", json.dumps({"name": "Synthetic", "age": 130, "relation": "Child"}), content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        legacy = Dependent.objects.create(user=self.user, name="Legacy", age=500, relation="Other")
+        response = self.client.patch(f"/api/family/{legacy.pk}/", json.dumps({"name": "Renamed"}), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        legacy.refresh_from_db()
+        self.assertEqual((legacy.name, legacy.age), ("Renamed", 500))
 
     def test_reference_diagnostics_are_excluded_from_all_public_evidence(self):
         evidence = dict(_fresh_evidence("India Post"), notes=PRIVATE_TEXT, last_refresh_error=PRIVATE_TEXT)

@@ -222,6 +222,128 @@ class EmptySpendingWindowTests(TestCase):
         self.assertFalse(_build_derived_pressure_series(self.user)[0]["has_activity"])
 
 
+class BehavioralDateAlignmentTests(TestCase):
+    """FAMILY-06: a manual log only speaks for its own week, and only real outflow is pressure."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = get_user_model().objects.create_user("behavior_dates", password="Pass12345!", monthly_income=98000)
+        self.client.force_login(self.user)
+        patcher = patch("apps.behavioral.services.verified_intelligence.household_planning_context",
+                        return_value=_planning_context())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def debit(self, days_ago, amount=20000, category="loan", classification="loan", user=None):
+        Expense.objects.create(user=user or self.user, amount=amount, classification=classification, category=category,
+                               payment_mode="BANK", merchant="Synthetic", description="Synthetic", raw_description="Synthetic",
+                               transaction_date=timezone.localdate() - timedelta(days=days_ago), direction="debit", source="manual")
+
+    def log(self, days_ago, stress=8, sleep=7, work=8, user=None):
+        signal = BehavioralSignal.objects.create(user=user or self.user, stress_score=stress, sleep_hours=sleep, work_hours=work)
+        BehavioralSignal.objects.filter(pk=signal.pk).update(timestamp=timezone.now() - timedelta(days=days_ago))
+
+    def stress(self):
+        cache.clear()
+        response = self.client.get("/api/behavioral/stress/")
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def test_old_log_is_not_blended_with_this_weeks_spending(self):
+        self.debit(1)
+        self.log(70, stress=9)
+        payload = self.stress()
+        self.assertEqual(payload["current_stress"], _build_derived_pressure_series(self.user)[0]["score"])
+        self.assertEqual(payload["manual_signal_count"], 0)
+
+    def test_only_old_logs_is_no_current_data(self):
+        self.log(70, stress=9, sleep=3)
+        payload = self.stress()
+        self.assertEqual((payload["current_stress"], payload["weekly_data"]), (0, []))
+        self.assertEqual(self.client.get("/api/behavioral/fingerprint/").json()["fingerprint"], "No data")
+
+    def test_log_blends_with_the_spending_of_its_own_week(self):
+        self.debit(1)
+        self.debit(22)
+        self.log(22, stress=8)
+        scores = {index: item["score"] for index, item in enumerate(_build_derived_pressure_series(self.user)) if item["has_activity"]}
+        self.assertEqual(self.stress()["weekly_data"], [scores[0], round(8*0.65 + scores[3]*0.35, 2)])
+
+    def test_newest_log_represents_its_week(self):
+        self.log(3, stress=2)
+        self.log(1, stress=9)
+        self.assertEqual(self.stress()["weekly_data"], [9])
+
+    def test_labels_match_the_points_and_name_skipped_weeks(self):
+        self.debit(1)
+        self.debit(22)
+        today = timezone.localdate()
+
+        def label(index):
+            end = today - timedelta(days=index*7)
+            return f"{(end - timedelta(days=6)).strftime('%d %b')} - {end.strftime('%d %b')}"
+        payload = self.stress()
+        self.assertEqual(payload["weekly_labels"], [label(0), label(3)])
+        self.assertEqual(len(payload["weekly_labels"]), len(payload["weekly_data"]))
+
+    def test_message_says_when_latest_data_is_not_this_week(self):
+        self.debit(22)
+        payload = self.stress()
+        self.assertIn(f"Latest data is from {payload['weekly_labels'][0]}", payload["message"])
+        self.log(1)
+        self.assertNotIn("Latest data is from", self.stress()["message"])
+
+    def test_own_transfers_and_unreviewed_large_debits_are_not_pressure(self):
+        self.debit(1, category="transfer", classification="other")
+        self.debit(2, amount=60000, category="other", classification="other")
+        self.assertEqual(_build_derived_pressure_series(self.user), [])
+        self.debit(1)
+        self.assertEqual(_build_derived_pressure_series(self.user)[0]["outflow_total"], 20000)
+
+    def test_loan_category_counts_as_debt_like_canonical_treatment(self):
+        self.debit(1, category="loan", classification="other")
+        self.assertEqual(_build_derived_pressure_series(self.user)[0]["driver"], "Debt-servicing outflows dominated this period.")
+
+    def test_treatment_does_not_query_per_expense(self):
+        for days_ago in range(10):
+            self.debit(days_ago, amount=100, category="other", classification="other")
+        with self.assertNumQueries(1):
+            _build_derived_pressure_series(self.user)
+
+    def test_unset_sleep_is_not_a_low_sleep_warning(self):
+        self.log(1, stress=2, sleep=0, work=0)
+        self.assertFalse(any("Sleep recovery" in line for line in self.stress()["recommendations"]))
+
+    def test_recorded_low_sleep_still_warns_without_medical_certainty(self):
+        self.log(1, stress=2, sleep=4)
+        line = next(item for item in self.stress()["recommendations"] if "Sleep recovery" in item)
+        self.assertIn("may be", line)
+
+    def test_output_states_it_is_not_a_clinical_assessment(self):
+        self.log(1)
+        for path in ("/api/behavioral/stress/", "/api/behavioral/fingerprint/"):
+            self.assertIn("not a clinical", " ".join(self.client.get(path).json()["grounding"]["notes"]))
+
+    def test_other_accounts_logs_are_never_blended(self):
+        other = get_user_model().objects.create_user("behavior_dates_other", password="Pass12345!")
+        self.log(1, stress=9, sleep=3, user=other)
+        self.debit(1)
+        payload = self.stress()
+        self.assertEqual(payload["manual_signal_count"], 0)
+        self.assertEqual(payload["current_stress"], _build_derived_pressure_series(self.user)[0]["score"])
+
+    def test_failures_return_a_safe_reference_without_exception_text(self):
+        secret = "F:/synthetic-private/ledger.db"
+        for path, target in (("/api/behavioral/stress/", "build_behavioral_stress"),
+                             ("/api/behavioral/fingerprint/", "build_behavioral_fingerprint")):
+            with self.subTest(path=path), patch(f"apps.behavioral.views.{target}", side_effect=RuntimeError(secret)):
+                cache.clear()
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 500)
+                self.assertNotIn("synthetic-private", response.content.decode())
+                self.assertEqual(set(response.json()), {"error", "error_id"})
+
+
 def _planning_context():
     stale_after = (timezone.now() + timedelta(days=2)).isoformat()
     evidence = [

@@ -7,11 +7,14 @@ from statistics import mean
 from django.utils import timezone
 
 from apps.expenses.models import Expense
+from apps.expenses.services.cashflow_treatment import classify_cashflow
 from apps.expenses.services.financial_intelligence import DISCRETIONARY_CATEGORIES, build_financial_intelligence
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 
 from .models import BehavioralSignal
+
+STRESS_WINDOWS = 7
 
 
 def build_behavioral_fingerprint(user) -> dict:
@@ -109,6 +112,7 @@ def build_behavioral_stress(user) -> dict:
             "average_stress": 0,
             "trend": "Unknown",
             "weekly_data": [],
+            "weekly_labels": [],
             "message": "No stress data available",
             "recommendations": ["Log a few behavioral snapshots or import spending data to activate the stress advisor."],
             "pressure_map": [],
@@ -150,12 +154,16 @@ def build_behavioral_stress(user) -> dict:
         )
     else:
         message = "Derived from manual behavioral logs."
+    window_labels = linked["window_labels"]
+    if window_labels and window_labels[0] != _window_label(timezone.localdate(), 0):
+        message += f" Latest data is from {window_labels[0]}."
 
     return {
         "current_stress": round(combined_series[0] if combined_series else 0, 2),
         "average_stress": round(mean(combined_series), 2) if combined_series else 0,
         "trend": trend,
-        "weekly_data": combined_series[:7],
+        "weekly_data": combined_series[:STRESS_WINDOWS],
+        "weekly_labels": window_labels,
         "message": message,
         "recommendations": recommendations,
         "pressure_map": linked["pressure_map"],
@@ -191,7 +199,11 @@ def _behavioral_grounding(linked_data: dict, *, notes: list[str], planning_conte
         "freshness": freshness,
         "external_context": planning_context.get("payload", {}),
         "proof_contract": _behavioral_proof_contract(evidence, freshness),
-        "notes": [*notes, *planning_context.get("notes", [])],
+        "notes": [
+            *notes,
+            "Stress and pressure values are uncalibrated heuristics from your own records, not a clinical assessment or a prediction.",
+            *planning_context.get("notes", []),
+        ],
     }
 
 
@@ -206,19 +218,29 @@ def _behavioral_proof_contract(evidence: list[dict], freshness: dict) -> dict:
 
 def _build_linked_behavior_data(user) -> dict:
     intelligence = build_financial_intelligence(user)
-    manual_signal_objects = list(BehavioralSignal.objects.filter(user=user).order_by("-timestamp", "-id")[:7])
-    manual_series = [float(item.stress_score or 0) for item in manual_signal_objects]
+    today = timezone.localdate()
+    recent_signals = list(
+        BehavioralSignal.objects.filter(user=user, timestamp__date__gte=today - timedelta(days=(STRESS_WINDOWS * 7) - 1))
+        .order_by("-timestamp", "-id")
+    )
+    manual_signal_objects = recent_signals[:7]
+    manual_series = _manual_window_scores(recent_signals, today)
     derived_pressure = _build_derived_pressure_series(user)
     linked_transactions = int(intelligence["summary"].get("transactions") or 0)
     recurring_commitments = intelligence.get("recurring_commitments", []) or []
     spike_days = intelligence.get("spike_days", []) or []
     category_distribution = intelligence.get("charts", {}).get("category_labels", []) or []
-    has_behavior_data = bool(manual_series or linked_transactions or intelligence["loan_portfolio"]["active_loans"])
+    has_behavior_data = bool(recent_signals or linked_transactions or intelligence["loan_portfolio"]["active_loans"])
 
     return {
         "intelligence": intelligence,
         "manual_signal_objects": manual_signal_objects,
         "manual_series": manual_series,
+        "window_labels": [
+            _window_label(today, index)
+            for index in range(STRESS_WINDOWS)
+            if manual_series[index] is not None or (derived_pressure and derived_pressure[index]["has_activity"])
+        ],
         "derived_pressure_scores": [item["score"] if item["has_activity"] else None for item in derived_pressure],
         "derived_pressure": derived_pressure,
         "pressure_map": _build_pressure_map(intelligence, derived_pressure),
@@ -236,17 +258,37 @@ def _build_linked_behavior_data(user) -> dict:
     }
 
 
-def _build_derived_pressure_series(user, *, windows: int = 7) -> list[dict]:
+def _window_label(today, index: int) -> str:
+    window_end = today - timedelta(days=index * 7)
+    window_start = window_end - timedelta(days=6)
+    return f"{window_start.strftime('%d %b')} - {window_end.strftime('%d %b')}"
+
+
+def _manual_window_scores(signals: list[BehavioralSignal], today) -> list[float | None]:
+    """Newest log of each weekly window (signals arrive newest first), so a log only meets its own week's spending."""
+    scores = [None] * STRESS_WINDOWS
+    for signal in signals:
+        index = (today - timezone.localdate(signal.timestamp)).days // 7
+        if 0 <= index < STRESS_WINDOWS and scores[index] is None:
+            scores[index] = float(signal.stress_score or 0)
+    return scores
+
+
+def _build_derived_pressure_series(user, *, windows: int = STRESS_WINDOWS) -> list[dict]:
     today = timezone.localdate()
-    expenses = list(
-        Expense.objects.filter(
+    # Same outflow rule as the canonical baseline: own transfers and unreviewed debits are not spending.
+    expenses = [
+        item
+        for item in Expense.objects.filter(
             user=user,
             direction="debit",
             transaction_date__gte=today - timedelta(days=(windows * 7) + 6),
         )
-        .only("amount", "classification", "category", "merchant", "is_emotional", "transaction_date")
+        .only("amount", "direction", "classification", "category", "merchant", "description", "raw_description",
+              "counterparty", "company_name", "is_emotional", "transaction_date")
         .order_by("-transaction_date", "-id")
-    )
+        if classify_cashflow(item).counts_cashflow_outflow
+    ]
     if not expenses:
         return []
 
@@ -262,7 +304,7 @@ def _build_derived_pressure_series(user, *, windows: int = 7) -> list[dict]:
         if not window_items:
             window_payloads.append(
                 {
-                    "label": f"{window_start.strftime('%d %b')} - {window_end.strftime('%d %b')}",
+                    "label": _window_label(today, index),
                     "score": 0.0,
                     "driver": "No debit activity captured in this window.",
                 }
@@ -270,7 +312,7 @@ def _build_derived_pressure_series(user, *, windows: int = 7) -> list[dict]:
             continue
 
         outflow_total = sum(float(item.amount or 0) for item in window_items)
-        loan_total = sum(float(item.amount or 0) for item in window_items if item.classification == "loan")
+        loan_total = sum(float(item.amount or 0) for item in window_items if classify_cashflow(item).bucket == "loan")
         discretionary_total = sum(float(item.amount or 0) for item in window_items if item.category in DISCRETIONARY_CATEGORIES)
         emotional_count = sum(1 for item in window_items if item.is_emotional)
         merchant_counter = Counter(
@@ -280,7 +322,7 @@ def _build_derived_pressure_series(user, *, windows: int = 7) -> list[dict]:
         )
         window_payloads.append(
             {
-                "label": f"{window_start.strftime('%d %b')} - {window_end.strftime('%d %b')}",
+                "label": _window_label(today, index),
                 "outflow_total": outflow_total,
                 "loan_ratio": _safe_ratio(loan_total, outflow_total),
                 "discretionary_ratio": _safe_ratio(discretionary_total, outflow_total),
@@ -377,7 +419,7 @@ def _build_pressure_map(intelligence: dict, derived_pressure: list[dict]) -> lis
     ]
 
 
-def _build_combined_stress_series(*, manual_series: list[float], derived_scores: list[float | None], fallback_stress: float) -> list[float]:
+def _build_combined_stress_series(*, manual_series: list[float | None], derived_scores: list[float | None], fallback_stress: float) -> list[float]:
     series_length = max(len(manual_series), len(derived_scores))
     combined = []
     for index in range(series_length):
@@ -392,7 +434,7 @@ def _build_combined_stress_series(*, manual_series: list[float], derived_scores:
     return combined or [round(float(fallback_stress or 0) / 10, 2)]
 
 
-def _blend_current_stress(manual_series: list[float], derived_scores: list[float], fallback_stress: float) -> float:
+def _blend_current_stress(manual_series: list[float | None], derived_scores: list[float | None], fallback_stress: float) -> float:
     combined = _build_combined_stress_series(
         manual_series=manual_series,
         derived_scores=derived_scores,
@@ -440,14 +482,15 @@ def _derive_decision_style(*, summary: dict, behavior: dict, stress_level: float
 def _stress_recommendations_from_manual(signals: list[BehavioralSignal]) -> list[str]:
     if not signals:
         return []
-    avg_sleep = mean(float(item.sleep_hours or 0) for item in signals)
+    # The model default of 0 means "not logged", as in the Risk health score.
+    logged_sleep = [float(item.sleep_hours) for item in signals if item.sleep_hours > 0]
     avg_work = mean(float(item.work_hours or 0) for item in signals)
     avg_stress = mean(float(item.stress_score or 0) for item in signals)
     recommendations = []
     if avg_stress > 6:
         recommendations.append("Manual stress logs are elevated. Delay non-essential spending while pressure is high.")
-    if avg_sleep < 6:
-        recommendations.append("Sleep recovery is low in recent logs. Decision fatigue is likely affecting financial choices.")
+    if logged_sleep and mean(logged_sleep) < 6:
+        recommendations.append("Sleep recovery is low in recent logs. Decision fatigue may be affecting financial choices.")
     if avg_work > 10:
         recommendations.append("Workload is elevated. Protect a lower-pressure window before making financial commitments.")
     return recommendations
