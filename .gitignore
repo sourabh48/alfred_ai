@@ -129,6 +129,35 @@ config/*.env
 !config/*.env.example
 # Claude aliases here are absolute junctions into this machine's skill directory.
 /.claude/skills/
+# Session worktrees, personal settings and scheduler state are per machine.
+/.claude/worktrees/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# =========================
+# Local databases, backups and built packages
+# =========================
+# Any local database or dump can hold private records.
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.dump
+# Git bundles, archives and installers are backups or release outputs, never source.
+*.bundle
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+*.whl
+*.exe
+*.msi
+*.lnk
+# Office lock files and notebook checkpoints
+~$*
+.ipynb_checkpoints/
+*.egg-info/
 
 # Code-signing material and local signing configuration never enter the repository
 *.pfx
