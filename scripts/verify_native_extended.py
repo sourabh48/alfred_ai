@@ -93,7 +93,11 @@ def verify_extended(base, session, scenario, data, passed, *, user_count=12, wri
                 browser.get(f"{base}/{page}/")
                 wait.until(lambda driver: driver.execute_script("return document.readyState") == "complete")
                 if page == "dashboard":
-                    wait.until(lambda driver: "80,000" in driver.find_element(By.ID, "dashboardSummaryCards").text)
+                    try:
+                        wait.until(lambda driver: "80,000" in driver.find_element(By.ID, "dashboardSummaryCards").text)
+                    except Exception:
+                        _print_dashboard_failure(browser, Path(data), width)
+                        raise
                 # Audit the settled page, after entry fades have completed.
                 wait.until(lambda driver: driver.execute_script(
                     "return document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity)"
@@ -142,3 +146,24 @@ def verify_extended(base, session, scenario, data, passed, *, user_count=12, wri
     assert not serious, "Accessibility findings: see mobile-accessibility.json"
     passed("automated_wcag_audit", {"pages": len(pages), "page_names": pages, "widths": [390, 1440], "themes": ["light", "dark"], "serious_or_critical": 0,
                                    "scope": "Automated checks; manual screen-reader audit remains separate"})
+
+
+def _print_dashboard_failure(browser, data, width):
+    """CI-only evidence for a dashboard that never showed its totals; synthetic accounts only, ASCII for cp1252 logs."""
+    state = browser.execute_script("""
+        const text = id => (document.getElementById(id) || {}).innerText || "";
+        return {url: location.href, width: innerWidth, cards: text("dashboardSummaryCards"),
+                busy: (document.getElementById("dashboardRoot") || {dataset: {}}).dataset.pageBusy,
+                alerts: [...document.querySelectorAll(".alert")].map(item => item.innerText).join(" | "),
+                api: performance.getEntriesByType("resource").filter(item => item.name.includes("/api/"))
+                    .map(item => item.name.split("/api/")[1] + " " + Math.round(item.duration) + "ms " + item.responseStatus),
+                body: document.body.innerText.slice(0, 1500)};
+    """)
+    try:
+        console = [entry["message"] for entry in browser.get_log("browser") if entry.get("level") == "SEVERE"]
+    except Exception:
+        console = ["browser log unavailable"]
+    log = data / "artifacts" / "native" / "server.log"
+    tail = log.read_text(encoding="utf-8", errors="replace").splitlines()[-40:] if log.is_file() else []
+    report = json.dumps({"requested_width": width, **state, "console": console, "server_log_tail": tail}, indent=1)
+    print("DASHBOARD FAILURE " + report.encode("ascii", "backslashreplace").decode(), flush=True)

@@ -77,6 +77,11 @@
   "savings below 10%" flag, an income-inflated tone and strategy, and labels such as Steady Builder from those rates.
   Now withheld or recomputed without savings, and shown as "—". Two review rounds; 30 behavioral, 88 related backend and
   the Behavioral/Risk Chrome tests PASS. COMPLETE_VERIFIED for bounded scope; baseline 81/143.
+- Master CI on `0ab3485`: everything passed except native-windows, the same dashboard timeout as `fdf1a25`, so not a
+  flake. Locally the run logged 43 "Too Many Requests": the layout loop loads about 28 pages a minute on one account
+  (limit 120 API calls a minute), and each page now also checked the data version on load. The check is now exempt from
+  the API budgets (local count 15; the remainder predates this change), and a dashboard failure prints the page, API
+  calls, console errors and server log tail to the job log (synthetic data only).
 - Next: FAMILY-07.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)

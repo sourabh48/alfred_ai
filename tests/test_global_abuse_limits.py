@@ -81,6 +81,15 @@ class GlobalAbuseLimitTests(TestCase):
         self.assertEqual(response.status_code, 429)
         retry.assert_not_called()
 
+    def test_open_page_change_checks_do_not_use_the_account_api_budget(self):
+        self.client.force_login(self.user)
+        for _ in range(5):
+            self.assertEqual(self.client.get('/api/session/data-version/').status_code, 200)
+        # The API account limit here is 2: both real data requests still go through.
+        self.assertEqual(self.client.get('/api/family/').status_code, 200)
+        self.assertEqual(self.client.get('/api/family/').status_code, 200)
+        self.assertEqual(self.client.get('/api/family/').status_code, 429)
+
     def test_document_search_uses_existing_expensive_budget_before_parser_or_query(self):
         self.client.force_login(self.user)
         for kind in ('expense', 'loan', 'investment'):

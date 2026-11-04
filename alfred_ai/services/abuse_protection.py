@@ -29,7 +29,8 @@ class AbuseProtectionMiddleware(MiddlewareMixin):
         authenticated = request.user.is_authenticated
         if path == '/' and authenticated:
             login = False
-        api = authenticated and path.startswith('/api/')
+        # The open-page change check is a small cache read every 10 s per tab; it must not use up the owner's data budget.
+        api = authenticated and path.startswith('/api/') and path != '/api/session/data-version/'
         if not (login or signup or api):
             return None
         buckets = []
