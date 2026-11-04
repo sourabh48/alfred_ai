@@ -32,8 +32,11 @@ function loadRelationshipDashboard(options = {}) {
         });
 }
 
+// A withheld or missing alignment has no factors; its numeric 0 is not a measured score.
+const alignmentLabel = alignment => (alignment.factors || []).length ? `${Alfred.formatNumber(alignment.alignment_score || 0, 0)}%` : "—";
+
 function renderRelationshipHero(alignment) {
-    document.getElementById("relationshipScoreValue").textContent = `${Alfred.formatNumber(alignment.alignment_score || 0, 0)}%`;
+    document.getElementById("relationshipScoreValue").textContent = alignmentLabel(alignment);
     document.getElementById("relationshipCompatibilityValue").textContent = alignment.compatibility || "Unknown";
     document.getElementById("relationshipHeroCopy").textContent = alignment.message || "Relationship insights are active.";
 }
@@ -42,9 +45,9 @@ function renderRelationshipSummary(profiles, alignment) {
     const latest = profiles[0];
     const cards = [
         { title: "Profiles", value: Alfred.formatNumber(profiles.length, 0), copy: "Saved partner profiles" },
-        { title: "Alignment", value: `${Alfred.formatNumber(alignment.alignment_score || 0, 0)}%`, copy: alignment.compatibility || "Unknown" },
-        { title: "Partner Score", value: Alfred.formatNumber(latest?.partner_financial_score || 0, 0), copy: latest ? latest.partner_name : "No partner profile yet" },
-        { title: "Savings Habit", value: `${Alfred.formatNumber((latest?.partner_savings_habits || 0) * 20, 0)} / 100`, copy: "Converted from 1-5 habit score" },
+        { title: "Alignment", value: alignmentLabel(alignment), copy: alignment.compatibility || "Unknown" },
+        { title: "Partner Score", value: latest ? Alfred.formatNumber(latest.partner_financial_score || 0, 0) : "—", copy: latest ? latest.partner_name : "No partner profile yet" },
+        { title: "Savings Habit", value: latest ? `${Alfred.formatNumber((latest.partner_savings_habits || 0) * 20, 0)} / 100` : "—", copy: "Converted from 1-5 habit score" },
     ];
 
     document.getElementById("relationshipSummaryCards").innerHTML = cards.map(card => `
@@ -63,47 +66,21 @@ function renderRelationshipChart(profiles, alignment) {
         relationshipChart.destroy();
     }
 
-    const factorMap = Object.fromEntries((alignment.factors || []).map(item => [item.label, item.score]));
-    const partner = [
-        factorMap["Financial Alignment"] ?? 0,
-        factorMap["Savings Habit Fit"] ?? 0,
-        factorMap["Shared Resilience"] ?? 0,
-        alignment.alignment_score || 0,
-    ];
-    const baseline = [
-        alignment.alignment_score || 0,
-        factorMap["Savings Habit Fit"] ?? 0,
-        factorMap["Planning Pressure"] ?? 0,
-        80,
-    ];
-
+    // Plot only the factors that were scored; unavailable factors are listed in the message instead.
+    const factors = alignment.factors || [];
+    relationshipChart = null;
+    if (!factors.length) return;
     relationshipChart = new Chart(canvas, {
-        type: "radar",
+        type: "bar",
         data: {
-            labels: ["Financial", "Savings", "Compatibility", "Alignment"],
-            datasets: [
-                {
-                    label: "You",
-                    data: baseline,
-                    borderColor: "#1858d6",
-                    backgroundColor: "rgba(24, 88, 214, 0.14)",
-                },
-                {
-                    label: latest?.partner_name || "Partner",
-                    data: partner,
-                    borderColor: "#ff825c",
-                    backgroundColor: "rgba(255, 130, 92, 0.16)",
-                },
-            ],
+            labels: factors.map(item => item.label),
+            datasets: [{
+                label: latest?.partner_name ? `Alignment with ${latest.partner_name}` : "Alignment factors",
+                data: factors.map(item => item.score),
+                backgroundColor: "rgba(24, 88, 214, 0.45)",
+            }],
         },
-        options: {
-            scales: {
-                r: {
-                    suggestedMin: 0,
-                    suggestedMax: 100,
-                },
-            },
-        },
+        options: { indexAxis: "y", scales: { x: { min: 0, max: 100 } } },
     });
 }
 
@@ -132,7 +109,7 @@ function renderRelationshipGrounding(alignment) {
 
     metaTarget.innerHTML = [
         ["Monthly income", Number(history.monthly_income) > 0 ? Alfred.formatCurrency(history.monthly_income) : "Unavailable", "Household income basis"],
-        ["Monthly spend", Alfred.formatCurrency(history.monthly_expenses || 0), "Recent spend basis"],
+        ["Monthly spend", history.spend_observed ? Alfred.formatCurrency(history.monthly_expenses || 0) : "Unavailable", "Recent spend basis"],
         ["Fixed load", Alfred.formatCurrency(history.fixed_load || 0), "Rent plus EMI pressure"],
         ["Fresh evidence", Alfred.formatNumber(freshness.fresh_records || 0, 0), `${Alfred.formatNumber(freshness.tracked_records || 0, 0)} records tracked`],
     ].map(([label, value, copy]) => `
@@ -146,7 +123,7 @@ function renderRelationshipGrounding(alignment) {
     const details = [
         `Monthly EMI grounding: ${Alfred.formatCurrency(history.monthly_emi || 0)}`,
         `Debt pressure: ${Number(history.monthly_income) > 0 ? `${Alfred.formatNumber(history.debt_pressure || 0, 0)}/100` : "unavailable"}`,
-        `Savings rate: ${Number(history.monthly_income) > 0 ? `${Alfred.formatNumber(history.savings_rate || 0, 0)}%` : "unavailable"}`,
+        `Savings rate: ${history.spend_observed ? `${Alfred.formatNumber(history.savings_rate || 0, 0)}%` : "unavailable"}`,
         freshness.next_stale_after ? `Next evidence refresh due after ${Alfred.formatDateTime(freshness.next_stale_after)}` : "No external refresh deadline attached yet.",
         ...((grounding.notes || []).map(item => item)),
     ];

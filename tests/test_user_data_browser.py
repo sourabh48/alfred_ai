@@ -195,12 +195,36 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login(); self.browser.get(self.live_server_url + "/relationship/")
         self.wait.until(lambda _: 'withheld' in self.text('relationshipHeroCopy'))
         self.assertEqual(self.text('relationshipCompatibilityValue'), 'Unknown')
+        self.assertEqual(self.text('relationshipScoreValue'), '—')
+        self.assertIsNone(self.browser.execute_script("return Chart.getChart('relationshipRadar') || null"))
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#relationshipFactorCards article')), 0)
         self.assertEqual(self.browser.find_element(self.By.ID, 'partnerFinancialScore').get_attribute('max'), '100')
         self.wait.until(lambda _: 'Debt pressure' in self.browser.find_element(self.By.ID, 'relationshipGroundingList').get_attribute('textContent'))
         details = self.browser.find_element(self.By.ID, 'relationshipGroundingList').get_attribute('textContent')
         self.assertIn('Debt pressure: unavailable', details)
         self.assertIn('Savings rate: unavailable', details)
+
+    def test_relationship_page_plots_only_scored_factors_without_spend_history(self):
+        from apps.relationship.models import RelationshipProfile
+
+        user = self.scenario['user']
+        RelationshipProfile.objects.filter(user=user).delete()
+        RelationshipProfile.objects.create(user=user, partner_name='Synthetic', partner_financial_score=70,
+            partner_savings_habits=3, compatibility_score=75)
+        service = "apps.relationship.services.relationship_intelligence"
+        self.enterContext(patch(f"{service}.resolve_canonical_financial_baseline", return_value={
+            "monthly_income": 100000, "savings_rate": 100, "debt_burden_ratio": 10,
+            "metric_states": {"savings_capacity": {"status": "unavailable"}}}))
+        self.enterContext(patch(f"{service}.verified_intelligence.household_planning_context", return_value={
+            "payload": {"inflation": {"latest_value": 5.0}, "market": {"india_vix": 12.0}}, "evidence": [], "freshness": {}, "notes": []}))
+        self.login(); self.browser.get(self.live_server_url + "/relationship/")
+        self.wait.until(lambda _: 'Your spending history' in self.text('relationshipHeroCopy'))
+        labels = self.browser.execute_script("return Chart.getChart('relationshipRadar').data.labels")
+        self.assertEqual(labels, ['Shared Resilience', 'Planning Pressure'])
+        self.assertTrue(self.text('relationshipScoreValue').endswith('%'))
+        self.assertIn('Unavailable', self.browser.find_element(self.By.ID, 'relationshipGroundingMeta').get_attribute('textContent'))
+        self.assertIn('Savings rate: unavailable', self.browser.find_element(self.By.ID, 'relationshipGroundingList').get_attribute('textContent'))
+        self.capture('relationship-scored-factors-without-spend')
 
     def test_unconfirmed_income_is_flagged_until_the_owner_chooses_a_period(self):
         from datetime import timedelta

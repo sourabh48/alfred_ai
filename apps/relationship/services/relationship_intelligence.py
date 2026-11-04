@@ -65,14 +65,19 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
 
     # Fields default to 0 and absent evidence reads as 0, so neither may be scored as a measurement.
     income_known = monthly_income > 0
+    # Without recorded spending (e.g. a credit-only statement) the savings rate is income minus fixed load, not a measured habit.
+    savings_known = (income_known and recent_expense_total > 0
+                     and baseline.get("metric_states", {}).get("savings_capacity", {}).get("status", "unavailable") != "unavailable")
     partner_score = float(profile.partner_financial_score or 0)
     compatibility_input = float(profile.compatibility_score or 0)
     inflation_value = inflation_payload.get("latest_value")
     volatility_value = market_payload.get("india_vix")
-    planning_known = inflation_value is not None or volatility_value is not None
+    # Each source fails independently; a missing one must not be scored as zero pressure.
+    planning_known = inflation_value is not None and volatility_value is not None
     missing_inputs = [label for label, present in (
-        ("Your income", income_known), ("Partner financial score", bool(partner_score)),
-        ("Compatibility input", bool(compatibility_input)), ("External planning context", planning_known)) if not present]
+        ("Your income", income_known), ("Your spending history", savings_known or not income_known),
+        ("Partner financial score", bool(partner_score)), ("Compatibility input", bool(compatibility_input)),
+        ("Inflation context", inflation_value is not None), ("Market volatility context", volatility_value is not None)) if not present]
 
     baseline_financial_score = round(max(25.0, min(95.0, (savings_rate * 0.55) + (100.0 - debt_pressure) * 0.45)), 2)
     user_habit_score = max(20.0, min(100.0, savings_rate))
@@ -92,16 +97,17 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
     )
 
     factors = []
-    if income_known and partner_score:
+    if savings_known and partner_score:
         factors.append({"label": "Financial Alignment", "score": round(financial_alignment, 2), "weight": 0.32, "detail": "Partner score vs your current financial baseline."})
-    if income_known:
+    if savings_known:
         factors.append({"label": "Savings Habit Fit", "score": round(habit_alignment, 2), "weight": 0.23, "detail": "Partner savings habit vs your observed savings capacity."})
     if income_known and compatibility_input:
         factors.append({"label": "Shared Resilience", "score": round(shared_resilience, 2), "weight": 0.3, "detail": "Compatibility input blended with debt and fixed-load resilience."})
     if planning_known:
         factors.append({"label": "Planning Pressure", "score": round(planning_pressure, 2), "weight": 0.15, "detail": "Lower inflation and volatility support easier shared planning."})
 
-    if income_known:
+    scored = income_known and bool(factors)
+    if scored:
         weights = {"Financial Alignment": financial_alignment, "Savings Habit Fit": habit_alignment,
                    "Shared Resilience": shared_resilience, "Planning Pressure": planning_pressure}
         total_weight = sum(item["weight"] for item in factors)
@@ -124,7 +130,7 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
         alignment_score = heuristic_score
         model_note = "The score uses only bounded household-planning heuristics; a trained model is blended only when every input is present."
 
-    if not income_known:
+    if not scored:
         compatibility = "Unknown"
     elif alignment_score >= 80:
         compatibility = "Strong"
@@ -136,9 +142,9 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
         compatibility = "Fragile"
 
     insights = []
-    if income_known and partner_score:
+    if savings_known and partner_score:
         insights.append(f"Partner financial score is {partner_score:.0f} versus your current household baseline of {baseline_financial_score:.0f}.")
-    if income_known:
+    if savings_known:
         insights.append(f"Savings habit alignment is {habit_alignment:.0f}/100 after comparing partner habit score with your current savings rate.")
     if planning_known:
         insights.append(f"Shared planning pressure is {100.0 - planning_pressure:.0f}/100 after considering inflation and market volatility context.")
@@ -146,12 +152,16 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
         insights.append("Add your income so Alfred can compare household signals; no alignment is inferred without it.")
     elif debt_pressure >= 45:
         insights.append("Debt and fixed-load pressure are elevated, so large shared commitments should be staged more carefully.")
+    elif not savings_known:
+        insights.append("Add recent spending so Alfred can compare savings habits; fixed costs alone do not show what you save.")
     elif savings_rate >= 25:
         insights.append("Savings buffer is relatively healthy, which supports medium-term shared goals more safely.")
     else:
         insights.append("Savings runway is thin, so short-term affordability discussions matter more than long-horizon goals right now.")
-    if income_known:
+    if scored:
         message = f"Alignment is {compatibility.lower()} based on partner inputs, current household cash-flow pressure, and shared planning context."
+    elif income_known:
+        message = "Alignment is withheld until at least one household factor has data."
     else:
         message = "Alignment is withheld until your income is available."
     if income_known and missing_inputs:
@@ -163,14 +173,15 @@ def build_relationship_alignment(user) -> RelationshipAlignment:
             "compatibility": compatibility,
             "message": message,
             "insights": insights,
-            "coverage": {"status": "insufficient_data" if not income_known else ("partial" if missing_inputs else "observed"),
+            "coverage": {"status": "insufficient_data" if not scored else ("partial" if missing_inputs else "observed"),
                          "missing_inputs": missing_inputs},
             "financial_baseline": baseline,
-            "factors": factors if income_known else [],
+            "factors": factors if scored else [],
             "grounding": {
                 "history": {
                     "monthly_income": round(monthly_income, 2),
                     "monthly_expenses": round(recent_expense_total, 2),
+                    "spend_observed": savings_known,
                     "monthly_emi": round(monthly_emi, 2),
                     "fixed_load": round(fixed_load, 2),
                     "savings_rate": round(savings_rate, 2),

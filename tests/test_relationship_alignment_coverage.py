@@ -21,12 +21,21 @@ def planning(inflation=5.0, vix=12.0):
 
 class RelationshipCoverageTests(TestCase):
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()  # The baseline is cached per user id, and ids repeat across rolled-back tests.
         self.user = get_user_model().objects.create_user("relationship_cover", password="synthetic-pass-123")
         self.profile = RelationshipProfile.objects.create(
             user=self.user, partner_name="Synthetic", partner_financial_score=70, partner_savings_habits=3, compatibility_score=75)
 
-    def set_income(self):
+    def set_income(self, spend=True):
         self.user.monthly_income = Decimal("100000.00"); self.user.save(update_fields=["monthly_income"])
+        if spend:
+            from datetime import timedelta
+            from django.utils import timezone
+            from apps.expenses.models import Expense
+            Expense.objects.create(user=self.user, amount=Decimal("40000.00"), classification="expense", category="utilities",
+                                   payment_mode="BANK", merchant="Synthetic utilities", description="", raw_description="",
+                                   transaction_date=timezone.localdate()-timedelta(days=20), direction="debit", source="manual")
 
     def alignment(self, context=None, model=None):
         with patch(f"{SERVICE}.verified_intelligence.household_planning_context", return_value=context or planning()), \
@@ -56,9 +65,55 @@ class RelationshipCoverageTests(TestCase):
         payload = self.alignment(context=planning(None, None))
         self.assertNotIn("Planning Pressure", [item["label"] for item in payload["factors"]])
         self.assertEqual(payload["coverage"]["status"], "partial")
-        self.assertIn("External planning context", payload["coverage"]["missing_inputs"])
+        self.assertIn("Inflation context", payload["coverage"]["missing_inputs"])
+        self.assertIn("Market volatility context", payload["coverage"]["missing_inputs"])
         self.assertFalse(any("Shared planning pressure" in line for line in payload["insights"]))
         self.assertLess(payload["alignment_score"], complete["alignment_score"] + 15)
+
+    def test_missing_spend_history_is_not_a_full_savings_rate(self):
+        # Income with no recorded spending previously scored a 100% savings rate as observed.
+        self.set_income(spend=False)
+        payload = self.alignment()
+        labels = [item["label"] for item in payload["factors"]]
+        self.assertNotIn("Savings Habit Fit", labels)
+        self.assertNotIn("Financial Alignment", labels)
+        self.assertEqual(payload["coverage"]["status"], "partial")
+        self.assertIn("Your spending history", payload["coverage"]["missing_inputs"])
+        self.assertFalse(any("Savings buffer" in line or "Savings habit alignment" in line for line in payload["insights"]))
+        self.assertFalse(payload["grounding"]["history"]["spend_observed"])
+        self.assertEqual(self.alignment(model=99.0)["alignment_score"], payload["alignment_score"])
+
+    def test_credit_only_history_is_not_observed_spending(self):
+        # A statement with only salary credits creates a month of records but no measured spending.
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.expenses.models import Expense
+        self.set_income(spend=False)
+        Expense.objects.create(user=self.user, amount=Decimal("100000.00"), classification="income", category="salary",
+                               payment_mode="BANK", merchant="Synthetic salary", description="", raw_description="",
+                               transaction_date=timezone.localdate()-timedelta(days=20), direction="credit", source="manual")
+        payload = self.alignment()
+        self.assertNotIn("Savings Habit Fit", [item["label"] for item in payload["factors"]])
+        self.assertIn("Your spending history", payload["coverage"]["missing_inputs"])
+        self.assertFalse(payload["grounding"]["history"]["spend_observed"])
+
+    def test_one_planning_source_is_not_scored_as_zero_for_the_other(self):
+        # A missing inflation feed previously counted as 0% inflation and lowered planning pressure.
+        self.set_income()
+        for context, missing in ((planning(None, 15.0), "Inflation context"), (planning(5.0, None), "Market volatility context")):
+            with self.subTest(missing=missing):
+                payload = self.alignment(context=context)
+                self.assertNotIn("Planning Pressure", [item["label"] for item in payload["factors"]])
+                self.assertEqual(payload["coverage"]["missing_inputs"], [missing])
+                self.assertFalse(any("Shared planning pressure" in line for line in payload["insights"]))
+
+    def test_no_scored_factor_withholds_alignment(self):
+        self.set_income(spend=False)
+        RelationshipProfile.objects.filter(pk=self.profile.pk).update(partner_financial_score=0, compatibility_score=0)
+        payload = self.alignment(context=planning(None, None))
+        self.assertEqual((payload["compatibility"], payload["alignment_score"], payload["factors"]), ("Unknown", 0, []))
+        self.assertEqual(payload["coverage"]["status"], "insufficient_data")
+        self.assertIn("withheld", payload["message"])
 
     def test_unset_partner_inputs_are_not_measured_zero(self):
         self.set_income()

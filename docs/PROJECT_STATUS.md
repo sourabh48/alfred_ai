@@ -785,9 +785,9 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 - **PR/CI:** Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 - **Current task:** Local consolidation preparation is validated on preparation/alfred-consolidation-20261026; required reviews and PR19 CI still block canonical integration. Preserve 143 original IDs/75 verified and 13 extensions/0 accepted. See CONSOLIDATION_STATE for sources, conflict decisions and receipts. Stage7 selection is not reached.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 79/143 (55.2%) verified.**
+**Baseline: 80/143 (55.9%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 79
+IMPLEMENTED_NOT_ACCEPTED: 19 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 80
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -802,7 +802,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | AI | 11 | 18 | 61.1 | 3 | 2 | 2 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 0 | 3 | 0 | 0 | 0 |
 | TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
-| FAMILY | 4 | 7 | 57.1 | 3 | 0 | 0 | 0 | 0 |
+| FAMILY | 5 | 7 | 71.4 | 2 | 0 | 0 | 0 | 0 |
 | BIKE | 2 | 6 | 33.3 | 2 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
@@ -2880,16 +2880,17 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FAMILY-05 — Relationship alignment and family growth
 
-**IMPLEMENTED_NOT_ACCEPTED** · Family, relationships and risk · P2.
+**COMPLETE_VERIFIED** · Family, relationships and risk · P2.
 
 - Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py), [apps/family/views.py](../apps/family/views.py), [apps/relationship/services/relationship_intelligence.py](../apps/relationship/services/relationship_intelligence.py).
 - APIs/UI/models: /family/; family relationship/financial-sharing APIs; Dependent, FamilyAccountLink; owner-scoped financial baseline.
-- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py), [tests/test_investment_and_relationship_advisory.py](../tests/test_investment_and_relationship_advisory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py), [tests/test_investment_and_relationship_advisory.py](../tests/test_investment_and_relationship_advisory.py), [alignment coverage](../tests/test_relationship_alignment_coverage.py), [browser](../tests/test_user_data_browser.py). **122 related backend and 5 actual Chrome PASS** (2026-11-04, master), zero skips.
+- Acceptance: TECHNICAL_PASS on synthetic data. Alignment scores only factors with data and names the rest; it abstains without income or when no factor has data; partner-family financial totals include only members who opted in, summed as Decimal; growth is projected only for positive net worth and labelled as an 8% heuristic. Two independent review rounds. Real household outcomes, partner-reported inputs and a normal existing account are not evaluated.
 - Bounded unit 2026-10-31 (source/test only, branch `batch/fast-dev-20261031`): reproduced a "Good 72.57" verdict with no income, a perfect Planning score when external context was absent, unset partner fields scored as measured zero, and API acceptance of out-of-range values (NaN caused a server error). Alignment now abstains without income, drops and reweights unavailable factors with the original weights, blends the model only on complete inputs, and reports coverage; new API writes are bounded and finite while legacy records stay readable and unrewritten; the chart no longer invents fallback values. 46 related backend and one new actual Chrome PASS, zero skips. Complete inputs keep the existing formula; no schema change.
 - Bounded unit 2026-11-02 (source/test only, branch `claude/family-05-07-0247d4`, cut from `1d9df25` before RUNTIME-11's dependency upgrades; no Chrome or full regression run): reproduced a debt position compounding at 8% as "growth" and unbounded dependent ages. Net worth at or below zero now shows no projection and says why; new dependent ages are limited to 0-130 while legacy rows stay readable and editable; the Net Worth card names how many consenting linked accounts it includes. Positive net worth keeps the existing projection. No schema change.
-- Limitations/dependencies: Grounded inputs plus bounded model blend; 8% family projection is already labelled heuristic, not guaranteed. An unset partner savings habit reads as the default 3 and is not listed as missing. A partner score or compatibility input of exactly 0 is treated as not provided. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Evaluate outcomes rather than reopen an already-labelled assumption.
+- Bounded unit 2026-11-04 (master): a review found a 100% savings rate scored as observed when income had no recorded spending (including credit-only statements), one missing planning feed scored as zero inflation or volatility, and a page radar with a hard-coded 80 and values on the wrong axes, a withheld score shown as 0%, and missing spend shown as INR 0. Savings-based factors now need recorded spending, planning pressure needs both feeds, the page plots only scored factors and shows "—"/"Unavailable", and family totals sum as Decimal. Each new backend test fails on the previous code.
+- Limitations/dependencies: Grounded inputs plus bounded model blend; 8% family projection is already labelled heuristic, not guaranteed. An unset partner savings habit reads as the default 3 and is not listed as missing. A partner score or compatibility input of exactly 0 is treated as not provided. "Recent" spending is the canonical baseline's last three months with records, not months relative to today, so an old history still counts. A linked member's shared summary can be up to 60 seconds stale after non-API writes. Existing owner/session controls.
+- Next: Evaluate outcomes with the owner's real household data rather than reopen an already-labelled assumption.
 
 ### FAMILY-06 — Behavioral signals and personalization
 

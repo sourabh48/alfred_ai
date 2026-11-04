@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -272,13 +273,8 @@ def _family_financial_summary(user, *, own_baseline: dict) -> dict:
         item.id: item
         for item in user_model.objects.filter(id__in=family_financial_user_ids(user)).order_by("id")
     }
-    totals = {
-        "monthly_income": 0.0,
-        "savings_capacity": 0.0,
-        "total_assets": 0.0,
-        "total_liabilities": 0.0,
-        "net_worth": 0.0,
-    }
+    # Canonical money is summed as Decimal; each member value is already rounded to paise.
+    totals = dict.fromkeys(("monthly_income", "savings_capacity", "total_assets", "total_liabilities", "net_worth"), Decimal("0"))
     members = []
     income_unverified_members = 0
 
@@ -295,17 +291,17 @@ def _family_financial_summary(user, *, own_baseline: dict) -> dict:
         members.append(member_summary)
         income_unverified_members += bool(member_baseline.get("income_basis_needs_confirmation"))
         for key in totals:
-            totals[key] += float(member_summary.get(key, 0) or 0)
+            totals[key] += Decimal(str(member_summary.get(key, 0) or 0))
 
     family_baseline = {
         "scope": "accepted_family_financial_summary",
         "member_count": len(members),
         "income_unverified_member_count": income_unverified_members,
-        "monthly_income": round(totals["monthly_income"], 2),
-        "savings_capacity": round(totals["savings_capacity"], 2),
-        "total_assets": round(totals["total_assets"], 2),
-        "total_liabilities": round(totals["total_liabilities"], 2),
-        "net_worth": round(totals["total_assets"] - totals["total_liabilities"], 2),
+        "monthly_income": float(totals["monthly_income"]),
+        "savings_capacity": float(totals["savings_capacity"]),
+        "total_assets": float(totals["total_assets"]),
+        "total_liabilities": float(totals["total_liabilities"]),
+        "net_worth": float(totals["total_assets"] - totals["total_liabilities"]),
     }
     return {
         "family_financial_baseline": family_baseline,

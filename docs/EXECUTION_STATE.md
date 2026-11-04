@@ -44,7 +44,12 @@
 - Master CI on `4baff42`: two Selenium shards crashed. The new summary also printed for tests that capture evidence on
   purpose, and a rupee sign in the page text broke the runner's cp1252 console. Now printed only on failure, ASCII only.
   The Pages deploy timed out on GitHub's side ("updating_pages" for 10 minutes); nothing in the build failed.
-- Next: exact-head master CI on the flake-fix commit (re-run only a failed flaky shard on the same SHA), then FAMILY-05.
+- Master CI on `45a5336`: every check passed (3 Selenium shards, native Windows, Linux, Pages) on that exact SHA. The AI
+  insights first-load flake did not recur; its cause is still unknown, and the next failure will print evidence to the log.
+- FAMILY-05 (same day): two review rounds. A 100% savings rate was scored as observed with no recorded spending, one
+  missing planning feed counted as zero, the page radar plotted a hard-coded 80, and family totals summed as float. Fixed;
+  122 backend and 5 Chrome PASS. COMPLETE_VERIFIED for bounded scope; baseline 80/143.
+- Next: exact-head master CI on the FAMILY-05 commit, then the next queue item.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
