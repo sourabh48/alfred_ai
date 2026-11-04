@@ -41,6 +41,9 @@
   page's first load timed out). It is the third failure on that page's first load, and no server error was logged in the window.
   Locally the page loads in under 2 s with Ollama down. The CI artifact could not be retrieved, so browser failures now also print
   the URL, open server requests, console errors, completed API calls and page text into the job log (synthetic data only).
+- Master CI on `4baff42`: two Selenium shards crashed. The new summary also printed for tests that capture evidence on
+  purpose, and a rupee sign in the page text broke the runner's cp1252 console. Now printed only on failure, ASCII only.
+  The Pages deploy timed out on GitHub's side ("updating_pages" for 10 minutes); nothing in the build failed.
 - Next: exact-head master CI on the flake-fix commit (re-run only a failed flaky shard on the same SHA), then FAMILY-05.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)

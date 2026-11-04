@@ -79,7 +79,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def tearDown(self):
         result = getattr(getattr(self, "_outcome", None), "result", None)
         if result and any(self in (test, getattr(test, "test_case", None)) for test, _ in result.failures + result.errors):  # Sub-test failures are recorded under the sub-test.
-            browser_support.DocumentReviewBrowserTests._capture_browser_artifacts(self, self.browser)
+            browser_support.DocumentReviewBrowserTests._capture_browser_artifacts(self, self.browser, failed=True)
         self.browser.get("about:blank")
         # Drain real live-server requests before TransactionTestCase flushes
         # users and sessions; navigation can abort a fetch while its server

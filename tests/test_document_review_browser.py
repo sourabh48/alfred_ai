@@ -256,7 +256,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
     def tearDown(self):
         result = getattr(getattr(self, "_outcome", None), "result", None)
         if result and any(self in (test, getattr(test, "test_case", None)) for test, _ in result.failures + result.errors):  # Sub-test failures are recorded under the sub-test.
-            self._capture_browser_artifacts()
+            self._capture_browser_artifacts(failed=True)
         self._disable_live_refresh_timers()
         self._park_browser_between_tests()
         super().tearDown()
@@ -900,7 +900,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         element.clear()
         element.send_keys(value)
 
-    def _capture_browser_artifacts(self, driver=None):
+    def _capture_browser_artifacts(self, driver=None, failed=False):
         driver = driver or getattr(self, "selenium", None)
         if not driver:
             return
@@ -947,7 +947,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
             metadata["title"] = driver.title
         except Exception as exc:
             metadata["notes"].append(f"metadata failed: {exc}")
-        # CI artifacts are hard to retrieve, so the job log also gets a short synthetic-data summary.
+        # CI artifacts are hard to retrieve, so a failure also logs a short synthetic-data summary.
         try:
             calls = driver.execute_script(
                 "return performance.getEntriesByType('resource').filter(e=>e.name.includes('/api/'))"
@@ -955,10 +955,12 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
             text = driver.execute_script("return (document.querySelector('main')||document.body).innerText.slice(0,1500)")
         except Exception as exc:
             calls, text = [], f"page summary failed: {exc}"
-        print(f"\nBROWSER FAILURE {self.id()} url={metadata['current_url']} "
+        summary = (f"\nBROWSER FAILURE {self.id()} url={metadata['current_url']} "
               f"open_server_requests={getattr(self, 'active_requests', 'n/a')}\n"
               f"console: {[item.get('message') for item in browser_logs if item.get('level') == 'SEVERE']}\n"
-              f"completed api calls: {calls}\npage text: {text}\n", file=sys.stderr, flush=True)
+              f"completed api calls: {calls}\npage text: {text}\n")
+        if failed:  # ASCII only: the CI runner echoes output through a cp1252 console.
+            print(summary.encode("ascii", "backslashreplace").decode(), file=sys.stderr, flush=True)
 
         try:
             (artifact_dir / f"{stem}.json").write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
