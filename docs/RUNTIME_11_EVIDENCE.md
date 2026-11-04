@@ -1,4 +1,4 @@
-# RUNTIME-11 evidence — 2026-11-01
+# RUNTIME-11 evidence — 2026-11-04
 
 Status: IMPLEMENTED_NOT_ACCEPTED. Baseline 75/143 and extensions 0/13 are unchanged. The residual risk below is
 documented, not formally accepted. That needs a separate owner decision.
@@ -7,12 +7,12 @@ Which commit each result belongs to:
 
 | Commit | Change | Results that apply |
 |---|---|---|
-| `d2a9601` | Last product change, and the source of the package | Scan, drills, local AI, journeys, backend, package, installer |
-| `338ad27` | Test-only, from `d2a9601` | Chrome, CI preflight |
+| `d2a9601` | First mitigation, earlier package | Results kept below for history, marked with that commit |
+| `297e180` | Last product change, and the source of the current package | Scan, drills, local AI, journeys, Chrome, backend, package, installer |
 
-The final commit adds only this evidence and tracker text. The diff from `d2a9601` to `338ad27` is
-`tests/test_user_data_browser.py` only, and tests are not packaged. A green check applies only to its exact commit, so
-exact-head CI still decides.
+`0b42291`, `e46f4f9` and `297e180` changed product code after the review (see Independent review). `7bb90e9` and
+`b1fcc92` are test-only. The final commit adds only this evidence and tracker text. A green check applies only to its
+exact commit, so exact-head CI still decides.
 
 ## Dependencies
 
@@ -65,12 +65,49 @@ These stay open after the mitigation:
 - The storage lock covers one process, so separate processes creating the same new store at the same moment could collide.
   Rate limits run only in the web process.
 - `Cache.pull`, `peek` and `peekitem` loop on a planted row. ALFRED does not call them, and a test holds that true.
-- Other pickle paths, outside diskcache and not changed here:
+- Other pickle paths, outside diskcache:
   - `joblib.load` in `apps/ml_engine/inference_adapters/` and `apps/ml_engine/loaders/model_loader.py`.
   - Huey payloads in `artifacts/native/jobs.sqlite3`.
   - Backups restore both `ml_models` and that queue file.
   - `torch.load` uses `weights_only=True`.
-- No independent security review was done on this mitigation, only a self-review by the same AI harness.
+  - Since `0b42291`, startup refuses a queue file (`jobs.sqlite3`, `-wal`, `-shm`) or any model file that is not
+    private. It does not repair them. See the review below for what this leaves.
+
+## Independent review
+
+A separate read-only reviewer, not the author, reviewed `d2a9601` and then the fixes. It covered diskcache JSON
+integrity, the permission check race, multi-process creation, Huey and joblib pickle reachability and restored backups.
+
+Findings on `d2a9601`:
+
+- F1, Medium: the Huey queue and model files had no permission refusal, though both are read through pickle or joblib.
+  Fixed in `0b42291`.
+- F2, Low: a forged rate-limit row could raise on a huge number or block as long as a far-future time says. Fixed in
+  `0b42291` and `e46f4f9`.
+- F3, Low, residual: diskcache Settings rows can set cache attributes. Not fixed.
+- F4, Low, residual: restore accepts any key (`scripts/release_recovery.py:260`); a crafted backup with its own key
+  passes verification and is then unpickled. Not fixed.
+- F5, Low, residual: during the 30-second recheck window a junction or re-created folder also passes.
+
+Second pass on `e46f4f9` found two defects, both fixed in `297e180` with a test that fails on the old code:
+
+- D1: forged times slightly ahead of now still blocked forever. Times ahead of now are now ignored.
+- D2: SQLite creates and removes `-wal` and `-shm` while the startup check runs, which could refuse a healthy start. A
+  failed check is now repeated once, and a file that vanished passes.
+
+Residual after both passes, for the owner to decide on, not accepted:
+
+- R1: the queue and model check runs at startup only. A file loosened while running is refused at the next start.
+- R2: absolute `artifact_path` rows in the database are not checked (`training/quality.py:30`,
+  `inference_adapters/artifacts.py:13`, `projection_engine.py:200`).
+- R3: `-journal` is not checked; Huey uses WAL by default.
+- R4: scripts that skip the launcher's configuration skip the queue folder check.
+- One loose model file stops the app. This fails closed.
+- Moving the clock back more than one window gives one fresh quota. That needs administrator rights.
+- Anyone who can already write the private folders can still deny service.
+
+The reviewer could not read the installed package sources, so diskcache Settings mechanics and Huey startup order were
+reviewed from ALFRED code only.
 
 ## Compatibility, on `d2a9601`
 
@@ -80,6 +117,11 @@ These stay open after the mitigation:
 - Local AI with Ollama: 19/20. The other test is STALE_EVIDENCE, not a defect. Its held-out benchmark hashes all of
   `persistent_memory.py`, frozen 2026-10-19. Later changes there are vault tables, pruning and journal recovery, not
   scoring, and they predate RUNTIME-11. The hash was not edited. A new independent held-out set is needed to clear it.
+- Local AI on `297e180`: 13/20. The stale benchmark above fails as before. Six canonical tests time out: Ollama updated
+  itself to 0.40.14 on 2026-11-03, after the last passing run. It now loads models without memory mapping, and ALFRED
+  asks for a fresh load on every call, so each chat call passed the 30-second client limit (Ollama logged 500 at 30 s).
+  Embedding calls all answered. The timeout was not raised; this needs a decision on the Ollama setup, not a code change
+  here. Packaged memory drill on `297e180` with Ollama running: 35/35.
 - Drills: runtime 22, memory 34, backup, recovery and travel all pass.
 - Packaged: extended 23, memory 35, launcher, statement parsing and OCR 13/13.
 - Journeys: 89/89 and 13/13. A third set is 199/201. Its two failures are the Reports page answering 403 by design, and
@@ -87,8 +129,11 @@ These stay open after the mitigation:
 
 ## Regression
 
-- Chrome on `338ad27`: 156/156, shard accounting complete.
-- Backend on `d2a9601`: 2,521 run, 0 failures, 176 skipped. Through `SafeDisk`: the same counts.
+- Chrome on `297e180`: 156/156, shard accounting complete. Earlier: 156/156 on `b1fcc92` and `338ad27`.
+- Backend on `297e180`: 2,526 run, 0 failures, 176 skipped. Through `SafeDisk`: the same counts.
+- Since `b1fcc92` the browser tests run Chrome and Edge with reduced motion. Fades read as empty text and smooth
+  scrolling misplaced clicks, failing a different test each run. The trade-off: animations and smooth scrolling are no
+  longer exercised by these tests. The app's own reduced-motion rule is what now runs.
 - Chrome runs on earlier commits failed one or two tests each, a different set each time. No product change was needed for
   them apart from the 30-second recheck above:
   - Lost session: the live server shares one in-memory SQLite connection between threads, which the real runtime does not,
@@ -105,23 +150,30 @@ These stay open after the mitigation:
 
 ## Package and installer
 
-Built from `d2a9601` with the existing signed Inno Setup, on disposable folders and synthetic data. The owner's installed
+Built from `297e180` with the existing signed Inno Setup, on disposable folders and synthetic data. The owner's installed
 ALFRED was not modified.
 
-- `ALFRED-Setup.exe`: 449,204,998 bytes, SHA-256 `d725f6470fccdb83bb56d53df09b0b19186a3393683b835225e8591e42b95d99`.
-- `ALFRED-Windows-x64.zip`: 501,959,474 bytes, SHA-256 `1c9ca18ac56999da9b602acc2d116c719aabf2f825158b280c2a794d17ededea`.
-- Installer verifier 6/6 and lifecycle 37/37: failed install, refused and interrupted upgrade, upgrade while running,
-  rollback keeping later writes, uninstall keeping data, and reinstall.
+- `ALFRED-Setup.exe`: 449,202,204 bytes, SHA-256 `d520994d87468620f09d2809efa8cbc61cbc5f1bc0d90405625277174d79a925`.
+- `ALFRED-Windows-x64.zip`: 501,961,984 bytes, SHA-256 `6cb1cf3162733c3387f325176b912f17edff918c9e516b90ec356e9be5273253`.
+- Statement parsing and OCR from the packaged app: 13/13. Launcher: pass.
+- Smart App Control blocked the new unsigned `ALFRED.exe` and `ALFRED-Setup.exe` (`WinError 4551`) in the extended
+  drill, the installer verifier and the lifecycle test, so those did not run on `297e180`. It was not bypassed.
+- Last full installer results, on `d2a9601`: verifier 6/6 and lifecycle 37/37: failed install, refused and interrupted
+  upgrade, upgrade while running, rollback keeping later writes, uninstall keeping data, and reinstall. On `7bb90e9`,
+  the same package code as `297e180` except the D1 and D2 fixes: extended 23, memory 35, crypto 14/14,
+  verifier 6/6, lifecycle 37/37.
 - Finding: an upgrade interrupted by a locked file does not restore files already replaced, so the app will not start until
   Setup runs again. Data was unchanged, and rerunning Setup repaired it.
-- Finding: the installer is not code-signed. Windows Smart App Control blocked an earlier build (`4e140df`) twice, then
-  allowed the same file on a later attempt, and it allowed the `d2a9601` build first time. Other users may see the block.
-  Only Inno Setup itself is signed.
+- Finding: the installer is not code-signed. Windows Smart App Control blocked builds `4e140df` and `297e180`, and
+  allowed `d2a9601` and `7bb90e9`. Other users may see the block. Only Inno Setup itself is signed. The owner decided on
+  2026-11-04 not to buy a code-signing certificate, so the installers stay unsigned.
 - Operator databases had identical SHA-256 hashes, `integrity_check` ok and no foreign-key errors, before and after.
 
 PENDING: separate-user installation and a clean PC.
 
 ## Acceptance
 
-RUNTIME-11 stays unaccepted. Still needed: exact-head CI, an independent review, and the owner's decision on the residual
-risk.
+RUNTIME-11 stays unaccepted. The independent review is done and its defects are fixed. Still needed: exact-head PR CI,
+the owner's decision on the residual risk above, a fresh independent AI held-out benchmark, installer runs on
+`297e180` where Smart App Control allows them, separate-user installation and a clean PC. Installer signing stays
+declined by the owner.
