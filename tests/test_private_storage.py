@@ -1,6 +1,6 @@
 """Real Windows permission checks against disposable synthetic storage only."""
 import copy
-from contextlib import redirect_stdout
+from contextlib import closing, redirect_stdout
 import ctypes
 from ctypes import wintypes
 import os
@@ -8,6 +8,8 @@ import json
 import hashlib
 from io import StringIO
 from pathlib import Path
+import sqlite3
+import subprocess
 from tempfile import TemporaryDirectory
 import time
 from unittest import TestCase, skipUnless
@@ -15,9 +17,9 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 from alfred_private_storage import (
-    PrivateStorageUnavailable, acl_snapshot, apply_plan, current_sid,
-    permission_plan, private_directory, replace_acl, rollback_plan, verify_private,
-    main,
+    PrivateStorageUnavailable, acl_snapshot, apply_plan, current_sid, guard_sqlite_storage,
+    inspect_storage, network_drive, permission_plan, private_directory, replace_acl, rollback_plan,
+    safe_path, verify_private, main,
 )
 
 
@@ -205,6 +207,85 @@ class PrivateStorageTests(TestCase):
                     action(root)
             self.assertEqual(permission_plan(root), before)
             self.assertFalse((root / "config/native.env").exists())
+
+    def test_loosened_signing_key_is_refused_without_changing_it(self):
+        from alfred_ai.local_config import native_secret_file
+        with TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
+            root = private_directory(Path(directory))
+            secret = native_secret_file(root)
+            self.assertTrue(verify_private(secret))
+            content = secret.read_bytes()
+            self.assertEqual(native_secret_file(root), secret)
+            replace_acl(secret, f"D:P(A;;FA;;;{current_sid()})(A;;FA;;;SY)(A;;FR;;;AU)")
+            before = acl_snapshot(secret)
+            with self.assertRaises(PermissionError):
+                native_secret_file(root)
+            self.assertEqual(acl_snapshot(secret), before)
+            self.assertEqual(secret.read_bytes(), content)
+
+    def test_loosened_sqlite_side_file_is_refused_and_a_private_one_accepted(self):
+        with TemporaryDirectory() as directory:
+            root = private_directory(Path(directory))
+            database = root / "synthetic.sqlite3"
+            config = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": database}}
+            with closing(sqlite3.connect(database)) as connection, connection:
+                connection.execute("PRAGMA journal_mode=WAL")
+                connection.execute("CREATE TABLE synthetic(id INTEGER)")
+                # SQLite's own side files inherit the private folder.
+                self.assertTrue(database.with_name(database.name + "-wal").exists())
+                guard_sqlite_storage(config)
+            for suffix in ("-wal", "-shm", "-journal"):
+                side = database.with_name(database.name + suffix)
+                side.write_bytes(b"synthetic recent rows")
+                replace_acl(side, f"D:P(A;;FA;;;{current_sid()})(A;;FA;;;SY)(A;;FR;;;AU)")
+                before = acl_snapshot(side)
+                with self.subTest(suffix=suffix), self.assertRaises(PrivateStorageUnavailable):
+                    guard_sqlite_storage(config)
+                self.assertEqual(acl_snapshot(side), before)
+                side.unlink()
+            guard_sqlite_storage(config)
+
+    def test_mapped_network_drive_is_refused_before_anything_is_created(self):
+        with TemporaryDirectory() as directory:
+            target = Path(directory) / "fresh"
+            self.assertFalse(network_drive(target))
+            remote = {"GetDriveTypeW": lambda anchor: 4}
+            with patch("alfred_private_storage.windows", return_value=(None, SimpleNamespace(**remote))):
+                self.assertTrue(network_drive(target))
+                with self.assertRaises(PrivateStorageUnavailable):
+                    safe_path(target)
+            with patch("alfred_private_storage.network_drive", return_value=True):
+                with self.assertRaises(PrivateStorageUnavailable):
+                    private_directory(target)
+            self.assertFalse(target.exists())
+
+    def test_inspection_reports_permissions_without_changing_or_naming_private_files(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.unsafe_tree(root)
+            (root / "config/native.env").write_bytes(b"synthetic signing key")
+            (root / "synthetic-private-statement.pdf").write_bytes(b"synthetic")
+            outside = private_directory(root.parent / (root.name + "-outside"))
+            self.addCleanup(outside.rmdir)
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(root / "linked"), str(outside)], check=True, capture_output=True)
+            before = {path: (path.stat().st_mtime_ns, acl_snapshot(path)) for path in root.rglob("*") if path.name != "linked"}
+            with patch("sys.argv", ["alfred_private_storage.py", str(root), "--inspect"]), redirect_stdout(StringIO()) as output:
+                self.assertEqual(main(), 0)
+            report = json.loads(output.getvalue())
+            self.assertEqual(report["status"], "NEEDS_REPAIR")
+            self.assertEqual(report["sensitive"]["config/native.env"], "loose")
+            self.assertEqual(report["sensitive"]["db.sqlite3"], "absent")
+            self.assertEqual(report["counts"]["linked"], 1)
+            self.assertEqual(report["counts"]["private"], 0)
+            self.assertIn("S-1-5-11", report["outside_access_sids"])
+            self.assertNotIn("synthetic-private-statement", output.getvalue())
+            self.assertNotIn("key.fixture", output.getvalue())
+            self.assertEqual({path: (path.stat().st_mtime_ns, acl_snapshot(path)) for path in root.rglob("*") if path.name != "linked"}, before)
+            with patch("sys.argv", ["alfred_private_storage.py", str(root), "--inspect", "--apply"]), redirect_stdout(StringIO()) as output:
+                self.assertEqual(main(), 1)
+            private = private_directory(root.parent / (root.name + "-private"))
+            self.addCleanup(private.rmdir)
+            self.assertEqual(inspect_storage(private)["status"], "PRIVATE")
 
     def test_parser_and_ocr_temporary_data_are_private_before_worker_access(self):
         from alfred_ai.services import bounded_parser, document_extraction

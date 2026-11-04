@@ -1,5 +1,6 @@
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import tarfile
@@ -7,9 +8,10 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
+from alfred_private_storage import verify_private
 from scripts.local_stack_ops import (
-    OperationError, SERVICES, backup, digest, inspect_archive, restore_check,
-    validate_restore_name, verify, write_json,
+    Compose, OperationError, SERVICES, backup, digest, inspect_archive, read_env_file, restore_check,
+    ROOT, validate_restore_name, verify, write_json,
 )
 
 
@@ -78,6 +80,59 @@ class LocalStackOperationsTests(unittest.TestCase):
         manifest = json.loads(next(self.root.glob("*/manifest.json")).read_text())
         self.assertFalse(manifest["complete"])
         self.assertTrue(manifest["writers_resumed"])
+
+    def test_backup_folder_is_private_before_anything_is_written(self):
+        compose = Mock()
+        compose.status.return_value = {"postgres": {"State": "running"}}
+        compose.sql.return_value = "public.example|2\n"
+        observed = []
+
+        def run(*args, **kwargs):
+            observed.append(verify_private(Path(kwargs["output_file"].name).parent))
+            raise OperationError("synthetic dump failure")
+
+        compose.run.side_effect = run
+        with self.assertRaises(OperationError):
+            backup(compose, self.root / "backups")
+        self.assertEqual(observed, [True])
+
+    def exposure(self, *lines, **environment):
+        path = self.root / "local.env"
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        with patch.dict("os.environ", environment):
+            Compose(path).check_exposure()
+
+    def test_verification_refuses_published_secrets_wildcard_hosts_and_public_addresses(self):
+        example = read_env_file(ROOT / "config/local.env.example")
+        safe = ("DJANGO_SECRET_KEY=synthetic-long-random-key", "DB_PASSWORD=synthetic-long-random-password")
+        for lines in ((f"DJANGO_SECRET_KEY={example['DJANGO_SECRET_KEY']}", safe[1]),
+                      (safe[0], f'DB_PASSWORD="{example["DB_PASSWORD"]}"'),
+                      (*safe, "ALLOWED_HOSTS=localhost,*"),
+                      (*safe, "ALFRED_BIND_ADDRESS=0.0.0.0"),
+                      (*safe, "ALFRED_BIND_ADDRESS=::"),
+                      (*safe, "ALFRED_BIND_ADDRESS=8.8.8.8"),
+                      (*safe, "ALFRED_BIND_ADDRESS=alfred.example.com")):
+            with self.subTest(lines=lines), self.assertRaises(OperationError):
+                self.exposure(*lines)
+        with self.assertRaises(OperationError):
+            self.exposure(*safe, "ALFRED_BIND_ADDRESS=192.168.1.20", ALFRED_BIND_ADDRESS="0.0.0.0")
+
+    def test_verification_accepts_loopback_and_private_lan_addresses(self):
+        safe = ("DJANGO_SECRET_KEY=synthetic-long-random-key", "DB_PASSWORD=synthetic-long-random-password")
+        with patch.dict("os.environ"):
+            os.environ.pop("ALFRED_BIND_ADDRESS", None)
+            self.exposure(*safe)
+            for address in ("127.0.0.1", "192.168.1.20", "10.0.0.5", "fd00::5"):
+                with self.subTest(address=address):
+                    self.exposure(*safe, f"ALFRED_BIND_ADDRESS={address}")
+
+    def test_exposure_failure_blocks_acceptance_and_leaks_no_value(self):
+        compose = Mock()
+        compose.check_exposure.side_effect = OperationError("Replace the example DB_PASSWORD in the local environment file")
+        summary = verify(compose, self.root / "proof.json")
+        self.assertFalse(summary["accepted"])
+        self.assertEqual(summary["blockers"], ["Replace the example DB_PASSWORD in the local environment file"])
+        compose.status.assert_not_called()
 
     def test_failed_restart_is_recorded_in_backup_manifest(self):
         compose = Mock()

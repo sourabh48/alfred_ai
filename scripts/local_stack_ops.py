@@ -7,17 +7,22 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from alfred_private_storage import PrivateStorageUnavailable, private_directory  # noqa: E402
+
 SERVICES = {"web", "worker", "beat", "postgres", "redis"}
 WRITERS = ("beat", "worker", "web")
 ARCHIVE_ROOTS = {"media", "ml_models", "artifacts"}
@@ -49,6 +54,12 @@ class OperationError(RuntimeError):
     pass
 
 
+def read_env_file(path):
+    rows = (line.split("=", 1) for line in Path(path).read_text(encoding="utf-8").splitlines()
+            if "=" in line and not line.lstrip().startswith("#"))
+    return {name.strip(): value.strip().strip("'\"") for name, value in rows}
+
+
 class Compose:
     def __init__(self, env_file=ROOT / "config/local.env"):
         self.env_file = Path(env_file).resolve()
@@ -74,6 +85,24 @@ class Compose:
         self.run("version")
         self.run("config", "--quiet")
         self.run("ps", timeout=30)  # daemon connection, without exposing config
+
+    def check_exposure(self):
+        """Compose checks none of this: refuse published secrets and any address beyond this host or LAN."""
+        values = read_env_file(self.env_file)
+        example = read_env_file(ROOT / "config/local.env.example")
+        for name in ("DJANGO_SECRET_KEY", "DB_PASSWORD"):
+            if values.get(name) == example[name]:
+                raise OperationError(f"Replace the example {name} in the local environment file")
+        if "*" in values.get("ALLOWED_HOSTS", "").split(","):
+            raise OperationError("ALLOWED_HOSTS must name this host instead of using a wildcard")
+        # A variable in the shell overrides the file when Compose fills in the published port.
+        bind = os.environ.get("ALFRED_BIND_ADDRESS") or values.get("ALFRED_BIND_ADDRESS") or "127.0.0.1"
+        try:
+            address = ipaddress.ip_address(bind)
+        except ValueError:
+            raise OperationError("ALFRED_BIND_ADDRESS must be this host's loopback or private LAN address") from None
+        if address.is_unspecified or not (address.is_loopback or address.is_private):
+            raise OperationError("ALFRED_BIND_ADDRESS must be this host's loopback or private LAN address")
 
     def status(self):
         raw = self.run("ps", "--all", "--format", "json").strip()
@@ -159,7 +188,8 @@ def backup(compose, output_root):
         raise OperationError("PostgreSQL must be running before backup")
     running_writers = [name for name in WRITERS if status.get(name, {}).get("State") == "running"]
     destination = Path(output_root).resolve() / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8])
-    destination.mkdir(parents=True, exist_ok=False)
+    # The dump and uploads are the whole private dataset; the checkout's own permissions may be open to other users.
+    private_directory(destination)
     summary = {"version": 1, "kind": "local_compose_backup", "generated_at_utc": utc_now(),
                "complete": False, "writers_paused": running_writers,
                "writers_resumed": not running_writers,
@@ -198,7 +228,7 @@ def restore_check(compose, backup_directory):
             raise OperationError(f"Backup checksum mismatch: {name}")
     # Reject unsafe or inconsistent file archives before creating any database.
     with tempfile.TemporaryDirectory(prefix="alfred-restore-files-") as destination:
-        files = inspect_archive(folder / "files.tar.gz", destination)
+        files = inspect_archive(folder / "files.tar.gz", private_directory(Path(destination)))
     if files != manifest["files"]:
         raise OperationError("Restored file manifest differs from the backup")
     compose.preflight()
@@ -245,6 +275,7 @@ def verify(compose, proof_path):
                              "isolated backup restore check", "sustained scheduled job outcomes"]}
     try:
         compose.preflight()
+        compose.check_exposure()
         summary["services"] = compose.status()
         summary["checks"]["services_healthy"] = all(
             summary["services"].get(name, {}).get("State") == "running"
@@ -291,7 +322,7 @@ def main():
             result = restore_check(compose, args.backup_directory)
         print(json.dumps(result, indent=2))
         return 0 if result.get("accepted", result.get("complete", False)) else 1
-    except (OperationError, OSError, ValueError, tarfile.TarError, subprocess.TimeoutExpired) as exc:
+    except (OperationError, PrivateStorageUnavailable, OSError, ValueError, tarfile.TarError, subprocess.TimeoutExpired) as exc:
         print(json.dumps({"complete": False, "error": str(exc) if isinstance(exc, OperationError) else type(exc).__name__}))
         return 1
 

@@ -23,6 +23,13 @@ if (-not (Test-Path config\local.env)) {
 }
 ```
 
+The image runs as the non-root user `alfred` (UID 10001). A volume created by an
+older image is owned by root, so run this once after rebuilding:
+
+```powershell
+docker compose --env-file config/local.env -f docker-compose.local.yml run --rm --no-deps --user root --entrypoint chown web -R 10001:10001 /app/media /app/artifacts /app/staticfiles /app/ml_models
+```
+
 Edit `config/local.env` before using real data:
 
 - Replace `DJANGO_SECRET_KEY` and `DB_PASSWORD` with long random values.
@@ -97,7 +104,10 @@ statuses, applied migrations, Django checks, HTTP liveness, Redis, and worker
 response. It writes `artifacts/ops/local_stack_verification.json` on the host
 and exits with status 1 if validation fails. The command does not start or stop
 services or apply migrations. A missing Docker CLI, daemon, or environment file
-is recorded as a blocker.
+is recorded as a blocker. So are the example `DJANGO_SECRET_KEY` or
+`DB_PASSWORD`, a wildcard `ALLOWED_HOSTS`, and an `ALFRED_BIND_ADDRESS` that is
+not a loopback or private LAN address, such as `0.0.0.0`. The web service itself
+refuses to start with the example `DJANGO_SECRET_KEY`.
 
 An accepted result confirms the checks at that moment. Complete these separate
 operational checks before claiming recovery and sustained operation:
@@ -158,6 +168,13 @@ Do not use `down -v` unless you intend to delete this data.
 Use the paired PostgreSQL and file backup helper, followed by the isolated
 restore check in [Backup and restore](BACKUP_AND_RESTORE.md). A database-only
 dump omits retained media, trained models, and runtime artifacts.
+
+## What Compose does not include
+
+Local AI and private memory work only in the native Windows runtime. ALFRED calls
+Ollama at the fixed address `127.0.0.1:11434`, which inside a container is the
+container itself, and the private memory vault needs Windows user-bound key
+protection. Use the native runtime when you need them.
 
 ## Local access and secrets
 

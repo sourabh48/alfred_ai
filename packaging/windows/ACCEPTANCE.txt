@@ -5,7 +5,8 @@ ALFRED - separate Windows PC acceptance
 3. Run "Verify fresh install.cmd" and retain the evidence folder.
 4. Save your other work and restart Windows normally.
 5. Run "Verify after reboot.cmd" on the same PC and Windows account.
-6. Follow MANUAL_ACCEPTANCE.md and WINDOWS_ACCEPTANCE.md for the human checks.
+6. Follow MANUAL_ACCEPTANCE.md and WINDOWS_ACCEPTANCE.md for the human checks,
+   including the offline and local AI check.
 
 The checks create a synthetic account in a separate data directory. They do not
 use your normal account or restart Windows. Run both checks in the same calendar

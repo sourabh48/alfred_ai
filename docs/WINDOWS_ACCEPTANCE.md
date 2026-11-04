@@ -44,5 +44,17 @@ manual observations and a genuinely separate PC are needed to complete acceptanc
 Use [Human acceptance checks](MANUAL_ACCEPTANCE.md) to record Windows sign-in,
 screen-reader, keyboard and document observations.
 
+## Offline and local AI check
+
+Use the same synthetic test data folder. Record each result.
+
+1. While online, install Ollama and run `ollama pull all-minilm:latest` and
+   `ollama pull qwen3.5:4b`. `ollama list` must show both.
+2. Disconnect the PC from every network, then start ALFRED. It must open and sign
+   in, and an assistant question must get a local answer.
+3. Quit Ollama and ask again. ALFRED must keep working, report that the local model
+   is unavailable, and keep the draft. Restart Ollama and retry the draft.
+4. Reconnect the network only after recording these results.
+
 The local synthetic baseline contains a test password only. Do not use this
 script against an existing account or production data folder.

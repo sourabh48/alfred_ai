@@ -1,13 +1,18 @@
 """Boundary checks that do not require the long-running native integration drill."""
 import os
 import json
+import re
 import socket
 import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest import skipUnless
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase, override_settings
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.test import SimpleTestCase, TestCase, override_settings
 from alfred_ai.services.ocr_process import ocr_command
 from apps.integrations.models import _encrypt_token, _decrypt_token
 from alfred_native import InstanceLock, data_directory, parent_is_running, stop, write_json
@@ -15,7 +20,49 @@ from alfred_ai.services.native_web import create_native_server
 from scripts.verify_native_runtime import runtime_dashboard
 
 
+class OfflineStartupTests(TestCase):
+    @skipUnless(os.name == 'nt', 'The private memory vault requires Windows key protection')
+    def test_startup_maintenance_makes_no_connection_on_a_machine_without_network(self):
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        get_user_model().objects.create_user(username='synthetic-offline-owner')
+        with TemporaryDirectory(prefix='alfred-offline-synthetic-') as directory, \
+                override_settings(ALFRED_MEMORY_DIR=directory, ALFRED_MEMORY_SYNC_PROVIDER='', ALFRED_KNOWLEDGE_GIT_AUTHORIZED=False), \
+                patch.object(socket.socket, 'connect', side_effect=OSError('synthetic: no network')) as connect, \
+                patch('socket.getaddrinfo', side_effect=OSError('synthetic: no network')) as resolve:
+            # Runs once on a fresh folder and again once a memory vault exists.
+            for retained in (False, True):
+                if retained:
+                    MemoryStore(directory)
+                with self.subTest(retained=retained):
+                    call_command('prune_private_memory', verbosity=0)
+                    call_command('sync_private_memory', seconds=5, verbosity=0)
+                    call_command('checkpoint_knowledge_hub', seconds=2, verbosity=0)
+            connect.assert_not_called()
+            resolve.assert_not_called()
+
+    def test_pages_load_no_script_style_or_font_from_the_internet(self):
+        root = Path(__file__).resolve().parents[1]
+        remote = re.compile(r'''<(?:script|link)\b[^>]*\b(?:src|href)=["'](?:https?:)?//|url\(\s*["']?(?:https?:)?//|@import\s+["'](?:https?:)?//''', re.I)
+        found = [str(path.relative_to(root)) for pattern in ('templates/**/*.html', 'apps/*/templates/**/*.html', 'static/**/*.css')
+                 for path in root.glob(pattern) if remote.search(path.read_text(encoding='utf-8', errors='ignore'))]
+        self.assertEqual(found, [])
+
+    def test_operator_guides_name_the_models_the_code_requires(self):
+        from apps.ml_engine.services.local_embeddings import OllamaEmbeddings
+        root = Path(__file__).resolve().parents[1]
+        for guide in ('docs/NATIVE_WINDOWS.md', 'docs/WINDOWS_ACCEPTANCE.md', 'packaging/windows/READ ME.txt'):
+            text = (root / guide).read_text(encoding='utf-8')
+            for model in (OllamaEmbeddings.model, settings.ALFRED_MEMORY_OLLAMA_MODEL):
+                with self.subTest(guide=guide, model=model):
+                    self.assertIn(f'ollama pull {model}', text)
+
+
 class NativeRuntimeBoundaryTests(SimpleTestCase):
+    def test_listener_binds_this_computer_only(self):
+        with patch('alfred_ai.services.native_web.socket.socket') as listener, patch('waitress.create_server'):
+            create_native_server(lambda *_: [], 8123)
+        listener.return_value.bind.assert_called_once_with(('127.0.0.1', 8123))
+
     def test_native_travel_fence_rejects_external_dns_connect_and_local_ollama(self):
         import subprocess
         import sys
