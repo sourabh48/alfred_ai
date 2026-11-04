@@ -20,6 +20,13 @@ class OpenMeteoGeocoding(Provider):
             return ""
         return "" if os.getenv("TRAVEL_USE_MODE") == "personal_noncommercial" else "set_TRAVEL_USE_MODE_or_TRAVEL_OPEN_METEO_API_KEY"
 
+    def parameters(self, parameters):
+        # Rejected before query() logs a network call, so a bad name never uses budget or backs off the provider.
+        clean = super().parameters(parameters)
+        if self.category == "geocoding" and not public_place(clean.get("name")):
+            raise ProviderError("invalid_location")
+        return clean
+
     def fetch(self, p):
         name = public_place(p.get("name"))
         if not name:

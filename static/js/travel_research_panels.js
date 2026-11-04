@@ -30,7 +30,7 @@ window.TravelResearchPanels = (() => {
         return sites.length ? `<p class="small mb-1"><strong>Booking websites</strong> · ALFRED researches; you book on the site. These plain links send nothing from your trip. List reviewed ${esc(sites[0].reviewed_on)}; prices and availability are not checked.</p><ul class="travel-external-links">${sites.map(s=>`<li>${link(s.url,s.label)}</li>`).join("")}</ul><p class="small">Search links below put your destination in the web address and can add your dates, traveller count or start city. Open one only if you choose to share that with the site.</p>` : "";
     }
     function routeSources(d) {
-        const rows = [d.route_result,d.geocoding_result].filter(r=>r?.success);
+        const rows = [d.route_result,d.geocoding_result,d.origin_geocoding_result].filter(r=>r?.success);
         return rows.length ? `<h3 class="h5">Route and location sources</h3>${rows.map(provenance).join("")}` : "";
     }
     function weather(d) {

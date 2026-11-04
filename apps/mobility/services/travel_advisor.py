@@ -57,7 +57,7 @@ class TravelAdvisorService:
             "proof_contract": proof_contract_payload(
                 evidence_items=evidence,
                 freshness=evidence_freshness,
-                required_sources=["OpenStreetMap Nominatim"] if destination else [],
+                required_sources=["Open-Meteo / GeoNames, CC BY 4.0"] if destination else [],
                 advisory_surface="travel_advisor_preview",
             ),
         }
@@ -77,6 +77,8 @@ class TravelAdvisorService:
         try:
             weather = verified_intelligence.weather_snapshot(location["latitude"], location["longitude"], start_date, end_date)
             evidence.append(weather.evidence)
+            if not weather.payload:
+                return self._empty_weather()
             average_max = weather.payload.get("average_max_temp")
             average_min = weather.payload.get("average_min_temp")
             precipitation_total = weather.payload.get("precipitation_total")
@@ -88,7 +90,7 @@ class TravelAdvisorService:
             else:
                 summary = "Weather looks broadly manageable for a bike-led itinerary."
             return {
-                "status": "live",
+                "status": "cached" if weather.cached else "live",
                 "summary": summary,
                 "average_max_temp": average_max,
                 "average_min_temp": average_min,
@@ -111,7 +113,8 @@ class TravelAdvisorService:
     def _nearby_offbeat(self, destination: str, evidence: list[dict]) -> list[dict]:
         try:
             result = verified_intelligence.offbeat_suggestions(destination)
-            evidence.append(result.evidence)
+            if result.payload.get("results"):  # An empty, unsourced lookup is not evidence.
+                evidence.append(result.evidence)
             return result.payload.get("results", [])[:6]
         except Exception:
             return []

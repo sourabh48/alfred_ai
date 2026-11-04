@@ -125,16 +125,19 @@ def enrich_candidate(user, state, destination):
         results.append(result)
     coords = d.get("lat") is not None and d.get("lon") is not None
     origin = CITIES.get(str(value(state,"origin","")).casefold())
+    d.pop("origin_geocoding_result", None)
     if not origin and value(state,"origin"):
         geocoded = fetch(OpenMeteoGeocoding(),{"name":value(state,"origin")})
         results.append(geocoded)
+        d["origin_geocoding_result"] = geocoded.as_dict()  # Its attribution is shown with the route sources.
         matches = geocoded.payload.get("locations",[])
         if len(matches) == 1:
             origin = (matches[0]["lat"], matches[0]["lon"])
         elif matches:
             d["issues"].append("Starting city is ambiguous; include region/country before routing.")
     if coords and origin:
-        d["origin_location"] = {"name":value(state,"origin"),"lat":origin[0],"lon":origin[1]}
+        d["origin_location"] = {"name":value(state,"origin"),"lat":origin[0],"lon":origin[1],
+                                "freshness":d.get("origin_geocoding_result",{}).get("freshness","STATIC_REFERENCE")}
         km = approximate_road_km(value(state,"origin"), d, origin)
         d.update(distance_km=km, travel_hours=round(km/45+km/180*.3, 1),
                  distance_basis="Estimated one-way road distance from town centres; not a verified route.")

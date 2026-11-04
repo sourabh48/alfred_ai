@@ -18,7 +18,7 @@ def map_features(destination):
             "properties": {"name": f"Route {index+1}", "kind": "route", "selected": bool(item.get("route_id") and item["route_id"] == destination.get("selected_route_id")), "freshness": route.get("freshness", "UNKNOWN"), "expires_at":route.get("expires_at")}})
     if destination.get("origin_location"):
         origin = destination["origin_location"]
-        point(origin["name"],"origin",origin["lat"],origin["lon"],"STATIC_REFERENCE")
+        point(origin["name"],"origin",origin["lat"],origin["lon"],origin.get("freshness","STATIC_REFERENCE"))
     for result_key in ("places_result", "hotels_result"):
         result = destination.get(result_key, {})
         for item in result.get("payload", {}).get("places", result.get("payload", {}).get("options", [])):

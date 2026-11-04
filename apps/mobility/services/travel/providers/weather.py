@@ -17,6 +17,15 @@ class OpenMeteoWeather(OpenMeteoGeocoding):
     variables = ("temperature_2m_max", "temperature_2m_min", "precipitation_sum", "wind_speed_10m_max",
                  "weather_code", "sunrise", "sunset")
 
+    def parameters(self, parameters):
+        # Checked before query() logs a network call: an unforecastable window must not use budget or back off geocoding.
+        clean = super().parameters(parameters)
+        start, end = date.fromisoformat(clean["start_date"]), date.fromisoformat(clean["end_date"])
+        today = timezone.localdate()
+        if not today <= start <= end <= today+timedelta(days=15):
+            raise ProviderError("outside_forecast_window")
+        return clean
+
     def fetch(self, p):
         start, end = date.fromisoformat(p["start_date"]), date.fromisoformat(p["end_date"])
         today = timezone.localdate()

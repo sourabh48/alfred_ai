@@ -1,6 +1,6 @@
 # ALFRED execution state
 
-## Active checkpoint — CAREER-03, CAREER-06 and TRAVEL-02 (2026-11-04)
+## Active checkpoint — CAREER-03, CAREER-06, TRAVEL-02 and TRAVEL-23 (2026-11-04)
 
 - Work on `master` after the 2026-11-04 consolidation. Owner direction: one module at a time, only finished work is pushed
   to master; the development branch stays local.
@@ -23,7 +23,15 @@
 - TRAVEL-02 (same day): seven review findings fixed, then a second review found that broad "haven't been"/"new place"
   wording turned on the visited-place filter; narrowed to wording about places, and "familiar"/"revisit" turns it off.
   145 Travel backend and 11 Travel Chrome tests PASS; COMPLETE_VERIFIED for bounded scope; baseline 78/143.
-- Next: exact-head master CI on the TRAVEL-02 commit, then the next queue item.
+- Master CI on `8af9824`: all jobs passed except one Selenium shard (`test_investment_local_review_reminders_consent_reopen_lifecycle_and_privacy`,
+  wait timeout), which passes locally in 14 s. Three master runs in a row each failed one different browser test; `4f12c53`
+  before them was fully green. Recorded as CI-runner timing flakes; neither `323ab0f` nor `8af9824` is green.
+- TRAVEL-23 (same day): three review rounds. The older Travel advisor and the 6-hourly refresh bypassed budgets, terms
+  and attribution; now routed through the planner's `query()` with no second cache. Withdrawn terms stop cached data;
+  invalid lookups use no budget. Full backend 2733 run, 0 failed, 182 skipped; 12 Travel Chrome PASS. COMPLETE_VERIFIED
+  for bounded scope; baseline 79/143.
+- Next: exact-head master CI on the TRAVEL-23 commit (re-run only a failed flaky shard on the same SHA), then the next
+  queue item.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

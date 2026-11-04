@@ -32,9 +32,10 @@ def budget_status(provider, *, now=None):
     """Application budgets only; a provider's own plan quota is reported separately when exposed."""
     now = now or timezone.now()
     calls = TravelProviderRequest.objects.filter(provider=provider.name, network_call=True)
+    local = timezone.localtime(now)  # Day and month follow the owner's clock, like "calls today".
     starts = {"minute": now-timedelta(minutes=1), "hour": now-timedelta(hours=1),
-              "day": now.replace(hour=0, minute=0, second=0, microsecond=0),
-              "month": now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)}
+              "day": local.replace(hour=0, minute=0, second=0, microsecond=0),
+              "month": local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)}
     status = {}
     for period, limit in provider.limits.items():
         used = calls.filter(created_at__gte=starts[period]).count()
@@ -45,7 +46,7 @@ def budget_status(provider, *, now=None):
 def query(provider, parameters, *, force=False, cache_only=False):
     try:
         parameters = provider.parameters(parameters)
-    except (ValueError, TypeError, ProviderError):
+    except (ValueError, TypeError, KeyError, ProviderError):
         return ProviderResult(provider.name, provider.category, error="invalid_parameters")
     digest = hashlib.sha256((provider.cache_partition+json.dumps(parameters, sort_keys=True, allow_nan=False)).encode()).hexdigest()
     key = f"{provider.name}:{provider.category}:{provider.version}:{digest}"
@@ -56,6 +57,12 @@ def query(provider, parameters, *, force=False, cache_only=False):
             cache_key=key, parameters=parameters, status=status if len(status) <= 32 else "failed", network_call=network,
             latency_ms=latency, error=error)
 
+    # Withdrawn terms, use mode or configuration stop cached data too, not only new calls.
+    reason = provider.unavailable_reason()
+    if reason:
+        log("unavailable", error=reason)
+        return ProviderResult(provider.name, provider.category, request_parameters=parameters,
+            source_url=provider.source_url, attribution=provider.attribution, error=reason)
     if record and record.is_fresh and not force:
         log("cache_hit")
         return _cache_result(record)
@@ -73,9 +80,6 @@ def query(provider, parameters, *, force=False, cache_only=False):
             return _cache_result(record)
         return unavailable("refresh_not_requested")
 
-    reason = provider.unavailable_reason()
-    if reason:
-        return unavailable(reason)
     now = timezone.now()
     state, _ = TravelProviderState.objects.get_or_create(provider=provider.name)
     token = str(uuid4())
@@ -178,9 +182,9 @@ def cleanup_request_history(*, apply=False):
         raise ImproperlyConfigured("Invalid Travel request retention configuration.")
     now = timezone.now()
     cutoff = now - timedelta(days=days)
-    # query() counts the current UTC month; pruning must never replenish that quota.
+    # query() counts the current local month; pruning must never replenish that quota.
     network_cutoff = min(now - timedelta(days=network_days),
-                         now.replace(day=1, hour=0, minute=0, second=0, microsecond=0))
+                         timezone.localtime(now).replace(day=1, hour=0, minute=0, second=0, microsecond=0))
     active = TravelProviderState.objects.filter(lease_until__gt=now).values('provider')
     expired = TravelProviderRequest.objects.filter(
         Q(network_call=False, created_at__lt=cutoff) |

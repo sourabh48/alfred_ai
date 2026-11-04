@@ -9,7 +9,6 @@ import os
 from math import isfinite
 from pathlib import Path
 import re
-from statistics import mean
 from typing import Any
 from urllib.parse import quote_plus, unquote
 
@@ -282,7 +281,7 @@ ADVISORY_PROOF_SURFACE_CONTRACTS = (
         "label": "Travel advisor preview",
         "surface_type": "recommendation",
         "payload_path": "apps.mobility.services.travel_advisor.TravelAdvisorService.build_advice",
-        "required_sources": ["OpenStreetMap Nominatim"],
+        "required_sources": ["Open-Meteo / GeoNames, CC BY 4.0"],
         "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
     },
     {
@@ -495,49 +494,47 @@ class VerifiedIntelligenceService:
             raise ValueError("Market observation volatility is invalid.")
         return min(expiries)
 
+    def _travel_insight(self, provider, parameters: dict, title: str, query: str, shape, force: bool = False) -> InsightResult:
+        """Travel lookups use the planner's provider cache, budgets, terms checks and attribution, with no second cache."""
+        from apps.mobility.services.travel.cache import query as travel_query
+        result = travel_query(provider, parameters, force=force)
+        payload = shape(result.payload) if result.success and not result.stale and not result.error else {}
+        status = "fresh" if payload else "failed"  # Stale, blocked or failed provider data never counts as fresh.
+        summary = f"{title}." if payload else f"{title} is unavailable ({result.error or 'no usable result'})."
+        evidence = {**self._synthetic_evidence(title, provider.attribution, result.source_url or provider.source_url, query,
+                                               status, summary, provider.attribution),
+                    "fetched_at": result.retrieved_at or "", "verified_at": result.verified_at or "",
+                    "stale_after": result.expires_at or ""}
+        return InsightResult(payload, evidence, result.cached)
+
     def geocode_destination(self, destination: str, stale_days: int = 30, *, force: bool = False) -> InsightResult:
-        slug = slugify(destination) or "destination"
-        source_url = "https://nominatim.openstreetmap.org/search"
-        return self._use_or_refresh(
-            scope="travel",
-            cache_key=f"geocode:{slug}",
-            title=f"Destination match for {destination}",
-            source_name="OpenStreetMap Nominatim",
-            source_url=source_url,
-            ttl=timedelta(days=stale_days),
-            query=destination,
-            fetcher=lambda: self._fetch_geocode(destination),
-            force=force,
-        )
+        from apps.mobility.services.travel.providers.geocoding import OpenMeteoGeocoding
+
+        def shape(payload):
+            items = payload.get("locations", [])
+            if not items:
+                return {}
+            item = items[0]
+            return {"display_name": ", ".join(filter(None, [item["name"], item.get("region"), item.get("country")])),
+                    "latitude": float(item["lat"]), "longitude": float(item["lon"])}
+        return self._travel_insight(OpenMeteoGeocoding(), {"name": destination}, f"Destination match for {destination}",
+                                    destination, shape, force)
 
     def offbeat_suggestions(self, destination: str, stale_days: int = 14, *, force: bool = False) -> InsightResult:
-        slug = slugify(destination) or "destination"
-        source_url = "https://nominatim.openstreetmap.org/search"
-        return self._use_or_refresh(
-            scope="travel",
-            cache_key=f"offbeat:{slug}",
-            title=f"Offbeat suggestions near {destination}",
-            source_name="OpenStreetMap Nominatim",
-            source_url=source_url,
-            ttl=timedelta(days=stale_days),
-            query=destination,
-            fetcher=lambda: self._fetch_offbeat(destination),
-            force=force,
-        )
+        # shortcut: the old seven-query Nominatim search had no budget, rate limit or attribution, and the Travel
+        # planner's sourced discovery replaces it. Restore only through a budgeted provider in travel/providers.
+        title = f"Offbeat suggestions near {destination}"
+        return InsightResult({"results": []}, self._synthetic_evidence(title, "Travel planner", "", destination, "failed",
+            "Nearby suggestions come from the Travel planner, which applies provider budgets and terms."), False)
 
     def weather_snapshot(self, latitude: float, longitude: float, start_date: date, end_date: date, stale_hours: int = 8, *, force: bool = False) -> InsightResult:
-        cache_key = f"weather:{latitude:.3f}:{longitude:.3f}:{start_date.isoformat()}:{end_date.isoformat()}"
-        source_url = "https://api.open-meteo.com/v1/forecast"
-        return self._use_or_refresh(
-            scope="travel",
-            cache_key=cache_key,
-            title=f"Weather forecast {start_date.isoformat()} to {end_date.isoformat()}",
-            source_name="Open-Meteo",
-            source_url=source_url,
-            ttl=timedelta(hours=stale_hours),
-            fetcher=lambda: self._fetch_weather(latitude, longitude, start_date, end_date),
-            force=force,
-        )
+        from apps.mobility.services.travel.providers.weather import OpenMeteoWeather
+
+        def shape(payload):
+            return {key: payload.get(key) for key in ("average_max_temp", "average_min_temp", "precipitation_total", "wind_max")}
+        return self._travel_insight(OpenMeteoWeather(), {"latitude": latitude, "longitude": longitude,
+            "start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            f"Weather forecast {start_date.isoformat()} to {end_date.isoformat()}", "", shape, force)
 
     def google_news_search(self, query: str, stale_hours: int = 8, *, force: bool = False) -> InsightResult:
         slug = slugify(query)[:120] or "news"
@@ -1102,16 +1099,10 @@ class VerifiedIntelligenceService:
                 return self._run_refresh_adapter(record, lambda: self.world_bank_indicator(indicator, record.title, force=True))
             if record.scope == "market" and record.cache_key == "india-equity-volatility":
                 return self._run_refresh_adapter(record, lambda: self.market_snapshot(force=True))
-            if record.scope == "travel" and record.cache_key.startswith("geocode:") and record.query:
-                return self._run_refresh_adapter(record, lambda: self.geocode_destination(record.query, force=True))
-            if record.scope == "travel" and record.cache_key.startswith("offbeat:") and record.query:
-                return self._run_refresh_adapter(record, lambda: self.offbeat_suggestions(record.query, force=True))
-            if record.scope == "travel" and record.cache_key.startswith("weather:"):
-                _, latitude, longitude, start_date, end_date = record.cache_key.split(":")
-                return self._run_refresh_adapter(
-                    record,
-                    lambda: self.weather_snapshot(float(latitude), float(longitude), date.fromisoformat(start_date), date.fromisoformat(end_date), force=True),
-                )
+            if record.scope == "travel":
+                # Travel lookups now live in the planner's provider cache; the advisor's old copies are retired, not re-fetched.
+                VerifiedExternalInsight.objects.filter(pk=record.pk).update(is_active=False)
+                return "skipped"
             if record.scope == "news" and record.query:
                 return self._run_refresh_adapter(record, lambda: self.google_news_search(record.query, force=True))
             if record.scope == "jobs" and record.query:
@@ -1362,78 +1353,6 @@ class VerifiedIntelligenceService:
             return {"close": [value for _, value in valid], "timestamp": [stamp for stamp, _ in valid]}
         except (KeyError, TypeError, AttributeError, IndexError, InvalidOperation, OverflowError, OSError) as exc:
             raise ValueError("Yahoo chart evidence is malformed.") from exc
-
-    def _fetch_geocode(self, destination: str) -> tuple[dict, str, str]:
-        response = public_http.request("GET",
-            "https://nominatim.openstreetmap.org/search",
-            params={"q": destination, "format": "jsonv2", "limit": 1},
-            headers={"User-Agent": self.USER_AGENT},
-        )
-        items = response.json()
-        if not items:
-            raise ValueError("No matching destination was found.")
-        item = items[0]
-        payload = {
-            "display_name": item.get("display_name", destination),
-            "latitude": float(item["lat"]),
-            "longitude": float(item["lon"]),
-        }
-        summary = f"Destination resolved to {payload['display_name']}."
-        return payload, summary, "OpenStreetMap geocoding is cached to avoid repeated requests and stale results are rotated out."
-
-    def _fetch_offbeat(self, destination: str) -> tuple[dict, str, str]:
-        suggestions = []
-        seen = set()
-        for term in ("viewpoint", "waterfall", "lake", "fort", "village", "ghat", "forest"):
-            response = public_http.request("GET",
-                "https://nominatim.openstreetmap.org/search",
-                params={"q": f"{term} near {destination}", "format": "jsonv2", "limit": 2},
-                headers={"User-Agent": self.USER_AGENT},
-            )
-            for item in response.json():
-                label = item.get("display_name", "")
-                if not label or label in seen:
-                    continue
-                seen.add(label)
-                suggestions.append(
-                    {
-                        "title": label.split(",")[0],
-                        "detail": label,
-                        "latitude": float(item["lat"]),
-                        "longitude": float(item["lon"]),
-                    }
-                )
-        summary = f"Generated {len(suggestions[:6])} offbeat suggestions near {destination}."
-        return {"results": suggestions[:6]}, summary, "Suggestions are cached from geocoded place results and old entries are replaced as they refresh."
-
-    def _fetch_weather(self, latitude: float, longitude: float, start_date: date, end_date: date) -> tuple[dict, str, str]:
-        response = public_http.request("GET",
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude": latitude,
-                "longitude": longitude,
-                "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max",
-                "timezone": "auto",
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-            },
-        )
-        daily = response.json().get("daily", {})
-        max_temps = daily.get("temperature_2m_max", [])
-        min_temps = daily.get("temperature_2m_min", [])
-        rainfall = daily.get("precipitation_sum", [])
-        wind = daily.get("windspeed_10m_max", [])
-        payload = {
-            "average_max_temp": round(mean(max_temps), 1) if max_temps else None,
-            "average_min_temp": round(mean(min_temps), 1) if min_temps else None,
-            "precipitation_total": round(sum(rainfall), 1) if rainfall else None,
-            "wind_max": round(max(wind), 1) if wind else None,
-        }
-        summary = (
-            f"Average max temperature is {payload['average_max_temp']} C with total precipitation "
-            f"{payload['precipitation_total']} mm for the selected window."
-        )
-        return payload, summary, "Weather is cached from Open-Meteo with short freshness windows so stale forecasts can be replaced quickly."
 
     def _fetch_google_news(self, feed_url: str, query: str) -> tuple[dict, str, str]:
         response = public_http.request("GET", feed_url, headers={"User-Agent": self.USER_AGENT},

@@ -167,7 +167,7 @@ class TravelProviderTests(TestCase):
         self.assertEqual((status["minute"]["used"], status["hour"]["used"]), (0, 1))
         TravelProviderRequest.objects.create(provider="other", category="weather", cache_key="x", status="ok", network_call=True)
         self.assertEqual(budget_status(self.provider, now=now)["day"]["used"], 1)
-        first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        first_of_month = timezone.localtime(now).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         TravelProviderRequest.objects.filter(provider=self.provider.name).update(created_at=first_of_month-timedelta(seconds=1))
         status = budget_status(self.provider, now=now)
         self.assertEqual((status["month"]["used"], status["month"]["remaining"]), (0, 3))
@@ -489,3 +489,101 @@ class TravelTransportTests(TestCase):
         self.assertIsNone(option["waitlist"])
         self.assertEqual(option["fare_freshness"],"ESTIMATED")
         self.assertFalse(query(provider,{}).success)
+
+
+class TravelProviderPolicyBoundaryTests(TestCase):
+    """Withdrawn use mode stops cached data, and the older advisor uses the same budgeted path."""
+
+    geocoding = {"results": [{"id": 1, "name": "Synthetic Town", "latitude": 12.5, "longitude": 77.5,
+                              "admin1": "Synthetic State", "country": "India", "country_code": "IN"}]}
+
+    @patch("apps.mobility.services.travel.providers.geocoding.request_json")
+    def test_withdrawn_use_mode_stops_fresh_cached_results(self, request_json):
+        request_json.return_value = (self.geocoding, "hash")
+        with patch.dict("os.environ", {"TRAVEL_USE_MODE": "personal_noncommercial"}):
+            self.assertTrue(query(OpenMeteoGeocoding(), {"name": "Synthetic Town"}).success)
+        with patch.dict("os.environ", {"TRAVEL_USE_MODE": ""}):
+            result = query(OpenMeteoGeocoding(), {"name": "Synthetic Town"})
+        self.assertFalse(result.success)
+        self.assertEqual(result.payload, {})
+        self.assertEqual(request_json.call_count, 1)
+
+    @patch("apps.mobility.services.travel.providers.geocoding.request_json")
+    def test_advisor_lookups_use_the_budgeted_provider_with_no_second_cache(self, request_json):
+        from apps.integrations.services.verified_intelligence import verified_intelligence
+        request_json.return_value = (self.geocoding, "hash")
+        with patch.dict("os.environ", {"TRAVEL_USE_MODE": ""}):
+            blocked = verified_intelligence.geocode_destination("Synthetic Town")
+        self.assertEqual((blocked.payload, blocked.evidence["status"]), ({}, "failed"))
+        request_json.assert_not_called()
+        with patch.dict("os.environ", {"TRAVEL_USE_MODE": "personal_noncommercial"}):
+            live = verified_intelligence.geocode_destination("Synthetic Town")
+            cached = verified_intelligence.geocode_destination("Synthetic Town")
+        self.assertEqual(live.payload["display_name"], "Synthetic Town, Synthetic State, India")
+        self.assertIn("GeoNames", live.evidence["source_name"])
+        self.assertEqual((live.cached, cached.cached), (False, True))
+        self.assertEqual(TravelProviderRequest.objects.filter(provider="open_meteo", network_call=True).count(), 1)
+        # Withdrawing the use mode stops the advisor too: it keeps no copy of its own.
+        with patch.dict("os.environ", {"TRAVEL_USE_MODE": ""}):
+            self.assertEqual(verified_intelligence.geocode_destination("Synthetic Town").payload, {})
+        self.assertFalse(VerifiedExternalInsight.objects.filter(scope="travel").exists())
+
+    @patch("alfred_ai.services.public_http.request")
+    def test_advisor_offbeat_search_makes_no_call_and_old_travel_records_retire(self, request):
+        from apps.integrations.services.verified_intelligence import verified_intelligence
+        old = VerifiedExternalInsight.objects.create(scope="travel", cache_key="offbeat:synthetic-town",
+            title="Offbeat suggestions near Synthetic Town", source_name="OpenStreetMap Nominatim",
+            source_url="https://nominatim.openstreetmap.org/search", query="Synthetic Town", summary="old",
+            payload={"results": [{"title": "Old place"}]}, checksum="x", status="fresh", fetched_at=timezone.now(),
+            verified_at=timezone.now(), stale_after=timezone.now()+timedelta(days=1))
+        self.assertEqual(verified_intelligence.offbeat_suggestions("Synthetic Town").payload, {"results": []})
+        self.assertEqual(verified_intelligence._refresh_record(old), "skipped")
+        old.refresh_from_db()
+        self.assertFalse(old.is_active)
+        request.assert_not_called()
+
+    @patch("apps.mobility.services.travel.providers.weather.request_json")
+    def test_unforecastable_window_uses_no_budget_or_backoff(self, request_json):
+        with patch.dict("os.environ", {"TRAVEL_USE_MODE": "personal_noncommercial"}):
+            result = query(OpenMeteoWeather(), {"latitude": 12.5, "longitude": 77.5,
+                                                "start_date": "2001-01-01", "end_date": "2001-01-02"})
+        self.assertFalse(result.success)
+        request_json.assert_not_called()
+        self.assertFalse(TravelProviderRequest.objects.filter(network_call=True).exists())
+        self.assertFalse(TravelProviderState.objects.filter(provider="open_meteo", next_allowed_at__isnull=False).exists())
+        self.assertEqual(query(OpenMeteoWeather(), {"latitude": 1, "longitude": 1}).error, "invalid_parameters")
+
+    def test_geocoded_origin_keeps_its_source_and_is_not_labelled_static(self):
+        from copy import deepcopy
+        from apps.mobility.services.travel.research import enrich_candidate
+        from apps.mobility.services.travel_catalog import DESTINATIONS
+        now = timezone.now()
+
+        def fake_query(provider, parameters, **kwargs):
+            if provider.category == "geocoding":
+                return ProviderResult("open_meteo", "geocoding", success=True, status="ok", freshness="LIVE",
+                    confidence="LIKELY", source_url=provider.source_url, attribution=provider.attribution,
+                    retrieved_at=now.isoformat(), expires_at=(now+timedelta(days=1)).isoformat(),
+                    payload={"locations": [{"name": "Synthetic Origin", "lat": 13.0, "lon": 77.0}]})
+            return ProviderResult(provider.name, provider.category, error="offline")
+        from apps.mobility.services.travel_discovery import candidates_for
+        owner = get_user_model().objects.create_user("origin-owner", password="x-Unused-12345")
+        destination = candidates_for(owner, {"origin": fact("Bengaluru")}, destinations=[deepcopy(DESTINATIONS[0])])[0]
+        with patch("apps.mobility.services.travel.research.query", side_effect=fake_query):
+            d, _ = enrich_candidate(owner, {"origin": fact("Synthetic Origin")}, destination)
+        self.assertIn("GeoNames", d["origin_geocoding_result"]["attribution"])
+        origin = next(f for f in map_features(d)["features"] if f["properties"]["kind"] == "origin")
+        self.assertEqual(origin["properties"]["freshness"], "LIVE")
+
+    def test_day_budget_starts_at_local_midnight(self):
+        from zoneinfo import ZoneInfo
+        zone = ZoneInfo("Asia/Kolkata")
+        now = datetime(2026, 11, 4, 1, 0, tzinfo=zone).astimezone(datetime_timezone.utc)  # timezone.now() is UTC: 3 November.
+        event = TravelProviderRequest.objects.create(provider="open_meteo", category="weather", cache_key="k",
+                                                     parameters={}, status="ok", network_call=True)
+        TravelProviderRequest.objects.filter(pk=event.pk).update(created_at=datetime(2026, 11, 4, 0, 30, tzinfo=zone))
+        with timezone.override(zone):
+            self.assertEqual(budget_status(OpenMeteoGeocoding(), now=now)["day"]["used"], 1)
+        TravelProviderRequest.objects.filter(pk=event.pk).update(created_at=datetime(2026, 11, 3, 23, 30, tzinfo=zone))
+        with timezone.override(zone):
+            self.assertEqual(budget_status(OpenMeteoGeocoding(), now=now)["day"]["used"], 0)

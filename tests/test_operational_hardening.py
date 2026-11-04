@@ -471,29 +471,6 @@ class VerifiedIntelligenceCircuitBreakerTests(TestCase):
                 "source_url": "https://finance.yahoo.com/quote/%5ENSEI/",
             },
             {
-                "scope": "travel",
-                "cache_key": "geocode:darjeeling",
-                "title": "Destination match for Darjeeling",
-                "source_name": "OpenStreetMap Nominatim",
-                "source_url": "https://nominatim.openstreetmap.org/search",
-                "query": "Darjeeling",
-            },
-            {
-                "scope": "travel",
-                "cache_key": "offbeat:darjeeling",
-                "title": "Offbeat suggestions near Darjeeling",
-                "source_name": "OpenStreetMap Nominatim",
-                "source_url": "https://nominatim.openstreetmap.org/search",
-                "query": "Darjeeling",
-            },
-            {
-                "scope": "travel",
-                "cache_key": "weather:27.030:88.260:2026-08-05:2026-08-06",
-                "title": "Weather forecast 2026-08-05 to 2026-08-06",
-                "source_name": "Open-Meteo",
-                "source_url": "https://api.open-meteo.com/v1/forecast",
-            },
-            {
                 "scope": "news",
                 "cache_key": "google-news:test-role",
                 "title": "Google News search for test role",
@@ -560,18 +537,6 @@ class VerifiedIntelligenceCircuitBreakerTests(TestCase):
             return_value=(market_payload(nifty_close=25000.0, one_month_return_pct=1.0, india_vix=12.0), "Market refreshed.", "notes"),
         ) as market_mock, patch.object(
             verified_intelligence,
-            "_fetch_geocode",
-            return_value=({"display_name": "Darjeeling", "latitude": 27.03, "longitude": 88.26}, "Geocode refreshed.", "notes"),
-        ) as geocode_mock, patch.object(
-            verified_intelligence,
-            "_fetch_offbeat",
-            return_value=({"results": []}, "Offbeat refreshed.", "notes"),
-        ) as offbeat_mock, patch.object(
-            verified_intelligence,
-            "_fetch_weather",
-            return_value=({"average_max_temp": 23.0}, "Weather refreshed.", "notes"),
-        ) as weather_mock, patch.object(
-            verified_intelligence,
             "_fetch_google_news",
             return_value=({"items": []}, "News refreshed.", "notes"),
         ) as news_mock, patch.object(
@@ -599,9 +564,6 @@ class VerifiedIntelligenceCircuitBreakerTests(TestCase):
         self.assertTrue(result["last_refresh_success_at"])
         self.assertEqual(world_bank_mock.call_count, 1)
         self.assertEqual(market_mock.call_count, 1)
-        self.assertEqual(geocode_mock.call_count, 1)
-        self.assertEqual(offbeat_mock.call_count, 1)
-        self.assertEqual(weather_mock.call_count, 1)
         self.assertEqual(news_mock.call_count, 1)
         self.assertEqual(remotive_mock.call_count, 1)
         self.assertEqual(arbeitnow_mock.call_count, 1)
@@ -610,7 +572,6 @@ class VerifiedIntelligenceCircuitBreakerTests(TestCase):
         per_scope = {item["scope"]: item for item in result["per_scope"]}
         self.assertEqual(per_scope["macro"]["refreshed"], 1)
         self.assertEqual(per_scope["market"]["refreshed"], 1)
-        self.assertEqual(per_scope["travel"]["refreshed"], 3)
         self.assertEqual(per_scope["news"]["refreshed"], 1)
         self.assertEqual(per_scope["jobs"]["refreshed"], 3)
         self.assertEqual(per_scope["tax"]["refreshed"], 3)

@@ -785,9 +785,9 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 - **PR/CI:** Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 - **Current task:** Local consolidation preparation is validated on preparation/alfred-consolidation-20261026; required reviews and PR19 CI still block canonical integration. Preserve 143 original IDs/75 verified and 13 extensions/0 accepted. See CONSOLIDATION_STATE for sources, conflict decisions and receipts. Stage7 selection is not reached.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 78/143 (54.5%) verified.**
+**Baseline: 79/143 (55.2%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 78
+IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 79
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -801,7 +801,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | DOC | 7 | 9 | 77.8 | 0 | 2 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 3 | 2 | 2 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 0 | 3 | 0 | 0 | 0 |
-| TRAVEL | 11 | 23 | 47.8 | 1 | 5 | 3 | 0 | 3 |
+| TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
 | FAMILY | 4 | 7 | 57.1 | 3 | 0 | 0 | 0 | 0 |
 | BIKE | 2 | 6 | 33.3 | 2 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
@@ -2729,16 +2729,17 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-23 — API budgets and provider terms compliance
 
-**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+**COMPLETE_VERIFIED** · Travel · P2.
 
 - Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
-- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py), [provider boundary](../tests/test_travel_providers.py), [refresh](../tests/test_travel_refresh.py), [retention](../tests/test_travel_retention.py), [advisor evidence](../tests/test_advisory_evidence_freshness.py). On 2026-11-04: **full backend 2733 run, 0 failed, 182 skipped** (browser and local AI); 141 focused backend and 12 Travel Chrome tests PASS with the CI browser settings; synthetic data, no provider called.
+- Acceptance: TECHNICAL_PASS on synthetic data for the provider boundary: every Travel network lookup goes through `travel/cache.py` `query()`, which checks the provider's use mode/terms/configuration before any cached data, enforces local minute/hour/day/month budgets before the call, logs every attempt and attaches attribution. Three independent review rounds. Real provider plan rights, account limits and live quota remain NOT_RUN/external.
 - Bounded unit 2026-10-31 (source/test only, branch `batch/fast-dev-20261031`): `budget_status` is now the single source for enforcement and the staff panel, reporting used/remaining local budget per minute/hour/day/month; the panel separates it from provider-reported quota. Window parity, window expiry, cached evidence on exhaustion with no call, staff-only access and no secret disclosure: 56 Travel backend and one actual Chrome PASS, zero skips. Existing Brave terms opt-out cache isolation was reviewed and retained. No provider was called or activated.
 - Bounded unit 2026-11-02 (source/test only, not on development): route and geocoding attribution are now shown, Overpass status uses the transport's HTTPS check, and withdrawing SearXNG terms isolates its cache. Focused synthetic backend PASS; no Chrome or full regression, and no provider was called. Status unchanged.
-- Limitations/dependencies: Application quotas/paid opt-ins/storage flags exist; provider-specific plan rights and current account limits need acceptance. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Use current register and contract-specific approval.
+- Bounded unit 2026-11-04 (master): the older Travel advisor (`/api/mobility/travel-advisor/preview/`, no UI caller) and the 6-hourly evidence refresh called Nominatim and Open-Meteo directly with no budget, terms check, request log or attribution. Its place and weather lookups now use the planner providers through `query()` with no second cache (blocked, stale or failed data is never shown as fresh; cache hits are labelled cached); its seven-query Nominatim "offbeat" search is withdrawn; the refresh retires old `scope="travel"` records instead of re-fetching. Withdrawn use mode or terms now also stop cached data. Invalid place names and unforecastable dates are rejected before any call is counted or backs off the provider. A geocoded start city shows its source and real freshness. Budget days and months, and request-history pruning, follow the local clock. Exact-head CI is recorded in EXECUTION_STATE.
+- Limitations/dependencies: The map always credits OpenStreetMap even for a custom tile URL. Geocoding and weather share one Open-Meteo budget, and hotels and flights one Duffel budget, though the staff panel lists them as separate rows. Provider-reported quota is never filled and shows "not exposed". Legacy travel records still fresh are retired only when due. Invalid place or date errors use the generic `invalid_parameters` code. Application quotas/paid opt-ins/storage flags exist; provider-specific plan rights and current account limits need acceptance. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Real provider plan rights and account limits need contract-specific approval and evidence.
 
 ### CAREER-01 — Resume upload, extraction and review
 

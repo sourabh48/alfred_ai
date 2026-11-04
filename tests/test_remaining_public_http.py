@@ -24,9 +24,7 @@ class RemainingPublicHTTPTests(TestCase):
         calls = [
             lambda: self.verified._fetch_world_bank('https://example.org/indicator', 'Indicator'),
             lambda: self.verified._fetch_yahoo_chart('TEST', '1mo', '1d'),
-            lambda: self.verified._fetch_geocode('Synthetic place'),
-            lambda: self.verified._fetch_offbeat('Synthetic place'),
-            lambda: self.verified._fetch_weather(12, 77, date(2026, 10, 11), date(2026, 10, 12)),
+            # Travel geocoding and weather go through the budgeted travel providers (tests/test_travel_providers.py).
             lambda: self.verified._fetch_google_news('https://example.org/feed', 'Synthetic query'),
             lambda: self.verified._fetch_remotive_jobs('Synthetic role'),
             lambda: self.verified._fetch_arbeitnow_jobs('Synthetic role'),
