@@ -78,7 +78,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def tearDown(self):
         result = getattr(getattr(self, "_outcome", None), "result", None)
-        if result and any(test is self for test, _ in result.failures + result.errors):
+        if result and any(self in (test, getattr(test, "test_case", None)) for test, _ in result.failures + result.errors):  # Sub-test failures are recorded under the sub-test.
             browser_support.DocumentReviewBrowserTests._capture_browser_artifacts(self, self.browser)
         self.browser.get("about:blank")
         # Drain real live-server requests before TransactionTestCase flushes
@@ -3903,6 +3903,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         Investment.objects.filter(pk=holding.pk).update(updated_at=timezone.now()-timedelta(days=40))
         self.login(); self.browser.get(self.live_server_url+'/investments/')
         self.wait.until(lambda _: 'Reminders off' in self.text('investmentReviewStatus'))
+        # Late summary cards shift the form between mousedown and mouseup, which drops the click (CI 8af9824).
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'#investmentSummaryCards > *'))
         self.assertFalse(self.browser.find_element(self.By.ID,'investmentReviewEnabled').is_selected())
         self.assertFalse(self.browser.find_element(self.By.ID,'investmentReviewCheck').is_enabled())
         self.memory_click('#investmentReviewEnabled'); self.memory_click('#investmentReviewForm button[type="submit"]')
@@ -3922,6 +3924,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('investment-review-reminders-desktop')
         holding.save(update_fields=['updated_at'])
         self.browser.refresh(); self.wait.until(lambda _: '· resolved ·' in self.text('investmentReviewItems'))
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'#investmentSummaryCards > *'))
         self.browser.set_window_size(390,844)
         self.browser.execute_script("document.getElementById('investmentReviewTitle').scrollIntoView({behavior:'instant',block:'start'})")
         self.capture('investment-review-reminders-390px')

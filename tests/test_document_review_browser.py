@@ -254,7 +254,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
 
     def tearDown(self):
         result = getattr(getattr(self, "_outcome", None), "result", None)
-        if result and any(test is self for test, _ in result.failures + result.errors):
+        if result and any(self in (test, getattr(test, "test_case", None)) for test, _ in result.failures + result.errors):  # Sub-test failures are recorded under the sub-test.
             self._capture_browser_artifacts()
         self._disable_live_refresh_timers()
         self._park_browser_between_tests()

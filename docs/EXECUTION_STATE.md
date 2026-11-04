@@ -30,8 +30,14 @@
   and attribution; now routed through the planner's `query()` with no second cache. Withdrawn terms stop cached data;
   invalid lookups use no budget. Full backend 2733 run, 0 failed, 182 skipped; 12 Travel Chrome PASS. COMPLETE_VERIFIED
   for bounded scope; baseline 79/143.
-- Next: exact-head master CI on the TRAVEL-23 commit (re-run only a failed flaky shard on the same SHA), then the next
-  queue item.
+- Master CI on `ca3a4f8`: one Selenium shard failed (`test_financial_source_discovery_survives_cloud_policy_outage_but_not_permission_loss`,
+  NotAuthenticated and PermissionDenied sub-tests timed out waiting for "Sign in or reload"); passes locally. Not green.
+- Flake diagnosis (same day): the `8af9824` CI capture showed the investment reminder opt-in ticked and Save focused, form idle,
+  status unchanged. Cause: the summary cards above the form render late and shift it between mousedown and mouseup, so no
+  click fires. The test now waits for the cards. Failure capture also missed sub-test failures (which is why the `ca3a4f8`
+  failure left no evidence); fixed in the document-review and user-data browser suites. The cloud-policy sub-test cause is
+  still unknown; the next CI failure will now save its screenshot, page and console.
+- Next: exact-head master CI on the flake-fix commit (re-run only a failed flaky shard on the same SHA), then FAMILY-05.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
