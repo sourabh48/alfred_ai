@@ -259,6 +259,13 @@ class ThrottlingStoreTests(Base):
         self.plant(self.database(), self.key(), mode=1, value="[9e15, 9e15]")
         self.assertEqual(self.reserve(), 0)
 
+    def test_times_just_ahead_do_not_block(self):
+        # Spread so that some always fall within the next window, which once blocked every request.
+        ahead = [timezone.now().timestamp() + offset for offset in range(1, 600, 10)]
+        self.assertEqual(self.reserve(), 0)
+        self.plant(self.database(), self.key(), mode=1, value=json.dumps(ahead))
+        self.assertEqual(self.reserve(), 0)
+
     def test_moving_the_clock_back_does_not_refuse_a_request(self):
         buckets = [(("scope", "user"), 5, 60)]
         self.assertEqual(self.reserve(buckets), 0)
@@ -385,6 +392,25 @@ class CachePermissionTests(SimpleTestCase):
                         config.ready()
                     target.unlink()
             config.ready()
+
+    def test_a_side_file_appearing_during_the_startup_check_is_accepted(self):
+        import alfred_private_storage
+
+        data = private_directory(self.root / "data")
+        queue = private_directory(data / "native") / "jobs.sqlite3"
+        for path in (queue, queue.with_name("jobs.sqlite3-wal")):
+            path.write_bytes(b"synthetic")
+        real, missed = alfred_private_storage.verify_private, []
+
+        def created_meanwhile(path):
+            if path.name.endswith("-wal") and not missed:
+                missed.append(path)
+                raise FileNotFoundError(path)
+            return real(path)
+
+        with patch("alfred_private_storage.verify_private", side_effect=created_meanwhile):
+            alfred_private_storage.verify_pickle_storage(queue, data / "ml_models")
+        self.assertTrue(missed)
 
     def test_a_folder_owned_by_another_account_is_refused(self):
         path = private_directory(self.root / "owned")

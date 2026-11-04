@@ -61,8 +61,8 @@ def reserve_attempts(directory, buckets):
                 store.delete(key)
                 retry = max(retry, window)
                 continue
-            # A time over a window ahead means the clock moved back or the row is forged. Neither should block anyone.
-            history = [stamp for stamp in history if now - window < stamp <= now + window]
+            # A time ahead of now means the clock moved back or the row is forged; counting it lets a row block forever.
+            history = [stamp for stamp in history if now - window < stamp <= now]
             if len(history) >= limit:
                 retry = max(retry, min(history) + window - now)
             reservations.append((key, history, window))

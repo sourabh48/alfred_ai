@@ -215,13 +215,19 @@ def verify_pickle_storage(queue, models):
         paths += [models, *models.rglob("*")]
     with STORAGE_LOCK:
         for path in paths:
-            try:
-                private = verify_private(path)
-            except (OSError, PrivateStorageUnavailable):
-                private = False
-            # SQLite removes its side files as connections close, so only a path still there can fail.
-            if not private and path.exists():
+            # SQLite creates and removes its side files as connections open and close, so a failure is checked again.
+            if not (_private_or_gone(path) or _private_or_gone(path)):
                 raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
+
+
+def _private_or_gone(path):
+    try:
+        return verify_private(path)
+    except (OSError, PrivateStorageUnavailable):
+        try:
+            return not path.exists()
+        except OSError:  # A file being deleted can refuse to be read.
+            return False
 
 
 def permission_plan(root):
