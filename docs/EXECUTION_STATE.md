@@ -49,7 +49,9 @@
 - FAMILY-05 (same day): two review rounds. A 100% savings rate was scored as observed with no recorded spending, one
   missing planning feed counted as zero, the page radar plotted a hard-coded 80, and family totals summed as float. Fixed;
   122 backend and 5 Chrome PASS. COMPLETE_VERIFIED for bounded scope; baseline 80/143.
-- Next: exact-head master CI on the FAMILY-05 commit, then the next queue item.
+- Master CI on `14e0aa6`: all three Selenium shards stopped before running because the new Chrome test had no measured
+  duration in `tests/browser_durations.json`; recorded (8.75 s locally), and collect-only now plans 157 tests.
+- Next: exact-head master CI on the durations commit, then FAMILY-06.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

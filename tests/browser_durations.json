@@ -108,6 +108,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_private_history_outage_stale_edit_and_clear_keep_drafts":  9.735,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_private_memory_delete_retention_reset_keep_family_isolated":  7.485,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_private_trip_photo_exif_review_and_gallery":  10.281,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_relationship_page_plots_only_scored_factors_without_spend_history":  8.75,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_relationship_page_withholds_alignment_without_income":  7.2,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_reviewed_financial_health_discloses_heuristic_and_owned_history":  5.14,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_reviewed_synthetic_model_comparison_verdict_metrics_outage_and_mobile":  14.359,
