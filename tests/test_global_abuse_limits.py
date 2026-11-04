@@ -1,10 +1,14 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+import json
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Barrier
 from unittest.mock import patch
 
 from diskcache import Cache
+from alfred_ai.safe_cache import SafeDisk
+from alfred_ai.services.throttling import STORE
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
@@ -138,8 +142,8 @@ class GlobalAbuseLimitTests(TestCase):
         with ThreadPoolExecutor(max_workers=12) as pool:
             outcomes = list(pool.map(attempt, range(12)))
         self.assertEqual(outcomes.count(0), 3)
-        with Cache(self.directory) as store:
-            self.assertEqual(len(store.get('per-account')), 3)
+        with Cache(str(Path(self.directory) / STORE), disk=SafeDisk) as store:
+            self.assertEqual(len(store.get(json.dumps('per-account'))), 3)
         self.assertGreater(reserve_attempts(self.directory, buckets), 0)
         now = timezone.now()
         with patch('django.utils.timezone.now', return_value=now + timedelta(seconds=601)):
@@ -153,7 +157,7 @@ class GlobalAbuseLimitTests(TestCase):
 
     def test_rate_store_never_contains_username_or_password(self):
         self.client.post('/login/', {'username': 'synthetic-private-user', 'password': 'synthetic-private-password'})
-        with Cache(self.directory) as store:
+        with Cache(str(Path(self.directory) / STORE), disk=SafeDisk) as store:
             text = str(list(store.iterkeys()))
         self.assertNotIn('synthetic-private-user', text)
         self.assertNotIn('synthetic-private-password', text)

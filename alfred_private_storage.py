@@ -10,8 +10,12 @@ import json
 import os
 from pathlib import Path
 import stat
+import threading
 import time
 from urllib.parse import parse_qs, urlsplit
+
+# Replacing a folder's permissions briefly breaks path lookups in other threads, which then wrongly refuse the folder.
+STORAGE_LOCK = threading.Lock()
 
 
 class PrivateStorageUnavailable(RuntimeError):
@@ -118,6 +122,17 @@ def acl_snapshot(path):
         kernel.LocalFree(descriptor)
 
 
+def owner_sid(path):
+    api, kernel = windows()
+    owner, descriptor = ctypes.c_void_p(), ctypes.c_void_p()
+    if api.GetNamedSecurityInfoW(str(path), 1, 1, ctypes.byref(owner), None, None, None, ctypes.byref(descriptor)):
+        raise PrivateStorageUnavailable("Private storage ownership cannot be inspected.")
+    try:
+        return sid_string(owner.value)
+    finally:
+        kernel.LocalFree(descriptor)
+
+
 def replace_acl(path, sddl):
     api, kernel = windows()
     descriptor, dacl = ctypes.c_void_p(), ctypes.c_void_p()
@@ -141,6 +156,9 @@ def verify_private(path):
     path = safe_path(path)
     if os.name != "nt":
         return path.stat().st_uid == os.getuid() and not stat.S_IMODE(path.stat().st_mode) & 0o077
+    # An owner can always rewrite the permissions; Administrators can take ownership regardless.
+    if owner_sid(path) not in {current_sid(), "S-1-5-18", "S-1-5-32-544"}:
+        return False
     snapshot = acl_snapshot(path)
     allowed = {current_sid(), "S-1-5-18"}
     entries = snapshot["entries"]
@@ -162,16 +180,54 @@ def protect(path):
 
 
 def private_directory(path, *, deadline=None):
-    path = safe_path(path)
-    if deadline is not None and time.monotonic() >= deadline:
-        raise PrivateStorageUnavailable("Private storage protection deadline expired.")
-    fresh = not path.exists() or path.is_dir() and not any(path.iterdir())
-    path.mkdir(parents=True, exist_ok=True)
-    if fresh:
+    with STORAGE_LOCK:
+        path = safe_path(path)
+        if deadline is not None and time.monotonic() >= deadline:
+            raise PrivateStorageUnavailable("Private storage protection deadline expired.")
+        fresh = not path.exists() or path.is_dir() and not any(path.iterdir())
+        path.mkdir(parents=True, exist_ok=True)
+        # Already private needs no rewrite, which could disturb a request already using the folder.
+        if verify_private(path):
+            return path
+        if not fresh:
+            raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
         protect(path)
-    elif not verify_private(path):
-        raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
     return path
+
+
+def verify_cache_storage(path):
+    """Refuse a cache folder if a shard or a database was loosened, since each has permissions of its own."""
+    if os.name != "nt":
+        return
+    with STORAGE_LOCK:
+        for folder in (path, *(item for item in path.iterdir() if item.is_dir())):
+            database = folder / "cache.db"
+            if not verify_private(folder) or database.exists() and not verify_private(database):
+                raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
+
+
+def verify_pickle_storage(queue, models):
+    """Refuse a loosened job queue or model file: both are read through pickle, and each file has its own permissions."""
+    if os.name != "nt":
+        return
+    paths = [queue.with_name(queue.name + suffix) for suffix in ("", "-wal", "-shm")]
+    if models.exists():
+        paths += [models, *models.rglob("*")]
+    with STORAGE_LOCK:
+        for path in paths:
+            # SQLite creates and removes its side files as connections open and close, so a failure is checked again.
+            if not (_private_or_gone(path) or _private_or_gone(path)):
+                raise PrivateStorageUnavailable("Existing private storage needs explicitly authorized permission repair.")
+
+
+def _private_or_gone(path):
+    try:
+        return verify_private(path)
+    except (OSError, PrivateStorageUnavailable):
+        try:
+            return not path.exists()
+        except OSError:  # A file being deleted can refuse to be read.
+            return False
 
 
 def permission_plan(root):

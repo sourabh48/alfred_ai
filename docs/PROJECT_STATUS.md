@@ -3150,8 +3150,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
 - Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
-- Limitations/dependencies: Django 6.0.8 has subsequent 6.0.9 security patch; pip check passes but does not establish security. Build-tool availability/locks need follow-up. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Django 6.0.9 isolated dependency and repeat-package gate complete at 4aa7ac70. Independent clean-PC replay still pending.
+- Limitations/dependencies: Security branch `security/runtime-11-dependencies`, not merged. One advisory stays open and visible: diskcache CVE-2025-69872, no upstream fix, mitigated in ALFRED, residual risk not accepted. Evidence, remaining paths and findings are in [RUNTIME_11_EVIDENCE.md](RUNTIME_11_EVIDENCE.md). Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: exact-head CI, independent review, owner decision on residual risk, separate-user install and clean-PC replay.
 
 ### RUNTIME-12 — GitHub CI and branch/source protection
 

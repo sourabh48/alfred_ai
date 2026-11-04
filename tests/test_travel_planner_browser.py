@@ -379,7 +379,7 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.browser.save_screenshot(str(self.artifacts/"research-map-desktop.png"))
         first=self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="1"]').text
         self.send("Day 2 is too busy. Make it relaxed.")
-        self.assertIn("relaxed",self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="2"]').text)
+        self.wait.until(lambda _: "relaxed" in self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="2"]').text)
         self.assertIn("Booking.com",self.text("plannerEvidenceBody"))
         self.assertEqual(first,self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="1"]').text)
         self.click("#plannerSave")
@@ -388,7 +388,7 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         url=self.browser.current_url
         self.browser.get(url)
         self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,".travel-day"))==4)
-        self.assertIn("relaxed",self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="2"]').text)
+        self.wait.until(lambda _: "relaxed" in self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="2"]').text)
         for width in (390,768):
             self.browser.set_window_size(width,1000)
             self.browser.execute_cdp_cmd("Emulation.setDeviceMetricsOverride",{"width":width,"height":1000,"deviceScaleFactor":1,"mobile":True})

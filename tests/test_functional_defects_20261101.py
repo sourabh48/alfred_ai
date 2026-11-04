@@ -71,6 +71,13 @@ class RepeatedReferenceTests(TestCase):
                 self.assertEqual(self.row(**changes).status_code, 201)
         self.assertEqual(self.row(external_reference="").status_code, 201)
 
+    def test_a_reference_derived_from_the_description_is_not_a_duplicate(self):
+        # Without a supplied reference ALFRED derives one from long words, so identical bills must still save.
+        for _ in range(2):
+            saved = self.client.post("/api/expenses/", dict(amount="999.00", category="utilities", classification="expense", direction="debit",
+                                     transaction_date="2026-11-01", description="Electricity payment", bank_account=self.account.pk), format="json")
+            self.assertEqual(saved.status_code, 201, saved.content[:200])
+
     def test_another_owner_and_another_account_are_separate(self):
         self.assertEqual(self.row().status_code, 201)
         second = BankAccount.objects.create(user=self.user, bank_name="Other", account_number="R2002", current_balance="1")

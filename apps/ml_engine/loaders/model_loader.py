@@ -8,7 +8,7 @@ class ModelLoader:
         return joblib.load(path)
 
     def load_pytorch(self, path):
-        return torch.load(path, map_location="cpu")
+        return torch.load(path, map_location="cpu", weights_only=True)
 
     def load_tensorflow(self, path):
         return tf.keras.models.load_model(path)

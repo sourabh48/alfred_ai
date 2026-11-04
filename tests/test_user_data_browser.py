@@ -1,4 +1,5 @@
 """Real-page acceptance of synthetic financial data and its explanations."""
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
@@ -32,13 +33,17 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         cls.By = By
         cls.active_requests = 0
         cls.request_lock = threading.Lock()
+        # The live server shares one in-memory SQLite connection between threads, unlike the real runtime.
+        # A page's burst of requests could empty another request's session read and sign the browser out.
+        cls.request_turn = threading.Lock()
         original_get_response = BaseHandler.get_response
 
         def tracked_response(handler, request):
             with cls.request_lock:
                 cls.active_requests += 1
             try:
-                return original_get_response(handler, request)
+                with cls.request_turn:
+                    return original_get_response(handler, request)
             finally:
                 with cls.request_lock:
                     cls.active_requests -= 1
@@ -58,8 +63,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def setUp(self):
         self.browser.set_window_size(1440, 1200)
-        directory = self.enterContext(TemporaryDirectory(prefix="alfred-browser-invite-limits-"))
-        self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=directory,
+        directory = self.enterContext(TemporaryDirectory(prefix="alfred-browser-invite-limits-", ignore_cleanup_errors=True))
+        # Sibling stores, as in settings.py: the temporary parent is not private, so it cannot itself be a store.
+        self.enterContext(override_settings(ALFRED_FAMILY_INVITE_THROTTLE_DIR=str(Path(directory) / 'family-invites'),
             ALFRED_ABUSE_THROTTLE_DIR=str(Path(directory) / 'runtime-limits')))
         self.browser.get("about:blank")
         cache.clear()
@@ -92,6 +98,17 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda driver: driver.find_elements(self.By.ID, "dashboardPeriodNote"))
         self.wait.until(lambda driver: self.text("dashboardPeriodNote") and "Loading" not in self.text("dashboardPeriodNote"))
         self.wait.until(lambda driver: self.text("dashboardSummaryCards"))
+
+    def allow_simultaneous_requests(self):
+        # For a test that holds one request open while another completes.
+        self.enterContext(patch.object(type(self), 'request_turn', nullcontext()))
+
+    def lose_session(self):
+        from django.contrib.sessions.models import Session
+        cookie=self.browser.get_cookie(settings.SESSION_COOKIE_NAME)
+        # A pending authorized response can renew a removed browser cookie, so end the session itself too.
+        Session.objects.filter(session_key=cookie['value']).delete()
+        self.browser.delete_cookie(settings.SESSION_COOKIE_NAME)
 
     def text(self, element_id):
         from selenium.common.exceptions import StaleElementReferenceException, WebDriverException
@@ -297,7 +314,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Source-backed job leads matched', self.browser.find_element(self.By.ID, 'careerRoot').text)
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings img')), 0)
         self.assertFalse(self.browser.execute_script('return Boolean(window.discoveryLeak)'))
-        self.assertTrue(all(a.get_attribute('href').startswith('https://')
+        # A later page redraw can replace the links between finding and reading them.
+        self.wait.until(lambda _: all(a.get_attribute('href').startswith('https://')
             for a in self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings a')))
         self.browser.execute_script("document.getElementById('careerOpenings').scrollIntoView({block:'center',behavior:'instant'})")
         self.capture('career-discovery-desktop')
@@ -418,7 +436,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn("incomplete", self.text("careerJobMatchPanel"))
         self.assertEqual(before, [list(model.objects.values()) for model in models])
         self.browser.set_window_size(390,844)
-        if not self.browser.find_element(self.By.CSS_SELECTOR, '[data-fit-sources]').get_attribute('open'):
+        # In a list because the attribute is empty when closed, and the wait retries if a refresh replaces the panel.
+        if not self.wait.until(lambda _: [self.browser.find_element(self.By.CSS_SELECTOR, '[data-fit-sources]').get_attribute('open')])[0]:
             self.memory_click('[data-fit-sources] summary')
         self.browser.execute_script("document.getElementById('careerJobMatchPanel').scrollIntoView({behavior:'instant',block:'start'});")
         self.capture("career-matching-unavailable-mobile")
@@ -447,7 +466,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#budgetForecastEvidence summary')
         self.assertNotIn(month_start(1).strftime("%Y-%m"), self.text("budgetForecastEvidence"))
         self.browser.execute_async_script("loadBudgetDashboard({live:true}).then(arguments[0]);")
-        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR, '#budgetForecastEvidence details').get_attribute('open'))
+        # The live refresh can replace the panel between finding it and reading it; the open state must still survive.
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, '#budgetForecastEvidence details').get_attribute('open'))
         self.browser.execute_script("document.getElementById('budgetForecastEvidence').scrollIntoView({behavior:'instant',block:'start'});")
         self.wait.until(lambda _: self.browser.execute_script("return !document.getAnimations().some(a=>a.playState==='running');"))
         self.capture("cashflow-forecast-evidence-desktop")
@@ -754,6 +774,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.ID,'memoryEvaluationQuery').get_property('value'),'')
 
     def test_reviewed_synthetic_model_comparison_verdict_metrics_outage_and_mobile(self):
+        self.allow_simultaneous_requests()
         # This tests rendered synthetic reports; current-source eligibility is tested separately.
         from apps.ml_engine.services.retrieval_holdout import RAW
         self.enterContext(patch('apps.ml_engine.services.retrieval_holdout.cohort',return_value=json.loads(RAW)))
@@ -881,6 +902,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('memory-evaluation-stale-source-and-retry')
 
     def test_memory_evaluation_pending_pagehide_discards_late_response_and_over_limit_preserves_cases(self):
+        self.allow_simultaneous_requests()
         from apps.ml_engine.services.persistent_memory import MemoryStore
         from apps.ml_engine.services.memory_learning import MemoryLearning
         store,owner,identities=self.memory_evaluation_fixture()
@@ -2408,6 +2430,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('document-field-questions-reviewed-current-values')
 
     def test_financial_document_questions_stale_outage_retry_and_no_history(self):
+        self.allow_simultaneous_requests()
         from selenium.webdriver.support.ui import Select
         from uuid import uuid4
         from apps.ml_engine.services.conversation_history import ConversationHistory
@@ -2889,6 +2912,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(question.get_property('value'),'')
 
     def test_initial_catalog_response_does_not_cancel_independent_private_vault_requests(self):
+        self.allow_simultaneous_requests()
         from threading import Event
         from selenium.webdriver.support.ui import Select
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -3798,7 +3822,6 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def test_inferred_loan_requires_explicit_confirmation_on_real_page(self):
         from django.utils import timezone
         from apps.loans.models import Loan
-        from selenium.common.exceptions import StaleElementReferenceException
 
         user = get_user_model().objects.get(username="acceptance_demo")
         loan = Loan.objects.create(
@@ -3814,25 +3837,18 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertNotIn("3,40,000", self.text("loanSummaryCards"))
         self.assertIn("Excluded from financial totals", self.text("loanTableBody"))
         self.capture("loan-estimate-excluded")
-        def open_review(driver):
-            try:
-                driver.find_element(self.By.CSS_SELECTOR, f'button[onclick="editLoan({loan.pk})"]').click()
-                return True
-            except StaleElementReferenceException:
-                # The live summary may replace a row between locating and clicking it.
-                return False
-
-        self.wait.until(open_review)
+        # The table redraws every second and the page scrolls smoothly, so the click retries from an instant scroll.
+        self.memory_click(f'button[onclick="editLoan({loan.pk})"]')
         self.assertFalse(self.browser.find_element(self.By.ID, "loanConfirmEstimate").is_selected())
         for field_id, value in (("manualLoanPrincipal", "200000"), ("manualLoanInterest", "8"),
                                 ("manualLoanEmi", "9000"), ("manualLoanBalance", "150000")):
             field = self.browser.find_element(self.By.ID, field_id)
             field.clear()
             field.send_keys(value)
-        self.browser.find_element(self.By.ID, "loanConfirmEstimate").click()
+        self.memory_click("#loanConfirmEstimate")
         self.browser.execute_script("document.getElementById('loanVerificationFields').scrollIntoView({behavior: 'instant', block: 'center'});")
         self.capture("loan-terms-review")
-        self.browser.find_element(self.By.ID, "loanSubmitButton").click()
+        self.memory_click("#loanSubmitButton")
         self.wait.until(lambda _: "2,50,000" in self.text("loanSummaryCards"))
         self.assertIn("19,000", self.text("loanSummaryCards"))
         self.assertFalse(self.browser.find_element(self.By.ID, "loanVerificationNotice").is_displayed())
@@ -3861,9 +3877,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login()
         self.browser.get(self.live_server_url + "/expenses/")
         self.wait.until(lambda _: "Personal Test Scooter" in self.text("balanceSheetPanel"))
-        cards = self.text("balanceSheetCards")
-        self.assertIn("2,10,000", cards)
-        self.assertIn("1,00,000", cards)
+        # The cards fade in, and WebDriver reads a transparent card as empty.
+        self.wait.until(lambda _: "2,10,000" in self.text("balanceSheetCards"))
+        self.assertIn("1,00,000", self.text("balanceSheetCards"))
         panel = self.text("balanceSheetPanel")
         self.assertIn("Estimated asset ₹50,000", panel)
         self.assertIn("Recorded running costs ₹6,000", panel)
@@ -4099,7 +4115,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn(transport.end.isoformat(), evidence)
         self.assertIn('30-day lookback', evidence)
         self.assertIn('not independently verified exchange closing prices', evidence)
-        self.assertTrue(any('finance.yahoo.com' in link.get_attribute('href')
+        # A later page redraw can replace the links between finding and reading them.
+        self.wait.until(lambda _: any('finance.yahoo.com' in link.get_attribute('href')
             for link in self.browser.find_elements(self.By.CSS_SELECTOR, '#investmentWatchlistEvidence a')))
         self.browser.execute_script("document.getElementById('investmentWatchlistEvidence').scrollIntoView({block:'center',behavior:'instant'})")
         self.capture('yahoo-market-observations-desktop')
@@ -5305,7 +5322,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('D1 packed gloves',self.text('plannerPacking'));self.assertTrue(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerDocuments a[href*="/original/"]'))
         self.wait.until(lambda _:self.active_requests==0)
         cookie=self.browser.get_cookie(settings.SESSION_COOKIE_NAME);Session.objects.filter(session_key=cookie['value']).delete()
-        self.browser.delete_cookie(settings.SESSION_COOKIE_NAME);self.memory_click('[data-packing-reload]')
+        # A background request can see the lost session first and clear the panel, which removes this button.
+        self.browser.delete_cookie(settings.SESSION_COOKIE_NAME);self.browser.execute_script("document.querySelector('[data-packing-reload]')?.click()")
         self.wait.until(lambda _:not self.browser.find_element(self.By.ID,'plannerPacking').is_displayed())
         self.assertEqual(self.text('plannerDocuments'),'');mark('J7 reopen/late dedupe/auth clearing')
         self.assertEqual(len(passed),7);self.capture('travel-d1-private-state-cleared')
@@ -5556,7 +5574,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#plannerPrepareICS')
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'[data-calendar-event]'))
         self.wait.until(lambda _: self.active_requests==0)
-        self.browser.delete_cookie('sessionid');self.memory_click('#plannerExportICS')
+        self.lose_session();self.memory_click('#plannerExportICS')
         self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
         self.assertEqual(self.text('plannerCalendar'),'');self.assertFalse(list(folder.glob('*.ics')))
 
@@ -5616,7 +5634,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportGPX').is_displayed())
         self.wait.until(lambda _: self.active_requests==0)
-        self.browser.delete_cookie('sessionid');self.memory_click('#plannerExportGPX')
+        self.lose_session();self.memory_click('#plannerExportGPX')
         self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
         self.assertFalse(list(folder.glob('*.gpx')))
 
@@ -5666,7 +5684,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerExportPDF').is_displayed())
         self.wait.until(lambda _: self.active_requests==0)
-        self.browser.delete_cookie('sessionid')
+        self.lose_session()
         self.memory_click('#plannerExportPDF')
         self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerExport').is_displayed())
         self.assertFalse(list(folder.glob('*.pdf')))
@@ -5676,18 +5694,23 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.mobility.services.travel import reminders
         session=self.packing_fixture()
         clock=self.enterContext(patch.object(reminders,'current_time',return_value=now or datetime(2035,1,1,tzinfo=timezone.utc)))
+        # These journeys reload the planner often, and the budget they spend depends on machine speed.
+        self.enterContext(override_settings(ALFRED_API_ACCOUNT_LIMIT=10**6,ALFRED_API_GLOBAL_LIMIT=10**6))
         return session,clock
 
     def reminder_fields(self,selector,label,zone,local_time,fold=''):
         from selenium.webdriver.support.ui import Select
-        def ready(_):
+        def fill(_):
             form=self.browser.find_element(self.By.CSS_SELECTOR,selector)
-            return form if all(field.is_enabled() for field in form.find_elements(self.By.CSS_SELECTOR,'input,select,button')) else False
-        form=self.wait.until(ready)
-        for name,value in (('label',label),('zone',zone)):
-            field=form.find_element(self.By.NAME,name);field.clear();field.send_keys(value)
-        self.browser.execute_script("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",form.find_element(self.By.NAME,'local_time'),local_time)
-        Select(form.find_element(self.By.NAME,'fold')).select_by_value(fold)
+            if not all(field.is_enabled() for field in form.find_elements(self.By.CSS_SELECTOR,'input,select,button')):
+                return False
+            for name,value in (('label',label),('zone',zone)):
+                field=form.find_element(self.By.NAME,name);field.clear();field.send_keys(value)
+            self.browser.execute_script("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",form.find_element(self.By.NAME,'local_time'),local_time)
+            Select(form.find_element(self.By.NAME,'fold')).select_by_value(fold)
+            return True
+        # A planner redraw can replace the form while it is being filled; the wait then starts over on the new one.
+        self.wait.until(fill)
 
     def test_travel_reminder_desktop_lifecycle_late_delivery_and_optout(self):
         from datetime import datetime,timedelta
@@ -5808,8 +5831,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
         self.wait.until(lambda _: 'Synthetic private reminder' in self.text('plannerReminders'))
         self.wait.until(lambda _: self.active_requests==0)
-        self.browser.delete_cookie('sessionid')
-        self.assertIsNone(self.browser.get_cookie('sessionid'))
+        self.lose_session()
         self.memory_click('[data-reminder-reload]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerReminders').get_attribute('textContent')=='')
 
@@ -5842,7 +5864,16 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         toggle=self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]')
         toggle.send_keys(Keys.SPACE)
         self.wait.until(lambda _: '1 of' in self.text('packingStatus'))
-        self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]').send_keys(Keys.SPACE)
+        from selenium.common.exceptions import ElementNotInteractableException
+
+        def toggle_again(_):
+            # The checklist redraws after saving, so its new checkbox can be briefly not ready for keys.
+            try:
+                self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]').send_keys(Keys.SPACE)
+                return True
+            except ElementNotInteractableException:
+                return False
+        self.wait.until(toggle_again)
         self.wait.until(lambda _: '0 of' in self.text('packingStatus'))
         self.memory_click(selector+' summary')
         field=self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[name="label"]')
@@ -6327,24 +6358,29 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login()
         self.browser.get(self.live_server_url + '/career/')
         self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#careerOpenings > .mini-card')) == 8)
-        self.assertIn('Location not specified', self.text('careerOpenings'))
+        # Cards read as empty text while they fade in, after the count above is already right.
+        self.wait.until(lambda _: 'Location not specified' in self.text('careerOpenings'))
         self.assertIn('Remote work does not confirm country eligibility', self.browser.find_element(self.By.ID, 'careerRoot').text)
+        def choose(filter_id, value):
+            # A refresh rebuilds the options, so selecting retries instead of holding an old one.
+            self.wait.until(lambda _: Select(self.browser.find_element(self.By.ID, filter_id)).select_by_value(value) or True)
+
         self.browser.execute_script("document.querySelector('#careerProfileForm [name=role]').value = 'Unsaved local draft';")
 
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('India')
+        choose('careerOpeningCountryFilter', 'India')
         self.wait.until(lambda _: '3 of 8' in self.text('careerOpeningsMeta'))
         self.assertNotIn('US only', self.text('careerOpenings'))
         self.assertNotIn('India / United States', self.text('careerOpenings'))
         self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR, '#careerProfileForm [name=role]').get_attribute('value'), 'Unsaved local draft')
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningStateFilter')).select_by_value('Karnataka')
+        choose('careerOpeningStateFilter', 'Karnataka')
         self.wait.until(lambda _: '1 of 8' in self.text('careerOpeningsMeta'))
-        self.assertIn('Remote - Bengaluru, Karnataka, India', self.text('careerOpenings'))
+        self.wait.until(lambda _: 'Remote - Bengaluru, Karnataka, India' in self.text('careerOpenings'))
 
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('United States')
+        choose('careerOpeningCountryFilter', 'United States')
         self.wait.until(lambda _: '2 of 8' in self.text('careerOpeningsMeta'))
-        self.assertIn('Remote (US only)', self.text('careerOpenings'))
+        self.wait.until(lambda _: 'Remote (US only)' in self.text('careerOpenings'))
         self.assertNotIn('except United States', self.text('careerOpenings'))
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('Remote')
+        choose('careerOpeningCountryFilter', 'Remote')
         self.wait.until(lambda _: '5 of 8' in self.text('careerOpeningsMeta'))
         self.assertNotIn('Non-remote', self.text('careerOpenings'))
         self.browser.execute_script("""const fetch = window.fetch;
@@ -6354,9 +6390,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 }
                 return response;
             }); window.restoreCountryFetch = () => {window.fetch = fetch;};""")
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('India')
+        choose('careerOpeningCountryFilter', 'India')
         self.wait.until(lambda _: self.browser.execute_script("return typeof window.releaseCountryResponse === 'function'"))
-        Select(self.browser.find_element(self.By.ID, 'careerOpeningCountryFilter')).select_by_value('United States')
+        choose('careerOpeningCountryFilter', 'United States')
         self.wait.until(lambda _: '2 of 8' in self.text('careerOpeningsMeta'))
         self.browser.execute_async_script("window.restoreCountryFetch(); window.releaseCountryResponse(); requestAnimationFrame(()=>requestAnimationFrame(arguments[arguments.length-1]));")
         self.assertIn('2 of 8', self.text('careerOpeningsMeta'))

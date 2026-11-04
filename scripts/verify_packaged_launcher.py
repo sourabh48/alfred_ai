@@ -60,7 +60,8 @@ def main():
             user32.GetWindowRect(handle, ctypes.byref(rectangle))
             if rectangle.right - rectangle.left > 100:
                 report["gui_window_observed"] = True
-                screenshot = data / "launcher.png"
+                # Beside the data folder: ALFRED refuses a data folder that already holds files and is not private.
+                screenshot = data.with_name(data.name + " launcher.png")
                 if not screenshot.exists():
                     from PIL import ImageGrab
                     # Capture only our window, even when another app covers it.

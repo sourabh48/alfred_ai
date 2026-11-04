@@ -1,5 +1,24 @@
 # ALFRED execution state
 
+## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
+
+- Branch `security/runtime-11-dependencies`. Not merged to development or master, nothing deployed. Implemented, not
+  accepted. Baseline75/143, extensions0/13 unchanged. Evidence and residual risk: `docs/RUNTIME_11_EVIDENCE.md`.
+- Last product commit `297e180`. Results there: Chrome 156/156; backend 2526 run, 0 failed, 176 skipped, the same through
+  SafeDisk; local AI 13/20 (6 time out on Ollama 0.40.14, 1 stale benchmark); packaged memory 35/35; journeys 89/89, 13/13, 199/201 (Reports 403 by design); OCR 13/13; operator database hashes identical.
+- Smart App Control blocked the unsigned `297e180` exe and installer (`WinError 4551`), so the extended drill, installer
+  verifier and lifecycle did not run there. Last full runs: `7bb90e9` and `d2a9601`, verifier 6/6, lifecycle 37/37.
+- Advisories 276 to 1. `diskcache` CVE-2025-69872 stays open and visible, with no upstream fix.
+- OWNER_DECISION: mitigate diskcache in ALFRED and do not rely only on folder permissions. Residual risk is not formally
+  accepted. OWNER_DECISION 2026-11-04: no paid code-signing certificate; installers stay unsigned.
+- Independent review done: F1 and F2 fixed, then D1 and D2 fixed in `297e180`. F3 to F5 and R1 to R4 are residual.
+- Pending: exact-head PR CI, owner decision on residual risk, separate-user install, clean PC, installer runs on
+  `297e180`, a new independent held-out set for the stale benchmark.
+- Findings to carry: an interrupted upgrade needs Setup rerun; the installer is unsigned and Smart App Control can block it.
+  The D-02 regression fixed here in `b634a88` is still on development `1d9df25`.
+- Next: the owner opens the draft PR from `security/runtime-11-dependencies` to `development/alfred-integrated` so CI
+  runs. Then the owner's consolidation batch merges it with the other branches and runs the full suite once.
+
 ## Active checkpoint — post-master functional results and owner decisions (2026-11-01)
 
 - Master `96d4637` functional verdict: FUNCTIONAL FAILURES FOUND. Exact-SHA results: Chrome 156/156; backend 2457 run,
