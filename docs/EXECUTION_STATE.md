@@ -62,6 +62,7 @@
   - A linked family account sees only the shared dependents or financial part, never when the other person is active.
   - Skipped or failed reloads now retry, and failures back off from 10 s to 5 min.
   - Script versions are bumped.
+  - Owner follow-up: background reloads no longer show the top progress bar or the page busy overlay.
 
   Evidence: 8 version tests and 348 cache, family and contract tests PASS; full Chrome suite 170 PASS. Residual: the
   20-minute statement retry job re-saves failed uploads, causing one quiet reload with unchanged data each time.

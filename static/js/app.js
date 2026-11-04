@@ -170,7 +170,7 @@ function ensurePageBusyIndicator(root, label, options = {}) {
 
 function setPageBusy(rootId, busy, options = {}) {
     const root = resolveElement(rootId);
-    if (!root) {
+    if (!root || (busy && quietLiveLoads > 0)) {
         return;
     }
     root.dataset.pageBusy = busy ? "true" : "false";
@@ -274,6 +274,8 @@ function installNavAnchorPersistence() {
 
 // Loaders catch their own errors, so a failed live reload is detected by this count.
 let liveFetchFailures = 0;
+// While a background reload runs, its requests show no progress bar or busy overlay: values just update in place.
+let quietLiveLoads = 0;
 function fetchJSON(url, options = {}) {
     const {onResponse, ...requestOptions} = options;
     const config = {
@@ -290,7 +292,8 @@ function fetchJSON(url, options = {}) {
         config.headers["X-CSRFToken"] = getCookie("csrftoken");
     }
 
-    beginGlobalProgress();
+    const quiet = quietLiveLoads > 0;
+    if (!quiet) beginGlobalProgress();
     return fetch(url, config)
         .catch(error => {
             liveFetchFailures += 1;
@@ -310,7 +313,7 @@ function fetchJSON(url, options = {}) {
             return payload;
         })
         .finally(() => {
-            endGlobalProgress();
+            if (!quiet) endGlobalProgress();
         });
 }
 
@@ -659,6 +662,7 @@ function enableLiveRefresh(key, loadFn, options = {}) {
         entry.inFlight = true;
         entry.lastStarted = Date.now();
         const failuresBefore = liveFetchFailures;
+        quietLiveLoads += 1;
         const failed = () => {
             // 10 s doubling to 5 min, so a failing or rate-limited endpoint is not hammered.
             entry.stale = true;
@@ -673,6 +677,7 @@ function enableLiveRefresh(key, loadFn, options = {}) {
             })
             .catch(failed)
             .finally(() => {
+                quietLiveLoads -= 1;
                 entry.inFlight = false;
             });
     };

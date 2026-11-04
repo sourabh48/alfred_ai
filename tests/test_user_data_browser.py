@@ -1128,6 +1128,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             const original = window.fetch;
             window.fetch = (url, options) => {{ window.liveCalls.push(String(url)); return original(url, options); }};
             window.cardsBefore = [...{cards}];
+            window.busyShown = false;
+            const progress = document.getElementById('alfredTopProgress');
+            const overlay = document.getElementById('dashboardRoot');
+            new MutationObserver(() => {{
+                if (progress.classList.contains('is-visible') || overlay.dataset.pageBusy === 'true') window.busyShown = true;
+            }}).observe(document.body, {{ attributes: true, subtree: true, attributeFilter: ['class', 'data-page-busy'] }});
         ''')
         check = '''
             const done = arguments[0];
@@ -1144,6 +1150,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.execute_script(f"return {cards}[3].textContent") != before)
         connected = self.browser.execute_script("return window.cardsBefore.map(card => card.isConnected)")
         self.assertEqual(connected[:4], [True, True, True, False])
+        # A background reload updates values quietly: no progress bar, no busy overlay.
+        self.assertFalse(self.browser.execute_script("return window.busyShown"))
 
     def test_loan_refresh_response_does_not_replace_rows_during_table_interaction(self):
         self.login()
