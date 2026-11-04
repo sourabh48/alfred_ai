@@ -87,6 +87,8 @@
   because nothing had changed. Now a section whose load failed is reloaded at the next check (10 s) whenever any request
   failed since its last load. The new Chrome test (first load answers 429) fails on the old `app.js` and passes now;
   live, cache, abuse-limit (36) and the dashboard/loan/behavioral Chrome tests PASS.
+- Master CI on `50f96ef` (run 41933533908): all 9 checks PASS, native-windows included; local native verification
+  22/22. First fully green exact head since `6d6551e`. Owner's app restarted on standing permission (no migrations).
 - Next: FAMILY-07.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
