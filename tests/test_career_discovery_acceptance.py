@@ -145,6 +145,16 @@ class CareerDiscoveryRulesTests(SimpleTestCase):
         feeds(self, [feed(jobs=[lead(url=url) for url in urls]), feed(1, jobs=[]), feed(2, jobs=[])])
         self.assertEqual(job_intelligence.suggest_openings("Data Analyst", ["Python"])["total_candidates"], 3)
 
+    def test_hash_routes_keep_distinct_postings_and_plain_anchors_merge(self):
+        urls = ["https://jobs.example.org/#/jobs/1", "https://jobs.example.org/#!/jobs/2",
+            "https://jobs.example.org/roles/7#apply", "https://jobs.example.org/roles/7"]
+        feeds(self, [feed(jobs=[lead(url=url) for url in urls]), feed(1, jobs=[]), feed(2, jobs=[])])
+        result = job_intelligence.suggest_openings("Data Analyst", ["Python"])
+        self.assertEqual(result["total_candidates"], 3)
+        links = {row["url"] for row in result["openings"]}
+        self.assertTrue({"https://jobs.example.org/#/jobs/1", "https://jobs.example.org/#!/jobs/2"} <= links)
+        self.assertIn("https://jobs.example.org/roles/7", links)
+
 
 class CareerDiscoveryAPITests(TestCase):
     def setUp(self):

@@ -178,16 +178,33 @@ class BenchmarkLocationTests(SimpleTestCase):
     def test_restricted_and_ambiguous_locations_are_not_local_salary_evidence(self):
         for requested, location in (("Bengaluru", "Remote (US only)"), ("Bengaluru", "Remote - Europe"),
                                     ("India", "Anywhere except India"), ("India", "India / United States"),
-                                    ("India", "Indiana"), ("Berlin", "Remote, not Berlin"), ("Bengaluru", "Mumbai, India")):
+                                    ("India", "Indiana"), ("Berlin", "Remote, not Berlin"), ("Bengaluru", "Mumbai, India"),
+                                    # A different city in the same state, and pay open to anywhere, are not local pay.
+                                    ("Mumbai", "Pune, India"), ("San Francisco", "Los Angeles, California"),
+                                    ("Bengaluru", "Remote"), ("Bengaluru", "Worldwide"),
+                                    ("Mumbai", "India, excl. Mumbai"), ("Mumbai", "Anywhere but Mumbai"),
+                                    ("Mumbai", "India - other than Mumbai"),
+                                    # A city missing from the tables, or a posting naming two cities, is not local pay elsewhere.
+                                    ("Thane, Maharashtra", "Pune, Maharashtra"), ("Jaipur, Rajasthan, India", "Mumbai, India"),
+                                    ("Mumbai", "Mumbai, Pune, India")):
             with self.subTest(requested=requested, location=location):
                 self.assertTrue(self.benchmark(requested, location)["evidence_contract"]["fallback_to_global"])
 
-    def test_matching_places_and_unrestricted_remote_remain_salary_evidence(self):
-        for requested, location in (("Bengaluru", "Bangalore, India"), ("Bengaluru", "Remote"), ("Bengaluru", "Worldwide"),
+    def test_matching_places_remain_salary_evidence(self):
+        for requested, location in (("Bengaluru", "Bangalore, India"), ("Mumbai", "Mumbai, Maharashtra, India"),
                                     ("Karnataka, India", "Bengaluru, Karnataka, India"), ("India", "Mumbai, India"),
-                                    ("Berlin", "Berlin, Germany"), ("Remote", "Remote (US only)")):
+                                    ("Maharashtra, India", "Pune, India"), ("", "Remote"),
+                                    ("Berlin", "Berlin, Germany"), ("Remote", "Remote (US only)"),
+                                    ("Thane, Maharashtra", "Thane, Maharashtra, India"),
+                                    ("New York, United States", "Buffalo, New York, United States")):
             with self.subTest(requested=requested, location=location):
                 self.assertFalse(self.benchmark(requested, location)["evidence_contract"]["fallback_to_global"])
+
+    def test_match_level_uses_city_aliases_and_new_york_alone_is_the_state(self):
+        for requested, location, level in (("Bengaluru", "Bangalore, India", "city"),
+                                           ("New York, United States", "Buffalo, New York, United States", "state")):
+            with self.subTest(requested=requested, location=location):
+                self.assertEqual(self.benchmark(requested, location)["evidence_contract"]["geo_match_level"], level)
 
     def test_band_from_other_locations_says_so_and_is_not_compared_with_income(self):
         result = self.benchmark("Bengaluru", "Austin, Texas, United States", current_income_annual=1000000)

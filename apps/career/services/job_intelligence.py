@@ -78,7 +78,11 @@ STATE_TO_COUNTRY = {
     "texas": "United States",
 }
 # Wording that excludes a place; "not remote" is about the work model, so it still names the place.
-LOCATION_EXCLUSION_RE = re.compile(r"\b(?:except|exclud\w*|outside|ex|(?:not|non|no)(?![ -]+remote\b))\b", re.IGNORECASE)
+LOCATION_EXCLUSION_RE = re.compile(
+    r"\b(?:except|excl(?:ud\w*)?|outside|ex|other\s+than|(?:anywhere|everywhere|all)\s+but|(?:not|non|no)(?![ -]+remote\b))\b",
+    re.IGNORECASE)
+# Old and new names of one city.
+CITY_ALIASES = {"bangalore": "bengaluru", "gurgaon": "gurugram"}
 # Campaign and referral parameters say how a link was found, not which posting it is.
 TRACKING_QUERY_RE = re.compile(r"utm_.*|ref|referrer|source|src|gh_src|lever-source|lever-origin|gclid|fbclid|trk", re.IGNORECASE)
 COUNTRY_ALIASES = {
@@ -417,7 +421,8 @@ class JobIntelligenceService:
                     url = public_http.normalized_link(item.get("url"))
                     if not url:
                         continue
-                    url = urlparse(url)._replace(fragment="").geturl()
+                    parts = urlparse(url)
+                    url = parts._replace(fragment=self._route_fragment(parts.fragment)).geturl()
                     item = {**item, "_aggregator_name": feed_result["source_name"]}
                     item["url"] = url
                     tags = item.get("tags") or []
@@ -473,7 +478,13 @@ class JobIntelligenceService:
     def _opening_identity(self, url: str) -> str:
         parts = urlparse(url)
         query = sorted(item for item in parse_qsl(parts.query, keep_blank_values=True) if not TRACKING_QUERY_RE.fullmatch(item[0]))
-        return parts._replace(path=parts.path.rstrip("/"), query=urlencode(query), fragment="").geturl()
+        return parts._replace(path=parts.path.rstrip("/"), query=urlencode(query),
+                              fragment=self._route_fragment(parts.fragment)).geturl()
+
+    @staticmethod
+    def _route_fragment(fragment: str) -> str:
+        # Single-page job boards route by fragment (#/jobs/1 or #!/jobs/1); a plain anchor such as #apply is page position.
+        return fragment if fragment.startswith(("/", "!/")) else ""
 
     def current_openings_evidence(self, evidence: dict) -> dict:
         # Owner caching cannot keep merged feed evidence fresh past its earliest source expiry.
@@ -802,6 +813,7 @@ class JobIntelligenceService:
         country = ""
         countries = set()
         states = set()
+        cities = set()
         for part in parts:
             lowered = part.lower()
             if lowered in COUNTRY_ALIASES and COUNTRY_ALIASES[lowered] != "Remote":
@@ -816,6 +828,7 @@ class JobIntelligenceService:
                 continue
             if lowered in CITY_TO_STATE_COUNTRY:
                 city = part.title()
+                cities.add(self._city_key(city))
                 mapped_state, mapped_country = CITY_TO_STATE_COUNTRY[lowered]
                 states.add(mapped_state)
                 state = state or mapped_state
@@ -824,15 +837,20 @@ class JobIntelligenceService:
         if not city:
             for city_name, (mapped_state, mapped_country) in CITY_TO_STATE_COUNTRY.items():
                 if re.search(r"\b" + re.escape(city_name) + r"\b", normalized):
-                    city = city_name.title()
                     states.add(mapped_state)
                     state = state or mapped_state
                     country = country or mapped_country
                     countries.add(mapped_country)
+                    # "New York" and "Delhi" also name a state, so the words alone do not place the city.
+                    if city_name in STATE_TO_COUNTRY:
+                        continue
+                    city = city_name.title()
                     break
         # Composite/negative restrictions need review, not a guessed eligible country.
         if len(countries) > 1 or len(states) > 1 or LOCATION_EXCLUSION_RE.search(normalized):
             country, state, city = "", "", ""
+        elif len(cities) > 1:
+            city = ""
         elif not country and is_remote:
             country = "Remote"
         return {"country": country, "state": state, "city": city, "is_remote": is_remote}
@@ -1302,7 +1320,7 @@ class JobIntelligenceService:
         if fallback_to_global:
             return "global_fallback"
         requested = self._location_hierarchy(requested_location)
-        if requested["city"] and any(item.get("city") == requested["city"] for item in selected):
+        if requested["city"] and any(self._city_key(item.get("city")) == self._city_key(requested["city"]) for item in selected):
             return "city"
         if requested["state"] and any(item.get("state") == requested["state"] for item in selected):
             return "state"
@@ -1346,14 +1364,23 @@ class JobIntelligenceService:
         observation_location = str(observation.get("location", "") or "").lower()
         if requested_meta["country"] == "Remote":
             return bool(observation.get("is_remote"))
-        # "Remote (US only)" is US evidence; only remote with no stated limit counts for any place.
-        if observation.get("is_remote") and not re.sub(r"\b(?:remote|worldwide|global|anywhere)\b|\W", "", observation_location):
-            return True
+        # A city outside the tables must be named by the observation, or pay from elsewhere in its state would count.
+        first_part = re.split(r"[,/|()·-]", requested)[0].strip().lower()
+        if not requested_meta["city"] and first_part not in COUNTRY_ALIASES and first_part not in STATE_TO_COUNTRY and not re.search(
+                r"(?<!\w)" + re.escape(first_part) + r"(?!\w)", observation_location):
+            return False
+        # Remote pay open to anywhere is not evidence for one place; a named place must match down to its city.
         if requested_meta["country"]:
             return observation.get("country") == requested_meta["country"] and (
-                not requested_meta["state"] or observation.get("state") == requested_meta["state"])
+                not requested_meta["state"] or observation.get("state") == requested_meta["state"]) and (
+                not requested_meta["city"] or self._city_key(observation.get("city")) == self._city_key(requested_meta["city"]))
         # A place outside the known tables can only match by name, and never where the text excludes it.
         return bool(re.search(r"(?<!\w)" + re.escape(requested.lower()) + r"(?!\w)", observation_location)) and not LOCATION_EXCLUSION_RE.search(observation_location)
+
+    @staticmethod
+    def _city_key(value) -> str:
+        key = str(value or "").strip().lower()
+        return CITY_ALIASES.get(key, key)
 
     def _salary_geography_scope(self, requested_location: str, observations: list[dict], selected: list[dict], *, fallback_to_global: bool) -> dict:
         requested_meta = self._location_hierarchy(requested_location)

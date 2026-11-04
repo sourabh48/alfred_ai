@@ -1,5 +1,24 @@
 # ALFRED execution state
 
+## Active checkpoint — Career module, CAREER-03 and CAREER-06 (2026-11-04)
+
+- Work on `master` after the 2026-11-04 consolidation. Owner direction: one module at a time, only finished work is pushed
+  to master; the development branch stays local.
+- CAREER-03: hash-routed job links (`#/jobs/1`, `#!/jobs/2`) stay distinct; a plain `#apply` anchor merges with its page.
+- CAREER-06: pay from a different city in the same state (Pune for Mumbai) is no longer local evidence; "excl.",
+  "other than" and "anywhere/everywhere/all but" are exclusions; pay open to anywhere ("Remote", "Worldwide") is not
+  evidence for one named place.
+- CAREER-06 second review: unlisted cities ("Thane" vs "Pune, Maharashtra"), "New York" read as the city, labels ignoring
+  aliases, and a posting naming two cities. All fixed: unlisted cities must be named, "New York"/"Delhi" alone mean the
+  state, two cities place neither.
+- Evidence: 111 Career backend tests (nine modules) and eight Career Chrome tests PASS, zero skips, synthetic data.
+  Independent review: CAREER-03 and CAREER-06 TECHNICAL_PASS for bounded scope. Both COMPLETE_VERIFIED; baseline 77/143,
+  extensions 0/13.
+- Residuals: generic words such as "manager" give a role match; the job-match panel's saved pay band shows no date or
+  staleness label; search adds "developer"/"analyst"; `#job=123` fragments are dropped; placeholder `alfred.local`
+  source URL. Real accounts, live providers and NVDA: NOT_RUN.
+- Next: exact-head master CI, then the next Career item from the queue.
+
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
 - Branch `security/runtime-11-dependencies`. Not merged to development or master, nothing deployed. Implemented, not
