@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -118,12 +119,13 @@ class AdvisoryEvidenceFreshnessTests(TestCase):
         self.assertEqual(payload["grounding"]["history"]["tracked_snapshots"], 0)
         self.assertIn("External evidence grounds market and macro pressure only", payload["grounding"]["notes"][1])
 
-    def test_verified_job_filter_blocks_provider_token(self):
-        service = VerifiedIntelligenceService()
-        blocked_token = "".join(("A", "W", "S"))
+    def test_job_feeds_keep_postings_that_mention_a_cloud_skill(self):
+        # A posting asking for AWS is a search interest, not AWS runtime activation.
+        row = {"position": "Java Developer", "company": "Synthetic", "tags": ["Java", "AWS"], "url": "https://jobs.example.org/1"}
+        with patch("apps.integrations.services.verified_intelligence.public_http.request", return_value=SimpleNamespace(json=lambda: [row])):
+            payload, _summary, _notes = VerifiedIntelligenceService()._fetch_remoteok_jobs("AWS")
 
-        self.assertTrue(service._mentions_blocked_provider({"tags": ["Python", blocked_token]}))
-        self.assertFalse(service._mentions_blocked_provider({"title": "Financial laws analyst"}))
+        self.assertEqual([job["title"] for job in payload["jobs"]], ["Java Developer"])
 
 
 def _insight(payload, source_name):

@@ -9,8 +9,9 @@ from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from alfred_ai.services.public_http import PublicHTTPError
-from apps.career.models import CareerProfile
+from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services.job_intelligence import JOB_FEED_ADAPTERS, job_intelligence, verified_intelligence
+from apps.career.services.resume_intelligence import SKILL_CATALOG, extract_skill_terms
 
 
 def lead(**changes):
@@ -113,6 +114,37 @@ class CareerDiscoveryRulesTests(SimpleTestCase):
         self.assertEqual(result["total_candidates"], 2)
         self.assertTrue(all(item["publication_date"] == "" for item in result["openings"]))
 
+    def test_search_terms_come_only_from_the_configured_role_and_skills(self):
+        mocks = feeds(self, [feed(jobs=[]), feed(1, jobs=[]), feed(2, jobs=[])])
+        job_intelligence.suggest_openings("Java Developer", ["Java", "Spring Boot", "AWS"])
+        self.assertEqual({call.args[0] for call in mocks[0].call_args_list},
+            {"Java Developer Java Spring Boot", "Java Developer", "Java"})
+
+    def test_configured_java_stack_is_extracted_from_postings_and_resumes(self):
+        text = "Java developer with Spring Boot and AWS; laws and draws are not skills."
+        self.assertEqual(set(job_intelligence._extract_skills(text)), {"Java", "Spring Boot", "Aws"})
+        self.assertLessEqual({"Java", "Spring Boot", "Aws"}, set(extract_skill_terms(text, SKILL_CATALOG)))
+
+    def test_non_text_saved_skills_do_not_break_discovery(self):
+        feeds(self, [feed(), feed(1, jobs=[]), feed(2, jobs=[])])
+        result = job_intelligence.suggest_openings("Data Analyst", [None, 5, "", "SQL"])
+        self.assertEqual(result["total_candidates"], 1)
+
+    def test_role_and_skills_match_whole_words_only(self):
+        feeds(self, [feed(jobs=[lead(title="JavaScript Engineer", tags=[], url="https://jobs.example.org/js"),
+            lead(title="Senior Java Engineer", tags=[], url="https://jobs.example.org/java")]), feed(1, jobs=[]), feed(2, jobs=[])])
+        rows = {i["title"]: i for i in job_intelligence.suggest_openings("Java Developer", ["Java"])["openings"]}
+        self.assertEqual(rows["JavaScript Engineer"]["match_reasons"], [])
+        self.assertFalse(rows["JavaScript Engineer"]["role_matched"])
+        self.assertTrue(rows["Senior Java Engineer"]["role_matched"])
+        self.assertGreater(rows["Senior Java Engineer"]["relevance_score"], rows["JavaScript Engineer"]["relevance_score"])
+
+    def test_tracking_parameters_and_trailing_slash_do_not_split_one_posting(self):
+        urls = ["https://jobs.example.org/roles/123?utm_source=feed", "https://jobs.example.org/roles/123/?ref=board",
+            "https://jobs.example.org/roles/123?gh_jid=9", "https://jobs.example.org/roles/123?gh_jid=10&utm_medium=x"]
+        feeds(self, [feed(jobs=[lead(url=url) for url in urls]), feed(1, jobs=[]), feed(2, jobs=[])])
+        self.assertEqual(job_intelligence.suggest_openings("Data Analyst", ["Python"])["total_candidates"], 3)
+
 
 class CareerDiscoveryAPITests(TestCase):
     def setUp(self):
@@ -141,6 +173,8 @@ class CareerDiscoveryAPITests(TestCase):
         item = second.json()["openings"][0]
         self.assertFalse(item["verified_source"])
         self.assertEqual(item["source_status"], "stale")
+        self.assertEqual(first.json()["openings_evidence"]["status"], "fresh")
+        self.assertEqual(second.json()["openings_evidence"]["status"], "stale")
         self.assertEqual(list(CareerProfile.objects.order_by("pk").values()), before)
         self.assertNotIn("PRIVATE-FOREIGN", str(first.json()))
         self.assertNotIn("PRIVATE-FOREIGN", str(mocks[0].call_args_list))
@@ -153,3 +187,26 @@ class CareerDiscoveryAPITests(TestCase):
         self.assertNotIn("PRIVATE-FOREIGN", str(response.json()))
         self.client.logout()
         self.assertIn(self.client.get("/api/career/dashboard/").status_code, (401, 403))
+
+    def test_configured_profile_skills_drive_discovery_after_a_resume_upload(self):
+        CareerResume.objects.create(user=self.user, file_name="synthetic.txt", uploaded_file="synthetic.txt", parser_status="parsed",
+            extracted_payload={"role": "Resume Role", "skills": ["Cobol"]})
+        mocks = feeds(self, [feed(jobs=[]), feed(1, jobs=[]), feed(2, jobs=[])])
+        self.assertEqual(self.client.get("/api/career/dashboard/").status_code, 200)
+        terms = {call.args[0] for call in mocks[0].call_args_list}
+        self.assertIn("Data Analyst Python SQL", terms)
+        self.assertNotIn("Cobol", " ".join(terms))
+
+    def test_saved_analysis_salary_keeps_its_read_date_instead_of_looking_newly_verified(self):
+        read_at = timezone.now() - timedelta(days=30)
+        analysis = CareerJobAnalysis.objects.create(user=self.user, job_url="https://jobs.example.org/roles/saved", location="Bengaluru",
+            extracted_payload={"job_snapshot": {"title": "Data Analyst", "location": "Bengaluru", "salary_min": 1800000,
+                "salary_max": 2200000, "salary_currency": "INR", "salary_period": "year", "source_kind": "job_page"}})
+        CareerJobAnalysis.objects.filter(pk=analysis.pk).update(created_at=read_at)
+        feeds(self, [feed(jobs=[]), feed(1, jobs=[]), feed(2, jobs=[])])
+        benchmark = self.client.get("/api/career/dashboard/").json()["compensation_benchmark"]
+        self.assertTrue(benchmark["available"])
+        self.assertEqual(benchmark["salary_observations"][0]["observed_at"], read_at.isoformat())
+        self.assertEqual(benchmark["evidence"][-1]["status"], "stale")
+        self.assertEqual(benchmark["evidence"][-1]["verified_at"], read_at.isoformat())
+        self.assertFalse(benchmark["evidence_contract"]["proof_complete"])

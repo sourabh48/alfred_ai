@@ -1475,8 +1475,6 @@ class VerifiedIntelligenceService:
                 "salary": item.get("salary", ""),
                 "tags": item.get("tags", [])[:8],
             }
-            if self._mentions_blocked_provider(job):
-                continue
             jobs.append(job)
         summary = f"Loaded {len(jobs)} remote openings for search term '{search_term}'."
         return {"jobs": jobs}, summary, "Openings are cached from the Remotive Jobs API and refreshed on a short TTL."
@@ -1518,8 +1516,6 @@ class VerifiedIntelligenceService:
                 "tags": tags[:8],
                 "description_excerpt": description[:1200],
             }
-            if self._mentions_blocked_provider(job):
-                continue
             jobs.append(job)
             if len(jobs) >= 10:
                 break
@@ -1567,25 +1563,11 @@ class VerifiedIntelligenceService:
                 "tags": tags[:8],
                 "description_excerpt": description[:1200],
             }
-            if self._mentions_blocked_provider(job):
-                continue
             jobs.append(job)
             if len(jobs) >= 10:
                 break
         summary = f"Loaded {len(jobs)} matching remote openings from Remote OK for search term '{search_term}'."
         return {"jobs": jobs}, summary, "Openings are cached from the Remote OK public feed and refreshed on a short TTL."
-
-    def _mentions_blocked_provider(self, value) -> bool:
-        text = self._flatten_job_text(value).lower()
-        blocked = "".join(("a", "w", "s"))
-        return bool(re.search(rf"(?<![a-z0-9]){blocked}(?![a-z0-9])", text))
-
-    def _flatten_job_text(self, value) -> str:
-        if isinstance(value, dict):
-            return " ".join(self._flatten_job_text(item) for item in value.values())
-        if isinstance(value, (list, tuple, set)):
-            return " ".join(self._flatten_job_text(item) for item in value)
-        return str(value or "")
 
     def _job_search_terms(self, search_term: str) -> list[str]:
         ignored = {"and", "for", "the", "with", "job", "jobs", "remote"}
