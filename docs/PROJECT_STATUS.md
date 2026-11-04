@@ -785,9 +785,9 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 - **PR/CI:** Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 - **Current task:** Local consolidation preparation is validated on preparation/alfred-consolidation-20261026; required reviews and PR19 CI still block canonical integration. Preserve 143 original IDs/75 verified and 13 extensions/0 accepted. See CONSOLIDATION_STATE for sources, conflict decisions and receipts. Stage7 selection is not reached.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 80/143 (55.9%) verified.**
+**Baseline: 81/143 (56.6%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 19 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 80
+IMPLEMENTED_NOT_ACCEPTED: 18 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 81
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -802,7 +802,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | AI | 11 | 18 | 61.1 | 3 | 2 | 2 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 0 | 3 | 0 | 0 | 0 |
 | TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
-| FAMILY | 5 | 7 | 71.4 | 2 | 0 | 0 | 0 | 0 |
+| FAMILY | 6 | 7 | 85.7 | 1 | 0 | 0 | 0 | 0 |
 | BIKE | 2 | 6 | 33.3 | 2 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
@@ -2894,16 +2894,17 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FAMILY-06 — Behavioral signals and personalization
 
-**IMPLEMENTED_NOT_ACCEPTED** · Family, relationships and risk · P2.
+**COMPLETE_VERIFIED** · Family, relationships and risk · P2.
 
-- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py), [apps/behavioral/services.py](../apps/behavioral/services.py).
+- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py), [apps/behavioral/services.py](../apps/behavioral/services.py), [static/js/behavioral.js](../static/js/behavioral.js).
 - APIs/UI/models: /family/; family relationship/financial-sharing APIs; Dependent, FamilyAccountLink; owner-scoped financial baseline.
-- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py), [tests/test_behavioral_linkage.py](../tests/test_behavioral_linkage.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py), [tests/test_behavioral_linkage.py](../tests/test_behavioral_linkage.py), [browser](../tests/test_user_data_browser.py). **30 behavioral and 88 related backend tests, plus the Behavioral and Risk Chrome tests, PASS** (2026-11-05, master), zero skips.
+- Acceptance: TECHNICAL_PASS on synthetic data. Pressure uses only real outflow and each log's own week; values with nothing behind them show as unavailable ("—"), not 0; income-based pressure, labels, tone and texts are withheld without recorded income or while debits await review, matching the dashboard. Two independent review rounds. Clinical or personal prediction accuracy and a normal existing account are not evaluated.
 - Bounded unit 2026-10-31 (source/test only, branch `batch/fast-dev-20261031`): reproduced an empty spending week scored as 0.0, which turned manual stress 8 into 5.2, padded the series with zeros that could fake a trend, and lost its "No debit activity" driver. Empty windows are now marked, excluded from the blend and Behavior pressure average, and skipped in the series, with the existing fallback only when nothing remains. The Risk signal API now rejects values outside 0-100 and non-finite values (`NaN` previously raised a database error); legacy records stay readable and unrewritten. 74 affected backend and one actual Chrome PASS, zero skips. No schema or JavaScript change.
 - Bounded unit 2026-11-02 (source/test only, branch `claude/family-05-07-0247d4`, cut from `1d9df25` before RUNTIME-11's dependency upgrades; no Chrome or full regression run): reproduced raw exception text in Behavioral API errors, own transfers and unreviewed large debits counted as spending pressure, a months-old log blended with this week's spending as current stress, and an unset sleep field raising a low-sleep warning. Errors now return a safe message and reference; pressure uses the canonical outflow rule; each log only meets its own week's spending, with the week's newest log representing it; logs older than seven weeks no longer feed pressure; the chart names real weeks instead of T-n; output states it is not a clinical assessment. No schema change.
+- Bounded unit 2026-11-05 (master): savings, debt-service and cash-flow stress divide by recorded income and leave out debits awaiting review, so without income they read as 0% and while a review is pending savings is inflated. The page showed a Cash-flow pressure number, a fallback stress, "0.0" when nothing was observed, a zero chart point, a "savings below 10%" flag, an income-inflated coach tone, strategy and "All systems normal", and labels such as Steady Builder, Strategic Accumulator, Controlled and Analytical from those rates. These are now withheld with a reason or recomputed without savings; unavailable bars announce "Unavailable". Each new backend test fails on the previous code.
 - Limitations/dependencies: Manual signals and derived pressure maps exist; clinical/personal prediction accuracy not established. "Current" pressure can come from an earlier week when this week has no data; the message then names that week. The burnout and risk model trainers read every account's logs and derive their labels from the same inputs, so they are not outcome-validated; nothing on these pages uses them. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Obtain consent and labelled outcomes; avoid medical certainty.
+- Next: Obtain consent and labelled outcomes; avoid medical certainty. The dashboard and loan pages still show the shared "savings below 10%" flag and coach tone without recorded income; that shared financial-intelligence text is outside this unit.
 
 ### FAMILY-07 — Financial/health/relocation risk intelligence
 

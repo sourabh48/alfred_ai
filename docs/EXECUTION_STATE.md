@@ -67,7 +67,17 @@
   Evidence: 8 version tests and 348 cache, family and contract tests PASS; full Chrome suite 170 PASS. Residual: the
   20-minute statement retry job re-saves failed uploads, causing one quiet reload with unchanged data each time.
   This is not one of the 143 baseline items or the 13 extensions; baseline stays 80/143.
-- Next: FAMILY-06.
+- Master CI on `fdf1a25`: Selenium (3 shards), Linux, build and Pages passed; native-windows failed once waiting for the
+  dashboard income card after its concurrency step. The same native verification passes locally (22 checks) on that code.
+  Recorded as unconfirmed runner timing; `fdf1a25` is not green. `a5ce8bc` before it failed the backend gate with no test
+  failure printed (30-minute step); its exact cause is unknown.
+- The owner's app was restarted on request (2026-11-05) to load this code; no migrations changed, data folder unchanged.
+- FAMILY-06 (2026-11-05): savings, debt-service and cash-flow stress divide by recorded income and leave out debits
+  awaiting review, so the Behavioral page showed a Cash-flow pressure number, 0.0 stress with nothing observed, a
+  "savings below 10%" flag, an income-inflated tone and strategy, and labels such as Steady Builder from those rates.
+  Now withheld or recomputed without savings, and shown as "—". Two review rounds; 30 behavioral, 88 related backend and
+  the Behavioral/Risk Chrome tests PASS. COMPLETE_VERIFIED for bounded scope; baseline 81/143.
+- Next: FAMILY-07.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

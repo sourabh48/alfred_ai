@@ -1,5 +1,10 @@
 let stressChart;
 
+// Missing values show as a dash, never as an observed 0.
+function scoreText(value, digits = 1) {
+    return value === null || value === undefined ? "\u2014" : Alfred.formatNumber(value, digits);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     if (!document.getElementById("behavioralRoot")) {
         return;
@@ -32,7 +37,7 @@ function loadBehavioralDashboard() {
 
 function renderBehavioralHero(stress, fingerprint) {
     document.getElementById("behavioralFingerprintValue").textContent = fingerprint.fingerprint || "No data";
-    document.getElementById("behavioralStressValue").textContent = Alfred.formatNumber(stress.current_stress || 0, 1);
+    document.getElementById("behavioralStressValue").textContent = scoreText(stress.current_stress);
     document.getElementById("behavioralHeroCopy").textContent = fingerprint.message || stress.message || "No behavioral baseline yet.";
 }
 
@@ -41,12 +46,12 @@ function renderBehavioralSummary(history, stress, fingerprint) {
     const cards = [
         {
             title: "Current Pressure",
-            value: Alfred.formatNumber(stress.current_stress || 0, 1),
+            value: scoreText(stress.current_stress),
             copy: stress.trend || "Unknown trend",
         },
         {
             title: "Average Pressure",
-            value: Alfred.formatNumber(stress.average_stress || 0, 1),
+            value: scoreText(stress.average_stress),
             copy: "Blended from manual logs and linked spending windows",
         },
         {
@@ -72,13 +77,14 @@ function renderBehavioralSummary(history, stress, fingerprint) {
 
 function renderStressChart(values, windowLabels) {
     const canvas = document.getElementById("stressChart");
-    const ordered = values.length ? [...values].reverse() : [0];
+    // No data plots nothing rather than a zero point.
+    const ordered = [...values].reverse();
     // The single fallback point has no weekly window behind it.
     const labels = windowLabels.length === values.length ? [...windowLabels].reverse() : ordered.map(() => "Current");
     stressChart = Alfred.renderChart(stressChart, canvas, {
         type: "line",
         data: {
-            labels: values.length ? labels : ["No data"],
+            labels,
             datasets: [{
                 label: "Stress",
                 data: ordered,
@@ -112,7 +118,7 @@ function renderFingerprintPanel(stress, fingerprint) {
     const linkedData = fingerprint.linked_data || {};
     Alfred.setHTML(document.getElementById("behavioralFingerprintPanel"), [
         ["Fingerprint", fingerprint.fingerprint || "No data"],
-        ["Stress level", Alfred.formatNumber(fingerprint.stress_level || stress.current_stress || 0, 1)],
+        ["Stress level", scoreText(fingerprint.stress_level ?? stress.current_stress)],
         ["Spending pattern", fingerprint.spending_pattern || "Unknown"],
         ["Decision style", fingerprint.decision_style || "Unknown"],
         ["Trend", stress.trend || "Unknown"],
@@ -143,9 +149,9 @@ function renderPressureMap(stress, fingerprint) {
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-center gap-3 mb-2">
                 <div class="fw-semibold">${Alfred.escapeHtml(item.label || "Pressure")}</div>
-                <div class="small fw-semibold">${Alfred.formatNumber(item.score || 0, 1)} / 100</div>
+                <div class="small fw-semibold">${scoreText(item.score)} / 100</div>
             </div>
-            <div class="progress mb-2" role="progressbar" aria-valuenow="${Math.round(item.score || 0)}" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress mb-2" role="progressbar" aria-label="${Alfred.escapeHtml(item.label || "Pressure")}" ${item.score == null ? 'aria-valuetext="Unavailable"' : `aria-valuenow="${Math.round(item.score)}"`} aria-valuemin="0" aria-valuemax="100">
                 <div class="progress-bar" style="width: ${Math.max(0, Math.min(100, Number(item.score || 0)))}%;"></div>
             </div>
             <div class="muted small">${Alfred.escapeHtml(item.detail || "")}</div>

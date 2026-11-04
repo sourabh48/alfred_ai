@@ -259,7 +259,7 @@ class BehavioralDateAlignmentTests(TestCase):
     def test_only_old_logs_is_no_current_data(self):
         self.log(70, stress=9, sleep=3)
         payload = self.stress()
-        self.assertEqual((payload["current_stress"], payload["weekly_data"]), (0, []))
+        self.assertEqual((payload["current_stress"], payload["weekly_data"]), (None, []))  # Unavailable, not an observed zero.
         self.assertEqual(self.client.get("/api/behavioral/fingerprint/").json()["fingerprint"], "No data")
 
     def test_log_blends_with_the_spending_of_its_own_week(self):
@@ -371,3 +371,92 @@ def _planning_context():
         "freshness": freshness_snapshot(evidence),
         "notes": ["Household planning evidence fixture is fresh."],
     }
+
+
+class BehavioralIncomeGateTests(TestCase):
+    """FAMILY-06: savings, debt service and cash-flow stress divide by recorded income; without it they are not 0."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = get_user_model().objects.create_user("behavior_income_gate", password="Pass12345!", monthly_income=98000)
+        self.client.force_login(self.user)
+        patcher = patch("apps.behavioral.services.verified_intelligence.household_planning_context",
+                        return_value=_planning_context())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def row(self, amount, *, direction="debit", category="food", classification="expense", days_ago=1):
+        Expense.objects.create(user=self.user, amount=amount, classification=classification, category=category,
+                               payment_mode="BANK", merchant="Synthetic", description="Synthetic", raw_description="Synthetic",
+                               transaction_date=timezone.localdate() - timedelta(days=days_ago), direction=direction,
+                               source="manual")
+
+    def get(self, path):
+        cache.clear()
+        response = self.client.get(path)
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def cash_flow(self):
+        return next(item for item in self.get("/api/behavioral/fingerprint/")["pressure_map"]
+                    if item["label"] == "Cash-flow pressure")
+
+    def test_no_recorded_income_leaves_cash_flow_pressure_unavailable(self):
+        self.row(4000)
+        self.assertEqual(self.cash_flow(), {"label": "Cash-flow pressure", "score": None,
+                                            "detail": "Cash-flow pressure needs recorded income."})
+        stress = self.get("/api/behavioral/stress/")
+        self.assertIsNotNone(stress["current_stress"])  # Spending windows still count.
+        self.assertIn("needs recorded income", stress["message"])
+        self.assertNotIn("pressure state is", stress["message"])
+
+    def test_debits_awaiting_review_leave_cash_flow_pressure_unavailable(self):
+        self.row(95000, direction="credit", category="income", classification="other")
+        self.row(4000)
+        self.assertIsNotNone(self.cash_flow()["score"])
+        self.row(500000, category="other", classification="other")
+        self.assertEqual(self.cash_flow()["detail"], "Cash-flow pressure needs your transactions reviewed first.")
+        self.assertIsNone(self.cash_flow()["score"])
+
+    def test_no_weekly_data_and_no_income_is_unavailable_not_zero(self):
+        self.row(4000, days_ago=120)  # Linked history, but nothing in the last seven weeks.
+        stress = self.get("/api/behavioral/stress/")
+        self.assertEqual((stress["current_stress"], stress["average_stress"], stress["weekly_data"], stress["trend"]),
+                         (None, None, [], "Unknown"))
+        fingerprint = self.get("/api/behavioral/fingerprint/")
+        self.assertIsNone(fingerprint["stress_level"])
+        behavior = next(item for item in fingerprint["pressure_map"] if item["label"] == "Behavior pressure")
+        self.assertIsNone(behavior["score"])
+
+    def test_no_data_at_all_is_unavailable_not_zero(self):
+        stress = self.get("/api/behavioral/stress/")
+        self.assertEqual((stress["current_stress"], stress["average_stress"]), (None, None))
+        self.assertIsNone(self.get("/api/behavioral/fingerprint/")["stress_level"])
+
+    def test_debits_awaiting_review_do_not_drive_income_based_labels(self):
+        # Salary plus small bills reads as ~95% savings while a large debit awaits review; the old code then
+        # labelled the owner Steady Builder / Controlled / Analytical / Strategic Accumulator from that rate.
+        self.row(95000, direction="credit", category="income", classification="other", days_ago=0)
+        for _ in range(6):
+            self.row(600, category="utilities", days_ago=0)
+        self.row(500000, category="other", classification="other", days_ago=0)
+        fingerprint = self.get("/api/behavioral/fingerprint/")
+        self.assertEqual((fingerprint["fingerprint"], fingerprint["spending_pattern"], fingerprint["decision_style"]),
+                         ("Adaptive Balancer", "Mixed", "Balanced"))
+        self.assertIsNone(fingerprint["coach_tone"])
+        texts = fingerprint["insights"] + self.get("/api/behavioral/stress/")["recommendations"]
+        self.assertFalse([text for text in texts if text.startswith("All systems normal")])
+
+    def test_no_income_drops_savings_and_income_stress_texts(self):
+        self.row(4000, category="loan", classification="loan")
+        fingerprint = self.get("/api/behavioral/fingerprint/")
+        texts = fingerprint["insights"] + fingerprint["pattern_flags"] + self.get("/api/behavioral/stress/")["recommendations"]
+        self.assertFalse([text for text in texts if text.startswith(("Savings conversion", "Stress levels rising",
+                                                                     "Stress signals have accelerated"))])
+        self.assertIsNone(fingerprint["coach_tone"])
+        self.assertEqual(fingerprint["decision_style"], "Balanced")  # Old code: "Analytical" from 0% debt service.
+        # Every strategy branch compares against the income-inflated stress average.
+        self.assertEqual(fingerprint["strategy"], "")
+        self.assertNotIn("stress-spending", fingerprint["message"])
+        behavior = next(item for item in fingerprint["pressure_map"] if item["label"] == "Behavior pressure")
+        self.assertNotIn("stress-spending", behavior["detail"])

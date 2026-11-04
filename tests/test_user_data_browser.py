@@ -226,6 +226,30 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Savings rate: unavailable', self.browser.find_element(self.By.ID, 'relationshipGroundingList').get_attribute('textContent'))
         self.capture('relationship-scored-factors-without-spend')
 
+    def test_behavioral_page_shows_unavailable_pressure_as_a_dash_not_zero(self):
+        from apps.behavioral.models import BehavioralSignal
+        from apps.expenses.models import Expense
+        from apps.loans.models import Loan
+
+        user = self.scenario['user']
+        self.login(); self.browser.get(self.live_server_url + "/behavioral/")
+        # The seeded history has a large debit awaiting review, so income-based pressure is withheld.
+        self.wait.until(lambda _: 'Cash-flow pressure' in self.text('behavioralPressureMap'))
+        cash_flow = self.browser.find_element(self.By.XPATH,
+            "//div[@id='behavioralPressureMap']/div[contains(., 'Cash-flow pressure')]")
+        self.assertIn('— / 100', cash_flow.text)
+        self.assertIn('reviewed first', cash_flow.text)
+        self.assertEqual(cash_flow.find_element(self.By.CSS_SELECTOR, '[role=progressbar]').get_attribute('aria-valuetext'), 'Unavailable')
+        BehavioralSignal.objects.filter(user=user).delete()
+        Expense.objects.filter(user=user).delete()
+        Loan.objects.filter(user=user).delete()
+        cache.clear(); self.browser.refresh()
+        self.wait.until(lambda _: 'No stress data' in self.text('behavioralHeroCopy') or 'Not enough behavioral data' in self.text('behavioralHeroCopy'))
+        self.assertEqual(self.text('behavioralStressValue'), '—')
+        self.assertIn('—', self.text('behavioralSummaryCards'))
+        self.assertEqual(self.browser.execute_script("return Chart.getChart('stressChart').data.datasets[0].data.length"), 0)
+        self.capture('behavioral-unavailable-pressure')
+
     def test_unconfirmed_income_is_flagged_until_the_owner_chooses_a_period(self):
         from datetime import timedelta
         from decimal import Decimal

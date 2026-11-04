@@ -8,13 +8,25 @@ from django.utils import timezone
 
 from apps.expenses.models import Expense
 from apps.expenses.services.cashflow_treatment import classify_cashflow
-from apps.expenses.services.financial_intelligence import DISCRETIONARY_CATEGORIES, build_financial_intelligence
+from apps.expenses.services.financial_intelligence import (
+    DISCRETIONARY_CATEGORIES,
+    _behavior_personality,
+    build_financial_intelligence,
+)
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 
 from .models import BehavioralSignal
 
 STRESS_WINDOWS = 7
+# Texts built from savings or from the monthly stress score, which reads a missing income as no income.
+INCOME_DERIVED_TEXT = (
+    "Savings conversion is below 10%",
+    "Stress levels rising",
+    "Stress signals have accelerated",
+    # Debits awaiting review are left out of that score, so "normal" can hide them.
+    "All systems normal",
+)
 
 
 def build_behavioral_fingerprint(user) -> dict:
@@ -22,13 +34,13 @@ def build_behavioral_fingerprint(user) -> dict:
     manual_series = linked["manual_series"]
     intelligence = linked["intelligence"]
     summary = intelligence["summary"]
-    behavior = intelligence["behavior"]
+    behavior = _usable_behavior(summary, intelligence["behavior"])
     planning_context = verified_intelligence.household_planning_context()
 
     if not linked["has_behavior_data"]:
         return {
             "fingerprint": "No data",
-            "stress_level": 0,
+            "stress_level": None,
             "spending_pattern": "Pattern unavailable",
             "decision_style": "Style unavailable",
             "message": "Not enough behavioral data. Continue using Alfred to build your profile.",
@@ -37,7 +49,7 @@ def build_behavioral_fingerprint(user) -> dict:
             "stress_drivers": [],
             "minute_details": [],
             "strategy": "Import transaction history or log behavioral signals to activate the fingerprint engine.",
-            "coach_tone": "energetic",
+            "coach_tone": None,
             "linked_data": linked["linked_data"],
             "pressure_map": [],
             "grounding": _behavioral_grounding(
@@ -50,10 +62,13 @@ def build_behavioral_fingerprint(user) -> dict:
             ),
         }
 
-    stress_level = round(_blend_current_stress(manual_series, linked["derived_pressure_scores"], summary["stress_score"]), 2)
-    fingerprint = _derive_fingerprint(summary=summary, behavior=behavior, stress_level=stress_level, linked=linked)
-    spending_pattern = _derive_spending_pattern(summary=summary, linked=linked)
-    decision_style = _derive_decision_style(summary=summary, behavior=behavior, stress_level=stress_level)
+    income_known = _income_metrics_known(summary)
+    stress_level = _blend_current_stress(manual_series, linked["derived_pressure_scores"], _fallback_stress(summary))
+    fingerprint = _derive_fingerprint(summary=summary, behavior=behavior, stress_level=stress_level, linked=linked,
+                                      income_known=income_known)
+    spending_pattern = _derive_spending_pattern(summary=summary, linked=linked, income_known=income_known)
+    decision_style = _derive_decision_style(summary=summary, behavior=behavior, stress_level=stress_level,
+                                            income_known=income_known)
     insights = _dedupe_items(
         behavior.get("ai_insights", []),
         behavior.get("pattern_flags", []),
@@ -85,7 +100,7 @@ def build_behavioral_fingerprint(user) -> dict:
         "stress_drivers": behavior.get("stress_drivers", []),
         "minute_details": behavior.get("minute_details", []),
         "strategy": behavior.get("strategy", ""),
-        "coach_tone": behavior.get("coach_tone", "energetic"),
+        "coach_tone": behavior.get("coach_tone"),
         "linked_data": linked["linked_data"],
         "pressure_map": linked["pressure_map"],
         "grounding": _behavioral_grounding(
@@ -103,13 +118,13 @@ def build_behavioral_stress(user) -> dict:
     linked = _build_linked_behavior_data(user)
     intelligence = linked["intelligence"]
     summary = intelligence["summary"]
-    behavior = intelligence["behavior"]
+    behavior = _usable_behavior(summary, intelligence["behavior"])
     planning_context = verified_intelligence.household_planning_context()
 
     if not linked["has_behavior_data"]:
         return {
-            "current_stress": 0,
-            "average_stress": 0,
+            "current_stress": None,
+            "average_stress": None,
             "trend": "Unknown",
             "weekly_data": [],
             "weekly_labels": [],
@@ -131,9 +146,9 @@ def build_behavioral_stress(user) -> dict:
     combined_series = _build_combined_stress_series(
         manual_series=linked["manual_series"],
         derived_scores=linked["derived_pressure_scores"],
-        fallback_stress=summary["stress_score"],
+        fallback_stress=_fallback_stress(summary),
     )
-    trend = _series_trend(combined_series)
+    trend = _series_trend(combined_series) if combined_series else "Unknown"
     recommendations = _dedupe_items(
         behavior.get("stress_drivers", []),
         behavior.get("ai_insights", []),
@@ -142,16 +157,14 @@ def build_behavioral_stress(user) -> dict:
     transactions = linked["linked_data"]["transactions"]
     manual_signal_count = linked["linked_data"]["manual_signal_count"]
 
-    if transactions and manual_signal_count:
-        message = (
-            f"Derived from {transactions} linked transactions and {manual_signal_count} manual behavioral logs. "
-            f"Current financial pressure state is {summary['risk_level'].lower()}."
-        )
+    state = (f" Current financial pressure state is {summary['risk_level'].lower()}." if _income_metrics_known(summary)
+             else f" {_income_gap(summary)}")
+    if not combined_series:
+        message = "No stress data in the last seven weeks: no manual logs and no counted spending." + state
+    elif transactions and manual_signal_count:
+        message = f"Derived from {transactions} linked transactions and {manual_signal_count} manual behavioral logs." + state
     elif transactions:
-        message = (
-            f"Derived from {transactions} linked transactions. "
-            f"Current financial pressure state is {summary['risk_level'].lower()}."
-        )
+        message = f"Derived from {transactions} linked transactions." + state
     else:
         message = "Derived from manual behavioral logs."
     window_labels = linked["window_labels"]
@@ -159,8 +172,8 @@ def build_behavioral_stress(user) -> dict:
         message += f" Latest data is from {window_labels[0]}."
 
     return {
-        "current_stress": round(combined_series[0] if combined_series else 0, 2),
-        "average_stress": round(mean(combined_series), 2) if combined_series else 0,
+        "current_stress": round(combined_series[0], 2) if combined_series else None,
+        "average_stress": round(mean(combined_series), 2) if combined_series else None,
         "trend": trend,
         "weekly_data": combined_series[:STRESS_WINDOWS],
         "weekly_labels": window_labels,
@@ -386,20 +399,21 @@ def _pressure_driver(*, loan_ratio: float, discretionary_ratio: float, emotional
 
 def _build_pressure_map(intelligence: dict, derived_pressure: list[dict]) -> list[dict]:
     summary = intelligence["summary"]
-    behavior = intelligence["behavior"]
+    behavior = _usable_behavior(summary, intelligence["behavior"])
     recurring_commitments = intelligence.get("recurring_commitments", []) or []
     spike_days = intelligence.get("spike_days", []) or []
     active_pressure = [item["score"] for item in derived_pressure if item["has_activity"]]
-    avg_pressure = round(mean(active_pressure), 2) if active_pressure else round(
-        float(summary.get("stress_score") or 0) / 10,
-        2,
-    )
+    fallback = _fallback_stress(summary)
+    avg_pressure = round(mean(active_pressure), 2) if active_pressure else (
+        round(fallback / 10, 2) if fallback is not None else None)
+    income_known = _income_metrics_known(summary)
 
     return [
         {
             "label": "Cash-flow pressure",
-            "score": round(float(summary.get("stress_score") or 0), 1),
-            "detail": f"{summary.get('risk_level', 'Unknown')} state driven by current savings and debt-service ratios.",
+            "score": round(float(summary.get("stress_score") or 0), 1) if income_known else None,
+            "detail": (f"{summary.get('risk_level', 'Unknown')} state driven by current savings and debt-service ratios."
+                       if income_known else _income_gap(summary)),
         },
         {
             "label": "Lifestyle pressure",
@@ -413,8 +427,8 @@ def _build_pressure_map(intelligence: dict, derived_pressure: list[dict]) -> lis
         },
         {
             "label": "Behavior pressure",
-            "score": round(avg_pressure * 10, 1),
-            "detail": behavior.get("strategy", "ALFRED is still calibrating the right behavioral response."),
+            "score": round(avg_pressure * 10, 1) if avg_pressure is not None else None,
+            "detail": behavior.get("strategy") or "ALFRED is still calibrating the right behavioral response.",
         },
     ]
 
@@ -431,29 +445,76 @@ def _build_combined_stress_series(*, manual_series: list[float | None], derived_
             combined.append(round(manual_value, 2))
         elif derived_value is not None:
             combined.append(round(derived_value, 2))
-    return combined or [round(float(fallback_stress or 0) / 10, 2)]
+    if combined or fallback_stress is None:
+        return combined
+    return [round(float(fallback_stress) / 10, 2)]
 
 
-def _blend_current_stress(manual_series: list[float | None], derived_scores: list[float | None], fallback_stress: float) -> float:
+def _blend_current_stress(manual_series: list[float | None], derived_scores: list[float | None],
+                          fallback_stress: float | None) -> float | None:
     combined = _build_combined_stress_series(
         manual_series=manual_series,
         derived_scores=derived_scores,
         fallback_stress=fallback_stress,
     )
-    return combined[0] if combined else 0.0
+    return round(combined[0], 2) if combined else None
 
 
-def _derive_fingerprint(*, summary: dict, behavior: dict, stress_level: float, linked: dict) -> str:
-    if float(summary.get("debt_service_ratio") or 0) >= 28 or stress_level >= 7:
+def _income_metrics_known(summary: dict) -> bool:
+    # Savings, debt service and the cash-flow stress score divide by recorded income, and debits awaiting review are
+    # left out of the totals; without income, or with debits awaiting review, they read as 0% (the dashboard shows "-").
+    return float(summary.get("history_income") or 0) > 0 and not float(summary.get("history_review_required") or 0) > 0
+
+
+def _income_gap(summary: dict) -> str:
+    if float(summary.get("history_review_required") or 0) > 0:
+        return "Cash-flow pressure needs your transactions reviewed first."
+    return "Cash-flow pressure needs recorded income."
+
+
+def _usable_behavior(summary: dict, behavior: dict) -> dict:
+    """Without recorded income, drop the labels, tone and texts that read missing income as none."""
+    if _income_metrics_known(summary):
+        return behavior
+
+    def keep(items):
+        return [item for item in items or [] if not str(item).startswith(INCOME_DERIVED_TEXT)]
+
+    return {
+        **behavior,
+        "ai_insights": keep(behavior.get("ai_insights")),
+        "pattern_flags": keep(behavior.get("pattern_flags")),
+        "stress_drivers": keep(behavior.get("stress_drivers")),
+        "minute_details": keep(behavior.get("minute_details")),
+        # Every strategy branch compares against the same monthly stress average.
+        "strategy": "",
+        "coach_tone": None,
+        # The same rule with savings left out: loan and lifestyle shares come from debits alone.
+        "personality": _behavior_personality(
+            0.0,
+            float(summary.get("loan_ratio") or 0) / 100,
+            float(summary.get("discretionary_ratio") or 0) / 100,
+            float(summary.get("stability_score") or 0),
+        ),
+    }
+
+
+def _fallback_stress(summary: dict) -> float | None:
+    return float(summary.get("stress_score") or 0) if _income_metrics_known(summary) else None
+
+
+def _derive_fingerprint(*, summary: dict, behavior: dict, stress_level: float | None, linked: dict,
+                        income_known: bool) -> str:
+    if (income_known and float(summary.get("debt_service_ratio") or 0) >= 28) or (stress_level or 0) >= 7:
         return "Pressure-Weighted Planner"
-    if float(summary.get("stability_score") or 0) >= 75 and float(summary.get("savings_rate") or 0) >= 18:
+    if income_known and float(summary.get("stability_score") or 0) >= 75 and float(summary.get("savings_rate") or 0) >= 18:
         return "Steady Builder"
     if linked["linked_data"]["transactions"] >= 8:
         return behavior.get("personality") or "Adaptive Balancer"
     return "Adaptive Balancer"
 
 
-def _derive_spending_pattern(*, summary: dict, linked: dict) -> str:
+def _derive_spending_pattern(*, summary: dict, linked: dict, income_known: bool) -> str:
     discretionary_ratio = float(summary.get("discretionary_ratio") or 0)
     loan_ratio = float(summary.get("loan_ratio") or 0)
     recurring_count = int(linked["linked_data"]["recurring_commitments"] or 0)
@@ -464,17 +525,17 @@ def _derive_spending_pattern(*, summary: dict, linked: dict) -> str:
         return "Lifestyle-heavy"
     if recurring_count >= 3:
         return "Commitment-led"
-    if float(summary.get("savings_rate") or 0) >= 20:
+    if income_known and float(summary.get("savings_rate") or 0) >= 20:
         return "Controlled"
     return "Mixed"
 
 
-def _derive_decision_style(*, summary: dict, behavior: dict, stress_level: float) -> str:
-    if stress_level >= 7 or str(summary.get("risk_level") or "").lower() == "high":
+def _derive_decision_style(*, summary: dict, behavior: dict, stress_level: float | None, income_known: bool) -> str:
+    if (stress_level or 0) >= 7 or (income_known and str(summary.get("risk_level") or "").lower() == "high"):
         return "Reactive"
-    if float(summary.get("discipline_score") or 0) >= 70 and float(summary.get("stability_score") or 0) >= 70:
+    if income_known and float(summary.get("discipline_score") or 0) >= 70 and float(summary.get("stability_score") or 0) >= 70:
         return "Analytical"
-    if behavior.get("coach_tone") == "gentle":
+    if income_known and behavior.get("coach_tone") == "gentle":
         return "Cautious"
     return "Balanced"
 
