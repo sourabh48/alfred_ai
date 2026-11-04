@@ -226,7 +226,7 @@ It uses synthetic records in disposable folders, never the live account.
 .\.venv\Scripts\python.exe manage.py test --noinput
 .\.venv\Scripts\python.exe -m PyInstaller packaging/ALFRED.spec --noconfirm
 .\.venv\Scripts\python.exe scripts/verify_native_runtime.py --executable dist/ALFRED/ALFRED.exe --browser
-.\.venv\Scripts\python.exe scripts/package_windows_release.py --bundle dist/ALFRED --output artifacts/windows-release --iscc F:/ALFRED-tools/InnoSetup/ISCC.exe
+.\.venv\Scripts\python.exe scripts/package_windows_release.py --bundle dist/ALFRED --output artifacts/windows-release --iscc F:/ALFRED-tools/InnoSetup/ISCC.exe --signing-mode development
 ```
 
 Build tools are listed in `requirements-build.txt`. Inno Setup 6.7.3 builds the

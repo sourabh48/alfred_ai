@@ -9,10 +9,19 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts import windows_signing  # noqa: E402
+
+DEVELOPMENT_LABEL = "UNSIGNED DEVELOPMENT BUILD"
+LABEL_FILE = "UNSIGNED-DEVELOPMENT-BUILD.txt"
+DEVELOPMENT_NOTICE = (f"{DEVELOPMENT_LABEL}\nThis build is for isolated testing with synthetic data. It is not signed, "
+                      "and nothing is claimed about Windows Smart App Control or SmartScreen. "
+                      "Do not disable Windows security to run it.\n")
 
 
 def source_identity(repo=ROOT):
@@ -54,7 +63,8 @@ def write_acceptance_kit(bundle, output):
         machine_guid = winreg.QueryValueEx(key, "MachineGuid")[0]
     for name in ("Verify fresh install.cmd", "Verify after reboot.cmd", "ACCEPTANCE.txt", "READ ME.txt"):
         shutil.copy2(ROOT / "packaging/windows" / name, output / name)
-    shutil.copy2(ROOT / "scripts/verify_windows_acceptance.ps1", output / "verify_windows_acceptance.ps1")
+    for name in windows_signing.OWNED_SCRIPTS:
+        shutil.copy2(ROOT / "scripts" / name, output / name)
     for name in ("MANUAL_ACCEPTANCE.md", "WINDOWS_ACCEPTANCE.md"):
         shutil.copy2(ROOT / "docs" / name, output / name)
     (output / "acceptance-manifest.json").write_text(json.dumps({
@@ -121,32 +131,73 @@ def main():
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--iscc", type=Path, required=True)
+    parser.add_argument("--signing-mode", choices=("development", "release"), required=True,
+                        help="development is unsigned and clearly labelled; release fails closed without valid signatures")
+    parser.add_argument("--signing-config", type=Path, help="release: local non-secret signing configuration")
+    parser.add_argument("--authorize-production-signing", metavar="SOURCE_COMMIT",
+                        help="release: the owner's authorization, naming the exact source commit")
+    parser.add_argument("--approve-unsigned-third-party", action="store_true",
+                        help="release: sign unsigned third-party binaries as their distributor")
     args = parser.parse_args()
     bundle, output = args.bundle.resolve(), args.output.resolve()
     if bundle == output or bundle in output.parents:
         parser.error("output must be outside the bundle")
+    release = args.signing_mode == "release"
+    if not release and (args.signing_config or args.authorize_production_signing or args.approve_unsigned_third_party):
+        parser.error("signing options need --signing-mode release")
     files = inspect_bundle(bundle)
     source = verify_build_provenance(bundle)
+    config = None
+    if release:
+        try:
+            config = windows_signing.prepare_release(args.signing_config, args.authorize_production_signing,
+                                                     source["source_commit"])
+        except windows_signing.SigningError as error:
+            parser.error(str(error))
+    else:
+        print(DEVELOPMENT_LABEL, flush=True)
     output.mkdir(parents=True, exist_ok=True)
     archive = output / "ALFRED-Windows-x64.zip"
     installer = output / "ALFRED-Setup.exe"
     if archive.exists() or installer.exists():
         parser.error("release artifacts already exist; choose a new output folder")
-    subprocess.run([str(args.iscc.resolve()), f"/DBundleDir={bundle}", f"/DReleaseDir={output}",
-                    str(ROOT / "packaging/ALFRED.iss")], check=True)
     temporary = archive.with_suffix(".zip.partial")
-    with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zipped:
-        for path in files:
-            zipped.write(path, "ALFRED/" + path.relative_to(bundle).as_posix())
-    with zipfile.ZipFile(temporary) as zipped:
-        bad = zipped.testzip()
-        if bad:
-            raise RuntimeError(f"ZIP verification failed: {bad}")
-    temporary.replace(archive)
-    write_acceptance_kit(bundle, output)
-    if verify_build_provenance(bundle)!=source:
-        raise RuntimeError('Source changed during Windows distribution assembly.')
+    sign_log = output / "inno-signing-log.jsonl"
+    command = [str(args.iscc.resolve()), f"/DBundleDir={bundle}", f"/DReleaseDir={output}"]
+    try:
+        if release:
+            plan = windows_signing.sign_bundle(bundle, config, args.approve_unsigned_third_party)
+            command += ["/DAlfredReleaseSigned=1", windows_signing.inno_sign_tool(args.signing_config, sign_log)]
+        subprocess.run([*command, str(ROOT / "packaging/ALFRED.iss")], check=True)
+        with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zipped:
+            for path in files:
+                zipped.write(path, "ALFRED/" + path.relative_to(bundle).as_posix())
+            if not release:
+                zipped.writestr(f"ALFRED/{LABEL_FILE}", DEVELOPMENT_NOTICE)
+        with zipfile.ZipFile(temporary) as zipped:
+            bad = zipped.testzip()
+            if bad:
+                raise RuntimeError(f"ZIP verification failed: {bad}")
+        temporary.replace(archive)
+        write_acceptance_kit(bundle, output)
+        if verify_build_provenance(bundle)!=source:
+            raise RuntimeError('Source changed during Windows distribution assembly.')
+        if release:
+            for name in windows_signing.OWNED_SCRIPTS:
+                windows_signing.sign_file(config, output / name)
+            signing_manifest = windows_signing.write_signing_manifest(bundle, output, plan, config, source, sign_log)
+            signing = {"mode": "release", "signing_manifest_sha256": digest(signing_manifest),
+                       "smart_app_control": windows_signing.SMART_APP_CONTROL_STATUS}
+        else:
+            (output / LABEL_FILE).write_text(DEVELOPMENT_NOTICE, encoding="utf-8")
+            signing = {"mode": "development", "label": DEVELOPMENT_LABEL, "smart_app_control": "not claimed"}
+    except BaseException:
+        if release:  # A release that did not verify must not look like one.
+            for path in (archive, installer, temporary, sign_log, output / "signing-manifest.json"):
+                path.unlink(missing_ok=True)
+        raise
     manifest = {
+        "signing": signing,
         "project": json.loads((bundle / "project-identity.json").read_text(encoding="utf-8")),
         "source_commit": source['source_commit'], "source_tree": source['source_tree'],
         "source_dirty": source['source_dirty'],

@@ -163,7 +163,7 @@ If a fresh build is needed, substitute a fresh folder for `next-build` below:
 .\.venv\Scripts\python.exe -m PyInstaller packaging/ALFRED.spec --noconfirm --distpath artifacts/releases/next-build --workpath build/next-build
 .\.venv\Scripts\python.exe scripts/verify_packaged_launcher.py --bundle artifacts/releases/next-build/ALFRED
 .\.venv\Scripts\python.exe scripts/verify_native_runtime.py --executable artifacts/releases/next-build/ALFRED/ALFRED.exe --launcher "artifacts/releases/next-build/ALFRED/ALFRED Launcher.exe" --port 8054 --browser --extended --load-users 24 --load-writes 20 --load-seconds 120
-.\.venv\Scripts\python.exe scripts/package_windows_release.py --bundle artifacts/releases/next-build/ALFRED --output artifacts/releases/next-build/distributables --iscc F:/ALFRED-tools/InnoSetup/ISCC.exe
+.\.venv\Scripts\python.exe scripts/package_windows_release.py --bundle artifacts/releases/next-build/ALFRED --output artifacts/releases/next-build/distributables --iscc F:/ALFRED-tools/InnoSetup/ISCC.exe --signing-mode development
 .\.venv\Scripts\python.exe scripts/verify_windows_installer.py --installer artifacts/releases/next-build/distributables/ALFRED-Setup.exe --report artifacts/ops/next-installer-lifecycle.json
 ```
 

@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import time
 import uuid
 import winreg
@@ -24,6 +25,8 @@ import requests
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts import windows_signing  # noqa: E402
 UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{D4BFC620-610B-4AF7-81BF-215ECAC7297B}_is1"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
@@ -109,6 +112,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--installer", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--signing-manifest", type=Path,
+                        help="release builds: also verify the installed files and uninstaller against this manifest")
     args = parser.parse_args()
     installer, report_path = args.installer.resolve(), args.report.resolve()
     if report_path.exists():
@@ -197,6 +202,8 @@ def main():
     try:
         install("install")
         passed("install_and_named_uninstaller")
+        if args.signing_manifest:
+            passed("installed_signatures_match_manifest", windows_signing.verify_installed(args.signing_manifest, installed))
         base = start()
         assert session.get(base + "/health/native/", timeout=30).json()["status"] == "ok"
         username, password = "installer_" + run, "InstallerProof936!"

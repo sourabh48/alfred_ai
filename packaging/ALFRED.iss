@@ -27,9 +27,27 @@ SetupIconFile=..\static\alfred.ico
 UninstallDisplayIcon={app}\ALFRED Launcher.exe
 UninstallDisplayName=ALFRED
 CloseApplications=no
+#ifdef AlfredReleaseSigned
+; scripts/package_windows_release.py defines alfredsign with ISCC /S. Without it, the compile fails.
+SignTool=alfredsign
+; Also covers Setup's temporary self-copies, per the Inno Setup SignedUninstaller documentation.
+SignedUninstaller=yes
+; The callback retries transient timestamp failures itself.
+SignToolRetryCount=0
+#else
+AppVerName=ALFRED {#SetupSetting("AppVersion")} (UNSIGNED DEVELOPMENT BUILD)
+VersionInfoDescription=ALFRED Setup - UNSIGNED DEVELOPMENT BUILD
+#endif
 
 [Files]
+#ifdef AlfredReleaseSigned
+; The pipeline signs these before embedding; signcheck stops an unsigned copy being stored.
+Source: "{#BundleDir}\ALFRED.exe"; DestDir: "{app}"; Flags: ignoreversion signcheck
+Source: "{#BundleDir}\ALFRED Launcher.exe"; DestDir: "{app}"; Flags: ignoreversion signcheck
+Source: "{#BundleDir}\*"; Excludes: "\ALFRED.exe,\ALFRED Launcher.exe"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+#else
 Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 Source: "windows\Uninstall ALFRED.cmd"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
