@@ -1177,6 +1177,29 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         # A background reload updates values quietly: no progress bar, no busy overlay.
         self.assertFalse(self.browser.execute_script("return window.busyShown"))
 
+    def test_dashboard_whose_first_load_was_rate_limited_loads_at_the_next_check(self):
+        self.login()
+        self.browser.get(self.live_server_url + "/dashboard/")
+        self.wait.until(lambda _: '80,000' in self.text('dashboardSummaryCards'))
+        # A page load whose dashboard request answers 429, as when the account's API budget is used up.
+        self.browser.execute_script('''
+            const original = window.fetch;
+            window.fetch = (url, options) => {
+                if (String(url).includes('/api/expenses/dashboard/') && !window.limitedOnce) {
+                    window.limitedOnce = true;
+                    return Promise.resolve(new Response(JSON.stringify({detail: 'Too many requests. Please wait and try again.'}),
+                        {status: 429, headers: {'Content-Type': 'application/json'}}));
+                }
+                return original(url, options);
+            };
+            Alfred.setHTML(document.getElementById('dashboardSummaryCards'), '');
+            loadDashboard();
+        ''')
+        self.wait.until(lambda _: 'Too many requests' in self.text('dashboardRoot'))
+        self.assertEqual(self.text('dashboardSummaryCards'), '')
+        self.browser.execute_async_script("Alfred.checkLiveVersion().then(arguments[0])")
+        self.wait.until(lambda _: '80,000' in self.text('dashboardSummaryCards'))
+
     def test_loan_refresh_response_does_not_replace_rows_during_table_interaction(self):
         self.login()
         self.browser.get(self.live_server_url + '/loans/')

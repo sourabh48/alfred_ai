@@ -82,6 +82,11 @@
   (limit 120 API calls a minute), and each page now also checked the data version on load. The check is now exempt from
   the API budgets (local count 15; the remainder predates this change), and a dashboard failure prints the page, API
   calls, console errors and server log tail to the job log (synthetic data only).
+- Master CI on `207cf10`: native-windows failed again, and the new diagnostic showed why: the first
+  `expenses/dashboard/` request got a 429, the cards stayed empty, and the page only checked the data version afterwards
+  because nothing had changed. Now a section whose load failed is reloaded at the next check (10 s) whenever any request
+  failed since its last load. The new Chrome test (first load answers 429) fails on the old `app.js` and passes now;
+  live, cache, abuse-limit (36) and the dashboard/loan/behavioral Chrome tests PASS.
 - Next: FAMILY-07.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)

@@ -635,6 +635,14 @@ function pollLiveVersion() {
         .catch(() => {})
         .finally(() => {
             liveVersionPending = false;
+            // A request failed since this section last loaded (its first load, a rate limit, a server error):
+            // load it again rather than leave it broken until the data changes.
+            liveRefreshRegistry.forEach(entry => {
+                if (!entry.inFlight && entry.seenFailures !== liveFetchFailures) {
+                    entry.stale = true;
+                    entry.seenFailures = liveFetchFailures;
+                }
+            });
             runLiveRefreshEntries();
         });
 }
@@ -645,7 +653,7 @@ function enableLiveRefresh(key, loadFn, options = {}) {
     const rootId = options.rootId || "";
     disableLiveRefresh(key);
 
-    const entry = { stale: false, inFlight: false, lastStarted: Date.now(), retryAt: 0, retryDelay: 0 };
+    const entry = { stale: false, inFlight: false, lastStarted: Date.now(), retryAt: 0, retryDelay: 0, seenFailures: liveFetchFailures };
     entry.run = () => {
         const root = rootId ? document.getElementById(rootId) : document.body;
         if (rootId && !root) {
@@ -679,6 +687,8 @@ function enableLiveRefresh(key, loadFn, options = {}) {
             .finally(() => {
                 quietLiveLoads -= 1;
                 entry.inFlight = false;
+                // This load's own failures are already handled by the backoff above.
+                entry.seenFailures = liveFetchFailures;
             });
     };
     liveRefreshRegistry.set(key, entry);
