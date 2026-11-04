@@ -117,7 +117,8 @@ def enrich_candidate(user, state, destination):
                      cache_only=cached_only(provider.category))
     results = []
     for key in ("geocoding_result","discovery_result"):
-        if d.get(key):
+        # An offline catalog place was not suggested by the guide, so the guide query is not its source.
+        if d.get(key) and not (key == "discovery_result" and d.get("source_freshness") == "STATIC_REFERENCE"):
             results.append(ProviderResult(**d[key]))
     def attach(key,result):
         d[key] = result.as_dict()

@@ -1,3 +1,4 @@
+import re
 from collections import Counter
 
 from django.utils import timezone
@@ -37,7 +38,8 @@ def learn(user, key, val, source, confidence=0.6, confirmed=False):
 
 def destination_name(name):
     # A log's "Talakadu, Karnataka" is the guide's "Talakadu".
-    name = " ".join(str(name).split()).split(",")[0].strip()
+    # A guide's "Aurangabad (Maharashtra)" is the same place too.
+    name = re.sub(r"\s*\([^)]*\)\s*$", "", " ".join(str(name).split()).split(",")[0]).strip()
     return (lookup(name) or {}).get("name", name.casefold())
 
 
@@ -50,10 +52,12 @@ def history_for(user):
         return bool(day) and 0 <= (now - day).days <= 365
     for p in TravelPlan.objects.filter(user=user).prefetch_related("logs").select_related("feedback"):
         if p.destination and (p.status == "completed" or p.logs.exists()):
-            name = destination_name(p.destination)
-            visits[name] += 1
-            if within_year(p.end_date):
-                recent[name] += 1
+            # Every stop of a multi-stop trip was visited, not only the first.
+            stops = value(p.planning_state or {}, "_itinerary_stops", []) or []
+            for name in {destination_name(p.destination), *(destination_name(s.get("name", "")) for s in stops if isinstance(s, dict) and s.get("name"))}:
+                visits[name] += 1
+                if within_year(p.end_date):
+                    recent[name] += 1
         try:
             ratings[destination_name(p.destination)] = p.feedback.rating
         except TravelPlan.feedback.RelatedObjectDoesNotExist:
@@ -70,7 +74,8 @@ def history_for(user):
         if name:
             record_location(name, day)
         for d in DESTINATIONS:
-            if d["name"].lower() in location.lower():
+            # "Ooty Road, Mysuru" or "Hampi Express platform" is not a visit to Ooty or Hampi.
+            if re.search(r"(?<!\w)" + re.escape(d["name"].lower()) + r"(?!\w)(?!\s+(?:road|rd|express|street|highway|nagar|layout|colony)\b)", location.lower()):
                 record_location(d["name"], day)
     for row in UserDestinationHistory.objects.filter(user=user):
         if "visited" in row.events:
@@ -101,7 +106,8 @@ def candidates_for(user, state, limit=3, *, destinations=None, origin_coordinate
         confidence = pref.get("confidence",0)
         updated = parse_datetime(pref.get("updated_at") or "")
         if updated and not pref.get("confirmed_by_user"):
-            confidence *= max(.2, 1-(timezone.now()-updated).days/730)
+            # A future timestamp from a skewed clock must not raise the weight above its saved confidence.
+            confidence *= max(.2, min(1, 1-(timezone.now()-updated).days/730))
         if confidence >= .3:
             styles.add(k)
             weights.setdefault(k,confidence)

@@ -785,9 +785,9 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 - **PR/CI:** Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 - **Current task:** Local consolidation preparation is validated on preparation/alfred-consolidation-20261026; required reviews and PR19 CI still block canonical integration. Preserve 143 original IDs/75 verified and 13 extensions/0 accepted. See CONSOLIDATION_STATE for sources, conflict decisions and receipts. Stage7 selection is not reached.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 77/143 (53.8%) verified.**
+**Baseline: 78/143 (54.5%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 22 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 77
+IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 78
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -801,7 +801,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | DOC | 7 | 9 | 77.8 | 0 | 2 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 3 | 2 | 2 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 0 | 3 | 0 | 0 | 0 |
-| TRAVEL | 10 | 23 | 43.5 | 2 | 5 | 3 | 0 | 3 |
+| TRAVEL | 11 | 23 | 47.8 | 1 | 5 | 3 | 0 | 3 |
 | FAMILY | 4 | 7 | 57.1 | 3 | 0 | 0 | 0 | 0 |
 | BIKE | 2 | 6 | 33.3 | 2 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
@@ -2495,15 +2495,16 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-02 — Source-backed new destinations and novelty
 
-**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+**COMPLETE_VERIFIED** · Travel · P2.
 
 - Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
-- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
+- Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py), [discovery acceptance](../tests/test_travel_discovery_acceptance.py), [Chrome](../tests/test_travel_planner_browser.py). **145 Travel backend tests (eight modules) and 11 Travel Chrome tests PASS** on 2026-11-04 with the CI browser settings, zero skips, synthetic data.
 - Acceptance: bounded synthetic destination novelty/source provenance accepted2026-10-27: case/spacing and owner-isolated recorded visits/rejections, failed/empty/filtered provider fallback, read-time expiry and invalid-clock abstention, escaped guide links and explicit static references. Batch123 backend/3 Chrome/8 global Axe PASS; active checkpoint and artifacts/travel-discovery-20261027. Full real-account destination accuracy and live provider/terms acceptance remain PENDING; this does not promote the parent capability.
 - Bounded unit 2026-11-02 (source/test only, not on development): location labels such as "Talakadu, Karnataka" now match the guide name in candidate and place filters, and dated log/photo locations count as recent. Focused synthetic backend PASS; no Chrome or full regression, and no provider was called. Status unchanged.
-- Limitations/dependencies: Dynamic Wikivoyage/provider discovery and saved history exist; absent visits are not proof of never visiting. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Accept actual intended destinations/sources under current terms.
+- Bounded acceptance 2026-11-04 (master): two independent reviews. Fixed: an offline catalog place no longer lists the guide query as its source; every stop of a completed multi-stop trip counts as visited; "somewhere new", "places I have never been" and "a destination we haven't visited" hide recorded visits, while unrelated wording ("I haven't been riding", "a new place to stay") does not and "familiar"/"revisit" turns it off; expired card sources show STALE; a place name followed by road, street, highway, express, nagar, layout or colony is not a visit; a guide's "Name (Region)" matches a logged "Name, Region"; a future preference timestamp cannot raise its weight. Each new test failed before the fix. TECHNICAL_PASS for owner-isolated synthetic novelty and source provenance; live Wikivoyage accuracy, provider terms and real-account history remain NOT_RUN. Exact-head CI is recorded in EXECUTION_STATE.
+- Limitations/dependencies: Names sharing a base ("Aurangabad (Bihar)" and "Aurangabad (Maharashtra)") are treated as one place. Rejected names are avoided by substring. Offline catalog references carry no reviewed date. A visit is found only when the label starts with the place name or names it as a whole word, so "Ooty Main Road" still counts as Ooty. A future "Checked" time is shown as-is in the card sources. Dynamic Wikivoyage/provider discovery and saved history exist; absent visits are not proof of never visiting. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: Live destinations and provider terms need separate approval and evidence.
 
 ### TRAVEL-03 — Large candidate pools, show-more batches and comparison
 

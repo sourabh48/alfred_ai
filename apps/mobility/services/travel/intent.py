@@ -103,7 +103,11 @@ def augment(state, text):
     if any(w in lower for w in ("unexplored", "less explored", "hidden", "offbeat")):
         put("discover_places", True)
         put("preferred_trip_style", sorted(set(value(state,"preferred_trip_style",[])+["offbeat places"])))
-    if any(w in lower for w in ("not visited", "haven't visited", "never visited")):
+    # Only wording about places: "I haven't been riding lately" and "a new place to stay" say nothing about novelty.
+    new_places = re.search(r"(?<!not )\b(?:somewhere|places?|destinations?)\s+(?:new\b|(?:i|we)\s+(?:haven't|have not|'ve never|have never|never)\s+(?:been|visited)\b)", lower)
+    if "familiar" in lower or "revisit" in lower:
+        put("only_new_places", False)
+    elif new_places or any(w in lower for w in ("not visited", "haven't visited", "never visited")):
         put("only_new_places", True)
         put("novelty", "mostly_new")
     if "scenic" in lower:

@@ -1,6 +1,6 @@
 # ALFRED execution state
 
-## Active checkpoint — Career module, CAREER-03 and CAREER-06 (2026-11-04)
+## Active checkpoint — CAREER-03, CAREER-06 and TRAVEL-02 (2026-11-04)
 
 - Work on `master` after the 2026-11-04 consolidation. Owner direction: one module at a time, only finished work is pushed
   to master; the development branch stays local.
@@ -12,12 +12,18 @@
   aliases, and a posting naming two cities. All fixed: unlisted cities must be named, "New York"/"Delhi" alone mean the
   state, two cities place neither.
 - Evidence: 111 Career backend tests (nine modules) and eight Career Chrome tests PASS, zero skips, synthetic data.
-  Independent review: CAREER-03 and CAREER-06 TECHNICAL_PASS for bounded scope. Both COMPLETE_VERIFIED; baseline 77/143,
+  Independent review: CAREER-03 and CAREER-06 TECHNICAL_PASS for bounded scope. Both COMPLETE_VERIFIED (77/143 at `323ab0f`),
   extensions 0/13.
 - Residuals: generic words such as "manager" give a role match; the job-match panel's saved pay band shows no date or
   staleness label; search adds "developer"/"analyst"; `#job=123` fragments are dropped; placeholder `alfred.local`
   source URL. Real accounts, live providers and NVDA: NOT_RUN.
-- Next: exact-head master CI, then the next Career item from the queue.
+- Master CI on `323ab0f`: all jobs passed except one Selenium shard (`test_travel_d1_same_trip_complete_browser_journey`,
+  element not interactable). On `b929775` (`.gitignore` only) three other browser tests timed out. All four pass locally on
+  the same Chrome 156 with the CI settings, so they are recorded as CI-runner flakes; `323ab0f` itself is not green.
+- TRAVEL-02 (same day): seven review findings fixed, then a second review found that broad "haven't been"/"new place"
+  wording turned on the visited-place filter; narrowed to wording about places, and "familiar"/"revisit" turns it off.
+  145 Travel backend and 11 Travel Chrome tests PASS; COMPLETE_VERIFIED for bounded scope; baseline 78/143.
+- Next: exact-head master CI on the TRAVEL-02 commit, then the next queue item.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

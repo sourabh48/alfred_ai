@@ -10,7 +10,8 @@ from apps.mobility.models import TravelPlan, TripLog, TripPhoto
 from apps.mobility.services.travel.discovery import rank_places, remember
 from apps.mobility.services.travel.providers.base import ProviderResult
 from apps.mobility.services.travel.presentation import age_saved_facts
-from apps.mobility.services.travel.research import discover_destinations
+from apps.mobility.services.travel.intent import augment
+from apps.mobility.services.travel.research import discover_destinations, enrich_candidate
 from apps.mobility.services.travel_catalog import DESTINATIONS
 from apps.mobility.services.travel_discovery import candidates_for, fact, history_for
 from apps.mobility.services.travel_conversation import new_session
@@ -148,6 +149,57 @@ class TravelDiscoveryAcceptanceTests(TestCase):
                 self.assertTrue(candidate["discovery_result"]["success"])
                 self.assertNotIn("destinations", candidate["quality"]["verified"])
                 self.assertIn("offline seed catalog", " ".join(candidate["issues"]))
+
+    def test_offline_catalog_card_does_not_list_the_guide_query_as_its_source(self):
+        source = ProviderResult(**synthetic_discovery_result())
+        source.payload = {"destinations": []}
+        with patch("apps.mobility.services.travel.research.query", return_value=source):
+            candidate = discover_destinations(self.user, {"origin": fact("Bengaluru")}, self.options("Offline reference"))[0]
+        offline = ProviderResult("open_meteo", "weather", error="offline")
+        with patch("apps.mobility.services.travel.research.query", return_value=offline):
+            _, results = enrich_candidate(self.user, {"origin": fact("Bengaluru")}, candidate)
+        self.assertNotIn("wikivoyage", [result.provider for result in results])
+
+    def test_every_stop_of_a_completed_trip_counts_as_visited(self):
+        TravelPlan.objects.create(user=self.user, title="Two stops", destination="First Stop", status="completed",
+            end_date=self.today, planning_state={"_itinerary_stops": fact([{"name": "First Stop"}, {"name": "Second Stop"}])})
+        self.assertEqual(self.options("Second Stop", only_new_places=fact(True)), [])
+
+    def test_somewhere_new_wording_excludes_recorded_visits(self):
+        for message in ("Suggest somewhere new I haven't been to", "Places I have never been to", "a destination we haven't visited"):
+            with self.subTest(message=message):
+                self.assertTrue(augment({}, message)["only_new_places"]["value"])
+        for message in ("I haven't been on a long ride since March, plan 2 days from Bengaluru",
+                        "Find a new place to stay near Coorg", "Take me somewhere familiar, not somewhere new"):
+            with self.subTest(message=message):
+                self.assertFalse(augment({}, message).get("only_new_places", {}).get("value"))
+        self.assertFalse(augment(augment({}, "Somewhere new please"), "Actually revisit a favourite")["only_new_places"]["value"])
+
+    def test_place_name_inside_a_street_or_train_name_is_not_a_visit(self):
+        name = DESTINATIONS[0]["name"]
+        plan = TravelPlan.objects.create(user=self.user, title="Synthetic trip", destination="Somewhere else")
+        for location in (name + " Road, Mysuru", name + " Express platform"):
+            TripLog.objects.create(user=self.user, travel_plan=plan, log_date=self.today, title="Synthetic log", location_name=location)
+        self.assertNotIn(name, history_for(self.user)["visits"])
+        TripLog.objects.create(user=self.user, travel_plan=plan, log_date=self.today, title="Synthetic log", location_name="Near " + name)
+        self.assertIn(name, history_for(self.user)["visits"])
+
+    def test_guide_disambiguation_matches_a_logged_place(self):
+        plan = TravelPlan.objects.create(user=self.user, title="Synthetic trip", destination="Somewhere else")
+        TripLog.objects.create(user=self.user, travel_plan=plan, log_date=self.today, title="Synthetic log", location_name="Synthetic Town, Maharashtra")
+        self.assertEqual(self.options("Synthetic Town (Maharashtra)", only_new_places=fact(True)), [])
+
+    def test_future_preference_timestamp_does_not_raise_its_weight(self):
+        from apps.mobility.services.travel_discovery import profile_for
+        profile = profile_for(self.user)
+        profile.preferences = {style: {"value": True, "confidence": .4, "updated_at": (timezone.now()+timedelta(days=365)).isoformat()}
+                               for style in DESTINATIONS[1]["styles"]}
+        profile.save()
+        baseline = self.options("Synthetic Valley")[0]["score"]
+        for pref in profile.preferences.values():
+            pref["updated_at"] = timezone.now().isoformat()
+        profile.save()
+        self.assertEqual(self.options("Synthetic Valley")[0]["score"], baseline)
 
     def test_incomplete_discovery_source_or_clock_never_claims_freshness(self):
         for field, invalid in (("retrieved_at", None), ("retrieved_at", (timezone.now()+timedelta(days=1)).isoformat()),
