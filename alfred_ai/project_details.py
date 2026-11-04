@@ -793,7 +793,7 @@ def project_details_payload(guardrails: dict) -> dict:
         "full_ui_mature": False,
         "execution_command": "python scripts/run_browser_regressions.py --browser Chrome --require-browser",
         "edge_execution_command": "python scripts/run_browser_regressions.py --browser Edge --require-browser",
-        "ci_execution_command": "python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome",
+        "ci_execution_command": "python scripts/run_browser_regressions.py --browser Chrome --require-browser --proof-label ci-chrome-shard-<n> --shard-count 3 --shard-index <n>",
         "ci_workflow": ".github/workflows/browser-regression.yml",
         "artifact_dir": "artifacts/browser",
         "summary_artifact": browser_proof["latest_accepted"]["summary_path"],
@@ -810,6 +810,13 @@ def project_details_payload(guardrails: dict) -> dict:
             "vehicle setup form submission",
             "vehicle invoice/OCR overlay correction",
             "statement review correction",
+            "bank, loan, investment and credit report review forms",
+            "reviewed financial document questions and citations",
+            "private document upload, extraction search and corpus",
+            "private memory and history consent, deletion and evaluation",
+            "career discovery, matching and outcomes",
+            "family sharing and invitations",
+            "travel planning, editing, packing, reminders and exports",
         ],
         "live_server_contracts": [
             "login POST form and CSRF controls",
@@ -1050,7 +1057,8 @@ def project_details_payload(guardrails: dict) -> dict:
             "detail": (
                 "Django live-server rendering, static-asset checks, upload/form contracts, a dedicated Selenium runner, "
                 "CI browser workflow, failure artifacts, local Chrome/Edge proof, CI Chrome proof, run-summary proof, and gated Selenium workflows now cover login, "
-                "document-center statement upload, vehicle setup submission, dashboard live refresh, vehicle invoice/OCR overlay correction, and statement review correction. "
+                "document-center statement upload, vehicle setup submission, dashboard live refresh, vehicle invoice/OCR overlay correction, statement review correction, "
+                "financial review forms, reviewed document questions, private documents and memory, career, family sharing, and travel. "
                 f"{browser_proof['summary']}"
             ),
             "maturity_status": browser_coverage["maturity_status"],
@@ -1062,13 +1070,13 @@ def project_details_payload(guardrails: dict) -> dict:
                 f"CI runner: {browser_coverage['ci_execution_command']}",
                 f"artifacts: {browser_coverage['artifact_dir']}",
                 f"CI summary: {browser_coverage['ci_summary_artifact']}",
-                "CI summary filename: browser_regression_summary.ci-chrome.json",
+                "CI summary filename: browser_regression_summary.ci-chrome.json, aggregated from 3 shards",
                 f"local browser proof: {'recorded' if browser_proof['local_gate_recorded'] else 'not accepted'}",
                 f"CI Chrome proof: {'recorded' if browser_proof['ci_gate_recorded'] else 'not accepted'}",
                 f"CI GitHub Actions metadata: {'recorded' if browser_proof['ci_gate_recorded'] else 'not accepted'}",
                 f"latest browser run: {browser_proof['latest_recorded']['status']} via {browser_proof['latest_recorded']['run_context']}",
                 f"recorded browser skips: {browser_proof['latest_recorded']['skipped_count'] if browser_proof['latest_recorded']['skipped_count'] is not None else 'not recorded'}",
-                "login, statement upload, vehicle setup, dashboard refresh, and core form submissions are named",
+                "login, statement upload, vehicle setup, dashboard refresh, core form submissions, private documents, career, family, and travel are named",
                 "full UI maturity is still not claimed",
             ],
             "maturity_gates": [
