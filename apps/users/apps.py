@@ -30,3 +30,5 @@ class UsersConfig(AppConfig):
             raise ImproperlyConfigured("Private storage requires verified owner permissions; review the authorized repair procedure.") from None
         if settings.TIME_ZONE_WARNING:
             logging.getLogger(__name__).warning(settings.TIME_ZONE_WARNING)
+        from alfred_ai.services.live_version import connect
+        connect()

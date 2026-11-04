@@ -69,26 +69,24 @@ function renderTaxSummary(data) {
     const shown = taxIncomeUnavailable(data)
         ? cards.map(card => ({ ...card, value: "Unavailable", copy: "Needs a confirmed income." }))
         : cards;
-    document.getElementById("taxSummaryCards").innerHTML = shown.map(card => `
+    Alfred.setHTML(document.getElementById("taxSummaryCards"), shown.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${Alfred.escapeHtml(card.copy)}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderTaxChart(comparison, incomeUnavailable) {
     const canvas = document.getElementById("taxComparisonChart");
-    if (taxComparisonChart) {
-        taxComparisonChart.destroy();
-        taxComparisonChart = null;
-    }
     if (incomeUnavailable) {
+        taxComparisonChart?.destroy();
+        taxComparisonChart = null;
         return;
     }
 
-    taxComparisonChart = new Chart(canvas, {
+    taxComparisonChart = Alfred.renderChart(taxComparisonChart, canvas, {
         type: "bar",
         data: {
             labels: ["Old Regime", "New Regime"],
@@ -117,15 +115,15 @@ function renderTaxInputs(inputs) {
 
 function renderTaxActions(items, incomeUnavailable) {
     const target = document.getElementById("taxActionList");
-    target.innerHTML = items.length
+    Alfred.setHTML(target, items.length
         ? items.map(item => `<li class="insight-item">${Alfred.escapeHtml(`${item.action} • ${Alfred.formatCurrency(item.amount)} • tax benefit ${Alfred.formatCurrency(item.tax_benefit)}`)}</li>`).join("")
-        : `<li class="insight-item">${incomeUnavailable ? "Tax benefits need a confirmed income." : "No tax-saving action items available."}</li>`;
+        : `<li class="insight-item">${incomeUnavailable ? "Tax benefits need a confirmed income." : "No tax-saving action items available."}</li>`);
 }
 
 function renderTaxBenefits(hra, homeLoan, incomeUnavailable) {
     const panel = document.getElementById("taxBenefitPanel");
     if (incomeUnavailable) {
-        panel.innerHTML = `<div class="data-row"><div class="data-label">Tax benefits</div><div class="data-value">Unavailable</div></div>`;
+        Alfred.setHTML(panel, `<div class="data-row"><div class="data-label">Tax benefits</div><div class="data-value">Unavailable</div></div>`);
         return;
     }
     const rows = [
@@ -139,23 +137,23 @@ function renderTaxBenefits(hra, homeLoan, incomeUnavailable) {
         rows.push(["Home loan tax saved", Alfred.formatCurrency(homeLoan.total_tax_saved || 0)]);
     }
 
-    panel.innerHTML = rows.map(([label, value]) => `
+    Alfred.setHTML(panel, rows.map(([label, value]) => `
         <div class="data-row">
             <div class="data-label">${label}</div>
             <div class="data-value">${value}</div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderTaxDeductions(items) {
     const target = document.getElementById("taxDeductionList");
-    target.innerHTML = items.map(item => `
+    Alfred.setHTML(target, items.map(item => `
         <div class="mini-card">
             <div class="fw-semibold">${Alfred.escapeHtml(item.section)} • ${Alfred.escapeHtml(item.name)}</div>
             <div class="muted small mt-1">Max limit ${item.max_limit === null ? "Variable" : Alfred.formatCurrency(item.max_limit)}</div>
             <div class="muted small mt-2">${Alfred.escapeHtml(item.instruments.slice(0, 2).join(" • "))}</div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function submitTaxForm(event) {

@@ -46,30 +46,30 @@ function renderRecommendationSummary(data) {
         { title: "Debt Load", value: incomeKnown ? `${Alfred.formatNumber(profile.dti_ratio || 0)}%` : "Unavailable", copy: `${Alfred.formatCurrency(data.insurance?.total_annual_premium || 0)} annual essential premium` },
     ];
 
-    document.getElementById("recommendationSummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("recommendationSummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${card.copy}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderDisabledModules(items) {
     const target = document.getElementById("recommendationDisabledList");
     if (!items.length) {
-        target.innerHTML = `<div class="empty-state">All strategy modules are active.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">All strategy modules are active.</div>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `
+    Alfred.setHTML(target, items.map(item => `
         <div class="data-row align-items-start">
             <div class="data-label">
                 <div class="fw-semibold">${Alfred.escapeHtml(item.label || item.key || "Module")}</div>
             </div>
             <div class="data-value muted small">${Alfred.escapeHtml(item.reason || "Disabled by configuration.")}</div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderInvestmentRecommendations(data) {
@@ -79,7 +79,7 @@ function renderInvestmentRecommendations(data) {
         title: "Investment grounding",
     });
     const target = document.getElementById("recommendationInvestmentsList");
-    target.innerHTML = renderRecommendationStack(recommendations, item => `
+    Alfred.setHTML(target, renderRecommendationStack(recommendations, item => `
         <div class="fw-semibold">${Alfred.escapeHtml(item.investment.name)}</div>
         <div class="muted small">${Alfred.escapeHtml(item.investment.type)} | ${Alfred.escapeHtml(item.investment.risk)} risk</div>
         <div class="data-row">
@@ -91,11 +91,11 @@ function renderInvestmentRecommendations(data) {
             <div class="data-value">${Alfred.formatCurrency(item.expected_value_1y)}</div>
         </div>
         <div class="muted small mt-2">${Alfred.escapeHtml(item.match_reason)}</div>
-    `, "No investment recommendations available.");
+    `, "No investment recommendations available."));
 
     const portfolioTarget = document.getElementById("recommendationPortfolioList");
     const allocations = data.suggested_portfolio?.allocations || [];
-    portfolioTarget.innerHTML = allocations.length
+    Alfred.setHTML(portfolioTarget, allocations.length
         ? allocations.map(item => `
             <div class="mini-card">
                 <div class="d-flex justify-content-between align-items-start gap-3">
@@ -107,7 +107,7 @@ function renderInvestmentRecommendations(data) {
                 </div>
             </div>
         `).join("")
-        : `<div class="empty-state">No diversified portfolio suggestion yet.</div>`;
+        : `<div class="empty-state">No diversified portfolio suggestion yet.</div>`);
 }
 
 function renderInsuranceRecommendations(data) {
@@ -117,12 +117,12 @@ function renderInsuranceRecommendations(data) {
         title: "Insurance grounding",
     });
     const target = document.getElementById("recommendationInsuranceList");
-    target.innerHTML = renderRecommendationStack(items, item => `
+    Alfred.setHTML(target, renderRecommendationStack(items, item => `
         <div class="fw-semibold">${Alfred.escapeHtml(item.insurance.name)}</div>
         <div class="muted small">${Alfred.escapeHtml(item.insurance.type)} | premium ${Alfred.formatCurrency(item.insurance.premium_estimate)}</div>
         <div class="chip-row mt-2">${item.insurance.benefits.map(benefit => `<span class="chip-neutral">${Alfred.escapeHtml(benefit)}</span>`).join("")}</div>
         <div class="muted small mt-2">${item.is_essential ? "Marked essential." : "Optional coverage."} ${Alfred.escapeHtml(item.match_reason)}</div>
-    `, "No insurance recommendations available.");
+    `, "No insurance recommendations available."));
 }
 
 function renderGrounding(grounding) {
@@ -137,13 +137,13 @@ function renderGrounding(grounding) {
         { title: "Tracked Personas", value: Alfred.formatNumber((history.tracked_personas || []).length, 0), copy: "Behavior personas influencing the stack" },
         { title: "Fresh Evidence", value: Alfred.formatNumber(freshness.fresh_records || 0, 0), copy: `${Alfred.formatNumber(freshness.tracked_records || 0, 0)} evidence records attached` },
     ];
-    cardsTarget.innerHTML = cards.map(card => `
+    Alfred.setHTML(cardsTarget, cards.map(card => `
         <article class="metric-card metric-card--compact">
             <p class="metric-kicker">${card.title}</p>
             <h3 class="metric-value" style="font-size:1.35rem;">${card.value}</h3>
             <p class="metric-caption">${Alfred.escapeHtml(card.copy)}</p>
         </article>
-    `).join("");
+    `).join(""));
 
     const notes = grounding.notes || [];
     const evidence = grounding.evidence || [];
@@ -156,7 +156,7 @@ function renderGrounding(grounding) {
         ...moduleSummaries.map(note => ({ note })),
         ...evidence.map(item => ({ proof: item })),
     ];
-    evidenceTarget.innerHTML = entries.length
+    Alfred.setHTML(evidenceTarget, entries.length
         ? entries.map(item => {
             if (item.note) {
                 return `<li class="insight-item">${Alfred.escapeHtml(item.note)}</li>`;
@@ -164,7 +164,7 @@ function renderGrounding(grounding) {
             const proof = item.proof || {};
             return `<li class="insight-item"><strong>${Alfred.escapeHtml(proof.source_name || proof.title || "Evidence")}</strong>: ${Alfred.escapeHtml(proof.summary || "")}${proof.source_url ? ` <a href="${proof.source_url}" target="_blank" rel="noopener">Proof</a>` : ""}</li>`;
         }).join("")
-        : `<li class="insight-item">No supporting evidence is attached yet.</li>`;
+        : `<li class="insight-item">No supporting evidence is attached yet.</li>`);
 }
 
 function renderModuleGrounding(targetId, grounding, options = {}) {
@@ -177,7 +177,7 @@ function renderModuleGrounding(targetId, grounding, options = {}) {
     const notes = grounding.notes || [];
     const evidence = grounding.evidence || [];
     if (!Object.keys(history).length && !notes.length && !evidence.length) {
-        target.innerHTML = `<div class="muted small">${Alfred.escapeHtml(options.emptyCopy || "No grounding metadata attached.")}</div>`;
+        Alfred.setHTML(target, `<div class="muted small">${Alfred.escapeHtml(options.emptyCopy || "No grounding metadata attached.")}</div>`);
         return;
     }
 
@@ -213,7 +213,7 @@ function renderModuleGrounding(targetId, grounding, options = {}) {
     if (evidence[0]?.source_url) {
         pieces.push(`<div class="mt-2"><a href="${evidence[0].source_url}" target="_blank" rel="noopener">Open proof</a></div>`);
     }
-    target.innerHTML = pieces.join("");
+    Alfred.setHTML(target, pieces.join(""));
 }
 
 function humanizeKey(value) {

@@ -1118,6 +1118,33 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('a[href="/ai/insights/?scope=travel#intelligencePanel"]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_attribute('value')=='travel')
 
+    def test_dashboard_reloads_only_after_a_data_change_and_redraws_only_changed_cards(self):
+        from apps.loans.models import Loan
+        self.login()
+        cards = "document.querySelectorAll('#dashboardSummaryCards .metric-card')"
+        self.wait.until(lambda _: self.browser.execute_script(f"return {cards}.length") >= 4)
+        self.browser.execute_script(f'''
+            window.liveCalls = [];
+            const original = window.fetch;
+            window.fetch = (url, options) => {{ window.liveCalls.push(String(url)); return original(url, options); }};
+            window.cardsBefore = [...{cards}];
+        ''')
+        check = '''
+            const done = arguments[0];
+            Alfred.checkLiveVersion().then(() => setTimeout(() => done(window.liveCalls.filter(url => !url.includes('/data-version/'))), 500));
+        '''
+        # Idle: version checks only, no data reloads.
+        self.assertEqual(self.browser.execute_async_script(check), [])
+        self.assertEqual(self.browser.execute_async_script(check), [])
+        loan = Loan.objects.get(user__username='acceptance_demo')
+        loan.remaining_balance -= 1000
+        loan.save()  # No request: like a background import.
+        before = self.browser.execute_script("return window.cardsBefore[3].textContent")
+        self.assertIn('/api/expenses/dashboard/', self.browser.execute_async_script(check))
+        self.wait.until(lambda _: self.browser.execute_script(f"return {cards}[3].textContent") != before)
+        connected = self.browser.execute_script("return window.cardsBefore.map(card => card.isConnected)")
+        self.assertEqual(connected[:4], [True, True, True, False])
+
     def test_loan_refresh_response_does_not_replace_rows_during_table_interaction(self):
         self.login()
         self.browser.get(self.live_server_url + '/loans/')
@@ -1143,12 +1170,18 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(search.get_attribute('value'), 'NO-MATCH-SYNTHETIC')
         self.assertIn('0 matching', self.browser.find_element(self.By.CSS_SELECTOR,
             '[data-table-controls="loanTableBody"] [data-table-count]').text)
+        # Unchanged rows now stay in place; change the data so this row must be redrawn.
+        from apps.loans.models import Loan
+        Loan.objects.filter(user__username='acceptance_demo').update(lender='Refreshed Synthetic Lender')
+        cache.clear()
         self.assertFalse(self.browser.execute_async_script('''
             const done = arguments[0];
             document.activeElement.blur();
             document.getElementById('loanPlannerRoot').dataset.liveRefreshLockedUntil = '0';
             loadLoanPage({live:true}).then(() => done(window.loanRowBeforeRefresh.isConnected));
         '''))
+        self.assertIn('Refreshed Synthetic Lender', self.browser.execute_script(
+            "return document.getElementById('loanTableBody').textContent"))
 
     def test_currency_source_cards_and_exact_decimal_formatting(self):
         from unittest.mock import Mock

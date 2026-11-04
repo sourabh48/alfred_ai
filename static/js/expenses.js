@@ -90,11 +90,7 @@ function loadChart(options = {}) {
     return apiFetch(`/api/expenses/chart/?granularity=${encodeURIComponent(granularity)}`)
         .then(data => {
             const canvas = document.getElementById("expenseTrend");
-            if (expenseChart) {
-                expenseChart.destroy();
-            }
-
-            expenseChart = new Chart(canvas, {
+            expenseChart = Alfred.renderChart(expenseChart, canvas, {
                 type: "bar",
                 data: {
                     labels: data.labels,
@@ -213,7 +209,7 @@ function ensureSummaryCards(target, cards) {
         return;
     }
 
-    target.innerHTML = cards.map(card => `
+    Alfred.setHTML(target, cards.map(card => `
         <div class="col-md-6 col-xl-${cards.length > 4 ? "4" : "3"}" data-expense-summary-key="${card.key}">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
@@ -223,7 +219,7 @@ function ensureSummaryCards(target, cards) {
                 </div>
             </div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderMonthlyWindow(windowData) {
@@ -422,11 +418,11 @@ function renderStatementUploads(items) {
         return;
     }
     if (!items.length) {
-        target.innerHTML = `<div class="empty-state">No statement uploads tracked yet.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">No statement uploads tracked yet.</div>`);
         return;
     }
 
-    target.innerHTML = items.slice(0, 10).map(item => {
+    Alfred.setHTML(target, items.slice(0, 10).map(item => {
         const parserLabel = item.parser_status_label || item.parser_status || "Unknown";
         const toneClass = item.imported_count ? "text-success" : (item.parser_status === "needs_review" ? "text-warning" : "text-danger");
         const previewInfo = statementPreviewInfo(item);
@@ -449,7 +445,7 @@ function renderStatementUploads(items) {
                 </div>
             </div>
         `;
-    }).join("");
+    }).join(""));
 }
 
 function renderBalanceSheet(balanceSheet) {
@@ -541,7 +537,7 @@ function ensureBalanceSheetCards(target, cards) {
         return;
     }
 
-    target.innerHTML = cards.map(card => `
+    Alfred.setHTML(target, cards.map(card => `
         <div class="col-md-6" data-balance-sheet-key="${card.key}">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
@@ -551,7 +547,7 @@ function ensureBalanceSheetCards(target, cards) {
                 </div>
             </div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function ensureBalanceSheetPanel(target, rows) {
@@ -563,12 +559,12 @@ function ensureBalanceSheetPanel(target, rows) {
         return;
     }
 
-    target.innerHTML = rows.map(row => `
+    Alfred.setHTML(target, rows.map(row => `
         <div class="data-row" data-balance-sheet-row="${row.key}">
             <div class="data-label" data-role="label">${escapeHtml(row.label)}</div>
             <div class="data-value" data-role="value"></div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderTimeline(timeline, meta = {}) {
@@ -617,14 +613,14 @@ function renderTimeline(timeline, meta = {}) {
             breakdown.push(`Credits ${formatCurrency(filteredCreditTotal)}`);
         }
 
-        summaryCard.innerHTML = `
+        Alfred.setHTML(summaryCard, `
             <div class="expense-filter-summary-label">${escapeHtml(summaryLabel)}</div>
             <div class="expense-filter-summary-value">${formatCurrency(summaryValue)}</div>
             <div class="expense-filter-summary-meta">
                 ${Alfred.formatNumber(matchingCount, 0)} ${matchingCount === 1 ? "result" : "results"} | ${Alfred.formatNumber(visibleCount, 0)} visible
                 <br>${escapeHtml(breakdown.join(" | "))}
             </div>
-        `;
+        `);
     }
 
     if (metaBar) {
@@ -654,18 +650,18 @@ function renderTimeline(timeline, meta = {}) {
                 ${latestStatementUpload.parser_notes ? `<div class="small text-warning-emphasis mt-1">${escapeHtml(latestStatementUpload.parser_notes)}</div>` : ""}
             `
             : "";
-        body.innerHTML = `
+        Alfred.setHTML(body, `
             <tr>
                 <td colspan="9" class="text-center text-muted py-4">
                     No matching transactions. Adjust the filters, add one manually, or import a bank statement.
                     ${uploadHint}
                 </td>
             </tr>
-        `;
+        `);
         return;
     }
 
-    body.innerHTML = timeline.map(group => {
+    Alfred.setHTML(body, timeline.map(group => {
         const rows = group.items.map(item => {
             expenseIndex.set(item.id, item);
             const amountClass = item.direction === "credit" ? "text-success" : "text-dark";
@@ -699,7 +695,7 @@ function renderTimeline(timeline, meta = {}) {
             </tr>
             ${rows}
         `;
-    }).join("");
+    }).join(""));
 }
 
 function applyTimelineFilters(event) {
@@ -908,9 +904,9 @@ function deleteExpense(id) {
 }
 
 function showUploadStatus(message, tone) {
-    document.getElementById("statementUploadStatus").innerHTML = `
+    Alfred.setHTML(document.getElementById("statementUploadStatus"), `
         <div class="alert alert-${tone} mb-0">${escapeHtml(message)}</div>
-    `;
+    `);
 }
 
 function classificationTone(value) {

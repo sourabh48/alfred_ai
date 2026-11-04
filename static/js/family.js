@@ -47,22 +47,18 @@ function renderFamilySummary(dependents, growth) {
         { title: "10-Year Projection", value: yearTen ? Alfred.formatCurrency(yearTen.projected_net_worth) : "N/A", copy: yearTen ? "Projected household base in year 10" : "Needs a positive net worth" },
     ];
 
-    document.getElementById("familySummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("familySummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${card.copy}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderFamilyChart(items) {
     const canvas = document.getElementById("familyNetChart");
-    if (familyChart) {
-        familyChart.destroy();
-    }
-
-    familyChart = new Chart(canvas, {
+    familyChart = Alfred.renderChart(familyChart, canvas, {
         type: "line",
         data: {
             labels: items.map(item => `Year ${item.year}`),
@@ -82,26 +78,26 @@ function renderFamilyChart(items) {
 function renderFamilyInsights(items) {
     const target = document.getElementById("familyInsightList");
     if (!items.length) {
-        target.innerHTML = `<li class="insight-item">Family planning insights will appear after data is added.</li>`;
+        Alfred.setHTML(target, `<li class="insight-item">Family planning insights will appear after data is added.</li>`);
         return;
     }
-    target.innerHTML = items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+    Alfred.setHTML(target, items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join(""));
 }
 
 function renderFamilyTable(items) {
     const body = document.getElementById("familyTableBody");
     if (!items.length) {
-        body.innerHTML = `<tr><td colspan="3" class="text-center muted py-4">No dependents registered yet.</td></tr>`;
+        Alfred.setHTML(body, `<tr><td colspan="3" class="text-center muted py-4">No dependents registered yet.</td></tr>`);
         return;
     }
 
-    body.innerHTML = items.map(item => `
+    Alfred.setHTML(body, items.map(item => `
         <tr>
             <td class="fw-semibold">${Alfred.escapeHtml(item.name)}</td>
             <td>${Alfred.escapeHtml(item.relation)}</td>
             <td class="text-end">${Alfred.formatNumber(item.age, 0)}</td>
         </tr>
-    `).join("");
+    `).join(""));
 }
 
 function submitDependentForm(event) {

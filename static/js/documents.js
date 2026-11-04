@@ -175,7 +175,7 @@ function loadDocumentCenter(options = {}) {
             // A request can finish after the user opens a form or starts typing.
             // Keep its DOM intact; the next idle refresh will load fresh data.
             if (options.live && Alfred.shouldPauseLiveRefresh(document.getElementById("documentCenterRoot"))) {
-                return;
+                return false;
             }
             const payload = Object.fromEntries(results.map(result => [result.key, result.data]));
             const failures = results.filter(result => result.error);

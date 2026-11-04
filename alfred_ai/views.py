@@ -175,6 +175,16 @@ def session_ping_api_view(request):
     )
 
 
+@login_required
+@require_http_methods(["GET"])
+def data_version_api_view(request):
+    from .services.live_version import data_version
+
+    response = JsonResponse({"version": data_version(request.user)})
+    response["Cache-Control"] = "no-store, private"
+    return response
+
+
 def signup_view(request):
     if request.user.is_authenticated:
         return redirect("index")

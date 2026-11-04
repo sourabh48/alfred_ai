@@ -51,7 +51,22 @@
   122 backend and 5 Chrome PASS. COMPLETE_VERIFIED for bounded scope; baseline 80/143.
 - Master CI on `14e0aa6`: all three Selenium shards stopped before running because the new Chrome test had no measured
   duration in `tests/browser_durations.json`; recorded (8.75 s locally), and collect-only now plans 157 tests.
-- Next: exact-head master CI on the durations commit, then FAMILY-06.
+- Master CI on `6d6551e`: every check passed (3 Selenium shards, native Windows, Linux, Pages) on that exact SHA.
+- Live refresh fix (owner request, between FAMILY-05 and FAMILY-06): 15 pages reloaded all their data every second, about
+  300 requests a minute on Investments, above the 120 a minute account limit, with a session write on each one. Pages now
+  ask `/api/session/data-version/` every 10 s and reload only after the owner's data (or a sharing family member's) changes:
+  API writes, background imports and jobs. Writes made while a page loads do not count, so pages cannot reload themselves
+  in a loop. On reload, `Alfred.setHTML` replaces only the cards and rows whose markup changed, and charts update in place.
+  Two review rounds:
+  - Session pings and client error logs no longer count as changes; only real database writes do, bulk updates included.
+  - A linked family account sees only the shared dependents or financial part, never when the other person is active.
+  - Skipped or failed reloads now retry, and failures back off from 10 s to 5 min.
+  - Script versions are bumped.
+
+  Evidence: 8 version tests and 348 cache, family and contract tests PASS; full Chrome suite 170 PASS. Residual: the
+  20-minute statement retry job re-saves failed uploads, causing one quiet reload with unchanged data each time.
+  This is not one of the 143 baseline items or the 13 extensions; baseline stays 80/143.
+- Next: FAMILY-06.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

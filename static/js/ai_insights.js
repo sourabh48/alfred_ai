@@ -52,13 +52,13 @@ function renderSummary(summary, signature, readability) {
         { title: "Peak spending jumps", value: spikeFactor.label, copy: spikeFactor.summary },
     ];
 
-    document.getElementById("aiInsightSummary").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("aiInsightSummary"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${card.copy}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderRecommendations(items) {
@@ -67,11 +67,7 @@ function renderRecommendations(items) {
 
 function renderSignalChart(summary, signature) {
     const ctx = document.getElementById("aiSignalChart");
-    if (aiSignalChart) {
-        aiSignalChart.destroy();
-    }
-
-    aiSignalChart = new Chart(ctx, {
+    aiSignalChart = Alfred.renderChart(aiSignalChart, ctx, {
         type: "radar",
         data: {
             labels: ["Health", "Stability", "Discipline", "Liquidity", "Stress", "Savings"],
@@ -109,11 +105,11 @@ function renderSignalChart(summary, signature) {
 function renderRecurring(items) {
     const target = document.getElementById("aiRecurringCommitments");
     if (!items.length) {
-        target.innerHTML = `<div class="detail-item">No recurring commitments detected yet.</div>`;
+        Alfred.setHTML(target, `<div class="detail-item">No recurring commitments detected yet.</div>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `
+    Alfred.setHTML(target, items.map(item => `
         <div class="detail-item mb-3">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -123,17 +119,17 @@ function renderRecurring(items) {
                 <strong>${Alfred.formatCurrency(item.average_amount)}</strong>
             </div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderSpikes(items) {
     const target = document.getElementById("aiSpikeDays");
     if (!items.length) {
-        target.innerHTML = `<div class="detail-item">No major anomalies detected in the current ledger.</div>`;
+        Alfred.setHTML(target, `<div class="detail-item">No major anomalies detected in the current ledger.</div>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `
+    Alfred.setHTML(target, items.map(item => `
         <div class="detail-item mb-3">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -143,15 +139,15 @@ function renderSpikes(items) {
                 <strong>${Alfred.formatCurrency(item.amount)}</strong>
             </div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderSimpleList(elementId, items, emptyCopy) {
     const target = document.getElementById(elementId);
     if (!items.length) {
-        target.innerHTML = `<li class="insight-item">${Alfred.escapeHtml(emptyCopy)}</li>`;
+        Alfred.setHTML(target, `<li class="insight-item">${Alfred.escapeHtml(emptyCopy)}</li>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+    Alfred.setHTML(target, items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join(""));
 }

@@ -82,23 +82,23 @@ function renderCreditSummary(score, peer, reportPayload) {
         },
     ];
 
-    document.getElementById("creditSummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("creditSummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${Alfred.escapeHtml(card.copy)}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderCreditReportUploads(items) {
     const target = document.getElementById("creditReportUploadList");
     if (!items.length) {
-        target.innerHTML = `<div class="empty-state">No uploaded credit reports yet.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">No uploaded credit reports yet.</div>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `
+    Alfred.setHTML(target, items.map(item => `
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -113,16 +113,12 @@ function renderCreditReportUploads(items) {
                 </div>
             </div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderCreditFactorChart(items) {
     const canvas = document.getElementById("creditFactorChart");
-    if (creditFactorChart) {
-        creditFactorChart.destroy();
-    }
-
-    creditFactorChart = new Chart(canvas, {
+    creditFactorChart = Alfred.renderChart(creditFactorChart, canvas, {
         type: "bar",
         data: {
             labels: items.map(item => item.name || item.factor_name),
@@ -142,11 +138,7 @@ function renderCreditFactorChart(items) {
 
 function renderCreditTrendChart(items) {
     const canvas = document.getElementById("creditTrendChart");
-    if (creditTrendChart) {
-        creditTrendChart.destroy();
-    }
-
-    creditTrendChart = new Chart(canvas, {
+    creditTrendChart = Alfred.renderChart(creditTrendChart, canvas, {
         type: "line",
         data: {
             labels: items.map(item => item.month),
@@ -181,7 +173,7 @@ function renderCreditFactorList(analysis, report) {
         `);
     }
 
-    panel.innerHTML = [
+    Alfred.setHTML(panel, [
         ...cards,
         ...factors.map(item => `
             <div class="mini-card">
@@ -196,7 +188,7 @@ function renderCreditFactorList(analysis, report) {
         `),
         ...strengths.map(item => `<div class="mini-card"><strong>Strength</strong><div class="muted small mt-1">${Alfred.escapeHtml(item)}</div></div>`),
         ...weaknesses.map(item => `<div class="mini-card"><strong>Risk</strong><div class="muted small mt-1">${Alfred.escapeHtml(item)}</div></div>`),
-    ].join("");
+    ].join(""));
 }
 
 function renderCreditImprovement(plan) {
@@ -206,13 +198,13 @@ function renderCreditImprovement(plan) {
         ...(plan.long_term_goals || []),
     ];
     const target = document.getElementById("creditImprovementList");
-    target.innerHTML = items.length
+    Alfred.setHTML(target, items.length
         ? items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("")
-        : `<li class="insight-item">No improvement actions available yet.</li>`;
+        : `<li class="insight-item">No improvement actions available yet.</li>`);
 }
 
 function renderCreditPeer(peer, report) {
-    document.getElementById("creditPeerPanel").innerHTML = [
+    Alfred.setHTML(document.getElementById("creditPeerPanel"), [
         ["Peer group", peer.peer_group || "Unknown"],
         ["Peer average", Alfred.formatNumber(peer.peer_average || 0, 0)],
         ["National average", Alfred.formatNumber(peer.national_average || 0, 0)],
@@ -223,14 +215,14 @@ function renderCreditPeer(peer, report) {
             <div class="data-label">${label}</div>
             <div class="data-value">${Alfred.escapeHtml(String(value))}</div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderCreditAlerts(items) {
     const target = document.getElementById("creditAlertList");
-    target.innerHTML = items.length
+    Alfred.setHTML(target, items.length
         ? items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item.message)}</li>`).join("")
-        : `<li class="insight-item">No active alerts right now.</li>`;
+        : `<li class="insight-item">No active alerts right now.</li>`);
 }
 
 function refreshCreditScore() {

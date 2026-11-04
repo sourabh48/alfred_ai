@@ -61,25 +61,21 @@ function renderBehavioralSummary(history, stress, fingerprint) {
         },
     ];
 
-    document.getElementById("behavioralSummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("behavioralSummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${Alfred.escapeHtml(String(card.value))}</h2>
             <p class="metric-caption">${Alfred.escapeHtml(card.copy)}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderStressChart(values, windowLabels) {
     const canvas = document.getElementById("stressChart");
-    if (stressChart) {
-        stressChart.destroy();
-    }
-
     const ordered = values.length ? [...values].reverse() : [0];
     // The single fallback point has no weekly window behind it.
     const labels = windowLabels.length === values.length ? [...windowLabels].reverse() : ordered.map(() => "Current");
-    stressChart = new Chart(canvas, {
+    stressChart = Alfred.renderChart(stressChart, canvas, {
         type: "line",
         data: {
             labels: values.length ? labels : ["No data"],
@@ -105,16 +101,16 @@ function renderBehavioralInsights(stress, fingerprint) {
     ])).slice(0, 8);
     const target = document.getElementById("behavioralInsightList");
     if (!insights.length) {
-        target.innerHTML = `<li class="insight-item">Behavioral guidance will appear after a few logs are captured.</li>`;
+        Alfred.setHTML(target, `<li class="insight-item">Behavioral guidance will appear after a few logs are captured.</li>`);
         return;
     }
 
-    target.innerHTML = insights.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+    Alfred.setHTML(target, insights.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join(""));
 }
 
 function renderFingerprintPanel(stress, fingerprint) {
     const linkedData = fingerprint.linked_data || {};
-    document.getElementById("behavioralFingerprintPanel").innerHTML = [
+    Alfred.setHTML(document.getElementById("behavioralFingerprintPanel"), [
         ["Fingerprint", fingerprint.fingerprint || "No data"],
         ["Stress level", Alfred.formatNumber(fingerprint.stress_level || stress.current_stress || 0, 1)],
         ["Spending pattern", fingerprint.spending_pattern || "Unknown"],
@@ -129,7 +125,7 @@ function renderFingerprintPanel(stress, fingerprint) {
             <div class="data-label">${label}</div>
             <div class="data-value">${Alfred.escapeHtml(String(value))}</div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderPressureMap(stress, fingerprint) {
@@ -139,11 +135,11 @@ function renderPressureMap(stress, fingerprint) {
         return;
     }
     if (!items.length) {
-        target.innerHTML = `<div class="empty-state">Pressure mapping will appear once ALFRED has linked enough transaction history.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">Pressure mapping will appear once ALFRED has linked enough transaction history.</div>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `
+    Alfred.setHTML(target, items.map(item => `
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-center gap-3 mb-2">
                 <div class="fw-semibold">${Alfred.escapeHtml(item.label || "Pressure")}</div>
@@ -154,7 +150,7 @@ function renderPressureMap(stress, fingerprint) {
             </div>
             <div class="muted small">${Alfred.escapeHtml(item.detail || "")}</div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderBehavioralGrounding(grounding) {
@@ -165,7 +161,7 @@ function renderBehavioralGrounding(grounding) {
     const history = grounding.history || {};
     const freshness = grounding.freshness || {};
     const notes = grounding.notes || [];
-    target.innerHTML = [
+    Alfred.setHTML(target, [
         `
         <div class="mini-card">
             <div class="data-row">
@@ -188,17 +184,17 @@ function renderBehavioralGrounding(grounding) {
         </div>
         `,
         ...notes.map(item => `<div class="mini-card muted small">${Alfred.escapeHtml(item)}</div>`),
-    ].join("");
+    ].join(""));
 }
 
 function renderBehavioralHistory(items) {
     const target = document.getElementById("behavioralHistory");
     if (!items.length) {
-        target.innerHTML = `<div class="empty-state">No manual behavioral signals logged yet. ALFRED is still using linked financial activity where available.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">No manual behavioral signals logged yet. ALFRED is still using linked financial activity where available.</div>`);
         return;
     }
 
-    target.innerHTML = items.slice(0, 6).map(item => `
+    Alfred.setHTML(target, items.slice(0, 6).map(item => `
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -208,7 +204,7 @@ function renderBehavioralHistory(items) {
                 <span class="muted small">${Alfred.formatDateTime(item.timestamp)}</span>
             </div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function submitBehavioralForm(event) {

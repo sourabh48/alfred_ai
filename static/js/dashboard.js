@@ -75,13 +75,13 @@ function renderFocusStrip(summary, loanPortfolio, behavior) {
         });
     }
 
-    document.getElementById("dashboardFocusStrip").innerHTML = items.map(item => `
+    Alfred.setHTML(document.getElementById("dashboardFocusStrip"), items.map(item => `
         <article class="dashboard-focus-card dashboard-focus-${item.tone}">
             <div class="dashboard-focus-label">${item.label}</div>
             <div class="dashboard-focus-value">${Alfred.escapeHtml(String(item.value))}</div>
             <div class="dashboard-focus-meta">${Alfred.escapeHtml(item.meta)}</div>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderHero(summary, behavior) {
@@ -135,22 +135,18 @@ function renderSummaryCards(summary, loanPortfolio) {
         });
     }
 
-    document.getElementById("dashboardSummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("dashboardSummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.kicker}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${card.caption}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderMonthlyChart(charts) {
     const ctx = document.getElementById("dashboardMonthlyChart");
-    if (dashboardMonthlyChart) {
-        dashboardMonthlyChart.destroy();
-    }
-
-    dashboardMonthlyChart = new Chart(ctx, {
+    dashboardMonthlyChart = Alfred.renderChart(dashboardMonthlyChart, ctx, {
         data: {
             labels: charts.monthly_labels,
             datasets: [
@@ -216,11 +212,7 @@ function renderMonthlyChart(charts) {
 
 function renderCategoryChart(charts) {
     const ctx = document.getElementById("dashboardCategoryChart");
-    if (dashboardCategoryChart) {
-        dashboardCategoryChart.destroy();
-    }
-
-    dashboardCategoryChart = new Chart(ctx, {
+    dashboardCategoryChart = Alfred.renderChart(dashboardCategoryChart, ctx, {
         type: "doughnut",
         data: {
             labels: charts.category_labels,
@@ -236,12 +228,12 @@ function renderCategoryChart(charts) {
         },
     });
 
-    document.getElementById("dashboardCategoryList").innerHTML = charts.category_labels.map((label, index) => `
+    Alfred.setHTML(document.getElementById("dashboardCategoryList"), charts.category_labels.map((label, index) => `
         <div class="d-flex justify-content-between py-2 border-top">
             <span>${Alfred.escapeHtml(label)}</span>
             <strong>${Alfred.formatCurrency(charts.category_values[index])}</strong>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderBehavior(summary, behavior) {
@@ -251,13 +243,13 @@ function renderBehavior(summary, behavior) {
         { kicker: "Spending Stability", value: summary.transactions ? `${Math.round(summary.stability_score)}/100` : "—", caption: "Estimated from how much monthly spending changes." },
     ];
 
-    document.getElementById("dashboardBehaviorCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("dashboardBehaviorCards"), cards.map(card => `
         <div class="metric-card">
             <p class="metric-kicker">${card.kicker}</p>
             <div class="metric-value">${card.value}</div>
             <p class="metric-caption">${card.caption}</p>
         </div>
-    `).join("");
+    `).join(""));
 
     renderList("dashboardPatternFlags", behavior.pattern_flags, "No behavior flags yet.");
 }
@@ -265,11 +257,11 @@ function renderBehavior(summary, behavior) {
 function renderRecurring(items) {
     const target = document.getElementById("dashboardRecurring");
     if (!items.length) {
-        target.innerHTML = `<div class="detail-item">Recurring patterns will appear once ALFRED has repeated months of history.</div>`;
+        Alfred.setHTML(target, `<div class="detail-item">Recurring patterns will appear once ALFRED has repeated months of history.</div>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `
+    Alfred.setHTML(target, items.map(item => `
         <div class="detail-item mb-3">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -279,7 +271,7 @@ function renderRecurring(items) {
                 <strong>${Alfred.formatCurrency(item.average_amount)}</strong>
             </div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderStress(behavior, spikeDays) {
@@ -287,11 +279,11 @@ function renderStress(behavior, spikeDays) {
 
     const target = document.getElementById("dashboardSpikeDays");
     if (!spikeDays.length) {
-        target.innerHTML = `<div class="detail-item">No material spike days detected in the current history window.</div>`;
+        Alfred.setHTML(target, `<div class="detail-item">No material spike days detected in the current history window.</div>`);
         return;
     }
 
-    target.innerHTML = spikeDays.map(item => `
+    Alfred.setHTML(target, spikeDays.map(item => `
         <div class="detail-item mb-3">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -301,17 +293,17 @@ function renderStress(behavior, spikeDays) {
                 <strong>${Alfred.formatCurrency(item.amount)}</strong>
             </div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderTransactions(items) {
     const target = document.getElementById("dashboardRecentTransactions");
     if (!items.length) {
-        target.innerHTML = `<tr><td colspan="6" class="text-center muted py-4">No transaction history available yet.</td></tr>`;
+        Alfred.setHTML(target, `<tr><td colspan="6" class="text-center muted py-4">No transaction history available yet.</td></tr>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `
+    Alfred.setHTML(target, items.map(item => `
         <tr>
             <td>${Alfred.formatDate(item.date)}</td>
             <td>
@@ -324,17 +316,17 @@ function renderTransactions(items) {
             </td>
             <td class="muted small">${Alfred.escapeHtml(item.description)}</td>
         </tr>
-    `).join("");
+    `).join(""));
 }
 
 function renderList(elementId, items, emptyCopy) {
     const target = document.getElementById(elementId);
     if (!items.length) {
-        target.innerHTML = `<li class="insight-item">${Alfred.escapeHtml(emptyCopy)}</li>`;
+        Alfred.setHTML(target, `<li class="insight-item">${Alfred.escapeHtml(emptyCopy)}</li>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+    Alfred.setHTML(target, items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join(""));
 }
 
 function statusClass(level) {

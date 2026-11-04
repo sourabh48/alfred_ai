@@ -118,22 +118,18 @@ function renderInvestmentSummary(data) {
         { title: "Risk / Diversification", value: `${analysis.risk_level || summary.risk || "No data"}`, copy: `${Alfred.formatNumber(analysis.diversification_score || 0)} diversification score` },
     ];
 
-    document.getElementById("investmentSummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("investmentSummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${card.copy}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderAllocationChart(data) {
     const canvas = document.getElementById("allocationChart");
-    if (allocationChart) {
-        allocationChart.destroy();
-    }
-
-    allocationChart = new Chart(canvas, {
+    allocationChart = Alfred.renderChart(allocationChart, canvas, {
         type: "doughnut",
         data: {
             labels: data.labels,
@@ -152,19 +148,18 @@ function renderAllocationChart(data) {
 
 function renderGrowthChart(data) {
     const canvas = document.getElementById("growthChart");
-    if (growthChart) {
-        growthChart.destroy();
-        growthChart = null;
-    }
-
     const status = document.getElementById("investmentGrowthStatus");
     const unavailable = data.available === false;
     status.textContent = unavailable ? data.unavailable_reason : "";
     status.hidden = !unavailable;
     canvas.hidden = unavailable;
-    if (unavailable) return;
+    if (unavailable) {
+        growthChart?.destroy();
+        growthChart = null;
+        return;
+    }
 
-    growthChart = new Chart(canvas, {
+    growthChart = Alfred.renderChart(growthChart, canvas, {
         type: "line",
         data: {
             labels: data.labels,
@@ -187,11 +182,11 @@ function renderInvestmentRecommendations(items, marketItems) {
     const target = document.getElementById("investmentRecommendationList");
     const combined = [...items, ...(marketItems || []).map(item => item.message)];
     if (!combined.length) {
-        target.innerHTML = `<li class="insight-item">Add holdings to unlock portfolio guidance.</li>`;
+        Alfred.setHTML(target, `<li class="insight-item">Add holdings to unlock portfolio guidance.</li>`);
         return;
     }
 
-    target.innerHTML = combined.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+    Alfred.setHTML(target, combined.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join(""));
 }
 
 function renderInvestmentGrounding(grounding) {
@@ -205,13 +200,13 @@ function renderInvestmentGrounding(grounding) {
         { title: "Monthly SIP", value: Alfred.formatCurrency(history.monthly_sip || 0), copy: "Recurring contribution grounding" },
         { title: "Total Value", value: Alfred.formatCurrency(history.total_value || 0), copy: "Position-backed market value" },
     ];
-    cardsTarget.innerHTML = cards.map(card => `
+    Alfred.setHTML(cardsTarget, cards.map(card => `
         <article class="metric-card metric-card--compact">
             <p class="metric-kicker">${card.title}</p>
             <h3 class="metric-value" style="font-size:1.35rem;">${card.value}</h3>
             <p class="metric-caption">${Alfred.escapeHtml(card.copy)}</p>
         </article>
-    `).join("");
+    `).join(""));
 
     const notes = grounding.notes || [];
     const evidence = grounding.evidence || [];
@@ -219,13 +214,13 @@ function renderInvestmentGrounding(grounding) {
         ...notes.map(note => ({ note })),
         ...evidence.map(item => ({ proof: item })),
     ];
-    evidenceTarget.innerHTML = evidenceItems.map(item => {
+    Alfred.setHTML(evidenceTarget, evidenceItems.map(item => {
         if (item.note) {
             return `<li class="insight-item">${Alfred.escapeHtml(item.note)}</li>`;
         }
         const proof = item.proof || {};
         return `<li class="insight-item"><strong>${Alfred.escapeHtml(proof.source_name || proof.title || "Evidence")}</strong>: ${Alfred.escapeHtml(proof.summary || "")}${proof.source_url ? ` <a href="${Alfred.safeHref(proof.source_url)}" target="_blank" rel="noopener">Proof</a>` : ""}</li>`;
-    }).join("");
+    }).join(""));
 }
 
 function renderInvestmentWatchlist(watchlist) {
@@ -243,9 +238,9 @@ function renderInvestmentWatchlist(watchlist) {
 
     const items = Array.isArray(watchlist.items) ? watchlist.items : [];
     if (!items.length) {
-        cardsTarget.innerHTML = `<div class="empty-state">No proof-backed watchlist candidates are available right now.</div>`;
+        Alfred.setHTML(cardsTarget, `<div class="empty-state">No proof-backed watchlist candidates are available right now.</div>`);
     } else {
-        cardsTarget.innerHTML = items.map(item => {
+        Alfred.setHTML(cardsTarget, items.map(item => {
             const score = clamp(item.short_horizon_score || 0, 0, 100);
             const proofChips = (item.proof || []).slice(0, 3).map(proof => `
                 <a class="chip-neutral investment-proof-chip" href="${Alfred.escapeHtml(proof.source_url || "#")}" target="_blank" rel="noopener">
@@ -284,12 +279,12 @@ function renderInvestmentWatchlist(watchlist) {
                     <p class="metric-caption mt-3 mb-0">${Alfred.escapeHtml(item.caution || "")}</p>
                 </article>
             `;
-        }).join("");
+        }).join(""));
     }
 
     const algorithm = watchlist.algorithm || {};
     const factors = Array.isArray(algorithm.factors) ? algorithm.factors : [];
-    algorithmTarget.innerHTML = `
+    Alfred.setHTML(algorithmTarget, `
         <div class="mini-card investment-algorithm-card">
             <div class="fw-semibold mb-2">${Alfred.escapeHtml(algorithm.name || "Transparent watchlist")}</div>
             <div class="muted small mb-2">Window: ${Alfred.formatNumber(algorithm.window_days || 0, 0)} days</div>
@@ -298,10 +293,10 @@ function renderInvestmentWatchlist(watchlist) {
             </ul>
             <p class="metric-caption mb-0">${Alfred.escapeHtml(algorithm.guardrail || "")}</p>
         </div>
-    `;
+    `);
 
     const evidenceItems = Array.isArray(watchlist.evidence) ? watchlist.evidence : [];
-    evidenceTarget.innerHTML = evidenceItems.length
+    Alfred.setHTML(evidenceTarget, evidenceItems.length
         ? evidenceItems.map(item => `
             <li class="insight-item">
                 <strong>${Alfred.escapeHtml(item.source_name || item.title || "Evidence")}</strong>:
@@ -309,17 +304,17 @@ function renderInvestmentWatchlist(watchlist) {
                 ${item.source_url ? ` <a href="${Alfred.safeHref(item.source_url)}" target="_blank" rel="noopener">Proof</a>` : ""}
             </li>
         `).join("")
-        : `<li class="insight-item">No external proof items are available right now.</li>`;
+        : `<li class="insight-item">No external proof items are available right now.</li>`);
 }
 
 function renderInvestmentPositions(items) {
     const body = document.getElementById("investmentPositionsBody");
     if (!items.length) {
-        body.innerHTML = `<tr><td colspan="6" class="text-center muted py-4">No registered positions yet.</td></tr>`;
+        Alfred.setHTML(body, `<tr><td colspan="6" class="text-center muted py-4">No registered positions yet.</td></tr>`);
         return;
     }
 
-    body.innerHTML = items.map(item => `
+    Alfred.setHTML(body, items.map(item => `
         <tr>
             <td>
                 <div class="fw-semibold">${Alfred.escapeHtml(item.asset_name)}</div>
@@ -332,7 +327,7 @@ function renderInvestmentPositions(items) {
             <td class="text-end">${Alfred.formatCurrency(item.monthly_sip)}</td>
             <td>${Alfred.escapeHtml(item.risk_level || "Not set")}</td>
         </tr>
-    `).join("");
+    `).join(""));
 }
 
 function renderInvestmentImports(items) {
@@ -341,11 +336,11 @@ function renderInvestmentImports(items) {
         return;
     }
     if (!Array.isArray(items) || !items.length) {
-        target.innerHTML = `<div class="empty-state">No portfolio imports tracked yet.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">No portfolio imports tracked yet.</div>`);
         return;
     }
 
-    target.innerHTML = items.slice(0, 8).map(item => {
+    Alfred.setHTML(target, items.slice(0, 8).map(item => {
         const linkedCount = Array.isArray(item.linked_investments) ? item.linked_investments.length : 0;
         const parserLabel = item.parser_status_label || item.parser_status || "Unknown";
         return `
@@ -362,7 +357,7 @@ function renderInvestmentImports(items) {
                 </div>
             </div>
         `;
-    }).join("");
+    }).join(""));
 }
 
 function submitInvestmentForm(event) {

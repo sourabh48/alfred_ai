@@ -272,6 +272,8 @@ function installNavAnchorPersistence() {
     });
 }
 
+// Loaders catch their own errors, so a failed live reload is detected by this count.
+let liveFetchFailures = 0;
 function fetchJSON(url, options = {}) {
     const {onResponse, ...requestOptions} = options;
     const config = {
@@ -290,9 +292,14 @@ function fetchJSON(url, options = {}) {
 
     beginGlobalProgress();
     return fetch(url, config)
+        .catch(error => {
+            liveFetchFailures += 1;
+            throw error;
+        })
         .then(async response => {
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
+                liveFetchFailures += 1;
                 const error = new Error(payload.detail || payload.error || payload.message || (response.status === 413 ? "This file exceeds the upload limit." : "Request failed. Please retry."));
                 error.status = response.status;
                 error.code = payload.code;
@@ -593,40 +600,132 @@ function shouldPauseLiveRefresh(root) {
     return root.contains(active);
 }
 
+// Pages refetch only after the owner's data version changes (a save, import or family change), never on a timer.
+// The old 1-second timer reloaded every page's full data each second and exceeded the per-account API limit.
+const LIVE_VERSION_POLL_MS = 10000;
+let liveVersion = null;
+let liveVersionPending = false;
+let liveVersionTimer = null;
+
+function runLiveRefreshEntries() {
+    liveRefreshRegistry.forEach(entry => entry.run());
+}
+
+function pollLiveVersion() {
+    if (document.hidden || liveVersionPending || !liveRefreshRegistry.size) {
+        return Promise.resolve();
+    }
+    liveVersionPending = true;
+    // Plain fetch: a tiny check must not flash the page progress bar.
+    return fetch("/api/session/data-version/", { credentials: "same-origin", cache: "no-store", redirect: "error", headers: { Accept: "application/json" } })
+        .then(response => (response.ok ? response.json() : null))
+        .then(payload => {
+            const next = payload && typeof payload.version === "string" ? payload.version : null;
+            if (!next) {
+                return;
+            }
+            if (liveVersion !== null && next !== liveVersion) {
+                liveRefreshRegistry.forEach(entry => { entry.stale = true; });
+            }
+            liveVersion = next;
+        })
+        .catch(() => {})
+        .finally(() => {
+            liveVersionPending = false;
+            runLiveRefreshEntries();
+        });
+}
+
 function enableLiveRefresh(key, loadFn, options = {}) {
-    const intervalMs = Number(options.intervalMs || 1000);
+    // intervalMs is now the minimum gap between this section's reloads, protecting expensive endpoints.
+    const minGapMs = Number(options.intervalMs || 0);
     const rootId = options.rootId || "";
     disableLiveRefresh(key);
 
-    let inFlight = false;
-    const tick = () => {
+    const entry = { stale: false, inFlight: false, lastStarted: Date.now(), retryAt: 0, retryDelay: 0 };
+    entry.run = () => {
         const root = rootId ? document.getElementById(rootId) : document.body;
         if (rootId && !root) {
             disableLiveRefresh(key);
             return;
         }
         installLiveRefreshGuards(root, options);
-        if (inFlight || shouldPauseLiveRefresh(root)) {
+        // A paused or skipped (loader returned false) reload retries at the next check; a failed one backs off.
+        if (!entry.stale || entry.inFlight || shouldPauseLiveRefresh(root) || Date.now() - entry.lastStarted < minGapMs
+            || Date.now() < entry.retryAt) {
             return;
         }
-        inFlight = true;
+        entry.stale = false;
+        entry.inFlight = true;
+        entry.lastStarted = Date.now();
+        const failuresBefore = liveFetchFailures;
+        const failed = () => {
+            // 10 s doubling to 5 min, so a failing or rate-limited endpoint is not hammered.
+            entry.stale = true;
+            entry.retryDelay = Math.min(Math.max(entry.retryDelay * 2, LIVE_VERSION_POLL_MS), 300000);
+            entry.retryAt = Date.now() + entry.retryDelay;
+        };
         Promise.resolve(loadFn({ live: true }))
-            .catch(() => {})
+            .then(result => {
+                if (liveFetchFailures !== failuresBefore) failed();
+                else if (result === false) entry.stale = true;
+                else entry.retryDelay = 0;
+            })
+            .catch(failed)
             .finally(() => {
-                inFlight = false;
+                entry.inFlight = false;
             });
     };
-
-    const timer = window.setInterval(tick, intervalMs);
-    liveRefreshRegistry.set(key, timer);
+    liveRefreshRegistry.set(key, entry);
+    if (!liveVersionTimer) {
+        liveVersionTimer = window.setInterval(pollLiveVersion, LIVE_VERSION_POLL_MS);
+        document.addEventListener("visibilitychange", pollLiveVersion);
+    }
+    if (liveVersion === null) {
+        pollLiveVersion();
+    }
 }
 
 function disableLiveRefresh(key) {
-    const timer = liveRefreshRegistry.get(key);
-    if (timer) {
-        window.clearInterval(timer);
-        liveRefreshRegistry.delete(key);
+    liveRefreshRegistry.delete(key);
+}
+
+// Replace only the child nodes whose markup changed, so unchanged cards and values are not rebuilt.
+// Use only where the caller does not attach listeners to the children afterwards (kept nodes would get them twice).
+function setHTML(target, html) {
+    if (!target) {
+        return;
     }
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    const next = [...template.content.childNodes];
+    const current = [...target.childNodes];
+    next.forEach((node, index) => {
+        const old = current[index];
+        if (!old) {
+            target.appendChild(node);
+        } else if (!old.isEqualNode(node)) {
+            target.replaceChild(node, old);
+        }
+    });
+    current.slice(next.length).forEach(node => node.remove());
+}
+
+// Update an existing chart's data in place without animation instead of destroying and redrawing it.
+function renderChart(existing, canvas, config) {
+    if (existing && existing.canvas === canvas && existing.config.type === config.type) {
+        existing.data.labels = config.data.labels;
+        existing.data.datasets = config.data.datasets;
+        if (config.options) {
+            existing.options = config.options;
+        }
+        existing.update("none");
+        return existing;
+    }
+    if (existing) {
+        existing.destroy();
+    }
+    return new Chart(canvas, config);
 }
 
 function upsertPageAlert(rootId, message, tone = "danger") {
@@ -1187,6 +1286,9 @@ installNavAnchorPersistence();
 window.addEventListener("resize", syncShellOffsets);
 
 window.Alfred = {
+    setHTML,
+    renderChart,
+    checkLiveVersion: pollLiveVersion,
     formatRecordedMoney,
     fetchJSON,
     uploadJSON,

@@ -66,18 +66,18 @@ function renderRiskSummary(summary, outlook, consolidated, items) {
         },
     ];
 
-    document.getElementById("riskSummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("riskSummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${card.copy}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderRiskBoard(items) {
     const target = document.getElementById("riskBoard");
-    target.innerHTML = items.length ? items.map(item => `
+    Alfred.setHTML(target, items.length ? items.map(item => `
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -91,19 +91,15 @@ function renderRiskBoard(items) {
                 <span class="status-pill ${riskTone(item.level)}">${item.level === "insufficient_data" ? "insufficient data" : `${Alfred.escapeHtml(item.level)} | ${Alfred.formatNumber(item.score || 0, 0)}`}</span>
             </div>
         </div>
-    `).join("") : `<div class="empty-state">No consolidated risk items yet.</div>`;
+    `).join("") : `<div class="empty-state">No consolidated risk items yet.</div>`);
 }
 
 function renderRiskChart(items) {
     const canvas = document.getElementById("riskRadar");
     const meta = document.getElementById("riskRadarMeta");
-    if (riskChart) {
-        riskChart.destroy();
-    }
-
     if (!items.length) {
         meta.textContent = "No live consolidated risk items are available yet. Save a snapshot to render the radar.";
-        riskChart = new Chart(canvas, {
+        riskChart = Alfred.renderChart(riskChart, canvas, {
             type: "radar",
             data: { labels: [], datasets: [{ label: "Current risk", data: [] }] },
             options: {
@@ -121,7 +117,7 @@ function renderRiskChart(items) {
     const labels = items.map(item => item.label);
     const values = items.map(item => item.coverage?.status === "insufficient_data" ? null : (item.score || 0));
 
-    riskChart = new Chart(canvas, {
+    riskChart = Alfred.renderChart(riskChart, canvas, {
         type: "radar",
         data: {
             labels,
@@ -146,13 +142,13 @@ function renderRiskChart(items) {
 
 function renderRiskInsights(items) {
     const target = document.getElementById("riskInsightList");
-    target.innerHTML = items.length
+    Alfred.setHTML(target, items.length
         ? items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("")
-        : `<li class="insight-item">Mitigation guidance will appear once a snapshot is captured.</li>`;
+        : `<li class="insight-item">Mitigation guidance will appear once a snapshot is captured.</li>`);
 }
 
 function renderRiskMacroContext(context) {
-    document.getElementById("riskMacroContext").innerHTML = [
+    Alfred.setHTML(document.getElementById("riskMacroContext"), [
         ["Unemployment", context.unemployment?.latest_value ?? "N/A", context.unemployment?.latest_year || "Latest available"],
         ["Inflation", context.inflation?.latest_value ?? "N/A", context.inflation?.latest_year || "Latest available"],
         ["NIFTY 1M Return", context.market?.one_month_return_pct ?? "N/A", "Market snapshot"],
@@ -162,12 +158,12 @@ function renderRiskMacroContext(context) {
             <div class="data-label">${label}</div>
             <div class="data-value">${Alfred.escapeHtml(String(value))} <span class="muted small">${Alfred.escapeHtml(String(note))}</span></div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderRiskEvidence(items) {
     const target = document.getElementById("riskEvidenceList");
-    target.innerHTML = items.length ? items.map(item => `
+    Alfred.setHTML(target, items.length ? items.map(item => `
         <div class="mini-card">
             <div class="fw-semibold">${Alfred.escapeHtml(item.title || item.source_name)}</div>
             <div class="muted small">${Alfred.escapeHtml(item.source_name || "Source")} | ${Alfred.escapeHtml(item.status || "unknown")}${item.verified_at ? ` | refreshed ${Alfred.formatDateTime(item.verified_at)}` : ""}</div>
@@ -175,7 +171,7 @@ function renderRiskEvidence(items) {
             ${item.stale_after ? `<div class="muted small mt-2">Next stale after ${Alfred.formatDateTime(item.stale_after)}</div>` : ""}
             ${item.source_url ? `<div class="mt-2"><a href="${Alfred.safeHref(item.source_url)}" target="_blank" rel="noopener">Open source</a></div>` : ""}
         </div>
-    `).join("") : `<div class="empty-state">No external evidence cached yet.</div>`;
+    `).join("") : `<div class="empty-state">No external evidence cached yet.</div>`);
 }
 
 function renderRiskGrounding(grounding, freshness) {
@@ -185,7 +181,7 @@ function renderRiskGrounding(grounding, freshness) {
     const notes = grounding.notes || [];
     const activeFreshness = Object.keys(grounding.freshness || {}).length ? grounding.freshness : freshness;
 
-    cardsTarget.innerHTML = [
+    Alfred.setHTML(cardsTarget, [
         ["Evidence tracked", Alfred.formatNumber(activeFreshness.tracked_records || 0, 0), "Verified records attached"],
         ["Fresh now", Alfred.formatNumber(activeFreshness.fresh_records || 0, 0), activeFreshness.next_stale_after ? `Next stale after ${Alfred.formatDateTime(activeFreshness.next_stale_after)}` : "No stale deadline attached"],
         ["Snapshots", Alfred.formatNumber(history.tracked_snapshots || 0, 0), Number(history.monthly_income) > 0 ? `${Alfred.formatCurrency(history.monthly_income)} income basis` : "Income unavailable"],
@@ -195,7 +191,7 @@ function renderRiskGrounding(grounding, freshness) {
             <h3 class="metric-value" style="font-size:1.35rem;">${Alfred.escapeHtml(String(value))}</h3>
             <p class="metric-caption">${Alfred.escapeHtml(copy)}</p>
         </article>
-    `).join("");
+    `).join(""));
 
     const entries = [
         `Liquid cash basis: ${Alfred.formatCurrency(history.liquid_cash || 0)}`,
@@ -203,13 +199,13 @@ function renderRiskGrounding(grounding, freshness) {
         `Dependents tracked: ${Alfred.formatNumber(history.dependents || 0, 0)}`,
         ...notes,
     ];
-    listTarget.innerHTML = entries.length
+    Alfred.setHTML(listTarget, entries.length
         ? entries.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("")
-        : `<li class="insight-item">No grounding notes are attached yet.</li>`;
+        : `<li class="insight-item">No grounding notes are attached yet.</li>`);
 }
 
 function renderRiskSignals(signals) {
-    document.getElementById("riskSignalBoard").innerHTML = [
+    Alfred.setHTML(document.getElementById("riskSignalBoard"), [
         ["Career market risk", signals.career_market_risk ?? "N/A"],
         ["Job fit score", signals.job_fit_score ?? "N/A"],
         ["Debt burden %", signals.debt_burden_pct ?? "N/A"],
@@ -223,12 +219,12 @@ function renderRiskSignals(signals) {
             <div class="data-label">${label}</div>
             <div class="data-value">${Alfred.escapeHtml(String(value))}</div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderRiskActions(items) {
     const target = document.getElementById("riskActionList");
-    target.innerHTML = items.length ? items.map(item => `
+    Alfred.setHTML(target, items.length ? items.map(item => `
         <div class="mini-card">
             <div class="d-flex justify-content-between gap-3 align-items-start">
                 <div>
@@ -238,29 +234,29 @@ function renderRiskActions(items) {
                 <span class="status-pill ${riskTone(item.priority)}">${Alfred.escapeHtml(item.priority || "low")}</span>
             </div>
         </div>
-    `).join("") : `<div class="empty-state">No action items yet.</div>`;
+    `).join("") : `<div class="empty-state">No action items yet.</div>`);
 }
 
 function renderRiskTable(items) {
     const body = document.getElementById("riskTableBody");
     if (!items.length) {
-        body.innerHTML = `<tr><td colspan="4" class="text-center muted py-4">No risk snapshots stored yet.</td></tr>`;
+        Alfred.setHTML(body, `<tr><td colspan="4" class="text-center muted py-4">No risk snapshots stored yet.</td></tr>`);
         return;
     }
 
-    body.innerHTML = items.map(item => `
+    Alfred.setHTML(body, items.map(item => `
         <tr>
             <td>${Alfred.formatDateTime(item.timestamp)}</td>
             <td class="text-end">${Alfred.formatNumber(item.layoff_risk, 0)}</td>
             <td class="text-end">${Alfred.formatNumber(item.illness_risk, 0)}</td>
             <td class="text-end">${Alfred.formatNumber(item.relocation_risk, 0)}</td>
         </tr>
-    `).join("");
+    `).join(""));
 }
 
 function renderRiskNews(items) {
     const target = document.getElementById("riskNewsList");
-    target.innerHTML = items.length ? items.map(item => `
+    Alfred.setHTML(target, items.length ? items.map(item => `
         <div class="mini-card">
             <div class="d-flex justify-content-between gap-3 align-items-start">
                 <div>
@@ -271,7 +267,7 @@ function renderRiskNews(items) {
                 <a href="${Alfred.safeHref(item.link)}" target="_blank" rel="noopener">Open</a>
             </div>
         </div>
-    `).join("") : `<div class="empty-state">No related news was returned right now.</div>`;
+    `).join("") : `<div class="empty-state">No related news was returned right now.</div>`);
 }
 
 function submitRiskForm(event) {

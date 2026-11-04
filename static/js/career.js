@@ -37,7 +37,7 @@ function loadCareerDashboard(options = {}) {
             }
             // A response can arrive after the owner opens sources or starts editing.
             if (options.live && Alfred.shouldPauseLiveRefresh(document.getElementById("careerRoot"))) {
-                return;
+                return false;
             }
             const profile = data.profile || {};
             const projection = data.projection || {};
@@ -109,18 +109,18 @@ function renderOpeningFilters(filters, active) {
 
     const countries = Array.isArray(filters?.countries) ? filters.countries : [];
     const statesByCountry = filters?.states_by_country || {};
-    countrySelect.innerHTML = `<option value="">All countries</option>${countries.map(country => `
+    Alfred.setHTML(countrySelect, `<option value="">All countries</option>${countries.map(country => `
         <option value="${Alfred.escapeHtml(country)}"${country === careerOpeningFilters.country ? " selected" : ""}>${Alfred.escapeHtml(country)}</option>
-    `).join("")}`;
+    `).join("")}`);
 
     const states = careerOpeningFilters.country ? (statesByCountry[careerOpeningFilters.country] || []) : [];
     if (!states.includes(careerOpeningFilters.state)) {
         careerOpeningFilters.state = "";
     }
     stateSelect.disabled = !states.length;
-    stateSelect.innerHTML = `<option value="">All states</option>${states.map(state => `
+    Alfred.setHTML(stateSelect, `<option value="">All states</option>${states.map(state => `
         <option value="${Alfred.escapeHtml(state)}"${state === careerOpeningFilters.state ? " selected" : ""}>${Alfred.escapeHtml(state)}</option>
-    `).join("")}`;
+    `).join("")}`);
 }
 
 function renderCareerHero(profile, projection, timing) {
@@ -157,22 +157,18 @@ function renderCareerSummary(profile, projection, resume, jobAnalysis, market, t
         },
     ];
 
-    document.getElementById("careerSummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("careerSummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${card.copy}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderCareerChart(items) {
     const canvas = document.getElementById("salaryChart");
-    if (salaryChart) {
-        salaryChart.destroy();
-    }
-
-    salaryChart = new Chart(canvas, {
+    salaryChart = Alfred.renderChart(salaryChart, canvas, {
         type: "line",
         data: {
             labels: items.map(item => `Year ${item.year}`),
@@ -194,11 +190,11 @@ function renderCareerChart(items) {
 function renderCareerInsights(projectionInsights, marketInsights, timing) {
     const target = document.getElementById("careerInsightList");
     const items = [...projectionInsights, ...(timing?.signals || []), ...marketInsights].slice(0, 7);
-    target.innerHTML = items.map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join("");
+    Alfred.setHTML(target, items.map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join(""));
 }
 
 function renderCareerSnapshot(profile) {
-    document.getElementById("careerProfileSnapshot").innerHTML = [
+    Alfred.setHTML(document.getElementById("careerProfileSnapshot"), [
         ["Role", profile.role || "Profile pending"],
         ["Experience", `${Alfred.formatNumber(profile.experience_years, 1)} years`],
         ["Skills", profile.skills || "No skills listed yet."],
@@ -208,7 +204,7 @@ function renderCareerSnapshot(profile) {
             <div class="data-label">${label}</div>
             <div class="data-value">${Alfred.escapeHtml(String(value))}</div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderCareerProjectionTable(projection) {
@@ -217,7 +213,7 @@ function renderCareerProjectionTable(projection) {
     const projectionConfidence = projection?.projection_confidence || {};
     const reasoning = Array.isArray(projection?.reasoning) ? projection.reasoning : [];
     if (!items.length) {
-        target.innerHTML = `<div class="empty-state">Projection data is not available yet.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">Projection data is not available yet.</div>`);
         return;
     }
 
@@ -251,7 +247,7 @@ function renderCareerProjectionTable(projection) {
         </div>
     ` : "";
 
-    target.innerHTML = `${confidenceHeader}${reasoningPanel}${items.map(item => `
+    Alfred.setHTML(target, `${confidenceHeader}${reasoningPanel}${items.map(item => `
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -261,11 +257,11 @@ function renderCareerProjectionTable(projection) {
                 <strong>${Alfred.formatCurrency(item.projected_income)}</strong>
             </div>
         </div>
-    `).join("")}`;
+    `).join("")}`);
 }
 
 function renderCareerMacroContext(context, basis) {
-    document.getElementById("careerMacroContext").innerHTML = [
+    Alfred.setHTML(document.getElementById("careerMacroContext"), [
         ["Unemployment", context.unemployment?.latest_value ?? "N/A", context.unemployment?.latest_year || "Latest available"],
         ["Inflation", context.inflation?.latest_value ?? "N/A", context.inflation?.latest_year || "Latest available"],
         ["Market 1M Return", context.market?.one_month_return_pct ?? "N/A", "India market snapshot"],
@@ -276,30 +272,30 @@ function renderCareerMacroContext(context, basis) {
             <div class="data-label">${label}</div>
             <div class="data-value">${Alfred.escapeHtml(String(value))} <span class="muted small">${Alfred.escapeHtml(String(note))}</span></div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderCareerEvidence(items) {
     const target = document.getElementById("careerEvidenceList");
     const unique = dedupeEvidence(items);
-    target.innerHTML = unique.length ? unique.map(item => `
+    Alfred.setHTML(target, unique.length ? unique.map(item => `
         <div class="mini-card">
             <div class="fw-semibold">${Alfred.escapeHtml(item.title || item.source_name)}</div>
             <div class="muted small">${Alfred.escapeHtml(item.source_name || "Source")} | refreshed ${Alfred.formatDateTime(item.verified_at)}</div>
             <div class="muted small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
             <div class="mt-2"><a href="${Alfred.safeHref(item.source_url)}" target="_blank" rel="noopener">Open source</a></div>
         </div>
-    `).join("") : `<div class="empty-state">No evidence records available yet.</div>`;
+    `).join("") : `<div class="empty-state">No evidence records available yet.</div>`);
 }
 
 function renderCareerTiming(timing) {
     const target = document.getElementById("careerTimingPanel");
     if (!timing || (!timing.summary && !timing.window_start)) {
-        target.innerHTML = `<div class="empty-state">Career timing guidance will appear once Alfred has enough profile, market, and financial data.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">Career timing guidance will appear once Alfred has enough profile, market, and financial data.</div>`);
         return;
     }
 
-    target.innerHTML = `
+    Alfred.setHTML(target, `
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -334,7 +330,7 @@ function renderCareerTiming(timing) {
                 `).join("")}
             </div>
         </div>
-    `;
+    `);
 }
 
 function renderCareerDataPipeline(pipeline) {
@@ -346,20 +342,20 @@ function renderCareerDataPipeline(pipeline) {
         ["Current State", pipeline.current_state || []],
     ].filter(([, items]) => items.length);
 
-    target.innerHTML = sections.length ? sections.map(([label, items]) => `
+    Alfred.setHTML(target, sections.length ? sections.map(([label, items]) => `
         <div class="mini-card">
             <div class="fw-semibold mb-2">${Alfred.escapeHtml(label)}</div>
             <ul class="insight-list mb-0">
                 ${items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("")}
             </ul>
         </div>
-    `).join("") : `<div class="empty-state">Collection and processing details are not available yet.</div>`;
+    `).join("") : `<div class="empty-state">Collection and processing details are not available yet.</div>`);
 }
 
 function renderResumePanel(resume) {
     const target = document.getElementById("careerResumePanel");
     if (!resume) {
-        target.innerHTML = `<div class="empty-state">No parsed resume yet. Upload one to unlock stronger strengths, weaknesses, and job-fit analysis.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">No parsed resume yet. Upload one to unlock stronger strengths, weaknesses, and job-fit analysis.</div>`);
         return;
     }
     const payload = resume.extracted_payload || {};
@@ -375,7 +371,7 @@ function renderResumePanel(resume) {
     const extractionNotes = (payload.extraction_notes || []).length
         ? `<div class="muted small mt-2">${Alfred.escapeHtml(payload.extraction_notes.join(" "))}</div>`
         : "";
-    target.innerHTML = `
+    Alfred.setHTML(target, `
         <div class="mini-card">
             <div class="fw-semibold">${Alfred.escapeHtml(resume.file_name || "Latest resume")}</div>
             <div class="muted small">${Alfred.escapeHtml(resume.parser_status_label || "Parsed")} | confidence ${Alfred.formatNumber((resume.parse_confidence || 0) * 100, 0)}%</div>
@@ -397,7 +393,7 @@ function renderResumePanel(resume) {
             </div>
             ${extractionNotes}
         </div>
-    `;
+    `);
 }
 
 function renderCareerBulletList(value) {
@@ -414,7 +410,7 @@ function renderCareerBulletList(value) {
 function renderJobMatchPanel(analysis) {
     const target = document.getElementById("careerJobMatchPanel");
     if (!analysis) {
-        target.innerHTML = `<div class="empty-state">No job link analyzed yet.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">No job link analyzed yet.</div>`);
         return;
     }
     const payload = analysis.extracted_payload || {};
@@ -426,7 +422,7 @@ function renderJobMatchPanel(analysis) {
         const url = new URL(analysis.apply_url || analysis.job_url);
         if (["http:", "https:"].includes(url.protocol) && !url.username && !url.password) jobHref = url.href;
     } catch (_) { /* A missing or malformed source is displayed without an active link. */ }
-    target.innerHTML = `
+    Alfred.setHTML(target, `
         <div class="mini-card surface-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -457,7 +453,7 @@ function renderJobMatchPanel(analysis) {
                 </div>
             </div>
         </div>
-    `;
+    `);
 }
 
 function careerOpportunityLabel(item) {
@@ -551,7 +547,7 @@ function formatCompensationAmount(value, currency) {
 function renderCompensationBenchmark(benchmark) {
     const target = document.getElementById("careerCompensationPanel");
     if (!benchmark || !benchmark.available) {
-        target.innerHTML = `<div class="mini-card"><div class="fw-semibold">Compensation Benchmark</div><div class="muted small mt-2">${Alfred.escapeHtml(benchmark?.summary || "Salary evidence will appear when Alfred finds pay-bearing job signals.")}</div></div>`;
+        Alfred.setHTML(target, `<div class="mini-card"><div class="fw-semibold">Compensation Benchmark</div><div class="muted small mt-2">${Alfred.escapeHtml(benchmark?.summary || "Salary evidence will appear when Alfred finds pay-bearing job signals.")}</div></div>`);
         return;
     }
     const observations = (benchmark.salary_observations || []).map(item => {
@@ -559,7 +555,7 @@ function renderCompensationBenchmark(benchmark) {
         const band = `${formatCompensationAmount(item.salary_min_annual, item.currency)} to ${formatCompensationAmount(item.salary_max_annual || item.salary_min_annual, item.currency)} annual`;
         return `<li class="insight-item surface-card">${Alfred.escapeHtml(item.source || "Source")} | ${Alfred.escapeHtml(item.location || "Location not specified")} | ${Alfred.escapeHtml(band)} | ${item.observed_at ? `Checked ${Alfred.escapeHtml(Alfred.formatDate(item.observed_at))}` : "Check date unavailable"}${link ? ` · <a href="${Alfred.escapeHtml(link)}" target="_blank" rel="noopener">Source</a>` : ""}</li>`;
     }).join("");
-    target.innerHTML = `
+    Alfred.setHTML(target, `
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -575,17 +571,17 @@ function renderCompensationBenchmark(benchmark) {
             <div class="muted small mt-3"><strong>Band:</strong> ${Alfred.escapeHtml(formatCompensationAmount(benchmark.market_min_annual, benchmark.currency))} to ${Alfred.escapeHtml(formatCompensationAmount(benchmark.market_max_annual || benchmark.market_min_annual, benchmark.currency))} annual</div>
             ${observations ? `<ul class="insight-list mb-0 mt-3">${observations}</ul>` : ""}
         </div>
-    `;
+    `);
 }
 
 function renderStudyPlan(plan) {
     const target = document.getElementById("careerStudyPlan");
     if (!plan || !(plan.tracks || []).length) {
-        target.innerHTML = `<div class="empty-state">Study recommendations will appear once Alfred has enough profile, resume, or job-gap data.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">Study recommendations will appear once Alfred has enough profile, resume, or job-gap data.</div>`);
         return;
     }
 
-    target.innerHTML = `
+    Alfred.setHTML(target, `
         <div class="mini-card">
             <div class="fw-semibold">${Alfred.escapeHtml(plan.experience_stage || "Current stage")}</div>
             <div class="muted small mt-1">${Alfred.escapeHtml(plan.stage_note || "")}</div>
@@ -609,18 +605,18 @@ function renderStudyPlan(plan) {
                 </div>
             </div>
         `).join("")}
-    `;
+    `);
 }
 
 function renderLayoffNews(items) {
     const target = document.getElementById("careerLayoffNews");
-    target.innerHTML = items.length ? items.map(item => `
+    Alfred.setHTML(target, items.length ? items.map(item => `
         <div class="mini-card">
             <div class="fw-semibold">${Alfred.escapeHtml(item.title || "News item")}</div>
             <div class="muted small">${Alfred.escapeHtml(item.source || "Unknown source")} | ${Alfred.escapeHtml(item.published || "No publish time")}</div>
             <div class="mt-2"><a href="${Alfred.safeHref(item.link)}" target="_blank" rel="noopener">Open article</a></div>
         </div>
-    `).join("") : `<div class="empty-state">No layoff news items were pulled from the configured feed right now.</div>`;
+    `).join("") : `<div class="empty-state">No layoff news items were pulled from the configured feed right now.</div>`);
 }
 
 function openingSourceLink(value) {
@@ -641,7 +637,7 @@ function renderOpenings(items, counts = {}) {
             ? `${filteredCount} job lead${filteredCount === 1 ? "" : "s"} matched your search. Availability is unverified.`
             : `${filteredCount} of ${totalCount} job leads match the active location filter. Availability is unverified.`;
     }
-    target.innerHTML = items.length ? items.map(item => {
+    Alfred.setHTML(target, items.length ? items.map(item => {
         const link = openingSourceLink(item.url), proof = openingSourceLink(item.source_evidence?.source_url);
         const labels = {fresh:"Fresh feed evidence; opening availability is unverified.", stale:"Stale cached lead; recheck the source.", unknown:"Unverified lead; freshness evidence is missing.", unavailable:"Source unavailable; cached lead only."};
         return `
@@ -656,7 +652,7 @@ function renderOpenings(items, counts = {}) {
             <div class="muted small mt-2">${(item.match_reasons || []).length ? Alfred.escapeHtml(item.match_reasons.join(" ")) : "No direct title or skill overlap with your role and tracked skills."}</div>
             <div class="mt-2">${link ? `<a href="${Alfred.escapeHtml(link)}" target="_blank" rel="noopener">View posting</a>` : "Posting link unavailable"}${proof ? ` · <a href="${Alfred.escapeHtml(proof)}" target="_blank" rel="noopener">Source feed</a>` : ""}</div>
         </div>
-    `; }).join("") : `<div class="empty-state">No source-backed job leads are available for this search.</div>`;
+    `; }).join("") : `<div class="empty-state">No source-backed job leads are available for this search.</div>`);
 }
 
 function hydrateCareerForm(profile) {
@@ -889,7 +885,7 @@ function renderSimulationPanel(simulation) {
     const baseline = simulation?.baseline || careerSimulationBaseline;
     const scenario = simulation?.scenario || null;
     if (!baseline) {
-        target.innerHTML = `<div class="empty-state">Projection data is not available yet.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">Projection data is not available yet.</div>`);
         return;
     }
 
@@ -901,7 +897,7 @@ function renderSimulationPanel(simulation) {
     const baselineReasoning = Array.isArray(baseline.reasoning) ? baseline.reasoning.slice(0, 3) : [];
     const scenarioReasoning = Array.isArray(scenario?.reasoning) ? scenario.reasoning.slice(0, 3) : [];
 
-    target.innerHTML = `
+    Alfred.setHTML(target, `
         <div class="soft-grid two-up">
             <div class="mini-card">
                 <div class="fw-semibold">Baseline</div>
@@ -942,7 +938,7 @@ function renderSimulationPanel(simulation) {
                 <div class="muted small mt-2">${Alfred.escapeHtml(assumptions.explainability_note || "")}</div>
             </div>
         ` : ""}
-    `;
+    `);
 }
 
 function showCareerFeedback(elementId, message, tone) {

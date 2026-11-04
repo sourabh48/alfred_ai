@@ -49,24 +49,21 @@ function renderBudgetSummary(summary, affordability) {
         { title: "Daily Budget Guide", value: affordability.safe_daily_spend == null ? "Unavailable" : Alfred.formatCurrency(affordability.safe_daily_spend), copy: `${affordability.days_remaining || 0} days left, including today` },
     ];
 
-    document.getElementById("budgetSummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("budgetSummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${card.copy}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderBudgetForecast(items, evidence) {
     const canvas = document.getElementById("budgetForecastChart");
-    if (budgetForecastChart) {
-        budgetForecastChart.destroy();
-    }
     const uncertainty = evidence.uncertainty || {};
     const backtest = evidence.backtest || {};
     const assumptionsOpen = document.querySelector('#budgetForecastEvidence details')?.open || false;
-    document.getElementById("budgetForecastEvidence").innerHTML = `
+    Alfred.setHTML(document.getElementById("budgetForecastEvidence"), `
         <p>${items.length ? "Planning estimate" : "Forecast unavailable: add income evidence and a completed recorded spending month"}. As of ${Alfred.escapeHtml(evidence.as_of || "unavailable")}. Not calibrated.</p>
         <p>${Alfred.escapeHtml(evidence.method || "Forecast evidence is unavailable.")}</p>
         <p>${uncertainty.status === "HISTORICAL_RANGE" ? `Historical monthly living-spend range: ${Alfred.formatCurrency(uncertainty.expense_low)} to ${Alfred.formatCurrency(uncertainty.expense_high)}.` : "Uncertainty range unavailable: fewer than three completed recorded months."} ${Alfred.escapeHtml(uncertainty.method || "No calibrated prediction interval is available.")}</p>
@@ -74,10 +71,10 @@ function renderBudgetForecast(items, evidence) {
         <details ${assumptionsOpen ? "open" : ""}><summary>Assumptions and recorded months</summary>
             <ul>${(evidence.assumptions || []).map(item => `<li>${Alfred.escapeHtml(item)}</li>`).join("")}</ul>
             <ul>${(evidence.observations || []).map(row => `<li>${Alfred.escapeHtml(row.month)}: ${Alfred.formatCurrency(row.living_spend)}</li>`).join("") || "<li>No completed recorded living-spend months.</li>"}</ul>
-        </details>`;
+        </details>`);
     canvas.hidden = !items.length;
     if (!items.length) return;
-    budgetForecastChart = new Chart(canvas, {
+    budgetForecastChart = Alfred.renderChart(budgetForecastChart, canvas, {
         data: {
             labels: items.map(item => item.month),
             datasets: [
@@ -108,7 +105,7 @@ function renderBudgetForecast(items, evidence) {
 
 function renderBudgetAffordability(affordability) {
     const panel = document.getElementById("budgetAffordabilityPanel");
-    panel.innerHTML = [
+    Alfred.setHTML(panel, [
         ["Remaining Budget", affordability.remaining_budget == null ? "Unavailable" : Alfred.formatCurrency(affordability.remaining_budget)],
         ["Days Remaining", Alfred.formatNumber(affordability.days_remaining, 0)],
         ["Today's Spend", Alfred.formatCurrency(affordability.today_spending)],
@@ -118,7 +115,7 @@ function renderBudgetAffordability(affordability) {
             <div class="data-label">${label}</div>
             <div class="data-value">${value}</div>
         </div>
-    `).join("");
+    `).join(""));
 
     const tones = {
         GOOD: "status-stable",
@@ -127,22 +124,22 @@ function renderBudgetAffordability(affordability) {
         PLAN_ONLY: "status-guarded",
         UNAVAILABLE: "status-guarded",
     };
-    document.getElementById("budgetDailyStatus").innerHTML = `
+    Alfred.setHTML(document.getElementById("budgetDailyStatus"), `
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
             <span class="status-pill ${tones[affordability.status] || "status-stable"}">${Alfred.escapeHtml(affordability.status || "UNKNOWN")}</span>
             <span>${Alfred.escapeHtml(affordability.message || "No affordability signal yet.")}</span>
         </div>
-    `;
+    `);
 }
 
 function renderBudgetCategories(items) {
     const body = document.getElementById("budgetCategoryBody");
     if (!items.length) {
-        body.innerHTML = `<tr><td colspan="5" class="text-center muted py-4">No category signals yet. Add a budget and some expenses first.</td></tr>`;
+        Alfred.setHTML(body, `<tr><td colspan="5" class="text-center muted py-4">No category signals yet. Add a budget and some expenses first.</td></tr>`);
         return;
     }
 
-    body.innerHTML = items.map(item => `
+    Alfred.setHTML(body, items.map(item => `
         <tr>
             <td>
                 <div class="fw-semibold">${Alfred.escapeHtml(item.label)}</div>
@@ -153,27 +150,27 @@ function renderBudgetCategories(items) {
             <td class="text-end ${item.remaining < 0 ? "text-danger" : ""}">${Alfred.formatCurrency(item.remaining)}</td>
             <td class="text-end"><span class="status-pill ${categoryTone(item.status)}">${item.percent_used == null ? "—" : Alfred.formatPercent(item.percent_used)}</span></td>
         </tr>
-    `).join("");
+    `).join(""));
 }
 
 function renderBudgetSuggestions(items) {
     const target = document.getElementById("budgetSuggestionList");
     if (!items.length) {
-        target.innerHTML = `<li class="insight-item surface-card">Budget recommendations will appear once income and transaction patterns are available.</li>`;
+        Alfred.setHTML(target, `<li class="insight-item surface-card">Budget recommendations will appear once income and transaction patterns are available.</li>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join("");
+    Alfred.setHTML(target, items.map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join(""));
 }
 
 function renderBudgetHistory(items) {
     const target = document.getElementById("budgetHistoryList");
     if (!items.length) {
-        target.innerHTML = `<div class="empty-state">No stored budget plans yet.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">No stored budget plans yet.</div>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `
+    Alfred.setHTML(target, items.map(item => `
         <div class="mini-card surface-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
@@ -183,7 +180,7 @@ function renderBudgetHistory(items) {
                 <strong>${Alfred.formatCurrency(item.spent)}</strong>
             </div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function hydrateBudgetForm(plan, month) {

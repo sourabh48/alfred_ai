@@ -31,7 +31,7 @@ function loadLoanPage({ live = false } = {}) {
     return Alfred.fetchJSON("/api/loans/summary/")
         .then(payload => {
             // Interaction can begin after the background request was sent.
-            if (live && Alfred.shouldPauseLiveRefresh(document.getElementById("loanPlannerRoot"))) return;
+            if (live && Alfred.shouldPauseLiveRefresh(document.getElementById("loanPlannerRoot"))) return false;
             renderLoanSummary(payload);
             Alfred.clearPageAlert("loanPlannerRoot");
         })
@@ -87,13 +87,13 @@ function renderLoanSummary(payload) {
         });
     }
 
-    document.getElementById("loanSummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("loanSummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.kicker}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${card.caption}</p>
         </article>
-    `).join("");
+    `).join(""));
 
     renderPendingForeclosureNotice(summary, payload.balance_sheet || {});
     const verificationNotice = document.getElementById("loanVerificationNotice");
@@ -118,27 +118,23 @@ function renderPendingForeclosureNotice(summary, balanceSheet) {
     const totalLiabilities = Number(balanceSheet.total_liabilities || 0);
     if (pendingBalance <= 0 || Number(summary.foreclosure_pending_count || 0) <= 0) {
         target.className = "d-none mb-4";
-        target.innerHTML = "";
+        Alfred.setHTML(target, "");
         return;
     }
 
     target.className = "alert alert-warning border-0 shadow-sm mb-4";
-    target.innerHTML = `
+    Alfred.setHTML(target, `
         <div class="fw-semibold">Pending foreclosure still counts as debt.</div>
         <div class="small mt-1">
             ${Alfred.formatCurrency(pendingBalance)} remains inside liabilities and net worth until Alfred confirms a full closure-payment match from statements.
             Current tracked liabilities: ${Alfred.formatCurrency(totalLiabilities)}.
         </div>
-    `;
+    `);
 }
 
 function renderLoanChart(chart) {
     const ctx = document.getElementById("loanTrendChart");
-    if (loanTrendChart) {
-        loanTrendChart.destroy();
-    }
-
-    loanTrendChart = new Chart(ctx, {
+    loanTrendChart = Alfred.renderChart(loanTrendChart, ctx, {
         type: "line",
         data: {
             labels: chart.labels,
@@ -179,12 +175,12 @@ function renderLoanTable(loans) {
     if (!loans.length) {
         selectedLoanIds.clear();
         resetForeclosureForm();
-        target.innerHTML = `<tr><td colspan="7" class="text-center muted py-4">No manual loans registered yet.</td></tr>`;
+        Alfred.setHTML(target, `<tr><td colspan="7" class="text-center muted py-4">No manual loans registered yet.</td></tr>`);
         renderConsolidationSelection();
         return;
     }
 
-    target.innerHTML = loans.map(item => {
+    Alfred.setHTML(target, loans.map(item => {
         loanIndex.set(item.id, item);
         const confirmed = item.verification_status === "confirmed";
         const loanLabel = Alfred.escapeHtml(item.loan_type_label || formatLoanType(item.loan_type));
@@ -232,7 +228,7 @@ function renderLoanTable(loans) {
                 </td>
             </tr>
         `;
-    }).join("");
+    }).join(""));
 
     renderConsolidationSelection();
 }
@@ -240,11 +236,11 @@ function renderLoanTable(loans) {
 function renderDetectedRepayments(items) {
     const target = document.getElementById("loanDetectedRepayments");
     if (!items.length) {
-        target.innerHTML = `<div class="detail-item">No loan repayments detected from imported statements yet.</div>`;
+        Alfred.setHTML(target, `<div class="detail-item">No loan repayments detected from imported statements yet.</div>`);
         return;
     }
 
-    target.innerHTML = items.map(item => `
+    Alfred.setHTML(target, items.map(item => `
         <div class="detail-item mb-3">
             <div class="d-flex justify-content-between gap-3">
                 <div>
@@ -256,7 +252,7 @@ function renderDetectedRepayments(items) {
                 <strong>${Alfred.formatCurrency(item.amount)}</strong>
             </div>
         </div>
-    `).join("");
+    `).join(""));
 }
 
 function renderLoanImportHistory(items) {
@@ -265,11 +261,11 @@ function renderLoanImportHistory(items) {
         return;
     }
     if (!items.length) {
-        target.innerHTML = `<div class="empty-state">No loan import history saved yet.</div>`;
+        Alfred.setHTML(target, `<div class="empty-state">No loan import history saved yet.</div>`);
         return;
     }
 
-    target.innerHTML = items.slice(0, 5).map(item => {
+    Alfred.setHTML(target, items.slice(0, 5).map(item => {
         const linkedLoans = Array.isArray(item.linked_loans) ? item.linked_loans : [];
         const linkedSummary = linkedLoans.length
             ? `${linkedLoans.length} loan record${linkedLoans.length === 1 ? "" : "s"} linked`
@@ -282,7 +278,7 @@ function renderLoanImportHistory(items) {
                 <div class="muted small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
             </div>
         `;
-    }).join("");
+    }).join(""));
 }
 
 function renderRecentClosures(items) {
@@ -291,11 +287,11 @@ function renderRecentClosures(items) {
         return;
     }
     if (!items.length) {
-        target.innerHTML = `<div class="detail-item">No foreclosure or no-due documents have been uploaded yet.</div>`;
+        Alfred.setHTML(target, `<div class="detail-item">No foreclosure or no-due documents have been uploaded yet.</div>`);
         return;
     }
 
-    target.innerHTML = items.slice(0, 6).map(item => {
+    Alfred.setHTML(target, items.slice(0, 6).map(item => {
         const snapshot = item.foreclosure_snapshot || {};
         const amount = snapshot.total_amount_payable ?? item.closure_amount ?? 0;
         const matched = snapshot.matched_payment_total ?? 0;
@@ -318,7 +314,7 @@ function renderRecentClosures(items) {
                 </div>
             </div>
         `;
-    }).join("");
+    }).join(""));
 }
 
 function submitLoanForm(event) {
@@ -449,17 +445,17 @@ function renderConsolidationSelection() {
     const selected = [...selectedLoanIds].map(id => loanIndex.get(id)).filter(Boolean);
     if (!selected.length) {
         document.getElementById("consolidationPrincipal").value = "";
-        target.innerHTML = "Select at least two active loans from the table below.";
+        Alfred.setHTML(target, "Select at least two active loans from the table below.");
         return;
     }
 
     const totalBalance = selected.reduce((sum, item) => sum + Number(item.estimated_balance || 0), 0);
     document.getElementById("consolidationPrincipal").value = totalBalance.toFixed(2);
-    target.innerHTML = `
+    Alfred.setHTML(target, `
         <div><strong>${selected.length}</strong> loan(s) selected</div>
         <div class="muted small mt-1">${selected.map(item => Alfred.escapeHtml(item.lender || item.loan_type_label)).join(", ")}</div>
         <div class="muted small mt-1">Estimated carry balance ${Alfred.formatCurrency(totalBalance)}</div>
-    `;
+    `);
 }
 
 function submitLoanConsolidation(event) {
@@ -504,10 +500,10 @@ function prepareForeclosure(id) {
     foreclosureLoanId = id;
     document.getElementById("foreclosureLoanId").value = id;
     document.getElementById("foreclosureAmount").value = loan.estimated_balance || loan.remaining_balance || "";
-    document.getElementById("foreclosureLoanMeta").innerHTML = `
+    Alfred.setHTML(document.getElementById("foreclosureLoanMeta"), `
         <strong>${Alfred.escapeHtml(loan.lender || loan.loan_type_label)}</strong>
         <div class="muted small mt-1">Loan #${loan.id} | Estimated balance ${Alfred.formatCurrency(loan.estimated_balance || 0)}</div>
-    `;
+    `);
     window.scrollTo({ top: document.getElementById("loanForeclosureForm").getBoundingClientRect().top + window.scrollY - 80, behavior: "smooth" });
 }
 
@@ -614,9 +610,9 @@ function detectLoansFromExpenses() {
 }
 
 function showLoanImportStatus(message, tone) {
-    document.getElementById("loanImportStatus").innerHTML = `
+    Alfred.setHTML(document.getElementById("loanImportStatus"), `
         <div class="alert alert-${tone} mb-0">${Alfred.escapeHtml(message)}</div>
-    `;
+    `);
 }
 
 function showLoanImportResult(payload) {
@@ -628,12 +624,12 @@ function showLoanImportResult(payload) {
         return `<span class="chip-neutral">${label} | ${lender}${accountRef}</span>`;
     }).join("");
 
-    document.getElementById("loanImportStatus").innerHTML = `
+    Alfred.setHTML(document.getElementById("loanImportStatus"), `
         <div class="alert alert-success mb-0">
             <div>${Alfred.escapeHtml(payload.message || "Loan PDF imported successfully.")}</div>
             ${chips ? `<div class="chip-row mt-3">${chips}</div>` : ""}
         </div>
-    `;
+    `);
 }
 
 function summarizeLoanImportBatch(results) {

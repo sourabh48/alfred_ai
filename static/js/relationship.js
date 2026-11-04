@@ -50,27 +50,26 @@ function renderRelationshipSummary(profiles, alignment) {
         { title: "Savings Habit", value: latest ? `${Alfred.formatNumber((latest.partner_savings_habits || 0) * 20, 0)} / 100` : "—", copy: "Converted from 1-5 habit score" },
     ];
 
-    document.getElementById("relationshipSummaryCards").innerHTML = cards.map(card => `
+    Alfred.setHTML(document.getElementById("relationshipSummaryCards"), cards.map(card => `
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
             <p class="metric-caption">${Alfred.escapeHtml(card.copy)}</p>
         </article>
-    `).join("");
+    `).join(""));
 }
 
 function renderRelationshipChart(profiles, alignment) {
     const latest = profiles[0];
     const canvas = document.getElementById("relationshipRadar");
-    if (relationshipChart) {
-        relationshipChart.destroy();
-    }
-
     // Plot only the factors that were scored; unavailable factors are listed in the message instead.
     const factors = alignment.factors || [];
-    relationshipChart = null;
-    if (!factors.length) return;
-    relationshipChart = new Chart(canvas, {
+    if (!factors.length) {
+        relationshipChart?.destroy();
+        relationshipChart = null;
+        return;
+    }
+    relationshipChart = Alfred.renderChart(relationshipChart, canvas, {
         type: "bar",
         data: {
             labels: factors.map(item => item.label),
@@ -86,7 +85,7 @@ function renderRelationshipChart(profiles, alignment) {
 
 function renderRelationshipInsights(items) {
     const target = document.getElementById("relationshipInsightList");
-    target.innerHTML = items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+    Alfred.setHTML(target, items.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join(""));
 }
 
 function renderRelationshipGrounding(alignment) {
@@ -99,15 +98,15 @@ function renderRelationshipGrounding(alignment) {
     const listTarget = document.getElementById("relationshipGroundingList");
     const evidenceTarget = document.getElementById("relationshipEvidenceLog");
 
-    cardsTarget.innerHTML = factors.map(item => `
+    Alfred.setHTML(cardsTarget, factors.map(item => `
         <article class="metric-card metric-card--compact">
             <p class="metric-kicker">${Alfred.escapeHtml(item.label)}</p>
             <h3 class="metric-value" style="font-size:1.35rem;">${Alfred.formatNumber(item.score || 0, 0)}/100</h3>
             <p class="metric-caption">${Alfred.escapeHtml(item.detail || "")}</p>
         </article>
-    `).join("");
+    `).join(""));
 
-    metaTarget.innerHTML = [
+    Alfred.setHTML(metaTarget, [
         ["Monthly income", Number(history.monthly_income) > 0 ? Alfred.formatCurrency(history.monthly_income) : "Unavailable", "Household income basis"],
         ["Monthly spend", history.spend_observed ? Alfred.formatCurrency(history.monthly_expenses || 0) : "Unavailable", "Recent spend basis"],
         ["Fixed load", Alfred.formatCurrency(history.fixed_load || 0), "Rent plus EMI pressure"],
@@ -118,7 +117,7 @@ function renderRelationshipGrounding(alignment) {
             <h3 class="metric-value" style="font-size:1.35rem;">${Alfred.escapeHtml(String(value))}</h3>
             <p class="metric-caption">${Alfred.escapeHtml(copy)}</p>
         </article>
-    `).join("");
+    `).join(""));
 
     const details = [
         `Monthly EMI grounding: ${Alfred.formatCurrency(history.monthly_emi || 0)}`,
@@ -127,10 +126,10 @@ function renderRelationshipGrounding(alignment) {
         freshness.next_stale_after ? `Next evidence refresh due after ${Alfred.formatDateTime(freshness.next_stale_after)}` : "No external refresh deadline attached yet.",
         ...((grounding.notes || []).map(item => item)),
     ];
-    listTarget.innerHTML = details.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join("");
+    Alfred.setHTML(listTarget, details.map(item => `<li class="insight-item">${Alfred.escapeHtml(item)}</li>`).join(""));
 
     const evidence = grounding.evidence || [];
-    evidenceTarget.innerHTML = evidence.length ? evidence.map(item => `
+    Alfred.setHTML(evidenceTarget, evidence.length ? evidence.map(item => `
         <div class="mini-card">
             <div class="d-flex justify-content-between gap-3 align-items-start">
                 <div>
@@ -142,24 +141,24 @@ function renderRelationshipGrounding(alignment) {
                 ${item.source_url ? `<a href="${Alfred.safeHref(item.source_url)}" target="_blank" rel="noopener">Proof</a>` : ""}
             </div>
         </div>
-    `).join("") : `<div class="empty-state">No external proof items are attached yet.</div>`;
+    `).join("") : `<div class="empty-state">No external proof items are attached yet.</div>`);
 }
 
 function renderRelationshipTable(items) {
     const body = document.getElementById("relationshipTableBody");
     if (!items.length) {
-        body.innerHTML = `<tr><td colspan="4" class="text-center muted py-4">No relationship profiles saved yet.</td></tr>`;
+        Alfred.setHTML(body, `<tr><td colspan="4" class="text-center muted py-4">No relationship profiles saved yet.</td></tr>`);
         return;
     }
 
-    body.innerHTML = items.map(item => `
+    Alfred.setHTML(body, items.map(item => `
         <tr>
             <td class="fw-semibold">${Alfred.escapeHtml(item.partner_name)}</td>
             <td class="text-end">${Alfred.formatNumber(item.partner_financial_score, 0)}</td>
             <td class="text-end">${Alfred.formatNumber(item.partner_savings_habits, 0)} / 5</td>
             <td class="text-end">${Alfred.formatNumber(item.compatibility_score, 0)}</td>
         </tr>
-    `).join("");
+    `).join(""));
 }
 
 function hydrateRelationshipForm(profile) {
