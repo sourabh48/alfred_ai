@@ -677,7 +677,7 @@ function renderBikeServiceLogs(items) {
                     ${item.notes ? `<div class="muted small mt-2">${Alfred.escapeHtml(item.notes)}</div>` : ""}
                 </div>
                 <div class="text-end flex-shrink-0">
-                    <strong>${Alfred.formatCurrency(item.cost || 0)}</strong>
+                    <strong>${item.parsed_payload?.cost_held_for_review ? "Cost awaiting review" : Alfred.formatCurrency(item.cost || 0)}</strong>
                     <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeServiceRecord(${item.id})">Delete</button></div>
                 </div>
             </div>
@@ -1542,9 +1542,11 @@ function summarizeBikeServiceImportBatch(results) {
     const summary = Alfred.summarizeUploadBatch(results, { itemLabel: "service file", successVerb: "imported" });
     const createdLogs = summary.succeeded.filter(result => result.data?.service_record && !result.data?.duplicate).length;
     const replayed = summary.succeeded.filter(result => result.data?.duplicate).length;
+    const held = summary.succeeded.filter(result => result.data?.cost_held_for_review).length;
     return {
         ...summary,
-        message: `${summary.message}${createdLogs ? ` ${createdLogs} service log${createdLogs === 1 ? "" : "s"} created.` : ""}${replayed ? ` ${replayed} already imported; existing logs preserved.` : ""}`,
+        tone: held && !summary.failed.length ? "warning" : summary.tone,
+        message: `${summary.message}${createdLogs ? ` ${createdLogs} service log${createdLogs === 1 ? "" : "s"} created.` : ""}${replayed ? ` ${replayed} already imported; existing logs preserved.` : ""}${held ? ` ${held} cost${held === 1 ? "" : "s"} not counted yet: review in Documents.` : ""}`,
     };
 }
 

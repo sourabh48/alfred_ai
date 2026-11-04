@@ -955,7 +955,12 @@ function summarizeLoanBatch(results) {
 function summarizeServiceBatch(results) {
     const summary = Alfred.summarizeUploadBatch(results, { itemLabel: "service file", successVerb: "imported" });
     const createdLogs = summary.succeeded.filter(result => result.data?.service_record).length;
-    return appendBatchExtras(summary, createdLogs ? [`${createdLogs} service log${createdLogs === 1 ? "" : "s"} created`] : []);
+    const held = summary.succeeded.filter(result => result.data?.cost_held_for_review).length;
+    const extras = createdLogs ? [`${createdLogs} service log${createdLogs === 1 ? "" : "s"} created`] : [];
+    if (held) {
+        extras.push(`${held} cost${held === 1 ? "" : "s"} not counted until reviewed below`);
+    }
+    return appendBatchExtras(summary, extras, held && !summary.failed.length ? "warning" : summary.tone);
 }
 
 function summarizeResumeBatch(results) {

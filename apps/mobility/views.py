@@ -36,6 +36,7 @@ from .serializers import (
 )
 from .services import bike_document_ai, bike_service_intelligence, build_profile_payload, catalog_coverage_summary, list_catalog_manufacturers, list_catalog_models, travel_advisor
 from .services import build_document_payload, build_service_record_payload, merge_nested_payload, resolve_vehicle_identity
+from .services.payload_contracts import COST_HELD_FOR_REVIEW
 
 
 PROFILE_MANUAL_OVERRIDE_FIELDS = {
@@ -67,6 +68,16 @@ def _apply_profile_payload(profile, payload):
             setattr(profile, field, value)
     profile.save()
     return profile
+
+
+def _catalog_payload(profile):
+    # The model field names the vehicle; the display name may be a nickname, so it is only a fallback.
+    payload = build_profile_payload(profile.model_name or profile.display_name, profile.vehicle_number, profile.variant, profile.make)
+    if not payload["catalog_key"]:
+        by_display_name = build_profile_payload(profile.display_name, profile.vehicle_number, profile.variant, profile.make)
+        if by_display_name["catalog_key"]:
+            return by_display_name
+    return payload
 
 
 def _profile_manual_overrides(serializer):
@@ -127,7 +138,7 @@ class BikeProfileListCreateView(ListCreateAPIView):
     def perform_create(self, serializer):
         profile = serializer.save(user=self.request.user)
         manual_overrides = _profile_manual_overrides(serializer)
-        payload = build_profile_payload(profile.display_name or profile.model_name, profile.vehicle_number, profile.variant, profile.make)
+        payload = _catalog_payload(profile)
         payload["vehicle_type"] = profile.vehicle_type or payload.get("vehicle_type", "motorcycle")
         payload.update(manual_overrides)
         payload["is_primary"] = profile.is_primary or not BikeProfile.objects.filter(user=self.request.user).exclude(pk=profile.pk).exists()
@@ -144,20 +155,23 @@ class BikeProfileDetailView(RetrieveUpdateDestroyAPIView):
         return BikeProfile.objects.filter(user=self.request.user)
 
     def perform_update(self, serializer):
+        model_before = (serializer.instance.make, serializer.instance.model_name)
         profile = serializer.save()
+        if profile.is_primary:
+            BikeProfile.objects.filter(user=self.request.user).exclude(pk=profile.pk).update(is_primary=False)
+        # Only a different model re-reads the catalog; other edits keep earlier owner values.
+        if (profile.make, profile.model_name) == model_before:
+            return
         manual_overrides = _profile_manual_overrides(serializer)
         # Catalog specifications cannot replace an owner's recorded financial values.
         # The saved profile includes explicit edits, including zero-value corrections.
         manual_overrides.update({
             field: getattr(profile, field)
-            for field in ("usage_pattern", "estimated_market_value", "monthly_income_support")
+            for field in ("display_name", "usage_pattern", "estimated_market_value", "monthly_income_support", "is_primary")
         })
-        payload = build_profile_payload(profile.display_name or profile.model_name, profile.vehicle_number, profile.variant, profile.make)
+        payload = _catalog_payload(profile)
         payload["vehicle_type"] = profile.vehicle_type or payload.get("vehicle_type", "motorcycle")
         payload.update(manual_overrides)
-        payload["is_primary"] = profile.is_primary
-        if payload["is_primary"]:
-            BikeProfile.objects.filter(user=self.request.user).exclude(pk=profile.pk).update(is_primary=False)
         _apply_profile_payload(profile, payload)
 
 
@@ -201,6 +215,10 @@ class BikeServiceRecordDetailView(RetrieveUpdateDestroyAPIView):
         )
         if "parsed_payload" in serializer.validated_data:
             save_kwargs["parsed_payload"] = merge_nested_payload(instance.parsed_payload, serializer.validated_data.get("parsed_payload"))
+        if "cost" in serializer.validated_data:
+            # The owner has stated the cost, so a later review must not post the read value over it.
+            payload = save_kwargs.get("parsed_payload", instance.parsed_payload)
+            save_kwargs["parsed_payload"] = {key: value for key, value in payload.items() if key != COST_HELD_FOR_REVIEW}
         serializer.save(**save_kwargs)
 
 
@@ -334,9 +352,13 @@ class BikeDocumentUploadView(APIView):
         if upload is None:
             return Response({"detail": "Upload a document file."}, status=status.HTTP_400_BAD_REQUEST)
 
+        override = request.data.get("document_type_override")
+        if override and override not in dict(BikeDocument.DOCUMENT_TYPE_CHOICES):
+            return Response({"detail": "Choose a supported document type."}, status=status.HTTP_400_BAD_REQUEST)
+
         parsed = bike_document_ai.parse(upload, upload.name, user=request.user)
         upload.seek(0)
-        document_type = request.data.get("document_type_override") or parsed.document_type
+        document_type = override or parsed.document_type
         relevance = bike_document_ai.verify_relevance(bike_profile, parsed, document_type)
         if not relevance["accepted"]:
             operational_logging_service.log(
@@ -530,6 +552,8 @@ class BikeServiceImportView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # An unsure reading stays in the review form; recorded spending changes when the owner accepts it.
+        hold_cost = parsed.parser_status != "parsed"
         service_serializer = BikeServiceRecordSerializer(data={
             **service_payload, "bike_profile": bike_profile.pk, "bike_name": bike_profile.display_name,
             "vehicle_number": parsed.fields.get("vehicle_number") or bike_profile.vehicle_number,
@@ -537,7 +561,7 @@ class BikeServiceImportView(APIView):
             "odometer_km": service_payload.get("odometer_km") or 0,
             "next_service_km": service_payload.get("next_service_km") or None,
             "next_service_date": service_payload.get("next_service_date") or None,
-            "cost": service_payload.get("cost") or 0,
+            "cost": 0 if hold_cost else service_payload.get("cost") or 0,
             "notes": request.data.get("notes", ""),
             "source_mode": "bill_import" if parsed.document_type == "invoice" else "work_note",
         }, context={"request": request})
@@ -599,9 +623,12 @@ class BikeServiceImportView(APIView):
                 )
                 bike_service_intelligence.hydrate_document(document)
 
+                record_payload = build_service_record_payload(parsed, service_payload, document=document, document_payload=document.extracted_payload)
+                if parsed.parser_status != "parsed":
+                    record_payload[COST_HELD_FOR_REVIEW] = True
                 service_record = service_serializer.save(
                     user=request.user, source_document=document, source_document_name=upload.name,
-                    parsed_payload=build_service_record_payload(parsed, service_payload, document=document, document_payload=document.extracted_payload),
+                    parsed_payload=record_payload,
                 )
                 record_parser_learning(
                     user=request.user,
@@ -643,6 +670,7 @@ class BikeServiceImportView(APIView):
             "service_record": BikeServiceRecordSerializer(service_record, context={"request": request}).data,
             "raw_file_retention": retention,
             "duplicate": duplicate,
+            "cost_held_for_review": bool((service_record.parsed_payload or {}).get(COST_HELD_FOR_REVIEW)),
         }, status=status.HTTP_200_OK if duplicate else status.HTTP_201_CREATED)
 
 

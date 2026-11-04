@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from functools import lru_cache
 from importlib import import_module
 from io import BytesIO, StringIO
@@ -25,7 +26,12 @@ DATE_FORMATS = (
     "%Y-%m-%d",
     "%d %b %Y",
     "%d %B %Y",
+    "%d-%b-%Y",
+    "%d-%B-%Y",
 )
+DATE_TEXT = r"(?:[0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}[\s-][A-Za-z]{3,9}[\s-][0-9]{4})"
+# These dates describe something other than when a document was issued or a service was done.
+OTHER_DATE_CONTEXT_RE = re.compile(r"next|expir|valid|due|end date|renew|birth|period", re.IGNORECASE)
 
 VEHICLE_NUMBER_RE = re.compile(r"\b([A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}|\d{2}BH\d{4}[A-Z]{2})\b")
 CURRENCY_TOKEN_RE = INR_LABEL_TOKEN
@@ -34,7 +40,7 @@ NUMERIC_TOKEN_RE = re.compile(rf"^(?:{CURRENCY_TOKEN_RE}\s*)?([0-9,]+(?:\.\d{{1,
 TABLE_CODE_RE = re.compile(r"^[A-Z0-9][A-Z0-9/-]{0,30}$")
 
 DOCUMENT_KEYWORDS = {
-    "invoice": ["invoice", "pre-invoice", "service bill", "job card", "work order", "labour", "gst invoice", "work note"],
+    "invoice": ["invoice", "pre-invoice", "service invoice", "tax invoice", "service bill", "job card", "work order", "labour", "gst invoice", "work note"],
     "insurance": ["insurance", "policy no", "policy number", "insured declared value", "third party"],
     "puc": ["pollution under control", "pucc", "emission", "pollution certificate"],
     "registration": ["certificate of registration", "registration certificate", "registering authority", "owner serial"],
@@ -195,6 +201,8 @@ class BikeDocumentAI:
             parser_notes.append(f"Primary extraction path: {extraction.method.replace('_', ' ')}.")
         if fields.get("vehicle_number"):
             parser_notes.append(f"Vehicle number {fields['vehicle_number']} detected.")
+        review_gaps = self._invoice_review_gaps(fields, service_payload) if document_type == "invoice" and text.strip() else []
+        parser_notes.extend(review_gaps)
         if document_type == "invoice" and service_payload:
             parser_notes.append("Service bill/work note fields were detected and can be imported as a service log.")
             part_count = len(service_payload.get("parts_items") or [])
@@ -215,7 +223,7 @@ class BikeDocumentAI:
         parser_notes.extend(extraction.notes[:2])
         parser_notes.extend(learning_notes)
 
-        parser_status = "parsed" if text.strip() and confidence >= 0.65 else ("needs_review" if text.strip() else "failed")
+        parser_status = "parsed" if text.strip() and confidence >= 0.65 and not review_gaps else ("needs_review" if text.strip() else "failed")
         title = self._build_title(document_type, fields, name)
 
         return ParsedDocument(
@@ -236,6 +244,22 @@ class BikeDocumentAI:
             },
         )
 
+    def _invoice_review_gaps(self, fields: dict, service_payload: dict) -> list[str]:
+        gaps = []
+        if not fields.get("vehicle_number"):
+            gaps.append("No vehicle number was read, so this bill is not tied to the vehicle.")
+        if not service_payload.get("service_date"):
+            gaps.append("No service date was read.")
+        cost = service_payload.get("cost")
+        if not cost:
+            gaps.append("No invoice total was read.")
+        else:
+            sections = sum(Decimal(str(fields.get(key) or 0)) for key in ("parts_customer_amount", "labour_customer_amount"))
+            # Invoices round each section, so allow a rupee of difference.
+            if sections and abs(sections - Decimal(str(cost))) > 1:
+                gaps.append("The invoice total does not match its parts and labour sections.")
+        return gaps
+
     def verify_relevance(self, profile, parsed: ParsedDocument, override_type: str = "") -> dict:
         reasons = []
         related = True
@@ -255,9 +279,11 @@ class BikeDocumentAI:
         if normalized_profile_number and normalized_doc_number and normalized_profile_number != normalized_doc_number:
             related = False
             reasons.append("Vehicle number in the document does not match the selected vehicle profile.")
-        elif normalized_doc_number:
+        elif normalized_profile_number and normalized_doc_number:
             score += 0.18
             reasons.append("Vehicle number matched the uploaded document.")
+        elif normalized_profile_number or normalized_doc_number:
+            reasons.append("Vehicle number was not compared because the document or the profile does not have one.")
 
         searchable_tokens = [
             getattr(profile, "make", ""),
@@ -265,7 +291,7 @@ class BikeDocumentAI:
             getattr(profile, "display_name", ""),
             getattr(profile, "vehicle_type", ""),
         ]
-        if any(token and token.lower() in normalized_source for token in searchable_tokens):
+        if any(token and token != "other" and re.search(rf"(?<![a-z0-9]){re.escape(token.lower())}(?![a-z0-9])", normalized_source) for token in searchable_tokens):
             score += 0.1
             reasons.append("Vehicle make/model cues were found in the document text.")
 
@@ -358,10 +384,15 @@ class BikeDocumentAI:
                 "document_number": self._find_by_labels(text, ["policy no", "policy number", "certificate no", "registration no", "registration number", "invoice no", "job card no", "job card number"]),
                 "issuer": self._extract_issuer(text),
                 "issue_date": self._extract_date_by_labels(text, ["issue date", "invoice date", "job card date", "date of issue", "date"], allow_generic=True),
-                "expiry_date": self._extract_date_by_labels(text, ["expiry", "valid upto", "valid till", "policy end date", "policy period"], allow_generic=False),
-                "amount": self._extract_amount_by_labels(text, ["total customer amount", "customer payable", "net amount", "grand total", "total amount", "premium", "total"]),
+                "expiry_date": self._extract_date_by_labels(text, ["expiry date", "date of expiry", "policy expiry", "expiry", "valid upto", "valid till", "valid until", "policy end date", "end date"], allow_generic=False) or self._extract_period_end(text),
+                "amount": self._extract_amount_by_labels(text, ["total customer amount", "customer payable", "net amount", "grand total", "total amount", "premium payable", "total premium", "premium", "total"]),
             }
         )
+
+    def _extract_period_end(self, text: str) -> str:
+        match = re.search(r"(?:policy period|period of (?:insurance|cover)|insurance period)(.{0,120})", text, re.IGNORECASE | re.DOTALL)
+        dates = [self._parse_date(value) for value in re.findall(DATE_TEXT, match.group(1))] if match else []
+        return dates[1] if len(dates) >= 2 and dates[1] > dates[0] else ""
 
     def _extract_type_specific_fields(self, document_type: str, text: str, invoice_fields: dict | None = None) -> dict:
         fields = {}
@@ -466,7 +497,8 @@ class BikeDocumentAI:
 
     def _find_by_labels(self, text: str, labels: list[str]) -> str:
         for label in labels:
-            pattern = re.compile(rf"{re.escape(label)}\s*[:#-]?\s*([A-Z0-9/._ -]{{3,80}})", re.IGNORECASE)
+            # Stay on the label's line: a label-only line is read by _extract_label_value below.
+            pattern = re.compile(rf"{re.escape(label)}[ \t]*[:#-]?[ \t]*([A-Z0-9/._ -]{{3,80}})", re.IGNORECASE)
             match = pattern.search(text)
             if match:
                 return match.group(1).strip(" .:-")
@@ -474,10 +506,9 @@ class BikeDocumentAI:
 
     def _extract_date_by_labels(self, text: str, labels: list[str], allow_generic: bool = False) -> str:
         for label in labels:
-            pattern = re.compile(
-                rf"{re.escape(label)}\s*[:#-]?\s*([0-9]{{1,2}}[/-][0-9]{{1,2}}[/-][0-9]{{2,4}}(?:\s+[0-9]{{1,2}}:[0-9]{{2}})?|[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}|[0-9]{{1,2}}\s+[A-Za-z]{{3,9}}\s+[0-9]{{4}})",
-                re.IGNORECASE,
-            )
+            # A bare label must not read "Expiry Date" or "Next Service Date".
+            guard = r"(?<![A-Za-z])(?<![A-Za-z] )" if label in {"date", "service date"} else ""
+            pattern = re.compile(rf"{guard}{re.escape(label)}\s*[:#-]?\s*({DATE_TEXT})", re.IGNORECASE)
             match = pattern.search(text)
             if match:
                 parsed = self._parse_date(match.group(1))
@@ -485,22 +516,25 @@ class BikeDocumentAI:
                     return parsed
 
         value = self._extract_label_value(self._split_lines(text), labels, max_lines=2)
-        if value:
+        if value and not (allow_generic and OTHER_DATE_CONTEXT_RE.search(value)):
             parsed = self._parse_date(value)
             if parsed:
                 return parsed
 
         if allow_generic:
-            generic_match = re.search(r"\b([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2})\b", text)
-            if generic_match:
-                return self._parse_date(generic_match.group(1))
+            for generic_match in re.finditer(rf"\b{DATE_TEXT}\b", text):
+                line_start = text.rfind("\n", 0, generic_match.start()) + 1
+                if not OTHER_DATE_CONTEXT_RE.search(text[line_start:generic_match.start()]):
+                    parsed = self._parse_date(generic_match.group(0))
+                    if parsed:
+                        return parsed
         return ""
 
     def _parse_date(self, value: str) -> str:
         cleaned = " ".join((value or "").strip().split())
-        date_match = re.search(r"([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}\s+[A-Za-z]{3,9}\s+[0-9]{4})", cleaned)
+        date_match = re.search(DATE_TEXT, cleaned)
         if date_match:
-            cleaned = date_match.group(1)
+            cleaned = date_match.group(0)
         cleaned = re.sub(r"\b\d{1,2}:\d{2}(?::\d{2})?\b", "", cleaned).strip(" ,:-")
         for fmt in DATE_FORMATS:
             try:
@@ -516,11 +550,7 @@ class BikeDocumentAI:
             if match:
                 return self._amount_string_to_float(match.group(1))
         value = self._extract_label_value(self._split_lines(text), labels, max_lines=2)
-        amount = self._parse_amount_token(value)
-        if amount:
-            return amount
-        generic = MONEY_RE.search(text)
-        return self._amount_string_to_float(generic.group(1)) if generic else 0.0
+        return self._parse_amount_token(value)
 
     def _extract_odometer(self, text: str) -> int:
         pattern = re.compile(r"(?:odometer(?:\s+reading)?|kms?|km reading)\s*[:#-]?\s*([0-9,]{3,8})", re.IGNORECASE)
@@ -594,7 +624,7 @@ class BikeDocumentAI:
         customer_voice_items = self._extract_customer_voice_items(lines)
         advisor_contact, advisor_name = self._extract_customer_voice_contact(lines)
         total_customer_amount = self._extract_amount_by_labels(text, ["total customer amount", "customer payable"])
-        total_amount = self._extract_amount_by_labels(text, ["total amount", "grand total", "net amount"])
+        total_amount = self._extract_amount_by_labels(text, ["total amount", "grand total", "net amount", "net payable", "amount payable", "invoice total"])
         service_center_name = self._extract_label_value(lines, ["service centre", "service center", "dealer", "workshop"], max_lines=2)
         job_card_number = self._extract_label_value(lines, ["job card number", "job card no", "invoice no", "bill no"], max_lines=1)
         registration_number = self._extract_label_value(lines, ["registration number", "registration no", "regn. no", "regn no"], max_lines=1)
