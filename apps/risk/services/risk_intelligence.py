@@ -22,6 +22,8 @@ RISK_NEWS_QUERIES = {
     "relocation": "India rent prices relocation cost of living cities",
     "mobility": "India two wheeler recall road safety fuel prices maintenance",
 }
+# A manual risk snapshot older than this no longer describes the present (owner decision, 2026-11-05).
+MANUAL_SNAPSHOT_MAX_AGE = timedelta(days=90)
 
 
 def _clamp(value: float, lower: float = 0.0, upper: float = 100.0) -> float:
@@ -88,7 +90,10 @@ class RiskIntelligenceService:
             .only("id", "layoff_risk", "illness_risk", "relocation_risk", "timestamp")
             .order_by("-timestamp", "-id")[:12]
         )
-        latest = history[0] if history else None
+        newest = history[0] if history else None
+        latest = newest if newest and newest.timestamp >= timezone.now() - MANUAL_SNAPSHOT_MAX_AGE else None
+        old_snapshot_note = (f"Latest manual snapshot ({timezone.localtime(newest.timestamp):%d %b %Y}) is older than 90 days; not counted"
+                             if newest and not latest else "")
         profile = CareerProfile.objects.filter(user=user).only("role").first()
         latest_job_analysis = (
             CareerJobAnalysis.objects.filter(user=user)
@@ -97,7 +102,8 @@ class RiskIntelligenceService:
             .first()
         )
         role = (profile.role if profile and profile.role and profile.role != "Profile pending" else "") or "analyst"
-        career_market = job_intelligence.market_outlook(role, getattr(latest_job_analysis, "company", ""))
+        # Only the generic role goes to the news search; the company of a job you analyzed stays on this PC (owner decision).
+        career_market = job_intelligence.market_outlook(role, "")
         macro = career_market["macro_context"]
 
         unemployment = macro["unemployment"].get("latest_value") or 0
@@ -199,7 +205,7 @@ class RiskIntelligenceService:
                 "trend": _trend(career_values),
                 "note": "Role-level job market, layoffs, and fit-gap pressure combined with your latest layoff snapshot.",
                 "drivers": [
-                    f"Manual layoff snapshot {manual_layoff:.0f}/100" if latest else "No manual layoff snapshot recorded",
+                    f"Manual layoff snapshot {manual_layoff:.0f}/100" if latest else (old_snapshot_note or "No manual layoff snapshot recorded"),
                     f"External market risk {career_market['risk_score']:.0f}/100" if market_usable else "External market evidence unavailable",
                     f"Rule-based job-fit gap {fit_gap:.0f}/100" if available_fit is not None else "Job-fit evidence unavailable; not scored",
                 ],
@@ -227,7 +233,7 @@ class RiskIntelligenceService:
                 "trend": _trend(health_values),
                 "note": "Illness risk blended with behavioral stress, sleep, workload, and inflation pressure.",
                 "drivers": [
-                    f"Manual illness snapshot {manual_illness:.0f}/100" if latest else "No manual illness snapshot recorded",
+                    f"Manual illness snapshot {manual_illness:.0f}/100" if latest else (old_snapshot_note or "No manual illness snapshot recorded"),
                     f"Average stress {avg_stress:.1f}/10" if recent_behavior else "No stress log recorded",
                     f"Average sleep {avg_sleep:.1f}h" if logged_sleep else "No sleep hours recorded",
                 ],
@@ -241,7 +247,7 @@ class RiskIntelligenceService:
                 "trend": _trend(relocation_values),
                 "note": "Relocation pressure blended with rent burden, inflation, and market volatility." if monthly_income else "Relocation pressure blended with inflation and market volatility.",
                 "drivers": [
-                    f"Manual relocation snapshot {manual_relocation:.0f}/100" if latest else "No manual relocation snapshot recorded",
+                    f"Manual relocation snapshot {manual_relocation:.0f}/100" if latest else (old_snapshot_note or "No manual relocation snapshot recorded"),
                     f"Rent plus EMI burden {debt_burden:.1f}%" if monthly_income else "Rent plus EMI burden unknown without income",
                     f"Inflation {inflation:.1f}%" if inflation else "Inflation evidence unavailable",
                 ],
@@ -257,6 +263,9 @@ class RiskIntelligenceService:
                 "drivers": [
                     *([f"Critical faults {mobility_summary.get('critical_faults', 0)}",
                        f"Expired documents {mobility_summary.get('expired_documents', 0)}"] if vehicle_records else ["No vehicle records"]),
+                    # Listed, not scored: a document not yet added to ALFRED is not proof it is missing (owner decision).
+                    *([f"Required documents not yet added: {mobility_summary['missing_required_documents']}"]
+                      if mobility_summary.get("managed_vehicle_count") and mobility_summary.get("missing_required_documents") else []),
                     f"Condition score {condition_score}/100" if condition_score else "No vehicle condition record",
                 ],
             },

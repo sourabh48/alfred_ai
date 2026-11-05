@@ -238,6 +238,35 @@ class RiskEvidenceCoverageTests(TestCase):
         search.assert_not_called()
         self.assertEqual(result["action_items"], [])
 
+    def test_manual_snapshot_older_than_ninety_days_is_not_counted(self):
+        signal = RiskSignal.objects.create(user=self.user, layoff_risk=90, illness_risk=90, relocation_risk=90)
+        RiskSignal.objects.filter(pk=signal.pk).update(timestamp=timezone.now() - timedelta(days=91))
+        result, items = self.outlook()
+        self.assertEqual(items["career"]["score"], 0)
+        self.assertEqual(items["health"]["coverage"]["status"], "insufficient_data")
+        self.assertTrue(items["career"]["drivers"][0].endswith("older than 90 days; not counted"))
+        self.assertIsNone(result["grounding"]["history"]["latest_manual_layoff"])
+        self.assertEqual(len(result["history"]), 1)
+        RiskSignal.objects.filter(pk=signal.pk).update(timestamp=timezone.now() - timedelta(days=89))
+        _, items = self.outlook()
+        self.assertEqual(items["career"]["score"], 31.5)
+
+    def test_news_search_gets_the_role_but_not_the_analyzed_company(self):
+        CareerJobAnalysis.objects.create(user=self.user, job_url="https://example.test/job", company="Synthetic Employer Ltd",
+                                         fit_score=0, extracted_payload={"fit": {"score_status": "UNAVAILABLE"}})
+        with patch("apps.risk.services.risk_intelligence.job_intelligence.market_outlook", return_value=market_payload()) as outlook:
+            risk_intelligence.build_outlook(self.user)
+        self.assertEqual(outlook.call_args.args[1], "")
+
+    def test_required_documents_not_added_are_listed_but_not_scored(self):
+        summary = {"critical_faults": 0, "expired_documents": 0, "expiring_documents": 0, "latest_condition_score": 0,
+                   "document_compliance_score": 0, "managed_vehicle_count": 1, "missing_required_documents": 3}
+        with patch("apps.risk.services.risk_intelligence.bike_service_intelligence.risk_snapshot",
+                   return_value={"summary": summary, "pending_tasks": []}):
+            _, items = self.outlook()
+        self.assertEqual(items["mobility"]["score"], 0)
+        self.assertIn("Required documents not yet added: 3", items["mobility"]["drivers"])
+
     def test_unrecorded_inputs_are_not_reported_as_zero_in_grounding(self):
         result, _ = self.outlook()
         history = result["grounding"]["history"]
