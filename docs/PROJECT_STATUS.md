@@ -3205,6 +3205,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Code/helper tests present; no complete actual M21 acceptance receipt.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: M20 branch contains orchestration/tests; full native/browser/packaged rehearsal was not executed. Real acceptance remains open. Existing owner/session controls; canonical data availability; acceptance plan.
+- 2026-11-05 on drive G: (owner-approved scope, candidate `89583b5`): backend 1829 and Chrome 162 PASS with zero skips; the rehearsal was blocked by its local-model gate, where chat calls take 23-30 s against the 30-second deadline (CPU-only Ollama 0.40.14; staged Vulkan runtime still near the limit). Details in EXECUTION_STATE.
 - Next: M21 actual disposable promotion/failure/restore/source-rollback/browser rehearsal PASS at 4aa7ac70; scripts/release_acceptance.py. Separate PC, normal account and device-loss acceptance remain open.
 
 ### RUNTIME-15 — Local/LAN hosting and optional Docker stack

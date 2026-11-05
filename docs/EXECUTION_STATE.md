@@ -152,6 +152,16 @@
   Now BLOCKED_EXTERNAL: offline independent-host kit on a separate PC.
 - OWNER_DECISION 2026-11-05: RUNTIME-14 rehearsal approved on disposable synthetic folders on drive G:, never the real
   runtime ("THEN DO 14"). RUNTIME-03 and RUNTIME-05 stay open: real sign-ins over days, and a separate PC.
+- RUNTIME-14 attempt (2026-11-05, candidate `89583b5`, G: only): preflight PASS; backend 1829 run, 0 skips; Chrome 162,
+  0 skips (after copying the CI-pinned iCal parser and hash-checked axe-core into the G: checkout). The rehearsal did not
+  run: its native/Ollama gate fails at the first Chrome conversation check because local chat calls take 23-30 s against
+  the 30-second deadline. Cause: installed Ollama 0.40.14 runs on CPU ("AMD driver is too old") and has no Vulkan backend;
+  ALFRED's `keep_alive=0` reloads the model each call. With owner approval the staged, hash- and signature-verified
+  v0.40.9 Vulkan runtime ran as a test server: generation 0.6 s on the RX 6700 XT, but each load still spends about 10 s
+  on timed-out GPU discovery plus cold model reads, so some calls still pass 30 s. Earlier the same day the gate passed
+  twice (packaged 35/35, source 34). Also found: the rehearsal's 60-second git timeout is too short to clone this
+  repository file by file across drives (worked around with a packed `--no-local` clone; limit unchanged).
+  Needs an owner decision: update the AMD driver, raise the local-model deadline, or keep the model loaded between calls.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
