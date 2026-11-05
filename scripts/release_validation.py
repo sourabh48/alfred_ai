@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -39,6 +40,34 @@ BACKEND = tuple("tests." + name for name in (
     "test_local_stack_ops", "test_production_readiness_contracts",
     "test_release_gate", "test_release_validation", "test_release_recovery", "test_private_recovery_verifier",
     "test_release_promotion", "test_release_acceptance", "test_browser_regression_runner", "test_browser_test_runner", "test_browser_test_plan", "test_live_ui_contracts", "test_windows_build_provenance"))
+
+BACKEND_DURATIONS = Path(__file__).resolve().parents[1] / "tests" / "backend_durations.json"
+
+
+def backend_shard(index, count):
+    """Deterministic measured split of BACKEND; a module without a recorded duration fails closed."""
+    from scripts.browser_test_plan import plan_tests
+    durations = json.loads(BACKEND_DURATIONS.read_text(encoding="utf-8"))
+    return plan_tests(BACKEND, durations, count)["shards"][index]
+
+
+def aggregate_backend(manifests, count, candidate):
+    """Every shard passed on the exact candidate and the shards cover BACKEND exactly once."""
+    indexes, executed = set(), []
+    for manifest in manifests:
+        backend = manifest["gates"]["backend"]
+        evidence = backend["evidence"]
+        index = evidence.get("shard_index")
+        if (manifest.get("candidate_sha") != candidate or backend["status"] != "PASS"
+                or evidence.get("shard_count") != count or type(index) is not int or index in indexes
+                or evidence.get("labels") != backend_shard(index, count) or not evidence.get("tests")):
+            raise ValueError("backend_shard_evidence_mismatch")
+        indexes.add(index)
+        executed += evidence["labels"]
+    if len(manifests) != count or sorted(executed) != sorted(BACKEND):
+        raise ValueError("backend_shards_incomplete")
+    return {"shards": count, "labels": len(executed), "candidate_sha": candidate}
+
 
 SECRET = re.compile(rb"sk-(?:proj-|svcacct-|ant-api[0-9]-)?[A-Za-z0-9_-]{30,}|"
                     rb"github_pat_[A-Za-z0-9_]{35,}|gh[pousr]_[A-Za-z0-9]{30,}|"
@@ -234,7 +263,7 @@ def run(repo, command, env, output, name, timeout):
     return result
 
 
-def validate(repo, manifest, output, profile, labels=(), with_ollama=False, bundle=None, package_manifest=None):
+def validate(repo, manifest, output, profile, labels=(), with_ollama=False, bundle=None, package_manifest=None, shard=None):
     repo, output = Path(repo).resolve(), Path(output).resolve()
     release.source_checks(repo, manifest)
     privacy(repo, manifest)
@@ -254,6 +283,8 @@ def validate(repo, manifest, output, profile, labels=(), with_ollama=False, bund
         return
     if profile in ("targeted", "backend", "full"):
         selected = tuple(labels) if profile == "targeted" else BACKEND
+        if shard and profile == "backend":
+            selected = tuple(backend_shard(*shard))
         if not selected or any(not re.fullmatch(r"(?:tests|apps)\.[A-Za-z0-9_.]+", label) for label in selected):
             raise release.GateError("invalid_targeted_test_labels")
         # The combined suite takes about 27-28 minutes on hosted Windows runners; 30 left no margin (two timeouts, Nov 2026).
@@ -265,7 +296,9 @@ def validate(repo, manifest, output, profile, labels=(), with_ollama=False, bund
             manifest.setdefault("targeted_runs", []).append(result)
             manifest["last_validation"] = {"profile": profile, "status": result["status"]}
         else:
-            release.gate(manifest, "backend", result["status"], "combined_backend", **result_evidence(result), labels=list(selected))
+            sharding = {"shard_index": shard[0], "shard_count": shard[1]} if shard and profile == "backend" else {}
+            release.gate(manifest, "backend", result["status"], "combined_backend", **result_evidence(result),
+                         labels=list(selected), **sharding)
         if result["status"] != "PASS":
             return
     if profile in ("browser", "full"):

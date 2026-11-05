@@ -28,9 +28,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  native-windows:
+  native-windows-shards:
+    # The backend suite took about 28 minutes in one job; measured shards keep each part near 10.
     runs-on: windows-latest
-    timeout-minutes: 55
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ["0", "1", "2", native]
     env:
       ALFRED_LOCAL_RUNTIME: "true"
       ALFRED_AUTO_TRAIN_ON_STARTUP: "false"
@@ -69,6 +74,7 @@ jobs:
           if ((Get-FileHash artifacts/tools/ical/ical.js.tgz -Algorithm SHA256).Hash -ne '36482280D62CC50F0ADDDB0587612CFF32B96DF18EB9E2071EC9929C2E7B3107') { throw 'Unexpected calendar test-tool archive hash' }
           tar -xzf artifacts/tools/ical/ical.js.tgz -C artifacts/tools/ical package/dist/ical.es5.cjs package/LICENSE
       - name: Backend and recovery regression suite
+        if: matrix.part != 'native'
         shell: pwsh
         run: |
           $baseline = $env:BASELINE_SHA
@@ -76,15 +82,16 @@ jobs:
           # Reviewed consolidated dependency/migration contents; later changes still fail closed.
           python scripts/release_gate.py preflight --release-id "ci-$env:GITHUB_RUN_ID" --candidate $env:GITHUB_SHA --baseline $baseline --reviewed-source 0defab2c204dcb06e7e866cec5b6805c3417ac1a --output artifacts/release-ci
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python scripts/release_gate.py validate --output artifacts/release-ci --profile backend
+          python scripts/release_gate.py validate --output artifacts/release-ci --profile backend --shard-index ${{ matrix.part }} --shard-count 3
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Native HTTP, recovery, backup, concurrency and accessibility
+        if: matrix.part == 'native'
         run: python scripts/verify_native_runtime.py --browser --extended
       - name: Upload native proof (synthetic data only)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: native-windows-proof
+          name: native-windows-proof-${{ matrix.part }}
           path: |
             artifacts/ops/native_huey_extended_verification.json
             artifacts/native-tests/*/mobile-accessibility.json
@@ -93,6 +100,37 @@ jobs:
             artifacts/release-ci/release.md
             artifacts/release-ci/*.log
           if-no-files-found: warn
+
+  native-windows:
+    # Stable check name: passes only when every part passed and the shards ran each backend module once.
+    if: ${{ always() }}
+    needs: native-windows-shards
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-windows-proof-*
+          path: artifacts/native-windows-parts
+      - name: Verify complete exact-source backend coverage
+        shell: bash
+        env:
+          PARTS_RESULT: ${{ needs.native-windows-shards.result }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from scripts.release_validation import aggregate_backend
+
+          assert os.environ["PARTS_RESULT"] == "success", os.environ["PARTS_RESULT"]
+          paths = sorted(Path("artifacts/native-windows-parts").glob("native-windows-proof-*/**/release.json"))
+          manifests = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+          print(aggregate_backend(manifests, 3, os.environ["GITHUB_SHA"]))
+          PY
 
   selenium-shards:
     # The complete suite exercises real DPAPI encryption; private-memory tests remain required.

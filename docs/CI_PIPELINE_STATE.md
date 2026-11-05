@@ -311,7 +311,7 @@ Source base25f028d; PR #20 DRAFT/unmerged. Exactly one file exists under
 
 | Workflow / file | Triggers | Jobs / check names | Unique responsibilities | Disposition |
 | --- | --- | --- | --- | --- |
-| Browser Regression / browser-regression.yml | master push; path-filtered PR; manual dispatch | native-windows, selenium, linux-secure-failure; three additional selenium-shards checks | Windows DPAPI/full backend+financial+privacy preflight/native HTTP/backup/recovery/accessibility; complete browser suite split across Windows; Linux fail-closed + portable browser | RETAIN; original three check identities preserved, selenium now fail-closed aggregate |
+| Browser Regression / browser-regression.yml | master push; path-filtered PR; manual dispatch | native-windows, selenium, linux-secure-failure; three additional selenium-shards checks; four native-windows-shards checks (three backend shards plus native runtime) | Windows DPAPI/full backend+financial+privacy preflight/native HTTP/backup/recovery/accessibility; complete browser suite split across Windows; Linux fail-closed + portable browser | RETAIN; original three check identities preserved, selenium and native-windows now fail-closed aggregates |
 | GitHub-managed pages-build-deployment / dynamic/pages/pages-build-deployment | GitHub Pages service; no source YAML in this checkout | Managed by GitHub, separate publication context | Existing Pages publishing | BLOCKED_REVIEW for any change; retain untouched, do not invoke/deploy |
 
 Recent runs40771632812 (SUCCESS),40754201960 (45m Selenium cutoff),40742137700
@@ -323,7 +323,7 @@ push has no trigger, so it does not duplicate PR validation. Manual diagnostics
 remain intentional. No workflow_call or overlapping repository workflow exists.
 
 Stable native-windows/selenium/linux-secure-failure checks must remain. Any future
-Selenium shards must feed the selenium aggregate fail-closed; no missing/skipped/
+Selenium or backend shards must feed their aggregate (selenium, native-windows) fail-closed; no missing/skipped/
 duplicate tests, stale SHA evidence or relaxed privacy/native checks are accepted.
 Pip caches explicitly hash requirements.txt and constraints/*.txt. They contain
 package downloads only, never private/runtime state. Native and Linux commands

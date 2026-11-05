@@ -126,7 +126,12 @@ class BrowserPlanTests(TestCase):
         root=Path(__file__).resolve().parents[1]
         workflow=yaml.load((root/'.github/workflows/browser-regression.yml').read_text(encoding='utf-8'),Loader=yaml.BaseLoader)
         jobs=workflow['jobs']
-        self.assertEqual(set(jobs),{'native-windows','linux-secure-failure','selenium-shards','selenium'})
+        self.assertEqual(set(jobs),{'native-windows-shards','native-windows','linux-secure-failure','selenium-shards','selenium'})
+        self.assertEqual(jobs['native-windows-shards']['strategy']['matrix']['part'],['0','1','2','native'])
+        self.assertEqual(jobs['native-windows-shards']['strategy']['fail-fast'],'false')
+        self.assertEqual(jobs['native-windows']['needs'],'native-windows-shards')
+        self.assertEqual(jobs['native-windows']['if'],'${{ always() }}')
+        self.assertIn('aggregate_backend',json.dumps(jobs['native-windows']))
         self.assertEqual(jobs['selenium-shards']['runs-on'],'windows-latest')
         self.assertEqual(jobs['selenium-shards']['strategy']['matrix']['shard'],['0','1','2'])
         self.assertEqual(jobs['selenium-shards']['strategy']['fail-fast'],'false')
@@ -137,13 +142,13 @@ class BrowserPlanTests(TestCase):
         self.assertEqual(workflow['concurrency']['cancel-in-progress'],'false')
         for key in ('github.event_name','github.ref','github.sha'):
             self.assertIn(key,workflow['concurrency']['group'])
-        for name in ('native-windows','linux-secure-failure','selenium-shards'):
+        for name in ('native-windows-shards','linux-secure-failure','selenium-shards'):
             step=next(step for step in jobs[name]['steps'] if step.get('uses','').startswith('actions/setup-python@'))
             self.assertEqual(step['with']['cache'],'pip')
             self.assertEqual(step['with']['cache-dependency-path'].split(),['requirements.txt','constraints/*.txt'])
         text=json.dumps(jobs)
         self.assertIn('test_memory_platform',text);self.assertIn('--extended',text)
-        self.assertIn('release_gate.py preflight',text);self.assertIn('--profile backend',text)
+        self.assertIn('release_gate.py preflight',text);self.assertIn('--profile backend --shard-index',text)
 
     def test_failed_job_cannot_publish_a_passing_canonical_proof(self):
         paths,manifest=self.proof();root=paths[0].parents[1]

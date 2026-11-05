@@ -318,6 +318,8 @@ def main(argv=None):
     parser.add_argument("--reviewed-source", help="Exact reviewed dependency/migration source SHA, not deployment approval")
     parser.add_argument("--profile", choices=("targeted", "backend", "browser", "native", "packaged", "full"), default="targeted")
     parser.add_argument("--test-label", action="append", default=[])
+    parser.add_argument("--shard-index", type=int)
+    parser.add_argument("--shard-count", type=int)
     parser.add_argument("--with-ollama", action="store_true")
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--backup-directory", type=Path)
@@ -378,8 +380,14 @@ def main(argv=None):
             state.update(stage="COMPLETE", status="PASS", code="all_release_and_human_acceptance_recorded")
         if args.command == "validate":
             from scripts.release_validation import validate
+            shard = None
+            if args.shard_count is not None or args.shard_index is not None:
+                if (args.profile != "backend" or args.shard_count is None or args.shard_index is None
+                        or not 0 <= args.shard_index < args.shard_count):
+                    raise GateError("invalid_backend_shard")
+                shard = (args.shard_index, args.shard_count)
             validate(args.repo, manifest, args.output, args.profile, args.test_label, args.with_ollama,
-                     args.bundle, args.package_manifest)
+                     args.bundle, args.package_manifest, shard)
         if args.command in ("backup", "recovery"):
             from scripts import release_recovery
             source_checks(args.repo, manifest)
