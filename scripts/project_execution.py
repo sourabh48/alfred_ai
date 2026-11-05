@@ -24,7 +24,7 @@ GATES = {
     'RUNTIME-05': 'BLOCKED_EXTERNAL: independent Windows PC acceptance',
     'RUNTIME-06': 'BLOCKED_EXTERNAL: offline independent-host kit on a separate PC; same-host packaged checks 35/35',
     'RUNTIME-11':'BLOCKED_EXTERNAL: separate-user and clean-PC installs; owner accepted the diskcache residual risk 2026-11-05',
-    'RUNTIME-14': 'BLOCKED_APPROVAL: G: rehearsal approved; local-model calls exceed the 30 s deadline on this PC (driver, deadline or keep-alive decision)',
+    'RUNTIME-14': 'BLOCKED_EXTERNAL: same-host synthetic M21 rehearsal PASS at 10203a3 on G:; separate PC, normal account and device-loss acceptance open',
     'FIN-15': 'BLOCKED_APPROVAL: canonical currency/FX policy is not approved',
     'TRAVEL-18': 'BLOCKED_APPROVAL: Google configuration/credentials and offline map scope',
 }

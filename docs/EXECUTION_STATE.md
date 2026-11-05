@@ -161,7 +161,16 @@
   on timed-out GPU discovery plus cold model reads, so some calls still pass 30 s. Earlier the same day the gate passed
   twice (packaged 35/35, source 34). Also found: the rehearsal's 60-second git timeout is too short to clone this
   repository file by file across drives (worked around with a packed `--no-local` clone; limit unchanged).
-  Needs an owner decision: update the AMD driver, raise the local-model deadline, or keep the model loaded between calls.
+  OWNER_DECISION 2026-11-05: keep the model loaded (`keep_alive` 5m, commit `de3888f`). The AMD driver update stays
+  the owner's own choice. Known lows: `scripts/development_council.py` still sends `keep_alive` 0 (deferred module);
+  both models may stay resident; the last prompt stays in local Ollama memory for up to 5 minutes.
+- RUNTIME-14 result (2026-11-06, candidate `10203a3`, G: only): technical validation PASS, all 7 gates, and the disposable
+  M21 rehearsal PASS (promotion, restart, worker-crash recovery, local restore, source rollback, 9 browser checks).
+  Backend 1830 and Chrome 162 with zero skips; native 34 checks on installed CPU Ollama with keep-alive 5m. The first
+  rehearsal at `de3888f` was refused because the native drill's worker kill leaves the interrupted memory-sync job in
+  review in most fixtures; `10203a3` releases it through `retry_review`. One Chrome run hit the gate's 30-minute limit
+  (152/162 passed, none failed) while a game used the CPU; the rerun took 25 minutes. Its margin on an idle PC is about
+  3-5 minutes (backend was already raised to 40). Now BLOCKED_EXTERNAL: separate PC, normal account, device-loss restore.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
