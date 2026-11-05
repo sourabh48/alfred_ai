@@ -1756,7 +1756,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: synthetic local correction/export flow PASS; normal-account, broader financial portability and fresh package acceptance PENDING.
 - Limitations/dependencies: CSV exports all owner expenses, independent of timeline display filters; retains exact recorded cents without asserting currency, blanks null balances, escapes formula-leading text and omits raw source/account details. Current-value export, not a backup or a reimport contract. Corrections preserve omitted owner values, import linkage/identity and unrelated bank snapshots.
 - OWNER_DECISION 2026-11-06: broader portability is one ZIP of CSVs. Implemented in `24e8b84`: owner-authenticated `/api/expenses/export/financial/` and an "Export financial data (ZIP)" button on Expenses. One CSV each for bank accounts, transactions, loans, investments and budgets; recorded values only, no currency inferred, unknowns blank, formula-leading text escaped, account numbers masked to the last four digits (short numbers with fewer than four digits stay as recorded, like the existing account display), only the signed-in owner's rows. Free-text notes are included. Tests: 6 export tests, 584 related backend tests (Chrome skipped there) and both Chrome download tests PASS.
-- Next: owner check of the ZIP on their own account (opens in a spreadsheet, values look right); then fresh-package acceptance. Not a backup or a reimport contract.
+- 2026-11-06: owner downloaded the ZIP on their own account and confirmed the page and files look right ("Looks right"). The header buttons now wrap on narrow windows (`96f9892`).
+- Next: exact-HEAD CI and a fresh-package check, due with the phase B push. Not a backup or a reimport contract.
 
 ### FIN-14 — Money storage across every domain
 

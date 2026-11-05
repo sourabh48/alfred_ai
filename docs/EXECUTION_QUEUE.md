@@ -22,7 +22,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 
 | Order | Phase | Task / module | Status | Value / effort | Prerequisites | Required acceptance | Readiness / blocker |
 | ---: | --- | --- | --- | --- | --- | --- | --- |
-| 1 | A | FIN-13 — Financial export and correction | IMPLEMENTED_NOT_ACCEPTED | P2 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 1 | A | FIN-13 — Financial export and correction | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: owner account check PASS 2026-11-06; exact-HEAD CI and a fresh-package check remain, due with the phase B push |
 | 2 | A | LOAN-07 — Loan forecasting and cross-module liabilities | IMPLEMENTED_NOT_ACCEPTED | P2 / L | FIN-07 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: FIN-07 |
 | 3 | A | LOAN-08 — Broad real-document/lender acceptance | IMPLEMENTED_NOT_ACCEPTED | P2 / L | DOC-02 | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: independent lender/document acceptance corpus |
 | 4 | A | INV-02 — Investment PDF imports and corrections | IMPLEMENTED_NOT_ACCEPTED | P2 / L | DOC-02, DOC-04, FIN-14 | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: broader broker/layout/OCR and authorized real-account corpus; bounded receipts in EXECUTION_STATE |
@@ -81,7 +81,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 57 | B | COUNCIL-05 — AI development budget and human Git approval | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-04 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-04 |
 | 58 | D | COUNCIL-03 — Experimental self-improvement engine | NOT_IMPLEMENTED | P1 / L | COUNCIL-05 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-05 |
 
-**Next eligible for `next` or active `sprint`: FIN-13.**
+**Next eligible for `next` or active `sprint`: FIN-16.**
 
 ## Accepted baseline — excluded from execution
 

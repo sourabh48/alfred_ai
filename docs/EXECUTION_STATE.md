@@ -182,7 +182,8 @@
   accuracy claim. Amounts kept out of Git.
 - FIN-13 (2026-11-06, `24e8b84`): owner chose a ZIP of CSVs; Expenses now offers "Export financial data (ZIP)" with bank
   accounts, transactions, loans, investments and budgets, masked account numbers and the existing CSV safety rules.
-  Export tests, 584 related backend tests and two Chrome download tests PASS. IMPLEMENTED_NOT_ACCEPTED: owner account check.
+  Export tests, 584 related backend tests and two Chrome download tests PASS. Owner account check PASS ("Looks right");
+  header buttons wrap on narrow windows (`96f9892`). Remaining: exact-HEAD CI and a fresh-package check at the phase B push.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
