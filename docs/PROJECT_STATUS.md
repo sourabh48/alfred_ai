@@ -3171,7 +3171,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Security branch merged to master through PR #21; master `ca4d66a` passed all 14 CI checks. 2026-11-05 recheck: OSV shows only diskcache; PyInstaller's four dependencies are now pinned and the Dockerfile copies `constraints/` so its install no longer stops on a missing file (no Docker build run here). One advisory stays open and visible: diskcache CVE-2025-69872, no upstream fix, mitigated in ALFRED, residual risk accepted by the owner on 2026-11-05 and the advisory kept visible. Evidence, remaining paths and findings are in [RUNTIME_11_EVIDENCE.md](RUNTIME_11_EVIDENCE.md). Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: CI on the pin and Docker fix, a fresh AI held-out benchmark, installer runs where Smart App Control allows, separate-user install and clean-PC replay.
+- Next: CI on the pin and Docker fix, a fresh AI held-out benchmark (installer lifecycle 6/6 on `4517d0f` from drive G:, Smart App Control allowed it), separate-user install and clean-PC replay.
 
 ### RUNTIME-12 — GitHub CI and branch/source protection
 

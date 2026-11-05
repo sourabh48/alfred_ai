@@ -144,6 +144,9 @@
 - OWNER_DECISION 2026-11-05: "Accept the risk" — the diskcache CVE-2025-69872 residual risk in RUNTIME_11_EVIDENCE is
   formally accepted; the advisory stays visible while the scanner reports it. RUNTIME-11 now waits on separate-user and
   clean-PC installs (BLOCKED_EXTERNAL).
+- RUNTIME-11 installer on drive G: (owner request, 2026-11-05): clean build of `4517d0f`, unsigned; lifecycle verifier 6/6
+  with the new `--work-root`; Smart App Control allowed it; shortcut, startup entry and owner app untouched; G: files sent
+  to the Recycle Bin. Same account and PC, so separate-user and clean-PC stay open.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

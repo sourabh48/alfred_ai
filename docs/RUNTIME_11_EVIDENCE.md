@@ -185,11 +185,18 @@ PENDING: separate-user installation and a clean PC.
   itself, but the Dockerfile copied only `linux-py312.txt` into `/app/`, so pip stopped ("Could not open constraint
   file", reproduced locally). It now copies `constraints/` whole; the Windows pins all carry a `win32` marker and stay
   inactive on Linux. Docker is not installed here, so no image was built: the Linux install itself is unverified.
-- Local evidence: `F:\ALFRED\dev-evidence\post-audit\runtime-11-20261105` (freeze and OSV results, not in Git).
+- Installer on a second drive (owner's request): built from a clean checkout of `4517d0f` on G:, unsigned development
+  mode. `ALFRED-Setup.exe` 449,261,414 bytes, SHA-256 `d9d6daf7ba5f5c6698739776a5f701a7cd5ea731f2949e8f3b44feaf1027aa50`.
+  `verify_windows_installer.py --work-root` on G: passed 6/6: install, start without system Python and sign-up, upgrade
+  keeping account, totals and file, failed shutdown blocking uninstall, uninstall keeping data, and startup-entry
+  cleanup. Smart App Control allowed this build. The desktop shortcut and startup entry were restored, nothing stayed
+  registered, and the owner's running app was untouched. The G: files then went to the Recycle Bin. This is the same
+  Windows account on the development PC, so it is not the separate-user or clean-PC check.
+- Local evidence: `F:\ALFRED\dev-evidence\post-audit\runtime-11-20261105` (freeze, OSV results, installer report and
+  logs, not in Git).
 
 ## Acceptance
 
 RUNTIME-11 stays unaccepted. The independent review is done and its defects are fixed. Exact-head CI passed on master
-`ca4d66a`; the 2026-11-05 pin and Docker fix needs its own CI run. The owner accepted the residual risk above on 2026-11-05. Still needed: a fresh independent AI held-out benchmark, installer runs on
-`297e180` where Smart App Control allows them, separate-user installation and a clean PC. Installer signing stays
+`ca4d66a`; the 2026-11-05 pin and Docker fix needs its own CI run. The owner accepted the residual risk above on 2026-11-05. Still needed: a fresh independent AI held-out benchmark, separate-user installation and a clean PC. Installer signing stays
 declined by the owner.
