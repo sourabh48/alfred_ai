@@ -99,6 +99,7 @@
   failure, i.e. the 1800 s suite limit (the same as `a5ce8bc`). The step has taken 27-28 min on hosted runners since before
   the live-refresh change (6d6551e 34.6 min job), so slow runners time out. The backend suite limit is now 2400 s and the
   job limit 55 min; coverage unchanged; 114 release tests PASS.
+- Master CI on `e61b990` (contains FAMILY-07): all 9 checks PASS, native-windows job 29.6 min.
 - Next: BIKE-01.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
