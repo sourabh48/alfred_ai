@@ -171,6 +171,11 @@
   review in most fixtures; `10203a3` releases it through `retry_review`. One Chrome run hit the gate's 30-minute limit
   (152/162 passed, none failed) while a game used the CPU; the rerun took 25 minutes. Its margin on an idle PC is about
   3-5 minutes (backend was already raised to 40). Now BLOCKED_EXTERNAL: separate PC, normal account, device-loss restore.
+- RUNTIME-15 (2026-11-06): owner enabled WSL and Virtual Machine Platform; Docker Desktop 4.98.0 (checksum and Docker Inc
+  signature verified) ran a disposable Compose stack from `49d622e` on G:: 5/5 healthy, loopback-only web, no planted
+  private files in the image, non-root user, operator verify/backup/restore-check accepted with synthetic rows, data kept
+  through down/up, scheduled jobs completed. Now BLOCKED_EXTERNAL: second LAN device, host restart, sustained schedule.
+  Docker uninstalled afterwards at the owner's request ("DELETE IT AFTER DONE").
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

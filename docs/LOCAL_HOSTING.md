@@ -36,6 +36,8 @@ Edit `config/local.env` before using real data:
 - Keep `DB_NAME` and `DB_USER` consistent with the database you create.
 - Set `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION` to match your retention
   choice; `true` deletes raw uploaded PDFs/images after extraction.
+- Set `ALFRED_TIME_ZONE` (for example `Asia/Kolkata`). Containers cannot read the
+  Windows zone, so without it they log a warning and use the Asia/Kolkata fallback.
 - For LAN access, add `ALFRED_BIND_ADDRESS=<host-LAN-IP>`, add that IP to
   `ALLOWED_HOSTS`, and add `http://<host-LAN-IP>:8000` to
   `CSRF_TRUSTED_ORIGINS` and `CORS_ALLOWED_ORIGINS`. Allow inbound traffic only

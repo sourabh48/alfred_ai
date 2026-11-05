@@ -141,6 +141,16 @@ Needs a separate decision, because it cannot be tested without Docker:
 - A LAN connection is plain HTTP, so session cookies are readable on that network.
   This is the documented trusted-LAN limit.
 
+Compose run 2026-11-06 (Docker Desktop 4.98.0, disposable clone of `49d622e` on G:, synthetic settings):
+
+- Steps 1-3 below passed: SVM on, `config --quiet`, `up --build`, no planted private file in the image, user
+  `alfred`, `verify` accepted, backup and isolated restore check accepted with synthetic rows.
+- Data persisted through `down`/`up`; beat sent jobs and the worker completed them.
+- Containers cannot read the Windows zone and fall back to Asia/Kolkata with a warning; the hosting guide now
+  says to set `ALFRED_TIME_ZONE`.
+- Evidence: `F:\ALFRED\dev-evidence\post-audit\runtime-15-20261106`. Docker was uninstalled afterwards at the
+  owner's request.
+
 Still needed for acceptance:
 
 1. Owner enables SVM in the BIOS; virtualization was off when last checked
