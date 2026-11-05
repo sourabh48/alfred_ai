@@ -147,6 +147,11 @@
 - RUNTIME-11 installer on drive G: (owner request, 2026-11-05): clean build of `4517d0f`, unsigned; lifecycle verifier 6/6
   with the new `--work-root`; Smart App Control allowed it; shortcut, startup entry and owner app untouched; G: files sent
   to the Recycle Bin. Same account and PC, so separate-user and clean-PC stay open.
+- RUNTIME-06 (2026-11-05): clean package of `6743fd9` on G: passed 35/35 packaged native checks with installed Ollama
+  0.40.14 (test-owned `ollama serve`), `qwen3.5:4b` and `all-minilm`, including outage, safe 503 and no internet files.
+  Now BLOCKED_EXTERNAL: offline independent-host kit on a separate PC.
+- OWNER_DECISION 2026-11-05: RUNTIME-14 rehearsal approved on disposable synthetic folders on drive G:, never the real
+  runtime ("THEN DO 14"). RUNTIME-03 and RUNTIME-05 stay open: real sign-ins over days, and a separate PC.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

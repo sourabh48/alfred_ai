@@ -41,6 +41,16 @@ Depends on RUNTIME-11: on this branch `TransactionClassifierAdapter` can still t
 a Hugging Face download when it loads. RUNTIME-11 already sets
 `local_files_only=True`, so it is not changed here.
 
+Recheck on master, 2026-11-05: steps 1 to 3 below are done. A clean checkout of
+`6743fd9` on drive G: was packaged (ALFRED.exe SHA-256 `5b33a61b…44457`), and
+`verify_native_runtime.py --executable … --launcher … --browser --memory` passed
+**35/35** against the installed Ollama 0.40.14 with `qwen3.5:4b` and `all-minilm`.
+That includes Chrome pages with no internet-loaded files, the missing-model safe 503
+with no cloud call, the model-outage draft-and-retry check, and recovery after the
+outage. The installed Ollama passes as it is, so the staged runtime does not need to be
+adopted. Ollama ran as a test-owned `ollama serve`. Evidence, not in Git:
+`F:\ALFRED\dev-evidence\post-audit\runtime-06-20261105`. Still open: step 4, a separate PC.
+
 Still needed for acceptance:
 
 1. Package rebuild, because `READ ME.txt` changed: PyInstaller, then
