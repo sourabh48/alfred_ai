@@ -287,6 +287,13 @@ def main():
         assert crash_result["attempts"] == 2, crash_result
         assert HUEY.storage.sql("SELECT COUNT(*) FROM native_history WHERE outcome='recovered'", results=True)[0][0] >= 1
         passed("inflight_job_recovers_after_worker_kill", crash_result)
+        # The kill can also interrupt a scheduled job that waits for review instead of retrying (memory sync).
+        # Release it through the operator's retry-job path so the saved fixture starts clean; the M21
+        # rehearsal restores this folder and requires every readiness check, including no jobs awaiting review.
+        for job in HUEY.storage.review_jobs(HUEY.deserialize_task):
+            assert job["task"] != "unregistered task", job
+            HUEY.storage.retry_review(job["job_id"], HUEY.deserialize_task)
+        assert not HUEY.storage.review_jobs(HUEY.deserialize_task)
         heartbeat = cache.get("native:scheduler-heartbeat")
         assert heartbeat and heartbeat["instance"] == state["instance"]
         passed("scheduler_executed_heartbeat")
