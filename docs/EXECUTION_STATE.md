@@ -130,6 +130,7 @@
 - OWNER_DECISION 2026-11-05: AI Council tasks (COUNCIL-01..05) go after all other modules (`OWNER_DEFERRED_MODULES`).
 - OWNER_DECISION 2026-11-05: commit each task locally; push master only when a queue phase is finished or to fix
   failing CI. No unnecessary merges.
+- Master CI on `ca4d66a` (BIKE-04): all 14 checks PASS; backend shards 10.4-12.6 min, Selenium 16.8-19.5 min.
 - RUNTIME-09 (2026-11-05): 48 storage/native tests PASS on real Windows ACLs; live CLI drill on a disposable synthetic
   folder loosened like the audited install: inspect, blocked unapproved/unquiesced apply, pinned apply to owner+SYSTEM
   only, inheritance, exact rollback and blocked rollback after change. No code change. COMPLETE_VERIFIED for bounded
