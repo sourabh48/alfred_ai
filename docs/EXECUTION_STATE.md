@@ -176,6 +176,10 @@
   private files in the image, non-root user, operator verify/backup/restore-check accepted with synthetic rows, data kept
   through down/up, scheduled jobs completed. Now BLOCKED_EXTERNAL: second LAN device, host restart, sustained schedule.
   Docker uninstalled afterwards at the owner's request ("DELETE IT AFTER DONE").
+- FIN-07 (2026-11-06, `f586455`): backtest reports prior-range coverage; tests pass. Owner asked Claude to read their own
+  forecast panel (owner signed in; panel only): range held 6 of 9 walk-forward months, error about a quarter of a typical
+  month, forecast UNAVAILABLE without income evidence. Now BLOCKED_EVIDENCE: more months and income evidence before any
+  accuracy claim. Amounts kept out of Git.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

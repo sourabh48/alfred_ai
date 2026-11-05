@@ -26,6 +26,7 @@ GATES = {
     'RUNTIME-11':'BLOCKED_EXTERNAL: separate-user and clean-PC installs; owner accepted the diskcache residual risk 2026-11-05',
     'RUNTIME-14': 'BLOCKED_EXTERNAL: same-host synthetic M21 rehearsal PASS at 10203a3 on G:; separate PC, normal account and device-loss acceptance open',
     'RUNTIME-15': 'BLOCKED_EXTERNAL: same-host Compose run PASS at 49d622e; second LAN device, host restart and sustained schedule open',
+    'FIN-07': 'BLOCKED_EVIDENCE: on the owner\'s data the prior range held in 6 of 9 walk-forward months and income evidence is missing; no accuracy claim',
     'FIN-15': 'BLOCKED_APPROVAL: canonical currency/FX policy is not approved',
     'TRAVEL-18': 'BLOCKED_APPROVAL: Google configuration/credentials and offline map scope',
 }
