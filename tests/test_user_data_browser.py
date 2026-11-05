@@ -535,6 +535,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         data = self.client.get("/api/budgets/dashboard/").json()
         self.assertEqual(data["forecast"][0]["predicted_expense"], 6333.33)
         self.assertEqual(data["forecast_evidence"]["backtest"]["samples"], 2)
+        self.assertIn(f"contained the actual month in {data['forecast_evidence']['backtest']['range_hits']} of 2", evidence)
         self.assertTrue(self.browser.find_element(self.By.ID,"budgetForecastChart").is_displayed())
         self.memory_click('#budgetForecastEvidence summary')
         self.assertNotIn(month_start(1).strftime("%Y-%m"), self.text("budgetForecastEvidence"))

@@ -246,11 +246,13 @@ class BudgetIntelligenceService:
         holdouts = []
         errors = []
         for index in range(3, len(history)):
-            predicted = average([amount for _, amount in history[index-3:index]])
+            window = [amount for _, amount in history[index-3:index]]
+            predicted = average(window)
             actual = history[index][1]
             errors.append(abs(actual-predicted))
             holdouts.append({"month": observations[index]["month"], "training_through": observations[index-1]["month"],
-                             "predicted_expense": money_float(predicted), "actual_expense": money_float(actual)})
+                             "predicted_expense": money_float(predicted), "actual_expense": money_float(actual),
+                             "within_observed_range": min(window) <= actual <= max(window)})
         return {
             "as_of": today.isoformat(),
             "status": "PLANNING_ESTIMATE" if available else "UNAVAILABLE",
@@ -262,6 +264,8 @@ class BudgetIntelligenceService:
             "uncertainty": uncertainty,
             "backtest": {"status": "OBSERVED_ERROR" if errors else "UNAVAILABLE", "samples": len(errors),
                          "mae": money_float(average(errors)) if errors else None, "holdouts": holdouts,
+                         # Observed range coverage on this owner's own months: evidence for calibration, not a probability.
+                         "range_hits": sum(row["within_observed_range"] for row in holdouts),
                          "method": "Walk-forward one observed month ahead using only the preceding three observed months; sparse months are not filled with zero."},
             "calibration_status": "NOT_CALIBRATED",
             "assumptions": ["Recorded months may be incomplete; missing months are unknown, not zero.",

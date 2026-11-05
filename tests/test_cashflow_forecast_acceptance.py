@@ -81,6 +81,16 @@ class CashflowForecastAcceptanceTests(TestCase):
         self.assertEqual(second["holdouts"][-1]["predicted_expense"], 40)
         self.assertGreater(second["mae"], first["mae"])
 
+    def test_walk_forward_counts_months_inside_the_prior_observed_range(self):
+        # Prior windows: [10,30,20] then [30,20,25] then [20,25,90].
+        for month, amount in (("2025-07", "10"), ("2025-08", "30"), ("2025-09", "20"),
+                              ("2025-10", "25"), ("2025-11", "90"), ("2025-12", "20")):
+            self.spend(month, amount)
+        backtest = service.forecast_finances(self.owner)["backtest"]
+        self.assertEqual([row["within_observed_range"] for row in backtest["holdouts"]], [True, False, True])
+        self.assertEqual((backtest["range_hits"], backtest["samples"]), (2, 3))
+        self.assertIsNone(service.forecast_finances(self.owner)["uncertainty"]["coverage_probability"])
+
     def test_canonical_directions_fixed_bills_future_income_and_ownership(self):
         self.spend("2025-11", "10"); self.spend("2025-12", "20")
         for category, direction in (("transfer", "debit"), ("loan", "debit"), ("food", "credit")):
