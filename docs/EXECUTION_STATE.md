@@ -135,6 +135,12 @@
   folder loosened like the audited install: inspect, blocked unapproved/unquiesced apply, pinned apply to owner+SYSTEM
   only, inheritance, exact rollback and blocked rollback after change. No code change. COMPLETE_VERIFIED for bounded
   scope; live/original-install ACL repair still needs explicit approval. Baseline 85/143.
+- RUNTIME-11 recheck (2026-11-05): the branch is on master (PR #21) and `ca4d66a` passed all CI. OSV on installed,
+  Windows and Linux pins reports only diskcache CVE-2025-69872. Fixed: PyInstaller's four dependencies unpinned (now in
+  `requirements-build.txt`, contract test) and the Docker install stopping on a missing constraints file (Dockerfile copies
+  `constraints/`; no Docker here, image not built). Independent review TECHNICAL_PASS; its two test gaps fixed. CI pins the
+  dependency commit as reviewed source. Still IMPLEMENTED_NOT_ACCEPTED, now gated BLOCKED_APPROVAL: owner decision on
+  the diskcache residual risk, plus separate-user and clean-PC installs. Next eligible: RUNTIME-06.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

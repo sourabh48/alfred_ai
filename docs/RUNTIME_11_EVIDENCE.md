@@ -171,9 +171,25 @@ ALFRED was not modified.
 
 PENDING: separate-user installation and a clean PC.
 
+## Recheck on master — 2026-11-05
+
+- The RUNTIME-11 branch is on master through PR #21 (`7ab0572`, then `0defab2`). Master `ca4d66a` contains `297e180`
+  and passed all 14 CI checks on that exact SHA, so the exact-head CI item is met for that commit.
+- Advisories: OSV queried for the 152 installed packages, the 168 Windows pins and the 145 Linux pins. Only `diskcache`
+  5.6.3 is reported (GHSA-w8v5-vhqr-4h9v, the same issue as PYSEC-2026-2447 / CVE-2025-69872). The pip-audit download
+  was refused on this PC, so OSV was queried directly with package names and versions only.
+- `pip check` is clean. Every installed package matches its Windows pin exactly. Five installed packages had no pin:
+  PyInstaller (pinned in `requirements-build.txt`) and its four dependencies. A rebuild could therefore pull newer
+  PyInstaller hooks. They are now pinned in `requirements-build.txt` to the installed versions, with a contract test.
+- The Docker image could not install its requirements: `requirements.txt` names `constraints/windows-py312.txt` next to
+  itself, but the Dockerfile copied only `linux-py312.txt` into `/app/`, so pip stopped ("Could not open constraint
+  file", reproduced locally). It now copies `constraints/` whole; the Windows pins all carry a `win32` marker and stay
+  inactive on Linux. Docker is not installed here, so no image was built: the Linux install itself is unverified.
+- Local evidence: `F:\ALFRED\dev-evidence\post-audit\runtime-11-20261105` (freeze and OSV results, not in Git).
+
 ## Acceptance
 
-RUNTIME-11 stays unaccepted. The independent review is done and its defects are fixed. Still needed: exact-head PR CI,
-the owner's decision on the residual risk above, a fresh independent AI held-out benchmark, installer runs on
+RUNTIME-11 stays unaccepted. The independent review is done and its defects are fixed. Exact-head CI passed on master
+`ca4d66a`; the 2026-11-05 pin and Docker fix needs its own CI run. Still needed: the owner's decision on the residual risk above, a fresh independent AI held-out benchmark, installer runs on
 `297e180` where Smart App Control allows them, separate-user installation and a clean PC. Installer signing stays
 declined by the owner.

@@ -1,4 +1,7 @@
 -r requirements.txt
 pyinstaller==6.22.3
-rapidocr-onnxruntime==1.4.4
-onnxruntime==1.24.4
+# PyInstaller's own dependencies, pinned so a rebuild bundles the same hooks and tools.
+altgraph==0.17.5
+pefile==2024.8.26; sys_platform == "win32"
+pyinstaller-hooks-contrib==2026.9
+pywin32-ctypes==0.2.3; sys_platform == "win32"

@@ -21,9 +21,11 @@ RUN apt-get update \
         tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt constraints/linux-py312.txt /app/
+# requirements.txt names constraints/windows-py312.txt; its win32 markers keep those pins inactive here.
+COPY requirements.txt /app/
+COPY constraints/ /app/constraints/
 RUN python -m pip install pip==26.2.2 \
-    && python -m pip install -r /app/requirements.txt -c /app/linux-py312.txt
+    && python -m pip install -r /app/requirements.txt -c /app/constraints/linux-py312.txt
 
 COPY . /app
 

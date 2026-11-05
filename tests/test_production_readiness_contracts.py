@@ -200,13 +200,28 @@ class ProductionReadinessContractTests(SimpleTestCase):
         compose = (REPO_ROOT / "docker-compose.local.yml").read_text(encoding="utf-8")
         self.assertRegex(dockerfile, r"(?m)^FROM python:3\.12-slim@sha256:[0-9a-f]{64}$")
         self.assertIn("pip==26.2.2", dockerfile)
-        self.assertIn("-c /app/linux-py312.txt", dockerfile)
+        # requirements.txt resolves -c constraints/windows-py312.txt next to itself, so the folder must be copied.
+        self.assertIn("COPY constraints/ /app/constraints/", dockerfile)
+        self.assertIn("-c /app/constraints/linux-py312.txt", dockerfile)
         # Nothing may run as root after the last privileged step.
         self.assertRegex(dockerfile, r"(?s)\nUSER alfred\n(?:(?!\n(?:RUN|USER) ).)*$")
         owned = re.search(r"chown -R alfred:alfred ([^\n]+)", dockerfile).group(1).split()
         for target in re.findall(r"alfred_local_\w+:(/app/\w+)", compose):
             with self.subTest(volume=target):
                 self.assertIn(target, owned)
+
+    def test_build_requirements_pin_pyinstaller_and_its_dependencies(self):
+        lines = [line.strip() for line in (REPO_ROOT / "requirements-build.txt").read_text(encoding="utf-8").splitlines()]
+        pins = {}
+        for line in lines:
+            if line and not line.startswith(("#", "-r")):
+                # Exact release only: no wildcard, range or missing version.
+                match = re.fullmatch(r"([A-Za-z0-9._-]+)==([0-9][0-9A-Za-z.+!-]*)(?:\s*;\s*(.+))?", line)
+                self.assertIsNotNone(match, line)
+                pins[match[1].lower()] = match[3]
+        self.assertTrue({"pyinstaller", "altgraph", "pefile", "pyinstaller-hooks-contrib", "pywin32-ctypes"} <= set(pins))
+        # A marker may only narrow a pin to Windows, where the installer is built.
+        self.assertTrue(all(marker in (None, 'sys_platform == "win32"') for marker in pins.values()), pins)
 
     def test_linux_constraints_cover_every_pinned_requirement(self):
         def pins(text):

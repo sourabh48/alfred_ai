@@ -29,7 +29,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 5 | A | AI-10 — Persistent general conversation history | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: private-history activation remains off |
 | 6 | A | AI-14 — Background learning pipeline | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: eligible consented training and reviewed outcomes |
 | 7 | A | AI-15 — Model registry and serving readiness | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: genuine per-model held-out outcomes |
-| 8 | A | RUNTIME-11 — Dependency security and reproducible builds | IMPLEMENTED_NOT_ACCEPTED | P1 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 8 | A | RUNTIME-11 — Dependency security and reproducible builds | IMPLEMENTED_NOT_ACCEPTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: owner decision on the diskcache residual risk; separate-user and clean-PC installs |
 | 9 | A | RUNTIME-14 — M21 rehearsal, failure injection and rollback acceptance | IMPLEMENTED_NOT_ACCEPTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: production/recovery rehearsal scope |
 | 10 | A | RUNTIME-03 — Windows sign-in and sustained scheduled observation | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: sustained sign-in/scheduler observation |
 | 11 | A | RUNTIME-05 — Install/upgrade/uninstall on separate PC | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: independent Windows PC acceptance |
@@ -81,7 +81,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 57 | B | COUNCIL-05 — AI development budget and human Git approval | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-04 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-04 |
 | 58 | D | COUNCIL-03 — Experimental self-improvement engine | NOT_IMPLEMENTED | P1 / L | COUNCIL-05 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-05 |
 
-**Next eligible for `next` or active `sprint`: RUNTIME-11.**
+**Next eligible for `next` or active `sprint`: RUNTIME-06.**
 
 ## Accepted baseline — excluded from execution
 
