@@ -95,6 +95,10 @@
   insufficient categories drive actions and news searches. Now unknown or withheld; the canonical baseline marks liquid
   cash and runway unavailable without a non-credit balance (status only). One independent review, findings fixed;
   30 Risk, 569 baseline-dependent backend and 3 Chrome tests PASS. COMPLETE_VERIFIED for bounded scope; baseline 82/143.
+- Master CI on `5f2cf1d`: 8 of 9 PASS; native-windows failed in the backend release gate after 30 min 13 s with no test
+  failure, i.e. the 1800 s suite limit (the same as `a5ce8bc`). The step has taken 27-28 min on hosted runners since before
+  the live-refresh change (6d6551e 34.6 min job), so slow runners time out. The backend suite limit is now 2400 s and the
+  job limit 55 min; coverage unchanged; 114 release tests PASS.
 - Next: BIKE-01.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)

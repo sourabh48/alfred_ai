@@ -30,7 +30,7 @@ concurrency:
 jobs:
   native-windows:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
     env:
       ALFRED_LOCAL_RUNTIME: "true"
       ALFRED_AUTO_TRAIN_ON_STARTUP: "false"

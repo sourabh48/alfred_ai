@@ -256,7 +256,8 @@ def validate(repo, manifest, output, profile, labels=(), with_ollama=False, bund
         selected = tuple(labels) if profile == "targeted" else BACKEND
         if not selected or any(not re.fullmatch(r"(?:tests|apps)\.[A-Za-z0-9_.]+", label) for label in selected):
             raise release.GateError("invalid_targeted_test_labels")
-        result = run(repo, [sys.executable, "manage.py", "test", *selected, "--noinput", "--durations", "20"], env, output, "backend-" + run_id, 1800)
+        # The combined suite takes about 27-28 minutes on hosted Windows runners; 30 left no margin (two timeouts, Nov 2026).
+        result = run(repo, [sys.executable, "manage.py", "test", *selected, "--noinput", "--durations", "20"], env, output, "backend-" + run_id, 2400)
         if result["status"] == "PASS" and (not result["tests"] or result["skips"]):
             result["status"] = "NOT_RUN"
             result["code"] = "tests_missing_or_skipped"
