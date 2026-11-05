@@ -2,13 +2,14 @@ from collections import defaultdict
 import csv
 from datetime import date
 from decimal import Decimal
-from io import StringIO
+from io import BytesIO, StringIO
 import logging
 import sys
+import zipfile
 
 from django.db import transaction
 from django.db.models import Q
-from django.http import StreamingHttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
@@ -20,7 +21,7 @@ from rest_framework.views import APIView
 from alfred_ai.pagination import OptionalPageNumberPagination
 from alfred_ai.services import record_parser_learning
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction, raw_upload_cleanup_enabled
-from .models import BankAccount, Expense, StatementUpload
+from .models import BankAccount, Expense, StatementUpload, mask_account_number
 from .money import money_float
 from .serializers import BankAccountSerializer, ExpenseSerializer, StatementUploadSerializer
 from .services.cashflow_treatment import (
@@ -313,13 +314,24 @@ class ExpenseListCreateView(ListCreateAPIView):
         sync_account_balance(expense.bank_account, expense.closing_balance)
 
 
+EXPENSE_EXPORT_COLUMNS = ("id", "transaction_date", "direction", "classification", "category", "amount",
+                          "closing_balance", "merchant", "description", "external_reference", "source",
+                          "bank_account_id", "statement_upload_id")
+MASKED_EXPORT_COLUMNS = {"account_number", "loan_account_number"}
+
+
+def spreadsheet_safe(value):
+    # CSV quoting alone does not stop spreadsheet formula execution.
+    if isinstance(value, str) and (value.lstrip().startswith(("=", "+", "-", "@")) or value.startswith(("\t", "\r", "\n"))):
+        return "'" + value
+    return value
+
+
 class ExpenseExportView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        columns = ("id", "transaction_date", "direction", "classification", "category", "amount",
-                   "closing_balance", "merchant", "description", "external_reference", "source",
-                   "bank_account_id", "statement_upload_id")
+        columns = EXPENSE_EXPORT_COLUMNS
         queryset = Expense.objects.filter(user=request.user).order_by("-transaction_date", "-id").values_list(*columns)
 
         def rows():
@@ -330,16 +342,55 @@ class ExpenseExportView(APIView):
                 for values in queryset.iterator(chunk_size=2000):
                     buffer.seek(0)
                     buffer.truncate(0)
-                    # CSV quoting alone does not stop spreadsheet formula execution.
-                    writer.writerow([
-                        "'" + value if isinstance(value, str) and (
-                            value.lstrip().startswith(("=", "+", "-", "@")) or value.startswith(("\t", "\r", "\n"))
-                        ) else value for value in values
-                    ])
+                    writer.writerow([spreadsheet_safe(value) for value in values])
                     yield buffer.getvalue()
 
         response = StreamingHttpResponse(rows(), content_type="text/csv; charset=utf-8")
         response["Content-Disposition"] = 'attachment; filename="alfred-expenses.csv"'
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
+class FinancialExportView(APIView):
+    """The owner's financial registers as one ZIP of CSVs: recorded values, masked account numbers, no currency."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from apps.budgets.models import Budget
+        from apps.investments.models import Investment
+        from apps.loans.models import Loan
+
+        user = request.user
+        tables = (
+            ("bank-accounts.csv", BankAccount, ("id", "bank_name", "nickname", "account_number", "account_type",
+                                                "current_balance", "is_primary", "is_active", "last_synced_at", "created_at"), ("id",)),
+            ("expenses.csv", Expense, EXPENSE_EXPORT_COLUMNS, ("-transaction_date", "-id")),
+            ("loans.csv", Loan, ("id", "loan_type", "lender", "loan_account_number", "principal", "interest_rate", "emi",
+                                 "tenure_months", "remaining_balance", "home_purchase_price", "home_down_payment",
+                                 "home_other_upfront_payments", "start_date", "closed_on", "is_active", "status",
+                                 "consolidated_into_id", "consolidation_group", "closure_reason", "auto_detected",
+                                 "verification_status", "verification_source", "verified_at", "last_payment_date",
+                                 "total_paid", "missed_payments", "notes", "created_at", "updated_at"), ("id",)),
+            ("investments.csv", Investment, ("id", "asset_type", "asset_name", "institution", "account_number",
+                                             "invested_amount", "monthly_sip", "current_value", "annual_return_rate",
+                                             "risk_level", "notes", "created_at", "updated_at"), ("id",)),
+            ("budgets.csv", Budget, ("id", "month", "base_budget", "inflation_adjusted", "spent"), ("month", "id")),
+        )
+        archive = BytesIO()
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
+            for name, model, columns, order in tables:
+                masked = [index for index, column in enumerate(columns) if column in MASKED_EXPORT_COLUMNS]
+                with StringIO(newline="") as buffer:
+                    writer = csv.writer(buffer)
+                    writer.writerow(columns)
+                    for values in model.objects.filter(user=user).order_by(*order).values_list(*columns).iterator(chunk_size=2000):
+                        values = list(values)
+                        for index in masked:
+                            values[index] = mask_account_number(values[index] or "")
+                        writer.writerow([spreadsheet_safe(value) for value in values])
+                    bundle.writestr(name, buffer.getvalue())
+        response = HttpResponse(archive.getvalue(), content_type="application/zip")
+        response["Content-Disposition"] = 'attachment; filename="alfred-financial-data.zip"'
         response["Cache-Control"] = "private, no-store"
         return response
 

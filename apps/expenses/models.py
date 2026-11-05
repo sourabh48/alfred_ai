@@ -5,6 +5,13 @@ from django.utils import timezone
 from .money import ExpenseMoneyField
 
 
+def mask_account_number(value: str) -> str:
+    digits = "".join(char for char in value if char.isdigit())
+    if len(digits) < 4:
+        return value
+    return f"****{digits[-4:]}"
+
+
 class BankAccount(models.Model):
     ACCOUNT_TYPE_CHOICES = [
         ("savings", "Savings"),
@@ -38,10 +45,7 @@ class BankAccount(models.Model):
 
     @property
     def masked_account_number(self) -> str:
-        digits = "".join(char for char in self.account_number if char.isdigit())
-        if len(digits) < 4:
-            return self.account_number
-        return f"****{digits[-4:]}"
+        return mask_account_number(self.account_number)
 
     @property
     def display_name(self) -> str:

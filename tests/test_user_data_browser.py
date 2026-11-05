@@ -6498,6 +6498,32 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertNotIn("FOREIGN-CSV-ONLY", content)
         self.capture("expense-csv-download")
 
+    def test_financial_zip_download_contains_owner_registers_with_masked_numbers(self):
+        import zipfile
+        from apps.expenses.models import BankAccount
+
+        user = self.scenario["user"]
+        BankAccount.objects.create(user=user, bank_name="Zip Owner Bank", account_number="1111-2222-3333", current_balance="0.10")
+        other = get_user_model().objects.create_user(username="zip-download-other")
+        BankAccount.objects.create(user=other, bank_name="FOREIGN-ZIP-ONLY", account_number="9999")
+        downloads = Path(self.enterClassContext(TemporaryDirectory(prefix="alfred-zip-download-")))
+        self.browser.execute_cdp_cmd("Page.setDownloadBehavior", {"behavior": "allow", "downloadPath": str(downloads)})
+        self.addCleanup(self.browser.execute_cdp_cmd, "Page.setDownloadBehavior", {"behavior": "default"})
+        self.login()
+        self.browser.get(self.live_server_url + "/expenses/")
+        self.memory_click("#financialExportBtn")
+        target = downloads / "alfred-financial-data.zip"
+        self.wait.until(lambda _: target.is_file() and not list(downloads.glob("*.crdownload")))
+        with zipfile.ZipFile(target) as bundle:
+            files = {name: bundle.read(name).decode("utf-8") for name in bundle.namelist()}
+        self.assertEqual(set(files), {"bank-accounts.csv", "expenses.csv", "loans.csv", "investments.csv", "budgets.csv"})
+        self.assertIn("Zip Owner Bank", files["bank-accounts.csv"])
+        self.assertIn("****3333", files["bank-accounts.csv"])
+        content = "".join(files.values())
+        for private in ("1111-2222-3333", "FOREIGN-ZIP-ONLY"):
+            self.assertNotIn(private, content)
+        self.capture("financial-zip-download")
+
     def test_old_transactions_show_their_actual_reporting_month(self):
         Expense.objects.filter(user=self.scenario["user"]).update(transaction_date=month_start(-1))
         cache.clear()

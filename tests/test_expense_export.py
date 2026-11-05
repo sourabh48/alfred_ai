@@ -1,7 +1,8 @@
 import csv
 from datetime import date
 from decimal import Decimal
-from io import StringIO
+from io import BytesIO, StringIO
+import zipfile
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -77,3 +78,62 @@ class ExpenseExportTests(TestCase):
         response = self.client.get("/expenses/")
         self.assertContains(response, 'id="expenseExportBtn"')
         self.assertContains(response, 'href="/api/expenses/export/"')
+
+
+class FinancialExportTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="financial-export-owner")
+        self.other = get_user_model().objects.create_user(username="financial-export-other")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def export(self):
+        response = self.client.get("/api/expenses/export/financial/")
+        self.assertEqual(response.status_code, 200)
+        with zipfile.ZipFile(BytesIO(response.content)) as bundle:
+            files = {name: bundle.read(name).decode("utf-8") for name in bundle.namelist()}
+        return response, files, {name: list(csv.DictReader(StringIO(text))) for name, text in files.items()}
+
+    def test_bundle_holds_each_register_with_exact_values_masked_numbers_and_owner_isolation(self):
+        from apps.budgets.models import Budget
+        from apps.investments.models import Investment
+        from apps.loans.models import Loan
+
+        BankAccount.objects.create(user=self.user, bank_name="Owner Bank", account_number="1234-5678-9012", current_balance="0.10")
+        Expense.objects.create(user=self.user, amount="12.34", closing_balance=None, transaction_date=date(2026, 9, 1))
+        Loan.objects.create(user=self.user, lender="=HYPERLINK(1)", loan_account_number="LN998877", principal="250000.50",
+                            emi="1234.56", interest_rate=8.5, tenure_months=60, remaining_balance="0.00", start_date=date(2026, 1, 1))
+        Investment.objects.create(user=self.user, asset_name="Owner Fund", account_number="INV00004321",
+                                  invested_amount="1000.01", current_value="0.00")
+        Budget.objects.create(user=self.user, month="2026-09", base_budget="5000.00", inflation_adjusted="5100.25", spent="0")
+        BankAccount.objects.create(user=self.other, bank_name="FOREIGN-BANK", account_number="5555")
+        Loan.objects.create(user=self.other, lender="FOREIGN-LENDER", principal="1", emi="1", interest_rate=1, tenure_months=1, start_date=date(2026, 1, 1))
+        response, files, tables = self.export()
+
+        self.assertEqual(set(files), {"bank-accounts.csv", "expenses.csv", "loans.csv", "investments.csv", "budgets.csv"})
+        self.assertEqual(tables["bank-accounts.csv"][0]["account_number"], "****9012")
+        self.assertEqual(tables["bank-accounts.csv"][0]["current_balance"], "0.10")
+        self.assertEqual(tables["expenses.csv"][0]["closing_balance"], "")
+        loan = tables["loans.csv"][0]
+        self.assertEqual((loan["loan_account_number"], loan["principal"], loan["remaining_balance"]), ("****8877", "250000.50", "0.00"))
+        self.assertEqual(loan["lender"], "'=HYPERLINK(1)")
+        investment = tables["investments.csv"][0]
+        self.assertEqual((investment["account_number"], investment["invested_amount"], investment["current_value"]),
+                         ("****4321", "1000.01", "0.00"))
+        self.assertEqual(tables["budgets.csv"][0]["inflation_adjusted"], "5100.25")
+        content = "".join(files.values())
+        for private in ("1234-5678-9012", "LN998877", "INV00004321", "FOREIGN-BANK", "FOREIGN-LENDER", "currency"):
+            self.assertNotIn(private, content)
+        self.assertTrue(all(len(rows) == 1 for rows in tables.values()))
+        self.assertEqual(response["Content-Type"], "application/zip")
+        self.assertIn('filename="alfred-financial-data.zip"', response["Content-Disposition"])
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+
+    def test_empty_account_gets_headers_and_export_requires_sign_in(self):
+        _, files, tables = self.export()
+        self.assertTrue(files["loans.csv"].startswith("id,loan_type,"))
+        self.assertTrue(all(rows == [] for rows in tables.values()))
+        self.client.force_authenticate(user=None)
+        self.assertIn(self.client.get("/api/expenses/export/financial/").status_code, (401, 403))
+        self.client.force_login(self.user)
+        self.assertContains(self.client.get("/expenses/"), 'href="/api/expenses/export/financial/"')
