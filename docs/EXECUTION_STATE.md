@@ -120,6 +120,8 @@
   PASS. Selenium shard 0 failed: the shard artifact showed the corpus refresh still pending, queued behind /documents/
   load calls that took up to 20 s on the hosted runner (not a 409). Two Chrome tests now wait for the page's requests
   to drain before clicking refresh (same drain as teardown). Owner: 15-20 min CI jobs are acceptable.
+- Master CI on `cc39cc3`: all 14 checks PASS. Backend shards 9.5 / 11.1 / 12.1 / 10.9 min, native 5.6 min, Selenium
+  shards 17.4 / 15.1 / 15.7 min; the whole run finishes in about 18 min (was about 35).
 - Next: BIKE-04 real-policy check when the owner provides a PDF; otherwise the next queue item.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
