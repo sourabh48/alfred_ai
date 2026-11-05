@@ -33,12 +33,17 @@ function loadRiskDashboard() {
         });
 }
 
+// A score that was not computed shows as a dash, never as a measured 0.
+function scoreOrDash(value) {
+    return value == null ? "—" : Alfred.formatNumber(value, 0);
+}
+
 function renderRiskHero(summary, outlook, items) {
     const latest = items[0];
-    document.getElementById("riskHighestValue").textContent = Alfred.formatNumber(summary.highest_score || 0, 0);
+    document.getElementById("riskHighestValue").textContent = scoreOrDash(summary.highest_score);
     document.getElementById("riskHighestLabel").textContent = summary.highest_label || "No data";
     document.getElementById("riskHeroCopy").textContent = latest
-        ? `Latest snapshot ${Alfred.formatDateTime(latest.timestamp)} | consolidated average ${Alfred.formatNumber(outlook.average || 0, 0)}`
+        ? `Latest snapshot ${Alfred.formatDateTime(latest.timestamp)} | consolidated average ${scoreOrDash(outlook.average)}`
         : "Capture a risk snapshot to start consolidated trend monitoring.";
 }
 
@@ -46,12 +51,12 @@ function renderRiskSummary(summary, outlook, consolidated, items) {
     const cards = [
         {
             title: "Overall Risk",
-            value: summary.rated_category_count === 0 ? "N/A" : `${Alfred.formatNumber(outlook.average || 0, 0)}/100`,
+            value: outlook.average == null ? "N/A" : `${Alfred.formatNumber(outlook.average, 0)}/100`,
             copy: `${summary.rated_category_count ?? consolidated.length} of ${consolidated.length} categories have enough data`,
         },
         {
             title: "Highest Pressure",
-            value: Alfred.formatNumber(summary.highest_score || 0, 0),
+            value: scoreOrDash(summary.highest_score),
             copy: summary.highest_label || "No category yet",
         },
         {
@@ -194,7 +199,7 @@ function renderRiskGrounding(grounding, freshness) {
     `).join(""));
 
     const entries = [
-        `Liquid cash basis: ${Alfred.formatCurrency(history.liquid_cash || 0)}`,
+        history.liquid_cash == null ? "Liquid cash basis: unknown until a bank account is added" : `Liquid cash basis: ${Alfred.formatCurrency(history.liquid_cash)}`,
         `Monthly EMI basis: ${Alfred.formatCurrency(history.monthly_emi || 0)}`,
         `Dependents tracked: ${Alfred.formatNumber(history.dependents || 0, 0)}`,
         ...notes,

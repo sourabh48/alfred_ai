@@ -785,9 +785,9 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 - **PR/CI:** Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 - **Current task:** Local consolidation preparation is validated on preparation/alfred-consolidation-20261026; required reviews and PR19 CI still block canonical integration. Preserve 143 original IDs/75 verified and 13 extensions/0 accepted. See CONSOLIDATION_STATE for sources, conflict decisions and receipts. Stage7 selection is not reached.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 81/143 (56.6%) verified.**
+**Baseline: 82/143 (57.3%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 18 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 81
+IMPLEMENTED_NOT_ACCEPTED: 17 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 82
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -802,7 +802,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | AI | 11 | 18 | 61.1 | 3 | 2 | 2 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 0 | 3 | 0 | 0 | 0 |
 | TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
-| FAMILY | 6 | 7 | 85.7 | 1 | 0 | 0 | 0 | 0 |
+| FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 2 | 6 | 33.3 | 2 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
@@ -2908,16 +2908,17 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FAMILY-07 — Financial/health/relocation risk intelligence
 
-**IMPLEMENTED_NOT_ACCEPTED** · Family, relationships and risk · P2.
+**COMPLETE_VERIFIED** · Family, relationships and risk · P2.
 
-- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py), [apps/risk/services/risk_intelligence.py](../apps/risk/services/risk_intelligence.py).
+- Source: [apps/family/services.py](../apps/family/services.py), [apps/family/models.py](../apps/family/models.py), [apps/family/urls.py](../apps/family/urls.py), [apps/risk/services/risk_intelligence.py](../apps/risk/services/risk_intelligence.py), [static/js/risk.js](../static/js/risk.js).
 - APIs/UI/models: /family/; family relationship/financial-sharing APIs; Dependent, FamilyAccountLink; owner-scoped financial baseline.
-- Tests: [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Tests: [tests/test_risk_evidence_coverage.py](../tests/test_risk_evidence_coverage.py), [tests/test_family_account_links.py](../tests/test_family_account_links.py), [tests/test_family_invitation_throttling.py](../tests/test_family_invitation_throttling.py), [browser](../tests/test_user_data_browser.py). **30 Risk and 569 baseline-dependent backend tests, plus the two Risk and the Behavioral Chrome tests, PASS** (2026-11-05, master), zero skips.
+- Acceptance: TECHNICAL_PASS on synthetic data. Never-recorded inputs add no risk and show as unavailable ("—", "unknown", "No vehicle records"), not 0; categories without enough data are not plotted and drive no highest score, average, action or news search; recorded values, including an explicit 0, still score as before; output states it is an uncalibrated heuristic, not a diagnosis; owner isolation tested. One independent review; its four findings fixed. Prediction accuracy and a normal existing account are not evaluated.
 - Bounded unit 2026-10-31 (source/test only, branch `batch/fast-dev-20261031`): reproduced phantom risk where an account with no logs scored 48 Health from "0h sleep", a no-vehicle account scored 32.5 Mobility, unset sleep raised Health from 11 to 59, and an abstained job fit counted as a 100 gap. Never-recorded inputs now add no risk; each category reports coverage and missing inputs; insufficient categories are excluded from highest/average; trends say insufficient history or not tracked instead of stable; output states uncalibrated heuristic, not diagnosis. Recorded values still score as before. 89 related backend, one new actual Chrome and 27 browser-plan PASS, zero skips. Canonical financial baseline untouched; no schema change.
 - Bounded unit 2026-11-02 (source/test only, branch `claude/family-05-07-0247d4`, cut from `1d9df25` before RUNTIME-11's dependency upgrades; no Chrome or full regression run): reproduced failed feeds counted as market evidence, a 24-point job-fit fallback contradicting the "never-recorded inputs add no risk" note, "Inflation 0" and vehicle compliance 0 shown when unknown, months-old behavior logs read as current burnout, and valid vehicle documents rated as insufficient data. Each is corrected; the radar no longer plots insufficient categories and the Overall card states how many categories have enough data. Recorded values still score as before. No schema change.
+- Bounded unit 2026-11-05 (master): reproduced a "Liquid cash is below two months of income" warning and a ₹0 liquid basis with no bank account, an account without an entered balance (or only credit cards) read as ₹0 cash and a 0-month runway adding 18 Financial points, never-recorded stress, sleep and manual snapshots returned as 0, a Highest Pressure and average of 0 with no rated category, "Critical faults 0" for a no-vehicle account, and actions or news searches from categories with insufficient data. Each is corrected; the canonical baseline now marks liquid cash and runway unavailable without a non-credit balance (status only, amounts unchanged). Each new test fails on the previous code.
 - Limitations/dependencies: Risk scores mix history, heuristic weights and external context; not calibrated diagnosis/prediction. An explicit stress score of 0 cannot be told apart from an unset one. The latest manual risk snapshot keeps full weight at any age, and missing required vehicle documents add no mobility risk; both need an owner policy. Opening Risk sends the career role and last analyzed company to Google News. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Document confidence and evaluate actual outcomes.
+- Next: Evaluate actual outcomes with consent. Owner policy needed for the age weight of manual snapshots, missing required vehicle documents, and the Google News queries that carry the career role and company.
 
 ### BIKE-01 — Vehicle profiles and Hunter 350 catalog support
 

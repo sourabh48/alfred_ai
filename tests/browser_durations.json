@@ -118,6 +118,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_reviewed_transaction_classification_questions_show_labels_without_inference":  8.657,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_reviewed_transaction_directions_keep_account_flow_transfer_and_reversal_distinct":  9.984,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_risk_board_labels_missing_inputs_without_phantom_scores":  7.2,
+    "tests.test_user_data_browser.UserDataBrowserTests.test_risk_page_shows_uncomputed_scores_and_unknown_cash_as_unknown": 4.68,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_sample_totals_and_explanations_on_real_pages":  8.266,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_selected_bank_pdf_text_search_and_scanned_abstention":  10.25,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_selected_document_extraction_search_privacy_staleness_and_mobile":  13.984,

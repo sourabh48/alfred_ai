@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from apps.behavioral.models import BehavioralSignal
 from apps.career.models import CareerJobAnalysis
+from apps.expenses.models import BankAccount
 from apps.risk.models import RiskSignal
 from apps.risk.serializers import RiskSignalSerializer
 from apps.risk.services.risk_intelligence import risk_intelligence
@@ -86,9 +87,7 @@ class RiskEvidenceCoverageTests(TestCase):
         with patch("apps.risk.services.risk_intelligence._category_coverage",
                    return_value={"status": "insufficient_data", "available_inputs": [], "missing_inputs": ["x"]}):
             result, _ = self.outlook()
-        self.assertEqual((result["summary"]["highest_label"], result["summary"]["highest_score"]), ("No data", 0))
-        self.assertEqual(result["summary"]["overall_average"], 0)
-        self.assertEqual(result["outlook"]["average"], 0)
+        self.assertEqual(result["summary"]["highest_label"], "No data")
         self.assertFalse(any("Highest consolidated risk" in line for line in result["insights"]))
 
     def test_recorded_short_sleep_and_stress_still_raise_health_risk(self):
@@ -192,6 +191,70 @@ class RiskEvidenceCoverageTests(TestCase):
             RiskSignal.objects.create(user=self.user, layoff_risk=layoff, illness_risk=0, relocation_risk=0)
         _, items = self.outlook()
         self.assertEqual(items["career"]["trend"], "falling")
+
+    def test_income_without_a_bank_account_makes_no_liquid_cash_claim(self):
+        self.user.monthly_income = 50000
+        self.user.save(update_fields=["monthly_income"])
+        result, _ = self.outlook()
+        self.assertFalse(any("Liquid cash" in line for line in result["insights"]), result["insights"])
+        self.assertIsNone(result["grounding"]["history"]["liquid_cash"])
+
+    def test_recorded_low_liquid_cash_is_still_reported(self):
+        self.user.monthly_income = 50000
+        self.user.save(update_fields=["monthly_income"])
+        BankAccount.objects.create(user=self.user, account_number="SYNTHETIC-RISK-1", current_balance="1000.00")
+        result, _ = self.outlook()
+        self.assertTrue(any("Liquid cash" in line for line in result["insights"]), result["insights"])
+        self.assertEqual(result["grounding"]["history"]["liquid_cash"], 1000.0)
+
+    def test_account_without_an_entered_balance_or_only_credit_is_unknown_cash(self):
+        self.user.monthly_income = 50000
+        self.user.rent_or_emi = 20000
+        self.user.save(update_fields=["monthly_income", "rent_or_emi"])
+        for number, kind in (("SYNTHETIC-RISK-NULL", "savings"), ("SYNTHETIC-RISK-CARD", "credit")):
+            BankAccount.objects.create(user=self.user, account_number=number, account_type=kind, current_balance=None)
+            result, items = self.outlook()
+            with self.subTest(kind):
+                self.assertIsNone(result["grounding"]["history"]["liquid_cash"])
+                self.assertFalse(any("Liquid cash" in line for line in result["insights"]))
+                self.assertIn("Emergency runway unknown", items["financial"]["drivers"])
+                self.assertEqual(items["financial"]["score"], 40 * 0.7)
+
+    def test_no_vehicle_shows_no_measured_fault_counts(self):
+        _, items = self.outlook()
+        self.assertEqual(items["mobility"]["drivers"][:1], ["No vehicle records"])
+        self.assertFalse(any(line.startswith(("Critical faults", "Expired documents")) for line in items["mobility"]["drivers"]))
+
+    def test_insufficient_category_drives_no_news_search_or_action(self):
+        from apps.family.models import Dependent
+        for index in range(6):
+            Dependent.objects.create(user=self.user, name=f"Synthetic {index}", age=10, relation="child")
+        market = market_payload()
+        market["macro_context"]["unemployment"]["latest_value"] = 10
+        with patch("apps.risk.services.risk_intelligence.verified_intelligence.google_news_search") as search:
+            result, items = self.outlook(market=market)
+        self.assertGreaterEqual(items["financial"]["score"], 35)
+        self.assertEqual(items["financial"]["coverage"]["status"], "insufficient_data")
+        search.assert_not_called()
+        self.assertEqual(result["action_items"], [])
+
+    def test_unrecorded_inputs_are_not_reported_as_zero_in_grounding(self):
+        result, _ = self.outlook()
+        history = result["grounding"]["history"]
+        for key in ("average_stress", "average_sleep", "latest_manual_layoff", "latest_manual_illness", "latest_manual_relocation"):
+            with self.subTest(key):
+                self.assertIsNone(history[key])
+        RiskSignal.objects.create(user=self.user, layoff_risk=0, illness_risk=0, relocation_risk=0)
+        result, _ = self.outlook()
+        self.assertEqual(result["grounding"]["history"]["latest_manual_layoff"], 0)
+
+    def test_no_rated_category_has_no_highest_score(self):
+        with patch("apps.risk.services.risk_intelligence._category_coverage",
+                   return_value={"status": "insufficient_data", "available_inputs": [], "missing_inputs": ["x"]}):
+            result, _ = self.outlook()
+        self.assertIsNone(result["summary"]["highest_score"])
+        self.assertIsNone(result["summary"]["overall_average"])
+        self.assertIsNone(result["outlook"]["average"])
 
     def test_output_states_uncalibrated_heuristic_and_stays_owner_isolated(self):
         other = get_user_model().objects.create_user("risk_other", password="synthetic-pass-123")

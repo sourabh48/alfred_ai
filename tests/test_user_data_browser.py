@@ -182,6 +182,22 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertNotIn('Average sleep 0.0h', board)
         self.assertIn('insufficient history', board)
 
+    def test_risk_page_shows_uncomputed_scores_and_unknown_cash_as_unknown(self):
+        from apps.expenses.models import BankAccount
+        from tests.test_risk_evidence_coverage import market_payload
+
+        self.enterContext(patch("apps.risk.services.risk_intelligence.job_intelligence.market_outlook", return_value=market_payload()))
+        self.enterContext(patch("apps.risk.services.risk_intelligence._category_coverage",
+            return_value={"status": "insufficient_data", "available_inputs": [], "missing_inputs": ["Synthetic input"]}))
+        BankAccount.objects.filter(user=self.scenario['user']).update(is_active=False)
+        self.login(); self.browser.get(self.live_server_url + "/risk/")
+        self.wait.until(lambda _: 'unknown until a bank account' in self.text('riskGroundingList'))
+        self.assertEqual(self.text('riskHighestValue'), '—')
+        cards = self.text('riskSummaryCards')
+        self.assertIn('N/A', cards)
+        self.assertIn('—', cards)
+        self.assertNotIn('0/100', cards)
+
     def test_relationship_page_withholds_alignment_without_income(self):
         from apps.relationship.models import RelationshipProfile
 

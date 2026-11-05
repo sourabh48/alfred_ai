@@ -129,7 +129,10 @@ class RiskIntelligenceService:
         monthly_income = float(baseline.get("monthly_income", 0) or 0)
         debt_burden = float(baseline.get("debt_burden_ratio", 0) or 0)
         emergency_months = float(baseline.get("liquid_runway_months", 0) or 0)
-        runway_known = ((baseline.get("metric_states") or {}).get("liquid_runway_months") or {}).get("status", "unavailable") != "unavailable"
+        states = baseline.get("metric_states") or {}
+        runway_known = (states.get("liquid_runway_months") or {}).get("status", "unavailable") != "unavailable"
+        # No active bank account means liquid cash is unknown, not zero.
+        liquid_known = (states.get("liquid_cash") or {}).get("status", "unavailable") != "unavailable"
 
         mobility = bike_service_intelligence.risk_snapshot(user)
         mobility_summary = mobility.get("summary", {})
@@ -252,20 +255,21 @@ class RiskIntelligenceService:
                 "trend": "not_tracked",
                 "note": "Vehicle faults, expired documents, and condition score from the service dashboard.",
                 "drivers": [
-                    f"Critical faults {mobility_summary.get('critical_faults', 0)}",
-                    f"Expired documents {mobility_summary.get('expired_documents', 0)}",
+                    *([f"Critical faults {mobility_summary.get('critical_faults', 0)}",
+                       f"Expired documents {mobility_summary.get('expired_documents', 0)}"] if vehicle_records else ["No vehicle records"]),
                     f"Condition score {condition_score}/100" if condition_score else "No vehicle condition record",
                 ],
             },
         ]
 
-        action_items = self._build_actions(consolidated, career_market, mobility, latest_job_analysis)
-        related_news, extra_evidence = self._build_related_news(consolidated, career_market)
+        # Categories without enough data drive no actions, news searches or highest score.
+        rated = [item for item in consolidated if item["coverage"]["status"] != "insufficient_data"]
+        action_items = self._build_actions(rated, career_market, mobility, latest_job_analysis)
+        related_news, extra_evidence = self._build_related_news(rated, career_market)
         evidence = _dedupe_evidence([*career_market["evidence"], *extra_evidence])
 
-        rated = [item for item in consolidated if item["coverage"]["status"] != "insufficient_data"]
         top = max(rated, key=lambda item: item["score"]) if rated else None
-        overall_average = round(mean(item["score"] for item in rated), 1) if rated else 0.0
+        overall_average = round(mean(item["score"] for item in rated), 1) if rated else None
         evidence_freshness = freshness_snapshot(evidence)
 
         return {
@@ -279,7 +283,7 @@ class RiskIntelligenceService:
             },
             "summary": {
                 "highest_label": top["label"] if top else "No data",
-                "highest_score": top["score"] if top else 0,
+                "highest_score": top["score"] if top else None,
                 "overall_average": overall_average,
                 "news_count": len(related_news),
                 "action_count": len(action_items),
@@ -305,22 +309,23 @@ class RiskIntelligenceService:
                 "mobility_condition_score": condition_score or None,
             },
             "financial_baseline": baseline,
-            "insights": self._build_insights(rated, career_market if market_usable else {}, monthly_income, liquid_cash),
+            "insights": self._build_insights(rated, career_market if market_usable else {}, monthly_income,
+                                             liquid_cash if liquid_known else None),
             "evidence": evidence,
             "evidence_freshness": evidence_freshness,
             "grounding": {
                 "history": {
                     "tracked_snapshots": len(history),
                     "monthly_income": round(float(monthly_income or 0), 2),
-                    "liquid_cash": round(float(liquid_cash or 0), 2),
+                    "liquid_cash": round(liquid_cash, 2) if liquid_known else None,
                     "monthly_emi": round(float(monthly_emi or 0), 2),
                     "fixed_obligations": round(float(baseline.get("fixed_obligations", 0) or 0), 2),
                     "dependents": dependents,
-                    "average_stress": round(float(avg_stress or 0), 1),
-                    "average_sleep": round(float(avg_sleep or 0), 1),
-                    "latest_manual_layoff": round(float(manual_layoff or 0), 1),
-                    "latest_manual_illness": round(float(manual_illness or 0), 1),
-                    "latest_manual_relocation": round(float(manual_relocation or 0), 1),
+                    "average_stress": round(avg_stress, 1) if recent_behavior else None,
+                    "average_sleep": round(avg_sleep, 1) if logged_sleep else None,
+                    "latest_manual_layoff": round(manual_layoff, 1) if latest else None,
+                    "latest_manual_illness": round(manual_illness, 1) if latest else None,
+                    "latest_manual_relocation": round(manual_relocation, 1) if latest else None,
                 },
                 "evidence": evidence,
                 "freshness": evidence_freshness,
@@ -427,12 +432,12 @@ class RiskIntelligenceService:
             deduped_news.append(item)
         return deduped_news[:12], evidence
 
-    def _build_insights(self, consolidated: list[dict], career_market: dict, monthly_income: float, liquid_cash: float) -> list[str]:
+    def _build_insights(self, consolidated: list[dict], career_market: dict, monthly_income: float, liquid_cash: float | None) -> list[str]:
         insights = []
         top = max(consolidated, key=lambda item: item["score"]) if consolidated else None
         if top:
             insights.append(f"Highest consolidated risk is {top['label'].lower()} at {top['score']:.0f}/100.")
-        if monthly_income and liquid_cash < monthly_income * 2:
+        if monthly_income and liquid_cash is not None and liquid_cash < monthly_income * 2:
             insights.append("Liquid cash is below roughly two months of income, which weakens your shock absorption.")
         insights.extend(career_market.get("insights", [])[:2])
         if not insights:

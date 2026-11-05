@@ -726,7 +726,9 @@ def _build_canonical_financial_baseline_uncached(
     income_status = _income_metric_status(income_source)
     observed_status = "observed" if recent_buckets else "unavailable"
     balance_status = "derived" if total_assets_amount or total_liabilities_amount else "unavailable"
-    liquid_status = "observed" if accounts else "unavailable"
+    # Liquid cash is known only from a non-credit account whose balance was entered; otherwise its 0 is not a measurement.
+    liquid_known = any(account.account_type != "credit" and account.current_balance is not None for account in accounts)
+    liquid_status = "observed" if liquid_known else "unavailable"
     metric_states = {
         "monthly_income": _baseline_metric_state(
             income_status,
@@ -792,7 +794,7 @@ def _build_canonical_financial_baseline_uncached(
             inputs=["fixed_obligations", "observed_average_monthly_variable_spend"],
         ),
         "liquid_runway_months": _baseline_metric_state(
-            "derived" if essential_monthly_outflow_amount > 0 and accounts else "unavailable",
+            "derived" if essential_monthly_outflow_amount > 0 and liquid_known else "unavailable",
             "canonical_baseline",
             "liquid_runway_months",
             inputs=["liquid_cash", "essential_monthly_outflow"],

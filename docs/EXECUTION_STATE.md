@@ -89,7 +89,13 @@
   live, cache, abuse-limit (36) and the dashboard/loan/behavioral Chrome tests PASS.
 - Master CI on `50f96ef` (run 41933533908): all 9 checks PASS, native-windows included; local native verification
   22/22. First fully green exact head since `6d6551e`. Owner's app restarted on standing permission (no migrations).
-- Next: FAMILY-07.
+- FAMILY-07 (2026-11-05): the Risk page warned of low liquid cash with no bank account, read an unentered balance or
+  credit-only accounts as ₹0 cash and a 0-month runway (+18 Financial), returned never-recorded stress, sleep and manual
+  snapshots as 0, showed Highest Pressure 0 with nothing rated and "Critical faults 0" with no vehicle, and let
+  insufficient categories drive actions and news searches. Now unknown or withheld; the canonical baseline marks liquid
+  cash and runway unavailable without a non-credit balance (status only). One independent review, findings fixed;
+  30 Risk, 569 baseline-dependent backend and 3 Chrome tests PASS. COMPLETE_VERIFIED for bounded scope; baseline 82/143.
+- Next: BIKE-01.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
