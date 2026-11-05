@@ -37,7 +37,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 13 | A | RUNTIME-06 — Offline startup and local model prerequisites | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: offline independent-host kit on a separate PC; same-host packaged checks 35/35 |
 | 14 | A | RUNTIME-15 — Local/LAN hosting and optional Docker stack | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: same-host Compose run PASS at 49d622e; second LAN device, host restart and sustained schedule open |
 | 15 | B | FIN-07 — Cash-flow forecasting | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: on the owner's data the prior range held in 6 of 9 walk-forward months and income evidence is missing; no accuracy claim |
-| 16 | B | FIN-16 — Tax calculations and source-backed eligibility | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 16 | B | FIN-16 — Tax calculations and source-backed eligibility | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: official Budget 2026 FAQ confirms only the tax year 2026-27 new-regime slabs; old-regime slabs, surcharge, cess and deduction limits need the Finance Act 2026 text |
 | 17 | B | FIN-17 — Credit bureau reports and official score access | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
 | 18 | B | INV-04 — Risk classification and recommendations | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
 | 19 | B | INV-06 — Long-term investment planning | PARTIALLY_IMPLEMENTED | P2 / L | FIN-06, FIN-15 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: FIN-06, FIN-15 |
@@ -81,7 +81,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 57 | B | COUNCIL-05 — AI development budget and human Git approval | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-04 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-04 |
 | 58 | D | COUNCIL-03 — Experimental self-improvement engine | NOT_IMPLEMENTED | P1 / L | COUNCIL-05 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-05 |
 
-**Next eligible for `next` or active `sprint`: FIN-16.**
+**Next eligible for `next` or active `sprint`: FIN-17.**
 
 ## Accepted baseline — excluded from execution
 
