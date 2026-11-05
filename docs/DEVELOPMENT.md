@@ -85,7 +85,7 @@ Linux results do not establish private-memory acceptance.
 CI runs the complete discovered Windows suite in three measured shards. Existing
 `native-windows`, `linux-secure-failure` and `selenium` check names remain; selenium
 is now the aggregate and fails if any shard/job/proof is incomplete.
-The backend gate is split the same way: `native-windows-shards` runs three measured
+The backend gate is split the same way: `native-windows-shards` runs four measured
 backend shards (`tests/backend_durations.json`) plus the native runtime check in parallel, and
 `native-windows` is the aggregate that fails unless every backend module ran exactly once
 on the exact commit. Re-measure the durations when a module is added to `BACKEND`. Each Windows

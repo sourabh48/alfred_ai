@@ -48,7 +48,7 @@ def backend_shard(index, count):
     """Deterministic measured split of BACKEND; a module without a recorded duration fails closed."""
     from scripts.browser_test_plan import plan_tests
     durations = json.loads(BACKEND_DURATIONS.read_text(encoding="utf-8"))
-    return plan_tests(BACKEND, durations, count)["shards"][index]
+    return plan_tests(BACKEND, durations, count, max_count=4)["shards"][index]
 
 
 def aggregate_backend(manifests, count, candidate):

@@ -11,10 +11,10 @@ def digest(value):
     return sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
-def plan_tests(inventory, durations, count):
+def plan_tests(inventory, durations, count, max_count=3):
     ids = sorted(inventory)
-    if not ids or len(set(ids)) != len(ids) or not 1 <= count <= 3 or len(ids) < count:
-        raise ValueError('Nonempty unique inventory and one to three nonempty shards required')
+    if not ids or len(set(ids)) != len(ids) or not 1 <= count <= max_count or len(ids) < count:
+        raise ValueError('Nonempty unique inventory and one to %d nonempty shards required' % max_count)
     weights = {}
     for name in ids:
         value = durations.get(name)

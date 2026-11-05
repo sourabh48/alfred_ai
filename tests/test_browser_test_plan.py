@@ -127,7 +127,7 @@ class BrowserPlanTests(TestCase):
         workflow=yaml.load((root/'.github/workflows/browser-regression.yml').read_text(encoding='utf-8'),Loader=yaml.BaseLoader)
         jobs=workflow['jobs']
         self.assertEqual(set(jobs),{'native-windows-shards','native-windows','linux-secure-failure','selenium-shards','selenium'})
-        self.assertEqual(jobs['native-windows-shards']['strategy']['matrix']['part'],['0','1','2','native'])
+        self.assertEqual(jobs['native-windows-shards']['strategy']['matrix']['part'],['0','1','2','3','native'])
         self.assertEqual(jobs['native-windows-shards']['strategy']['fail-fast'],'false')
         self.assertEqual(jobs['native-windows']['needs'],'native-windows-shards')
         self.assertEqual(jobs['native-windows']['if'],'${{ always() }}')

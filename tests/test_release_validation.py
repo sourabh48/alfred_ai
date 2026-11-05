@@ -324,7 +324,7 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
     def test_backend_shards_partition_the_measured_backend_suite(self):
         durations = json.loads(validation.BACKEND_DURATIONS.read_text(encoding="utf-8"))
         self.assertEqual(set(durations), set(validation.BACKEND))
-        shards = [validation.backend_shard(index, 3) for index in range(3)]
+        shards = [validation.backend_shard(index, 4) for index in range(4)]
         self.assertTrue(all(shards))
         self.assertEqual(sorted(sum(shards, [])), sorted(validation.BACKEND))
 
@@ -332,34 +332,34 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
         result = {"status": "PASS", "code": "suite_exit", "tests": 3, "skips": 0,
                   "log": "synthetic.log", "log_sha256": "a" * 64}
         with patch.object(validation, "run", return_value=result) as run:
-            validation.validate(self.repo, self.manifest, self.root / "shard", "backend", shard=(1, 3))
-        labels = validation.backend_shard(1, 3)
+            validation.validate(self.repo, self.manifest, self.root / "shard", "backend", shard=(1, 4))
+        labels = validation.backend_shard(1, 4)
         self.assertEqual(run.call_args_list[-1].args[1][3:3 + len(labels)], labels)
         evidence = self.manifest["gates"]["backend"]["evidence"]
-        self.assertEqual((evidence["labels"], evidence["shard_index"], evidence["shard_count"]), (labels, 1, 3))
+        self.assertEqual((evidence["labels"], evidence["shard_index"], evidence["shard_count"]), (labels, 1, 4))
 
     def test_backend_aggregate_requires_every_passing_shard_on_the_candidate(self):
         def shard_manifest(index, **changes):
             manifest = release.new_manifest("synthetic-1", self.candidate, self.baseline)
-            evidence = {"tests": 5, "labels": validation.backend_shard(index, 3), "shard_index": index, "shard_count": 3}
+            evidence = {"tests": 5, "labels": validation.backend_shard(index, 4), "shard_index": index, "shard_count": 4}
             manifest["gates"]["backend"] = {"status": changes.pop("status", "PASS"), "code": "combined_backend",
                                             "evidence": evidence | changes}
             return manifest
 
-        complete = [shard_manifest(index) for index in range(3)]
-        self.assertEqual(validation.aggregate_backend(complete, 3, self.candidate)["labels"], len(validation.BACKEND))
+        complete = [shard_manifest(index) for index in range(4)]
+        self.assertEqual(validation.aggregate_backend(complete, 4, self.candidate)["labels"], len(validation.BACKEND))
         broken = {
-            "missing shard": complete[:2],
-            "duplicate shard": [complete[0], complete[0], complete[2]],
+            "missing shard": complete[:3],
+            "duplicate shard": [complete[0], complete[0], *complete[2:]],
             "failed shard": [shard_manifest(0, status="FAIL"), *complete[1:]],
             "no tests": [shard_manifest(0, tests=0), *complete[1:]],
-            "wrong labels": [shard_manifest(0, labels=validation.backend_shard(1, 3)), *complete[1:]],
+            "wrong labels": [shard_manifest(0, labels=validation.backend_shard(1, 4)), *complete[1:]],
         }
         for name, manifests in broken.items():
             with self.subTest(name), self.assertRaises(ValueError):
-                validation.aggregate_backend(manifests, 3, self.candidate)
+                validation.aggregate_backend(manifests, 4, self.candidate)
         with self.assertRaises(ValueError):
-            validation.aggregate_backend(complete, 3, "f" * 40)
+            validation.aggregate_backend(complete, 4, "f" * 40)
 
     def test_skipped_or_zero_backend_tests_do_not_pass(self):
         for count, skips in ((0, 0), (3, 1)):

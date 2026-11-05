@@ -111,8 +111,11 @@
 - BIKE-04 layout review (2026-11-05): separated registrations, bundled cover-period expiry, "Total IDV" read as premium,
   same-line labels in invoice numbers and heading-as-insurer fixed with tests. Stays IMPLEMENTED_NOT_ACCEPTED until one
   real insurance policy is checked locally (owner saves the PDF; read only, nothing committed).
-- CI: the native-windows backend gate (27-28 min in one job) is split into three measured shards plus the native check
-  in parallel (`native-windows-shards`); `native-windows` is now a fail-closed aggregate over the shard manifests.
+- CI: the native-windows backend gate (27-28 min in one job) is split into measured shards plus the native check in
+  parallel (`native-windows-shards`); `native-windows` is now a fail-closed aggregate over the shard manifests.
+- Master CI on `45ef2c8` (three shards): all 13 checks PASS; backend shard jobs 14.9 / 15.5 / 12.4 min, native 5.9 min
+  (was one 34 min job). One job was over the 15 min target, so the backend now uses four shards (about 6.3 min of tests
+  each locally); Selenium shards (19 min) are now the longest jobs.
 - Next: BIKE-04 real-policy check when the owner provides a PDF; otherwise the next queue item.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)

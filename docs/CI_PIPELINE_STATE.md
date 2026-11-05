@@ -311,7 +311,7 @@ Source base25f028d; PR #20 DRAFT/unmerged. Exactly one file exists under
 
 | Workflow / file | Triggers | Jobs / check names | Unique responsibilities | Disposition |
 | --- | --- | --- | --- | --- |
-| Browser Regression / browser-regression.yml | master push; path-filtered PR; manual dispatch | native-windows, selenium, linux-secure-failure; three additional selenium-shards checks; four native-windows-shards checks (three backend shards plus native runtime) | Windows DPAPI/full backend+financial+privacy preflight/native HTTP/backup/recovery/accessibility; complete browser suite split across Windows; Linux fail-closed + portable browser | RETAIN; original three check identities preserved, selenium and native-windows now fail-closed aggregates |
+| Browser Regression / browser-regression.yml | master push; path-filtered PR; manual dispatch | native-windows, selenium, linux-secure-failure; three additional selenium-shards checks; five native-windows-shards checks (four backend shards plus native runtime) | Windows DPAPI/full backend+financial+privacy preflight/native HTTP/backup/recovery/accessibility; complete browser suite split across Windows; Linux fail-closed + portable browser | RETAIN; original three check identities preserved, selenium and native-windows now fail-closed aggregates |
 | GitHub-managed pages-build-deployment / dynamic/pages/pages-build-deployment | GitHub Pages service; no source YAML in this checkout | Managed by GitHub, separate publication context | Existing Pages publishing | BLOCKED_REVIEW for any change; retain untouched, do not invoke/deploy |
 
 Recent runs40771632812 (SUCCESS),40754201960 (45m Selenium cutoff),40742137700

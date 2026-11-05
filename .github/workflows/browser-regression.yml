@@ -29,13 +29,13 @@ concurrency:
 
 jobs:
   native-windows-shards:
-    # The backend suite took about 28 minutes in one job; measured shards keep each part near 10.
+    # The backend suite took about 28 minutes in one job; four measured shards keep each job under 15.
     runs-on: windows-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        part: ["0", "1", "2", native]
+        part: ["0", "1", "2", "3", native]
     env:
       ALFRED_LOCAL_RUNTIME: "true"
       ALFRED_AUTO_TRAIN_ON_STARTUP: "false"
@@ -82,7 +82,7 @@ jobs:
           # Reviewed consolidated dependency/migration contents; later changes still fail closed.
           python scripts/release_gate.py preflight --release-id "ci-$env:GITHUB_RUN_ID" --candidate $env:GITHUB_SHA --baseline $baseline --reviewed-source 0defab2c204dcb06e7e866cec5b6805c3417ac1a --output artifacts/release-ci
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python scripts/release_gate.py validate --output artifacts/release-ci --profile backend --shard-index ${{ matrix.part }} --shard-count 3
+          python scripts/release_gate.py validate --output artifacts/release-ci --profile backend --shard-index ${{ matrix.part }} --shard-count 4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Native HTTP, recovery, backup, concurrency and accessibility
         if: matrix.part == 'native'
@@ -129,7 +129,7 @@ jobs:
           assert os.environ["PARTS_RESULT"] == "success", os.environ["PARTS_RESULT"]
           paths = sorted(Path("artifacts/native-windows-parts").glob("native-windows-proof-*/**/release.json"))
           manifests = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
-          print(aggregate_backend(manifests, 3, os.environ["GITHUB_SHA"]))
+          print(aggregate_backend(manifests, 4, os.environ["GITHUB_SHA"]))
           PY
 
   selenium-shards:
