@@ -1,5 +1,11 @@
 # Development CI and integration pipeline
 
+## RUNTIME-11 build pins — 2026-11-05
+
+State LOCAL_ACCEPTED on master, not pushed (push at phase end). `b2f8936` pins PyInstaller's dependencies in
+`requirements-build.txt`, a dependency path that preflight fails closed on. After independent review (TECHNICAL_PASS)
+the backend step's `--reviewed-source` names `b2f8936`; any later edit to that file is refused again. Its CI is pending.
+
 ## Consolidation to master — 2026-11-04
 
 State MERGED, POST_MERGE_VERIFYING. The owner asked for one tested batch to master.
