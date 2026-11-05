@@ -785,9 +785,9 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 - **PR/CI:** Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 - **Current task:** Local consolidation preparation is validated on preparation/alfred-consolidation-20261026; required reviews and PR19 CI still block canonical integration. Preserve 143 original IDs/75 verified and 13 extensions/0 accepted. See CONSOLIDATION_STATE for sources, conflict decisions and receipts. Stage7 selection is not reached.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 84/143 (58.7%) verified.**
+**Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 15 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 84
+IMPLEMENTED_NOT_ACCEPTED: 14 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -807,7 +807,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
 | SYNC | 7 | 11 | 63.6 | 0 | 0 | 2 | 2 | 0 |
-| RUNTIME | 6 | 16 | 37.5 | 7 | 1 | 0 | 2 | 0 |
+| RUNTIME | 7 | 16 | 43.8 | 6 | 1 | 0 | 2 | 0 |
 <!-- END STATUS DASHBOARD -->
 
 ## Separate 2.0 acceptance ledger
@@ -3142,14 +3142,14 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### RUNTIME-09 — Filesystem protection of private DB/config
 
-**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P1.
+**COMPLETE_VERIFIED** · Windows, deployment and release · P1.
 
-- Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
+- Source: [alfred_private_storage.py](../alfred_private_storage.py), [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
 - APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
-- Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Tests: [tests/test_private_storage.py](../tests/test_private_storage.py), [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). **48 PASS** on real Windows ACLs (2026-11-05, master), including a restricted Windows identity that cannot read a private file; test_private_storage also runs in every native-windows CI backend shard.
+- Acceptance: live CLI drill 2026-11-05 on a disposable folder of synthetic files loosened like the audited install (Authenticated Users and Users read, inheritable). Inspect reported NEEDS_REPAIR with those outside readers and named only well-known sensitive paths. Apply without a pinned plan, or without quiesced writers, was BLOCKED with nothing changed. The dry run kept its plan outside the target (a plan inside it was refused). Pinned, approved, quiesced apply left every entry owner + SYSTEM only (icacls confirmed); files and folders created afterwards inherited private access. Rollback restored the exact prior permissions, and after a content change rollback was BLOCKED. No code change was needed.
 - Limitations/dependencies: Read-only ACL review found Authenticated Users/local Users read grants; DB has plaintext SQLite header. No exploitation or secret values observed. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Least-privilege creation/repair implementation tested in disposable Windows paths; tests/test_private_storage.py. Production ACL remediation requires authorization.
+- Next: Repair of the owner's original install folder or any live runtime stays a separate, explicitly authorized step (pinned plan, quiesced app). The database is protected by access control, not encrypted at rest.
 
 ### RUNTIME-10 — Session/CSRF/auth/upload/HTTP/diagnostic safeguards
 

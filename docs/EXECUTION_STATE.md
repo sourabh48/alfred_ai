@@ -128,7 +128,10 @@
   correct; synthetic test copies the layout. COMPLETE_VERIFIED for bounded scope (job card + own-damage schedule); a
   stand-alone third-party policy layout is not checked. Baseline 84/143.
 - OWNER_DECISION 2026-11-05: AI Council tasks (COUNCIL-01..05) go after all other modules (`OWNER_DEFERRED_MODULES`).
-- Next: RUNTIME-09.
+- RUNTIME-09 (2026-11-05): 48 storage/native tests PASS on real Windows ACLs; live CLI drill on a disposable synthetic
+  folder loosened like the audited install: inspect, blocked unapproved/unquiesced apply, pinned apply to owner+SYSTEM
+  only, inheritance, exact rollback and blocked rollback after change. No code change. COMPLETE_VERIFIED for bounded
+  scope; live/original-install ACL repair still needs explicit approval. Baseline 85/143.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
