@@ -190,6 +190,9 @@ OFFICIAL_BIKE_CATALOG = [
         "variant": "",
         "display_name": "Royal Enfield Hunter 350",
         "bike_class": "retro",
+        # Royal Enfield owner's manual (BS-VI, English, 2026), read 2026-11-05: 349 cc (p.14), 13 L tank and tyres (p.16),
+        # periodic maintenance every 5,000 km or 6 months, whichever is earlier, after 500 km / 1.5 months (p.105).
+        # The manual gives no fuel economy; about 36 kmpl is the published claimed figure.
         "engine_cc": 349.0,
         "fuel_tank_capacity_l": 13.0,
         "expected_mileage_kmpl": 36.0,
@@ -198,6 +201,8 @@ OFFICIAL_BIKE_CATALOG = [
         "optimal_cruising_speed_kmph": 75,
         "official_source_name": "Royal Enfield",
         "official_source_url": "https://www.royalenfield.com/in/en/motorcycles/hunter-350/",
+        "tyre_front_spec": "110/70-17 54P tubeless",
+        "tyre_rear_spec": "140/70-17 66P tubeless",
         "maintenance_highlights": [
             {"label": "Rear-Shock And Tyre Wear Review", "interval": "Monthly on broken city roads", "note": "Short-wheelbase city use can show rear suspension fatigue and squared-off tyre wear before owners notice a comfort drop."},
             {"label": "Clutch Feel And Heat Cycle Check", "interval": "At each service and after dense traffic weeks", "note": "Repeated stop-go use on the 350 platform often shows up first as heavier clutch feel and extra engine heat around the legs."},

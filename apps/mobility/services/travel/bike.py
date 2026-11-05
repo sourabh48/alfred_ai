@@ -14,11 +14,14 @@ def bike_context(bike, *, end_date=None, distance_km=None):
     if service:
         due = service.next_service_date or (service.service_date+timedelta(days=bike.service_interval_days) if bike.service_interval_days else None)
         if due and due <= end:
-            warnings.append(f"Recorded service due by {due}; review before this trip.")
+            # Only a next-service date on the record is "recorded"; one from the profile interval is an estimate.
+            warnings.append(f"Recorded service due by {due}; review before this trip." if service.next_service_date
+                            else f"Service estimated due by {due} from the profile's {bike.service_interval_days}-day interval; confirm before this trip.")
         odometers = [n for n in [service.odometer_km, snapshot.odometer_km if snapshot else None, refill.odometer_km if refill else None] if n is not None]
         due_km = service.next_service_km or (service.odometer_km+bike.service_interval_km if bike.service_interval_km else None)
         if due_km and odometers and max(odometers)+(distance_km or 0) >= due_km:
-            warnings.append("The planned distance reaches the recorded service mileage threshold.")
+            warnings.append("The planned distance reaches the recorded service mileage threshold." if service.next_service_km
+                            else "The planned distance reaches the service mileage estimated from the profile's interval.")
     else:
         warnings.append("No service record available for this vehicle.")
     for kind in ("insurance", "puc"):

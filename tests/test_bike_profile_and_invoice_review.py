@@ -238,6 +238,37 @@ class ProfileIdentityApiTests(TestCase):
         self.assertEqual(payload["verification_status"], "custom")
         self.assertEqual(payload["official_source_url"], "")
 
+    def test_hunter_350_profile_carries_the_owners_manual_figures(self):
+        payload = self.create()
+        self.assertEqual((payload["engine_cc"], payload["fuel_tank_capacity_l"]), (349.0, 13.0))
+        self.assertEqual((payload["service_interval_km"], payload["service_interval_days"]), (5000, 180))
+        self.assertEqual((payload["tyre_front_spec"], payload["tyre_rear_spec"]), ("110/70-17 54P tubeless", "140/70-17 66P tubeless"))
+
+    def test_model_change_with_echoed_specs_takes_the_new_models_figures(self):
+        # The edit form sends every field back; unchanged ones belong to the old model.
+        echoed = ("bike_class", "engine_cc", "fuel_tank_capacity_l", "expected_mileage_kmpl", "service_interval_km",
+                  "service_interval_days", "optimal_cruising_speed_kmph")
+        custom = self.create(make="", model_name="Workshop Special", display_name="Workshop Special")
+        self.assertEqual(custom["verification_status"], "custom")
+        url = f"/api/mobility/bikes/{custom['id']}/"
+        payload = self.send("patch", url, {"make": "Royal Enfield", "model_name": "Hunter 350", "display_name": "Hunter 350",
+                                           **{field: custom[field] for field in echoed if custom[field] is not None}}).json()
+        self.assertEqual(payload["verification_status"], "official")
+        self.assertEqual((payload["fuel_tank_capacity_l"], payload["expected_mileage_kmpl"], payload["engine_cc"]), (13.0, 36.0, 349.0))
+        payload = self.send("patch", url, {"model_name": "Workshop Special", "display_name": "Workshop Special",
+                                           **{field: payload[field] for field in echoed}}).json()
+        self.assertEqual(payload["verification_status"], "custom")
+        self.assertIsNone(payload["fuel_tank_capacity_l"])
+        self.assertIsNone(payload["engine_cc"])
+
+    def test_model_change_keeps_a_spec_the_owner_changed(self):
+        hunter = self.create()
+        url = f"/api/mobility/bikes/{hunter['id']}/"
+        payload = self.send("patch", url, {"model_name": "Meteor 350", "display_name": "Meteor 350",
+                                           "fuel_tank_capacity_l": hunter["fuel_tank_capacity_l"], "expected_mileage_kmpl": 31}).json()
+        self.assertEqual(payload["fuel_tank_capacity_l"], 15.0)
+        self.assertEqual(payload["expected_mileage_kmpl"], 31)
+
     def test_client_cannot_claim_official_verification_or_edit_foreign_profile(self):
         payload = self.create(display_name="Unknown Machine", model_name="Unknown Machine", make="Nobody", verification_status="official", catalog_key="royal-enfield-hunter-350")
         self.assertEqual(payload["verification_status"], "custom")

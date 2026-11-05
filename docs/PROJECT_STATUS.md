@@ -785,9 +785,9 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 - **PR/CI:** Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 - **Current task:** Local consolidation preparation is validated on preparation/alfred-consolidation-20261026; required reviews and PR19 CI still block canonical integration. Preserve 143 original IDs/75 verified and 13 extensions/0 accepted. See CONSOLIDATION_STATE for sources, conflict decisions and receipts. Stage7 selection is not reached.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 82/143 (57.3%) verified.**
+**Baseline: 83/143 (58.0%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 17 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 82
+IMPLEMENTED_NOT_ACCEPTED: 16 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 83
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -803,7 +803,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | CAREER | 5 | 8 | 62.5 | 0 | 3 | 0 | 0 | 0 |
 | TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
-| BIKE | 2 | 6 | 33.3 | 2 | 2 | 0 | 0 | 0 |
+| BIKE | 3 | 6 | 50.0 | 1 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
 | SYNC | 7 | 11 | 63.6 | 0 | 0 | 2 | 2 | 0 |
@@ -2923,14 +2923,15 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### BIKE-01 — Vehicle profiles and Hunter 350 catalog support
 
-**IMPLEMENTED_NOT_ACCEPTED** · Bike and mobility · P2.
+**COMPLETE_VERIFIED** · Bike and mobility · P2.
 
-- Source: [apps/mobility/services/bike_service_intelligence.py](../apps/mobility/services/bike_service_intelligence.py), [apps/mobility/services/bike_catalog.py](../apps/mobility/services/bike_catalog.py), [apps/mobility/urls.py](../apps/mobility/urls.py).
+- Source: [apps/mobility/services/bike_service_intelligence.py](../apps/mobility/services/bike_service_intelligence.py), [apps/mobility/services/bike_catalog.py](../apps/mobility/services/bike_catalog.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [apps/mobility/views.py](../apps/mobility/views.py), [static/js/bike_service.js](../static/js/bike_service.js).
 - APIs/UI/models: /bike-service/ and /api/mobility/; supported routes in root URLs; BikeProfile, BikeServiceRecord, FuelRefillLog, BikeIssueReport, BikeDocument, BikeConditionSnapshot.
-- Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
-- Limitations/dependencies: Catalog and profile defaults exist; official current model/service variants need acceptance. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Verify manufacturer/model data and owner's actual vehicle.
+- Tests: [tests/test_bike_profile_and_invoice_review.py](../tests/test_bike_profile_and_invoice_review.py), [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py), [browser](../tests/test_user_data_browser.py). **52 profile/dashboard and 510 mobility, travel and related backend tests (9 platform-gated skips), plus the vehicle Chrome tests, PASS** (2026-11-05, master).
+- Acceptance: TECHNICAL_PASS on synthetic data. Hunter 350 catalog figures match Royal Enfield's owner's manual (BS-VI, English, 2026, saved by the owner): 349 cc (p.14), 13 L tank and 110/70-17 54P / 140/70-17 66P tyres (p.16), periodic maintenance every 5,000 km or 6 months, whichever is earlier, after 500 km / 1.5 months (p.105); about 36 kmpl is the published claim (the manual states none). Profiles show their real catalog match; a model change takes the new model's figures unless the owner changed them; unmatched vehicles' class defaults are labelled estimates everywhere they appear. One independent review. The owner's own vehicle card is not inspected (personal data).
+- Bounded unit 2026-11-05 (master): every vehicle card said "Custom profile" because the dashboard never sent the label the page reads; changing a vehicle's model kept the old model's echoed figures under the new model's "Official Catalog Match"; an unmatched vehicle's class-default mileage was called "below-optimal efficiency" and drawn as its "Optimal benchmark"; a trip warning said "Recorded service due" for a date computed from a profile interval; and the trip assistant took class-default mileage as a 0.95-confidence vehicle fact. Each is corrected; the Hunter 350 entry now carries the manual's tyre sizes. Hunter 350 engine, 13 L tank and about 36 kmpl agree across published specifications; its service interval differed between secondary sources until the official manual confirmed 5,000 km / 6 months. One independent review; findings fixed or listed here. Each new test fails on the previous code.
+- Limitations/dependencies: Only the Hunter 350 entry is checked against its manual; other catalog sources were last checked 2026-07-31 and are stale under the 45-day policy. Whether a custom vehicle's figures were typed or defaulted is not stored, so an unmatched vehicle's benchmark is always called a possible class estimate; the manufacturer-guidance box on such a vehicle shows a class interval beside the manufacturer's link. The owner's actual vehicle is not inspected (personal data). Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: The owner checks their own vehicle card; refresh the other catalog entries against official sources.
 
 ### BIKE-02 — Service records, fuel and costs
 

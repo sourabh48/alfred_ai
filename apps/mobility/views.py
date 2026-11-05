@@ -62,6 +62,12 @@ PROFILE_MANUAL_OVERRIDE_FIELDS = {
 }
 
 
+PROFILE_SPEC_FIELDS = (
+    "bike_class", "engine_cc", "fuel_tank_capacity_l", "expected_mileage_kmpl", "service_interval_km",
+    "service_interval_days", "optimal_cruising_speed_kmph", "tyre_front_spec", "tyre_rear_spec", "fuel_type",
+)
+
+
 def _apply_profile_payload(profile, payload):
     for field, value in payload.items():
         if hasattr(profile, field):
@@ -156,13 +162,17 @@ class BikeProfileDetailView(RetrieveUpdateDestroyAPIView):
 
     def perform_update(self, serializer):
         model_before = (serializer.instance.make, serializer.instance.model_name)
+        specs_before = {field: getattr(serializer.instance, field) for field in PROFILE_SPEC_FIELDS}
         profile = serializer.save()
         if profile.is_primary:
             BikeProfile.objects.filter(user=self.request.user).exclude(pk=profile.pk).update(is_primary=False)
         # Only a different model re-reads the catalog; other edits keep earlier owner values.
         if (profile.make, profile.model_name) == model_before:
             return
-        manual_overrides = _profile_manual_overrides(serializer)
+        # The edit form sends every field; a specification sent back unchanged belongs to the old model, not the owner,
+        # so it must not survive under the new model's catalog label.
+        manual_overrides = {field: value for field, value in _profile_manual_overrides(serializer).items()
+                            if field not in PROFILE_SPEC_FIELDS or value != specs_before[field]}
         # Catalog specifications cannot replace an owner's recorded financial values.
         # The saved profile includes explicit edits, including zero-value corrections.
         manual_overrides.update({

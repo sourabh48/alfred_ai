@@ -94,7 +94,7 @@ function loadBikeServiceDashboard(options = {}) {
             if (!options.live && !profileEditorLocked) {
                 syncBikeProfileEditor();
             }
-            renderBikeCharts(data.charts || {});
+            renderBikeCharts(data.charts || {}, summary.benchmark_is_estimate);
         })
         .catch(error => showBikeServiceAlert(error.message, "danger"));
 }
@@ -142,7 +142,7 @@ function renderBikeHeroSignals(summary, profile, tasks) {
             label: "Mileage Status",
             value: actualMileage ? `${Alfred.formatNumber(actualMileage, 1)} kmpl` : (optimalMileage ? `${Alfred.formatNumber(optimalMileage, 1)} kmpl` : "No benchmark"),
             meta: actualMileage && optimalMileage
-                ? `${summary.mileage_gap_kmpl >= 0 ? "+" : ""}${Alfred.formatNumber(summary.mileage_gap_kmpl || 0, 1)} kmpl vs benchmark`
+                ? `${summary.mileage_gap_kmpl >= 0 ? "+" : ""}${Alfred.formatNumber(summary.mileage_gap_kmpl || 0, 1)} kmpl vs ${summary.benchmark_is_estimate ? "class estimate" : "benchmark"}`
                 : (optimalMileage ? "Real-world comparison starts after refill logs." : "Save a vehicle benchmark to compare mileage."),
         },
         {
@@ -172,9 +172,9 @@ function renderBikeServiceSummary(summary) {
     const mileageGap = Number(summary.mileage_gap_kmpl || 0);
     const mileageValue = actualMileage
         ? `${Alfred.formatNumber(actualMileage, 1)} kmpl`
-        : (optimalMileage ? `${Alfred.formatNumber(optimalMileage, 1)} kmpl optimal` : "No estimate");
+        : (optimalMileage ? `${Alfred.formatNumber(optimalMileage, 1)} kmpl ${summary.benchmark_is_estimate ? "class estimate" : "optimal"}` : "No estimate");
     const mileageCaption = actualMileage && optimalMileage
-        ? `Optimal ${Alfred.formatNumber(optimalMileage, 1)} kmpl | gap ${mileageGap >= 0 ? "+" : ""}${Alfred.formatNumber(mileageGap, 1)}`
+        ? `${summary.benchmark_is_estimate ? "Class estimate" : "Optimal"} ${Alfred.formatNumber(optimalMileage, 1)} kmpl | gap ${mileageGap >= 0 ? "+" : ""}${Alfred.formatNumber(mileageGap, 1)}`
         : (optimalMileage
             ? `${Alfred.formatNumber(summary.refill_count || 0, 0)} refill logs | add refill history to compare`
             : "Add a model and refill logs to compare mileage");
@@ -257,7 +257,9 @@ function renderBikeProfile(profile) {
         {
             label: "Mileage Benchmark",
             value: profile.expected_mileage_kmpl ? `${Alfred.formatNumber(profile.expected_mileage_kmpl, 1)} kmpl` : "No benchmark",
-            meta: profile.optimal_cruising_speed_kmph ? `Cruising ${Alfred.formatNumber(profile.optimal_cruising_speed_kmph, 0)} km/h` : "Cruising-speed target not saved",
+            // An unmatched vehicle's figures may be class defaults, not its own specification.
+            meta: profile.verification_status_code === "custom" && profile.expected_mileage_kmpl ? "Class estimate unless you entered it; not a model specification"
+                : profile.optimal_cruising_speed_kmph ? `Cruising ${Alfred.formatNumber(profile.optimal_cruising_speed_kmph, 0)} km/h` : "Cruising-speed target not saved",
         },
         {
             label: "Estimated Range",
@@ -337,7 +339,7 @@ function renderBikeMileageInsights(summary, profile, mileageChart) {
         ? `<div class="detail-item">Benchmark proof: <a class="proof-link" href="${profile.official_source_url}" target="_blank" rel="noopener">${Alfred.escapeHtml(profile.official_source_name || "official source")}</a></div>`
         : `<div class="detail-item">Benchmark source: custom or heuristic profile value.</div>`;
     const comparisonNote = summary.average_actual_mileage_kmpl && summary.expected_mileage_kmpl
-        ? `<div class="detail-item">${Alfred.escapeHtml(mileageComparisonNarrative(summary.average_actual_mileage_kmpl, summary.expected_mileage_kmpl))}</div>`
+        ? `<div class="detail-item">${Alfred.escapeHtml(mileageComparisonNarrative(summary.average_actual_mileage_kmpl, summary.expected_mileage_kmpl, summary.benchmark_is_estimate))}</div>`
         : `<div class="detail-item">Add refill logs after each fill-up to generate a real-world mileage comparison.</div>`;
     const evidenceNote = mileageChart?.labels?.length
         ? `<div class="detail-item">Comparison uses ${Alfred.escapeHtml(String(mileageChart.labels.length))} refill checkpoint(s) stored in your own account.</div>`
@@ -354,8 +356,12 @@ function renderBikeMileageInsights(summary, profile, mileageChart) {
     `);
 }
 
-function mileageComparisonNarrative(actualMileage, optimalMileage) {
+function mileageComparisonNarrative(actualMileage, optimalMileage, estimated = false) {
     const delta = Number(actualMileage || 0) - Number(optimalMileage || 0);
+    if (estimated && Math.abs(delta) >= 3) {
+        // A class estimate is not this vehicle's figure, so a gap from it says nothing about a fault.
+        return `Actual mileage differs from the saved benchmark by ${Alfred.formatNumber(delta, 1)} kmpl. This vehicle is not in the catalog, so the benchmark may be a class estimate; enter your own figure to compare against it.`;
+    }
     if (delta <= -5) {
         return `Actual mileage is materially below the saved benchmark by ${Alfred.formatNumber(Math.abs(delta), 1)} kmpl. Check riding conditions, tyre pressure, load, chain condition, and recent service quality.`;
     }
@@ -1102,7 +1108,7 @@ function syncSelectedProfileIntoForms() {
     }
 }
 
-function renderBikeCharts(charts) {
+function renderBikeCharts(charts, benchmarkIsEstimate = false) {
     const serviceLabels = charts.service_cost_trend?.labels || [];
     const serviceValues = charts.service_cost_trend?.values || [];
     const mixLabels = charts.cost_mix?.labels || [];
@@ -1155,7 +1161,7 @@ function renderBikeCharts(charts) {
                 pointHoverRadius: 5,
             },
             {
-                label: "Optimal benchmark",
+                label: benchmarkIsEstimate ? "Class estimate" : "Optimal benchmark",
                 data: optimalMileageValues,
                 borderColor: "#1858d6",
                 backgroundColor: "rgba(24,88,214,0.08)",

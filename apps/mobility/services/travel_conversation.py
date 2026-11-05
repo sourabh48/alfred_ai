@@ -233,7 +233,10 @@ def vehicle_state(session):
         for field, val in {"vehicle_name": bike.display_name, "vehicle_mileage": bike.expected_mileage_kmpl,
                            "vehicle_tank_litres": bike.fuel_tank_capacity_l}.items():
             if val:
-                session.state[field] = fact(val, "vehicle_profile", session.state["vehicle_profile"].get("confirmed_by_user",False), .95)
+                # An unmatched vehicle's mileage and tank may be class defaults, so they are weaker evidence.
+                estimate = bike.verification_status == "custom" and field != "vehicle_name"
+                session.state[field] = fact(val, "vehicle_profile_estimate" if estimate else "vehicle_profile",
+                                            session.state["vehicle_profile"].get("confirmed_by_user",False), .5 if estimate else .95)
 
 
 def ready_prompt(session, prefix=""):

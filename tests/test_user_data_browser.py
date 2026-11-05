@@ -4019,6 +4019,27 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('balanceSheetPanel').scrollIntoView({behavior: 'instant', block: 'center'});")
         self.capture("vehicle-value-and-running-costs")
 
+    def test_vehicle_card_shows_the_catalog_match_and_labels_class_estimates(self):
+        from apps.mobility.models import BikeProfile
+
+        user = self.scenario['user']
+        BikeProfile.objects.filter(user=user).update(is_primary=False)
+        hunter = BikeProfile.objects.create(user=user, display_name="Synthetic Hunter", model_name="Hunter 350", make="Royal Enfield",
+            bike_class="retro", expected_mileage_kmpl=36, verification_status="official", is_primary=True)
+        self.login(); self.browser.get(self.live_server_url + "/bike-service/")
+        self.wait.until(lambda _: "Synthetic Hunter" in self.text("bikeProfilePanel"))
+        panel = self.text("bikeProfilePanel")
+        self.assertIn("Official Catalog Match", panel)
+        self.assertNotIn("Class estimate", panel)
+        BikeProfile.objects.filter(pk=hunter.pk).update(is_primary=False)
+        BikeProfile.objects.create(user=user, display_name="Synthetic Special", model_name="Workshop Special",
+            bike_class="commuter", expected_mileage_kmpl=60, verification_status="custom", is_primary=True)
+        self.browser.get(self.live_server_url + "/bike-service/")
+        self.wait.until(lambda _: "Synthetic Special" in self.text("bikeProfilePanel"))
+        panel = self.text("bikeProfilePanel")
+        self.assertIn("Class estimate unless you entered it", panel)
+        self.assertIn("Custom / Unverified", panel)
+
     def test_investment_local_review_reminders_consent_reopen_lifecycle_and_privacy(self):
         from datetime import timedelta
         from django.utils import timezone

@@ -274,6 +274,7 @@ class BikeServiceIntelligenceService:
             expected_mileage,
             average_actual_mileage,
             route_wear,
+            estimated_benchmark=bool(primary_profile and primary_profile.verification_status == "custom"),
         )
         service_center_brief = self._build_service_center_brief(open_issues, latest_service, latest_condition)
         bike_profile = self._build_bike_profile(primary_profile, latest_service, current_documents, latest_condition, modification_summary, estimated_range)
@@ -305,6 +306,8 @@ class BikeServiceIntelligenceService:
                 "missing_required_documents": document_summary["missing_required_count"],
                 "document_compliance_score": document_summary["compliance_score"],
                 "expected_mileage_kmpl": expected_mileage,
+                # A vehicle outside the catalog may carry class defaults rather than its own figures.
+                "benchmark_is_estimate": bool(primary_profile and primary_profile.verification_status == "custom"),
                 "latest_actual_mileage_kmpl": latest_actual_mileage,
                 "average_actual_mileage_kmpl": average_actual_mileage,
                 "mileage_gap_kmpl": mileage_gap,
@@ -674,6 +677,7 @@ class BikeServiceIntelligenceService:
         expected_mileage,
         average_actual_mileage,
         route_wear,
+        estimated_benchmark=False,
     ) -> list[str]:
         observations = []
         if service_records:
@@ -682,7 +686,10 @@ class BikeServiceIntelligenceService:
             observations.append(f"Trip logs currently capture INR {trip_cost_total:,.0f} of ride spend at roughly INR {cost_per_km:,.2f} per km.")
         if refill_logs:
             observations.append(f"Fuel refill history now covers {len(refill_logs)} refill log(s), so Alfred can compare your real mileage against the expected benchmark.")
-        if average_actual_mileage and expected_mileage:
+        if average_actual_mileage and expected_mileage and estimated_benchmark:
+            # An unmatched vehicle's benchmark may be a class default, so the gap is not evidence of a fault.
+            observations.append(f"Average actual mileage is about {average_actual_mileage:,.1f} kmpl versus the saved benchmark of {expected_mileage:,.1f} kmpl. This vehicle is not in the catalog, so that benchmark may be a class estimate rather than its own figure.")
+        elif average_actual_mileage and expected_mileage:
             if average_actual_mileage < (expected_mileage * 0.9):
                 observations.append(f"Average actual mileage is about {average_actual_mileage:,.1f} kmpl versus the benchmark {expected_mileage:,.1f} kmpl, which suggests below-optimal efficiency.")
             elif average_actual_mileage > (expected_mileage * 1.05):
@@ -1136,6 +1143,9 @@ class BikeServiceIntelligenceService:
             "service_interval_days": getattr(primary_profile, "service_interval_days", None),
             "optimal_cruising_speed_kmph": getattr(primary_profile, "optimal_cruising_speed_kmph", None),
             "verification_status": getattr(primary_profile, "get_verification_status_display", lambda: "")(),
+            # The page reads the label and the code; "verification_status" stays the label for existing readers.
+            "verification_status_label": getattr(primary_profile, "get_verification_status_display", lambda: "")(),
+            "verification_status_code": getattr(primary_profile, "verification_status", ""),
             "official_source_name": getattr(primary_profile, "official_source_name", ""),
             "official_source_url": getattr(primary_profile, "official_source_url", ""),
             "last_service_date": latest_service.service_date.isoformat() if latest_service else "",

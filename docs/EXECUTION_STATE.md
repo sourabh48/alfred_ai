@@ -102,7 +102,12 @@
 - Master CI on `e61b990` (contains FAMILY-07): all 9 checks PASS, native-windows job 29.6 min.
 - FAMILY-07 owner decisions (2026-11-05, "You decide"): manual snapshots over 90 days are not counted; required vehicle
   documents not yet added are listed, not scored; Risk news searches carry only the role, not the analyzed company.
-- Next: BIKE-01.
+- BIKE-01 bounded unit (2026-11-05): vehicle card always said "Custom profile"; a model change kept the old model's
+  echoed figures under "Official Catalog Match"; class-default mileage was called below-optimal and drawn as the optimum;
+  interval-derived service dates were called "recorded"; class defaults were 0.95-confidence trip facts. Fixed; Hunter
+  manual figures. The owner saved the official manual: 349 cc, 13 L, tyres, service every 5,000 km / 6 months confirmed.
+  COMPLETE_VERIFIED for bounded scope; baseline 83/143.
+- Next: BIKE-04.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

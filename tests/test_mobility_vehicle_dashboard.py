@@ -327,3 +327,65 @@ class MobilityVehicleDashboardTests(TestCase):
         self.assertTrue(any(item["display_name"] == "Ola S1 Pro" for item in scooters))
         self.assertTrue(any(item["display_name"] == "Simple One" for item in scooters))
         self.assertEqual(next(item for item in scooters if item["display_name"] == "Ola S1 Pro")["fuel_type"], "electric")
+
+
+class VehicleProfileLabelTests(TestCase):
+    """BIKE-01: the page shows how a profile was matched, and a class estimate is not read as a model fault."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("bike01_labels", password="synthetic-pass-123")
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def refill(self, profile, km, litres):
+        FuelRefillLog.objects.create(user=self.user, bike_profile=profile, bike_name=profile.display_name,
+                                     refill_date=timezone.localdate(), trip_meter_km=km, fuel_liters=litres, total_cost=400)
+
+    def dashboard(self):
+        response = self.client.get("/api/mobility/bike-service-dashboard/")
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def test_catalog_matched_profile_reports_its_match_to_the_page(self):
+        profile = BikeProfile.objects.create(user=self.user, display_name="Hunter 350", model_name="Hunter 350",
+                                             make="Royal Enfield", bike_class="retro", verification_status="official", is_primary=True)
+        payload = self.dashboard()["bike_profile"]
+        self.assertEqual(payload["verification_status_code"], "official")
+        self.assertEqual(payload["verification_status_label"], "Official Catalog Match")
+        self.assertEqual(payload["id"], profile.id)
+
+    def test_unmatched_vehicle_benchmark_gap_is_not_called_a_fault(self):
+        profile = BikeProfile.objects.create(user=self.user, display_name="Workshop Special", model_name="Workshop Special",
+                                             bike_class="commuter", expected_mileage_kmpl=60, verification_status="custom", is_primary=True)
+        self.refill(profile, 120, 4)
+        observations = self.dashboard()["observations"]
+        self.assertFalse(any("below-optimal" in line for line in observations), observations)
+        self.assertTrue(any("may be a class estimate" in line for line in observations), observations)
+
+    def test_catalog_matched_vehicle_still_reports_below_benchmark_mileage(self):
+        profile = BikeProfile.objects.create(user=self.user, display_name="Hunter 350", model_name="Hunter 350",
+                                             bike_class="retro", expected_mileage_kmpl=36, verification_status="official", is_primary=True)
+        self.refill(profile, 100, 4)
+        observations = self.dashboard()["observations"]
+        self.assertTrue(any("below-optimal" in line for line in observations), observations)
+
+    def test_summary_marks_an_unmatched_vehicles_benchmark_as_an_estimate(self):
+        BikeProfile.objects.create(user=self.user, display_name="Workshop Special", model_name="Workshop Special",
+                                   expected_mileage_kmpl=60, verification_status="custom", is_primary=True)
+        self.assertTrue(self.dashboard()["summary"]["benchmark_is_estimate"])
+        BikeProfile.objects.filter(user=self.user).update(verification_status="official")
+        from django.core.cache import cache
+        cache.clear()
+        self.assertFalse(self.dashboard()["summary"]["benchmark_is_estimate"])
+
+    def test_trip_warning_calls_an_interval_due_date_an_estimate(self):
+        from apps.mobility.services.travel.bike import bike_context
+        profile = BikeProfile.objects.create(user=self.user, display_name="Workshop Special", model_name="Workshop Special",
+                                             service_interval_days=180, verification_status="custom")
+        BikeServiceRecord.objects.create(user=self.user, bike_profile=profile, bike_name=profile.display_name,
+                                         service_date=timezone.localdate() - timedelta(days=200), cost=1000)
+        warnings = bike_context(profile)["warnings"]
+        self.assertFalse(any(line.startswith("Recorded service due") for line in warnings), warnings)
+        self.assertTrue(any("estimated due by" in line for line in warnings), warnings)
+        BikeServiceRecord.objects.filter(user=self.user).update(next_service_date=timezone.localdate() - timedelta(days=1))
+        self.assertTrue(any(line.startswith("Recorded service due") for line in bike_context(profile)["warnings"]))

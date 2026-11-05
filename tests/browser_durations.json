@@ -169,6 +169,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_unconfirmed_income_is_flagged_until_the_owner_chooses_a_period":  6.765,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_vehicle_service_and_refill_forms_keep_owned_cents_and_measurements":  10.797,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_vehicle_value_and_running_costs_are_separate_on_real_page":  5.328,
+    "tests.test_user_data_browser.UserDataBrowserTests.test_vehicle_card_shows_the_catalog_match_and_labels_class_estimates": 5.78,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_verified_closure_exact_citation_file_liveness_and_metadata_limit":  7.984,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_yahoo_market_observations_identity_expiry_and_recovery_on_investment_page":  7.828
                   }
