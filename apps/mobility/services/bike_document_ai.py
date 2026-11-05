@@ -28,8 +28,10 @@ DATE_FORMATS = (
     "%d %B %Y",
     "%d-%b-%Y",
     "%d-%B-%Y",
+    "%b %d, %Y",
+    "%B %d, %Y",
 )
-DATE_TEXT = r"(?:[0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}[\s-][A-Za-z]{3,9}[\s-][0-9]{4})"
+DATE_TEXT = r"(?:[0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}[\s-][A-Za-z]{3,9}[\s-][0-9]{4}|[A-Za-z]{3,9} [0-9]{1,2}, ?[0-9]{4})"
 # These dates describe something other than when a document was issued or a service was done.
 OTHER_DATE_CONTEXT_RE = re.compile(r"next|expir|valid|due|end date|renew|birth|period", re.IGNORECASE)
 
@@ -42,6 +44,15 @@ SEPARATED_VEHICLE_NUMBER_RE = re.compile(
 # Insured declared value is the vehicle's cover value, never the premium paid.
 DECLARED_VALUE_RE = re.compile(r"(?:\bIDV\b|declared value)[^\n]*?\d[\d,]*(?:\.\d+)?", re.IGNORECASE)
 PREVIOUS_PERIOD_RE = re.compile(r"previous|prior|expiring|last year", re.IGNORECASE)
+# "Example General Insurance Company Limited" out of "PolicyIssuing Office:Example General Insurance Company Limited, ...".
+INSURER_NAME_RE = re.compile(
+    r"((?:[A-Z][\w&.'-]*[ \t]+){1,5}(?i:general[ \t]+)?(?i:insurance|assurance)[ \t]+"
+    r"(?:(?i:company|co\.?)(?![A-Za-z])(?:[ \t]+(?i:ltd\.?|limited)(?![A-Za-z]))?|(?i:ltd\.?|limited)(?![A-Za-z])))")
+# Some insurer PDFs extract the rupee sign as a backtick: "Total Premium Payable In ` 1,412.00".
+# The "In `" and "(`)" forms must have the amount on the same line, so a column header never reads the next row.
+AMOUNT_GAP = (r"(?:[ \t]+in[ \t]*(?:" + INR_LABEL_TOKEN + r"|`)[ \t]*"
+              r"|[ \t]*\([ \t]*(?:" + INR_LABEL_TOKEN + r"|`)[ \t]*\)[ \t]*[:#-]?[ \t]*"
+              r"|\s*[:#-]?\s*(?:" + INR_LABEL_TOKEN + r")?\s*)")
 INSURER_LINE_RE = re.compile(r"\b(?:insurance|assurance)\b.*\b(?:co\.?|company|ltd\.?|limited)(?:\W|$)", re.IGNORECASE)
 CURRENCY_TOKEN_RE = INR_LABEL_TOKEN
 MONEY_RE = re.compile(INR_AMOUNT, re.IGNORECASE)
@@ -433,7 +444,10 @@ class BikeDocumentAI:
         fields = {}
         if document_type == "insurance":
             fields["document_number"] = self._find_by_labels(text, ["policy no", "policy number"])
-            insurer = next((line for line in self._split_lines(text) if INSURER_LINE_RE.search(line)), "")
+            lines = self._split_lines(text)
+            current = [line for line in lines if not PREVIOUS_PERIOD_RE.search(line)]
+            name = next((match.group(1) for match in map(INSURER_NAME_RE.search, current) if match), "")
+            insurer = name or next((line for line in current if INSURER_LINE_RE.search(line)), "")
             fields["issuer"] = insurer[:160] or self._extract_issuer(text)
         elif document_type == "puc":
             fields["document_number"] = self._find_by_labels(text, ["certificate no", "pucc no", "puc no"])
@@ -570,7 +584,7 @@ class BikeDocumentAI:
         return ""
 
     def _parse_date(self, value: str) -> str:
-        cleaned = " ".join((value or "").strip().split())
+        cleaned = re.sub(r",(?=\d)", ", ", " ".join((value or "").strip().split()))
         date_match = re.search(DATE_TEXT, cleaned)
         if date_match:
             cleaned = date_match.group(0)
@@ -584,7 +598,7 @@ class BikeDocumentAI:
 
     def _extract_amount_by_labels(self, text: str, labels: list[str]) -> float:
         for label in labels:
-            pattern = re.compile(rf"{re.escape(label)}\s*[:#-]?\s*(?:{CURRENCY_TOKEN_RE})?\s*([0-9,]+(?:\.\d{{1,2}})?)", re.IGNORECASE)
+            pattern = re.compile(rf"{re.escape(label)}{AMOUNT_GAP}([0-9,]+(?:\.\d{{1,2}})?)", re.IGNORECASE)
             match = pattern.search(text)
             if match:
                 return self._amount_string_to_float(match.group(1))

@@ -122,7 +122,12 @@
   to drain before clicking refresh (same drain as teardown). Owner: 15-20 min CI jobs are acceptable.
 - Master CI on `cc39cc3`: all 14 checks PASS. Backend shards 9.5 / 11.1 / 12.1 / 10.9 min, native 5.6 min, Selenium
   shards 17.4 / 15.1 / 15.7 min; the whole run finishes in about 18 min (was about 35).
-- Next: BIKE-04 real-policy check when the owner provides a PDF; otherwise the next queue item.
+- BIKE-04 real-policy check (2026-11-05): the owner's own-damage policy PDF, read locally only. The parser misread
+  the issue date (previous policy start), missed the expiry ("Apr 11, 2027" dates), took the basic premium instead of the
+  total payable (rupee sign extracted as a backtick) and named the office address as insurer. Fixed; all six fields
+  correct; synthetic test copies the layout. COMPLETE_VERIFIED for bounded scope (job card + own-damage schedule); a
+  stand-alone third-party policy layout is not checked. Baseline 84/143.
+- Next: the next queue item.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

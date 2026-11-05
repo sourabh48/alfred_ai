@@ -785,9 +785,9 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 - **PR/CI:** Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 - **Current task:** Local consolidation preparation is validated on preparation/alfred-consolidation-20261026; required reviews and PR19 CI still block canonical integration. Preserve 143 original IDs/75 verified and 13 extensions/0 accepted. See CONSOLIDATION_STATE for sources, conflict decisions and receipts. Stage7 selection is not reached.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 83/143 (58.0%) verified.**
+**Baseline: 84/143 (58.7%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 16 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 83
+IMPLEMENTED_NOT_ACCEPTED: 15 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 84
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -803,7 +803,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | CAREER | 5 | 8 | 62.5 | 0 | 3 | 0 | 0 | 0 |
 | TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
-| BIKE | 3 | 6 | 50.0 | 1 | 2 | 0 | 0 | 0 |
+| BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
 | SYNC | 7 | 11 | 63.6 | 0 | 0 | 2 | 2 | 0 |
@@ -2957,15 +2957,15 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### BIKE-04 — Insurance/service documents and invoice review
 
-**IMPLEMENTED_NOT_ACCEPTED** · Bike and mobility · P2.
+**COMPLETE_VERIFIED** · Bike and mobility · P2.
 
 - Source: [apps/mobility/services/bike_service_intelligence.py](../apps/mobility/services/bike_service_intelligence.py), [apps/mobility/services/bike_catalog.py](../apps/mobility/services/bike_catalog.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [apps/mobility/services/bike_document_ai.py](../apps/mobility/services/bike_document_ai.py).
 - APIs/UI/models: /bike-service/ and /api/mobility/; supported routes in root URLs; BikeProfile, BikeServiceRecord, FuelRefillLog, BikeIssueReport, BikeDocument, BikeConditionSnapshot.
-- Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py), [tests/test_bike_document_parser.py](../tests/test_bike_document_parser.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: Local synthetic PDF import/review/replay accepted with 24 backend and one actual Chrome PASS (zero skips); receipts `artifacts/invoice-3c09291/`. Approved real invoice/insurance layouts remain PENDING; this is source-only evidence.
+- Tests: [tests/test_bike_profile_and_invoice_review.py](../tests/test_bike_profile_and_invoice_review.py), [tests/test_bike_document_parser.py](../tests/test_bike_document_parser.py), [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py). **130 vehicle, document and travel-document backend tests PASS** (2026-11-05, master).
+- Acceptance: Local synthetic PDF import/review/replay accepted with 24 backend and one actual Chrome PASS (zero skips); receipts `artifacts/invoice-3c09291/`. Real layouts checked: the Royal Enfield service job card (existing fixture) and, on 2026-11-05, the owner's own stand-alone own-damage policy schedule from a major Indian insurer, read locally only, nothing from it committed. All six fields now read correctly: policy number, registration, issue date, own-damage expiry, total premium payable and insurer name. Two independent reviews; findings fixed with tests. Before the fix, the previous policy's start date was read as the issue date, the expiry was missing, the basic premium was read instead of the total payable, and the issuing-office address was given as the insurer. The synthetic regression test copies that layout's structure.
 - Limitations/dependencies: Extraction, relevance checks and linked service updates exist; layout/identity review is essential. Existing owner/session controls; canonical data availability; acceptance plan.
 - Layout review 2026-11-05 (synthetic real-style policy schedules and dealer bills): hyphen/space registrations were not read, so bills could not be tied to the vehicle; bundled own-damage/third-party cover periods gave no expiry; "Total IDV" was read as the premium (Rs 1.45 lakh instead of Rs 2,345); same-line labels ran into the invoice number; a policy-schedule heading was named as the insurer. Fixed with tests (earliest cover end is the renewal; separated numbers need a state code and a non-month series; declared-value figures never supply the amount; previous-policy periods are ignored). One independent review: six findings fixed with tests.
-- Next: check one real insurance policy PDF the owner saves locally (read only, nothing committed). The Royal Enfield job-card layout is already a fixture. No-duplicate posting is verified for byte replay/concurrent upload and complete identity conflicts; incomplete/legacy identifiers still require review.
+- Next: check a stand-alone third-party policy and other insurers' layouts when available. No-duplicate posting is verified for byte replay/concurrent upload and complete identity conflicts; incomplete/legacy identifiers still require review.
 
 ### BIKE-05 — Spare parts and service recommendations
 

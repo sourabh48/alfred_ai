@@ -174,6 +174,60 @@ Synthetic General Insurance Co. Ltd."""
             with self.subTest(plate=plate):
                 self.assertEqual(parse_text(self.HEADER.replace("KA05MN4321", plate)).fields["vehicle_number"], expected)
 
+    # Structure of a real stand-alone own-damage schedule as extracted (owner-checked 2026-11-05); every value is synthetic.
+    OWN_DAMAGE_SCHEDULE = """Reference No.: SYN000001
+Date: Apr 12, 2026
+Pleasefind enclosed Policy No. 9999/O/000000001/01/B00, The same has been issued based on below mentioned details
+Period of Insurance - Own Damage Apr 12, 2026 to Apr 11, 2027
+Vehicle Make / Model ROYAL ENFIELD / HUNTER 350
+Vehicle Registration No. KA05MN4321
+Previous Policy Period 22-03-2025 to 21-03-2026
+Third Party Period of Insurance Mar 21, 2024 to Mar 21, 2029
+Policy No. : 9999/O/000000001/01/B00
+Policy Issued On : Apr 12, 2026
+Vehicle IDV Side Car Additional Accessories (`) Total IDV
+1,48,000.00 0.00 0.00 1,48,000.00
+Basic OD Premium 1,596.00
+Sub Total 1,596.00
+Total Own Damage Premium(A) 1,197.00
+Total Tax Payable in ` 215.00
+Total Premium Payable In ` 1,412.00
+Premium Collection No.\t1000000001\tPremium Amount (`)\t1,412.00\tReceipt Date\t12-04-2026
+PolicyIssuing Office:Synthetic Lombard General Insurance Company Limited, SYNTHETIC HOUSE, 1, Example Marg,"""
+
+    def test_own_damage_schedule_reads_issue_expiry_premium_and_insurer(self):
+        parsed = parse_text(self.OWN_DAMAGE_SCHEDULE)
+        self.assertEqual(parsed.document_type, "insurance")
+        expected = {"vehicle_number": "KA05MN4321", "document_number": "9999/O/000000001/01/B00",
+                    "issue_date": "2026-04-12", "expiry_date": "2027-04-11", "amount": 1412.0,
+                    "issuer": "Synthetic Lombard General Insurance Company Limited"}
+        self.assertEqual({key: parsed.fields.get(key) for key in expected}, expected)
+
+    def test_insurer_name_is_the_current_insurer_not_a_cover_phrase_or_previous_insurer(self):
+        cases = (
+            ("Two Wheeler Insurance Cover Note\nSynthetic General Insurance Company Limited", "Synthetic General Insurance Company Limited"),
+            ("Synthetic Digit General Insurance Ltd.\nPrevious Insurer: The Synthetic Assurance Company Limited", "Synthetic Digit General Insurance Ltd."),
+        )
+        for body, expected in cases:
+            with self.subTest(expected=expected):
+                text = "Motor Insurance Policy\nPolicy No: SYN/POL/1\n" + body
+                self.assertEqual(parse_text(text).fields["issuer"], expected)
+
+    def test_amount_is_never_a_count_or_the_row_under_a_currency_header(self):
+        self.assertEqual(parse_text(self.HEADER + "Premium payable in 2 instalments of Rs 706\nTotal Premium Payable: Rs 1,412").fields["amount"], 1412.0)
+        invoice = parse_text("TAX INVOICE\nInvoice No: SM/1 Invoice Date: 05/04/2026\nVehicle No: KA05MN4321\n"
+                             "Sl Description Qty Rate Total Amount (Rs.)\n1 Engine Oil 1 450.00 450.00\nGrand Total: 750.00")
+        self.assertEqual(invoice.service_payload["cost"], 750.0)
+
+    def test_previous_policy_issue_date_is_not_the_issue_date(self):
+        self.assertEqual(parse_text(self.HEADER + "Previous policy issued on 12/04/2025\nDate: 12/04/2026").fields["issue_date"], "2026-04-12")
+
+    def test_month_first_dates_are_read(self):
+        for line, expected in (("Policy Issued On : Apr 12, 2026", "2026-04-12"), ("Date: September 3, 2026", "2026-09-03"),
+                               ("Date: Apr 12,2026", "2026-04-12")):
+            with self.subTest(line=line):
+                self.assertEqual(parse_text(self.HEADER + line).fields["issue_date"], expected)
+
     def test_policy_period_words_are_never_a_registration_number(self):
         text = "Motor Insurance Policy\nPolicy No: SYN/POL/1\nPeriod of Insurance From 15-Mar-2026 To Midnight of 14 MAR 2027"
         self.assertNotIn("vehicle_number", parse_text(text).fields)
