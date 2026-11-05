@@ -89,6 +89,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             lambda _: self.active_requests == 0)
         super().tearDown()
 
+    def settle_page(self):
+        # Hosted runners took up to 20 s for /documents/ load calls (run 42008167396); a click made
+        # meanwhile queued behind them and missed the 20 s wait.
+        from selenium.webdriver.support.ui import WebDriverWait
+        WebDriverWait(self.browser, max(20, settings.ALFRED_UPLOAD_PARSER_SECONDS) + 10).until(
+            lambda _: self.active_requests == 0)
+
     def login(self, username="acceptance_demo"):
         self.browser.get(self.live_server_url + "/login/")
         self.browser.find_element(self.By.NAME, "username").send_keys(username)
@@ -3161,7 +3168,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertTrue(self.browser.execute_script("const e=document.querySelector('#documentCorpusResults article p');return e.scrollWidth<=e.clientWidth;"))
             self.capture('general-private-corpus-'+theme+'-390px')
         self.browser.refresh(); self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
-        self.memory_click('#documentCorpusRefresh')
+        self.settle_page(); self.memory_click('#documentCorpusRefresh')
         self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
         self.wait.until(lambda _: 'Synthetic local notes.txt' in self.text('documentCorpusList'))
         self.browser.find_element(self.By.ID,'documentCorpusFile').send_keys(str(pdf_file))
@@ -3222,7 +3229,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Encrypted copy stored' in self.text('documentCorpusStatus'))
         self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#documentCorpusList input:checked'))
         self.browser.refresh(); self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusRefresh').is_enabled())
-        self.memory_click('#documentCorpusRefresh')
+        self.settle_page(); self.memory_click('#documentCorpusRefresh')
         self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
         self.assertNotIn('Foreign private',self.text('documentCorpusList'))
         self.memory_click('#documentCorpusList input')

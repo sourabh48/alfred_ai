@@ -116,6 +116,10 @@
 - Master CI on `45ef2c8` (three shards): all 13 checks PASS; backend shard jobs 14.9 / 15.5 / 12.4 min, native 5.9 min
   (was one 34 min job). One job was over the 15 min target, so the backend now uses four shards (about 6.3 min of tests
   each locally); Selenium shards (19 min) are now the longest jobs.
+- Master CI on `ab061a0` (four backend shards): backend shards 13.7 / 12.2 / 7.8 / 11.2 min, native 5.2 min, aggregate
+  PASS. Selenium shard 0 failed: the shard artifact showed the corpus refresh still pending, queued behind /documents/
+  load calls that took up to 20 s on the hosted runner (not a 409). Two Chrome tests now wait for the page's requests
+  to drain before clicking refresh (same drain as teardown). Owner: 15-20 min CI jobs are acceptable.
 - Next: BIKE-04 real-policy check when the owner provides a PDF; otherwise the next queue item.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
