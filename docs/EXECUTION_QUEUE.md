@@ -10,6 +10,7 @@ local work first; CI_PENDING may coexist with independent IMPLEMENTING work.
 Phase A → B → C → D; module-by-module inside each phase. Skip an actually blocked
 item with its exact reason; do not call its acceptance complete. Later-phase
 prerequisite exceptions need a recorded reason. Accepted baseline rows are never requeued.
+Owner decision 2026-11-05: COUNCIL tasks are queued after all other modules.
 
 Effort bands are preliminary scope estimates, not measured durations: S = bounded existing path;
 M = multi-path acceptance; L = broader integration, outcomes or external environment.
@@ -28,60 +29,60 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 5 | A | AI-10 — Persistent general conversation history | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: private-history activation remains off |
 | 6 | A | AI-14 — Background learning pipeline | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: eligible consented training and reviewed outcomes |
 | 7 | A | AI-15 — Model registry and serving readiness | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: genuine per-model held-out outcomes |
-| 8 | A | COUNCIL-01 — Multiple ML inference roles and registry routing | IMPLEMENTED_NOT_ACCEPTED | P2 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 9 | A | RUNTIME-09 — Filesystem protection of private DB/config | IMPLEMENTED_NOT_ACCEPTED | P1 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 10 | A | RUNTIME-11 — Dependency security and reproducible builds | IMPLEMENTED_NOT_ACCEPTED | P1 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 11 | A | RUNTIME-14 — M21 rehearsal, failure injection and rollback acceptance | IMPLEMENTED_NOT_ACCEPTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: production/recovery rehearsal scope |
-| 12 | A | RUNTIME-03 — Windows sign-in and sustained scheduled observation | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: sustained sign-in/scheduler observation |
-| 13 | A | RUNTIME-05 — Install/upgrade/uninstall on separate PC | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: independent Windows PC acceptance |
-| 14 | A | RUNTIME-06 — Offline startup and local model prerequisites | IMPLEMENTED_NOT_ACCEPTED | P2 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 15 | A | RUNTIME-15 — Local/LAN hosting and optional Docker stack | IMPLEMENTED_NOT_ACCEPTED | P2 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 16 | B | FIN-07 — Cash-flow forecasting | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 17 | B | FIN-13 — Financial export and correction | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 18 | B | FIN-16 — Tax calculations and source-backed eligibility | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 19 | B | FIN-17 — Credit bureau reports and official score access | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 20 | B | INV-04 — Risk classification and recommendations | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 21 | B | INV-06 — Long-term investment planning | PARTIALLY_IMPLEMENTED | P2 / L | FIN-06, FIN-15 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: FIN-06, FIN-15 |
-| 22 | B | INV-07 — Persistent portfolio alerts | PARTIALLY_IMPLEMENTED | P2 / L | FIN-15 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: FIN-15 |
-| 23 | B | DOC-07 — AI Q&A over arbitrary financial documents | PARTIALLY_IMPLEMENTED | P2 / L | DOC-06 | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 24 | B | DOC-09 — Document deletion and retention | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 25 | B | AI-12 — Cross-module personal reasoning | PARTIALLY_IMPLEMENTED | P2 / L | AI-15, AI-16 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: AI-15, AI-16 |
-| 26 | B | AI-16 — Retrieval/model quality and drift monitoring | PARTIALLY_IMPLEMENTED | P2 / L | AI-15 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: AI-15 |
-| 27 | B | CAREER-04 — Recruiter email/attachment processing | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 28 | B | CAREER-07 — Interview preparation | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 29 | B | CAREER-08 — Predictive career forecasting and timing | PARTIALLY_IMPLEMENTED | P2 / L | CAREER-07, AI-15, AI-16 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: CAREER-07, AI-15, AI-16 |
-| 30 | B | TRAVEL-04 — Multiple destinations and day-wise itineraries | PARTIALLY_IMPLEMENTED | P2 / L | TRAVEL-03 | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 31 | B | TRAVEL-07 — Scenic and truly alternative routes | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 32 | B | TRAVEL-08 — Expressway avoidance and motorcycle road restrictions | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 33 | B | TRAVEL-09 — Route corridor stops and real detour distance | PARTIALLY_IMPLEMENTED | P2 / L | TRAVEL-07 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: TRAVEL-07 |
-| 34 | B | TRAVEL-15 — Live permits and road closure confirmation | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 35 | B | BIKE-03 — Maintenance prediction and condition tracking | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 36 | B | BIKE-05 — Spare parts and service recommendations | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 37 | B | COUNCIL-02 — Planning/coding/review/security multi-agent application | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-01 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-01 |
-| 38 | B | COUNCIL-04 — Persistent tasks, conflicts and usage-limit recovery | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-02 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-02 |
-| 39 | B | COUNCIL-05 — AI development budget and human Git approval | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-04 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-04 |
-| 40 | B | OPENAI-02 — Model compatibility and current price review | PARTIALLY_IMPLEMENTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 41 | B | RUNTIME-12 — GitHub CI and branch/source protection | PARTIALLY_IMPLEMENTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 42 | C | TRAVEL-11 — Hotel live availability | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
-| 43 | C | TRAVEL-12 — Flight live availability | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
-| 44 | C | TRAVEL-13 — Train live seat/fare/waitlist inventory | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
-| 45 | C | OPENAI-07 — Real paid-provider acceptance | BLOCKED_APPROVAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 46 | C | SYNC-09 — Portable keys and independent multi-device/device-loss recovery | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 47 | C | SYNC-10 — Real provider activation, costs and IAM acceptance | BLOCKED_APPROVAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 48 | C | RUNTIME-08 — Off-device/device-loss disaster recovery | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 49 | C | RUNTIME-16 — Real-account and manual accessibility acceptance | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 50 | D | FIN-15 — Canonical currency persistence and multi-currency aggregation | NOT_IMPLEMENTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: canonical currency/FX policy is not approved |
-| 51 | D | FIN-06 — Persisted savings goals and progress workflow | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 52 | D | AI-17 — Autonomous user task execution | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 53 | D | AI-18 — Voice assistant | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 54 | D | TRAVEL-14 — Bus live inventory | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 55 | D | TRAVEL-18 — Google Maps API integration and offline map packages | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: Google configuration/credentials and offline map scope |
-| 56 | D | TRAVEL-20 — Video management and social Travel profile | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 57 | D | COUNCIL-03 — Experimental self-improvement engine | NOT_IMPLEMENTED | P1 / L | COUNCIL-05 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-05 |
-| 58 | D | SYNC-02 — Non-AWS encrypted object adapter (AWS withdrawn) | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 59 | D | SYNC-11 — Full application/cloud backup | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 8 | A | RUNTIME-09 — Filesystem protection of private DB/config | IMPLEMENTED_NOT_ACCEPTED | P1 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 9 | A | RUNTIME-11 — Dependency security and reproducible builds | IMPLEMENTED_NOT_ACCEPTED | P1 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 10 | A | RUNTIME-14 — M21 rehearsal, failure injection and rollback acceptance | IMPLEMENTED_NOT_ACCEPTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: production/recovery rehearsal scope |
+| 11 | A | RUNTIME-03 — Windows sign-in and sustained scheduled observation | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: sustained sign-in/scheduler observation |
+| 12 | A | RUNTIME-05 — Install/upgrade/uninstall on separate PC | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: independent Windows PC acceptance |
+| 13 | A | RUNTIME-06 — Offline startup and local model prerequisites | IMPLEMENTED_NOT_ACCEPTED | P2 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 14 | A | RUNTIME-15 — Local/LAN hosting and optional Docker stack | IMPLEMENTED_NOT_ACCEPTED | P2 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 15 | B | FIN-07 — Cash-flow forecasting | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 16 | B | FIN-13 — Financial export and correction | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 17 | B | FIN-16 — Tax calculations and source-backed eligibility | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 18 | B | FIN-17 — Credit bureau reports and official score access | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 19 | B | INV-04 — Risk classification and recommendations | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 20 | B | INV-06 — Long-term investment planning | PARTIALLY_IMPLEMENTED | P2 / L | FIN-06, FIN-15 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: FIN-06, FIN-15 |
+| 21 | B | INV-07 — Persistent portfolio alerts | PARTIALLY_IMPLEMENTED | P2 / L | FIN-15 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: FIN-15 |
+| 22 | B | DOC-07 — AI Q&A over arbitrary financial documents | PARTIALLY_IMPLEMENTED | P2 / L | DOC-06 | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 23 | B | DOC-09 — Document deletion and retention | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 24 | B | AI-12 — Cross-module personal reasoning | PARTIALLY_IMPLEMENTED | P2 / L | AI-15, AI-16 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: AI-15, AI-16 |
+| 25 | B | AI-16 — Retrieval/model quality and drift monitoring | PARTIALLY_IMPLEMENTED | P2 / L | AI-15 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: AI-15 |
+| 26 | B | CAREER-04 — Recruiter email/attachment processing | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 27 | B | CAREER-07 — Interview preparation | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 28 | B | CAREER-08 — Predictive career forecasting and timing | PARTIALLY_IMPLEMENTED | P2 / L | CAREER-07, AI-15, AI-16 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: CAREER-07, AI-15, AI-16 |
+| 29 | B | TRAVEL-04 — Multiple destinations and day-wise itineraries | PARTIALLY_IMPLEMENTED | P2 / L | TRAVEL-03 | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 30 | B | TRAVEL-07 — Scenic and truly alternative routes | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 31 | B | TRAVEL-08 — Expressway avoidance and motorcycle road restrictions | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 32 | B | TRAVEL-09 — Route corridor stops and real detour distance | PARTIALLY_IMPLEMENTED | P2 / L | TRAVEL-07 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: TRAVEL-07 |
+| 33 | B | TRAVEL-15 — Live permits and road closure confirmation | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 34 | B | BIKE-03 — Maintenance prediction and condition tracking | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 35 | B | BIKE-05 — Spare parts and service recommendations | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 36 | B | OPENAI-02 — Model compatibility and current price review | PARTIALLY_IMPLEMENTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 37 | B | RUNTIME-12 — GitHub CI and branch/source protection | PARTIALLY_IMPLEMENTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 38 | C | TRAVEL-11 — Hotel live availability | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
+| 39 | C | TRAVEL-12 — Flight live availability | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
+| 40 | C | TRAVEL-13 — Train live seat/fare/waitlist inventory | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
+| 41 | C | OPENAI-07 — Real paid-provider acceptance | BLOCKED_APPROVAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
+| 42 | C | SYNC-09 — Portable keys and independent multi-device/device-loss recovery | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
+| 43 | C | SYNC-10 — Real provider activation, costs and IAM acceptance | BLOCKED_APPROVAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
+| 44 | C | RUNTIME-08 — Off-device/device-loss disaster recovery | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
+| 45 | C | RUNTIME-16 — Real-account and manual accessibility acceptance | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
+| 46 | D | FIN-15 — Canonical currency persistence and multi-currency aggregation | NOT_IMPLEMENTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: canonical currency/FX policy is not approved |
+| 47 | D | FIN-06 — Persisted savings goals and progress workflow | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 48 | D | AI-17 — Autonomous user task execution | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 49 | D | AI-18 — Voice assistant | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 50 | D | TRAVEL-14 — Bus live inventory | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 51 | D | TRAVEL-18 — Google Maps API integration and offline map packages | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: Google configuration/credentials and offline map scope |
+| 52 | D | TRAVEL-20 — Video management and social Travel profile | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 53 | D | SYNC-02 — Non-AWS encrypted object adapter (AWS withdrawn) | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 54 | D | SYNC-11 — Full application/cloud backup | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 55 | A | COUNCIL-01 — Multiple ML inference roles and registry routing | IMPLEMENTED_NOT_ACCEPTED | P2 / M | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 56 | B | COUNCIL-02 — Planning/coding/review/security multi-agent application | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-01 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-01 |
+| 57 | B | COUNCIL-04 — Persistent tasks, conflicts and usage-limit recovery | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-02 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-02 |
+| 58 | B | COUNCIL-05 — AI development budget and human Git approval | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-04 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-04 |
+| 59 | D | COUNCIL-03 — Experimental self-improvement engine | NOT_IMPLEMENTED | P1 / L | COUNCIL-05 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-05 |
 
-**Next eligible for `next` or active `sprint`: COUNCIL-01.**
+**Next eligible for `next` or active `sprint`: RUNTIME-09.**
 
 ## Accepted baseline — excluded from execution
 

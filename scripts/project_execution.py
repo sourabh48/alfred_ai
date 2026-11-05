@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 STATES = ('IMPLEMENTED_NOT_ACCEPTED', 'PARTIALLY_IMPLEMENTED', 'BLOCKED_APPROVAL',
           'BLOCKED_EXTERNAL', 'NOT_IMPLEMENTED', 'COMPLETE_VERIFIED')
 PHASE = {STATES[0]: 'A', STATES[1]: 'B', STATES[2]: 'C', STATES[3]: 'C', STATES[4]: 'D', STATES[5]: 'DONE'}
+# Owner decision 2026-11-05: AI Council work goes after every other module, whatever its phase.
+OWNER_DEFERRED_MODULES = ('COUNCIL',)
 MODULE_ORDER = ('FIN', 'LOAN', 'INV', 'DOC', 'AI', 'CAREER', 'TRAVEL', 'FAMILY', 'BIKE', 'COUNCIL', 'OPENAI', 'SYNC', 'RUNTIME')
 GATES = {
     'LOAN-08': 'BLOCKED_EVIDENCE: independent lender/document acceptance corpus',
@@ -50,7 +52,8 @@ def dependencies(requirements):
 def ordered(rows):
     def key(row):
         module = MODULE_ORDER.index(row['prefix']) if row['prefix'] in MODULE_ORDER else len(MODULE_ORDER)
-        return PHASE[row['status']], module, row['priority'], int(row['id'].split('-')[1])
+        return (row['prefix'] in OWNER_DEFERRED_MODULES, PHASE[row['status']], module, row['priority'],
+                int(row['id'].split('-')[1]))
     return sorted(rows, key=key)
 
 
@@ -148,7 +151,8 @@ def synchronize(root=ROOT, *, write=False, audit=None):
         'local work first; CI_PENDING may coexist with independent IMPLEMENTING work.',
         'Phase A → B → C → D; module-by-module inside each phase. Skip an actually blocked',
         'item with its exact reason; do not call its acceptance complete. Later-phase',
-        'prerequisite exceptions need a recorded reason. Accepted baseline rows are never requeued.', '',
+        'prerequisite exceptions need a recorded reason. Accepted baseline rows are never requeued.',
+        'Owner decision 2026-11-05: ' + ', '.join(OWNER_DEFERRED_MODULES) + ' tasks are queued after all other modules.', '',
         'Effort bands are preliminary scope estimates, not measured durations: S = bounded existing path;',
         'M = multi-path acceptance; L = broader integration, outcomes or external environment.',
         'Value P0/P1/P2/P3 is the recorded tracker priority, not an invented confidence score.',

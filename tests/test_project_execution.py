@@ -46,6 +46,11 @@ class ProjectExecutionTests(TestCase):
         self.assertEqual(set(result[2:4]), {'BLOCKED_EXTERNAL', 'BLOCKED_APPROVAL'})
         self.assertEqual(result[-1], 'NOT_IMPLEMENTED')
 
+    def test_owner_deferred_council_follows_every_other_phase(self):
+        rows = [dict(id='COUNCIL-1', prefix='COUNCIL', priority=0, status='IMPLEMENTED_NOT_ACCEPTED'),
+                dict(id='DOC-9', prefix='DOC', priority=3, status='NOT_IMPLEMENTED')]
+        self.assertEqual([r['id'] for r in ordered(rows)], ['DOC-9', 'COUNCIL-1'])
+
     def test_check_is_read_only_even_when_counts_are_stale(self):
         root = self.fixture()
         path = root / 'docs/PROJECT_STATUS.md'

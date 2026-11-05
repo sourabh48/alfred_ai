@@ -127,7 +127,8 @@
   total payable (rupee sign extracted as a backtick) and named the office address as insurer. Fixed; all six fields
   correct; synthetic test copies the layout. COMPLETE_VERIFIED for bounded scope (job card + own-damage schedule); a
   stand-alone third-party policy layout is not checked. Baseline 84/143.
-- Next: the next queue item.
+- OWNER_DECISION 2026-11-05: AI Council tasks (COUNCIL-01..05) go after all other modules (`OWNER_DEFERRED_MODULES`).
+- Next: RUNTIME-09.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
