@@ -54,7 +54,12 @@ function renderTaxHero(data) {
         document.getElementById("taxHeroCopy").textContent = "Confirm your income in Settings, or enter an annual income here, to estimate tax.";
     }
     const policy = data.tax_policy;
-    document.getElementById("taxPolicyCopy").textContent = `FY ${policy.financial_year} · AY ${policy.assessment_year}. Official-source rules verified ${policy.verified_at}; salary planning estimate before return-filing rounding.`;
+    const year = policy.assessment_year ? `FY ${policy.financial_year} · AY ${policy.assessment_year}` : `Tax year ${policy.financial_year}`;
+    document.getElementById("taxPolicyCopy").textContent = `${year} (${policy.act}). Official-source rules verified ${policy.verified_at}; salary planning estimate before return-filing rounding.`;
+    const coverage = data.tax_policy_coverage || {};
+    const notice = document.getElementById("taxPolicyNotice");
+    notice.textContent = [coverage.notice, coverage.filing_hint].filter(Boolean).join(" ");
+    notice.hidden = !notice.textContent;
 }
 
 function renderTaxSummary(data) {

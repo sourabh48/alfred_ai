@@ -30,7 +30,7 @@ from apps.loans.models import Loan
 from apps.loans.money import loan_money_float
 from apps.ml_engine.services.recommendation_engine import recommendation_engine
 from apps.ml_engine.services.tax_optimizer import tax_optimizer
-from apps.ml_engine.services.tax_policy import POLICY_VERSION, TaxPolicyError, amount, get_policy
+from apps.ml_engine.services.tax_policy import POLICY_VERSION, TaxPolicyError, amount, get_policy, policy_coverage
 
 
 def _query_float(request, key, default):
@@ -830,6 +830,7 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
     return {
         "annual_income": annual_income,
         "tax_policy": policy.metadata(),
+        "tax_policy_coverage": policy_coverage(),
         "financial_baseline": financial_baseline,
         "inputs": {
             "financial_year": policy.financial_year,

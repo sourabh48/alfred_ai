@@ -8,7 +8,8 @@
             <div class="alfred-chip mb-3">Regime comparison and deduction strategy</div>
             <h1 class="alfred-hero-title">Compare old versus new tax regime, identify deduction gaps, and convert them into a concrete action plan.</h1>
             <p class="alfred-hero-copy">Compare a salary planning scenario for a resident individual under 60. Review deduction eligibility before using the estimate.</p>
-            <p class="metric-caption" id="taxPolicyCopy">FY 2025-26 · AY 2026-27. Other years and special-rate income are not supported by this calculation.</p>
+            <p class="metric-caption" id="taxPolicyCopy">Tax year 2026-27 (Income-tax Act, 2025) and FY 2025-26 · AY 2026-27. Other years and special-rate income are not supported by this calculation.</p>
+            <p class="metric-caption fw-semibold" id="taxPolicyNotice" role="status" hidden></p>
         </div>
         <div class="surface-card" style="min-width: 280px;">
             <p class="metric-kicker">Recommended Regime</p>
@@ -29,6 +30,7 @@
                     <div class="col-12">
                         <label class="form-label" for="taxFinancialYear">Financial Year</label>
                         <select id="taxFinancialYear" name="financial_year" class="form-select">
+                            <option value="2026-27">Tax year 2026-27 (Income-tax Act, 2025)</option>
                             <option value="2025-26">FY 2025-26 / AY 2026-27</option>
                         </select>
                     </div>
@@ -96,5 +98,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/tax_optimizer.js?v=3.4.1"></script>
+<script src="/static/js/tax_optimizer.js?v=3.5.0"></script>
 {% endblock %}

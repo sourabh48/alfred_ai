@@ -10,7 +10,9 @@ from django.utils import timezone
 from apps.integrations.services import verified_intelligence
 from apps.loans.models import Loan, LoanPaymentHistory
 from apps.ml_engine.services.tax_optimizer import tax_optimizer
-from apps.ml_engine.services.tax_policy import POLICY_VERSION, TaxPolicyError, calculate_income_tax, get_policy
+from apps.ml_engine.services.tax_policy import (
+    POLICY_VERSION, TaxPolicyError, calculate_income_tax, default_financial_year, get_policy, policy_coverage,
+)
 
 
 D = Decimal
@@ -131,9 +133,10 @@ class TaxPolicyTests(SimpleTestCase):
         self.assertEqual(comparison["new_regime"]["total_deductions"], 30000)
 
     def test_unsupported_years_and_mismatch_are_never_substituted(self):
-        for options in ({"financial_year": "2024-25"}, {"financial_year": "2026-27"},
+        for options in ({"financial_year": "2024-25"}, {"financial_year": "2027-28"},
                         {"assessment_year": "2025-26"}, {"assessment_year": "2027-28"},
                         {"financial_year": "2025-26", "assessment_year": "2027-28"},
+                        {"financial_year": "2026-27", "assessment_year": "2026-27"},
                         {"financial_year": ""}):
             with self.subTest(options=options), self.assertRaises(TaxPolicyError):
                 calculate_income_tax(1000000, **options)
@@ -156,10 +159,63 @@ class TaxPolicyTests(SimpleTestCase):
         result = calculate_income_tax("1275000.01", "new")
         self.assertIsInstance(result["base_tax"], Decimal)
         self.assertEqual(result["final_tax"], D("0.01"))
-        self.assertEqual(result["policy"]["version"], POLICY_VERSION)
-        self.assertEqual(result["policy"]["verified_at"], "2026-10-01")
+        self.assertEqual(result["policy"]["version"], "india-ordinary-income-2026-27-v1")
+        self.assertEqual(result["policy"]["verified_at"], "2026-11-06")
+        self.assertEqual(calculate_income_tax(1, financial_year="2025-26")["policy"]["version"], POLICY_VERSION)
         self.assertEqual(result["policy"]["freshness"], "STATIC_REFERENCE")
         self.assertEqual(get_policy("new").metadata()["rebate_limit"], 60000)
+
+
+class TaxYear202627Tests(SimpleTestCase):
+    """Tax year 2026-27 under the Income-tax Act, 2025 and the enacted Finance Act, 2026."""
+
+    def test_every_figure_matches_the_enacted_texts_and_previous_year(self):
+        # Finance Act 2026 s.3 kept the slabs, surcharge and 4% cess; the 2025 Act kept the
+        # s.156 rebates, s.19 standard deductions and Chapter VIII caps.
+        for regime in ("old", "new"):
+            previous, current = get_policy(regime, financial_year="2025-26"), get_policy(regime, financial_year="2026-27")
+            for field in ("slabs", "standard_deduction", "rebate_threshold", "rebate_limit", "rebate_marginal_relief",
+                          "surcharge_bands", "deduction_limits", "cess_rate"):
+                with self.subTest(regime=regime, field=field):
+                    self.assertEqual(getattr(current, field), getattr(previous, field))
+            self.assertIsNone(current.assessment_year)
+            self.assertEqual(current.act, "Income-tax Act, 2025")
+        sections = get_policy("new", financial_year="2026-27").metadata()["legal_sections"]
+        self.assertEqual((sections["rebate"], sections["new_regime"], sections["80C"]), ("156", "202", "123 (Schedule XV)"))
+
+    def test_published_examples_hold_for_tax_year_2026_27(self):
+        # FAQ Budget 2026 (Rates of Income-tax Q.6-Q.11) worked examples.
+        cases = ((1200000, 0), (1210000, 10000), (1250000, 50000), (1270588, 70588))
+        for income, tax in cases:
+            with self.subTest(income=income):
+                result = calculate_income_tax(income, "new", income_type="ordinary", financial_year="2026-27")
+                self.assertEqual(result["tax_before_cess"], tax)
+        self.assertEqual(calculate_income_tax(1275000, "new", financial_year="2026-27")["final_tax"], 0)
+        old = calculate_income_tax(500001, "old", income_type="ordinary", financial_year="2026-27")
+        self.assertEqual(old["final_tax"], D("13000.21"))
+        senior = calculate_income_tax(1000000, "old", income_type="ordinary", financial_year="2026-27", age_group="60_to_79")
+        self.assertEqual(senior["base_tax"], 110000)
+
+    def test_default_year_follows_the_date_and_never_invents_rules(self):
+        self.assertEqual(default_financial_year(date(2026, 3, 31)), "2025-26")
+        self.assertEqual(default_financial_year(date(2026, 4, 1)), "2026-27")
+        self.assertEqual(default_financial_year(date(2027, 4, 1)), "2026-27")  # 2027-28 unverified
+
+    def test_coverage_warns_after_budget_day_and_when_a_year_starts_unverified(self):
+        quiet = policy_coverage(date(2026, 11, 6))
+        self.assertEqual((quiet["status"], quiet["notice"]), ("CURRENT", ""))
+        self.assertIn("tax year 2025-26", quiet["filing_hint"])
+        self.assertEqual(policy_coverage(date(2027, 1, 31))["status"], "CURRENT")
+        budget = policy_coverage(date(2027, 2, 1))
+        self.assertEqual(budget["status"], "NEXT_BUDGET_UNVERIFIED")
+        self.assertIn("2027-28", budget["notice"])
+        self.assertIn("2026-27 rules", budget["notice"])
+        self.assertEqual(budget["filing_hint"], "")
+        started = policy_coverage(date(2027, 4, 1))
+        self.assertEqual(started["status"], "CURRENT_YEAR_UNVERIFIED")
+        self.assertIn("Tax year 2027-28 has started", started["notice"])
+        self.assertIn("tax year 2026-27", started["filing_hint"])
+        self.assertEqual(policy_coverage(date(2026, 2, 1))["status"], "CURRENT")  # 2026-27 is verified
 
 
 class TaxOverviewTests(TestCase):
@@ -193,7 +249,7 @@ class TaxOverviewTests(TestCase):
         self.assertEqual(self.client.get(self.url).status_code, 200)
         for params in ({"annual_income": "NaN"}, {"annual_income": "-1"}, {"annual_income": "bad"},
                        {"rent_paid": "Infinity"}, {"annual_income": ""}, {"financial_year": "2024-25"},
-                       {"financial_year": "2026-27"}, {"assessment_year": "2027-28"}):
+                       {"financial_year": "2027-28"}, {"assessment_year": "2027-28"}):
             with self.subTest(params=params):
                 response = self.client.get(self.url, params)
                 self.assertEqual(response.status_code, 400)
@@ -203,6 +259,11 @@ class TaxOverviewTests(TestCase):
         data = self.client.get(self.url, {"assessment_year": "2026-27"}).json()
         self.assertEqual(data["tax_policy"]["financial_year"], "2025-26")
         self.assertEqual(data["inputs"]["financial_year"], "2025-26")
+        current = self.client.get(self.url, {"financial_year": "2026-27"}).json()
+        self.assertEqual(current["tax_policy"]["act"], "Income-tax Act, 2025")
+        self.assertIsNone(current["inputs"]["assessment_year"])
+        self.assertIn(current["tax_policy_coverage"]["status"],
+                      ("CURRENT", "NEXT_BUDGET_UNVERIFIED", "CURRENT_YEAR_UNVERIFIED"))
 
     def test_payment_deductions_use_selected_year(self):
         loan = Loan.objects.create(user=self.user, loan_type="home", lender="Test", principal=1000000,
