@@ -10,7 +10,7 @@ from django.test import TestCase, SimpleTestCase, Client, override_settings
 from django.utils import timezone
 
 from apps.ml_engine.services.persistent_memory import MemoryStore, MemoryConflict, _owner
-from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable, OllamaEmbeddings
 from apps.ml_engine.services.hybrid_intelligence import hybrid_answer, OllamaReasoner, source_context
 from apps.ml_engine.services.memory_reasoning import MockReasoner, configure_reasoning, ReasoningBudgetExceeded
 from tests.test_persistent_memory import SyntheticEmbeddings
@@ -184,6 +184,15 @@ class OllamaReasonerBoundaryTests(SimpleTestCase):
         _,path,body=http.call_args.args
         self.assertEqual(path,'/api/chat'); self.assertFalse(body['stream']); self.assertFalse(body['think'])
         self.assertNotIn('tools',body); self.assertEqual(body['options']['num_predict'],256)
+        # Owner decision 2026-11-05: models stay loaded for five idle minutes instead of reloading on every call.
+        self.assertEqual(body['keep_alive'],'5m')
+
+    def test_embedding_calls_keep_the_local_model_loaded_briefly(self):
+        embeddings=OllamaEmbeddings()
+        with patch.object(embeddings,'_digest',return_value='a'*64),patch.object(embeddings,'_request',return_value={'model':embeddings.model,'embeddings':[[0.1,0.2]]}) as http:
+            embeddings.embed('synthetic',deadline=time.monotonic()+5)
+        _,path,body=http.call_args.args
+        self.assertEqual(path,'/api/embed'); self.assertEqual(body['keep_alive'],'5m')
 
     def test_remote_models_malformed_outputs_tool_calls_and_model_changes_are_rejected(self):
         reasoner=OllamaReasoner()

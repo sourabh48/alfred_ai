@@ -5,6 +5,11 @@ import time
 from math import isfinite, hypot
 
 
+# Owner decision 2026-11-05: keep a model loaded for five idle minutes (Ollama's default). Reloading on every call
+# took 23-30 s on this PC against the 30-second deadline.
+KEEP_ALIVE = '5m'
+
+
 class EmbeddingUnavailable(RuntimeError):
     pass
 
@@ -72,7 +77,7 @@ class OllamaEmbeddings:
             raise ValueError('Choose a finite local processing deadline.')
         budget={'deadline':deadline} if deadline is not None else {}
         before = self._digest(**budget)
-        result = self._request('POST', '/api/embed', {'model': self.model, 'input': text, 'truncate': False, 'keep_alive': '0'},**budget)
+        result = self._request('POST', '/api/embed', {'model': self.model, 'input': text, 'truncate': False, 'keep_alive': KEEP_ALIVE},**budget)
         try:
             vector = validate_vector(result['embeddings'][0])
         except (KeyError, IndexError, TypeError):

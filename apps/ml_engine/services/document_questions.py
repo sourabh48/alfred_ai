@@ -4,7 +4,7 @@ import time
 
 from .canonical_evidence import SourceSelectionConflict
 from .hybrid_intelligence import OllamaReasoner
-from .local_embeddings import EmbeddingUnavailable
+from .local_embeddings import KEEP_ALIVE, EmbeddingUnavailable
 
 SCHEMA = {'type': 'object', 'properties': {
     'state': {'type': 'string', 'enum': ['evidence', 'insufficient', 'conflict']},
@@ -25,7 +25,7 @@ CONTEXT_LIMIT = ('The complete selected extraction does not fit the local contex
 class DocumentQuestionReasoner(OllamaReasoner):
     def select(self, payload, *, deadline):
         before = self._digest(deadline=deadline)
-        body = dict(model=self.model, stream=False, think=False, keep_alive='0', format=SCHEMA,
+        body = dict(model=self.model, stream=False, think=False, keep_alive=KEEP_ALIVE, format=SCHEMA,
             options=dict(num_predict=256, num_ctx=8192, temperature=0), messages=[
                 {'role': 'system', 'content': 'Return a JSON object with state and evidence. '
                     'state=evidence: one or more passages explicitly answer the question; evidence lists their IDs. '

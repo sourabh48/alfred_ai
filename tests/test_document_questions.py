@@ -122,7 +122,7 @@ class DocumentQuestionTests(TestCase):
             self.assertTrue(reasoner.select({'question':'synthetic','passages':[]},deadline=123))
         body=request.call_args.args[2]
         self.assertIn(json.dumps(SCHEMA,separators=(',',':')),body['messages'][0]['content'])
-        self.assertEqual(body['format'],SCHEMA); self.assertEqual(body['keep_alive'],'0'); self.assertFalse(body['think'])
+        self.assertEqual(body['format'],SCHEMA); self.assertEqual(body['keep_alive'],'5m'); self.assertFalse(body['think'])
         self.assertEqual(body['model'],reasoner.model); self.assertEqual(request.call_args.kwargs['deadline'],123)
         for change in ({'done_reason':'length'},{'done':False},{'model':'different'},
                 {'message':dict(role='assistant',content='{}',tool_calls=[{}])}):
