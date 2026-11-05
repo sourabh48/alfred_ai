@@ -34,6 +34,15 @@ DATE_TEXT = r"(?:[0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{
 OTHER_DATE_CONTEXT_RE = re.compile(r"next|expir|valid|due|end date|renew|birth|period", re.IGNORECASE)
 
 VEHICLE_NUMBER_RE = re.compile(r"\b([A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}|\d{2}BH\d{4}[A-Z]{2})\b")
+# "KA-05-MN-4321" / "KA 05 MN 4321": separated forms need a real state code and a series that is not a
+# month, so "OF 14 MAR 2027" in a policy period is never read as a registration.
+SEPARATED_VEHICLE_NUMBER_RE = re.compile(
+    r"\b((?:AN|AP|AR|AS|BR|CG|CH|DD|DL|DN|GA|GJ|HP|HR|JH|JK|KA|KL|LA|LD|MH|ML|MN|MP|MZ|NL|OD|OR|PB|PY|RJ|SK|TG|TN|TR|TS|UK|UP|WB)"
+    r"[ -]\d{1,2}[ -](?!(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\b)[A-Z]{1,3}[ -]\d{4}|\d{2}[ -]BH[ -]\d{4}[ -][A-Z]{1,2})\b")
+# Insured declared value is the vehicle's cover value, never the premium paid.
+DECLARED_VALUE_RE = re.compile(r"(?:\bIDV\b|declared value)[^\n]*?\d[\d,]*(?:\.\d+)?", re.IGNORECASE)
+PREVIOUS_PERIOD_RE = re.compile(r"previous|prior|expiring|last year", re.IGNORECASE)
+INSURER_LINE_RE = re.compile(r"\b(?:insurance|assurance)\b.*\b(?:co\.?|company|ltd\.?|limited)(?:\W|$)", re.IGNORECASE)
 CURRENCY_TOKEN_RE = INR_LABEL_TOKEN
 MONEY_RE = re.compile(INR_AMOUNT, re.IGNORECASE)
 NUMERIC_TOKEN_RE = re.compile(rf"^(?:{CURRENCY_TOKEN_RE}\s*)?([0-9,]+(?:\.\d{{1,2}})?)(?:\s*/-)?$", re.IGNORECASE)
@@ -118,6 +127,13 @@ INLINE_INVOICE_LABEL_TOKENS = {
     "sgst",
     "total",
 }
+
+NEXT_LABEL_RE = re.compile(
+    r"\s+(?=(?:%s)\s*[:#])" % "|".join(re.escape(label) for label in sorted(
+        KNOWN_LABELS | {"invoice no", "bill no", "vehicle no", "registration no", "policy no", "policy number", "odometer"},
+        key=len, reverse=True)),
+    re.IGNORECASE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -380,25 +396,45 @@ class BikeDocumentAI:
     def _extract_common_fields(self, text: str) -> dict:
         return self._drop_empty_values(
             {
-                "vehicle_number": self._find_first(VEHICLE_NUMBER_RE, text),
+                "vehicle_number": self._find_first(VEHICLE_NUMBER_RE, text) or re.sub(r"[ -]", "", self._find_first(SEPARATED_VEHICLE_NUMBER_RE, text)),
                 "document_number": self._find_by_labels(text, ["policy no", "policy number", "certificate no", "registration no", "registration number", "invoice no", "job card no", "job card number"]),
                 "issuer": self._extract_issuer(text),
                 "issue_date": self._extract_date_by_labels(text, ["issue date", "invoice date", "job card date", "date of issue", "date"], allow_generic=True),
                 "expiry_date": self._extract_date_by_labels(text, ["expiry date", "date of expiry", "policy expiry", "expiry", "valid upto", "valid till", "valid until", "policy end date", "end date"], allow_generic=False) or self._extract_period_end(text),
-                "amount": self._extract_amount_by_labels(text, ["total customer amount", "customer payable", "net amount", "grand total", "total amount", "premium payable", "total premium", "premium", "total"]),
+                "amount": self._extract_amount_by_labels(self._without_declared_value(text),
+                    ["total customer amount", "customer payable", "net amount", "grand total", "total amount", "premium payable", "total premium", "premium", "total"]),
             }
         )
 
+    def _without_declared_value(self, text: str) -> str:
+        """Remove "IDV: 1,45,000" but keep a premium printed beside it; drop label-only leftovers."""
+        lines = []
+        for line in text.splitlines():
+            if DECLARED_VALUE_RE.search(line):
+                line = DECLARED_VALUE_RE.sub(" ", line)
+                if not any(char.isdigit() for char in line):
+                    continue
+            lines.append(line)
+        return "\n".join(lines)
+
     def _extract_period_end(self, text: str) -> str:
-        match = re.search(r"(?:policy period|period of (?:insurance|cover)|insurance period)(.{0,120})", text, re.IGNORECASE | re.DOTALL)
-        dates = [self._parse_date(value) for value in re.findall(DATE_TEXT, match.group(1))] if match else []
-        return dates[1] if len(dates) >= 2 and dates[1] > dates[0] else ""
+        # A bundled policy lists separate own-damage and third-party periods; the earliest end is the next renewal.
+        ends = []
+        # The window is a lookahead so a second period label inside it is still matched.
+        for match in re.finditer(r"(?:policy period|period of (?:insurance|cover)|insurance period|cover(?:age)? period)(?=(.{0,120}))", text, re.IGNORECASE | re.DOTALL):
+            if PREVIOUS_PERIOD_RE.search(text[text.rfind("\n", 0, match.start()) + 1:match.start()]):
+                continue
+            dates = [self._parse_date(value) for value in re.findall(DATE_TEXT, match.group(1))]
+            if len(dates) >= 2 and dates[0] and dates[1] > dates[0]:
+                ends.append(dates[1])
+        return min(ends, default="")
 
     def _extract_type_specific_fields(self, document_type: str, text: str, invoice_fields: dict | None = None) -> dict:
         fields = {}
         if document_type == "insurance":
             fields["document_number"] = self._find_by_labels(text, ["policy no", "policy number"])
-            fields["issuer"] = self._extract_issuer(text)
+            insurer = next((line for line in self._split_lines(text) if INSURER_LINE_RE.search(line)), "")
+            fields["issuer"] = insurer[:160] or self._extract_issuer(text)
         elif document_type == "puc":
             fields["document_number"] = self._find_by_labels(text, ["certificate no", "pucc no", "puc no"])
             fields["issuer"] = self._find_by_labels(text, ["testing center", "center name", "issuer"]) or self._extract_issuer(text)
@@ -501,7 +537,10 @@ class BikeDocumentAI:
             pattern = re.compile(rf"{re.escape(label)}[ \t]*[:#-]?[ \t]*([A-Z0-9/._ -]{{3,80}})", re.IGNORECASE)
             match = pattern.search(text)
             if match:
-                return match.group(1).strip(" .:-")
+                # The capture stops before a ":", so cut the next label from the rest of the line instead.
+                line_end = text.find("\n", match.start(1))
+                rest = self._before_next_label(text[match.start(1):None if line_end < 0 else line_end])
+                return re.match(r"[A-Z0-9/._ -]{0,80}", rest, re.IGNORECASE).group(0).strip(" .:-")
         return self._extract_label_value(self._split_lines(text), labels, max_lines=2)
 
     def _extract_date_by_labels(self, text: str, labels: list[str], allow_generic: bool = False) -> str:
@@ -996,7 +1035,7 @@ class BikeDocumentAI:
             for label, normalized_label in zip(ordered_labels, normalized_labels):
                 direct_match = re.match(rf"^{re.escape(label)}\s*[:#-]?\s*(.+)$", line, re.IGNORECASE)
                 if direct_match:
-                    remainder = direct_match.group(1).strip(" :-")
+                    remainder = self._before_next_label(direct_match.group(1)).strip(" :-")
                     if remainder:
                         matches.append(remainder)
                         break
@@ -1019,6 +1058,10 @@ class BikeDocumentAI:
         if not matches:
             return ""
         return matches[-1] if occurrence == "last" else matches[0]
+
+    def _before_next_label(self, value: str) -> str:
+        """Cut "SM/42 Invoice Date: 05/04/2026" at the next label on the same line."""
+        return NEXT_LABEL_RE.split(value, 1)[0]
 
     def _find_line_index(self, lines: list[str], labels: list[str]) -> int:
         normalized_labels = {self._normalize_token(label) for label in labels}

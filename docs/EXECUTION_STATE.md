@@ -107,7 +107,13 @@
   interval-derived service dates were called "recorded"; class defaults were 0.95-confidence trip facts. Fixed; Hunter
   manual figures. The owner saved the official manual: 349 cc, 13 L, tyres, service every 5,000 km / 6 months confirmed.
   COMPLETE_VERIFIED for bounded scope; baseline 83/143.
-- Next: BIKE-04.
+- Master CI on `6eb28f3` and `8093d98` (BIKE-01): all 9 checks PASS on each exact head.
+- BIKE-04 layout review (2026-11-05): separated registrations, bundled cover-period expiry, "Total IDV" read as premium,
+  same-line labels in invoice numbers and heading-as-insurer fixed with tests. Stays IMPLEMENTED_NOT_ACCEPTED until one
+  real insurance policy is checked locally (owner saves the PDF; read only, nothing committed).
+- CI: the native-windows backend gate (27-28 min in one job) is split into three measured shards plus the native check
+  in parallel (`native-windows-shards`); `native-windows` is now a fail-closed aggregate over the shard manifests.
+- Next: BIKE-04 real-policy check when the owner provides a PDF; otherwise the next queue item.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

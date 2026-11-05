@@ -126,6 +126,68 @@ class InsuranceExtractionTests(SimpleTestCase):
         self.assertEqual(fields["issue_date"], "2026-04-01")
 
 
+    BUNDLED = """Two Wheeler Package Policy - Bundled
+Policy Schedule cum Certificate of Insurance
+Policy Number : 3005/2A1234567/00/000
+Registration No. : KA-05-MN-4321
+Own Damage Cover Period : 15/03/2026 00:00 to 14/03/2027 23:59
+Third Party Cover Period : 15/03/2026 00:00 to 14/03/2031 23:59
+Insured Declared Value (IDV) : 1,45,000.00
+Net Premium : 1,987.29
+Total Premium : 2,345.00
+Synthetic General Insurance Co. Ltd."""
+
+    def test_bundled_policy_reads_separated_number_earliest_renewal_and_insurer(self):
+        fields = parse_text(self.BUNDLED).fields
+        self.assertEqual(fields["vehicle_number"], "KA05MN4321")
+        self.assertEqual(fields["expiry_date"], "2027-03-14")
+        self.assertEqual(fields["amount"], 2345.0)
+        self.assertEqual(fields["issuer"], "Synthetic General Insurance Co. Ltd.")
+        self.assertEqual(fields["document_number"], "3005/2A1234567/00/000")
+
+    def test_total_idv_is_not_read_as_the_premium(self):
+        parsed = parse_text(self.HEADER + "Total IDV ₹ 1,45,000\nPremium Amount (incl. GST) ₹ 2,345")
+        self.assertEqual(parsed.fields["amount"], 2345.0)
+        self.assertFalse(parse_text(self.HEADER + "Total IDV ₹ 1,45,000").fields.get("amount"))
+
+    def test_renewal_is_the_earliest_current_cover_end_in_any_order(self):
+        third_party_first = ("Third Party Cover Period : 15/03/2026 00:00 to 14/03/2031 23:59\n"
+                             "Own Damage Cover Period : 15/03/2026 00:00 to 14/03/2027 23:59")
+        self.assertEqual(parse_text(self.HEADER + third_party_first).fields["expiry_date"], "2027-03-14")
+        renewal = "Policy Period: 15/03/2026 to 14/03/2027\nPrevious Policy Period: 15/03/2025 to 14/03/2026"
+        self.assertEqual(parse_text(self.HEADER + renewal).fields["expiry_date"], "2027-03-14")
+
+    def test_premium_beside_the_idv_on_one_line_is_kept(self):
+        self.assertEqual(parse_text(self.HEADER + "IDV: Rs 1,45,000  Premium: Rs 2,345").fields["amount"], 2345.0)
+
+    def test_insurer_named_on_an_invoice_is_not_the_workshop(self):
+        fields = parse_text("TAX INVOICE\nSynthetic Motors - Authorised Service Centre\nInvoice No: X1\n"
+                            "Grand Total: 900\nClaim approved by Synthetic General Insurance Co. Ltd.").fields
+        self.assertEqual(fields["issuer"], "Synthetic Motors - Authorised Service Centre")
+
+    def test_labelled_numbers_stop_at_the_next_label(self):
+        fields = parse_text("Motor Insurance Policy\nPolicy No: SYN/POL/1 Chassis Number: SYNCHASSIS1\nSynthetic Insurance Company").fields
+        self.assertEqual(fields["document_number"], "SYN/POL/1")
+
+    def test_newer_and_bharat_series_plates_are_read(self):
+        for plate, expected in (("TG 09 AB 1234", "TG09AB1234"), ("22 BH 1234 AA", "22BH1234AA")):
+            with self.subTest(plate=plate):
+                self.assertEqual(parse_text(self.HEADER.replace("KA05MN4321", plate)).fields["vehicle_number"], expected)
+
+    def test_policy_period_words_are_never_a_registration_number(self):
+        text = "Motor Insurance Policy\nPolicy No: SYN/POL/1\nPeriod of Insurance From 15-Mar-2026 To Midnight of 14 MAR 2027"
+        self.assertNotIn("vehicle_number", parse_text(text).fields)
+
+
+class InvoiceSameLineLabelTests(SimpleTestCase):
+    def test_invoice_number_stops_at_the_next_label_on_its_line(self):
+        parsed = parse_text("TAX INVOICE\nSynthetic Motors - Authorised Service Centre\n"
+                            "Invoice No: SM/2026/0042 Invoice Date: 05/04/2026\nVehicle No: KA 05 MN 4321\nGrand Total: Rs. 1,600/-")
+        self.assertEqual(parsed.fields["document_number"], "SM/2026/0042")
+        self.assertEqual(parsed.service_payload["service_date"], "2026-04-05")
+        self.assertEqual(parsed.fields["vehicle_number"], "KA05MN4321")
+
+
 class RelevanceEvidenceTests(SimpleTestCase):
     def parsed(self, number="KA05MN4321", text="Service Invoice job card"):
         return SimpleNamespace(source_text=text, confidence=0.7, document_type="invoice", fields={"vehicle_number": number}, service_payload={"cost": 1})
