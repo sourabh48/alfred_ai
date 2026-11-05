@@ -787,7 +787,7 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 14 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 15 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -795,7 +795,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 
 | Module | Verified | Total | Verified % | Unaccepted | Partial | Missing | Approval | External |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| FIN | 11 | 17 | 64.7 | 0 | 4 | 2 | 0 | 0 |
+| FIN | 11 | 17 | 64.7 | 1 | 3 | 2 | 0 | 0 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 0 | 2 | 0 | 0 | 0 |
@@ -1748,14 +1748,15 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FIN-13 — Financial export and correction
 
-**PARTIALLY_IMPLEMENTED** · Personal finance · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Personal finance · P2.
 
 - Source: [expense API/export](../apps/expenses/views.py), [correction boundary](../apps/expenses/serializers.py), [shared hydration](../apps/expenses/services/transaction_intelligence.py), [Expense UI](../templates/expenses/list.html), [existing reports](../apps/reports/services.py).
 - APIs/UI/models: `/expenses/`, `/api/expenses/`, owner-authenticated `/api/expenses/export/`; existing Expense/BankAccount/StatementUpload records, no duplicate register or schema change.
 - Tests: [correction regressions](../tests/test_expense_corrections.py), [CSV/privacy regressions](../tests/test_expense_export.py), [actual UI/download](../tests/test_user_data_browser.py), [financial invariance](../tests/test_financial_baseline_alignment.py). Final **186 backend + two Chrome PASS**, zero skips, at the checkpoint above.
 - Acceptance: synthetic local correction/export flow PASS; normal-account, broader financial portability and fresh package acceptance PENDING.
 - Limitations/dependencies: CSV exports all owner expenses, independent of timeline display filters; retains exact recorded cents without asserting currency, blanks null balances, escapes formula-leading text and omits raw source/account details. Current-value export, not a backup or a reimport contract. Corrections preserve omitted owner values, import linkage/identity and unrelated bank snapshots.
-- Next: Broader multi-domain structured portability requires an agreed format; reuse existing owner registers/reports and the unapproved currency contract without inferring currency.
+- OWNER_DECISION 2026-11-06: broader portability is one ZIP of CSVs. Implemented in `24e8b84`: owner-authenticated `/api/expenses/export/financial/` and an "Export financial data (ZIP)" button on Expenses. One CSV each for bank accounts, transactions, loans, investments and budgets; recorded values only, no currency inferred, unknowns blank, formula-leading text escaped, account numbers masked to the last four digits (short numbers with fewer than four digits stay as recorded, like the existing account display), only the signed-in owner's rows. Free-text notes are included. Tests: 6 export tests, 584 related backend tests (Chrome skipped there) and both Chrome download tests PASS.
+- Next: owner check of the ZIP on their own account (opens in a spreadsheet, values look right); then fresh-package acceptance. Not a backup or a reimport contract.
 
 ### FIN-14 — Money storage across every domain
 
