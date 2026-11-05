@@ -22,7 +22,7 @@ GATES = {
     'AI-15': 'BLOCKED_EVIDENCE: genuine per-model held-out outcomes',
     'RUNTIME-03': 'BLOCKED_EVIDENCE: sustained sign-in/scheduler observation',
     'RUNTIME-05': 'BLOCKED_EXTERNAL: independent Windows PC acceptance',
-    'RUNTIME-11': 'BLOCKED_APPROVAL: owner decision on the diskcache residual risk; separate-user and clean-PC installs',
+    'RUNTIME-11': 'BLOCKED_EXTERNAL: separate-user and clean-PC installs; owner accepted the diskcache residual risk 2026-11-05',
     'RUNTIME-14': 'BLOCKED_APPROVAL: production/recovery rehearsal scope',
     'FIN-15': 'BLOCKED_APPROVAL: canonical currency/FX policy is not approved',
     'TRAVEL-18': 'BLOCKED_APPROVAL: Google configuration/credentials and offline map scope',

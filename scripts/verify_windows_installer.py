@@ -114,6 +114,8 @@ def main():
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--signing-manifest", type=Path,
                         help="release builds: also verify the installed files and uninstaller against this manifest")
+    parser.add_argument("--work-root", type=Path, default=ROOT / "artifacts" / "installer-tests",
+                        help="folder for the disposable install and data, for example on another drive")
     args = parser.parse_args()
     installer, report_path = args.installer.resolve(), args.report.resolve()
     if report_path.exists():
@@ -128,7 +130,7 @@ def main():
     original_shortcut = desktop_shortcut.read_bytes() if desktop_shortcut.exists() else None
     owned_shortcuts = set()
     run = uuid.uuid4().hex[:10]
-    work = ROOT / "artifacts" / "installer-tests" / ("lifecycle-" + run)
+    work = args.work_root.resolve() / ("lifecycle-" + run)
     work.mkdir(parents=True)
     installed = work / "Program Files O'Brien" / "ALFRED"
     data = work / "data with spaces"

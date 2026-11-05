@@ -1,7 +1,7 @@
 # RUNTIME-11 evidence — 2026-11-04
 
-Status: IMPLEMENTED_NOT_ACCEPTED. Baseline 75/143 and extensions 0/13 are unchanged. The residual risk below is
-documented, not formally accepted. That needs a separate owner decision.
+Status: IMPLEMENTED_NOT_ACCEPTED. Baseline 75/143 and extensions 0/13 are unchanged. The owner formally accepted the
+residual risk below on 2026-11-05. The advisory stays open and visible while the scanner reports it.
 
 Which commit each result belongs to:
 
@@ -95,7 +95,7 @@ Second pass on `e46f4f9` found two defects, both fixed in `297e180` with a test 
 - D2: SQLite creates and removes `-wal` and `-shm` while the startup check runs, which could refuse a healthy start. A
   failed check is now repeated once, and a file that vanished passes.
 
-Residual after both passes, for the owner to decide on, not accepted:
+Residual after both passes, accepted by the owner on 2026-11-05 (OWNER_DECISION: "Accept the risk"):
 
 - R1: the queue and model check runs at startup only. A file loosened while running is refused at the next start.
 - R2: absolute `artifact_path` rows in the database are not checked (`training/quality.py:30`,
@@ -190,6 +190,6 @@ PENDING: separate-user installation and a clean PC.
 ## Acceptance
 
 RUNTIME-11 stays unaccepted. The independent review is done and its defects are fixed. Exact-head CI passed on master
-`ca4d66a`; the 2026-11-05 pin and Docker fix needs its own CI run. Still needed: the owner's decision on the residual risk above, a fresh independent AI held-out benchmark, installer runs on
+`ca4d66a`; the 2026-11-05 pin and Docker fix needs its own CI run. The owner accepted the residual risk above on 2026-11-05. Still needed: a fresh independent AI held-out benchmark, installer runs on
 `297e180` where Smart App Control allows them, separate-user installation and a clean PC. Installer signing stays
 declined by the owner.

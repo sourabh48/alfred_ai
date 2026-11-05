@@ -141,6 +141,9 @@
   `constraints/`; no Docker here, image not built). Independent review TECHNICAL_PASS; its two test gaps fixed. CI pins the
   dependency commit as reviewed source. Still IMPLEMENTED_NOT_ACCEPTED, now gated BLOCKED_APPROVAL: owner decision on
   the diskcache residual risk, plus separate-user and clean-PC installs. Next eligible: RUNTIME-06.
+- OWNER_DECISION 2026-11-05: "Accept the risk" — the diskcache CVE-2025-69872 residual risk in RUNTIME_11_EVIDENCE is
+  formally accepted; the advisory stays visible while the scanner reports it. RUNTIME-11 now waits on separate-user and
+  clean-PC installs (BLOCKED_EXTERNAL).
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
