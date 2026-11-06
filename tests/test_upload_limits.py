@@ -82,7 +82,6 @@ class UploadHTTPTests(TestCase):
             ("/api/investments/import-pdf/", "file"),
             ("/api/career/resumes/upload/", "resume"),
             ("/api/career/recruiter-match/", "attachment"),
-            ("/api/integrations/credit-score/upload-report/", "report"),
             ("/api/mobility/bike-documents/upload/", "document_file"),
             ("/api/mobility/bike-services/import/", "service_file"),
         )

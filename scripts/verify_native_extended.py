@@ -79,7 +79,7 @@ def verify_extended(base, session, scenario, data, passed, *, user_count=12, wri
     options.add_argument("--no-sandbox")
     browser = webdriver.Chrome(options=options)
     findings = {"axe_version": "4.13.0", "layouts": [], "accessibility": []}
-    pages = ("dashboard", "expenses", "settings", "documents", "loans", "career", "credit-score")
+    pages = ("dashboard", "expenses", "settings", "documents", "loans", "career")
     try:
         browser.set_script_timeout(90)
         browser.get(base + "/login/")

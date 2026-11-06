@@ -64,8 +64,8 @@ are private runtime data and are not source dependencies.
 ## OCR / Tesseract
 
 RapidOCR, ONNX Runtime, its packaged model assets and PyMuPDF are installed by
-the Python requirements for general document OCR. **Scanned credit-report
-OCR also uses Tesseract** in `credit_report_parser.py`. For that feature,
+the Python requirements for general document OCR. **Scanned document OCR
+also uses Tesseract** when it is installed. For that feature,
 follow the [Tesseract Windows installation instructions](https://tesseract-ocr.github.io/tessdoc/Installation.html)
 (which link the Windows installer), install English language data, and set
 this path privately in the selected data directory's `config/local.env`:

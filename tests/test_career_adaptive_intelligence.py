@@ -12,7 +12,6 @@ from django.utils import timezone
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, CareerResumeLearningMemory
 from apps.career.services.job_intelligence import job_intelligence
 from apps.expenses.models import StatementUpload
-from apps.integrations.models import CreditScore
 from apps.mobility.models import BikeDocument, BikeProfile
 
 
@@ -674,26 +673,6 @@ class UserDataIsolationTests(TestCase):
         self.assertEqual(resumes.json()[0]["file_name"], "alpha-resume.html")
         self.assertEqual(len(documents.json()), 1)
         self.assertEqual(documents.json()[0]["bike_name"], "My Bike")
-
-
-class CreditEstimateIntegrityTests(TestCase):
-    def setUp(self):
-        user_model = get_user_model()
-        self.user = user_model.objects.create_user(username="credit_user", password="Pass12345!", monthly_income=85000)
-        self.client = Client()
-        self.client.force_login(self.user)
-
-    def test_credit_score_endpoint_returns_estimate_without_persisting_fake_bureau_pull(self):
-        response = self.client.get("/api/integrations/credit-score/?bureau=CIBIL")
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(payload["score_kind"], "estimated")
-        self.assertIn("not an official bureau score", payload["detail"].lower())
-        self.assertEqual(CreditScore.objects.count(), 0)
-
-        trend = self.client.get("/api/integrations/credit-score/trend/?months=12")
-        self.assertEqual(trend.status_code, 200)
-        self.assertEqual(trend.json()["trend"], [])
 
 
 def _job_feed_result(source_name, source_url, jobs):

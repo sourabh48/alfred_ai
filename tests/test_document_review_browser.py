@@ -14,7 +14,6 @@ from django.test import Client
 
 from apps.expenses.models import StatementUpload
 from apps.career.models import CareerResume
-from apps.integrations.models import CreditReportUpload
 from apps.investments.models import InvestmentImportDocument
 from apps.loans.models import Loan, LoanClosureDocument, LoanImportDocument
 from apps.ml_engine.models import DocumentParserLearningMemory
@@ -450,15 +449,6 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         })
         self.assertEqual(resume.extracted_payload["experience_years"], 5.5)
         self.assertEqual(resume.parser_status, "parsed")
-
-    def test_credit_report_review_form_preserves_and_saves_checked_fields(self):
-        report = CreditReportUpload.objects.create(user=self.user, file_name="checked-credit.pdf",
-                                                  parser_status="needs_review", parse_confidence=0.2)
-        self._save_family_correction_in_browser("credit_report", report, {
-            "bureau": "CIBIL", "applicant_name": "Browser Test", "report_number": "TEST-REPORT-042",
-        })
-        self.assertEqual(report.report_number, "TEST-REPORT-042")
-        self.assertEqual(report.parser_status, "parsed")
 
     def test_loan_review_form_preserves_and_saves_checked_fields(self):
         document = LoanImportDocument.objects.create(user=self.user, file_name="checked-loan.pdf",

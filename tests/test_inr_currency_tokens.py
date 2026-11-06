@@ -4,7 +4,6 @@ from django.test import SimpleTestCase
 from alfred_ai.services.document_extraction import MONEY_RE, _build_field_candidates
 from apps.career.services.job_intelligence import JobIntelligenceService
 from apps.expenses.services.statement_import import _extract_loan_hints
-from apps.integrations.services.credit_report_parser import CreditReportParser, MONEY_PATTERN
 from apps.investments.services.portfolio_intelligence import PortfolioIntelligenceService
 from apps.loans.services.loan_closure_parser import LoanClosureParser
 from apps.loans.services.loan_pdf_parser import LoanPDFParser
@@ -43,16 +42,6 @@ class InrAmountTests(SimpleTestCase):
                 self.assertEqual(parser._extract_total_amount(f"Foreclosure Amount: {form}"), 12500.0)
                 self.assertEqual(parser._extract_amount_for_labels(f"Penalty: {form}", ["Penalty"]), 12500.0)
 
-    def test_credit_report_amounts_including_tradeline_rows(self):
-        parser = CreditReportParser()
-        for form in ALL_FORMS:
-            with self.subTest(form=form):
-                self.assertEqual(parser._extract_amount(f"Current Balance: {form}", ["Current Balance"]), 12500.0)
-                self.assertEqual(parser._extract_optional_amount_from_line(f"Current Balance: {form}", ["Current Balance"]), 12500.0)
-        for form in GENERIC_FORMS:
-            with self.subTest(form=form):
-                self.assertEqual(float(MONEY_PATTERN.search(f"Owed {form} today").group(1).replace(",", "")), 12500.0)
-
     def test_a_currency_name_touching_its_label_still_counts(self):
         self.assertEqual(LoanPDFParser()._extract_principal("Loan AmountRs.5,00,000"), 500000.0)
         self.assertEqual(_extract_loan_hints("EMI AmountINR 12,500.00")["emi_amount"], 12500.0)
@@ -75,13 +64,11 @@ class InrAmountTests(SimpleTestCase):
         for text in ("Invoice 12500", "Worked 40 hours 12500", "Page 3 of 12", "Mirrors 500"):
             with self.subTest(text=text):
                 self.assertIsNone(MONEY_RE.search(text))
-                self.assertIsNone(MONEY_PATTERN.search(text))
 
     def test_other_currencies_and_references_are_not_read_as_rupees(self):
         for text in NOT_RUPEES:
             with self.subTest(text=text):
                 self.assertIsNone(MONEY_RE.search(text))
-                self.assertIsNone(MONEY_PATTERN.search(text))
                 self.assertIsNone(BIKE_MONEY_RE.search(text))
 
     def test_a_long_digit_run_is_not_money(self):

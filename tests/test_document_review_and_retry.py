@@ -3,7 +3,6 @@ from decimal import Decimal
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-import fitz
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
@@ -13,7 +12,6 @@ from alfred_private_storage import private_directory
 from apps.career.models import CareerJobAnalysis, CareerResume
 from apps.expenses.models import BankAccount, Expense, StatementUpload
 from apps.expenses.services.statement_import import parse_bank_statement
-from apps.integrations.models import CreditReportUpload, CreditScore
 from apps.investments.models import Investment, InvestmentImportDocument
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument
 from apps.ml_engine.models import DocumentParserLearningMemory
@@ -1105,53 +1103,6 @@ class DocumentReviewAndRetryTests(TestCase):
             )
             | {"source_kind": "recruiter_message", "job_snapshot": {}},
         )
-        credit = CreditReportUpload.objects.create(
-            user=self.user,
-            uploaded_file=SimpleUploadedFile("cibil-mobile.jpg", b"credit", content_type="image/jpeg"),
-            file_name="cibil-mobile.jpg",
-            parser_status="needs_review",
-            parse_confidence=0.36,
-            extracted_text="Credit Bureau CIBIL Customer Name Sourabh Sarkar Control Number CN998877 Generated Date 2026-03-28",
-            extracted_payload=self._unknown_layout_review_payload(
-                method="unknown_credit_ocr",
-                text="Credit Bureau CIBIL Customer Name Sourabh Sarkar Control Number CN998877 Generated Date 2026-03-28",
-                field_candidates=[
-                    {
-                        "field_type": "credit bureau",
-                        "field_name": "credit-bureau",
-                        "label": "Credit Bureau",
-                        "value": "CIBIL",
-                        "confidence": 0.8,
-                        "source": "unknown_credit_ocr",
-                    },
-                    {
-                        "field_type": "customer name",
-                        "field_name": "customer-name",
-                        "label": "Customer Name",
-                        "value": "Sourabh Sarkar",
-                        "confidence": 0.78,
-                        "source": "unknown_credit_ocr",
-                    },
-                    {
-                        "field_type": "control number",
-                        "field_name": "control-number",
-                        "label": "Control Number",
-                        "value": "CN998877",
-                        "confidence": 0.77,
-                        "source": "unknown_credit_ocr",
-                    },
-                    {
-                        "field_type": "generated date",
-                        "field_name": "generated-date",
-                        "label": "Generated Date",
-                        "value": "2026-03-28",
-                        "confidence": 0.76,
-                        "source": "unknown_credit_ocr",
-                    },
-                ],
-            ),
-        )
-
         queue_response = self.client.get("/api/documents/review-queue/")
 
         self.assertEqual(queue_response.status_code, 200)
@@ -1163,7 +1114,6 @@ class DocumentReviewAndRetryTests(TestCase):
             ("investment_document", investment_doc.file_name): {"broker_name", "account_number", "asset_name", "invested_amount", "current_value"},
             ("resume_document", resume.file_name): {"role", "experience_years", "skills"},
             ("recruiter_document", recruiter.source_document_name): {"job_title", "company", "location", "salary_min", "salary_max"},
-            ("credit_report", credit.file_name): {"bureau", "applicant_name", "report_number", "report_date"},
         }
         for key, field_names in expected_aliases.items():
             with self.subTest(queue_item=key):
@@ -1267,21 +1217,6 @@ class DocumentReviewAndRetryTests(TestCase):
             },
             content_type="application/json",
         )
-        credit_response = self.client.post(
-            "/api/documents/review-queue/resolve/",
-            data={
-                "scope": "credit_report",
-                "id": credit.id,
-                "corrections": {
-                    "bureau": "CIBIL",
-                    "applicant_name": "Sourabh Sarkar",
-                    "report_number": "CN998877",
-                    "report_date": "2026-03-28",
-                },
-            },
-            content_type="application/json",
-        )
-
         for response in [
             statement_response,
             loan_response,
@@ -1289,7 +1224,6 @@ class DocumentReviewAndRetryTests(TestCase):
             investment_response,
             resume_response,
             recruiter_response,
-            credit_response,
         ]:
             self.assertEqual(response.status_code, 200, response.content)
 
@@ -1299,7 +1233,6 @@ class DocumentReviewAndRetryTests(TestCase):
         investment_doc.refresh_from_db()
         resume.refresh_from_db()
         recruiter.refresh_from_db()
-        credit.refresh_from_db()
 
         self.assertEqual(statement.bank_name, "HDFC Bank")
         self.assertEqual(statement.account_number, "50100244137504")
@@ -1318,12 +1251,9 @@ class DocumentReviewAndRetryTests(TestCase):
         self.assertEqual(recruiter.parser_status, "parsed")
         self.assertEqual(recruiter.job_title, "Senior Backend Engineer")
         self.assertEqual(recruiter.extracted_payload["job_snapshot"]["salary_min"], 1800000.0)
-        self.assertEqual(credit.parser_status, "parsed")
-        self.assertEqual(credit.report_number, "CN998877")
-        self.assertEqual(str(credit.report_date), "2026-03-28")
         self.assertGreaterEqual(
             DocumentParserLearningMemory.objects.filter(correction_count__gt=0).values("scope").distinct().count(),
-            7,
+            6,
         )
         recruiter_memory = DocumentParserLearningMemory.objects.get(
             scope="recruiter_document",
@@ -1950,39 +1880,6 @@ class DocumentReviewAndRetryTests(TestCase):
             ).exists()
         )
 
-    def test_retry_endpoint_supports_credit_reports(self):
-        upload = CreditReportUpload.objects.create(
-            user=self.user,
-            uploaded_file=SimpleUploadedFile(
-                "cibil-report.pdf",
-                self._build_credit_pdf(),
-                content_type="application/pdf",
-            ),
-            file_name="cibil-report.pdf",
-            parser_status="needs_review",
-            parse_confidence=0.18,
-            extracted_payload={},
-            summary="Needs review",
-        )
-
-        response = self.client.post(
-            "/api/documents/review-queue/retry/",
-            data={"scope": "credit_report", "id": upload.id},
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        upload.refresh_from_db()
-        self.assertEqual(upload.parser_status, "parsed")
-        self.assertTrue(CreditScore.objects.filter(user=self.user, score=782).exists())
-        self.assertTrue(
-            OperationalLog.objects.filter(
-                user=self.user,
-                scope="credit_report",
-                event_type="retry_document",
-            ).exists()
-        )
-
     def test_retry_endpoint_supports_vehicle_documents(self):
         profile = BikeProfile.objects.create(
             user=self.user,
@@ -2144,24 +2041,3 @@ class DocumentReviewAndRetryTests(TestCase):
         diagnostics = self.client.get("/api/documents/diagnostics/")
         self.assertEqual(diagnostics.status_code, 200)
         self.assertEqual(diagnostics.json()["results"][0]["event_type"], "render_failure")
-
-    def _build_credit_pdf(self) -> bytes:
-        document = fitz.open()
-        page = document.new_page()
-        point = fitz.Point(72, 72)
-        for line in [
-            "TransUnion CIBIL Credit Report",
-            "Credit Score: 782",
-            "Consumer Name: Soura Sarkar",
-            "Report Number: CIBIL-2026-001",
-            "Report Date: 30/03/2026",
-            "Total Accounts: 5",
-            "Active Accounts: 4",
-            "Closed Accounts: 1",
-            "Delinquent Accounts: 0",
-            "Credit Utilization: 18%",
-            "Total Credit Limit: INR 500000",
-        ]:
-            page.insert_text(point, line, fontsize=12)
-            point = fitz.Point(point.x, point.y + 22)
-        return document.tobytes()

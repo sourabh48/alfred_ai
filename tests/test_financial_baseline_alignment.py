@@ -280,11 +280,6 @@ class FinancialBaselineAlignmentTests(TestCase):
         self.assertEqual(loan_metrics["disposable_cash_flow"], baseline["disposable_cash_flow"])
         self.assertEqual(loan_metrics["savings_capacity"], baseline["savings_capacity"])
 
-        from apps.integrations.services.credit_score_tracker import credit_score_service
-
-        alerts = credit_score_service.get_comprehensive_report(self.user)["alerts"]
-        self.assertFalse(any(item["type"] == "DTI_WARNING" for item in alerts))
-
     def test_api_responses_expose_the_same_financial_baseline(self):
         baseline = resolve_canonical_financial_baseline(self.user)
 
@@ -382,14 +377,8 @@ class FinancialBaselineAlignmentTests(TestCase):
         self.assertEqual(baseline["debt_burden_ratio"], 75.0)
         self.assertEqual(baseline["savings_capacity"], 3000.0)
 
-        from apps.integrations.services.credit_score_tracker import credit_score_service
         from apps.mobility.services.travel_advisor import travel_advisor
         from apps.ml_engine.services.alfred_financial_brain import alfred_brain
-
-        alerts = credit_score_service.get_comprehensive_report(self.user)["alerts"]
-        dti_alerts = [item for item in alerts if item["type"] == "DTI_WARNING"]
-        self.assertEqual(len(dti_alerts), 1)
-        self.assertIn("50.0%", dti_alerts[0]["message"])
 
         stay_advice = travel_advisor._stay_advice(self.user, per_day_budget=12000, duration_days=1)
         self.assertEqual(stay_advice["tier"], "budget")

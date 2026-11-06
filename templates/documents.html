@@ -211,7 +211,7 @@
 </section>
 
 <section class="row g-4 mb-4">
-    <div class="col-xl-6">
+    <div class="col-12">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Career Files</h2>
             <p class="page-section-copy mb-3">Resume uploads stay available here too, so document intake remains centralized even though the career module keeps its own page.</p>
@@ -224,32 +224,6 @@
                 </div>
                 <div id="documentResumeFeedback" class="d-none alert mb-0"></div>
                 <button class="btn btn-primary" type="submit">Upload Resume Files</button>
-            </form>
-        </div>
-    </div>
-    <div class="col-xl-6">
-        <div class="surface-card h-100">
-            <h2 class="page-section-title">Credit Reports</h2>
-            <p class="page-section-copy mb-3">Upload one or more bureau reports here too. Alfred will retain weak parses for review instead of silently dropping them.</p>
-            <form id="documentCreditForm" class="soft-grid" enctype="multipart/form-data">
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label" for="documentCreditBureau">Bureau</label>
-                        <select id="documentCreditBureau" name="bureau" class="form-select">
-                            <option value="">Auto detect</option>
-                            <option value="CIBIL">CIBIL</option>
-                            <option value="EXPERIAN">Experian</option>
-                            <option value="EQUIFAX">Equifax</option>
-                            <option value="CRIF">CRIF High Mark</option>
-                        </select>
-                    </div>
-                    <div class="col-md-8">
-                        <label class="form-label" for="documentCreditFile">Credit Report Files</label>
-                        <input id="documentCreditFile" name="report" type="file" class="form-control" accept=".pdf,image/*,application/pdf" multiple required>
-                    </div>
-                </div>
-                <div id="documentCreditFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Upload Credit Reports</button>
             </form>
         </div>
     </div>
@@ -307,13 +281,7 @@
 </section>
 
 <section class="row g-4">
-    <div class="col-xl-6">
-        <div class="surface-card h-100">
-            <h2 class="page-section-title">Recent Credit Reports</h2>
-            <div id="documentCreditList" class="data-stack stack-scroll stack-scroll-sm"></div>
-        </div>
-    </div>
-    <div class="col-xl-6">
+    <div class="col-12">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Diagnostics Log</h2>
             <p class="page-section-copy mb-3">These logs explain why data did not populate, why a parser stayed in review, or why a document or visualization failed.</p>
@@ -353,5 +321,5 @@
 
 {% block extra_js %}
 <script src="/static/js/document_corpus.js?v=3"></script>
-<script src="/static/js/documents.js?v=2.10.2"></script>
+<script src="/static/js/documents.js?v=2.11.0"></script>
 {% endblock %}

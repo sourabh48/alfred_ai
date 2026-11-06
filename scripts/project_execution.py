@@ -51,7 +51,7 @@ GATES = {
     'SYNC-11': 'BLOCKED_EXTERNAL: encrypted backup copies to R2 built 2026-11-06 (scripts/cloud_backup.py), tested against a synthetic signed server only; needs the owner R2 bucket, a portable backup key with a copy kept off this PC, then a live upload, read-back and restore check',
     'TRAVEL-14': 'BLOCKED_APPROVAL: owner left the choice to Claude 2026-11-06; kept deferred because no free official bus inventory source exists and live booking stays off; links to verified bus websites remain',
     'INV-04': 'BLOCKED_EVIDENCE: assumed-age advice removed and guidance labelled 2026-11-06; reviewed risk-evidence definition and owner check remain',
-    'FIN-17': 'BLOCKED_EXTERNAL: owner dropped the score page 2026-11-06; report uploads stay in Documents; live bureau pulls need a bureau contract',
+    'FIN-17': 'BLOCKED_APPROVAL: owner dropped credit bureau access and all credit report features 2026-11-06; stored reports and scores are kept, not shown; reopening needs a new owner decision',
     'FIN-16': 'BLOCKED_EVIDENCE: tax year 2026-27 rules and the notice-only Budget check implemented; page check on the owner app PASS 2026-11-06; CI PASS at e8ef8f4; reviewed actual tax cases (income unverified) remain',
     'TRAVEL-18': 'BLOCKED_APPROVAL: Google configuration/credentials and offline map scope',
 }

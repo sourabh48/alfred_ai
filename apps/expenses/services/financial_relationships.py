@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 import re
 
-from apps.integrations.models import CreditReportUpload
 from apps.loans.models import LoanForeclosureSnapshot
 from apps.loans.services.payment_history_access import fetch_payment_history_rows
 
@@ -30,65 +29,9 @@ PART_PAYMENT_KEYWORDS = (
     "PRE-PAY",
     "TOP UP",
 )
-ACCOUNT_TYPE_TOKENS = {
-    "personal loan": "personal",
-    "home loan": "home",
-    "housing loan": "home",
-    "mortgage": "home",
-    "car loan": "car",
-    "auto loan": "car",
-    "education loan": "education",
-    "student loan": "education",
-    "business loan": "business",
-    "loan against property": "other",
-    "credit card": "credit_card",
-}
-CITY_TO_STATE_COUNTRY = {
-    "bengaluru": ("Karnataka", "India"),
-    "bangalore": ("Karnataka", "India"),
-    "mumbai": ("Maharashtra", "India"),
-    "pune": ("Maharashtra", "India"),
-    "hyderabad": ("Telangana", "India"),
-    "chennai": ("Tamil Nadu", "India"),
-    "delhi": ("Delhi", "India"),
-    "gurugram": ("Haryana", "India"),
-    "gurgaon": ("Haryana", "India"),
-    "noida": ("Uttar Pradesh", "India"),
-    "kolkata": ("West Bengal", "India"),
-    "san francisco": ("California", "United States"),
-    "new york": ("New York", "United States"),
-    "austin": ("Texas", "United States"),
-}
-STATE_TO_COUNTRY = {
-    "karnataka": "India",
-    "maharashtra": "India",
-    "telangana": "India",
-    "tamil nadu": "India",
-    "delhi": "India",
-    "haryana": "India",
-    "uttar pradesh": "India",
-    "west bengal": "India",
-    "california": "United States",
-    "new york": "United States",
-    "texas": "United States",
-}
-COUNTRY_ALIASES = {
-    "india": "India",
-    "united states": "United States",
-    "usa": "United States",
-    "us": "United States",
-    "united kingdom": "United Kingdom",
-    "uk": "United Kingdom",
-    "canada": "Canada",
-    "australia": "Australia",
-    "remote": "Remote",
-    "worldwide": "Remote",
-    "global": "Remote",
-}
 
 
 def build_financial_relationships(*, user, expenses, loans) -> tuple[dict, dict[int, list[dict]]]:
-    bureau_context = _bureau_account_context(user=user, loans=loans)
     payment_rows = fetch_payment_history_rows(
         user=user,
         require_expense_reference=True,
@@ -120,7 +63,6 @@ def build_financial_relationships(*, user, expenses, loans) -> tuple[dict, dict[
         payment_rows=payment_rows,
         expenses_by_id=expenses_by_id,
         foreclosure_by_expense_id=foreclosure_by_expense_id,
-        bureau_accounts=bureau_context["matched_accounts_by_loan_id"],
     ):
         events.append(event)
         _index_event(transaction_index, event)
@@ -128,7 +70,6 @@ def build_financial_relationships(*, user, expenses, loans) -> tuple[dict, dict[
     for event in _detect_loan_disbursements(
         expenses=expenses,
         loans=loans,
-        bureau_accounts=bureau_context["matched_accounts_by_loan_id"],
         excluded_transaction_ids=transfer_transaction_ids,
     ):
         events.append(event)
@@ -144,107 +85,10 @@ def build_financial_relationships(*, user, expenses, loans) -> tuple[dict, dict[
             "loan_repayments": relation_counts.get("loan_repayment", 0),
             "loan_part_payments": relation_counts.get("loan_part_payment", 0),
             "loan_closure_payments": relation_counts.get("loan_closure_payment", 0),
-            "bureau_accounts": len(bureau_context["accounts"]),
-            "bureau_accounts_linked": sum(1 for item in bureau_context["accounts"] if item.get("matched_loan_id")),
         },
-        "bureau_report": bureau_context["report"],
-        "bureau_accounts": bureau_context["accounts"],
         "events": events[:16],
     }
     return payload, transaction_index
-
-
-def _bureau_account_context(*, user, loans) -> dict:
-    uploads = CreditReportUpload.objects.filter(user=user).order_by("-created_at", "-id")
-    selected_upload = None
-    raw_accounts = []
-    for upload in uploads[:6]:
-        candidate_accounts = list((upload.extracted_payload or {}).get("loan_accounts") or [])
-        if candidate_accounts:
-            selected_upload = upload
-            raw_accounts = candidate_accounts
-            break
-
-    accounts = []
-    matched_accounts_by_loan_id = {}
-    for account in raw_accounts:
-        normalized = _normalize_bureau_account(account)
-        loan, match_basis, match_confidence = _match_bureau_account_to_loan(normalized, loans)
-        normalized.update(
-            {
-                "matched_loan_id": getattr(loan, "id", None),
-                "matched_lender": getattr(loan, "lender", ""),
-                "match_basis": match_basis,
-                "match_confidence": round(match_confidence, 2),
-            }
-        )
-        if loan and loan.id not in matched_accounts_by_loan_id:
-            matched_accounts_by_loan_id[loan.id] = normalized
-        accounts.append(normalized)
-
-    report = {
-        "source_upload_id": getattr(selected_upload, "id", None),
-        "bureau": getattr(selected_upload, "bureau", ""),
-        "report_date": selected_upload.report_date.isoformat() if getattr(selected_upload, "report_date", None) else "",
-        "file_name": getattr(selected_upload, "file_name", ""),
-    }
-    return {
-        "report": report,
-        "accounts": accounts,
-        "matched_accounts_by_loan_id": matched_accounts_by_loan_id,
-    }
-
-
-def _normalize_bureau_account(account: dict) -> dict:
-    location = _parse_location(account.get("branch_location", "") or account.get("location", ""))
-    return {
-        "lender_name": str(account.get("lender_name", "") or "").strip(),
-        "loan_account_number": str(account.get("loan_account_number", "") or "").strip(),
-        "account_last4": _digits_last4(account.get("loan_account_number", "")),
-        "account_type": str(account.get("account_type", "") or "").strip(),
-        "account_type_category": _loan_category(account.get("account_type", "")),
-        "status": str(account.get("status", "") or "").strip() or "unknown",
-        "opened_on": str(account.get("opened_on", "") or "").strip(),
-        "closed_on": str(account.get("closed_on", "") or "").strip(),
-        "sanctioned_amount": round(float(account.get("sanctioned_amount") or 0), 2),
-        "current_balance": round(float(account.get("current_balance") or 0), 2),
-        "emi_amount": round(float(account.get("emi_amount") or 0), 2),
-        "overdue_amount": round(float(account.get("overdue_amount") or 0), 2),
-        "payment_status": str(account.get("payment_status", "") or "").strip(),
-        "country": location["country"],
-        "state": location["state"],
-        "city": location["city"],
-    }
-
-
-def _match_bureau_account_to_loan(account: dict, loans) -> tuple[object | None, str, float]:
-    best_loan = None
-    best_basis = ""
-    best_score = 0.0
-    account_last4 = account.get("account_last4", "")
-    account_lender = _normalize_text(account.get("lender_name", ""))
-    account_category = account.get("account_type_category", "")
-    account_balance = float(account.get("current_balance") or 0)
-    for loan in loans:
-        score = 0.0
-        reasons = []
-        if account_last4 and account_last4 == _digits_last4(loan.loan_account_number):
-            score += 0.55
-            reasons.append("account_last4")
-        if account_lender and account_lender and account_lender in _normalize_text(loan.lender):
-            score += 0.3
-            reasons.append("lender")
-        if account_category and account_category == loan.loan_type:
-            score += 0.1
-            reasons.append("loan_type")
-        if account_balance and loan.remaining_balance and abs(account_balance - float(loan.remaining_balance or 0)) <= max(account_balance, float(loan.remaining_balance)) * 0.35:
-            score += 0.08
-            reasons.append("balance")
-        if score > best_score:
-            best_loan = loan
-            best_basis = ", ".join(reasons)
-            best_score = score
-    return (best_loan, best_basis, best_score) if best_score >= 0.35 else (None, "", 0.0)
 
 
 def _detect_self_transfers(expenses) -> list[dict]:
@@ -313,7 +157,6 @@ def _build_loan_payment_events(
     payment_rows,
     expenses_by_id: dict[int, object],
     foreclosure_by_expense_id: dict[int, object],
-    bureau_accounts: dict[int, dict],
 ) -> list[dict]:
     events = []
     for payment in payment_rows:
@@ -332,9 +175,6 @@ def _build_loan_payment_events(
             relation_type = "loan_part_payment"
             title = "Loan part payment"
             evidence.append("Payment exceeds the normal EMI band or contains part-payment keywords.")
-        bureau_account = bureau_accounts.get(payment.get("loan_id"))
-        if bureau_account:
-            evidence.append("Latest uploaded bureau report carries a matching loan account for this loan.")
         events.append(
             {
                 "relationship_id": f"{relation_type}-{payment.get('id')}",
@@ -359,14 +199,14 @@ def _build_loan_payment_events(
                     "tax_paid": round(float(payment.get("tax_paid") or 0), 2),
                     "total_paid": round(float(payment.get("amount") or 0), 2),
                 },
-                "source_records": [item for item in ["loan_payment_history", "foreclosure_snapshot" if snapshot else "", "credit_report" if bureau_account else ""] if item],
+                "source_records": [item for item in ["loan_payment_history", "foreclosure_snapshot" if snapshot else ""] if item],
                 "evidence": evidence,
             }
         )
     return events
 
 
-def _detect_loan_disbursements(*, expenses, loans, bureau_accounts: dict[int, dict], excluded_transaction_ids: set[int]) -> list[dict]:
+def _detect_loan_disbursements(*, expenses, loans, excluded_transaction_ids: set[int]) -> list[dict]:
     credit_transactions = [item for item in expenses if item.direction == "credit" and item.id not in excluded_transaction_ids]
     events = []
     used_ids: set[int] = set()
@@ -392,15 +232,6 @@ def _detect_loan_disbursements(*, expenses, loans, bureau_accounts: dict[int, di
             if _looks_like_disbursement(expense):
                 score += 0.12
                 evidence.append("Transaction text contains loan disbursement keywords.")
-            bureau_account = bureau_accounts.get(loan.id)
-            if bureau_account:
-                opened_on = bureau_account.get("opened_on", "")
-                if opened_on and abs((_coerce_date(opened_on) - expense.transaction_date).days) <= 30:
-                    score += 0.08
-                    evidence.append("Uploaded bureau report shows a matching account opened in the same period.")
-                elif bureau_account.get("matched_loan_id") == loan.id:
-                    score += 0.05
-                    evidence.append("Uploaded bureau report includes the same loan account.")
             if score > best_score:
                 best_loan = loan
                 best_score = score
@@ -425,7 +256,7 @@ def _detect_loan_disbursements(*, expenses, loans, bureau_accounts: dict[int, di
                 "transaction_fingerprints": [expense.transaction_fingerprint],
                 "external_references": [value for value in [expense.external_reference] if value],
                 "components": {"disbursed_amount": round(float(expense.amount or 0), 2)},
-                "source_records": [item for item in ["transactions", "credit_report" if bureau_accounts.get(best_loan.id) else ""] if item],
+                "source_records": ["transactions"],
                 "evidence": best_evidence,
             }
         )
@@ -489,49 +320,6 @@ def _expense_text(expense) -> str:
     )
 
 
-def _parse_location(value: str) -> dict:
-    raw = str(value or "").strip()
-    if not raw:
-        return {"country": "", "state": "", "city": ""}
-    normalized = raw.lower()
-    if any(token in normalized for token in ("remote", "worldwide", "global", "anywhere")):
-        return {"country": "Remote", "state": "", "city": ""}
-    parts = [item.strip() for item in re.split(r"[,/|]", raw) if item.strip()]
-    city = ""
-    state = ""
-    country = ""
-    for part in parts:
-        lowered = part.lower()
-        if lowered in COUNTRY_ALIASES:
-            country = COUNTRY_ALIASES[lowered]
-            continue
-        if lowered in STATE_TO_COUNTRY:
-            state = part.title()
-            country = country or STATE_TO_COUNTRY[lowered]
-            continue
-        if lowered in CITY_TO_STATE_COUNTRY:
-            city = part.title()
-            mapped_state, mapped_country = CITY_TO_STATE_COUNTRY[lowered]
-            state = state or mapped_state
-            country = country or mapped_country
-    if not city:
-        for city_name, (mapped_state, mapped_country) in CITY_TO_STATE_COUNTRY.items():
-            if city_name in normalized:
-                city = city_name.title()
-                state = state or mapped_state
-                country = country or mapped_country
-                break
-    return {"country": country, "state": state, "city": city}
-
-
-def _loan_category(value: str) -> str:
-    normalized = str(value or "").lower()
-    for token, category in ACCOUNT_TYPE_TOKENS.items():
-        if token in normalized:
-            return category
-    return "other"
-
-
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9 ]", " ", str(value or "").upper())).strip()
 
@@ -543,18 +331,3 @@ def _normalize_reference(value: str) -> str:
 def _digits_last4(value: str) -> str:
     digits = "".join(char for char in str(value or "") if char.isdigit())
     return digits[-4:] if digits else ""
-
-
-def _coerce_date(value: str):
-    from datetime import date
-
-    for separator in ("-", "/"):
-        parts = str(value or "").split(separator)
-        if len(parts) == 3:
-            try:
-                if len(parts[0]) == 4:
-                    return date(int(parts[0]), int(parts[1]), int(parts[2]))
-                return date(int(parts[2]), int(parts[1]), int(parts[0]))
-            except ValueError:
-                continue
-    return date.min

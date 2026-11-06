@@ -16,7 +16,7 @@ from alfred_ai.services.calculation_risk import calculation_risk_snapshot
 from apps.career.models import CareerJobAnalysis, CareerResume
 from apps.expenses.models import Expense, StatementUpload
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
-from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
+from apps.integrations.models import VerifiedExternalInsight
 from apps.investments.models import Investment, InvestmentImportDocument
 from apps.loans.models import Loan, LoanClosureDocument, LoanImportDocument, LoanPaymentHistory
 from apps.ml_engine.models import AdaptiveModelState
@@ -454,13 +454,6 @@ class CalculationRiskSnapshotTests(TestCase):
             job_url="https://example.com/job",
             parser_status="needs_review",
         )
-        CreditReportUpload.objects.create(
-            user=self.user,
-            uploaded_file=SimpleUploadedFile("credit.pdf", b"%PDF-1.4 fake", content_type="application/pdf"),
-            file_name="credit.pdf",
-            parser_status="needs_review",
-        )
-
         snapshot = calculation_risk_snapshot(guardrails=_guardrails())
         queues = {item["key"]: item for item in snapshot["manual_review_queues"]}
         review_gated = {item["key"]: item for item in snapshot["review_gated_calculations"]}
@@ -473,8 +466,8 @@ class CalculationRiskSnapshotTests(TestCase):
         self.assertEqual(queues["vehicle_import_review"]["count"], 1)
         self.assertEqual(queues["resume_import_review"]["count"], 1)
         self.assertEqual(queues["recruiter_import_review"]["count"], 1)
-        self.assertEqual(queues["credit_report_review"]["count"], 1)
-        self.assertEqual(snapshot["document_review_count"], 8)
+        self.assertNotIn("credit_report_review", queues)
+        self.assertEqual(snapshot["document_review_count"], 7)
         self.assertEqual(review_gated["document_derived_imports"]["status"], "review_gated")
         self.assertEqual(snapshot["critical_path_progress"]["document_derived_imports"], 66)
 

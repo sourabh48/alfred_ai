@@ -17,7 +17,7 @@ from alfred_ai.services.materialized_cache import (
     materialize_payload,
 )
 from apps.career.models import CareerResumeLearningMemory
-from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
+from apps.integrations.models import VerifiedExternalInsight
 from apps.integrations.services import verified_intelligence
 from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord
 
@@ -866,15 +866,6 @@ class ProjectDetailsLiveTests(TestCase):
                 skill_signature=f"skill-{index}",
                 successful_count=2,
                 average_confidence=0.76,
-            )
-        for index in range(2):
-            CreditReportUpload.objects.create(
-                user=self.user,
-                uploaded_file=f"credit_reports/2026/03/report-{index}.pdf",
-                file_name=f"report-{index}.pdf",
-                bureau="CIBIL",
-                parser_status="parsed",
-                parse_confidence=0.81,
             )
         now = timezone.now()
         VerifiedExternalInsight.objects.create(

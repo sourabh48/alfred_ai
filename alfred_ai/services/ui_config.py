@@ -34,7 +34,7 @@ DEFAULT_UI_CONFIG: dict[str, Any] = {
             "description": "Open your finance, career, credit, and vehicle workspaces from the same account.",
             "highlights": [
                 "Track expenses, debt, credit, and bank-linked evidence in one workspace.",
-                "Use document-backed workflows for statements, foreclosure, and bureau uploads.",
+                "Use document-backed workflows for statements, foreclosure, and loan documents.",
                 "Keep the same account even after using Remove My Data to start fresh.",
             ],
             "primary_cta": "Sign in",

@@ -51,12 +51,15 @@ class ApplicationSmokeTests(TestCase):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
 
-    def test_credit_score_page_is_dropped_but_report_uploads_remain(self):
-        # Owner decision 2026-11-06: no score page; bureau reports are still read from Documents.
+    def test_credit_score_page_and_credit_reports_are_dropped(self):
+        # Owner decisions 2026-11-06: no score page, then no credit report uploads, parsing or score APIs (FIN-17).
         self.client.force_login(self.user)
         self.assertEqual(self.client.get("/credit-score/").status_code, 404)
         self.assertNotContains(self.client.get("/dashboard/"), 'href="/credit-score/"')
-        self.assertEqual(self.client.get("/api/integrations/credit-score/uploads/").status_code, 200)
+        for path in ("/api/integrations/credit-score/", "/api/integrations/credit-score/uploads/"):
+            self.assertEqual(self.client.get(path).status_code, 404)
+        self.assertEqual(self.client.post("/api/integrations/credit-score/upload-report/").status_code, 404)
+        self.assertNotContains(self.client.get("/documents/"), "documentCreditForm")
 
     def test_remove_data_button_renders_only_in_settings(self):
         self.client.force_login(self.user)
@@ -196,7 +199,6 @@ class ApplicationSmokeTests(TestCase):
             "/api/mobility/bike-service-dashboard/",
             "/api/mobility/bike-models/catalog/",
             "/api/ai/runtime-status/",
-            "/api/integrations/credit-score/",
             "/api/integrations/recommendations/overview/",
             "/api/integrations/tax/overview/",
         ]

@@ -1,5 +1,3 @@
-import fitz
-
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
@@ -8,7 +6,6 @@ from unittest.mock import patch
 from apps.career.models import CareerResume
 from apps.expenses.models import StatementUpload
 from apps.expenses.services.statement_import import StatementParseResult
-from apps.integrations.models import CreditReportUpload
 from apps.loans.models import Loan, LoanImportDocument
 
 
@@ -51,14 +48,6 @@ class FileUploaderPersistenceTests(TestCase):
             statement_response = self.client.post("/api/expenses/import-statement/", data={"statement": statement})
         self.assertEqual(statement_response.status_code, 201)
         self.assertEqual(StatementUpload.objects.filter(user=self.user).count(), 1)
-
-        credit = SimpleUploadedFile("cibil.pdf", self._build_credit_pdf(), content_type="application/pdf")
-        credit_response = self.client.post(
-            "/api/integrations/credit-score/upload-report/",
-            data={"report": credit, "bureau": "CIBIL"},
-        )
-        self.assertEqual(credit_response.status_code, 201)
-        self.assertEqual(CreditReportUpload.objects.filter(user=self.user).count(), 1)
 
         loan_pdf = SimpleUploadedFile("sanction-letter.pdf", b"%PDF-1.4 fake", content_type="application/pdf")
         with patch(
@@ -121,24 +110,3 @@ class FileUploaderPersistenceTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Recent Loan Docs")
-
-    def _build_credit_pdf(self) -> bytes:
-        document = fitz.open()
-        page = document.new_page()
-        point = fitz.Point(72, 72)
-        for line in [
-            "TransUnion CIBIL Credit Report",
-            "Credit Score: 782",
-            "Consumer Name: Soura Sarkar",
-            "Report Number: CIBIL-2026-001",
-            "Report Date: 30/03/2026",
-            "Total Accounts: 5",
-            "Active Accounts: 4",
-            "Closed Accounts: 1",
-            "Delinquent Accounts: 0",
-            "Credit Utilization: 18%",
-            "Total Credit Limit: INR 500000",
-        ]:
-            page.insert_text(point, line, fontsize=12)
-            point = fitz.Point(point.x, point.y + 22)
-        return document.tobytes()

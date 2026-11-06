@@ -8,7 +8,6 @@ from django.utils import timezone
 
 from apps.expenses.models import BankAccount, Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
-from apps.integrations.models import CreditReportUpload
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanPaymentHistory
 
 
@@ -21,7 +20,7 @@ class FinancialRelationshipSynthesisTests(TestCase):
             monthly_income=120000,
         )
 
-    def test_financial_intelligence_links_transfers_loans_and_bureau_accounts(self):
+    def test_financial_intelligence_links_transfers_and_loans(self):
         primary_account = BankAccount.objects.create(
             user=self.user,
             bank_name="Axis Bank",
@@ -244,41 +243,6 @@ class FinancialRelationshipSynthesisTests(TestCase):
             audit_payload={},
         )
 
-        CreditReportUpload.objects.create(
-            user=self.user,
-            uploaded_file=SimpleUploadedFile("cibil.pdf", b"credit-data", content_type="application/pdf"),
-            file_name="cibil.pdf",
-            bureau="CIBIL",
-            parser_status="parsed",
-            parse_confidence=0.95,
-            extracted_payload={
-                "loan_accounts": [
-                    {
-                        "lender_name": "Axis Bank",
-                        "loan_account_number": "XXXX1234",
-                        "account_type": "Personal Loan",
-                        "status": "active",
-                        "opened_on": active_loan.start_date.isoformat(),
-                        "sanctioned_amount": 200000,
-                        "current_balance": 120000,
-                        "emi_amount": 10000,
-                    },
-                    {
-                        "lender_name": "Axis Bank",
-                        "loan_account_number": "XXXX9999",
-                        "account_type": "Personal Loan",
-                        "status": "closed",
-                        "opened_on": (closed_loan.start_date).isoformat(),
-                        "closed_on": closed_loan.closed_on.isoformat(),
-                        "sanctioned_amount": 150000,
-                        "current_balance": 0,
-                        "emi_amount": 9000,
-                    },
-                ]
-            },
-            summary="CIBIL report",
-        )
-
         intelligence = build_financial_intelligence(self.user)
 
         self.assertEqual(intelligence["financial_relationships"]["summary"]["self_transfers"], 1)
@@ -286,13 +250,8 @@ class FinancialRelationshipSynthesisTests(TestCase):
         self.assertEqual(intelligence["financial_relationships"]["summary"]["loan_repayments"], 1)
         self.assertEqual(intelligence["financial_relationships"]["summary"]["loan_part_payments"], 1)
         self.assertEqual(intelligence["financial_relationships"]["summary"]["loan_closure_payments"], 1)
-        self.assertEqual(intelligence["financial_relationships"]["summary"]["bureau_accounts"], 2)
-        self.assertEqual(intelligence["financial_relationships"]["summary"]["bureau_accounts_linked"], 2)
         self.assertEqual(len(intelligence["financial_relationships"]["events"]), 5)
-        self.assertEqual(
-            intelligence["financial_relationships"]["bureau_accounts"][0]["matched_loan_id"],
-            active_loan.id,
-        )
+        self.assertNotIn("bureau_accounts", intelligence["financial_relationships"])
         recent_by_reference = {
             item["description"]: item
             for item in intelligence["recent_transactions"]

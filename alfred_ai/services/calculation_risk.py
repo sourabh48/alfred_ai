@@ -8,7 +8,7 @@ from django.utils import timezone
 from apps.career.models import CareerJobAnalysis, CareerResume
 from apps.career.services.job_intelligence import career_opportunity_outcome_summary
 from apps.expenses.models import Expense, StatementUpload
-from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
+from apps.integrations.models import VerifiedExternalInsight
 from apps.investments.models import Investment, InvestmentImportDocument
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument, LoanPaymentHistory
 from apps.ml_engine.models import AdaptiveModelState
@@ -108,7 +108,6 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
     salary_model_ready = bool(salary_model_state and salary_model_state.inference_ready)
     salary_outcomes_ready = bool(career_outcome_summary.get("maturity_status") == "mature")
 
-    credit_report_review_count = CreditReportUpload.objects.filter(parser_status__in=PARSER_REVIEW_STATUSES).count()
     active_external_evidence = VerifiedExternalInsight.objects.filter(
         is_active=True,
         scope__in=EXTERNAL_CALCULATION_SCOPES,
@@ -138,7 +137,6 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
         _queue("Vehicle import documents", "vehicle_import_review", vehicle_import_review_count),
         _queue("Resume imports", "resume_import_review", career_resume_review_count),
         _queue("Recruiter/JD imports", "recruiter_import_review", recruiter_jd_review_count),
-        _queue("Credit report imports", "credit_report_review", credit_report_review_count),
     ]
     manual_review_queue_count = sum(item["count"] for item in manual_review_queues)
     document_review_count = sum(
@@ -153,7 +151,6 @@ def calculation_risk_snapshot(*, guardrails: dict | None = None) -> dict:
             "vehicle_import_review",
             "resume_import_review",
             "recruiter_import_review",
-            "credit_report_review",
         }
     )
 

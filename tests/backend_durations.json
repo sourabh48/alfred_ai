@@ -24,7 +24,6 @@
  "tests.test_career_resume_upload": 6.88,
  "tests.test_closure_citations": 1.17,
  "tests.test_conversation_history": 9.69,
- "tests.test_credit_report_upload": 22.36,
  "tests.test_document_center_and_statement_import": 18.14,
  "tests.test_document_corpus": 12.16,
  "tests.test_document_extraction": 0.05,

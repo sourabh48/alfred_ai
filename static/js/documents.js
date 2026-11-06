@@ -8,7 +8,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("documentVehicleForm").addEventListener("submit", submitVehicleDocument);
     document.getElementById("documentServiceForm").addEventListener("submit", submitServiceDocument);
     document.getElementById("documentResumeForm").addEventListener("submit", submitResumeDocument);
-    document.getElementById("documentCreditForm").addEventListener("submit", submitCreditDocument);
     document.getElementById("documentChatGPTImportForm").addEventListener("submit", submitChatGPTImport);
 
     loadDocumentCenter();
@@ -163,7 +162,6 @@ const documentCenterResources = [
     { key: "loanUploads", url: "/api/loans/import-uploads/", fallback: [] },
     { key: "bikeDashboard", url: "/api/mobility/bike-service-dashboard/", fallback: { bike_profiles: [], bike_documents: [] } },
     { key: "careerFiles", url: "/api/career/resumes/", fallback: [] },
-    { key: "creditUploads", url: "/api/integrations/credit-score/uploads/", fallback: [] },
     { key: "chatgptImports", url: "/api/reports/chatgpt-imports/", fallback: [] },
     { key: "reviewQueue", url: "/api/documents/review-queue/", fallback: { results: [] } },
     { key: "diagnostics", url: "/api/documents/diagnostics/", fallback: { results: [] } },
@@ -184,18 +182,16 @@ function loadDocumentCenter(options = {}) {
             const loanUploads = payload.loanUploads || [];
             const bikeDashboard = payload.bikeDashboard || { bike_profiles: [], bike_documents: [] };
             const careerFiles = payload.careerFiles || [];
-            const creditUploads = payload.creditUploads || [];
             const chatgptImports = documentCenterItems(payload.chatgptImports || []);
             const reviewQueue = payload.reviewQueue || { results: [] };
             const diagnostics = payload.diagnostics || { results: [] };
 
             hydrateVehicleProfiles(bikeDashboard.bike_profiles || []);
-            renderDocumentSummary(statementUploads, loanUploads, bikeDashboard.bike_documents || [], careerFiles, creditUploads, chatgptImports);
+            renderDocumentSummary(statementUploads, loanUploads, bikeDashboard.bike_documents || [], careerFiles, chatgptImports);
             renderStatementUploads(statementUploads);
             renderLoanUploads(loanUploads);
             renderVehicleDocuments(bikeDashboard.bike_documents || []);
             renderCareerFiles(careerFiles);
-            renderCreditUploads(creditUploads);
             renderChatGPTImports(chatgptImports);
             renderReviewQueue(reviewQueue.results || []);
             renderDiagnostics(diagnostics.results || []);
@@ -265,7 +261,6 @@ function documentCenterLabel(key) {
         loanUploads: "Loan docs",
         bikeDashboard: "Vehicle docs",
         careerFiles: "Career files",
-        creditUploads: "Credit reports",
         chatgptImports: "ChatGPT imports",
         reviewQueue: "Review queue",
         diagnostics: "Diagnostics",
@@ -369,21 +364,20 @@ function hydrateVehicleProfiles(profiles) {
     });
 }
 
-function renderDocumentSummary(statementUploads, loanUploads, vehicleDocuments, resumes, creditUploads, chatgptImports = []) {
+function renderDocumentSummary(statementUploads, loanUploads, vehicleDocuments, resumes, chatgptImports = []) {
     const recentConfidence = [
         ...statementUploads.map(item => Number(item.parse_confidence || 0)),
         ...loanUploads.map(item => Number(item.parse_confidence || 0)),
         ...vehicleDocuments.map(item => Number(item.parse_confidence || 0)),
         ...resumes.map(item => Number(item.parse_confidence || 0)),
-        ...creditUploads.map(item => Number(item.parse_confidence || 0)),
     ].filter(value => value > 0);
     const avgConfidence = recentConfidence.length
         ? Math.round((recentConfidence.reduce((sum, value) => sum + value, 0) / recentConfidence.length) * 100)
         : 0;
 
     Alfred.setTextIfChanged("documentConfidenceValue", `${avgConfidence}%`);
-    Alfred.setTextIfChanged("documentCenterMeta", statementUploads.length || loanUploads.length || vehicleDocuments.length || resumes.length || creditUploads.length || chatgptImports.length
-        ? `${statementUploads.length} statements | ${loanUploads.length} loan docs | ${vehicleDocuments.length} vehicle docs | ${resumes.length} career files | ${creditUploads.length} credit reports | ${chatgptImports.length} chat imports tracked`
+    Alfred.setTextIfChanged("documentCenterMeta", statementUploads.length || loanUploads.length || vehicleDocuments.length || resumes.length || chatgptImports.length
+        ? `${statementUploads.length} statements | ${loanUploads.length} loan docs | ${vehicleDocuments.length} vehicle docs | ${resumes.length} career files | ${chatgptImports.length} chat imports tracked`
         : "No recent uploads yet.");
 
     const cards = [
@@ -391,7 +385,6 @@ function renderDocumentSummary(statementUploads, loanUploads, vehicleDocuments, 
         { label: "Loan Docs", value: loanUploads.length, copy: "Imported sanction letters, schedules, and statements" },
         { label: "Vehicle Docs", value: vehicleDocuments.length, copy: "Compliance and service-supporting files" },
         { label: "Career Files", value: resumes.length, copy: "Resume-based career intelligence inputs" },
-        { label: "Credit Reports", value: creditUploads.length, copy: "Uploaded bureau reports retained with parser status" },
         { label: "Chat Imports", value: chatgptImports.length, copy: "Imported ChatGPT context retained for review" },
         { label: "Parser Avg", value: `${avgConfidence}%`, copy: "Average parser confidence across recent uploads" },
     ];
@@ -503,27 +496,6 @@ function renderCareerFiles(items) {
             <div class="list-actions mt-3">
                 <button class="btn btn-sm btn-outline-primary" type="button" onclick="retryReviewItem('resume_document', ${item.id})">Retry</button>
                 <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('resume_document', ${item.id})">Delete</button>
-            </div>
-        </div>
-    `).join(""));
-}
-
-function renderCreditUploads(items) {
-    const target = document.getElementById("documentCreditList");
-    if (!items.length) {
-        Alfred.setHTMLIfChanged(target, `<div class="empty-state">No credit reports uploaded yet.</div>`);
-        return;
-    }
-
-    Alfred.setHTMLIfChanged(target, items.slice(0, 10).map(item => `
-        <div class="mini-card">
-            <div class="fw-semibold">${Alfred.escapeHtml(item.file_name || "Credit report")}</div>
-            <div class="muted small">${Alfred.escapeHtml(item.bureau || "Unknown bureau")} | ${(Number(item.parse_confidence || 0) * 100).toFixed(0)}% | ${Alfred.formatDateTime(item.uploaded_at)}</div>
-            <div class="muted small mt-2">${Alfred.escapeHtml(item.parser_status || "Unknown")}${item.score ? ` | Score ${Alfred.escapeHtml(String(item.score))}` : " | Awaiting verified score extraction"}</div>
-            ${item.parser_notes ? `<div class="small mt-2">${Alfred.escapeHtml(item.parser_notes)}</div>` : ""}
-            <div class="list-actions mt-3">
-                <button class="btn btn-sm btn-outline-primary" type="button" onclick="retryReviewItem('credit_report', ${item.id})">Retry</button>
-                <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('credit_report', ${item.id})">Delete</button>
             </div>
         </div>
     `).join(""));
@@ -778,27 +750,6 @@ function submitResumeDocument(event) {
     });
 }
 
-function submitCreditDocument(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    runBatchUpload({
-        form,
-        fileFieldName: "report",
-        feedbackId: "documentCreditFeedback",
-        emptyMessage: "Choose at least one credit report file first.",
-        pendingText: "Uploading...",
-        itemLabel: "credit report",
-        successVerb: "uploaded",
-        uploadFile: (_file, payload, uploadContext) => Alfred.uploadJSON("/api/integrations/credit-score/upload-report/", {
-            method: "POST",
-            body: payload,
-            onUploadState: uploadContext?.reportProgress,
-        }),
-        summarizeResults: summarizeCreditBatch,
-        onSuccess: loadDocumentCenter,
-    });
-}
-
 function submitChatGPTImport(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -974,23 +925,6 @@ function summarizeResumeBatch(results) {
     }
     if (reviewCount) {
         extras.push(`${reviewCount} marked for review`);
-    }
-
-    return appendBatchExtras(summary, extras, reviewCount && !summary.failed.length ? "warning" : summary.tone);
-}
-
-function summarizeCreditBatch(results) {
-    const summary = Alfred.summarizeUploadBatch(results, { itemLabel: "credit report", successVerb: "uploaded" });
-    const parsedCount = summary.succeeded.filter(result => result.data?.upload?.parser_status === "parsed").length;
-    const reviewCount = summary.succeeded.length - parsedCount;
-    const scoreCount = summary.succeeded.filter(result => result.data?.score?.score).length;
-    const extras = [];
-
-    if (scoreCount) {
-        extras.push(`${scoreCount} official score snapshot${scoreCount === 1 ? "" : "s"} created`);
-    }
-    if (reviewCount) {
-        extras.push(`${reviewCount} retained for review`);
     }
 
     return appendBatchExtras(summary, extras, reviewCount && !summary.failed.length ? "warning" : summary.tone);

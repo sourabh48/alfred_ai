@@ -21,7 +21,7 @@ from apps.career.services.job_intelligence import (
     job_intelligence,
 )
 from apps.expenses.models import Expense, StatementUpload
-from apps.integrations.models import CreditReportUpload, VerifiedExternalInsight
+from apps.integrations.models import VerifiedExternalInsight
 from apps.loans.models import LoanClosureDocument, LoanPaymentHistory
 from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeServiceRecord
 from apps.mobility.services.bike_catalog import catalog_coverage_summary
@@ -71,7 +71,6 @@ DOCUMENT_CORRECTION_FAMILY_LABELS = {
     "vehicle_document": "vehicles",
     "resume_document": "resumes",
     "recruiter_document": "recruiter/JD intake",
-    "credit_report": "credit reports",
 }
 
 
@@ -461,7 +460,6 @@ def _build_learning_snapshot(now) -> dict:
     chatgpt_imports = ChatGPTImport.objects.count()
     resume_learning_memories = CareerResumeLearningMemory.objects.count()
     job_analyses = CareerJobAnalysis.objects.count()
-    credit_report_uploads = CreditReportUpload.objects.count()
     parser_correction_memories = DocumentParserLearningMemory.objects.filter(correction_count__gt=0).count()
     parser_correction_scope_names = _accepted_document_correction_scopes()
     parser_correction_scopes = len(parser_correction_scope_names)
@@ -484,7 +482,7 @@ def _build_learning_snapshot(now) -> dict:
         max(
             14,
             _progress(
-                vehicle_documents + statement_upload_count + resumes + recruiter_documents + credit_report_uploads + (chatgpt_imports * 0.5) + (resume_learning_memories * 0.75),
+                vehicle_documents + statement_upload_count + resumes + recruiter_documents + (chatgpt_imports * 0.5) + (resume_learning_memories * 0.75),
                 72,
                 floor=20,
             )
@@ -544,10 +542,10 @@ def _build_learning_snapshot(now) -> dict:
         {
             "title": "Document intelligence",
             "progress": document_progress,
-            "detail": "Statements, resumes, recruiter/JD intake, vehicle documents, credit reports, ChatGPT context imports, and loan PDFs now expose parser confidence, OCR overlay evidence, schema-aware correction candidates, cross-family unknown-layout fixtures, accepted correction memory outcomes, Selenium-proven correction interaction, and retry-fed learning traces where applicable.",
+            "detail": "Statements, resumes, recruiter/JD intake, vehicle documents, ChatGPT context imports, and loan PDFs now expose parser confidence, OCR overlay evidence, schema-aware correction candidates, cross-family unknown-layout fixtures, accepted correction memory outcomes, Selenium-proven correction interaction, and retry-fed learning traces where applicable.",
             "maturity_status": "Real-layout gated",
             "signals": [
-                f"{statement_upload_count + vehicle_documents + resumes + recruiter_documents + credit_report_uploads} parser-tracked uploads",
+                f"{statement_upload_count + vehicle_documents + resumes + recruiter_documents} parser-tracked uploads",
                 f"{chatgpt_imports} ChatGPT context imports",
                 f"{review_loan_payments} review-needed loan matches",
                 f"{recruiter_documents} recruiter/JD intake records",
@@ -562,7 +560,7 @@ def _build_learning_snapshot(now) -> dict:
             "blocker": "The current review workflow is stronger for supported layouts; live maturity still depends on more real samples from unknown and long-tail document layouts plus browser interaction proof beyond the vehicle invoice/OCR correction path.",
             "blocked_by_real_data": True,
             "completion_actions": [
-                "Upload and resolve real unknown layouts for statements, loans, loan closures, investments, vehicles, resumes, recruiter messages, and credit reports.",
+                "Upload and resolve real unknown layouts for statements, loans, loan closures, investments, vehicles, resumes, and recruiter messages.",
                 "Accept field corrections through the review queue until DocumentParserLearningMemory records validated outcomes by document family.",
                 "Expand browser interaction tests from vehicle invoice/OCR overlay correction into the remaining document-family review flows.",
             ],
@@ -810,7 +808,7 @@ def project_details_payload(guardrails: dict) -> dict:
             "vehicle setup form submission",
             "vehicle invoice/OCR overlay correction",
             "statement review correction",
-            "bank, loan, investment and credit report review forms",
+            "bank, loan and investment review forms",
             "reviewed financial document questions and citations",
             "private document upload, extraction search and corpus",
             "private memory and history consent, deletion and evaluation",

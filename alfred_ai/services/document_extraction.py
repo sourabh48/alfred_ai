@@ -165,8 +165,6 @@ def _document_hint_from_filename(filename: str) -> str:
     lowered = (filename or "").lower()
     if any(token in lowered for token in ("resume", "cv", "curriculum")):
         return "resume_document"
-    if any(token in lowered for token in ("cibil", "credit", "experian", "equifax", "crif")):
-        return "credit_report"
     if any(token in lowered for token in ("portfolio", "holding", "broker", "mutual", "zerodha", "groww")):
         return "investment_document"
     if any(token in lowered for token in ("closure", "foreclosure", "no-due", "noc")):

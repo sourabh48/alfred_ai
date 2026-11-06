@@ -14,7 +14,6 @@ from alfred_ai.services.materialized_cache import materialize_payload
 from apps.loans.diagnostics import public_allocation, reconciliation_message
 from apps.expenses.models import BankAccount, Expense
 from apps.expenses.services.cashflow_treatment import classify_cashflow, variable_spend_rows
-from apps.integrations.models import CreditReportUpload
 from apps.investments.money import investment_total_float
 from apps.investments.models import Investment
 from apps.loans.models import Loan, LoanForeclosureSnapshot, LoanPaymentHistory
@@ -307,7 +306,6 @@ def _financial_revision(user) -> str:
     account_meta = BankAccount.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_sync=Max("last_synced_at"))
     investment_meta = Investment.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"))
     foreclosure_meta = LoanForeclosureSnapshot.objects.filter(loan__user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
-    credit_meta = CreditReportUpload.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
     vehicle_meta = BikeProfile.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
     service_meta = BikeServiceRecord.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("service_date"))
     trip_meta = TripLog.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("log_date"))
@@ -325,7 +323,6 @@ def _financial_revision(user) -> str:
             account_meta["count"], account_meta["max_id"], account_meta["max_sync"],
             investment_meta["count"], investment_meta["max_id"],
             foreclosure_meta["count"], foreclosure_meta["max_id"], foreclosure_meta["max_updated"],
-            credit_meta["count"], credit_meta["max_id"], credit_meta["max_updated"],
             vehicle_meta["count"], vehicle_meta["max_id"], vehicle_meta["max_updated"],
             service_meta["count"], service_meta["max_id"], service_meta["max_date"],
             trip_meta["count"], trip_meta["max_id"], trip_meta["max_date"],
@@ -459,16 +456,7 @@ def _empty_intelligence() -> dict:
                 "loan_repayments": 0,
                 "loan_part_payments": 0,
                 "loan_closure_payments": 0,
-                "bureau_accounts": 0,
-                "bureau_accounts_linked": 0,
             },
-            "bureau_report": {
-                "source_upload_id": None,
-                "bureau": "",
-                "report_date": "",
-                "file_name": "",
-            },
-            "bureau_accounts": [],
             "events": [],
         },
         "lifestyle": {

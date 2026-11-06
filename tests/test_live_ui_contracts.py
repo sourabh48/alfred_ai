@@ -233,7 +233,6 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
             "documentVehicleForm": {"bike_profile_id", "document_type_override", "document_file"},
             "documentServiceForm": {"bike_profile_id", "service_file"},
             "documentResumeForm": {"resume"},
-            "documentCreditForm": {"bureau", "report"},
             "documentChatGPTImportForm": {"title", "import_type", "source_label", "raw_text"},
         }
         for form_id, expected_controls in document_forms.items():
@@ -247,13 +246,11 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
             'document.getElementById("documentVehicleForm").addEventListener("submit", submitVehicleDocument)',
             'document.getElementById("documentServiceForm").addEventListener("submit", submitServiceDocument)',
             'document.getElementById("documentResumeForm").addEventListener("submit", submitResumeDocument)',
-            'document.getElementById("documentCreditForm").addEventListener("submit", submitCreditDocument)',
             'document.getElementById("documentChatGPTImportForm").addEventListener("submit", submitChatGPTImport)',
             'Alfred.uploadJSON("/api/loans/import-pdf/"',
             'Alfred.uploadJSON("/api/mobility/bike-documents/upload/"',
             'Alfred.uploadJSON("/api/mobility/bike-services/import/"',
             'Alfred.uploadJSON("/api/career/resumes/upload/"',
-            'Alfred.uploadJSON("/api/integrations/credit-score/upload-report/"',
             'Alfred.fetchJSON("/api/reports/chatgpt-imports/"',
         ):
             self.assertIn(expected, documents_script)

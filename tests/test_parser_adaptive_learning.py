@@ -1,9 +1,6 @@
 from tempfile import TemporaryDirectory
 
-import fitz
-
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 
 from alfred_ai.services.parser_learning import apply_parser_learning, record_parser_learning
@@ -61,46 +58,3 @@ class ParserAdaptiveLearningTests(TestCase):
         self.assertGreater(boosted_confidence, 0.62)
         self.assertTrue(boosted_notes)
         self.assertEqual(DocumentParserLearningMemory.objects.count(), 1)
-
-    def test_repeated_credit_report_uploads_create_learning_memory_and_raise_confidence(self):
-        report_bytes = self._build_credit_pdf(
-            """
-            TransUnion CIBIL Credit Report
-            Credit Score: 782
-            Consumer Name: Soura Sarkar
-            Report Number: CIBIL-2026-001
-            Report Date: 30/03/2026
-            Total Accounts: 5
-            Active Accounts: 4
-            Closed Accounts: 1
-            Delinquent Accounts: 0
-            Credit Utilization: 18%
-            Total Credit Limit: INR 500000
-            """
-        )
-
-        responses = []
-        for index in range(3):
-            report = SimpleUploadedFile(
-                f"cibil-report-{index}.pdf",
-                report_bytes,
-                content_type="application/pdf",
-            )
-            response = self.client.post(
-                "/api/integrations/credit-score/upload-report/",
-                data={"report": report, "bureau": "CIBIL"},
-            )
-            self.assertEqual(response.status_code, 201)
-            responses.append(response.json())
-
-        self.assertEqual(DocumentParserLearningMemory.objects.filter(user=self.user, scope="credit_report").count(), 1)
-        self.assertIn("Adaptive parser memory", responses[2]["upload"]["parser_notes"])
-
-    def _build_credit_pdf(self, text: str) -> bytes:
-        document = fitz.open()
-        page = document.new_page()
-        point = fitz.Point(72, 72)
-        for line in [item.strip() for item in text.strip().splitlines() if item.strip()]:
-            page.insert_text(point, line, fontsize=12)
-            point = fitz.Point(point.x, point.y + 22)
-        return document.tobytes()

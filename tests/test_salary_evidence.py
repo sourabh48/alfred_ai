@@ -12,7 +12,6 @@ from apps.career.models import CareerProfile
 from apps.career.services.income_intelligence import build_employment_income_signals, is_never_pay
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence, resolve_canonical_financial_baseline
-from apps.integrations.services.credit_score_tracker import CreditScoreTrackerService
 from apps.loans.models import Loan
 from apps.ml_engine.services.recommendation_engine import FinancialRecommendationEngine
 from apps.ml_engine.training.orchestrator import TRAINING_SPECS
@@ -457,25 +456,6 @@ class UnknownIncomeIsNotZeroTests(SalaryEvidenceBase):
     def with_loan(self, user):
         Loan.objects.create(user=user, loan_type="personal", lender="Synthetic", principal=500000, interest_rate=10,
                             tenure_months=60, emi=20000, remaining_balance=400000, start_date=timezone.localdate() - timedelta(days=60))
-
-    def test_credit_alerts_say_the_ratio_is_unavailable_not_fine(self):
-        user = self.user("dti_unknown", 300000, "unconfirmed")
-        self.with_loan(user)
-        types = {item["type"] for item in CreditScoreTrackerService()._generate_alerts(get_user_model().objects.get(pk=user.pk))}
-        self.assertIn("DTI_UNAVAILABLE", types)
-        self.assertNotIn("DTI_WARNING", types)
-
-    def test_credit_alerts_still_warn_on_a_known_high_ratio(self):
-        user = self.user("dti_high", 30000, "monthly")
-        self.with_loan(user)
-        types = {item["type"] for item in CreditScoreTrackerService()._generate_alerts(get_user_model().objects.get(pk=user.pk))}
-        self.assertIn("DTI_WARNING", types)
-        self.assertNotIn("DTI_UNAVAILABLE", types)
-
-    def test_no_debt_means_no_income_alert(self):
-        user = self.user("dti_none", 300000, "unconfirmed")
-        types = {item["type"] for item in CreditScoreTrackerService()._generate_alerts(get_user_model().objects.get(pk=user.pk))}
-        self.assertNotIn("DTI_UNAVAILABLE", types)
 
     def test_recommendations_do_not_read_unknown_income_as_budget_or_low_debt(self):
         engine = FinancialRecommendationEngine()

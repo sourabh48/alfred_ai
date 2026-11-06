@@ -11,8 +11,6 @@ from django.utils import timezone
 
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
-from apps.integrations.models import CreditReportUpload
-from apps.integrations.services.credit_loan_sync import sync_credit_report_loans
 from apps.loans.models import Loan, LoanPaymentHistory
 from apps.loans.services.loan_intelligence import loan_intelligence_service
 from apps.loans.services.payment_review import review_loan_payment_match
@@ -53,19 +51,6 @@ class LoanVerificationTests(TestCase):
         )
         values.update(changes)
         return values
-
-    def report(self, **changes):
-        values = dict(
-            user=self.user, file_name="bureau.txt", parser_status="parsed", parse_confidence=.95,
-            extracted_payload={"loan_accounts": [{
-                "lender_name": "Example Housing Finance", "loan_account_number": "HOME123456",
-                "account_type": "Home Loan", "status": "Active", "sanctioned_amount": 200000,
-                "current_balance": 150000, "emi_amount": 9000,
-                "opened_on": timezone.localdate().isoformat(),
-            }]},
-        )
-        values.update(changes)
-        return CreditReportUpload.objects.create(**values)
 
     def test_repeated_detection_retains_estimate_without_debt_or_payment_effects(self):
         first = self.expense(transaction_date=timezone.localdate() - timedelta(days=30))
@@ -145,8 +130,6 @@ class LoanVerificationTests(TestCase):
         result = loan_intelligence_service.detect_loan_payments(self.user, [other_expense])
         self.assertEqual(result["new_payments"], 0)
         self.assertEqual(LoanPaymentHistory.objects.count(), 0)
-        with self.assertRaises(ValueError):
-            sync_credit_report_loans(user=self.user, report_upload=self.report(user=self.other))
 
     def test_payment_acceptance_does_not_confirm_terms_or_restore_old_guesses(self):
         loan = self.loan()
@@ -164,46 +147,6 @@ class LoanVerificationTests(TestCase):
         loan.refresh_from_db()
         self.assertEqual(loan.remaining_balance, 150000)
         self.assertEqual(loan.total_paid, 0)
-
-    def test_bureau_new_and_matched_loans_remain_confirmed(self):
-        report = self.report()
-        first = sync_credit_report_loans(user=self.user, report_upload=report)
-        self.assertEqual(first["created_loans"], 1)
-        loan = Loan.objects.get(user=self.user)
-        self.assertTrue(loan.auto_detected)
-        self.assertTrue(loan.is_confirmed)
-        self.assertEqual(loan.verification_source, "bureau")
-        self.assertEqual(build_financial_intelligence(self.user)["balance_sheet"]["total_liabilities"], 150000)
-        loan.verification_status = "estimated"
-        loan.remaining_balance = 240000
-        loan.save()
-        second = sync_credit_report_loans(user=self.user, report_upload=report)
-        self.assertEqual(second["created_loans"], 0)
-        loan.refresh_from_db()
-        self.assertTrue(loan.is_confirmed)
-        self.assertEqual(loan.remaining_balance, 150000)
-
-    def test_weak_bureau_report_does_not_confirm_inferred_loan(self):
-        loan = self.loan()
-        sync_credit_report_loans(user=self.user, report_upload=self.report(parse_confidence=.4))
-        loan.refresh_from_db()
-        self.assertFalse(loan.is_confirmed)
-
-    def test_bureau_missing_balance_requires_review_and_explicit_zero_is_preserved(self):
-        loan = self.loan()
-        report = self.report()
-        del report.extracted_payload["loan_accounts"][0]["current_balance"]
-        result = sync_credit_report_loans(user=self.user, report_upload=report)
-        self.assertEqual(result["review_items"], 1)
-        loan.refresh_from_db()
-        self.assertFalse(loan.is_confirmed)
-        report.extracted_payload["loan_accounts"][0]["current_balance"] = 0
-        report.extracted_payload["loan_accounts"][0]["balance_reported"] = True
-        sync_credit_report_loans(user=self.user, report_upload=report)
-        loan.refresh_from_db()
-        self.assertTrue(loan.is_confirmed)
-        self.assertEqual(loan.remaining_balance, 0)
-        self.assertEqual(build_financial_intelligence(self.user)["balance_sheet"]["total_liabilities"], 0)
 
     def test_late_imported_payment_cannot_reduce_a_confirmed_current_balance(self):
         loan = self.loan()
@@ -259,18 +202,6 @@ class LoanVerificationTests(TestCase):
         payment.refresh_from_db()
         self.assertEqual(loan.remaining_balance, 150000)
         self.assertFalse(payment.loan_effect_applied)
-
-    def test_bureau_balance_confirmation_does_not_confirm_a_guessed_emi(self):
-        loan = self.loan(status="foreclosure_pending")
-        report = self.report()
-        del report.extracted_payload["loan_accounts"][0]["emi_amount"]
-        sync_credit_report_loans(user=self.user, report_upload=report)
-        loan.refresh_from_db()
-        self.assertTrue(loan.is_confirmed)
-        self.assertEqual(loan.remaining_balance, 150000)
-        self.assertEqual(loan.emi, 0)
-        self.assertEqual(loan.interest_rate, 0)
-        self.assertEqual(loan.status, "foreclosure_pending")
 
     def test_confirmed_foreclosure_pending_stays_debt_without_recurring_emi(self):
         self.loan(verification_status="confirmed", status="foreclosure_pending", remaining_balance=75000)

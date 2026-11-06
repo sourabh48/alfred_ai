@@ -11,8 +11,6 @@ from alfred_private_storage import private_directory
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services.resume_intelligence import ParsedResume
 from apps.expenses.models import StatementUpload
-from apps.integrations.models import CreditReportUpload
-from apps.integrations.services.credit_report_parser import ParsedCreditReport
 from apps.investments.models import Investment, InvestmentImportDocument
 from apps.loans.models import Loan, LoanClosureDocument, LoanImportDocument
 from apps.mobility.models import BikeDocument, BikeProfile, BikeServiceRecord
@@ -58,12 +56,11 @@ class DocumentRetryIntegrityTests(TestCase):
             ("investment_document", InvestmentImportDocument, "uploaded_file", {"user": self.user}),
             ("vehicle_document", BikeDocument, "document_file", {"user": self.user}),
             ("resume_document", CareerResume, "uploaded_file", {"user": self.user}),
-            ("credit_report", CreditReportUpload, "uploaded_file", {"user": self.user}),
         ]
         parser_paths = [
             "queue_statement_retry", "retry_statement_upload", "loan_pdf_parser.parse_document",
             "loan_closure_parser.parse_document", "portfolio_intelligence_service.parse_portfolio_document",
-            "bike_document_ai.parse", "resume_intelligence.parse", "credit_report_parser.parse",
+            "bike_document_ai.parse", "resume_intelligence.parse",
         ]
         with ExitStack() as stack:
             parsers = [stack.enter_context(patch(f"alfred_ai.services.document_review.{path}")) for path in parser_paths]
@@ -305,24 +302,6 @@ class DocumentRetryIntegrityTests(TestCase):
             self.assertEqual(document.extracted_payload[key], value)
         self.assertEqual(document.closure_amount, 12345)
         self.assertEqual(document.closure_date, date(2026, 3, 20))
-
-    def test_credit_retry_keeps_accepted_metadata(self):
-        document = CreditReportUpload.objects.create(user=self.user, uploaded_file=self._file(), file_name="credit.pdf")
-        accepted = {"bureau": "CIBIL", "applicant_name": "Verified Applicant", "report_number": "VERIFIED-1", "report_date": "2026-03-20"}
-        self._post("resolve", "credit_report", document, corrections=accepted)
-        parsed = ParsedCreditReport(
-            parser_status="parsed", confidence=0.9, bureau="EXPERIAN", extracted_text="Noisy OCR",
-            payload={"applicant_name": "Wrong Applicant", "report_number": "WRONG", "report_date": "2026-01-01"},
-            factors=[], summary="Parsed", parser_notes="Retry",
-        )
-        with patch("alfred_ai.services.document_review.credit_report_parser.parse", return_value=parsed):
-            self._post("retry", "credit_report", document)
-        for key, value in accepted.items():
-            self.assertEqual(document.extracted_payload[key], value)
-        self.assertEqual(document.bureau, "CIBIL")
-        self.assertEqual(document.applicant_name, "Verified Applicant")
-        self.assertEqual(document.report_number, "VERIFIED-1")
-        self.assertEqual(document.report_date, date(2026, 3, 20))
 
     def test_recruiter_retry_keeps_accepted_fields_and_zero_experience(self):
         document = CareerJobAnalysis.objects.create(

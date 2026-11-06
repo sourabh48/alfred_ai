@@ -18,9 +18,6 @@ from apps.expenses.models import StatementUpload
 from apps.expenses.money import expense_money, money_float
 from apps.expenses.services.statement_import import clean_statement_text
 from apps.expenses.services.statement_lifecycle import delete_statement_upload, queue_statement_retry, retry_statement_upload
-from apps.integrations.models import CreditReportUpload, CreditScore
-from apps.integrations.services.credit_report_parser import credit_report_parser
-from apps.integrations.views import _persist_uploaded_credit_score
 from apps.investments.models import Investment, InvestmentImportDocument
 from apps.investments.money import INVESTMENT_MONEY_FIELDS, investment_money, investment_total_float
 from apps.investments.services import portfolio_intelligence_service
@@ -55,7 +52,6 @@ SCOPE_MODULE_MAP = {
     "vehicle_document": "mobility",
     "resume_document": "career",
     "recruiter_document": "career",
-    "credit_report": "general",
 }
 
 REVIEW_FIELD_SCHEMAS = {
@@ -128,13 +124,6 @@ REVIEW_FIELD_SCHEMAS = {
         {"name": "experience_years", "label": "Experience Years", "type": "number"},
         {"name": "salary_min", "label": "Salary Min", "type": "number"},
         {"name": "salary_max", "label": "Salary Max", "type": "number"},
-        {"name": "review_note", "label": "Review Note", "type": "text"},
-    ],
-    "credit_report": [
-        {"name": "bureau", "label": "Bureau", "type": "text"},
-        {"name": "applicant_name", "label": "Applicant Name", "type": "text"},
-        {"name": "report_number", "label": "Report Number", "type": "text"},
-        {"name": "report_date", "label": "Report Date", "type": "date"},
         {"name": "review_note", "label": "Review Note", "type": "text"},
     ],
 }
@@ -294,21 +283,6 @@ REVIEW_GENERIC_FIELD_ALIASES = {
         "title": ["job_title"],
         "work_location": ["location"],
         "years_exp": ["experience_years"],
-    },
-    "credit_report": {
-        "applicant": ["applicant_name"],
-        "bureau_name": ["bureau"],
-        "control_number": ["report_number"],
-        "credit_bureau": ["bureau"],
-        "crif_ref_no": ["report_number"],
-        "customer_name": ["applicant_name"],
-        "date": ["report_date"],
-        "document_date": ["report_date"],
-        "generated_date": ["report_date"],
-        "issue_date": ["report_date"],
-        "name": ["applicant_name"],
-        "report_id": ["report_number"],
-        "report_no": ["report_number"],
     },
 }
 
@@ -548,7 +522,6 @@ def build_review_queue(user, *, limit: int = 24) -> list[dict]:
             for item in CareerJobAnalysis.objects.filter(_review_filter(user), extracted_payload__source_kind__in=["recruiter_message", "jd_attachment"])
             .order_by("-updated_at", "-id")[:3]
         ],
-        *[_serialize_credit(item) for item in CreditReportUpload.objects.filter(_review_filter(user)).order_by("-updated_at", "-id")[:3]],
     ]
     items.sort(key=lambda item: (item["priority_rank"], item["created_at"]), reverse=True)
     return items[:limit]
@@ -653,20 +626,6 @@ def apply_correction(user, *, scope: str, document_id: int, corrections: dict) -
             event_type="accepted_correction",
             severity="info",
             message="Accepted a user correction for recruiter or JD intake.",
-            document_id=document_id,
-            file_name=item["file_name"],
-            payload={"fields": sorted(normalized.keys())},
-        )
-        return item
-    if scope == "credit_report":
-        item = _apply_credit_correction(user, document_id, normalized)
-        _log_document_event(
-            user=user,
-            module="integrations",
-            scope=scope,
-            event_type="accepted_correction",
-            severity="info",
-            message="Accepted a user correction for a credit report.",
             document_id=document_id,
             file_name=item["file_name"],
             payload={"fields": sorted(normalized.keys())},
@@ -813,27 +772,6 @@ def _delete_document_rows(user, *, scope: str, document_id: int) -> None:
         )
         return
 
-    if scope == "credit_report":
-        upload = CreditReportUpload.objects.get(user=user, pk=document_id)
-        file_name = upload.file_name
-        score = upload.parsed_credit_score
-        upload.delete()
-        if score:
-            score.factors.all().delete()
-            score.delete()
-        _log_document_event(
-            user=user,
-            module="integrations",
-            scope=scope,
-            event_type="delete_document",
-            severity="info",
-            message="Deleted a credit report upload and its linked parsed score where present.",
-            document_id=document_id,
-            file_name=file_name,
-            payload={"deleted_score": bool(score)},
-        )
-        return
-
     raise ValueError("Unsupported delete scope.")
 
 
@@ -853,8 +791,6 @@ def retry_review_item(user, *, scope: str, document_id: int) -> dict:
         return _retry_resume_document(user, document_id)
     if scope == "recruiter_document":
         return _retry_recruiter_document(user, document_id)
-    if scope == "credit_report":
-        return _retry_credit_report(user, document_id)
     raise ValueError("Unsupported retry scope.")
 
 
@@ -1580,118 +1516,6 @@ def _retry_recruiter_document(user, document_id: int) -> dict:
     return serialized
 
 
-def _retry_credit_report(user, document_id: int) -> dict:
-    upload = CreditReportUpload.objects.select_related("parsed_credit_score").get(user=user, pk=document_id)
-    unavailable = _retry_source_unavailable(upload, "uploaded_file", _serialize_credit)
-    if unavailable is not None:
-        return unavailable
-    payload, retry_state = _begin_retry_payload(upload.extracted_payload)
-    upload.extracted_payload = payload
-    upload.save(update_fields=["extracted_payload"])
-
-    upload.uploaded_file.open("rb")
-    try:
-        parsed = credit_report_parser.parse(upload.uploaded_file, filename=upload.file_name, user=user)
-    finally:
-        upload.uploaded_file.close()
-
-    accepted = _saved_corrections(payload, ("bureau", "applicant_name", "report_number", "report_date"))
-    parsed.payload.update(accepted)
-    parsed.bureau = accepted.get("bureau", parsed.bureau)
-    merged_payload = _merge_non_empty_payload(
-        upload.extracted_payload,
-        {**parsed.payload, "bureau": parsed.bureau or parsed.payload.get("bureau", "")},
-    )
-    merged_payload = _retry_payload(
-        merged_payload,
-        state="resolved" if parsed.parser_status == "parsed" else "needs_review",
-        reason="manual_review_retry",
-        resolution="credit_report_reparsed" if parsed.parser_status == "parsed" else "still_needs_review",
-        retry_count=retry_state["retry_count"],
-    )
-    upload.bureau = _prefer_value(parsed.bureau, upload.bureau)
-    upload.parse_confidence = max(float(upload.parse_confidence or 0), float(parsed.confidence or 0))
-    upload.parser_status = _best_status(upload.parser_status, parsed.parser_status)
-    upload.extracted_text = _prefer_value(parsed.extracted_text, upload.extracted_text)
-    upload.extracted_payload = merged_payload
-    upload.summary = parsed.summary or upload.summary
-    upload.parser_notes = " ".join(filter(None, [upload.parser_notes, parsed.parser_notes])).strip()
-    upload.applicant_name = _prefer_value(parsed.payload.get("applicant_name"), upload.applicant_name)
-    upload.report_number = _prefer_value(parsed.payload.get("report_number"), upload.report_number)
-    upload.report_date = _parse_date(parsed.payload.get("report_date")) or upload.report_date
-    upload.save(
-        update_fields=[
-            "bureau",
-            "parse_confidence",
-            "parser_status",
-            "extracted_text",
-            "extracted_payload",
-            "summary",
-            "parser_notes",
-            "applicant_name",
-            "report_number",
-            "report_date",
-            "updated_at",
-        ]
-    )
-    if parsed.payload.get("score"):
-        _persist_uploaded_credit_score(user, upload, parsed, upload.bureau)
-    record_parser_learning(
-        user=user,
-        scope="credit_report",
-        filename=upload.file_name,
-        detected_type=upload.bureau or parsed.bureau or "credit_report",
-        text=upload.extracted_text,
-        field_names=[key for key, value in (upload.extracted_payload or {}).items() if value not in ("", None, 0)],
-        parser_status=upload.parser_status,
-        confidence=upload.parse_confidence,
-        from_retry=True,
-        accepted_fields=list((upload.extracted_payload or {}).get("accepted_corrections", {}).keys()),
-        resolution=(upload.extracted_payload or {}).get("background_retry", {}).get("resolution", ""),
-    )
-    serialized = _serialize_credit(upload)
-    _log_document_event(
-        user=user,
-        module="integrations",
-        scope="credit_report",
-        event_type="retry_document",
-        severity="info" if upload.parser_status == "parsed" else "warning",
-        message=(
-            "Retried a credit report and refreshed the extracted bureau summary."
-            if upload.parser_status == "parsed"
-            else "Retried a credit report, but it still needs review before Alfred can trust the extracted score details."
-        ),
-        document_id=document_id,
-        file_name=upload.file_name,
-        payload={
-            "parser_status": upload.parser_status,
-            "parse_confidence": upload.parse_confidence,
-            "bureau": upload.bureau,
-            "score": parsed.payload.get("score") or 0,
-        },
-    )
-    if upload.parser_status != "parsed":
-        _create_retry_ticket_if_needed(
-            user=user,
-            scope="credit_report",
-            document_id=document_id,
-            file_name=upload.file_name,
-            retry_count=int(retry_state["retry_count"]),
-            parser_status=upload.parser_status,
-            parse_confidence=float(upload.parse_confidence or 0),
-            summary=(
-                f"Credit report retry {retry_state['retry_count']} still needs review. "
-                f"Bureau detection is {upload.bureau or 'unknown'} and score extraction is incomplete."
-            ),
-            unresolved_reason="credit_report_still_needs_review",
-            payload={
-                "bureau": upload.bureau or "",
-                "score": parsed.payload.get("score") or 0,
-            },
-        )
-    return serialized
-
-
 def _upsert_retry_loans(user, loans_data: list[dict]) -> list[Loan]:
     created_loans: list[Loan] = []
     if not loans_data:
@@ -2213,31 +2037,6 @@ def _serialize_recruiter(analysis: CareerJobAnalysis) -> dict:
         "review_fields": REVIEW_FIELD_SCHEMAS["recruiter_document"],
         "created_at": (analysis.updated_at or analysis.created_at).isoformat(),
         "priority_rank": _priority_rank(analysis.parser_status, analysis.parse_confidence),
-    }
-
-
-def _serialize_credit(upload: CreditReportUpload) -> dict:
-    payload = upload.extracted_payload or {}
-    return {
-        "scope": "credit_report",
-        "id": upload.id,
-        "file_name": upload.file_name,
-        "parser_status": upload.parser_status,
-        "parse_confidence": upload.parse_confidence,
-        "summary": upload.summary,
-        "notes": upload.parser_notes,
-        "fields": {
-            "bureau": upload.bureau,
-            "applicant_name": upload.applicant_name,
-            "report_number": upload.report_number,
-            "report_date": upload.report_date.isoformat() if upload.report_date else "",
-        },
-        "background_retry": payload.get("background_retry", {}),
-        "accepted_corrections": _accepted_corrections_payload(payload),
-        "review_artifacts": _review_artifacts_payload(payload, fallback_excerpt=upload.extracted_text, scope="credit_report"),
-        "review_fields": REVIEW_FIELD_SCHEMAS["credit_report"],
-        "created_at": upload.updated_at.isoformat(),
-        "priority_rank": _priority_rank(upload.parser_status, upload.parse_confidence),
     }
 
 
@@ -3177,48 +2976,6 @@ def _apply_recruiter_correction(user, document_id: int, corrections: dict) -> di
         resolution="accepted_correction_recruiter_document",
     )
     return _serialize_recruiter(analysis)
-
-
-def _apply_credit_correction(user, document_id: int, corrections: dict) -> dict:
-    upload = CreditReportUpload.objects.get(user=user, pk=document_id)
-    payload = dict(upload.extracted_payload or {})
-    accepted = dict(payload.get("accepted_corrections") or {})
-    accepted.update(corrections)
-    payload["accepted_corrections"] = accepted
-    payload = _mark_review_queue_resolved(payload)
-    upload.bureau = corrections.get("bureau", upload.bureau)
-    upload.applicant_name = corrections.get("applicant_name", upload.applicant_name)
-    upload.report_number = corrections.get("report_number", upload.report_number)
-    upload.report_date = _parse_date(corrections.get("report_date")) or upload.report_date
-    upload.parse_confidence = max(upload.parse_confidence, 0.76 if len(accepted) >= 3 else 0.61)
-    upload.parser_status = "parsed" if upload.report_number or upload.parsed_credit_score_id else "needs_review"
-    upload.parser_notes = " ".join(filter(None, [upload.parser_notes, corrections.get("review_note", "")])).strip()
-    upload.extracted_payload = payload
-    upload.save(
-        update_fields=[
-            "bureau",
-            "applicant_name",
-            "report_number",
-            "report_date",
-            "parse_confidence",
-            "parser_status",
-            "parser_notes",
-            "extracted_payload",
-            "updated_at",
-        ]
-    )
-    if upload.parsed_credit_score_id:
-        CreditScore.objects.filter(pk=upload.parsed_credit_score_id).update(bureau=upload.bureau or "CIBIL")
-    record_parser_correction(
-        user=user,
-        scope="credit_report",
-        filename=upload.file_name,
-        detected_type=upload.bureau or "credit_report",
-        text=upload.extracted_text,
-        field_names=[key for key, value in accepted.items() if value],
-        confidence=upload.parse_confidence,
-    )
-    return _serialize_credit(upload)
 
 
 def _priority_rank(parser_status: str, parse_confidence: float) -> int:
