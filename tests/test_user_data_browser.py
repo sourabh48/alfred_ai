@@ -1577,6 +1577,43 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local.reason.assert_not_called()
         self.capture('assistant-speech')
 
+    def test_private_trip_video_upload_play_and_delete(self):
+        from apps.mobility.models import TravelPlan, TripVideo
+        # Django's test-only public media handler must not bypass ALFRED's owner gate.
+        self.enterContext(patch('django.test.testcases._MediaFilesHandler._should_handle', return_value=False))
+        self.enterContext(override_settings(MEDIA_ROOT=self.enterContext(TemporaryDirectory(prefix='alfred-browser-synthetic-video-'))))
+        owner = self.scenario['user']
+        plan = TravelPlan.objects.create(user=owner, title='Synthetic video ride', destination='Gokarna')
+        self.login(); self.browser.get(self.live_server_url + '/mobility/')
+        self.wait.until(lambda _: 'Synthetic video ride' in self.browser.find_element(self.By.ID, 'videoPlan').text)
+        self.browser.find_element(self.By.ID, 'videoPlan').send_keys('Synthetic video ride')
+        # Chrome records a real one-second WebM from a canvas, so playback is proven end to end.
+        self.browser.execute_async_script('''
+            const done = arguments[0], canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 48;
+            const paint = canvas.getContext('2d'), recorder = new MediaRecorder(canvas.captureStream(10), {mimeType: 'video/webm'}), parts = [];
+            const timer = setInterval(() => { paint.fillStyle = `hsl(${Date.now() % 360},70%,50%)`; paint.fillRect(0, 0, 64, 48); }, 50);
+            recorder.ondataavailable = event => parts.push(event.data);
+            recorder.onstop = () => { clearInterval(timer); const files = new DataTransfer();
+                files.items.add(new File(parts, 'ride.webm', {type: 'video/webm'})); document.getElementById('videoFile').files = files.files; done(); };
+            recorder.start(); setTimeout(() => recorder.stop(), 1000);''')
+        caption = 'Synthetic <img src=x onerror=alert(1)> ride'
+        self.browser.find_element(self.By.ID, 'videoCaption').send_keys(caption)
+        self.memory_click('#tripVideoForm button[type="submit"]')
+        self.wait.until(lambda _: 'saved privately' in self.text('tripVideoFeedback'))
+        video = TripVideo.objects.get(user=owner)
+        self.assertEqual((video.travel_plan_id, video.caption), (plan.pk, caption))
+        self.wait.until(lambda _: self.browser.execute_script("const v = document.querySelector('#tripVideoGallery video'); return v && v.readyState >= 1 && v.videoWidth === 64;"))
+        self.assertIn(caption, self.text('tripVideoGallery'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, '#tripVideoGallery [onerror]'))
+        self.browser.execute_script("document.getElementById('tripVideoSection').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture('private-trip-video')
+        path = Path(video.video.path)
+        self.browser.execute_script('window.confirm = () => true;')
+        self.memory_click('#tripVideoGallery .btn-outline-danger')
+        self.wait.until(lambda _: 'No trip videos uploaded yet' in self.text('tripVideoGallery'))
+        self.wait.until(lambda _: not path.exists())
+        self.assertFalse(TripVideo.objects.exists())
+
     def test_assistant_responsive_keyboard_retry_and_new_conversation(self):
         from unittest.mock import Mock
         from selenium.webdriver.common.keys import Keys

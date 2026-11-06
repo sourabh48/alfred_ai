@@ -27,6 +27,8 @@ from .views import (
     TripLogListCreateView,
     TripPhotoDetailView,
     TripPhotoListCreateView,
+    TripVideoDetailView,
+    TripVideoListCreateView,
 )
 
 urlpatterns = [
@@ -62,4 +64,6 @@ urlpatterns = [
     path("trip-logs/<int:pk>/", TripLogDetailView.as_view(), name="trip_log_detail"),
     path("trip-photos/", TripPhotoListCreateView.as_view(), name="trip_photo_list"),
     path("trip-photos/<int:pk>/", TripPhotoDetailView.as_view(), name="trip_photo_detail"),
+    path("trip-videos/", TripVideoListCreateView.as_view(), name="trip_video_list"),
+    path("trip-videos/<int:pk>/", TripVideoDetailView.as_view(), name="trip_video_detail"),
 ]

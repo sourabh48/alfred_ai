@@ -7,7 +7,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from apps.expenses.money import NumericMoneySerializerField, money_float
 
-from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto
+from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto, TripVideo
 
 
 class BikeProfileSerializer(serializers.ModelSerializer):
@@ -303,6 +303,40 @@ class TripLogSerializer(serializers.ModelSerializer):
         if (latitude is None) != (longitude is None):
             raise serializers.ValidationError("Provide both latitude and longitude together.")
 
+        return attrs
+
+
+class TripVideoSerializer(serializers.ModelSerializer):
+    """TRAVEL-20: owner-only trip video. The file is checked by its header, not just its name."""
+
+    travel_plan_title = serializers.CharField(source="travel_plan.title", read_only=True, default="Unassigned")
+    video_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TripVideo
+        fields = ("id", "travel_plan", "travel_plan_title", "video", "video_url", "caption", "created_at")
+        read_only_fields = ("travel_plan_title", "video_url", "created_at")
+        extra_kwargs = {"video": {"write_only": True}}
+
+    def get_video_url(self, obj):
+        return obj.video.url if obj.video else ""
+
+    def validate_video(self, value):
+        extension = value.name.lower().rsplit(".", 1)[-1]
+        head = value.read(16)
+        value.seek(0)
+        if not ((extension in {"mp4", "m4v", "mov"} and head[4:8] == b"ftyp")
+                or (extension == "webm" and head.startswith(bytes.fromhex("1a45dfa3")))):  # WebM EBML header
+            raise serializers.ValidationError("Upload an MP4, MOV or WebM video.")
+        return value
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if self.instance is not None and "video" in attrs:
+            raise serializers.ValidationError({"video": "Upload a new video instead of replacing this one."})
+        plan = attrs.get("travel_plan")
+        if request is not None and plan and plan.user_id != request.user.id:
+            raise serializers.ValidationError({"travel_plan": "You can only add videos to your own travel plans."})
         return attrs
 
 

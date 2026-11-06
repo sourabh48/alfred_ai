@@ -14,7 +14,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 7 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 6 | COMPLETE_VERIFIED: 85
 
 PR/CI: master `e8ef8f4` CI_PASSED (run 42185812614: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 
@@ -41,7 +41,7 @@ a merge is not deployment authorization. No current production health is claimed
 - **Career 2.0:** owned resume/JD/recruiter workflows, skill gaps, configurable
   Bengaluru/Java/Spring Boot/AWS search interests, job/application outcomes,
   interview preparation and evidence-labelled salary/career scenarios. No implicit sending.
-- **Travel 2.0:** conversational discovery, private plans, day/stop editing,
+- **Travel 2.0:** conversational discovery, private plans, private trip photos and videos, day/stop editing,
   motorcycle/pillion budgets, maps and dated evidence. Expand routed detours,
   independently supported restrictions, organizers/reminders and exports. Car
   routing never proves motorcycle legality; links do not establish bookings/permits.

@@ -394,6 +394,21 @@ class TripPhoto(models.Model):
         return self.caption or (f"Photo for {self.travel_plan.title}" if self.travel_plan else "Unassigned trip photo")
 
 
+class TripVideo(models.Model):
+    """TRAVEL-20: a private trip video, stored locally and visible only to its owner (no sharing)."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="trip_videos")
+    travel_plan = models.ForeignKey(TravelPlan, null=True, blank=True, on_delete=models.CASCADE, related_name="videos")
+    video = models.FileField(upload_to="trip_videos/%Y/%m/")
+    caption = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return self.caption or "Trip video"
+
+
 class BikeIssueReport(models.Model):
     SYSTEM_CHOICES = [
         ("general", "General"),

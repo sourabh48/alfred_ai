@@ -1039,6 +1039,11 @@ h1, h2, h3, h4, h5, h6,
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+/* Keep one trip video card-sized instead of stretching across the page. */
+#tripVideoGallery {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
 .photo-card {
     overflow: hidden;
     border-radius: 1.2rem;
@@ -1048,7 +1053,8 @@ h1, h2, h3, h4, h5, h6,
     box-shadow: var(--alfred-shadow-soft);
 }
 
-.photo-card img {
+.photo-card img,
+.photo-card video {
     display: block;
     width: 100%;
     aspect-ratio: 4 / 3;

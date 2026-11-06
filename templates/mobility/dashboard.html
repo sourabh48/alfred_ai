@@ -250,11 +250,37 @@
     </div>
     <div id="tripPhotoGallery" class="photo-gallery"></div>
 </section>
+
+<section class="surface-card mt-4" id="tripVideoSection">
+    <h2 class="page-section-title">Trip Videos</h2>
+    <p class="page-section-copy mb-3">Videos stay on this PC and only you can see them. They are never shared or published. MP4, MOV or WebM, up to the upload limit (25 MB unless you changed it).</p>
+    <form id="tripVideoForm" class="soft-grid mb-3" enctype="multipart/form-data">
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label" for="videoPlan">Travel Plan</label>
+            <select id="videoPlan" name="travel_plan" class="form-select"></select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" for="videoFile">Video</label>
+            <input id="videoFile" name="video" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.m4v,.mov,.webm" class="form-control" required>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" for="videoCaption">Caption</label>
+            <input id="videoCaption" name="caption" maxlength="200" class="form-control">
+        </div>
+        <div class="col-12">
+            <div id="tripVideoFeedback" class="d-none alert mb-2"></div>
+            <button class="btn btn-primary" type="submit">Upload Video</button>
+        </div>
+    </div>
+    </form>
+    <div id="tripVideoGallery" class="photo-gallery"></div>
+</section>
 {% endblock %}
 
 {% block extra_js %}
 <link rel="stylesheet" href="/static/css/travel_planner.css?v=reminders1">
-<script src="/static/js/mobility.js?v=4"></script>
+<script src="/static/js/mobility.js?v=5"></script>
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <script src="/static/vendor/leaflet/leaflet.js"></script>
 <script src="/static/js/travel_research_panels.js?v=4"></script>

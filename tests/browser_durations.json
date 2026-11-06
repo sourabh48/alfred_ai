@@ -48,6 +48,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_savings_goals_save_update_and_delete_exact_cents":  7.781,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_assistant_action_proposal_saves_only_after_confirm":  7.172,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_assistant_speech_fills_the_question_and_reads_replies_aloud":  7.312,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_private_trip_video_upload_play_and_delete":  7.297,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_cashflow_forecast_observations_errors_and_unknown_state_are_visible":  10.859,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_changed_retrieval_source_blocks_frozen_holdout_before_model":  5.25,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_currency_source_cards_and_exact_decimal_formatting":  7.469,

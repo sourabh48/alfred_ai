@@ -31,6 +31,7 @@ from apps.mobility.models import (
     TravelPreferenceProfile,
     TripLog,
     TripPhoto,
+    TripVideo,
 )
 from apps.relationship.models import RelationshipProfile
 from apps.reports.models import ChatGPTImport, GeneratedReport, OperationalLog, SystemTicket
@@ -84,6 +85,7 @@ def clear_user_fed_data(user) -> dict:
     loan_import_qs = LoanImportDocument.objects.filter(user=user)
     loan_closure_qs = LoanClosureDocument.objects.filter(loan__user=user)
     trip_photo_qs = TripPhoto.objects.filter(user=user)
+    trip_video_qs = TripVideo.objects.filter(user=user)
     bike_document_qs = BikeDocument.objects.filter(user=user)
     generated_report_qs = GeneratedReport.objects.filter(user=user)
     family_link_qs = FamilyAccountLink.objects.filter(Q(created_by=user) | Q(linked_user=user))
@@ -102,6 +104,7 @@ def clear_user_fed_data(user) -> dict:
     file_names.extend(_collect_file_names(loan_import_qs, "uploaded_file"))
     file_names.extend(_collect_file_names(loan_closure_qs, "uploaded_file"))
     file_names.extend(_collect_file_names(trip_photo_qs, "image"))
+    file_names.extend(_collect_file_names(trip_video_qs, "video"))
     file_names.extend(_collect_file_names(bike_document_qs, "document_file"))
     generated_paths = list(generated_report_qs.values_list("file_path", flat=True))
 
@@ -128,6 +131,7 @@ def clear_user_fed_data(user) -> dict:
         "vehicle_services": BikeServiceRecord.objects.filter(user=user).count(),
         "travel_plans": TravelPlan.objects.filter(user=user).count(),
         "trip_photos": trip_photo_qs.count(),
+        "trip_videos": trip_video_qs.count(),
         "credit_reports": credit_report_qs.count(),
         "credit_scores": CreditScore.objects.filter(user=user).count(),
         "system_tickets": SystemTicket.objects.filter(user=user).count(),
@@ -169,6 +173,7 @@ def clear_user_fed_data(user) -> dict:
         BikeConditionSnapshot.objects.filter(user=user).delete()
         bike_document_qs.delete()
         trip_photo_qs.delete()
+        trip_video_qs.delete()
         TripLog.objects.filter(user=user).delete()
         TravelPlanningSession.objects.filter(user=user).delete()
         TravelPreferenceProfile.objects.filter(user=user).delete()

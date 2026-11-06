@@ -796,7 +796,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 7 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 6 | COMPLETE_VERIFIED: 85
 
 PR/CI: master `e8ef8f4` CI_PASSED (run 42185812614: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 
@@ -810,7 +810,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 5 | 2 | 0 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 1 | 2 | 0 | 0 | 0 |
-| TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
+| TRAVEL | 12 | 23 | 52.2 | 1 | 5 | 2 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
@@ -2730,7 +2730,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-20 — Video management and social Travel profile
 
-**NOT_IMPLEMENTED** · Travel · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
 
 - Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
@@ -2739,6 +2739,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Image/gallery paths do not establish video ingestion or an Instagram-style publish/privacy lifecycle. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Confirm local/private versus public scope before adding models.
 - OWNER DECISION 2026-11-06: private trip videos only, stored locally and owner-only like trip photos; no public profile or sharing.
+- SCOPED_IMPLEMENTATION 2026-11-06: model `TripVideo` (migration `mobility/0014_trip_video`, awaiting owner approval), `/api/mobility/trip-videos/` list/upload and `<id>/` caption, plan, delete. MP4/MOV/WebM checked by file header, not name; the file is served only through the owner-checked private media route (`private, no-store`); a video cannot be swapped in place; delete and the account data reset remove the file. Travel page section **Trip Videos** with upload, playback and delete. Social profile and sharing are out of scope by owner decision. Uploads use the existing 25 MB per-file limit (`ALFRED_UPLOAD_FILE_BYTES`). [Tests](../tests/test_trip_videos.py): 5 backend PASS (upload, playback bytes, refused non-videos, other accounts, delete, reset); Chrome test PASS (real one-second WebM recorded in Chrome, plays, escaped caption, delete removes the file), capture inspected; 296 related backend PASS.
+- Next: owner approves the migration (then CI's reviewed source is re-pinned and the migration applied to the owner runtime after a copy), then owner check in the app.
 
 ### TRAVEL-21 — Freshness, cache, quotas and safe external HTTP
 

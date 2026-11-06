@@ -38,6 +38,8 @@ With this enabled, uploaded files for these extraction families are deleted afte
 - vehicle documents and service invoices
 
 Trip photos are user media, not extraction-only documents, and are not automatically deleted by this policy.
+Trip videos are the same kind of private media: stored locally, served only to their owner, never shared; deleting
+a video or resetting account data removes its file.
 
 ## What The App Keeps
 

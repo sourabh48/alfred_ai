@@ -10,6 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("tripLogForm").addEventListener("submit", submitTripLog);
     document.getElementById("tripPhotoForm").addEventListener("submit", submitTripPhoto);
     document.getElementById("photoPlan").addEventListener("change", syncPhotoLogOptions);
+    document.getElementById("tripVideoForm").addEventListener("submit", submitTripVideo);
+    loadTripVideos();
 
     setMobilityDefaults();
     loadMobilityDashboard();
@@ -219,6 +221,15 @@ function hydratePlanSelects(selectedPhotoPlan, selectedPhotoLog) {
         fallbackValue: "",
     });
 
+    Alfred.syncSelectOptions(document.getElementById("videoPlan"), mobilityState.plans, {
+        includeBlank: true,
+        blankLabel: "No travel plan",
+        getValue: item => item.id,
+        getLabel: planLabel,
+        disableWhenEmpty: false,
+        preferredValue: document.getElementById("videoPlan").value,
+        fallbackValue: "",
+    });
     syncPhotoLogOptions(selectedPhotoLog);
     Alfred.setDisabledIfChanged(document.querySelector("#tripLogForm button[type='submit']"), !hasPlans);
     if (!hasPlans) {
@@ -328,6 +339,37 @@ function savePhotoPreference(id) {
         .then(loadMobilityDashboard).catch(error=>showRootAlert(error.message,"danger"));
 }
 function deleteTripLog(id) { deleteRecord(`/api/mobility/trip-logs/${id}/`, "Delete this trip log?"); }
+// TRAVEL-20: private trip videos, owner-only like trip photos.
+function loadTripVideos() {
+    return Alfred.fetchJSON("/api/mobility/trip-videos/")
+        .then(items => Alfred.setHTMLIfChanged(document.getElementById("tripVideoGallery"), items.length ? items.map(item => `
+            <article class="photo-card">
+                <video controls preload="metadata" src="${Alfred.escapeHtml(item.video_url)}" aria-label="${Alfred.escapeHtml(item.caption || "Trip video")}"></video>
+                <div class="photo-card-body">
+                    <div class="fw-semibold">${Alfred.escapeHtml(item.caption || "Trip video")}</div>
+                    <div class="muted small">${Alfred.escapeHtml(item.travel_plan_title)} | ${Alfred.formatDateTime(item.created_at)}</div>
+                    <button class="btn btn-sm btn-outline-danger mt-3" type="button" onclick="deleteTripVideo(${item.id})">Delete</button>
+                </div>
+            </article>
+        `).join("") : `<div class="empty-state w-100">No trip videos uploaded yet.</div>`))
+        .catch(error => showFeedback("tripVideoFeedback", error.message, "danger"));
+}
+function submitTripVideo(event) {
+    event.preventDefault();
+    const form = event.currentTarget, button = form.querySelector('button[type="submit"]');
+    if (button.disabled) return;
+    const payload = new FormData();
+    new FormData(form).forEach((value, key) => { if (value !== "" && value !== null) payload.append(key, value); });
+    button.disabled = true; button.textContent = "Uploading video…";
+    Alfred.fetchJSON("/api/mobility/trip-videos/", { method: "POST", body: payload })
+        .then(() => { form.reset(); showFeedback("tripVideoFeedback", "Trip video saved privately on this PC.", "success"); loadTripVideos(); })
+        .catch(error => showFeedback("tripVideoFeedback", error.message, "danger"))
+        .finally(() => { button.disabled = false; button.textContent = "Upload Video"; });
+}
+function deleteTripVideo(id) {
+    if (!window.confirm("Delete this trip video? The file is removed from this PC; backups you made earlier keep their copy.")) return;
+    Alfred.fetchJSON(`/api/mobility/trip-videos/${id}/`, { method: "DELETE" }).then(loadTripVideos).catch(error => showFeedback("tripVideoFeedback", error.message, "danger"));
+}
 function deleteTripPhoto(id) { deleteRecord(`/api/mobility/trip-photos/${id}/`, "Delete this trip photo?"); }
 
 function deleteRecord(url, promptText) {
@@ -381,3 +423,4 @@ function currentDateTimeLocal() {
 window.deleteTravelPlan = deleteTravelPlan;
 window.deleteTripLog = deleteTripLog;
 window.deleteTripPhoto = deleteTripPhoto;
+window.deleteTripVideo = deleteTripVideo;

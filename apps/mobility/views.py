@@ -20,9 +20,9 @@ from alfred_ai.services import record_parser_learning
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.money import money_float
 from apps.expenses.services.financial_intelligence import _numeric_currency_payload
-from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
+from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction, remove_unreferenced_files
 from apps.reports.services import operational_logging_service
-from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto
+from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto, TripVideo
 from .serializers import (
     BikeConditionSnapshotSerializer,
     BikeDocumentSerializer,
@@ -33,6 +33,7 @@ from .serializers import (
     TravelPlanSerializer,
     TripLogSerializer,
     TripPhotoSerializer,
+    TripVideoSerializer,
 )
 from .services import bike_document_ai, bike_service_intelligence, build_profile_payload, catalog_coverage_summary, list_catalog_manufacturers, list_catalog_models, travel_advisor
 from .services import build_document_payload, build_service_record_payload, merge_nested_payload, resolve_vehicle_identity
@@ -791,6 +792,34 @@ class TripPhotoListCreateView(ListCreateAPIView):
         photo = serializer.save(user=self.request.user)
         from .services.travel_media import enrich_photo
         enrich_photo(photo)
+
+
+class TripVideoListCreateView(ListCreateAPIView):
+    serializer_class = TripVideoSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    pagination_class = None
+
+    def get_queryset(self):
+        return TripVideo.objects.filter(user=self.request.user).select_related("travel_plan")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class TripVideoDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = TripVideoSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+
+    def get_queryset(self):
+        return TripVideo.objects.filter(user=self.request.user).select_related("travel_plan")
+
+    def perform_destroy(self, instance):
+        name = instance.video.name
+        with transaction.atomic():
+            instance.delete()
+            transaction.on_commit(lambda: remove_unreferenced_files({name}))
 
 
 class TripPhotoDetailView(RetrieveUpdateDestroyAPIView):
