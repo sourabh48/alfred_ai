@@ -46,6 +46,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_matching_cites_saved_sources_and_abstains_without_requirements":  8.844,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_outcomes_owner_history_save_correction_and_stale_draft":  9.297,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_savings_goals_save_update_and_delete_exact_cents":  7.781,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_assistant_action_proposal_saves_only_after_confirm":  7.172,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_cashflow_forecast_observations_errors_and_unknown_state_are_visible":  10.859,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_changed_retrieval_source_blocks_frozen_holdout_before_model":  5.25,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_currency_source_cards_and_exact_decimal_formatting":  7.469,

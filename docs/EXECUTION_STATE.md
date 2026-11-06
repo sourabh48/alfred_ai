@@ -9,7 +9,9 @@
   runtime; pre-migration copy at F:\ALFRED_BACKUPS\pre-fin06-migration-20261106 (hash matched).
 - CI reviewed source is pinned to `164d394`; any new migration or dependency fails backend preflight until the owner
   reviews it and the pin moves.
-- NEXT TASK: AI-17 (phase D). Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row AI-17.
+- Owner decisions 2026-11-06: AI-17 propose-then-confirm (implemented: savings-goal actions), AI-18 local offline speech
+  (download details need the owner's go-ahead), TRAVEL-20 private videos only.
+- NEXT TASK: AI-18 or TRAVEL-20 per the queue (phase D). Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row AI-17.
 
 ## Previous checkpoint — CAREER-03, CAREER-06, TRAVEL-02 and TRAVEL-23 (2026-11-04)
 

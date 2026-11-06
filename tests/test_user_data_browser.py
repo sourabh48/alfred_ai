@@ -1494,6 +1494,41 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertNotIn('SYNTHETIC-PRIVATE',self.text('modelReadinessStatus'))
             train.assert_not_called(); load.assert_not_called()
 
+    def test_assistant_action_proposal_saves_only_after_confirm(self):
+        from decimal import Decimal
+        from unittest.mock import Mock
+        from apps.budgets.models import SavingsGoal
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-ui-action-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_MEMORY_OPENAI_AUTHORIZED=False, ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
+        local = Mock(); local.reason.side_effect = AssertionError('An action request must not reach the model')
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner', return_value=local))
+        owner = self.scenario['user']
+        self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
+        self.wait.until(lambda _: 'Ollama available' in self.text('intelligenceLocalStatus'))
+        def ask(text):
+            field = self.browser.find_element(self.By.ID, 'intelligenceQuery'); field.clear(); field.send_keys(text)
+            self.memory_click('#intelligenceForm button[type="submit"]')
+        ask('add a savings goal <b>Synthetic</b> bike of 1.5 lakh by March 2027')
+        self.wait.until(lambda _: 'Nothing is saved until you press Confirm' in self.text('intelligenceFeedback'))
+        card = '#intelligenceAnswers [data-action-proposal]:last-child'
+        self.assertIn('₹150,000.00', self.browser.find_element(self.By.CSS_SELECTOR, card).text)
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, card+' b'))
+        self.assertFalse(SavingsGoal.objects.filter(user=owner).exists())
+        self.memory_click(card+' .btn-outline-secondary')
+        self.wait.until(lambda _: 'Cancelled. Nothing was saved.' in self.browser.find_element(self.By.CSS_SELECTOR, card).text)
+        self.assertFalse(SavingsGoal.objects.filter(user=owner).exists())
+        ask('add a savings goal Synthetic bike of 1.5 lakh by March 2027')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#intelligenceAnswers [data-action-proposal]')) == 2)
+        self.memory_click(card+' .btn-primary')
+        self.wait.until(lambda _: SavingsGoal.objects.filter(user=owner).exists() and 'Open Budgets' in self.browser.find_element(self.By.CSS_SELECTOR, card).text)
+        goal = SavingsGoal.objects.get(user=owner)
+        self.assertEqual((goal.name, goal.target_amount, goal.target_date.isoformat()), ('Synthetic bike', Decimal('150000.00'), '2027-03-31'))
+        local.reason.assert_not_called()
+        self.capture('assistant-action-confirmed')
+
     def test_assistant_responsive_keyboard_retry_and_new_conversation(self):
         from unittest.mock import Mock
         from selenium.webdriver.common.keys import Keys

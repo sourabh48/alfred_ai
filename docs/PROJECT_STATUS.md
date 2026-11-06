@@ -796,7 +796,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 18 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 9 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 19 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 8 | COMPLETE_VERIFIED: 85
 
 PR/CI: master `e8ef8f4` CI_PASSED (run 42185812614: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 
@@ -808,7 +808,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
-| AI | 11 | 18 | 61.1 | 3 | 2 | 2 | 0 | 0 |
+| AI | 11 | 18 | 61.1 | 4 | 2 | 1 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 1 | 2 | 0 | 0 | 0 |
 | TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
@@ -2286,7 +2286,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### AI-17 — Autonomous user task execution
 
-**NOT_IMPLEMENTED** · ALFRED intelligence · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · ALFRED intelligence · P2.
 
 - Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
 - APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
@@ -2294,6 +2294,9 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Current assistant is read-only; no approved general autonomous mutations, planner/executor or financial action agent. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Confirm scope and human approval policy before implementation.
+- OWNER DECISION 2026-11-06: propose, then the owner confirms each action. No money movement, bookings, trading or sending.
+- SCOPED_IMPLEMENTATION 2026-11-06: before a question goes to the model, `/api/ai/actions/propose/` checks it with fixed patterns (no model) for two allow-listed actions: create a savings goal ("add a savings goal Emergency fund of 1.5 lakh by March 2027"; k/lakh/crore and dates read) and set a goal's saved amount ("update Emergency fund saved to 25000", owner's goal by exact name). The chat shows a proposal card with the exact values; nothing is saved until Confirm, which posts to `/api/ai/actions/confirm/` with `confirmed: true` and goes through the Budgets serializer. Cancel saves nothing. Requests that look like actions but fail parsing stop with a message and never reach the model. [Service](../apps/ml_engine/services/assistant_actions.py), [tests](../tests/test_assistant_actions.py): 5 backend PASS (parsing, no-proposal questions, confirm-only saves, other owners, unknown actions); 106 related backend PASS; new Chrome test PASS (cancel, confirm, escaped text, model never called), capture inspected.
+- Next: owner check in the app; more actions (reminders, trip drafts) only one at a time with the same confirm rule.
 
 ### AI-18 — Voice assistant
 
@@ -2305,6 +2308,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Legacy service imports optional external speech libraries and has no demonstrated routed UI/caller. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Unrouted voice prototype retired by M17; no working accepted voice assistant. Future scope requires confirmation.
+- OWNER DECISION 2026-11-06: local offline speech-to-text, microphone only on a button press. Needs a new dependency and a model download; the exact file, source and size need the owner's go-ahead before download, and CI's reviewed source must be re-pinned after review.
 
 ### OPENAI-01 — Responses API request/response adapter
 
@@ -2730,6 +2734,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Image/gallery paths do not establish video ingestion or an Instagram-style publish/privacy lifecycle. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Confirm local/private versus public scope before adding models.
+- OWNER DECISION 2026-11-06: private trip videos only, stored locally and owner-only like trip photos; no public profile or sharing.
 
 ### TRAVEL-21 — Freshness, cache, quotas and safe external HTTP
 

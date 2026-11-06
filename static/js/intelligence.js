@@ -456,6 +456,36 @@ document.addEventListener("DOMContentLoaded", () => {
         while (answers.children.length > 20) answers.firstElementChild.remove();
         evidence.open = true;
     }
+    function renderActionProposal(text, result) {
+        // AI-17: a proposed change is shown with its exact values; only Confirm saves it.
+        const row = document.createElement("article"); row.dataset.actionProposal = "true";
+        const userMessage = document.createElement("div"); userMessage.className = "conversation-message conversation-message--user";
+        const userLabel = document.createElement("span"); userLabel.className = "conversation-label"; userLabel.textContent = "You";
+        const question = document.createElement("p"); question.textContent = text; userMessage.append(userLabel, question);
+        const reply = document.createElement("div"); reply.className = "conversation-message mt-3";
+        const label = document.createElement("span"); label.className = "conversation-label"; label.textContent = "Proposed action · no model used · nothing saved yet";
+        const summary = document.createElement("p"); summary.textContent = result.proposal ? result.proposal.summary : result.detail;
+        reply.append(label, summary); row.append(userMessage, reply);
+        if (result.proposal) {
+            const status = document.createElement("p"); status.className = "small"; status.setAttribute("role", "status");
+            const actions = document.createElement("div"); actions.className = "d-flex gap-2";
+            const confirmButton = document.createElement("button"); confirmButton.type = "button"; confirmButton.className = "btn btn-primary btn-sm"; confirmButton.textContent = "Confirm";
+            const cancelButton = document.createElement("button"); cancelButton.type = "button"; cancelButton.className = "btn btn-outline-secondary btn-sm"; cancelButton.textContent = "Cancel";
+            const finish = message => { actions.remove(); status.textContent = message; };
+            confirmButton.addEventListener("click", async () => {
+                confirmButton.disabled = cancelButton.disabled = true;
+                try {
+                    const saved = await Alfred.fetchJSON("/api/ai/actions/confirm/", {method:"POST", body:JSON.stringify({...result.proposal, confirmed:true})});
+                    finish(saved.message);
+                    const link = document.createElement("a"); link.href = saved.url; link.textContent = "Open Budgets"; status.append(" ", link);
+                } catch (error) { confirmButton.disabled = cancelButton.disabled = false; status.textContent = `${error.message} Nothing was saved.`; }
+            });
+            cancelButton.addEventListener("click", () => finish("Cancelled. Nothing was saved."));
+            actions.append(confirmButton, cancelButton); reply.append(actions, status);
+        }
+        answers.append(row);
+        while (answers.children.length > 20) answers.firstElementChild.remove();
+    }
     form.addEventListener("submit", async event => {
         event.preventDefault();
         if (pending) return;
@@ -488,6 +518,15 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
         try {
+            const action = await Alfred.fetchJSON("/api/ai/actions/propose/", {method:"POST", body:JSON.stringify({text:query.value})}).catch(() => null);
+            if (!active || ticket !== generation) return;
+            if (action?.proposal || action?.detail) {
+                renderActionProposal(query.value, action);
+                feedback.textContent = action.proposal ? "Review the proposed change. Nothing is saved until you press Confirm." : "That request could not be turned into an action. Nothing was saved.";
+                setLocalStatus("Action proposal · no model used", "ready");
+                query.value = ""; requestToken = null;
+                return;
+            }
             if (historyEnabled() && payload.scope !== "financial_document") {
                 if (!conversation) conversation = await Alfred.fetchJSON("/api/ai/conversations/", {method:"POST", body:JSON.stringify({title:historyTitle.value.trim() || "Private conversation"})});
                 if (!active || ticket !== generation) return;

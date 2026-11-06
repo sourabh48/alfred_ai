@@ -52,6 +52,7 @@
     <form id="intelligenceForm" class="conversation-composer" data-live-refresh-hold="true">
         <label for="intelligenceQuery" class="form-label">Your question</label>
         <textarea id="intelligenceQuery" class="form-control mb-3" rows="3" maxlength="1024" required autocomplete="off" placeholder="Ask a question…" aria-describedby="intelligencePrivacy"></textarea>
+        <p class="small" id="intelligenceActionHint">You can also say “add a savings goal Emergency fund of 1 lakh by March 2027” or “update Emergency fund saved to 25000”. ALFRED shows the change and saves it only when you press Confirm.</p>
         <div class="conversation-options mb-3"><div>
         <label for="intelligenceScope" class="form-label">Include local records</label>
         <select id="intelligenceScope" class="form-select mb-2">
@@ -184,5 +185,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
-<script src="/static/js/intelligence.js?v=12"></script>
+<script src="/static/js/intelligence.js?v=13"></script>
 {% endblock %}
