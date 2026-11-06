@@ -14,7 +14,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 19 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 8 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 7 | COMPLETE_VERIFIED: 85
 
 PR/CI: master `e8ef8f4` CI_PASSED (run 42185812614: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 
@@ -53,6 +53,8 @@ a merge is not deployment authorization. No current production health is claimed
 - **Shared intelligence:** owner-isolated documents/citations, encrypted learning
   candidates and reviewed packs, local models, quality/readiness checks, bounded
   jobs, offline recovery and explicit confirmation. Private Git sync stays disabled.
+  The assistant can take spoken questions and read replies aloud fully offline
+  (Whisper and Piper); the microphone is on only between Speak and Stop listening.
 
 Aurelio is reference-only; TREK ideas are independently implemented; TradingAgents
 uses compatible Python engine reuse through thin adapters. Career Ops business

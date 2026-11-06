@@ -1,5 +1,6 @@
 from django.urls import path
 from .assistant_actions import AssistantActionConfirmAPI, AssistantActionProposeAPI
+from .speech import SpeechSpeakAPI, SpeechStatusAPI, SpeechTranscribeAPI
 from .statements import StatementEvidenceAPI
 from .investment_evidence import InvestmentEvidenceAPI
 from .loan_evidence import LoanEvidenceAPI
@@ -44,6 +45,9 @@ urlpatterns = [
     path("memories/<str:identity>/", MemoryDetailAPI.as_view()),
     path("actions/propose/", AssistantActionProposeAPI.as_view()),
     path("actions/confirm/", AssistantActionConfirmAPI.as_view()),
+    path("speech/status/", SpeechStatusAPI.as_view()),
+    path("speech/transcribe/", SpeechTranscribeAPI.as_view()),
+    path("speech/speak/", SpeechSpeakAPI.as_view()),
     path("emotion/", EmotionalSpendAPI.as_view()),
     path("explain/", AlfredExplainAPI.as_view()),
     path("personal-insights/", AlfredPersonalInsightsAPI.as_view()),

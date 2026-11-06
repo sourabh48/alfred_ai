@@ -70,6 +70,7 @@ ALFRED keeps only the database records needed for product behavior:
 - resume/JD structured fields and learning memory
 - vehicle document fields and service logs
 - savings goals (name, target, saved amount and optional date), removed by the owner's data reset
+- nothing from speech: Speak recordings and Read aloud audio are processed in memory on this PC and never stored or sent
 - parser status, confidence, and `raw_file_retention` audit metadata
 
 ## Local Storage Controls

@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 import threading
+import time
 from unittest.mock import patch
 
 from django.conf import settings
@@ -1528,6 +1529,51 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual((goal.name, goal.target_amount, goal.target_date.isoformat()), ('Synthetic bike', Decimal('150000.00'), '2027-03-31'))
         local.reason.assert_not_called()
         self.capture('assistant-action-confirmed')
+
+    def test_assistant_speech_fills_the_question_and_reads_replies_aloud(self):
+        from unittest.mock import Mock
+        from apps.ml_engine.services import speech
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        from tests.test_speech import wav_bytes
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-ui-speech-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_MEMORY_OPENAI_AUTHORIZED=False, ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
+        local = Mock(); local.reason.side_effect = AssertionError('A spoken action request must not reach the model')
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local))
+        self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner', return_value=local))
+        heard = []
+        def transcribe(data):
+            heard.append(len(speech.read_wav(data)))
+            return 'add a savings goal Synthetic trip of 50k'
+        self.enterContext(patch.object(speech, 'status', return_value={'listen': True, 'speak': True}))
+        self.enterContext(patch.object(speech, 'transcribe', side_effect=transcribe))
+        spoken = self.enterContext(patch.object(speech, 'speak', return_value=wav_bytes(0.2)))
+        self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'intelligenceMic').is_displayed())
+        self.browser.execute_script("""
+            window.__played = 0; HTMLMediaElement.prototype.play = function () { window.__played += 1; return Promise.resolve(); };
+            navigator.mediaDevices.getUserMedia = async () => {
+                const context = new AudioContext(), tone = context.createOscillator(), out = context.createMediaStreamDestination();
+                tone.connect(out); tone.start(); window.__track = out.stream.getAudioTracks()[0]; return out.stream;
+            };""")
+        self.memory_click('#intelligenceMic')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'intelligenceMic').get_attribute('aria-pressed') == 'true')
+        self.wait.until(lambda _: self.browser.execute_script("return window.__track && window.__track.readyState === 'live'"))
+        time.sleep(0.6)
+        self.memory_click('#intelligenceMic')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'intelligenceMic').get_attribute('aria-pressed') == 'false' and not self.browser.find_element(self.By.ID, 'intelligenceMic').get_attribute('disabled'))
+        self.assertIn('Nothing has been asked yet', self.text('intelligenceFeedback'))
+        self.assertEqual(self.browser.find_element(self.By.ID, 'intelligenceQuery').get_attribute('value'), 'add a savings goal Synthetic trip of 50k')
+        self.assertEqual(self.browser.execute_script('return window.__track.readyState'), 'ended')
+        self.assertEqual(len(heard), 1); self.assertGreater(heard[0], 0)
+        self.memory_click('#intelligenceForm button[type="submit"]')
+        card = '#intelligenceAnswers [data-action-proposal]:last-child'
+        self.wait.until(lambda _: 'Nothing is saved until you press Confirm' in self.text('intelligenceFeedback'))
+        self.memory_click(card+' [data-read-aloud]')
+        self.wait.until(lambda _: self.browser.execute_script('return window.__played') == 1)
+        self.assertIn('Synthetic trip', spoken.call_args.args[0])
+        local.reason.assert_not_called()
+        self.capture('assistant-speech')
 
     def test_assistant_responsive_keyboard_retry_and_new_conversation(self):
         from unittest.mock import Mock

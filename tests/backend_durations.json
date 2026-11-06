@@ -118,6 +118,7 @@
  "tests.test_salary_evidence": 59.75,
  "tests.test_savings_goals": 0.57,
  "tests.test_serving_readiness": 3.88,
+ "tests.test_speech": 1.9,
  "tests.test_source_storage": 0.14,
  "tests.test_statement_columns": 0.03,
  "tests.test_statement_evidence": 1.64,

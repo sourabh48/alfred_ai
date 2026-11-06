@@ -14,3 +14,10 @@ their own copyright notices and licenses; this notice does not replace them.
 Release SHA-256 hashes identify the published files and can detect changes when
 compared with the official release. This project identifier is public attribution,
 not a secret, an access key, copy protection, or a digital signature.
+
+Offline speech components (downloaded separately, not part of Alfred's code):
+- Piper text-to-speech (piper-tts, https://github.com/OHF-voice/piper1-gpl), GPL-3.0-or-later;
+  run as a separate program and not included in the Windows installer.
+- Voice en_GB-vctk-medium (https://huggingface.co/rhasspy/piper-voices), trained on the CSTR VCTK
+  Corpus, University of Edinburgh (https://datashare.ed.ac.uk/handle/10283/3443), CC BY 4.0.
+- Whisper base speech recognition (https://huggingface.co/openai/whisper-base), OpenAI, Apache-2.0.

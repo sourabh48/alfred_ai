@@ -11,7 +11,9 @@
   reviews it and the pin moves.
 - Owner decisions 2026-11-06: AI-17 propose-then-confirm (implemented: savings-goal actions), AI-18 local offline speech
   (download details need the owner's go-ahead), TRAVEL-20 private videos only.
-- NEXT TASK: AI-18 or TRAVEL-20 per the queue (phase D). Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row AI-17.
+- AI-18 implemented 2026-11-06: offline Speak and Read aloud (owner approved whisper-base, Piper and the VCTK voice);
+  CI reviewed source re-pinned for the Piper dependency.
+- NEXT TASK: TRAVEL-20 per the queue (phase D). Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row AI-17.
 
 ## Previous checkpoint — CAREER-03, CAREER-06, TRAVEL-02 and TRAVEL-23 (2026-11-04)
 

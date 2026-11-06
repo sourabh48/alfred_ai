@@ -36,6 +36,7 @@ ml_models/**/model.pkl
 ml_models/**/model.json
 ml_models/**/model.safetensors
 ml_models/alfred/model_registry/.registry.lock
+ml_models/speech/
 ml_models/**/weights/
 ml_models/**/checkpoints/
 

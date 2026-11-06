@@ -343,6 +343,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(env("ALFRED_MEDIA_ROOT", default=str(BASE_DIR / "media")))
+# AI-18 offline speech models, fetched once by scripts/download_speech_models.py.
+SPEECH_MODEL_DIR = Path(env("ALFRED_SPEECH_MODEL_DIR", default=str(BASE_DIR / "ml_models" / "speech")))
 STORAGES = {
     "default": {"BACKEND": "alfred_ai.storage.PrivateFileSystemStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},

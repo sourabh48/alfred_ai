@@ -81,7 +81,9 @@
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
             This question is public. Allow approved cloud fallback for this question if Ollama fails.</label>
         <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
+        <p class="small" id="intelligenceSpeechHint" hidden>Speak turns on the microphone only until you press Stop listening (30 seconds at most). Speech becomes text on this PC; the audio is not stored or sent anywhere. Check the text before you ask.</p>
         <div class="conversation-actions"><button class="btn btn-primary" type="submit">Ask ALFRED</button>
+            <button id="intelligenceMic" class="btn btn-outline-primary" type="button" aria-pressed="false" aria-describedby="intelligenceSpeechHint" hidden>Speak</button>
             <span class="small text-muted">Enter for a new line · Ctrl/⌘ + Enter to send</span></div>
         <fieldset id="intelligenceSources" class="conversation-evidence mt-3 d-none" aria-describedby="intelligenceSourcesHelp">
             <legend id="intelligenceSourcesTitle" class="h6">Choose financial source documents</legend>
@@ -185,5 +187,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
-<script src="/static/js/intelligence.js?v=13"></script>
+<script src="/static/js/intelligence.js?v=14"></script>
 {% endblock %}

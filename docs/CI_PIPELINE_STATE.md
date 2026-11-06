@@ -1,5 +1,12 @@
 # Development CI and integration pipeline
 
+## AI-18 dependency review — 2026-11-06
+
+AI-18 adds `piper-tts==1.8.0` (GPL-3.0, run only as a separate program and excluded from the PyInstaller build)
+and `pathvalidate==3.3.1` (MIT) to `requirements.txt` and both constraint files. The owner approved Piper on
+2026-11-06, so the backend step's `--reviewed-source` names the AI-18 commit. Model files are not in Git; CI tests
+run without them (speech buttons stay hidden and the services are mocked).
+
 ## FIN-06 migration review — 2026-11-06
 
 CI run 42179590852 at `164d394` failed all four backend shards in preflight (`migrations`): migration

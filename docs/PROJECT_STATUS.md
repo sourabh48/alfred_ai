@@ -796,7 +796,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 19 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 8 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 7 | COMPLETE_VERIFIED: 85
 
 PR/CI: master `e8ef8f4` CI_PASSED (run 42185812614: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 
@@ -808,7 +808,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
-| AI | 11 | 18 | 61.1 | 4 | 2 | 1 | 0 | 0 |
+| AI | 11 | 18 | 61.1 | 5 | 2 | 0 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 1 | 2 | 0 | 0 | 0 |
 | TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
@@ -2300,7 +2300,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### AI-18 — Voice assistant
 
-**NOT_IMPLEMENTED** · ALFRED intelligence · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · ALFRED intelligence · P2.
 
 - Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/services/voice_assistant.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/services/voice_assistant.py).
 - APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
@@ -2309,6 +2309,9 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Legacy service imports optional external speech libraries and has no demonstrated routed UI/caller. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Unrouted voice prototype retired by M17; no working accepted voice assistant. Future scope requires confirmation.
 - OWNER DECISION 2026-11-06: local offline speech-to-text, microphone only on a button press. Needs a new dependency and a model download; the exact file, source and size need the owner's go-ahead before download, and CI's reviewed source must be re-pinned after review.
+- OWNER APPROVAL 2026-11-06: whisper-base (openai/whisper-base `e37978b`, Apache-2.0, 294.8 MB) and Piper (piper-tts 1.8.0 GPL-3.0 run as a separate program, pathvalidate 3.3.1 MIT) with the VCTK British voice (rhasspy/piper-voices `e7229f7`, en_GB-vctk-medium, CC BY 4.0, 77 MB). A copy of the game voice the owner linked was declined: it is a real actor's voice and copyrighted audio. Voices `alan` (dataset all rights reserved) and `semaine` (non-commercial) were excluded.
+- SCOPED_IMPLEMENTATION 2026-11-06: [scripts/download_speech_models.py](../scripts/download_speech_models.py) fetches the pinned files once and keeps each only if its size and hash match (into ignored `ml_models/speech/`). On the assistant page, **Speak** turns the microphone on until **Stop listening** (30 s cap), the browser sends 16 kHz WAV to `/api/ai/speech/transcribe/`, Whisper turns it into text in memory and the text goes into the question box for the owner to check; nothing is asked or stored automatically. **Read aloud** on each reply and action card plays `/api/ai/speech/speak/`: Piper speaker p254 (Southern English male), played 4% slower and lower for a calm tone. Buttons stay hidden when models are missing; both endpoints are signed-in only and rate-limited as expensive. Real round trip on this PC: Piper 3.6 s; Whisper 8.2 s first load, then 0.8 s, exact words back. [Service](../apps/ml_engine/services/speech.py), [tests](../tests/test_speech.py): 5 backend PASS; Chrome test PASS (fake microphone, track ends on stop, CSRF path, Read aloud), capture inspected; 149 related backend PASS.
+- Limits: the installer build excludes Piper (GPL), so Read aloud works from a checkout only; the microphone needs `localhost` or HTTPS, so plain-HTTP LAN devices cannot use Speak. Next: owner check in the app.
 
 ### OPENAI-01 — Responses API request/response adapter
 

@@ -45,7 +45,7 @@ analysis = Analysis(
     [str(root / "alfred_native.py")], pathex=[str(root)],
     binaries=binaries, datas=datas, hiddenimports=hiddenimports,
     hookspath=[str(root / "packaging" / "hooks")],
-    excludes=["pytest", "IPython", "jupyter", "notebook", "selenium", "tensorboard"],
+    excludes=["pytest", "IPython", "jupyter", "notebook", "selenium", "tensorboard", "piper"],  # piper: GPL-3.0, checkout-only
     noarchive=False,
 )
 pyz = PYZ(analysis.pure)
