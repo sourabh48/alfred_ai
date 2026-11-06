@@ -1943,7 +1943,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Allocation/watchlist logic is heuristic, supported by available sources; suitability accuracy is unverified. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Define risk evidence and acceptance; never present as certified advice.
+- SCOPED_INSPECTION 2026-11-06: market suggestions read `user.age`, but the user model has no age, so every user was treated as 30 and told "As a young investor, consider aggressive equity/SIP investments". Removed (no age, no age-based advice). Removed an unused news scraper that sent a browser User-Agent. Portfolio Guidance now states it is rule-based on recorded holdings with fixed asset-class weights and is general information, not personalised or certified advice. Risk score = value-weighted fixed class weights (Equity 80, Mutual Fund 60, Crypto 100, REIT 50, Debt 20, Gold 30, Cash 10; unknown 50); diversification = normalised Shannon entropy over 7 classes. Tests: 54 investment backend tests PASS, including a new no-assumed-age test.
+- Next: acceptance needs a reviewed definition of risk evidence (for example fund category instead of one Mutual Fund weight); suitability stays out of scope without the owner's stated goals and horizon.
 
 ### INV-05 — AMFI/Yahoo market evidence and historical performance
 

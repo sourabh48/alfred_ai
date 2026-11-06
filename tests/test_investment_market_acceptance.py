@@ -158,6 +158,14 @@ class InvestmentMarketAcceptanceTests(TestCase):
         context = service.get_market_trends_and_suggestions(self.owner)
         self.assertNotIn("Verified market context is", str(context["suggestions"]))
 
+    def test_suggestions_never_assume_an_age(self):
+        # Users have no recorded age; a default once told everyone to invest aggressively.
+        suggestions = service.get_market_trends_and_suggestions(self.owner)["suggestions"]
+        self.assertTrue(any(item["type"] == "market_overview" for item in suggestions))
+        self.assertFalse(any(item["type"] == "age_based" for item in suggestions))
+        self.assertNotIn("young investor", str(suggestions).lower())
+        self.assertContains(self.client.get("/investments/"), "not personalised or certified investment advice")
+
     def test_expired_source_is_not_reused_from_owner_summary_cache(self):
         now = timezone.now()
         self.market.evidence["stale_after"] = (now + timedelta(seconds=5)).isoformat()

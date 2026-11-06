@@ -38,7 +38,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 14 | A | RUNTIME-15 — Local/LAN hosting and optional Docker stack | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: same-host Compose run PASS at 49d622e; second LAN device, host restart and sustained schedule open |
 | 15 | B | FIN-07 — Cash-flow forecasting | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: on the owner's data the prior range held in 6 of 9 walk-forward months and income evidence is missing; no accuracy claim |
 | 16 | B | FIN-16 — Tax calculations and source-backed eligibility | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: tax year 2026-27 rules and the notice-only Budget check implemented; page check on the owner app PASS 2026-11-06; reviewed actual tax cases (income unverified) and exact-HEAD CI remain |
-| 17 | B | INV-04 — Risk classification and recommendations | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 17 | B | INV-04 — Risk classification and recommendations | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: assumed-age advice removed and guidance labelled 2026-11-06; reviewed risk-evidence definition and owner check remain |
 | 18 | B | INV-06 — Long-term investment planning | PARTIALLY_IMPLEMENTED | P2 / L | FIN-06, FIN-15 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: FIN-06, FIN-15 |
 | 19 | B | INV-07 — Persistent portfolio alerts | PARTIALLY_IMPLEMENTED | P2 / L | FIN-15 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: FIN-15 |
 | 20 | B | DOC-07 — AI Q&A over arbitrary financial documents | PARTIALLY_IMPLEMENTED | P2 / L | DOC-06 | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
@@ -81,7 +81,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 57 | B | COUNCIL-05 — AI development budget and human Git approval | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-04 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-04 |
 | 58 | D | COUNCIL-03 — Experimental self-improvement engine | NOT_IMPLEMENTED | P1 / L | COUNCIL-05 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-05 |
 
-**Next eligible for `next` or active `sprint`: INV-04.**
+**Next eligible for `next` or active `sprint`: DOC-07.**
 
 ## Accepted baseline — excluded from execution
 

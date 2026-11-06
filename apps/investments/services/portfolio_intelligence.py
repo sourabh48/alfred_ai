@@ -11,7 +11,6 @@ from decimal import Decimal, InvalidOperation, localcontext
 from math import isfinite, sqrt
 from statistics import mean, pstdev
 from typing import Dict, List, Optional, BinaryIO
-from bs4 import BeautifulSoup
 from alfred_ai.services import public_http
 from django.core.cache import cache
 from django.db import transaction
@@ -430,19 +429,7 @@ class PortfolioIntelligenceService:
                 "message": "Volatility is elevated. Fresh SIPs may be safer than large lump-sum deployment if your cash buffer is limited.",
             })
 
-        # AI-generated suggestions based on user profile
-        user_age = getattr(user, "age", 30)
-        if user_age < 35:
-            suggestions.append({
-                "type": "age_based",
-                "message": "As a young investor, consider aggressive equity/SIP investments for long-term wealth creation.",
-            })
-        elif user_age > 50:
-            suggestions.append({
-                "type": "age_based",
-                "message": "Consider increasing debt allocation for stability as you approach retirement.",
-            })
-
+        # No age-based suggestions: ALFRED records no age, and an assumed one would invent personal advice.
         return {
             "suggestions": suggestions,
             "evidence": evidence,
@@ -1354,29 +1341,6 @@ class PortfolioIntelligenceService:
         if len(df) < 2:
             return 0
         return ((df['Close'].iloc[-1] - df['Close'].iloc[0]) / df['Close'].iloc[0]) * 100
-
-    def _scrape_trending_sectors(self) -> List[Dict]:
-        """Scrape trending sectors from financial news."""
-        suggestions = []
-        try:
-            # Example: Scrape Moneycontrol or Economic Times (respect robots.txt)
-            url = "https://www.moneycontrol.com/news/business/markets/"
-            headers = {"User-Agent": "Mozilla/5.0"}
-            response = public_http.request("GET", url, headers=headers,
-                content_types=("text/html", "application/xhtml+xml"), max_bytes=2_000_000)
-            soup = BeautifulSoup(response.content, "html.parser")
-            headlines = soup.find_all("h2", limit=3)
-            for headline in headlines:
-                text = headline.get_text(strip=True)
-                if "IT" in text.upper() or "BANK" in text.upper() or "AUTO" in text.upper():
-                    suggestions.append({
-                        "type": "trending_sector",
-                        "message": f"Market buzz: {text[:100]}",
-                    })
-        except Exception as exc:
-            safe_error_details(exc, "Market news could not be loaded.", logger_name=__name__)
-
-        return suggestions
 
 
 # Singleton instance

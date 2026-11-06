@@ -191,6 +191,10 @@
 - FIN-17 (2026-11-06): the credit page no longer shows the internal estimate as a CIBIL score ("Estimated credit
   health"). Then the owner dropped the score page; uploads stay in Documents, data and APIs kept. Live bureau pulls
   BLOCKED_EXTERNAL (bureau contract).
+- CI: Browser Regression on `c315595` failed in Selenium shard 0 (logs need GitHub sign-in). Locally the shard plan also
+  failed because the FIN-13 ZIP Chrome test had no measured duration; recorded 5.219 s in `tests/browser_durations.json`.
+- INV-04 (2026-11-06): removed advice built on an assumed age 30 (no age is recorded) and an unused scraper; Portfolio
+  Guidance labelled rule-based general information. 54 investment tests PASS. Risk-evidence definition remains.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

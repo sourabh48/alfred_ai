@@ -28,6 +28,7 @@ GATES = {
     'RUNTIME-15': 'BLOCKED_EXTERNAL: same-host Compose run PASS at 49d622e; second LAN device, host restart and sustained schedule open',
     'FIN-07': 'BLOCKED_EVIDENCE: on the owner\'s data the prior range held in 6 of 9 walk-forward months and income evidence is missing; no accuracy claim',
     'FIN-13': 'BLOCKED_EVIDENCE: owner account check PASS 2026-11-06; exact-HEAD CI and a fresh-package check remain, due with the phase B push',
+    'INV-04': 'BLOCKED_EVIDENCE: assumed-age advice removed and guidance labelled 2026-11-06; reviewed risk-evidence definition and owner check remain',
     'FIN-17': 'BLOCKED_EXTERNAL: owner dropped the score page 2026-11-06; report uploads stay in Documents; live bureau pulls need a bureau contract',
     'FIN-16': 'BLOCKED_EVIDENCE: tax year 2026-27 rules and the notice-only Budget check implemented; page check on the owner app PASS 2026-11-06; reviewed actual tax cases (income unverified) and exact-HEAD CI remain',
     'FIN-15': 'BLOCKED_APPROVAL: canonical currency/FX policy is not approved',
