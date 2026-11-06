@@ -10,9 +10,9 @@
             <p class="alfred-hero-copy">Credit factors, improvement steps, and alerts are derived from your own ALFRED data. Official bureau scores require a bureau-approved integration and are not faked when that integration is absent.</p>
         </div>
         <div class="surface-card" style="min-width: 280px;">
-            <p class="metric-kicker">Current Bureau Score</p>
+            <p class="metric-kicker" id="creditScoreKicker">Credit score</p>
             <div class="metric-value" id="creditScoreValue">0</div>
-            <p class="metric-caption mb-1"><span id="creditScoreRating">Unknown</span> on <span id="creditScoreBureau">CIBIL</span></p>
+            <p class="metric-caption mb-1"><span id="creditScoreRating">Unknown</span> on <span id="creditScoreBureau">no official score yet</span></p>
             <p class="metric-caption mb-0" id="creditScoreMeta">Select a bureau to load the latest score.</p>
         </div>
     </div>
@@ -105,5 +105,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/credit_score.js?v=2.4.1"></script>
+<script src="/static/js/credit_score.js?v=2.4.3"></script>
 {% endblock %}

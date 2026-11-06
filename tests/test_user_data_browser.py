@@ -3963,6 +3963,15 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.ID, "taxFinancialYear").get_attribute("value"), "2025-26")
         self.capture("tax-policy-2025-26")
 
+    def test_credit_estimate_is_never_labelled_as_a_bureau_score(self):
+        self.login()
+        self.browser.get(self.live_server_url + "/credit-score/")
+        self.wait.until(lambda _: "ALFRED estimate" in self.text("creditScoreBureau"))
+        self.assertIn("not an official score", self.text("creditScoreBureau"))
+        self.assertEqual(self.text("creditScoreKicker").lower(), "estimated credit health")
+        self.assertIn("not an official bureau score", self.text("creditScoreMeta"))
+        self.capture("credit-estimate-label")
+
     def test_inferred_loan_requires_explicit_confirmation_on_real_page(self):
         from django.utils import timezone
         from apps.loans.models import Loan

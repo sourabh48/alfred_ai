@@ -43,7 +43,11 @@ function loadCreditDashboard() {
 function renderCreditHero(score, report) {
     document.getElementById("creditScoreValue").textContent = Alfred.formatNumber(score.score || 0, 0);
     document.getElementById("creditScoreRating").textContent = score.rating || "Unknown";
-    document.getElementById("creditScoreBureau").textContent = score.bureau || "CIBIL";
+    document.getElementById("creditScoreKicker").textContent = score.score_kind === "estimated" ? "Estimated credit health" : "Current bureau score";
+    // An estimate only borrows a bureau's scale; never present it as that bureau's score.
+    document.getElementById("creditScoreBureau").textContent = score.score_kind === "estimated"
+        ? `${score.bureau || "bureau"} scale (ALFRED estimate, not an official score)`
+        : (score.bureau || "an unnamed bureau");
     const activeSource = report?.active_score_source || null;
     if (score.source_kind === "uploaded_report") {
         document.getElementById("creditScoreMeta").textContent = score.source_file_name

@@ -1806,7 +1806,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py), [tests/test_credit_report_upload.py](../tests/test_credit_report_upload.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Official bureau integration BLOCKED_EXTERNAL; uploaded reports synthetic/dated acceptance only.
 - Limitations/dependencies: Uploaded bureau evidence and clearly labelled estimates exist; authenticated bureau pulls/contracts are not accepted. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Keep estimates distinct; obtain approved bureau access before live pulls.
+- SCOPED_INSPECTION 2026-11-06: the credit page showed the internal estimate as "Current Bureau Score" and "<rating> on CIBIL", and fell back to "CIBIL" when no bureau was known, so an estimate could pass for an official score. Fixed: estimates now read "Estimated credit health" and "<rating> on CIBIL scale (ALFRED estimate, not an official score)"; official uploaded snapshots keep "Current bureau score". New Chrome test plus 19 credit/smoke backend tests PASS. Parsed tradeline amounts reach loans only through the existing Decimal `loan_money` boundary (unchanged). Live pulls stay unimplemented: configured credentials return an explicit not-implemented status.
+- Next: BLOCKED_EXTERNAL for live bureau pulls (consumer bureau APIs need a membership/contract). Local acceptance path: the owner downloads their own free annual report from a bureau and uploads it; check score, date and tradelines against the PDF without recording identifiers.
 
 ### LOAN-01 — EMI, schedules, outstanding and repayment metrics
 

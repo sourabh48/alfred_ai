@@ -187,7 +187,10 @@
 - FIN-16 (2026-11-06): read the gazetted Income-tax Act 2025 and the enacted Finance Act 2026 locally; every tax year
   2026-27 figure equals FY 2025-26. Added the dated 2026-27 policy (2025 Act sections), a date-based default year, and a
   Budget/filing notice on the tax page. Owner-approved daily notice-only check of indiabudget.gov.in flags a newer
-  Budget than the verified rules; rules are never changed from the web. Remaining: owner check, exact-HEAD CI.
+  Budget than the verified rules; rules are never changed from the web. Page check PASS; remaining: exact-HEAD CI.
+- FIN-17 (2026-11-06): the credit page no longer shows the internal estimate as a CIBIL score ("Estimated credit
+  health", "... scale (ALFRED estimate, not an official score)"). Live bureau pulls BLOCKED_EXTERNAL (bureau contract);
+  owner-uploaded real report check open.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
