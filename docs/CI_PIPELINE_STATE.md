@@ -1,5 +1,11 @@
 # Development CI and integration pipeline
 
+## TRAVEL-20 migration review — 2026-11-06
+
+The owner approved migration `apps/mobility/migrations/0014_trip_video.py` (new empty `TripVideo` table) on
+2026-11-06, so the backend step's `--reviewed-source` names the TRAVEL-20 commit `d8a51e3`. Run 42194736278 at
+`99b8e8f` (Piper dependency re-pin): CI_PASSED.
+
 ## AI-18 dependency review — 2026-11-06
 
 AI-18 adds `piper-tts==1.8.0` (GPL-3.0, run only as a separate program and excluded from the PyInstaller build)
