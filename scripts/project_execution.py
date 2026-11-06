@@ -37,6 +37,8 @@ GATES = {
     'TRAVEL-08': 'BLOCKED_EVIDENCE: owner-reviewed restriction references accepted; independently authenticated route-applicable restrictions absent',
     'TRAVEL-09': 'BLOCKED_APPROVAL: straight-line stop distance labelled 2026-11-06; road-network detours need an approved routing key',
     'TRAVEL-15': 'BLOCKED_EXTERNAL: no verified live permit or closure service; dated references shown stale with UNKNOWN confidence',
+    'BIKE-03': 'BLOCKED_EVIDENCE: part windows and evidence score labelled 2026-11-06; prediction quality needs real logged service outcomes',
+    'BIKE-05': 'BLOCKED_EXTERNAL: cost figures labelled estimates 2026-11-06; authoritative part compatibility and live prices need a manufacturer or dealer source',
     'INV-04': 'BLOCKED_EVIDENCE: assumed-age advice removed and guidance labelled 2026-11-06; reviewed risk-evidence definition and owner check remain',
     'FIN-17': 'BLOCKED_EXTERNAL: owner dropped the score page 2026-11-06; report uploads stay in Documents; live bureau pulls need a bureau contract',
     'FIN-16': 'BLOCKED_EVIDENCE: tax year 2026-27 rules and the notice-only Budget check implemented; page check on the owner app PASS 2026-11-06; reviewed actual tax cases (income unverified) and exact-HEAD CI remain',

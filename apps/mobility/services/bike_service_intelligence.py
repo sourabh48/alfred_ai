@@ -997,11 +997,20 @@ class BikeServiceIntelligenceService:
                     "km_since_service": km_since,
                     "confidence": round(min(confidence, 0.96), 2),
                     "evidence": evidence[:3],
+                    "window_basis": self._part_window_basis(rule),
                 }
             )
 
         insights.sort(key=lambda item: CONDITION_ORDER.get(item["status"], 0), reverse=True)
         return insights[:6]
+
+    def _part_window_basis(self, rule) -> str:
+        windows = [f"{rule['service_window_km']:,} km" if rule["service_window_km"] else "",
+                   f"{rule['service_window_days']} days" if rule["service_window_days"] else ""]
+        window = " or ".join(item for item in windows if item)
+        if not window:
+            return "No fixed interval; status follows your logged condition and issues."
+        return f"General {window} window, not your manufacturer's schedule. Check the owner's manual."
 
     def _refill_actual_mileage(self, refill_log: FuelRefillLog):
         if not refill_log or not refill_log.fuel_liters or not refill_log.trip_meter_km:

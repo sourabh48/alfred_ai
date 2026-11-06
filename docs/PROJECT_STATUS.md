@@ -2970,7 +2970,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Rules, condition snapshots and optional service model exist; prediction quality is unverified. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Evaluate real service outcomes; label intervals/part-life assumptions.
+- SCOPED_IMPLEMENTATION 2026-11-06: each part card now states its window, for example "General 4,000 km or 180 days window, not your manufacturer's schedule. Check the owner's manual." The 28–96% figure is relabelled "Evidence score" (it grows with logged services, issues and checks; not a measured probability). Backend test added; 44 bike backend tests and 3 bike Chrome tests PASS.
+- Next: evaluate predictions against real logged service outcomes before any accuracy claim.
 
 ### BIKE-04 — Insurance/service documents and invoice review
 
@@ -2993,7 +2994,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [tests/test_mobility_vehicle_dashboard.py](../tests/test_mobility_vehicle_dashboard.py), [tests/test_vehicle_accounting.py](../tests/test_vehicle_accounting.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Model/class heuristics and suggestions exist; no verified live price/parts-inventory service. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Use authoritative compatibility and mark estimates.
+- SCOPED_IMPLEMENTATION 2026-11-06: route-action cost ranges now read "Estimate …" and the next-service line reads "Estimated service cost … Estimates, not workshop quotes."
+- Next: authoritative part compatibility and live prices need a manufacturer or dealer source; none is available or approved.
 
 ### BIKE-06 — Travel integration and vehicle net-worth relationship
 

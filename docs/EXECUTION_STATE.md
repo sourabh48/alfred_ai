@@ -205,6 +205,8 @@
 - TRAVEL (2026-11-06): routing needs TRAVEL_ORS_API_KEY (not configured), so TRAVEL-04/09 are approval-gated; TRAVEL-09
   places now show straight-line route distance labelled "not road detour distance" (Chrome PASS). TRAVEL-07/08 need
   independent evidence; TRAVEL-15 has no live permit/closure service.
+- BIKE (2026-11-06): part cards state their general window (not the manufacturer schedule), "Evidence score" replaces
+  "Confidence", and costs read as estimates. 44 backend + 3 Chrome PASS. Outcomes and a parts source remain.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

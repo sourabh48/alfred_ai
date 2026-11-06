@@ -111,7 +111,7 @@ function renderBikeServiceHero(summary) {
     const routeBuffer = summary.route_service_buffer || 0;
     Alfred.setTextIfChanged(
         "bikeServiceProjectionMeta",
-        `Projected service cost: ${Alfred.formatCurrency(projectedCost)} | route-adjusted ${Alfred.formatCurrency(adjustedCost)} | buffer ${Alfred.formatCurrency(routeBuffer)}`
+        `Estimated service cost: ${Alfred.formatCurrency(projectedCost)} | route-adjusted ${Alfred.formatCurrency(adjustedCost)} | buffer ${Alfred.formatCurrency(routeBuffer)}. Estimates, not workshop quotes.`
     );
 }
 
@@ -491,7 +491,7 @@ function renderRouteWearPanel(routeWear) {
                     <div class="text-end" style="min-width: 120px;">
                         <span class="status-pill ${routeWearTone(action.priority)}">${Alfred.escapeHtml(humanizeToken(action.priority || "watch"))}</span>
                         <div class="muted small mt-2">${action.next_check_km ? `${Alfred.formatNumber(action.next_check_km, 0)} km check` : "No interval"}</div>
-                        <div class="muted small">${action.estimated_cost_range ? `${Alfred.formatCurrency(action.estimated_cost_range.min || 0)}-${Alfred.formatCurrency(action.estimated_cost_range.max || 0)}` : ""}</div>
+                        <div class="muted small">${action.estimated_cost_range ? `Estimate ${Alfred.formatCurrency(action.estimated_cost_range.min || 0)}-${Alfred.formatCurrency(action.estimated_cost_range.max || 0)}` : ""}</div>
                     </div>
                 </div>
             </div>
@@ -539,7 +539,7 @@ function renderPartInsights(items) {
             </div>
             <div class="muted small mb-2">${Alfred.escapeHtml(item.performance_effect || "")}</div>
             <div class="chip-row mb-2">
-                <span class="chip-neutral">Confidence ${Alfred.formatNumber((Number(item.confidence || 0) * 100), 0)}%</span>
+                <span class="chip-neutral" title="Grows with logged services, issues and condition checks; not a measured probability">Evidence score ${Alfred.formatNumber((Number(item.confidence || 0) * 100), 0)}%</span>
                 <span class="chip-neutral">${Alfred.formatNumber(item.service_count || 0, 0)} service hits</span>
                 <span class="chip-neutral">${Alfred.formatNumber(item.issue_count || 0, 0)} issue signals</span>
                 ${item.last_service_date ? `<span class="chip-neutral">Last ${Alfred.formatDate(item.last_service_date)}</span>` : `<span class="chip-neutral">No logged service yet</span>`}
@@ -547,6 +547,7 @@ function renderPartInsights(items) {
             ${item.days_since_service != null ? `<div class="muted small">Days since service: ${Alfred.formatNumber(item.days_since_service, 0)}</div>` : ""}
             ${item.km_since_service != null ? `<div class="muted small">Km since service: ${Alfred.formatNumber(item.km_since_service, 0)}</div>` : ""}
             <div class="muted small mt-2"><strong>Recommended action:</strong> ${Alfred.escapeHtml(item.recommended_action || "")}</div>
+            ${item.window_basis ? `<div class="muted small mt-1">${Alfred.escapeHtml(item.window_basis)}</div>` : ""}
             <div class="muted small mt-2">${(item.evidence || []).map(entry => Alfred.escapeHtml(entry)).join(" | ")}</div>
         </div>
     `).join(""));

@@ -389,3 +389,14 @@ class VehicleProfileLabelTests(TestCase):
         self.assertTrue(any("estimated due by" in line for line in warnings), warnings)
         BikeServiceRecord.objects.filter(user=self.user).update(next_service_date=timezone.localdate() - timedelta(days=1))
         self.assertTrue(any(line.startswith("Recorded service due") for line in bike_context(profile)["warnings"]))
+
+    def test_part_insights_label_general_windows_not_manufacturer_schedules(self):
+        # BIKE-03/05: PART_RULES windows are general rules of thumb, so every card says so.
+        profile = BikeProfile.objects.create(user=self.user, display_name="Synthetic Ride", model_name="Synthetic Ride",
+            vehicle_type="motorcycle", bike_class="roadster", is_primary=True)
+        BikeServiceRecord.objects.create(user=self.user, bike_profile=profile, bike_name=profile.display_name,
+            service_date=date(2026, 1, 10), odometer_km=1200, service_type="routine", cost=900, notes="Engine oil change")
+        insights = self.client.get("/api/mobility/bike-service-dashboard/").json()["part_insights"]
+        oil = next(item for item in insights if item["label"] == "Engine Oil")
+        self.assertEqual(oil["window_basis"], "General 4,000 km or 180 days window, not your manufacturer's schedule. Check the owner's manual.")
+        self.assertTrue(all(item["window_basis"] for item in insights))
