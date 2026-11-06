@@ -498,8 +498,12 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 const response = await fetch("/api/ai/speech/speak/", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json", "X-CSRFToken":getCookie("csrftoken")}, body:JSON.stringify({text})});
                 if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || "The offline voice could not read this.");
-                if (player) { player.pause(); URL.revokeObjectURL(player.src); }
-                player = new Audio(URL.createObjectURL(await response.blob())); await player.play();
+                // Web Audio plays the WAV without a blob: URL, which the page's Content Security Policy blocks.
+                const audio = await response.arrayBuffer();
+                if (player) player.close();
+                player = new AudioContext();
+                const sound = player.createBufferSource(); sound.buffer = await player.decodeAudioData(audio);
+                sound.connect(player.destination); sound.start();
             } catch (error) { feedback.textContent = error.message; }
             finally { button.disabled = false; }
         });
@@ -513,13 +517,16 @@ document.addEventListener("DOMContentLoaded", () => {
         tag(0, "RIFF"); view.setUint32(4, 36 + length * 2, true); tag(8, "WAVE"); tag(12, "fmt "); view.setUint32(16, 16, true);
         view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 16000, true); view.setUint32(28, 32000, true);
         view.setUint16(32, 2, true); view.setUint16(34, 16, true); tag(36, "data"); view.setUint32(40, length * 2, true);
-        // shortcut: nearest-sample downsampling, fine for speech recognition; filter first if accuracy suffers.
+        // Fallback only when the browser refuses a 16 kHz context: nearest-sample downsampling.
         for (let i = 0; i < length; i++) view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, input[Math.floor(i * rate / 16000)] || 0)) * 0x7fff, true);
         return new Blob([view], {type:"audio/wav"});
     }
     async function startRecording() {
-        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-        const context = new AudioContext(), source = context.createMediaStreamSource(stream), processor = context.createScriptProcessor(4096, 1, 1), chunks = [];
+        // The browser's own free noise suppression and echo cancellation clean the voice before Whisper hears it.
+        const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, noiseSuppression:true, echoCancellation:true, autoGainControl:true}});
+        // A 16 kHz context lets the browser resample with filtering; naive downsampling garbled words.
+        let context; try { context = new AudioContext({sampleRate:16000}); } catch { context = new AudioContext(); }
+        const source = context.createMediaStreamSource(stream), processor = context.createScriptProcessor(4096, 1, 1), chunks = [];
         processor.onaudioprocess = event => chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
         source.connect(processor); processor.connect(context.destination); await context.resume();
         recording = {stream, context, chunks, timer:setTimeout(stopRecording, 30000)};

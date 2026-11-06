@@ -18,13 +18,13 @@ from apps.budgets.serializers import SavingsGoalSerializer
 UNITS = {"k": Decimal("1000"), "thousand": Decimal("1000"), "lakh": Decimal("100000"), "lakhs": Decimal("100000"),
          "lac": Decimal("100000"), "lacs": Decimal("100000"), "crore": Decimal("10000000"), "crores": Decimal("10000000"),
          "cr": Decimal("10000000")}
-AMOUNT = r"(?:₹|rs\.?|inr)?\s*(?P<{0}>\d[\d,]*(?:\.\d{{1,2}})?)\s*(?P<{0}_unit>k|thousand|lakhs?|lacs?|crores?|cr)?\b"
+AMOUNT = r"(?:₹|rs\.?|inr)?\s*(?P<{0}>\d[\d,]*(?:\.\d{{1,2}})?)[\s-]*(?P<{0}_unit>k|thousand|lakhs?|lacs?|crores?|cr)?\b(?:\s*rupees)?"
 CREATE = re.compile(
-    r"^(?:please\s+)?(?:add|create|set\s+up|start|make)\s+(?:a\s+|an\s+)?(?:new\s+)?savings\s+goal\s+"
+    r"^(?:please\s+)?(?:add|create|set\s+up|start|make)\s+(?:a\s+|an\s+|the\s+)?(?:new\s+)?savings\s+goal\s+"
     r"(?:called\s+|named\s+|for\s+)?[\"']?(?P<name>.+?)[\"']?\s+(?:of|for|with\s+a\s+target\s+of|target(?:ing)?)\s+"
     + AMOUNT.format("target") + r"(?:\s+(?:by|before)\s+(?P<date>.+?))?\s*[.!]?$", re.I)
 UPDATE = re.compile(
-    r"^(?:please\s+)?(?:update|set)\s+(?:my\s+)?[\"']?(?P<name>.+?)[\"']?\s+(?:goal\s+)?(?:saved|savings|progress|saved\s+amount)\s+to\s+"
+    r"^(?:please\s+)?(?:update|set)\s+(?:my\s+|the\s+)?[\"']?(?P<name>.+?)[\"']?\s+(?:goal\s+)?(?:saved|savings|progress|saved\s+amount)\s+to\s+"
     + AMOUNT.format("saved") + r"\s*[.!]?$", re.I)
 ACTIONS = ("create_savings_goal", "update_savings_goal")
 

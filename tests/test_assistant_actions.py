@@ -24,6 +24,9 @@ class AssistantActionTests(TestCase):
             "create savings goal called 'Goa trip' for ₹50,000.50": ("Goa trip", "50000.50", None),
             "please set up a new savings goal named Bike for 75k before 2027-01-15.": ("Bike", "75000.00", "2027-01-15"),
             "add a savings goal House for 1 crore by 31 December 2030": ("House", "10000000.00", "2030-12-31"),
+            # Exactly what Whisper wrote for a spoken request (AI-18).
+            "Add the Savings Goal Emergency Fund of 1-Lac by March 2027.": ("Emergency Fund", "100000.00", "2027-03-31"),
+            "add a savings goal Car of 2 lakh rupees": ("Car", "200000.00", None),
         }
         for text, (name, target, due) in cases.items():
             with self.subTest(text=text):

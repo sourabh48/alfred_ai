@@ -1551,7 +1551,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'intelligenceMic').is_displayed())
         self.browser.execute_script("""
-            window.__played = 0; HTMLMediaElement.prototype.play = function () { window.__played += 1; return Promise.resolve(); };
+            window.__played = 0; const start = AudioBufferSourceNode.prototype.start;
+            AudioBufferSourceNode.prototype.start = function (...args) { window.__played += 1; window.__seconds = this.buffer.duration; return start.apply(this, args); };
             navigator.mediaDevices.getUserMedia = async () => {
                 const context = new AudioContext(), tone = context.createOscillator(), out = context.createMediaStreamDestination();
                 tone.connect(out); tone.start(); window.__track = out.stream.getAudioTracks()[0]; return out.stream;
@@ -1571,6 +1572,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Nothing is saved until you press Confirm' in self.text('intelligenceFeedback'))
         self.memory_click(card+' [data-read-aloud]')
         self.wait.until(lambda _: self.browser.execute_script('return window.__played') == 1)
+        self.assertAlmostEqual(self.browser.execute_script('return window.__seconds'), 0.2, places=2)
         self.assertIn('Synthetic trip', spoken.call_args.args[0])
         local.reason.assert_not_called()
         self.capture('assistant-speech')

@@ -27,6 +27,8 @@ VOICE = "en_GB-vctk-medium.onnx"
 SPEAKER = "p254"  # VCTK Southern English male; the deepest of the British male voices checked
 DEEPER = 0.96  # play slightly slower and lower than the stock voice for a calm, measured tone
 
+# Steers Whisper toward money words: without it, "1 lakh by March" came back as "1-Lac by much".
+HINT = "Add a savings goal of 1 lakh by March 2027. Update Emergency fund saved to 25000."
 _lock = threading.Lock()
 _whisper = None
 
@@ -78,7 +80,7 @@ def _load_whisper():
 
         processor = WhisperProcessor.from_pretrained(path, local_files_only=True)
         model = WhisperForConditionalGeneration.from_pretrained(path, local_files_only=True, use_safetensors=True)
-        _whisper = (processor, model.eval())
+        _whisper = (processor, model.eval(), processor.get_prompt_ids(HINT, return_tensors="pt"))
     return _whisper
 
 
@@ -87,10 +89,10 @@ def transcribe(data: bytes) -> str:
     import torch
 
     with _lock:
-        processor, model = _load_whisper()
+        processor, model, hint = _load_whisper()
         features = processor(audio, sampling_rate=RATE, return_tensors="pt").input_features
         with torch.inference_mode():
-            tokens = model.generate(features, language="en", task="transcribe")
+            tokens = model.generate(features, language="en", task="transcribe", prompt_ids=hint)
     return processor.batch_decode(tokens, skip_special_tokens=True)[0].strip()
 
 
