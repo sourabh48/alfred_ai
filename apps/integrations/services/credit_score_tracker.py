@@ -106,7 +106,7 @@ class CreditScoreTrackerService:
         from apps.loans.models import Loan
         from apps.expenses.models import BankAccount
 
-        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed")
+        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed").in_rupee_totals()
         accounts = BankAccount.objects.filter(user=user, is_active=True)
         analysis = self.analyze_score_factors(user)
         # Portfolio totals can exceed the currency limit for a single loan.
@@ -277,7 +277,7 @@ class CreditScoreTrackerService:
         }
 
         # 1. Payment History (35% weight)
-        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed")
+        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed").in_rupee_totals()
         missed_payments = sum(loan.missed_payments for loan in active_loans)
 
         payment_score = max(0, 100 - (missed_payments * 10))
@@ -639,7 +639,7 @@ class CreditScoreTrackerService:
             })
 
         # Missed payments
-        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed")
+        active_loans = Loan.objects.filter(user=user, is_active=True, verification_status="confirmed").in_rupee_totals()
         missed_payments = sum(loan.missed_payments for loan in active_loans)
         if missed_payments > 0:
             alerts.append({

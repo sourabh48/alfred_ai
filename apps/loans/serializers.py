@@ -5,6 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
+from alfred_ai.services.currency import CURRENCY_CHOICES, currency_status
 from .models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument
 from .money import loan_money, loan_money_float
 from .diagnostics import import_message, public_allocation, public_payload, verification_message, reconciliation_message
@@ -80,6 +81,8 @@ class LoanSerializer(serializers.ModelSerializer):
     latest_foreclosure_snapshot = serializers.SerializerMethodField()
     home_upfront_cash_invested = serializers.SerializerMethodField()
     home_property_acquisition_cost = serializers.SerializerMethodField()
+    currency = serializers.ChoiceField(choices=CURRENCY_CHOICES, required=False, allow_null=True, allow_blank=True)
+    currency_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Loan
@@ -98,6 +101,8 @@ class LoanSerializer(serializers.ModelSerializer):
             "home_purchase_price",
             "home_down_payment",
             "home_other_upfront_payments",
+            "currency",
+            "currency_status",
             "home_upfront_cash_invested",
             "home_property_acquisition_cost",
             "start_date",
@@ -136,6 +141,17 @@ class LoanSerializer(serializers.ModelSerializer):
 
     def get_closure_documents_count(self, obj):
         return obj.closure_documents.count()
+
+    def get_currency_status(self, obj):
+        return currency_status(obj.currency)
+
+    def validate_currency(self, value):
+        value = value or None  # blank means not recorded, never a guessed INR
+        recorded = getattr(self.instance, "currency", None)
+        # A recorded denomination owns the loan's payment history; recording a missing one stays allowed.
+        if recorded and value != recorded and self.instance.payment_history.exists():
+            raise serializers.ValidationError("This loan already has payments in its recorded currency; it cannot change.")
+        return value
 
     def validate_consolidated_into(self, value):
         user = getattr(self.context.get("request"), "user", None)

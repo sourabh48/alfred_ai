@@ -367,7 +367,7 @@ class FinancialExportView(APIView):
             ("expenses.csv", Expense, EXPENSE_EXPORT_COLUMNS, ("-transaction_date", "-id")),
             ("loans.csv", Loan, ("id", "loan_type", "lender", "loan_account_number", "principal", "interest_rate", "emi",
                                  "tenure_months", "remaining_balance", "home_purchase_price", "home_down_payment",
-                                 "home_other_upfront_payments", "start_date", "closed_on", "is_active", "status",
+                                 "home_other_upfront_payments", "currency", "start_date", "closed_on", "is_active", "status",
                                  "consolidated_into_id", "consolidation_group", "closure_reason", "auto_detected",
                                  "verification_status", "verification_source", "verified_at", "last_payment_date",
                                  "total_paid", "missed_payments", "notes", "created_at", "updated_at"), ("id",)),

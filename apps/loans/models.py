@@ -4,7 +4,20 @@ from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
 
+from alfred_ai.services.currency import CURRENCY_CHOICES, RUPEE
 from .money import LoanMoneyField, loan_money
+
+
+class LoanQuerySet(models.QuerySet):
+    def in_rupee_totals(self):
+        """Loans that join rupee totals and bank-payment matching: INR, or never recorded (the legacy INR convention).
+
+        Other currencies are reported as separate groups; there is no FX conversion (FIN-15).
+        """
+        return self.filter(models.Q(currency__isnull=True) | models.Q(currency=RUPEE))
+
+    def in_other_currencies(self):
+        return self.exclude(currency__isnull=True).exclude(currency=RUPEE)
 
 
 class Loan(models.Model):
@@ -50,6 +63,8 @@ class Loan(models.Model):
     home_purchase_price = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
     home_down_payment = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
     home_other_upfront_payments = LoanMoneyField(max_digits=14, decimal_places=2, default=0)
+    # Contract denomination of every amount on this loan; null means not recorded and is never guessed (FIN-15).
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, null=True, blank=True, default=None)
     start_date = models.DateField()
     closed_on = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -76,6 +91,8 @@ class Loan(models.Model):
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = LoanQuerySet.as_manager()
 
     class Meta:
         ordering = ["-start_date", "-id"]

@@ -78,6 +78,11 @@ function renderLoanSummary(payload) {
             caption: `${summary.reconciled_foreclosures} closure payment match${summary.reconciled_foreclosures === 1 ? "" : "es"} confirmed from statements.`,
         },
     ];
+    (summary.other_currencies || []).forEach(group => cards.push({
+        kicker: `Loans in ${Alfred.escapeHtml(group.currency)}`,
+        value: Alfred.formatCurrency(group.outstanding, group.currency),
+        caption: `${group.loans} loan(s), EMI ${Alfred.formatCurrency(group.monthly_emi, group.currency)} a month. Kept out of rupee totals; nothing is converted.`,
+    }));
     if (Number(homeSummary.positions || 0) > 0) {
         const purchasePrice = Number(homeSummary.purchase_price_total || 0);
         cards.push({
@@ -103,7 +108,7 @@ function renderLoanSummary(payload) {
         ? `${unconfirmed} estimated loan(s) need review. Their balances, EMI commitments and home values are excluded from financial totals. Edit a loan to check and confirm its terms.`
         : "";
     renderLoanChart(payload.chart);
-    renderLoanTable(summary.manual_loans);
+    renderLoanTable(summary.manual_loans.concat(summary.other_currency_loans || []));
     renderRecentClosures(payload.recent_closures || []);
     renderDetectedRepayments(summary.detected_repayments);
     renderLoanImportHistory(payload.recent_imports || []);
@@ -182,6 +187,10 @@ function renderLoanTable(loans) {
 
     Alfred.setHTML(target, loans.map(item => {
         loanIndex.set(item.id, item);
+        const money = value => Alfred.formatCurrency(value, item.currency);
+        const currencyCopy = item.currency && item.currency !== "INR"
+            ? `<div class="small text-warning-emphasis" data-loan-currency>Recorded in ${Alfred.escapeHtml(item.currency)} | Kept out of rupee totals</div>`
+            : "";
         const confirmed = item.verification_status === "confirmed";
         const loanLabel = Alfred.escapeHtml(item.loan_type_label || formatLoanType(item.loan_type));
         const accountRef = item.loan_account_number
@@ -198,7 +207,7 @@ function renderLoanTable(loans) {
             || Number(item.home_down_payment || 0) > 0
             || Number(item.home_other_upfront_payments || 0) > 0
         )
-            ? `<div class="muted small">${Number(item.home_purchase_price || 0) > 0 ? `Purchase price ${Alfred.formatCurrency(item.home_purchase_price || 0)} | ` : ""}Down payment ${Alfred.formatCurrency(item.home_down_payment || 0)} | Other upfront ${Alfred.formatCurrency(item.home_other_upfront_payments || 0)}</div>`
+            ? `<div class="muted small">${Number(item.home_purchase_price || 0) > 0 ? `Purchase price ${money(item.home_purchase_price || 0)} | ` : ""}Down payment ${money(item.home_down_payment || 0)} | Other upfront ${money(item.home_other_upfront_payments || 0)}</div>`
             : "";
         return `
             <tr>
@@ -210,15 +219,16 @@ function renderLoanTable(loans) {
                     <div class="small ${confirmed ? "muted" : "text-warning-emphasis"}">${Alfred.escapeHtml(item.verification_label)}${confirmed ? "" : " | Excluded from financial totals"}</div>
                     <div class="muted small">${Alfred.escapeHtml(item.lender || "Unspecified lender")}</div>
                     ${accountRef}
+                    ${currencyCopy}
                     ${homeCashCopy}
                     ${statusCopy}
                     ${consolidationCopy}
                 </td>
-                <td class="text-end">${Alfred.formatCurrency(item.emi)}</td>
-                <td class="text-end">${Alfred.formatCurrency(item.estimated_balance)}</td>
+                <td class="text-end">${money(item.emi)}</td>
+                <td class="text-end">${money(item.estimated_balance)}</td>
                 <td class="text-end">${item.months_remaining}</td>
                 <td class="small">
-                    ${confirmed ? `<div>${Alfred.formatCurrency(item.recommended_prepayment)}</div>
+                    ${confirmed ? `<div>${money(item.recommended_prepayment)}</div>
                     <div class="muted">Projected end: ${Alfred.formatDate(item.projected_end_date)}</div>` : "Review loan terms first"}
                 </td>
                 <td class="text-end">
@@ -409,6 +419,7 @@ function editLoan(id) {
     form.elements.home_purchase_price.value = loan.home_purchase_price || 0;
     form.elements.home_down_payment.value = loan.home_down_payment || 0;
     form.elements.home_other_upfront_payments.value = loan.home_other_upfront_payments || 0;
+    form.elements.currency.value = loan.currency || "";
     form.elements.start_date.value = loan.start_date;
     form.elements.notes.value = loan.notes || "";
     form.elements.confirm_estimate.checked = false;

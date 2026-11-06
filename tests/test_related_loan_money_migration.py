@@ -266,6 +266,7 @@ class RelatedLoanMoneyMigrationTests(TransactionTestCase):
         self.new_apps.get_model("loans", "Loan").objects.filter(pk=self.loan.pk).delete()
         from apps.users.models import User
         from apps.users.services import clear_user_fed_data
+        MigrationExecutor(connection).migrate(self.leaves)  # the reset code uses today's models and schema
         result = clear_user_fed_data(User.objects.get(pk=self.user.pk))
         self.assertEqual(result["loan_related_money_snapshots"], 3)
         self.assertFalse(self.Snapshot.objects.filter(user_id=self.user.pk).exists())

@@ -359,7 +359,7 @@ class TaxOptimizerService:
             if any(token in name for token in qualifying_tokens):
                 investments_80c += investment.current_value or investment.invested_amount or 0
 
-        home_loans = Loan.objects.filter(user=user, loan_type='home', verification_status='confirmed')
+        home_loans = Loan.objects.filter(user=user, loan_type='home', verification_status='confirmed').in_rupee_totals()  # Indian tax uses INR
         home_principal_paid = Decimal("0")
         home_interest_paid = Decimal("0")
         for payment in LoanPaymentHistory.objects.filter(

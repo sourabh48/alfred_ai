@@ -511,7 +511,7 @@ def record_source(user, kind, identity, *, selected_documents=None, source_catal
         if document_sources:
             data['limitations'].append('Field confirmation is the owner\'s attestation, not independent bank/broker authentication. Current register corrections take precedence; unconfirmed, unavailable or changed document evidence remains unverified.')
     data['amounts']={field:_amount(getattr(row,field),helper,data['verification'],f'{row._meta.label}.{field}') for field in fields}
-    if kind=='investment' and row.currency:
+    if kind in ('investment','loan') and row.currency:
         for value in data['amounts'].values(): value.update(currency=row.currency,currency_status='recorded')
         data['limitations'][1]=f'Amounts are recorded in {row.currency}; no totals, currency conversion or live valuation are inferred.'
     if kind in ('loan','investment'):

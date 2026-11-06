@@ -269,6 +269,8 @@ class LoanConsolidationView(APIView):
         source_loans = list(Loan.objects.filter(user=request.user, pk__in=loan_ids, is_active=True, verification_status="confirmed").order_by("id"))
         if len(source_loans) != len(set(loan_ids)):
             return Response({"detail": "Choose active, confirmed loans from your own register."}, status=status.HTTP_400_BAD_REQUEST)
+        if len({loan.currency for loan in source_loans}) > 1:  # no FX: balances in different currencies cannot be added
+            return Response({"detail": "Consolidate only loans recorded in the same currency."}, status=status.HTTP_400_BAD_REQUEST)
 
         start_date_value = request.data.get("start_date") or timezone.localdate().isoformat()
         try:
@@ -724,7 +726,7 @@ def _build_networth_payload(user) -> dict:
         investment_by_type[asset_type] += inv.current_value
 
     loan_by_type = {}
-    for loan in Loan.objects.filter(user=user, verification_status="confirmed").exclude(status__in=["foreclosed", "closed", "prepaid"]):
+    for loan in Loan.objects.filter(user=user, verification_status="confirmed").in_rupee_totals().exclude(status__in=["foreclosed", "closed", "prepaid"]):
         loan_type = loan.get_loan_type_display()
         if loan_type not in loan_by_type:
             loan_by_type[loan_type] = 0

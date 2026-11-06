@@ -90,7 +90,7 @@ def resolve_canonical_financial_baseline(user, *, fresh=False, expenses=None, re
 
 def _build_financial_intelligence_uncached(user) -> dict:
     expenses = list(Expense.objects.filter(user=user).order_by("transaction_date", "id"))
-    loans = list(Loan.objects.filter(user=user).order_by("-start_date", "-id"))
+    loans = list(Loan.objects.filter(user=user).in_rupee_totals().order_by("-start_date", "-id"))
     payment_rows = fetch_payment_history_rows(user=user) if loans else []
 
     intelligence = _empty_intelligence()
@@ -119,6 +119,8 @@ def _build_financial_intelligence_uncached(user) -> dict:
                 "ALFRED has balance-sheet data, but it still needs transaction history to learn spending patterns."
             ]
             intelligence["behavior"]["strategy"] = "Import a statement to combine cash-flow behavior with the balance-sheet view."
+        other_rows = _serialize_loans(list(Loan.objects.filter(user=user).in_other_currencies()), today)
+        intelligence["loan_portfolio"].update(other_currency_loans=other_rows, other_currencies=_other_currency_loan_groups(other_rows))
         return _numeric_currency_payload(intelligence)
 
     current_key = (reference_date.year, reference_date.month)
@@ -276,7 +278,8 @@ def _build_financial_intelligence_uncached(user) -> dict:
                     peak_day=peak_day,
                 ),
             },
-            "loan_portfolio": _build_loan_portfolio(loans, debt_entries, current_bucket, payment_rows=payment_rows),
+            "loan_portfolio": _build_loan_portfolio(loans, debt_entries, current_bucket, payment_rows=payment_rows,
+                                                    other_currency_loans=Loan.objects.filter(user=user).in_other_currencies()),
             "balance_sheet": balance_sheet,
             "financial_relationships": financial_relationships,
             "lifestyle": lifestyle,
@@ -411,6 +414,8 @@ def _empty_intelligence() -> dict:
             "current_month_repayment": 0.0,
             "projected_payoff_months": 0,
             "manual_loans": [],
+            "other_currency_loans": [],
+            "other_currencies": [],
             "home_ownership_summary": {
                 "positions": 0,
                 "financed_asset_value_total": 0.0,
@@ -606,7 +611,7 @@ def _build_canonical_financial_baseline_uncached(
     from apps.career.services import build_employment_income_signals
 
     expenses = list(expenses) if expenses is not None else list(Expense.objects.filter(user=user).order_by("transaction_date", "id"))
-    loans = list(loans) if loans is not None else list(Loan.objects.filter(user=user).order_by("-start_date", "-id"))
+    loans = list(loans) if loans is not None else list(Loan.objects.filter(user=user).in_rupee_totals().order_by("-start_date", "-id"))
     payment_rows = list(payment_rows or [])
     if loans and not payment_rows:
         payment_rows = fetch_payment_history_rows(user=user)
@@ -1036,8 +1041,24 @@ def _serialize_recent_transactions(expenses: list[Expense], transaction_relation
     ]
 
 
-def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], current_bucket: dict, *, payment_rows: list[dict] | None = None) -> dict:
+def _other_currency_loan_groups(rows: list[dict]) -> list[dict]:
+    """Per-currency subtotals for loans outside the rupee totals; never converted or added to them (FIN-15)."""
+    groups = {}
+    for item in rows:
+        group = groups.setdefault(item["currency"], {"currency": item["currency"], "loans": 0, "outstanding": Decimal("0"), "monthly_emi": Decimal("0")})
+        group["loans"] += 1
+        if item["counts_toward_liabilities"]:
+            group["outstanding"] += _decimal_amount(item["estimated_balance"])
+        if item["counts_toward_recurring_emi"]:
+            group["monthly_emi"] += _decimal_amount(item["emi"])
+    return [dict(group, outstanding=_money_float(group["outstanding"]), monthly_emi=_money_float(group["monthly_emi"]))
+            for _, group in sorted(groups.items())]
+
+
+def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], current_bucket: dict, *, payment_rows: list[dict] | None = None,
+                          other_currency_loans=()) -> dict:
     manual_loans = _serialize_loans(loans, timezone.localdate())
+    other_currency_rows = _serialize_loans(list(other_currency_loans), timezone.localdate())
     active_manual_loans = [item for item in manual_loans if item["counts_toward_recurring_emi"]]
     liability_manual_loans = [item for item in manual_loans if item["counts_toward_liabilities"]]
     pending_manual_loans = [item for item in liability_manual_loans if item["status"] == "foreclosure_pending"]
@@ -1120,6 +1141,8 @@ def _build_loan_portfolio(loans: list[Loan], debt_entries: list[Expense], curren
         "current_month_repayment": round(current_month_repayment, 2),
         "projected_payoff_months": projected_months,
         "manual_loans": manual_loans,
+        "other_currency_loans": other_currency_rows,
+        "other_currencies": _other_currency_loan_groups(other_currency_rows),
         "home_ownership_summary": home_ownership_summary,
         "home_ownership_positions": home_ownership_positions,
         "detected_repayments": detected_repayments,
@@ -1151,6 +1174,7 @@ def _serialize_loans(loans: list[Loan], today: date) -> list[dict]:
                 "loan_type_label": loan.get_loan_type_display(),
                 "lender": loan.lender,
                 "loan_account_number": loan.loan_account_number,
+                "currency": loan.currency,
                 "principal": _money_float(loan.principal),
                 "interest_rate": round(loan.interest_rate, 2),
                 "emi": _money_float(loan.emi),
@@ -1198,6 +1222,7 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     accounts = list(BankAccount.objects.filter(user=user, is_active=True))
     investments = list(Investment.objects.filter(user=user).in_rupee_totals())
     other_currency_positions = Investment.objects.filter(user=user).count() - len(investments)
+    other_currency_loans = Loan.objects.filter(user=user).count() - Loan.objects.filter(user=user).in_rupee_totals().count()
     vehicle_profiles = list(BikeProfile.objects.filter(user=user))
     vehicle_services = list(BikeServiceRecord.objects.filter(user=user).select_related("bike_profile"))
     trip_logs = list(TripLog.objects.filter(user=user).select_related("travel_plan", "travel_plan__vehicle_profile"))
@@ -1271,6 +1296,9 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     if other_currency_positions:
         summary = (f"{summary} {other_currency_positions} investment position(s) recorded in another currency "
                    "are not included; there is no currency conversion.")
+    if other_currency_loans:
+        summary = (f"{summary} {other_currency_loans} loan(s) recorded in another currency "
+                   "are not included; there is no currency conversion.")
 
     return {
         "total_assets": total_assets,
@@ -1286,6 +1314,7 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
         "home_ownership_positions": home_ownership_positions,
         "vehicle_positions": vehicle_positions,
         "excluded_other_currency_investments": other_currency_positions,
+        "excluded_other_currency_loans": other_currency_loans,
         "summary": summary,
     }
 

@@ -807,7 +807,7 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
     else:
         metro_city = str(metro_city).lower() in {"1", "true", "yes", "on"}
 
-    home_loan = Loan.objects.filter(user=request.user, loan_type="home", is_active=True, verification_status="confirmed").order_by("-id").first()
+    home_loan = Loan.objects.filter(user=request.user, loan_type="home", is_active=True, verification_status="confirmed").in_rupee_totals().order_by("-id").first()
     home_loan_benefits = None
     if home_loan:
         annual_emi = loan_money_float(home_loan.emi or 0) * 12

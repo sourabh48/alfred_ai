@@ -127,7 +127,8 @@ class LoanIntelligenceService:
                 "reason": "Subscription or wallet mandate signals excluded this expense from loan matching.",
             }
 
-        active_loans = list(Loan.objects.filter(user=user, is_active=True).order_by("-updated_at", "-id"))
+        # Bank debits have no recorded currency, so only rupee loans may claim them (FIN-15).
+        active_loans = list(Loan.objects.filter(user=user, is_active=True).in_rupee_totals().order_by("-updated_at", "-id"))
         best_loan = None
         best_score = 0.0
         best_reason = "No reliable loan match was found."
@@ -290,6 +291,9 @@ class LoanIntelligenceService:
     ) -> Loan:
         if any(loan.user_id != user.pk or not loan.is_confirmed for loan in source_loans):
             raise ValueError("Only your confirmed loans can be consolidated.")
+        currencies = {loan.currency for loan in source_loans}
+        if len(currencies) > 1:
+            raise ValueError("Only loans recorded in the same currency can be consolidated.")
         consolidation_group = uuid4().hex[:12]
         consolidated_loan = Loan.objects.create(
             user=user,
@@ -305,6 +309,7 @@ class LoanIntelligenceService:
             status="active",
             is_active=True,
             consolidation_group=consolidation_group,
+            currency=currencies.pop() if currencies else None,
             notes=notes,
         )
 
@@ -339,7 +344,7 @@ class LoanIntelligenceService:
 
         baseline = resolve_canonical_financial_baseline(user)
         today = timezone.localdate()
-        all_loans = list(Loan.objects.filter(user=user).order_by("-updated_at", "-id"))
+        all_loans = list(Loan.objects.filter(user=user).in_rupee_totals().order_by("-updated_at", "-id"))
         recurring_loans = []
         pending_foreclosure_balance = 0.0
 

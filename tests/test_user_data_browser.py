@@ -1598,6 +1598,28 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('investmentSummaryCards').scrollIntoView({behavior:'instant',block:'center'});")
         self.capture('investment-other-currency')
 
+    def test_loan_in_another_currency_stays_out_of_rupee_totals(self):
+        from apps.loans.models import Loan
+        self.login(); self.browser.get(self.live_server_url + '/loans/')
+        self.wait.until(lambda _: 'RECORDED LOAN BALANCE' in self.text('loanSummaryCards').upper() and self.active_requests == 0)
+        rupee_cards = self.text('loanSummaryCards')
+        fields = dict(manualLoanLender='Synthetic Dollar Lender', manualLoanPrincipal='500', manualLoanInterest='6',
+                      manualLoanEmi='20.10', manualLoanTenure='24', manualLoanBalance='300.25')
+        self.browser.find_element(self.By.ID, 'manualLoanType').send_keys('Personal')
+        for element, value in fields.items():
+            self.browser.find_element(self.By.ID, element).send_keys(value)
+        self.browser.find_element(self.By.ID, 'manualLoanCurrency').send_keys('US dollar (USD)')
+        self.memory_click('#loanForm button[type="submit"]')
+        self.wait.until(lambda _: 'LOANS IN USD' in self.text('loanSummaryCards').upper() and self.active_requests == 0)
+        self.assertEqual(Loan.objects.get(lender='Synthetic Dollar Lender').currency, 'USD')
+        self.assertIn('$300.25', self.text('loanSummaryCards'))
+        rupee_balance = lambda text: text.upper().split('RECORDED LOAN BALANCE')[1].split('\n')[1]
+        self.assertEqual(rupee_balance(self.text('loanSummaryCards')), rupee_balance(rupee_cards))
+        self.wait.until(lambda _: 'Recorded in USD' in self.text('loanTableBody'))
+        self.assertIn('$20.10', self.text('loanTableBody'))
+        self.browser.execute_script("document.getElementById('loanSummaryCards').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture('loan-other-currency')
+
     def test_private_trip_video_upload_play_and_delete(self):
         from apps.mobility.models import TravelPlan, TripVideo
         # Django's test-only public media handler must not bypass ALFRED's owner gate.

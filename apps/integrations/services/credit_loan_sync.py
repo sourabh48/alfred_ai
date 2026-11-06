@@ -55,7 +55,7 @@ def sync_credit_report_loans(*, user, report_upload) -> dict:
             "summary": "Loan sync skipped because the bureau report did not contain enough verified tradeline detail.",
         }
 
-    loans = list(Loan.objects.filter(user=user).order_by("-start_date", "-id"))
+    loans = list(Loan.objects.filter(user=user).in_rupee_totals().order_by("-start_date", "-id"))  # bureau accounts are INR
     normalized_accounts = [_normalize_account(item) for item in raw_accounts]
     processed = []
     matched_loan_ids: set[int] = set()
