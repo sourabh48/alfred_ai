@@ -41,7 +41,7 @@ GATES = {
     'BIKE-05': 'BLOCKED_EXTERNAL: cost figures labelled estimates 2026-11-06; authoritative part compatibility and live prices need a manufacturer or dealer source',
     'OPENAI-02': 'BLOCKED_APPROVAL: OpenAI stays off; pinned model retires 2027-01-14; replacement choice waits for approval to enable',
     'RUNTIME-12': 'BLOCKED_EXTERNAL: CI runs on each master push and is read via the public API; branch protection needs signed-in GitHub access',
-    'FIN-15': 'BLOCKED_APPROVAL: investments currency slice implemented 2026-11-06 (FX off); migration investments 0006 needs owner approval; banking, loans, income, budgets and travel remain',
+    'FIN-15': 'BLOCKED_EVIDENCE: investments currency slice 2026-11-06 (FX off); owner approved and applied migration investments 0006 (backup F:/ALFRED_BACKUPS/pre-fin15-migration-20261106); owner check, then banking, loans, income, budgets and travel remain',
     'FIN-06': 'BLOCKED_EVIDENCE: INR savings goals with Decimal progress implemented 2026-11-06; owner approved migration budgets 0003; owner check in the app remains',
     'COUNCIL-01': 'BLOCKED_APPROVAL: owner agreed to local auto-training 2026-11-06; it takes effect when the owner presses Approve Auto-Training in their app, then held-out outcomes follow',
     'TRAVEL-20': 'BLOCKED_EVIDENCE: private trip videos implemented 2026-11-06; owner approved and applied migration mobility 0014; owner check in the app remains',

@@ -20,8 +20,8 @@
   Approve Auto-Training. The queue now has no eligible task: every remaining item waits on an owner approval,
   owner check in the app, evidence or an external party.
 - OWNER DECISIONS 2026-11-06: COUNCIL-01 auto-training agreed (owner presses Approve Auto-Training in the app); FIN-CURRENCY contract approved with FX disabled; cloud sync and cloud backup (SYNC-02, SYNC-11) approved, free tier, client-side encryption, owner creates the account; TRAVEL-14 kept deferred.
-- FIN-15 2026-11-06: investments currency slice implemented and tested locally, committed, not pushed; migration investments 0006 waits for owner approval before the CI pin moves.
-- NEXT TASK: after the 0006 approval, push FIN-15 and move the CI pin; then SYNC-02 and SYNC-11. Owner checks (AI-17, AI-18, TRAVEL-20, FIN-06, DOC-09, CAREER-07) remain. Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row FIN-15.
+- FIN-15 2026-11-06: investments currency slice pushed at 1f8a4b4 (CI pin 9add134); owner approved migration investments 0006, applied to the owner runtime after a verified backup (F:/ALFRED_BACKUPS/pre-fin15-migration-20261106, sha256 3ce0383d...). Local browser shard 0 54/54 and shard 2 56/56 PASS; CI for 1f8a4b4 pending.
+- NEXT TASK: FIN-15 owner check, then remaining FIN-15 domains or SYNC-02/SYNC-11 as the owner chooses. Owner checks (AI-17, AI-18, TRAVEL-20, FIN-06, DOC-09, CAREER-07) remain. Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row FIN-15.
 
 ## Previous checkpoint — CAREER-03, CAREER-06, TRAVEL-02 and TRAVEL-23 (2026-11-04)
 
