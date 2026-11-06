@@ -791,14 +791,14 @@ Read [EXECUTION_STATE](EXECUTION_STATE.md) for source-bound task state and resum
 [requirements](ALFRED_2_0_REQUIREMENTS.md) own intent and [queue](EXECUTION_QUEUE.md)
 owns deterministic selection. Work happens on `master` only; there is no open integration PR.
 
-- **PR/CI:** master `e8ef8f4` CI_PASSED (run 42185812614: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
+- **PR/CI:** master `99b8e8f` CI_PASSED (run 42194736278: Linux, four Windows backend shards, native, three Selenium shards); `84b61ac` and `0ef41f8` CI_PENDING. PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
 IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 6 | COMPLETE_VERIFIED: 85
 
-PR/CI: master `e8ef8f4` CI_PASSED (run 42185812614: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
+PR/CI: master `99b8e8f` CI_PASSED (run 42194736278: Linux, four Windows backend shards, native, three Selenium shards); `84b61ac` and `0ef41f8` CI_PENDING. PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 
@@ -2740,7 +2740,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Next: Confirm local/private versus public scope before adding models.
 - OWNER DECISION 2026-11-06: private trip videos only, stored locally and owner-only like trip photos; no public profile or sharing.
 - SCOPED_IMPLEMENTATION 2026-11-06: model `TripVideo` (migration `mobility/0014_trip_video`, awaiting owner approval), `/api/mobility/trip-videos/` list/upload and `<id>/` caption, plan, delete. MP4/MOV/WebM checked by file header, not name; the file is served only through the owner-checked private media route (`private, no-store`); a video cannot be swapped in place; delete and the account data reset remove the file. Travel page section **Trip Videos** with upload, playback and delete. Social profile and sharing are out of scope by owner decision. Uploads use the existing 25 MB per-file limit (`ALFRED_UPLOAD_FILE_BYTES`). [Tests](../tests/test_trip_videos.py): 5 backend PASS (upload, playback bytes, refused non-videos, other accounts, delete, reset); Chrome test PASS (real one-second WebM recorded in Chrome, plays, escaped caption, delete removes the file), capture inspected; 296 related backend PASS.
-- Next: owner approves the migration (then CI's reviewed source is re-pinned and the migration applied to the owner runtime after a copy), then owner check in the app.
+- OWNER APPROVAL 2026-11-06: migration mobility 0014 approved. CI reviewed source re-pinned to `d8a51e3` (`0ef41f8`, local preflight PASS). Owner runtime: database copied first to `F:\ALFRED_BACKUPS\pre-travel20-migration-20261106` (SHA-256 match, integrity ok), then the app start applied `0014_trip_video`; schema-only check shows the empty `mobility_tripvideo` table.
+- Next: owner check in the app.
 
 ### TRAVEL-21 — Freshness, cache, quotas and safe external HTTP
 

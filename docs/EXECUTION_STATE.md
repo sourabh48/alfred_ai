@@ -13,9 +13,10 @@
   (download details need the owner's go-ahead), TRAVEL-20 private videos only.
 - AI-18 implemented 2026-11-06: offline Speak and Read aloud (owner approved whisper-base, Piper and the VCTK voice);
   CI reviewed source re-pinned for the Piper dependency.
-- AI-18 real spoken check fixed three defects (84b61ac). TRAVEL-20 private trip videos implemented and committed
-  locally; not pushed until the owner approves migration mobility 0014 (CI preflight refuses unreviewed migrations).
-- NEXT TASK: after approval, re-pin CI to the TRAVEL-20 commit, push, copy then migrate the owner runtime. Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row AI-17.
+- AI-18 real spoken check fixed three defects (84b61ac). TRAVEL-20 private trip videos (d8a51e3): owner approved
+  migration mobility 0014, CI re-pinned (0ef41f8), runtime copied to F:\ALFRED_BACKUPS\pre-travel20-migration-20261106
+  and migrated. CI for 84b61ac and 0ef41f8 pending at checkpoint.
+- NEXT TASK: COUNCIL-01 per the queue. Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row AI-17.
 
 ## Previous checkpoint — CAREER-03, CAREER-06, TRAVEL-02 and TRAVEL-23 (2026-11-04)
 
