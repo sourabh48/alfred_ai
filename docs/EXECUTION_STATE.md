@@ -186,7 +186,8 @@
   header buttons wrap on narrow windows (`96f9892`). Remaining: exact-HEAD CI and a fresh-package check at the phase B push.
 - FIN-16 (2026-11-06): read the gazetted Income-tax Act 2025 and the enacted Finance Act 2026 locally; every tax year
   2026-27 figure equals FY 2025-26. Added the dated 2026-27 policy (2025 Act sections), a date-based default year, and a
-  Budget/filing notice on the tax page. Rules are never fetched or inferred. Remaining: owner check, exact-HEAD CI.
+  Budget/filing notice on the tax page. Owner-approved daily notice-only check of indiabudget.gov.in flags a newer
+  Budget than the verified rules; rules are never changed from the web. Remaining: owner check, exact-HEAD CI.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

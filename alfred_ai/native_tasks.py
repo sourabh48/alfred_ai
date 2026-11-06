@@ -62,6 +62,13 @@ def native_intelligence_refresh():
     return refresh_verified_external_intelligence(batch_size=75)
 
 
+@db_periodic_task(crontab(minute="45", hour="1"))
+def native_budget_publication_check():
+    # Daily, notice-only: reads which Budget the official site lists; never changes tax rules.
+    from apps.integrations.services import verified_intelligence
+    return verified_intelligence.budget_publication_check().payload
+
+
 @db_periodic_task(crontab(minute="15", hour="2"))
 def native_intelligence_cleanup():
     return cleanup_verified_external_intelligence(retention_days=90)

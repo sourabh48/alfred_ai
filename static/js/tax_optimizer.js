@@ -58,7 +58,9 @@ function renderTaxHero(data) {
     document.getElementById("taxPolicyCopy").textContent = `${year} (${policy.act}). Official-source rules verified ${policy.verified_at}; salary planning estimate before return-filing rounding.`;
     const coverage = data.tax_policy_coverage || {};
     const notice = document.getElementById("taxPolicyNotice");
-    notice.textContent = [coverage.notice, coverage.filing_hint].filter(Boolean).join(" ");
+    const check = coverage.budget_check;
+    const checked = check ? `Official Budget site last checked ${check.checked_at.slice(0, 10)}: latest Budget ${check.latest_budget_year}.` : "";
+    notice.textContent = [coverage.notice, coverage.filing_hint, checked].filter(Boolean).join(" ");
     notice.hidden = !notice.textContent;
 }
 

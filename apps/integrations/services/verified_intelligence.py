@@ -396,6 +396,16 @@ def advisory_proof_contract_snapshot() -> dict:
     }
 
 
+BUDGET_YEAR_RE = re.compile(r"Budget\s*(20\d\d)\s*[-–]\s*(?:20)?(\d\d)\b", re.IGNORECASE)
+
+
+def latest_budget_year(text: str, current_year: int) -> str:
+    """Newest 'Budget YYYY-YY' named in page text, as '2026-27'; implausible years are ignored."""
+    years = [int(start) for start, end in BUDGET_YEAR_RE.findall(text)
+             if int(end) == (int(start) + 1) % 100 and 2020 <= int(start) <= current_year + 1]
+    return f"{max(years)}-{str(max(years) + 1)[-2:]}" if years else ""
+
+
 def _iso_or_empty(value) -> str:
     return value.isoformat() if value else ""
 
@@ -664,6 +674,44 @@ class VerifiedIntelligenceService:
             notes="PPF is tracked here as an official reference input for Alfred's deduction catalog and planning guidance.",
             force=force,
         )
+
+    BUDGET_SOURCE_URL = "https://www.indiabudget.gov.in/"
+    BUDGET_CACHE_KEY = "india-union-budget-publication"
+
+    def budget_publication_check(self, stale_hours: int = 24, *, force: bool = False) -> InsightResult:
+        """Notice-only: which Union Budget the official site lists. Never changes tax rules."""
+        return self._use_or_refresh(
+            scope="tax",
+            cache_key=self.BUDGET_CACHE_KEY,
+            title="Union Budget publication check",
+            source_name="Ministry of Finance (India Budget)",
+            source_url=self.BUDGET_SOURCE_URL,
+            ttl=timedelta(hours=stale_hours),
+            fetcher=self._fetch_budget_publication,
+            force=force,
+        )
+
+    def stored_budget_publication(self) -> dict | None:
+        """Latest successful check from the database; makes no network call."""
+        record = (
+            VerifiedExternalInsight.objects.filter(scope="tax", cache_key=self.BUDGET_CACHE_KEY, is_active=True,
+                                                   status__in=("fresh", "stale"))
+            .order_by("-verified_at", "-id").first()
+        )
+        if not record or not record.payload.get("latest_budget_year"):
+            return None
+        return {"latest_budget_year": record.payload["latest_budget_year"], "source_url": record.source_url,
+                "checked_at": _iso_or_empty(record.verified_at), "status": record.status}
+
+    def _fetch_budget_publication(self) -> tuple[dict, str, str]:
+        response = public_http.request("GET", self.BUDGET_SOURCE_URL, headers={"User-Agent": self.USER_AGENT},
+                                       content_types=("text/html",), max_bytes=3_000_000)
+        latest = latest_budget_year(response.content.decode("utf-8", "replace"), timezone.localdate().year)
+        if not latest:
+            raise ValueError("The official Budget page did not name a Budget year.")
+        return ({"latest_budget_year": latest, "page_sha256": response.response_hash},
+                f"The official Budget site lists Budget {latest}.",
+                "Notice only: tax rules change in ALFRED only after the enacted Finance Act is verified.")
 
     def macro_context(self) -> dict:
         unemployment = self.world_bank_indicator("SL.UEM.TOTL.ZS", "India unemployment rate")
@@ -1118,6 +1166,8 @@ class VerifiedIntelligenceService:
                 return self._run_refresh_adapter(record, lambda: self.nps_tax_reference(force=True))
             if record.scope == "tax" and record.cache_key == "india-ppf-reference":
                 return self._run_refresh_adapter(record, lambda: self.ppf_reference(force=True))
+            if record.scope == "tax" and record.cache_key == self.BUDGET_CACHE_KEY:
+                return self._run_refresh_adapter(record, lambda: self.budget_publication_check(force=True))
         except Exception as exc:
             fallback_status = "stale" if record.status == "fresh" else record.status
             error = safe_error_details(exc, "External source refresh failed.", logger_name=__name__)

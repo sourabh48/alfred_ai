@@ -830,7 +830,7 @@ def _build_tax_optimizer_overview_payload(request) -> dict:
     return {
         "annual_income": annual_income,
         "tax_policy": policy.metadata(),
-        "tax_policy_coverage": policy_coverage(),
+        "tax_policy_coverage": policy_coverage(budget_check=verified_intelligence.stored_budget_publication()),
         "financial_baseline": financial_baseline,
         "inputs": {
             "financial_year": policy.financial_year,

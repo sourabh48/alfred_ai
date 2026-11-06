@@ -1,13 +1,16 @@
 """Official-table boundaries, relief ordering and dated tax API regressions."""
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
+from alfred_ai.services.public_http import PublicHTTPError, PublicResponse
 from apps.integrations.services import verified_intelligence
+from apps.integrations.services.verified_intelligence import latest_budget_year
 from apps.loans.models import Loan, LoanPaymentHistory
 from apps.ml_engine.services.tax_optimizer import tax_optimizer
 from apps.ml_engine.services.tax_policy import (
@@ -217,6 +220,26 @@ class TaxYear202627Tests(SimpleTestCase):
         self.assertIn("tax year 2026-27", started["filing_hint"])
         self.assertEqual(policy_coverage(date(2026, 2, 1))["status"], "CURRENT")  # 2026-27 is verified
 
+    def test_budget_year_is_read_only_from_plausible_budget_labels(self):
+        page = "Budget 2024-25 | Union Budget 2026-2027 | Budget 2025–26 | Budget 2026-29 | Budget 2031-32"
+        self.assertEqual(latest_budget_year(page, 2026), "2026-27")
+        self.assertEqual(latest_budget_year(page + " Budget 2027-2028", 2027), "2027-28")
+        self.assertEqual(latest_budget_year("No year here", 2026), "")
+
+    def test_published_budget_raises_a_notice_but_never_changes_rules(self):
+        check = {"latest_budget_year": "2027-28", "checked_at": "2027-02-02T01:45:00+00:00"}
+        published = policy_coverage(date(2027, 2, 2), check)
+        self.assertEqual(published["status"], "NEW_BUDGET_PUBLISHED")
+        self.assertIn("lists Budget 2027-28", published["notice"])
+        self.assertIn("still use the 2026-27 rules", published["notice"])
+        self.assertEqual(published["budget_check"], check)
+        started = policy_coverage(date(2027, 4, 1), check)
+        self.assertEqual(started["status"], "CURRENT_YEAR_UNVERIFIED")
+        self.assertIn("Tax year 2027-28 has started", started["notice"])
+        same = policy_coverage(date(2026, 11, 6), {"latest_budget_year": "2026-27"})
+        self.assertEqual((same["status"], same["notice"]), ("CURRENT", ""))
+        self.assertEqual(default_financial_year(date(2027, 4, 1)), "2026-27")
+
 
 class TaxOverviewTests(TestCase):
     def setUp(self):
@@ -293,6 +316,26 @@ class TaxOverviewTests(TestCase):
         legacy.refresh_from_db()
         self.assertFalse(legacy.is_active)
         self.assertEqual(legacy.payload["new_regime_basic_exemption"], 300000)
+
+    @patch("apps.integrations.services.verified_intelligence.public_http.request")
+    def test_budget_check_is_stored_shown_and_notice_only(self, request):
+        self.assertIsNone(self.client.get(self.url).json()["tax_policy_coverage"]["budget_check"])
+        request.side_effect = PublicHTTPError("timeout")
+        verified_intelligence.budget_publication_check()
+        self.assertIsNone(verified_intelligence.stored_budget_publication())
+        request.side_effect = None
+        request.return_value = PublicResponse(b"<h1>Union Budget 2099-2100</h1><p>Budget 2027-2028</p>", "text/html")
+        result = verified_intelligence.budget_publication_check(force=True)
+        self.assertEqual(result.payload["latest_budget_year"], "2027-28")
+        self.assertEqual(request.call_args.args[1], "https://www.indiabudget.gov.in/")
+        cache.clear()
+        data = self.client.get(self.url, {"financial_year": "2026-27"}).json()
+        coverage = data["tax_policy_coverage"]
+        self.assertEqual(coverage["status"], "NEW_BUDGET_PUBLISHED")
+        self.assertEqual(coverage["budget_check"]["latest_budget_year"], "2027-28")
+        self.assertEqual(data["tax_policy"]["financial_year"], "2026-27")
+        self.assertEqual(data["regime_comparison"]["new_regime"]["final_tax"],
+                         self.client.get(self.url, {"financial_year": "2025-26"}).json()["regime_comparison"]["new_regime"]["final_tax"])
 
     def test_other_users_income_is_not_reused(self):
         self.client.get(self.url)

@@ -160,13 +160,28 @@ def default_financial_year(today: date | None = None) -> str:
     return current if current in SUPPORTED_YEARS else SUPPORTED_YEARS[-1]
 
 
-def policy_coverage(today: date | None = None) -> dict:
+def policy_coverage(today: date | None = None, budget_check: dict | None = None) -> dict:
     """Tell the owner when a Budget or tax year has outrun ALFRED's verified rules.
 
     Rules are never fetched or inferred: a new year needs its enacted Finance Act checked
-    and added here. The notice says which year's rules an estimate uses.
+    and added here. `budget_check` is the stored official-site check (notice only).
     """
     today = today or timezone.localdate()
+    result = _date_coverage(today)
+    published = (budget_check or {}).get("latest_budget_year", "")
+    if published and published > result["latest_verified_year"]:
+        if result["status"] != "CURRENT_YEAR_UNVERIFIED":
+            result["status"] = "NEW_BUDGET_PUBLISHED"
+        result["notice"] = " ".join(filter(None, (
+            f"The official Budget site now lists Budget {published}. ALFRED has not verified its tax rules, so "
+            f"estimates still use the {result['latest_verified_year']} rules. Check the enacted changes before "
+            f"planning or filing for tax year {published}.",
+            result["notice"] if result["status"] == "CURRENT_YEAR_UNVERIFIED" else "")))
+    result["budget_check"] = budget_check
+    return result
+
+
+def _date_coverage(today: date) -> dict:
     current, latest = tax_year_for(today), SUPPORTED_YEARS[-1]
     following = tax_year_for(date(today.year + (today.month >= 4), 4, 1))
     previous = tax_year_for(date(today.year - (today.month < 4) - 1, 4, 1))
