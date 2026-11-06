@@ -23,12 +23,11 @@
             </ul>
         </div>
 
-        <details class="workspace-extra-nav" {% if request.path == '/credit-score/' or request.path == '/recommendations/' or request.path == '/tax-optimizer/' or request.path == '/career/' or request.path == '/behavioral/' or request.path == '/relationship/' or request.path == '/risk/' or request.path == '/bike-service/' %}open{% endif %}>
+        <details class="workspace-extra-nav" {% if request.path == '/recommendations/' or request.path == '/tax-optimizer/' or request.path == '/career/' or request.path == '/behavioral/' or request.path == '/relationship/' or request.path == '/risk/' or request.path == '/bike-service/' %}open{% endif %}>
         <summary>More tools</summary>
         <div class="alfred-nav-section px-2">
             <div class="alfred-nav-label px-2">Advisory</div>
             <ul class="nav flex-column alfred-nav-list">
-                <li class="nav-item"><a class="nav-link {% if request.path == '/credit-score/' %}active{% endif %}" href="/credit-score/">Credit Score</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/recommendations/' %}active{% endif %}" href="/recommendations/">Recommendations</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/tax-optimizer/' %}active{% endif %}" href="/tax-optimizer/">Tax Optimizer</a></li>
             </ul>

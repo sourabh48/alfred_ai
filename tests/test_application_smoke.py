@@ -42,7 +42,6 @@ class ApplicationSmokeTests(TestCase):
             "/risk/",
             "/mobility/",
             "/bike-service/",
-            "/credit-score/",
             "/recommendations/",
             "/tax-optimizer/",
         ]
@@ -51,6 +50,13 @@ class ApplicationSmokeTests(TestCase):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
+
+    def test_credit_score_page_is_dropped_but_report_uploads_remain(self):
+        # Owner decision 2026-11-06: no score page; bureau reports are still read from Documents.
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get("/credit-score/").status_code, 404)
+        self.assertNotContains(self.client.get("/dashboard/"), 'href="/credit-score/"')
+        self.assertEqual(self.client.get("/api/integrations/credit-score/uploads/").status_code, 200)
 
     def test_remove_data_button_renders_only_in_settings(self):
         self.client.force_login(self.user)

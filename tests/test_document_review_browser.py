@@ -643,7 +643,7 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         must_render = {"/expenses/", "/loans/", "/investments/", "/documents/"}
 
         pages = ("/dashboard/", "/expenses/", "/budgets/", "/loans/", "/investments/", "/family/", "/career/",
-                 "/behavioral/", "/relationship/", "/risk/", "/mobility/", "/bike-service/", "/credit-score/",
+                 "/behavioral/", "/relationship/", "/risk/", "/mobility/", "/bike-service/",
                  "/recommendations/", "/tax-optimizer/", "/documents/", "/settings/", "/ai/insights/", "/admin/login/")
         quotas = dict(ALFRED_API_ACCOUNT_LIMIT=10 ** 6, ALFRED_API_GLOBAL_LIMIT=10 ** 6,
                       ALFRED_EXPENSIVE_ACCOUNT_LIMIT=10 ** 6, ALFRED_EXPENSIVE_GLOBAL_LIMIT=10 ** 6)

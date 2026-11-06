@@ -520,10 +520,6 @@ def project_details_career_outcome_view(request):
     return redirect(f"{reverse('project_details')}#careerOutcomeEntry")
 
 @login_required
-def credit_score_view(request):
-    return render(request, "integrations/credit_score.html")
-
-@login_required
 def recommendations_view(request):
     return render(request, "integrations/recommendations.html")
 

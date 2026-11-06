@@ -82,7 +82,7 @@ def inspect_bundle(bundle):
                 "_internal/static/vendor/bootstrap.min.css", "_internal/static/vendor/chart.umd.min.js",
                 "_internal/templates/mobility/planner.html", "_internal/templates/mobility/preferences.html",
                 "_internal/static/js/travel_planner.js", "_internal/static/css/travel_planner.css",
-                "_internal/templates/career/list.html", "_internal/templates/integrations/credit_score.html",
+                "_internal/templates/career/list.html",
                 "_internal/templates/ai_insights.html", "_internal/templates/settings/memory.html",
                 "_internal/static/js/intelligence.js", "_internal/static/js/memory.js",
                 "_internal/static/css/workspace.css", "_internal/static/js/workspace.js")
@@ -112,7 +112,7 @@ def inspect_bundle(bundle):
                 or lowered.endswith("ml_models/alfred/model_registry/registry.json")):
             raise RuntimeError(f"Private runtime path found in release: {relative}")
         files.append(path)
-    for name in ("career/list.html", "integrations/credit_score.html", "mobility/dashboard.html",
+    for name in ("career/list.html", "mobility/dashboard.html",
                  "mobility/planner.html", "mobility/preferences.html", "ai_insights.html", "settings/memory.html",
                  "base.html", "settings/account.html", "partials/navbar.html", "partials/sidebar.html", "partials/table_search.html",
                  "dashboard.html", "expenses/list.html", "loans/list.html", "investments/list.html"):

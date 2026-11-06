@@ -15,7 +15,7 @@ from .views import (
     expenses_view, budgets_view, loans_view,
     investments_view, family_view, career_view,
     behavioral_view, relationship_view, risk_view,
-    reports_view, credit_score_view, recommendations_view,
+    reports_view, recommendations_view,
     tax_optimizer_view, mobility_view, bike_service_view,
     documents_view,
     document_center_item_delete_api_view,
@@ -93,7 +93,6 @@ urlpatterns = [
     path("reports/", reports_view, name="reports"),
     path("bike-service/", bike_service_view, name="bike_service"),
     path("mobility/", mobility_view, name="mobility"),
-    path("credit-score/", credit_score_view, name="credit_score"),
     path("recommendations/", recommendations_view, name="recommendations"),
     path("tax-optimizer/", tax_optimizer_view, name="tax_optimizer"),
 

@@ -787,7 +787,7 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 15 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 15 | PARTIALLY_IMPLEMENTED: 24 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -795,7 +795,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 
 | Module | Verified | Total | Verified % | Unaccepted | Partial | Missing | Approval | External |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| FIN | 11 | 17 | 64.7 | 1 | 3 | 2 | 0 | 0 |
+| FIN | 11 | 17 | 64.7 | 1 | 2 | 2 | 0 | 1 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 0 | 2 | 0 | 0 | 0 |
@@ -1799,7 +1799,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FIN-17 — Credit bureau reports and official score access
 
-**PARTIALLY_IMPLEMENTED** · Personal finance · P2.
+**BLOCKED_EXTERNAL** · Personal finance · P2.
 
 - Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/integrations/services/credit_report_parser.py](../apps/integrations/services/credit_report_parser.py), [apps/integrations/services/credit_score_tracker.py](../apps/integrations/services/credit_score_tracker.py).
 - APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
@@ -1807,7 +1807,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Official bureau integration BLOCKED_EXTERNAL; uploaded reports synthetic/dated acceptance only.
 - Limitations/dependencies: Uploaded bureau evidence and clearly labelled estimates exist; authenticated bureau pulls/contracts are not accepted. Existing owner/session controls; canonical data availability; acceptance plan.
 - SCOPED_INSPECTION 2026-11-06: the credit page showed the internal estimate as "Current Bureau Score" and "<rating> on CIBIL", and fell back to "CIBIL" when no bureau was known, so an estimate could pass for an official score. Fixed: estimates now read "Estimated credit health" and "<rating> on CIBIL scale (ALFRED estimate, not an official score)"; official uploaded snapshots keep "Current bureau score". New Chrome test plus 19 credit/smoke backend tests PASS. Parsed tradeline amounts reach loans only through the existing Decimal `loan_money` boundary (unchanged). Live pulls stay unimplemented: configured credentials return an explicit not-implemented status.
-- Next: BLOCKED_EXTERNAL for live bureau pulls (consumer bureau APIs need a membership/contract). Local acceptance path: the owner downloads their own free annual report from a bureau and uploads it; check score, date and tradelines against the PDF without recording identifiers.
+- OWNER_DECISION 2026-11-06: "drop cibil score page... no need". The `/credit-score/` page, its sidebar link, template and script are removed (the route now returns 404). Kept: credit report uploads and parsing in Documents, bureau tradeline-to-loan sync, the stored scores and the `/api/integrations/credit-score/...` endpoints, so no data is lost. Smoke, credit upload, packaging and the all-pages Chrome CSP tests PASS.
+- Next: none planned. Live bureau pulls stay BLOCKED_EXTERNAL (bureau membership/contract); an uploaded real-report check is optional if the owner ever wants it.
 
 ### LOAN-01 — EMI, schedules, outstanding and repayment metrics
 

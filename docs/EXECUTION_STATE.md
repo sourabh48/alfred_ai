@@ -189,8 +189,8 @@
   Budget/filing notice on the tax page. Owner-approved daily notice-only check of indiabudget.gov.in flags a newer
   Budget than the verified rules; rules are never changed from the web. Page check PASS; remaining: exact-HEAD CI.
 - FIN-17 (2026-11-06): the credit page no longer shows the internal estimate as a CIBIL score ("Estimated credit
-  health", "... scale (ALFRED estimate, not an official score)"). Live bureau pulls BLOCKED_EXTERNAL (bureau contract);
-  owner-uploaded real report check open.
+  health"). Then the owner dropped the score page; uploads stay in Documents, data and APIs kept. Live bureau pulls
+  BLOCKED_EXTERNAL (bureau contract).
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
