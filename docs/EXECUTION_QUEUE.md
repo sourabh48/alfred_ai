@@ -48,11 +48,11 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 24 | B | AI-16 — Retrieval/model quality and drift monitoring | PARTIALLY_IMPLEMENTED | P2 / L | AI-15 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: AI-15 |
 | 25 | B | CAREER-04 — Recruiter email/attachment processing | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: manual recruiter intake accepted; automatic mailbox access needs approved provider access and a reviewed integration |
 | 26 | B | CAREER-08 — Predictive career forecasting and timing | PARTIALLY_IMPLEMENTED | P2 / L | CAREER-07, AI-15, AI-16 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: CAREER-07, AI-15, AI-16 |
-| 27 | B | TRAVEL-04 — Multiple destinations and day-wise itineraries | PARTIALLY_IMPLEMENTED | P2 / L | TRAVEL-03 | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 28 | B | TRAVEL-07 — Scenic and truly alternative routes | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 29 | B | TRAVEL-08 — Expressway avoidance and motorcycle road restrictions | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
-| 30 | B | TRAVEL-09 — Route corridor stops and real detour distance | PARTIALLY_IMPLEMENTED | P2 / L | TRAVEL-07 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: TRAVEL-07 |
-| 31 | B | TRAVEL-15 — Live permits and road closure confirmation | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
+| 27 | B | TRAVEL-04 — Multiple destinations and day-wise itineraries | PARTIALLY_IMPLEMENTED | P2 / L | TRAVEL-03 | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: verified inter-stop routing needs an approved routing key (TRAVEL_ORS_API_KEY not configured); manual itineraries accepted |
+| 28 | B | TRAVEL-07 — Scenic and truly alternative routes | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: bounded alternative-route choice accepted; independently reviewed scenic/legal route evidence absent |
+| 29 | B | TRAVEL-08 — Expressway avoidance and motorcycle road restrictions | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: owner-reviewed restriction references accepted; independently authenticated route-applicable restrictions absent |
+| 30 | B | TRAVEL-09 — Route corridor stops and real detour distance | PARTIALLY_IMPLEMENTED | P2 / L | TRAVEL-07 | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: straight-line stop distance labelled 2026-11-06; road-network detours need an approved routing key |
+| 31 | B | TRAVEL-15 — Live permits and road closure confirmation | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: no verified live permit or closure service; dated references shown stale with UNKNOWN confidence |
 | 32 | B | BIKE-03 — Maintenance prediction and condition tracking | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
 | 33 | B | BIKE-05 — Spare parts and service recommendations | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
 | 34 | B | OPENAI-02 — Model compatibility and current price review | PARTIALLY_IMPLEMENTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | READY_FOR_SCOPED_INSPECTION |
@@ -81,7 +81,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 57 | B | COUNCIL-05 — AI development budget and human Git approval | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-04 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-04 |
 | 58 | D | COUNCIL-03 — Experimental self-improvement engine | NOT_IMPLEMENTED | P1 / L | COUNCIL-05 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-05 |
 
-**Next eligible for `next` or active `sprint`: TRAVEL-04.**
+**Next eligible for `next` or active `sprint`: BIKE-03.**
 
 ## Accepted baseline — excluded from execution
 

@@ -6298,6 +6298,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         session = new_session(owner)
         candidate = candidates_for(owner, {})[0]
         candidate["places_result"] = synthetic_place_result()
+        candidate["places_result"]["payload"]["places"][0]["route_distance_km"] = 3.4
         candidate["quality"] = {"verified": ["places"]}
         session.candidates = [candidate]; session.save()
         before = deepcopy(session.candidates)
@@ -6309,6 +6310,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn("Mapped hours: 24/7", text)
         self.assertIn("Booking availability: UNKNOWN", text)
         self.assertIn("Permit status: unverified", text)
+        self.assertIn("about 3.4 km straight-line from the route, not road detour distance", text)
         self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, selector+" [onerror]"))
         links = self.browser.find_elements(self.By.CSS_SELECTOR, selector+" a")
         self.assertTrue(any(a.get_attribute("href")=="https://www.openstreetmap.org/node/1" for a in links))

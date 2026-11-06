@@ -202,6 +202,9 @@
 - CAREER-04 (2026-11-06): manual intake accepted; automatic mailbox access stays approval-gated.
 - CAREER-07 (2026-11-06): Interview preparation panel from the saved job match (no model or network). 73 career backend
   tests and the career-outcome Chrome test PASS. Owner check remains.
+- TRAVEL (2026-11-06): routing needs TRAVEL_ORS_API_KEY (not configured), so TRAVEL-04/09 are approval-gated; TRAVEL-09
+  places now show straight-line route distance labelled "not road detour distance" (Chrome PASS). TRAVEL-07/08 need
+  independent evidence; TRAVEL-15 has no live permit/closure service.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

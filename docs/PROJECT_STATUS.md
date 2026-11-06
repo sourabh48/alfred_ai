@@ -2539,6 +2539,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Owned manual 2–5 stop motorcycle/car itineraries, dated days, reorder/remove, shared Decimal budgets, invalidation, save/reopen and desktop/390px Chrome accepted (104 backend/10 Chrome). Bounded estimated-order preview and explicit confirmation additionally accepted (14 focused backend/11 integrated Chrome plus final affected cosmetic recheck; overlapping totals). Distances and optimized stop order are allowances; verified inter-stop roads, transport connections and independent route acceptance remain incomplete. No permits, bookings, fastest/cheapest route or availability certified.
 - Next: Verify inter-stop routing and feasibility using approved provider evidence; keep unknown road legality and availability explicit. Independent DOC-07 quality work can continue meanwhile.
+- SCOPED_INSPECTION 2026-11-06: routing uses OpenRouteService only when `TRAVEL_ORS_API_KEY` is set; it is not configured, so inter-stop roads cannot be verified without a new credential.
 
 ### TRAVEL-05 — Budget summaries and estimates
 
@@ -2594,7 +2595,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Current sampled crow-flight corridor ranking is not verified road-detour distance. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Add bounded road-network detours and uncertain labels.
+- SCOPED_IMPLEMENTATION 2026-11-06: the places panel now shows each stop's straight-line distance to the route as "about X km straight-line from the route, not road detour distance" (it was computed but hidden). Road-network detours need the OpenRouteService routing key (`TRAVEL_ORS_API_KEY`), which is not configured; no key or provider was added. Places Chrome test PASS with the new label.
+- Next: with an approved routing key, compute bounded road detours for the top few stops and keep straight-line as the fallback label.
 
 ### TRAVEL-10 — Camping and attraction discovery
 
@@ -2661,6 +2663,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Dated official references exist; no verified live permit availability or closure service. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Maintain reviewed effective-date references and unknown state.
+- SCOPED_INSPECTION 2026-11-06: the Kerala forest reference was reviewed 2026-09-29 and now shows as stale with UNKNOWN confidence, as intended. No live permit or closure service exists to integrate.
 
 ### TRAVEL-16 — Weather, horizons and replanning
 
