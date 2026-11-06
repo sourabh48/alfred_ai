@@ -796,7 +796,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 6 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 23 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 5 | COMPLETE_VERIFIED: 85
 
 PR/CI: master `99b8e8f` CI_PASSED (run 42194736278: Linux, four Windows backend shards, native, three Selenium shards); `84b61ac` and `0ef41f8` CI_PENDING. PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 
@@ -804,7 +804,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 
 | Module | Verified | Total | Verified % | Unaccepted | Partial | Missing | Approval | External |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| FIN | 11 | 17 | 64.7 | 2 | 2 | 1 | 0 | 1 |
+| FIN | 11 | 17 | 64.7 | 2 | 3 | 0 | 0 | 1 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
@@ -1782,7 +1782,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FIN-15 — Canonical currency persistence and multi-currency aggregation
 
-**NOT_IMPLEMENTED** · Personal finance · P1.
+**PARTIALLY_IMPLEMENTED** · Personal finance · P1.
 
 - Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
 - APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
@@ -1790,6 +1790,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Legacy INR convention exists; finance models generally lack currency codes. AI correctly labels currency unrecorded; no proven FX ledger. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Decide currency ownership, migration/backfill and historical rate policy separately.
+- 2026-11-06 Investments slice (owner contract, FX off): registry `alfred_ai/services/currency.py` (INR/USD/EUR/GBP, null = not recorded); `Investment.currency` via expand-only migration investments 0006 with a reverse guard that refuses to erase recorded codes; `in_rupee_totals()` keeps other currencies out of the portfolio summary, allocation, growth, risk, net worth, loans dashboard, recommendations and 80C, and the summary groups them per currency; AI evidence and the ZIP export carry the recorded code. Evidence: tests/test_investment_currency.py (4, incl. forward/guarded-reverse rehearsal) plus 400 related backend tests and the Chrome test `test_investment_in_another_currency_stays_out_of_rupee_totals` PASS locally. Migration 0006 waits for owner approval; banking, loans, income, budgets and travel domains remain.
 
 ### FIN-16 — Tax calculations and source-backed eligibility
 

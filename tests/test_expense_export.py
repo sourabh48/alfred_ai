@@ -122,8 +122,11 @@ class FinancialExportTests(TestCase):
                          ("****4321", "1000.01", "0.00"))
         self.assertEqual(tables["budgets.csv"][0]["inflation_adjusted"], "5100.25")
         content = "".join(files.values())
-        for private in ("1234-5678-9012", "LN998877", "INV00004321", "FOREIGN-BANK", "FOREIGN-LENDER", "currency"):
+        for private in ("1234-5678-9012", "LN998877", "INV00004321", "FOREIGN-BANK", "FOREIGN-LENDER"):
             self.assertNotIn(private, content)
+        # FIN-15: only investments record a currency, and an unrecorded one stays blank, never a guessed INR.
+        self.assertEqual(investment["currency"], "")
+        self.assertEqual([name for name, rows in tables.items() if "currency" in rows[0]], ["investments.csv"])
         self.assertTrue(all(len(rows) == 1 for rows in tables.values()))
         self.assertEqual(response["Content-Type"], "application/zip")
         self.assertIn('filename="alfred-financial-data.zip"', response["Content-Disposition"])

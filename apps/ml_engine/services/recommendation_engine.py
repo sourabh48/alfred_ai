@@ -222,7 +222,7 @@ class FinancialRecommendationEngine:
         profile['dti_ratio'] = float(baseline.get('debt_burden_ratio', 0) or 0)
 
         # Investment analysis
-        investments = Investment.objects.filter(user=user)
+        investments = Investment.objects.filter(user=user).in_rupee_totals()
         profile['has_investments'] = investments.exists()
         profile['total_invested'] = float(investments.aggregate(Sum('current_value'))['current_value__sum'] or 0)
 

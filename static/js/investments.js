@@ -102,6 +102,10 @@ function renderInvestmentHero(data) {
     if (watchlistItems.length) {
         copyParts.push(`${watchlistItems.length} watchlist candidates`);
     }
+    const otherPositions = (summary.other_currencies || []).reduce((count, group) => count + group.positions, 0);
+    if (otherPositions) {
+        copyParts.push(`${otherPositions} in other currencies, not in this total`);
+    }
 
     document.getElementById("investmentHeroValue").textContent = Alfred.formatCurrency(summary.total_value || 0);
     document.getElementById("investmentHeroRisk").textContent = analysis.risk_level || summary.risk || "No data";
@@ -116,6 +120,11 @@ function renderInvestmentSummary(data) {
         { title: "Unrealized Gain / Loss", value: Alfred.formatCurrency(summary.gain_loss || 0), copy: "Latest recorded value minus amount invested; excludes withdrawals and realized gains" },
         { title: "Monthly SIP", value: Alfred.formatCurrency(summary.monthly_sip || 0), copy: "Recurring monthly contribution" },
         { title: "Risk / Diversification", value: `${analysis.risk_level || summary.risk || "No data"}`, copy: `${Alfred.formatNumber(analysis.diversification_score || 0)} diversification score` },
+        ...(summary.other_currencies || []).map(group => ({
+            title: `${Alfred.escapeHtml(group.currency)} positions`,
+            value: Alfred.formatCurrency(group.total_value, group.currency),
+            copy: `${group.positions} position(s), invested ${Alfred.formatCurrency(group.total_invested, group.currency)}. Kept out of rupee totals; nothing is converted.`,
+        })),
     ];
 
     Alfred.setHTML(document.getElementById("investmentSummaryCards"), cards.map(card => `
@@ -320,11 +329,12 @@ function renderInvestmentPositions(items) {
                 <div class="fw-semibold">${Alfred.escapeHtml(item.asset_name)}</div>
                 <div class="muted small">${Alfred.escapeHtml(item.asset_type.replaceAll("_", " "))} | ${Alfred.escapeHtml(item.institution || "Unspecified institution")}</div>
                 <div class="muted small">Account: ${Alfred.escapeHtml(item.account_number ? `…${item.account_number.slice(-4)}` : "not recorded")}</div>
+                <div class="muted small" data-position-currency>Currency: ${Alfred.escapeHtml(item.currency || "not recorded, shown in ₹")}</div>
             </td>
-            <td class="text-end">${Alfred.formatCurrency(item.invested_amount)}</td>
-            <td class="text-end">${Alfred.formatCurrency(item.current_value)}</td>
-            <td class="text-end ${Number(item.gain_loss) < 0 ? "text-danger" : "text-success"}">${Alfred.formatCurrency(item.gain_loss)}</td>
-            <td class="text-end">${Alfred.formatCurrency(item.monthly_sip)}</td>
+            <td class="text-end">${Alfred.formatCurrency(item.invested_amount, item.currency)}</td>
+            <td class="text-end">${Alfred.formatCurrency(item.current_value, item.currency)}</td>
+            <td class="text-end ${Number(item.gain_loss) < 0 ? "text-danger" : "text-success"}">${Alfred.formatCurrency(item.gain_loss, item.currency)}</td>
+            <td class="text-end">${Alfred.formatCurrency(item.monthly_sip, item.currency)}</td>
             <td>${Alfred.escapeHtml(item.risk_level || "Not set")}</td>
         </tr>
     `).join(""));

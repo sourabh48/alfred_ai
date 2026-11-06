@@ -120,6 +120,7 @@
  "tests.test_serving_readiness": 3.88,
  "tests.test_speech": 1.9,
  "tests.test_trip_videos": 0.8,
+ "tests.test_investment_currency": 4.5,
  "tests.test_source_storage": 0.14,
  "tests.test_statement_columns": 0.03,
  "tests.test_statement_evidence": 1.64,

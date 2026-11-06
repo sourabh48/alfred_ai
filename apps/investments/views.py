@@ -18,6 +18,7 @@ from alfred_ai.services import record_parser_learning
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from apps.reports.services import operational_logging_service
 from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
+from alfred_ai.services.currency import RUPEE
 from .services.portfolio_intelligence import portfolio_intelligence_service
 from .models import Investment, InvestmentImportDocument
 from .money import investment_money, investment_total_float
@@ -116,8 +117,24 @@ def _investment_revision(user) -> str:
     return f"investments-money-v1:{state['count']}:{state['latest'].isoformat() if state['latest'] else '0'}"
 
 
+def _other_currency_groups(positions) -> list[dict]:
+    """Per-currency totals for positions outside rupee totals; never converted or added to INR."""
+    groups: dict[str, dict] = {}
+    for item in positions:
+        if item.currency and item.currency != RUPEE:
+            group = groups.setdefault(item.currency, dict(currency=item.currency, positions=0, total_value=Decimal("0"),
+                                                          total_invested=Decimal("0"), monthly_sip=Decimal("0")))
+            group["positions"] += 1
+            group["total_value"] += item.current_value
+            group["total_invested"] += item.invested_amount
+            group["monthly_sip"] += item.monthly_sip
+    money = ("total_value", "total_invested", "monthly_sip")
+    return [{**group, **{key: format(group[key], ".2f") for key in money}} for _, group in sorted(groups.items())]
+
+
 def _investment_summary_payload(user) -> dict:
-    investments = list(Investment.objects.filter(user=user).order_by("-current_value", "-id"))
+    positions = list(Investment.objects.filter(user=user).order_by("-current_value", "-id"))
+    investments = [item for item in positions if item.currency in (None, RUPEE)]
     total_value = sum(item.current_value for item in investments)
     total_invested = sum(item.invested_amount for item in investments)
     total_sip = sum(item.monthly_sip for item in investments)
@@ -142,12 +159,14 @@ def _investment_summary_payload(user) -> dict:
             "annual_return": annual_return,
             "gain_loss": investment_total_float(gain_loss),
             "risk": _portfolio_risk(investments),
-            "positions": len(investments),
+            "positions": len(positions),
+            "positions_in_rupee_totals": len(investments),
+            "other_currencies": _other_currency_groups(positions),
         },
         "analysis": analysis,
         "market_context": market_context,
         "watchlist": watchlist,
-        "positions": InvestmentSerializer(investments, many=True).data,
+        "positions": InvestmentSerializer(positions, many=True).data,
         "grounding": {
             "history": {
                 "positions": len(investments),
@@ -172,7 +191,7 @@ def _investment_summary_payload(user) -> dict:
 
 
 def _investment_allocation_payload(user) -> dict:
-    investments = list(Investment.objects.filter(user=user))
+    investments = list(Investment.objects.filter(user=user).in_rupee_totals())
     buckets: dict[str, Decimal] = defaultdict(Decimal)
     labels = dict(Investment.ASSET_TYPES)
 
@@ -187,7 +206,7 @@ def _investment_allocation_payload(user) -> dict:
 
 
 def _investment_growth_payload(user, *, as_of: date | None = None) -> dict:
-    investments = list(Investment.objects.filter(user=user))
+    investments = list(Investment.objects.filter(user=user).in_rupee_totals())
     today = (as_of or timezone.localdate()).replace(day=1)
     labels = []
     values = []

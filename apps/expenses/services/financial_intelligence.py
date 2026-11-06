@@ -1196,7 +1196,8 @@ def _build_debt_trend(monthly_buckets: dict[tuple[int, int], dict]) -> dict:
 
 def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | None = None) -> dict:
     accounts = list(BankAccount.objects.filter(user=user, is_active=True))
-    investments = list(Investment.objects.filter(user=user))
+    investments = list(Investment.objects.filter(user=user).in_rupee_totals())
+    other_currency_positions = Investment.objects.filter(user=user).count() - len(investments)
     vehicle_profiles = list(BikeProfile.objects.filter(user=user))
     vehicle_services = list(BikeServiceRecord.objects.filter(user=user).select_related("bike_profile"))
     trip_logs = list(TripLog.objects.filter(user=user).select_related("travel_plan", "travel_plan__vehicle_profile"))
@@ -1267,6 +1268,9 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
             )
     else:
         summary = "Add account balances, investments, loans, or vehicle profiles to build the balance-sheet view."
+    if other_currency_positions:
+        summary = (f"{summary} {other_currency_positions} investment position(s) recorded in another currency "
+                   "are not included; there is no currency conversion.")
 
     return {
         "total_assets": total_assets,
@@ -1281,6 +1285,7 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
         "liabilities": liabilities,
         "home_ownership_positions": home_ownership_positions,
         "vehicle_positions": vehicle_positions,
+        "excluded_other_currency_investments": other_currency_positions,
         "summary": summary,
     }
 

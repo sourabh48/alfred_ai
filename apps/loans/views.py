@@ -717,7 +717,7 @@ def _build_networth_payload(user) -> dict:
     }
 
     investment_by_type = {}
-    for inv in Investment.objects.filter(user=user):
+    for inv in Investment.objects.filter(user=user).in_rupee_totals():
         asset_type = inv.get_asset_type_display()
         if asset_type not in investment_by_type:
             investment_by_type[asset_type] = 0

@@ -12,6 +12,7 @@ from scripts.rehearse_money_migrations import copy_database, file_hash, read_dat
 class InvestmentEvidenceMigrationTests(TransactionTestCase):
     def test_forward_empty_reverse_guard_and_restore_preserve_all_financial_rows(self):
         leaves=MigrationExecutor(connection).loader.graph.leaf_nodes()
+        leaves=[('investments','0005_investment_document_evidence') if item[0]=='investments' else item for item in leaves]  # rehearse 0005 itself
         baseline=[('investments','0004_investment_money_decimal') if item[0]=='investments' else item for item in leaves]
         with TemporaryDirectory(prefix='alfred-investment-evidence-synthetic-') as directory:
             root=Path(directory); source,candidate,restored=[root/name for name in ('source.sqlite3','candidate.sqlite3','restore.sqlite3')]

@@ -1,6 +1,18 @@
 from django.db import models
+from django.db.models import Q
 from django.conf import settings
+
+from alfred_ai.services.currency import CURRENCY_CHOICES, RUPEE
 from .money import InvestmentMoneyField, investment_money, investment_total_float
+
+
+class InvestmentQuerySet(models.QuerySet):
+    def in_rupee_totals(self):
+        """Positions that join rupee totals: INR, or never recorded (the legacy INR convention).
+
+        Other currencies are reported as separate groups; there is no FX conversion.
+        """
+        return self.filter(Q(currency__isnull=True) | Q(currency=RUPEE))
 
 
 class Investment(models.Model):
@@ -22,11 +34,15 @@ class Investment(models.Model):
     invested_amount = InvestmentMoneyField(max_digits=14, decimal_places=2, default=0)
     monthly_sip = InvestmentMoneyField(max_digits=14, decimal_places=2, default=0)
     current_value = InvestmentMoneyField(max_digits=14, decimal_places=2, default=0)
+    # Denomination of the three amounts above; null means not recorded and is never guessed (FIN-15).
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, null=True, blank=True, default=None)
     annual_return_rate = models.FloatField(default=0)
     risk_level = models.CharField(max_length=20, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = InvestmentQuerySet.as_manager()
 
     class Meta:
         ordering = ["-current_value", "-id"]

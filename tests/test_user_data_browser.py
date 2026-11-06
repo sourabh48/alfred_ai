@@ -1577,6 +1577,27 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local.reason.assert_not_called()
         self.capture('assistant-speech')
 
+    def test_investment_in_another_currency_stays_out_of_rupee_totals(self):
+        from apps.investments.models import Investment
+        self.login(); self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: self.text('investmentHeroValue') != 'INR 0' and self.active_requests == 0)
+        rupee_total = self.text('investmentHeroValue')
+        fields = dict(investmentName='Synthetic dollar ETF', investmentInvested='250', investmentCurrent='300.25')
+        for element, value in fields.items():
+            self.browser.find_element(self.By.ID, element).send_keys(value)
+        self.browser.find_element(self.By.ID, 'investmentType').send_keys('Equity')
+        self.browser.find_element(self.By.ID, 'investmentCurrency').send_keys('US dollar (USD)')
+        self.memory_click('#investmentForm button[type="submit"]')
+        self.wait.until(lambda _: 'Position saved' in self.text('investmentFormFeedback') and self.active_requests == 0)
+        self.wait.until(lambda _: 'USD POSITIONS' in self.text('investmentSummaryCards').upper())  # titles are upper-cased by CSS
+        self.assertEqual(Investment.objects.get(asset_name='Synthetic dollar ETF').currency, 'USD')
+        self.assertEqual(self.text('investmentHeroValue'), rupee_total)
+        self.assertIn('$300.25', self.text('investmentSummaryCards'))
+        self.assertIn('not in this total', self.text('investmentHeroCopy'))
+        self.wait.until(lambda _: 'Currency: USD' in self.text('investmentPositionsBody'))
+        self.browser.execute_script("document.getElementById('investmentSummaryCards').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture('investment-other-currency')
+
     def test_private_trip_video_upload_play_and_delete(self):
         from apps.mobility.models import TravelPlan, TripVideo
         # Django's test-only public media handler must not bypass ALFRED's owner gate.

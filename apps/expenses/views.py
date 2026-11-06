@@ -352,7 +352,7 @@ class ExpenseExportView(APIView):
 
 
 class FinancialExportView(APIView):
-    """The owner's financial registers as one ZIP of CSVs: recorded values, masked account numbers, no currency."""
+    """The owner's financial registers as one ZIP of CSVs: recorded values, masked account numbers, and a currency only where one was recorded."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -372,7 +372,7 @@ class FinancialExportView(APIView):
                                  "verification_status", "verification_source", "verified_at", "last_payment_date",
                                  "total_paid", "missed_payments", "notes", "created_at", "updated_at"), ("id",)),
             ("investments.csv", Investment, ("id", "asset_type", "asset_name", "institution", "account_number",
-                                             "invested_amount", "monthly_sip", "current_value", "annual_return_rate",
+                                             "invested_amount", "monthly_sip", "current_value", "currency", "annual_return_rate",
                                              "risk_level", "notes", "created_at", "updated_at"), ("id",)),
             ("budgets.csv", Budget, ("id", "month", "base_budget", "inflation_adjusted", "spent"), ("month", "id")),
         )

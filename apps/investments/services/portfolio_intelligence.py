@@ -321,7 +321,7 @@ class PortfolioIntelligenceService:
 
     def analyze_portfolio_risk(self, user) -> Dict[str, any]:
         """Analyze portfolio risk profile and diversification."""
-        investments = list(Investment.objects.filter(user=user))
+        investments = list(Investment.objects.filter(user=user).in_rupee_totals())
 
         if not investments:
             return {
@@ -404,7 +404,7 @@ class PortfolioIntelligenceService:
             })
 
         # Analyze user's portfolio and suggest actions
-        user_investments = list(Investment.objects.filter(user=user))
+        user_investments = list(Investment.objects.filter(user=user).in_rupee_totals())
 
         # Suggest rebalancing if needed
         if user_investments:
@@ -888,7 +888,7 @@ class PortfolioIntelligenceService:
                 "return_baselines": {str(days): day.isoformat() if day else None for days, day in baselines.items()}}
 
     def _portfolio_mix(self, user) -> dict:
-        investments = list(Investment.objects.filter(user=user).only("asset_type", "current_value"))
+        investments = list(Investment.objects.filter(user=user).in_rupee_totals().only("asset_type", "current_value"))
         total_value = sum(item.current_value for item in investments)
         if not total_value:
             return {"equity_pct": 0.0, "debt_pct": 0.0, "gold_pct": 0.0, "hybrid_pct": 0.0}

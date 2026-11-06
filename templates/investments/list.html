@@ -96,6 +96,17 @@
                         <input id="investmentCurrent" name="current_value" type="number" step="0.01" class="form-control" required>
                     </div>
                     <div class="col-md-6">
+                        <label class="form-label" for="investmentCurrency">Currency of these amounts</label>
+                        <select id="investmentCurrency" name="currency" class="form-select" aria-describedby="investmentCurrencyHelp">
+                            <option value="INR" selected>Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                            <option value="">Not recorded</option>
+                        </select>
+                        <div id="investmentCurrencyHelp" class="form-text">Only INR positions count in rupee totals. Other currencies are totalled separately; nothing is converted.</div>
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label" for="investmentSip">Monthly SIP</label>
                         <input id="investmentSip" name="monthly_sip" type="number" step="0.01" class="form-control" value="0">
                     </div>
@@ -200,5 +211,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.6.1"></script>
+<script src="/static/js/investments.js?v=2.6.2"></script>
 {% endblock %}

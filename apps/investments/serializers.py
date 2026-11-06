@@ -1,6 +1,7 @@
 from math import isfinite
 
 from rest_framework import serializers
+from alfred_ai.services.currency import CURRENCY_CHOICES, currency_status
 from .money import investment_money, investment_total_float
 from .models import Investment, InvestmentImportDocument
 
@@ -34,6 +35,8 @@ class InvestmentSerializer(serializers.ModelSerializer):
     current_value = InvestmentCurrencySerializerField(required=False)
     gain_loss = serializers.FloatField(read_only=True)
     annual_return_rate = InvestmentReturnRateField(required=False)
+    currency = serializers.ChoiceField(choices=CURRENCY_CHOICES, required=False, allow_null=True, allow_blank=True)
+    currency_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Investment
@@ -47,6 +50,8 @@ class InvestmentSerializer(serializers.ModelSerializer):
             "invested_amount",
             "monthly_sip",
             "current_value",
+            "currency",
+            "currency_status",
             "annual_return_rate",
             "risk_level",
             "notes",
@@ -55,6 +60,12 @@ class InvestmentSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ["user", "gain_loss", "created_at", "updated_at"]
+
+    def get_currency_status(self, obj):
+        return currency_status(obj.currency)
+
+    def validate_currency(self, value):
+        return value or None  # blank means not recorded, never a guessed INR
 
     def validate(self, attrs):
         invested_amount = attrs.get("invested_amount", getattr(self.instance, "invested_amount", 0))

@@ -354,7 +354,7 @@ class TaxOptimizerService:
         # 80C - Approximate from tagged tax-saving instruments already tracked in portfolio.
         qualifying_tokens = ("elss", "ppf", "nsc", "tax saver", "nps")
         investments_80c = 0
-        for investment in Investment.objects.filter(user=user):
+        for investment in Investment.objects.filter(user=user).in_rupee_totals():  # Indian deductions need INR
             name = f"{investment.asset_name} {investment.notes}".lower()
             if any(token in name for token in qualifying_tokens):
                 investments_80c += investment.current_value or investment.invested_amount or 0
