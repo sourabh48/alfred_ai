@@ -6332,6 +6332,43 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.querySelector(arguments[0]).scrollIntoView({behavior:'instant',block:'center'});",selector)
         self.capture("travel-places-unavailable-mobile")
 
+    def test_savings_goals_save_update_and_delete_exact_cents(self):
+        from datetime import timedelta
+        from decimal import Decimal
+        from django.utils import timezone
+        from apps.budgets.models import SavingsGoal
+        owner = self.scenario["user"]
+        foreign = get_user_model().objects.create_user("synthetic_goal_foreign", password=PASSWORD)
+        SavingsGoal.objects.create(user=foreign, name="DO-NOT-SHOW-FOREIGN-GOAL", target_amount="10.00")
+        self.login(); self.browser.get(self.live_server_url + "/budgets/")
+        self.wait.until(lambda _: "No savings goals yet" in self.text("savingsGoalList"))
+        due = (timezone.localdate() + timedelta(days=95)).isoformat()
+        for identity, value in (("savingsGoalName", '<img src=x onerror="window.__goalXss=1"> Synthetic fund'),
+                ("savingsGoalTarget", "50000.00"), ("savingsGoalSaved", "1000.50"), ("savingsGoalDate", due)):
+            self.browser.execute_script("document.getElementById(arguments[0]).value=arguments[1]", identity, value)
+        self.memory_click('#savingsGoalForm button[type="submit"]')
+        self.wait.until(lambda _: SavingsGoal.objects.filter(user=owner).exists() and "a month for" in self.text("savingsGoalList"))
+        goal = SavingsGoal.objects.get(user=owner)
+        self.assertEqual((goal.target_amount, goal.saved_amount, goal.target_date.isoformat()), (Decimal("50000.00"), Decimal("1000.50"), due))
+        self.assertNotIn("DO-NOT-SHOW-FOREIGN-GOAL", self.text("savingsGoalList"))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, "#savingsGoalList img"))
+        self.assertFalse(self.browser.execute_script("return Boolean(window.__goalXss)"))
+        self.browser.execute_script("document.getElementById(arguments[0]).value='50000'", f"savingsGoalUpdate{goal.pk}")
+        self.memory_click(f'[data-goal-save="{goal.pk}"]')
+        self.wait.until(lambda _: "Target reached" in self.text("savingsGoalList"))
+        goal.refresh_from_db(); self.assertEqual(goal.saved_amount, Decimal("50000.00"))
+        self.browser.execute_script("document.getElementById('savingsGoalsSection').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture("budgets-savings-goals-desktop")
+        self.addCleanup(self.browser.execute_cdp_cmd, "Emulation.clearDeviceMetricsOverride", {})
+        self.browser.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", dict(width=390, height=844, deviceScaleFactor=1, mobile=True))
+        self.assertLessEqual(self.browser.execute_script("return document.documentElement.scrollWidth"), 391)
+        self.browser.execute_script("document.getElementById('savingsGoalList').scrollIntoView({block:'center',behavior:'instant'})")
+        self.capture("budgets-savings-goals-mobile")
+        self.browser.execute_script("window.confirm=()=>true")
+        self.memory_click(f'[data-goal-delete="{goal.pk}"]')
+        self.wait.until(lambda _: not SavingsGoal.objects.filter(user=owner).exists())
+        self.assertTrue(SavingsGoal.objects.filter(user=foreign).exists())
+
     def test_budget_plan_reconciles_and_distinguishes_unknown_affordability(self):
         from decimal import Decimal
         from apps.budgets.models import Budget

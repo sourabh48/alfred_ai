@@ -115,6 +115,7 @@
  "tests.test_retrieval_quality": 17.41,
  "tests.test_safe_cache": 7.88,
  "tests.test_salary_evidence": 59.75,
+ "tests.test_savings_goals": 0.57,
  "tests.test_serving_readiness": 3.88,
  "tests.test_source_storage": 0.14,
  "tests.test_statement_columns": 0.03,

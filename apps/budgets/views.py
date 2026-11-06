@@ -13,9 +13,29 @@ from apps.expenses.models import Expense
 from apps.expenses.money import money_float
 from apps.expenses.services.cashflow_treatment import variable_spend_rows
 
-from .models import Budget
+from .models import Budget, SavingsGoal
 from .money import allocate_budget
-from .serializers import BudgetSerializer
+from .serializers import BudgetSerializer, SavingsGoalSerializer
+
+
+class SavingsGoalListCreateView(ListCreateAPIView):
+    serializer_class = SavingsGoalSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        return SavingsGoal.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class SavingsGoalDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = SavingsGoalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return SavingsGoal.objects.filter(user=self.request.user)
 
 
 class BudgetListCreateView(ListCreateAPIView):

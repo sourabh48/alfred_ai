@@ -6,6 +6,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     document.getElementById("budgetPlanForm").addEventListener("submit", submitBudgetPlan);
+    document.getElementById("savingsGoalForm").addEventListener("submit", submitSavingsGoal);
+    loadSavingsGoals();
     setBudgetMonthDefault();
     loadBudgetDashboard();
     Alfred.enableLiveRefresh("budget-live", loadBudgetDashboard, { rootId: "budgetRoot" });
@@ -217,6 +219,86 @@ function submitBudgetPlan(event) {
         })
         .catch(error => showBudgetFeedback(error.message, "danger"))
         .finally(() => { button.disabled = false; });
+}
+
+function loadSavingsGoals() {
+    return Alfred.fetchJSON("/api/budgets/goals/")
+        .then(renderSavingsGoals)
+        .catch(error => showSavingsGoalFeedback(error.message, "danger"));
+}
+
+function renderSavingsGoals(goals) {
+    const target = document.getElementById("savingsGoalList");
+    if (!goals.length) {
+        target.innerHTML = `<div class="empty-state">No savings goals yet.</div>`;
+        return;
+    }
+    target.innerHTML = goals.map(goal => {
+        const p = goal.progress || {};
+        const plan = p.status === "reached" ? "Target reached."
+            : p.status === "overdue" ? `Target date passed with ${Alfred.formatCurrency(p.remaining)} left.`
+            : p.monthly_needed != null ? `${Alfred.formatCurrency(p.monthly_needed)} a month for ${p.months_left} month(s) reaches it.`
+            : `${Alfred.formatCurrency(p.remaining)} left. Add a target date to see a monthly amount.`;
+        return `
+        <div class="mini-card surface-card" data-goal-id="${goal.id}">
+            <div class="d-flex justify-content-between flex-wrap gap-2">
+                <strong>${Alfred.escapeHtml(goal.name)}</strong>
+                <span class="muted small">${Alfred.formatCurrency(goal.saved_amount)} of ${Alfred.formatCurrency(goal.target_amount)}${goal.target_date ? ` by ${Alfred.formatDate(goal.target_date)}` : ""}</span>
+            </div>
+            <div class="progress my-2" role="progressbar" aria-label="${Alfred.escapeHtml(goal.name)} progress" aria-valuenow="${p.percent}" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar" style="width: ${Number(p.percent) || 0}%"></div>
+            </div>
+            <p class="small mb-2">${Alfred.escapeHtml(`${p.percent}% saved. ${plan}`)}</p>
+            <div class="d-flex flex-wrap gap-2 align-items-end">
+                <div>
+                    <label class="form-label small mb-1" for="savingsGoalUpdate${goal.id}">Saved so far</label>
+                    <input class="form-control form-control-sm" id="savingsGoalUpdate${goal.id}" type="number" min="0" step="0.01" value="${Alfred.escapeHtml(String(goal.saved_amount))}">
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-goal-save="${goal.id}">Update</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-goal-delete="${goal.id}">Delete</button>
+            </div>
+        </div>`;
+    }).join("");
+    target.querySelectorAll("[data-goal-save]").forEach(button => button.addEventListener("click", () => updateSavingsGoal(button)));
+    target.querySelectorAll("[data-goal-delete]").forEach(button => button.addEventListener("click", () => deleteSavingsGoal(button)));
+}
+
+function submitSavingsGoal(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    if (button.disabled) return;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    payload.saved_amount = payload.saved_amount || "0";
+    if (!payload.target_date) delete payload.target_date;
+    button.disabled = true;
+    Alfred.fetchJSON("/api/budgets/goals/", { method: "POST", body: JSON.stringify(payload) })
+        .then(() => { form.reset(); showSavingsGoalFeedback("Goal saved.", "success"); return loadSavingsGoals(); })
+        .catch(error => showSavingsGoalFeedback(error.message, "danger"))
+        .finally(() => { button.disabled = false; });
+}
+
+function updateSavingsGoal(button) {
+    const id = button.dataset.goalSave;
+    const value = document.getElementById(`savingsGoalUpdate${id}`).value;
+    button.disabled = true;
+    Alfred.fetchJSON(`/api/budgets/goals/${id}/`, { method: "PATCH", body: JSON.stringify({ saved_amount: value || "0" }) })
+        .then(() => { showSavingsGoalFeedback("Progress updated.", "success"); return loadSavingsGoals(); })
+        .catch(error => { button.disabled = false; showSavingsGoalFeedback(error.message, "danger"); });
+}
+
+function deleteSavingsGoal(button) {
+    if (!window.confirm("Delete this savings goal? Your transactions and budgets are not affected.")) return;
+    button.disabled = true;
+    Alfred.fetchJSON(`/api/budgets/goals/${button.dataset.goalDelete}/`, { method: "DELETE" })
+        .then(() => { showSavingsGoalFeedback("Goal deleted.", "success"); return loadSavingsGoals(); })
+        .catch(error => { button.disabled = false; showSavingsGoalFeedback(error.message, "danger"); });
+}
+
+function showSavingsGoalFeedback(message, tone) {
+    const box = document.getElementById("savingsGoalFeedback");
+    box.className = `alert alert-${tone}`;
+    box.textContent = message;
 }
 
 function showBudgetFeedback(message, tone) {

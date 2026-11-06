@@ -207,6 +207,9 @@
   independent evidence; TRAVEL-15 has no live permit/closure service.
 - BIKE (2026-11-06): part cards state their general window (not the manufacturer schedule), "Evidence score" replaces
   "Confidence", and costs read as estimates. 44 backend + 3 Chrome PASS. Outcomes and a parts source remain.
+- OPENAI-02 stays approval-gated (OpenAI off); RUNTIME-12 needs signed-in GitHub access for protection settings.
+- FIN-06 (2026-11-06): INR savings goals on Budgets (migration budgets 0003). 5 backend + Chrome PASS. The owner app
+  must NOT be restarted with this code until the owner approves the migration.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

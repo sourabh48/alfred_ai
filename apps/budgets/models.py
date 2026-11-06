@@ -13,6 +13,23 @@ class Budget(models.Model):
         return f"{self.user.username} - {self.month}"
 
 
+class SavingsGoal(models.Model):
+    """An owner-entered INR savings target; progress is what the owner reports, not linked transactions."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="savings_goals")
+    name = models.CharField(max_length=120)
+    target_amount = BudgetMoneyField(max_digits=14, decimal_places=2)
+    saved_amount = BudgetMoneyField(max_digits=14, decimal_places=2, default=0)
+    target_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.name}"
+
+
 class BudgetMoneySnapshot(models.Model):
     original_budget_id = models.PositiveBigIntegerField(unique=True)
     budget = models.ForeignKey(Budget, null=True, on_delete=models.SET_NULL, related_name="money_snapshots")

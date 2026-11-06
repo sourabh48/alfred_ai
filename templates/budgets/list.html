@@ -99,8 +99,34 @@
         </div>
     </div>
 </section>
+
+<section class="surface-card mt-4" id="savingsGoalsSection" aria-labelledby="savingsGoalsTitle">
+    <h2 class="page-section-title" id="savingsGoalsTitle">Savings Goals</h2>
+    <p class="page-section-copy mb-3">Set a target in INR and update what you have saved. Progress is what you enter, not matched transactions; the monthly amount spreads what is left evenly until the target date.</p>
+    <form id="savingsGoalForm" class="row g-3 align-items-end mb-3">
+        <div class="col-md-4">
+            <label for="savingsGoalName" class="form-label">Goal</label>
+            <input id="savingsGoalName" name="name" class="form-control" maxlength="120" placeholder="Emergency fund" required>
+        </div>
+        <div class="col-md-3">
+            <label for="savingsGoalTarget" class="form-label">Target (INR)</label>
+            <input id="savingsGoalTarget" name="target_amount" type="number" min="0.01" step="0.01" class="form-control" required>
+        </div>
+        <div class="col-md-2">
+            <label for="savingsGoalSaved" class="form-label">Saved so far</label>
+            <input id="savingsGoalSaved" name="saved_amount" type="number" min="0" step="0.01" class="form-control" value="0">
+        </div>
+        <div class="col-md-3">
+            <label for="savingsGoalDate" class="form-label">Target date (optional)</label>
+            <input id="savingsGoalDate" name="target_date" type="date" class="form-control">
+        </div>
+        <div class="col-12"><button class="btn btn-primary" type="submit">Add Goal</button></div>
+    </form>
+    <div id="savingsGoalFeedback" class="d-none alert" role="status" aria-live="polite"></div>
+    <div id="savingsGoalList" class="mini-list"></div>
+</section>
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/budgets.js?v=2.1.2"></script>
+<script src="/static/js/budgets.js?v=2.2.0"></script>
 {% endblock %}

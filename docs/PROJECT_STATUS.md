@@ -787,7 +787,7 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 17 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 18 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 9 | COMPLETE_VERIFIED: 85
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -795,7 +795,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 
 | Module | Verified | Total | Verified % | Unaccepted | Partial | Missing | Approval | External |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| FIN | 11 | 17 | 64.7 | 1 | 2 | 2 | 0 | 1 |
+| FIN | 11 | 17 | 64.7 | 2 | 2 | 1 | 0 | 1 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
@@ -1670,14 +1670,15 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FIN-06 — Persisted savings goals and progress workflow
 
-**NOT_IMPLEMENTED** · Personal finance · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Personal finance · P2.
 
 - Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
 - APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
 - Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: No dedicated goal model or end-to-end goal management route found; savings capacity is not goal persistence. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Confirm goal requirements; add owner goals only after currency/money decisions.
+- SCOPED_IMPLEMENTATION 2026-11-06: new `SavingsGoal` (migration budgets 0003) with name, INR target, saved-so-far and optional target date, using the existing Budget Decimal money field. Owner-only `/api/budgets/goals/` list/create/update/delete. Progress is owner-entered, not matched transactions; the monthly amount spreads what is left evenly over the months to the target date, rounded up to the cent; reached and overdue states are explicit. Budgets page has a Savings Goals section; account data reset removes goals. INR only; no FX (FIN-15 stays approval-gated). [Tests](../tests/test_savings_goals.py): 5 backend PASS (cents, edges, invalid input, other owners, reset) plus budget/reset/profile suites (58 PASS); a new Chrome test PASS with desktop and 390px captures inspected.
+- Next: owner check in the app after approving the migration; linking goals to transactions or investments is a separate decision.
 
 ### FIN-07 — Cash-flow forecasting
 
@@ -2317,6 +2318,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Official documentation reviewed 2026-10-15; no account availability call.
 - Limitations/dependencies: Pinned gpt-4.1-mini-2025-04-14 is deprecated; documented retirement 2027-01-14. Verified $0.40/$1.60 per million still matches code. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Select/test replacement with current official rates before enabling; no silent model switch.
+- SCOPED_INSPECTION 2026-11-06: OpenAI stays OFF by the owner's decision and no call is made. The pinned model retires 2027-01-14; choosing a replacement and re-checking rates waits until the owner approves enabling OpenAI.
 
 ### OPENAI-03 — Encrypted key provisioning and owner consent
 
@@ -3203,6 +3205,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: PR/manual browser workflow exists; Pages run is not backend acceptance. Fresh M15 backend CI/required checks not confirmed. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: M20 publish approved CI changes and verify actual remote checks.
+- SCOPED_INSPECTION 2026-11-06: the Browser Regression workflow runs on every master push (Linux secure-failure, four measured Windows backend shards, three measured Selenium shards); results are read through the public GitHub API, for example run 42141398727 at 1a36f53. Branch protection and rulesets need signed-in GitHub access, which this machine lacks (gh is not installed).
 
 ### RUNTIME-13 — M20 automated source/finance/privacy/backup gates
 
