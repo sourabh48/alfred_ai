@@ -1076,7 +1076,7 @@ function retryReviewItem(scope, id) {
 }
 
 function deleteDocumentCenterItem(scope, id) {
-    if (!window.confirm("Delete this document and the data derived directly from it where ALFRED can track that linkage?")) {
+    if (!window.confirm("Delete this document, its stored file and the data derived directly from it where ALFRED can track that linkage? Backups made before now keep their own copy.")) {
         return;
     }
     setDocumentCenterBusy(true);

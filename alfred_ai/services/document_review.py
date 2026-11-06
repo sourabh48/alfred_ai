@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from alfred_ai.services import record_parser_correction, record_parser_learning
 from .upload_limits import parser_budget
+from .upload_privacy import remove_unreferenced_files, stored_file_names
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume
 from apps.career.services import job_intelligence, resume_intelligence
 from apps.expenses.models import StatementUpload
@@ -674,6 +675,14 @@ def apply_correction(user, *, scope: str, document_id: int, corrections: dict) -
 
 
 def delete_document(user, *, scope: str, document_id: int) -> None:
+    before = stored_file_names(user.pk)
+    _delete_document_rows(user, scope=scope, document_id=document_id)
+    gone = before - stored_file_names(user.pk)
+    if gone:
+        transaction.on_commit(lambda: remove_unreferenced_files(gone))
+
+
+def _delete_document_rows(user, *, scope: str, document_id: int) -> None:
     if scope == "statement_document":
         upload = StatementUpload.objects.get(user=user, pk=document_id)
         file_name = upload.file_name

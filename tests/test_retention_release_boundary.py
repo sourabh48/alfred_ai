@@ -50,3 +50,22 @@ class RetentionReleaseBoundaryTests(TestCase):
         self.assertFalse(result['deleted'])
         self.assertEqual(CareerResume.objects.values().get(pk=self.document.pk), before)
         self.assertTrue(Path(self.document.uploaded_file.path).exists())
+
+    def test_deleting_a_document_removes_its_stored_file_only_for_the_owner(self):
+        path = Path(self.document.uploaded_file.path)
+        from alfred_ai.services.document_review import delete_document
+        with self.assertRaises(CareerResume.DoesNotExist):
+            delete_document(self.other, scope='resume_document', document_id=self.document.pk)
+        self.assertTrue(path.exists())
+        # A second record sharing the stored name keeps the file alive.
+        twin = CareerResume.objects.create(user=self.owner, file_name='twin.pdf', parser_status='needs_review')
+        CareerResume.objects.filter(pk=twin.pk).update(uploaded_file=self.document.uploaded_file.name)
+        self.client.force_login(self.owner)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.delete(f'/api/documents/items/resume_document/{self.document.pk}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(path.exists())
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.delete(f'/api/documents/items/resume_document/{twin.pk}/')
+        self.assertFalse(path.exists())
+        self.assertEqual(self.client.get(self.url).status_code, 404)

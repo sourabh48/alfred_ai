@@ -195,6 +195,9 @@
   failed because the FIN-13 ZIP Chrome test had no measured duration; recorded 5.219 s in `tests/browser_durations.json`.
 - INV-04 (2026-11-06): removed advice built on an assumed age 30 (no age is recorded) and an unused scraper; Portfolio
   Guidance labelled rule-based general information. 54 investment tests PASS. Risk-evidence definition remains.
+- DOC-07 (2026-11-06): 111 document tests re-run PASS; OCR/longer originals and an independent quality corpus remain.
+- DOC-09 (2026-11-06): document delete now removes orphaned stored files after commit (shared private-file field list with
+  the media view); prompt discloses backups keep copies. 118 tests PASS. Owner check on a synthetic document remains.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

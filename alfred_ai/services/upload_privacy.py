@@ -11,6 +11,45 @@ from .api_errors import safe_error_details
 
 RAW_FILE_RETENTION_KEY = "raw_file_retention"
 
+# Every stored private upload: (model, file field, owner lookup).
+PRIVATE_FILE_FIELDS = (
+    ("expenses.StatementUpload", "original_file", "user_id"),
+    ("investments.InvestmentImportDocument", "uploaded_file", "user_id"),
+    ("integrations.CreditReportUpload", "uploaded_file", "user_id"),
+    ("career.CareerResume", "uploaded_file", "user_id"),
+    ("mobility.TripPhoto", "image", "user_id"),
+    ("mobility.BikeDocument", "document_file", "user_id"),
+    ("loans.LoanImportDocument", "uploaded_file", "user_id"),
+    ("loans.LoanClosureDocument", "uploaded_file", "loan__user_id"),
+)
+
+
+def stored_file_names(owner_id=None) -> set[str]:
+    from django.apps import apps
+
+    names = set()
+    for model, field, owner in PRIVATE_FILE_FIELDS:
+        rows = apps.get_model(model).objects.exclude(**{field: ""})
+        if owner_id is not None:
+            rows = rows.filter(**{owner: owner_id})
+        names.update(rows.values_list(field, flat=True))
+    return names
+
+
+def remove_unreferenced_files(candidates) -> list[str]:
+    """Remove stored files that no remaining record references (after a user delete)."""
+    from django.core.files.storage import default_storage
+
+    referenced = stored_file_names()
+    removed = []
+    for name in sorted(set(candidates) - referenced):
+        try:
+            default_storage.delete(name)
+            removed.append(name)
+        except OSError:
+            pass  # the record is gone; a locked file stays until the next reset
+    return removed
+
 
 def raw_upload_cleanup_enabled() -> bool:
     return bool(getattr(settings, "ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION", False))

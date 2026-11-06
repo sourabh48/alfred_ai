@@ -787,7 +787,7 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 15 | PARTIALLY_IMPLEMENTED: 24 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 16 | PARTIALLY_IMPLEMENTED: 23 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -798,7 +798,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | FIN | 11 | 17 | 64.7 | 1 | 2 | 2 | 0 | 1 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
-| DOC | 7 | 9 | 77.8 | 0 | 2 | 0 | 0 | 0 |
+| DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 3 | 2 | 2 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 0 | 3 | 0 | 0 | 0 |
 | TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
@@ -2088,14 +2088,15 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### DOC-09 — Document deletion and retention
 
-**PARTIALLY_IMPLEMENTED** · Document intelligence · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Document intelligence · P2.
 
 - Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js), [alfred_ai/services/upload_privacy.py](../alfred_ai/services/upload_privacy.py).
 - APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
 - Tests: [tests/test_document_extraction.py](../tests/test_document_extraction.py), [tests/test_document_review_and_retry.py](../tests/test_document_review_and_retry.py), [tests/test_upload_privacy_retention.py](../tests/test_upload_privacy_retention.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Owner deletion/raw cleanup switches exist; native vault retention and historic backups retain data under separate policies. Source/non-native DEBUG media route served a synthetic file anonymously; native owner media is protected. No current live exposure asserted. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Unify disclosed retention across raw uploads, metadata, indexes and recovery. Reuse media ownership across source/native profiles (AUD-11).
+- SCOPED_INSPECTION 2026-11-06: deleting a document from Documents removed its rows but left the uploaded file on disk for every scope. Delete now removes stored files the delete orphaned, after commit, only when no remaining record references the same name (`stored_file_names`/`remove_unreferenced_files` in upload_privacy.py). The private media view and delete share one field list, so media ownership is one source (AUD-11 owner check already in place). The encrypted search index entry is removed by the existing post-delete signal. The delete prompt now says the stored file goes and earlier backups keep their copy. Raw-upload cleanup after extraction stays opt-in. Tests: 118 document/media/reset/retention backend tests PASS, including a new owner-only file-removal test.
+- Next: owner check on a synthetic document in the app (never a real record); backup/recovery copies keep data under their own retention policy.
 
 ### AI-01 — Ollama local inference
 

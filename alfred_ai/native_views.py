@@ -10,6 +10,8 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.core.cache import cache
 from django.db import connection
 
+from alfred_ai.services.upload_privacy import PRIVATE_FILE_FIELDS
+
 
 def native_health(request):
     try:
@@ -36,18 +38,8 @@ def private_media(request, path):
     target = (root / path).resolve()
     if not target.is_relative_to(root) or not target.is_file():
         raise Http404
-    fields = (
-        ("expenses.StatementUpload", "original_file", "user_id"),
-        ("investments.InvestmentImportDocument", "uploaded_file", "user_id"),
-        ("integrations.CreditReportUpload", "uploaded_file", "user_id"),
-        ("career.CareerResume", "uploaded_file", "user_id"),
-        ("mobility.TripPhoto", "image", "user_id"),
-        ("mobility.BikeDocument", "document_file", "user_id"),
-        ("loans.LoanImportDocument", "uploaded_file", "user_id"),
-        ("loans.LoanClosureDocument", "uploaded_file", "loan__user_id"),
-    )
     name = target.relative_to(root).as_posix()
-    for model, field, owner in fields:
+    for model, field, owner in PRIVATE_FILE_FIELDS:
         if apps.get_model(model).objects.filter(**{field: name, owner: request.user.pk}).exists():
             try:
                 source = target.open("rb")
