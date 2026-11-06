@@ -31,6 +31,18 @@ Implemented, verified, configured-provider, real-account, native/packaged and
 production acceptance are separate states. A pushed branch is not a merged PR;
 a merge is not deployment authorization. No current production health is claimed.
 
+## Screenshots
+
+Current source build with made-up sample data (`acceptance_demo`); no personal records.
+
+| Dashboard | Assistant proposes, you confirm |
+|---|---|
+| ![Dashboard with financial overview](docs/assets/screens/dashboard.webp) | ![Assistant proposing a savings goal with Confirm and Read aloud](docs/assets/screens/assistant.webp) |
+| **Savings goals** | **Travel planner** |
+| ![Savings goals with progress](docs/assets/screens/budgets.webp) | ![Travel planner chat and saved plan](docs/assets/screens/travel.webp) |
+| **Investments** | **Phone-width window** |
+| ![Investment portfolio summary](docs/assets/screens/investments.webp) | <img src="docs/assets/screens/dashboard-mobile.webp" width="260" alt="Dashboard in a phone-width window"> |
+
 ## Features and coordinated upgrades
 
 - **Finance and Wealth 2.0:** canonical income/expenses/loans/net worth, budgets,
