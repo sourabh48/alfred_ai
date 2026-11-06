@@ -85,6 +85,9 @@ PUBLIC_TEST_IDENTIFIERS = {
     ("tests/memory_s3_fixture.py", "1a5d44a2dca19669d72edf4c4f1c27c4c1ca4b4408fbb17f6ce4ad452d78ddb3"),
     ("tests/memory_s3_fixture.py", "099ffd0e4ccd9ca5a43a7ff4255d0ce24231fa1776f934dd60361dfa0499c431"),
     ("tests/test_memory_reasoning.py", "3de18efc58026cb49080132b1b2c2a55776401162062b9d6c060951ddb93e626"),
+    # Made-up Cloudflare R2 token secrets for the SYNC-02 signed-wire fixture, never a real account.
+    ("tests/test_memory_r2.py", "fb1557fb0173a09921c2df23cc2fbbe16e6110bdecf86fb67e841ec5396fd904"),
+    ("tests/test_memory_r2.py", "831f8fbe360c7ead40a79216d19852cc11b2791397107e7dc3dac5791452baf8"),
     # Explicit synthetic signing keys in local generated-data drills, never runtime credentials.
     ("scripts/benchmark_local_cache.py", "5dbfc784c7dd91de820790aecc08e0a09248acf4aceb858175544c73b6e270b7"),
     ("scripts/rehearse_money_migrations.py", "8c55aea836191192e8d863229227c32585de62f669d245e5383490ed6d125431"),
