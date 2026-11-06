@@ -31,7 +31,6 @@ class RemainingPublicHTTPTests(TestCase):
             lambda: self.verified._fetch_remoteok_jobs('Synthetic role'),
             self.portfolio._get_amfi_latest_nav_report,
             lambda: self.portfolio._get_amfi_history_report(days=60),
-            self.portfolio._scrape_trending_sectors,
         ]
         with patch('alfred_ai.services.public_http.request', return_value=PublicResponse(b'{}', 'application/json')) as fetch:
             for call in calls:
@@ -83,6 +82,6 @@ class RemainingPublicHTTPTests(TestCase):
         self.assertNotIn(marker, '\n'.join(logs.output))
         self.assertTrue(record.payload['error_id'])
 
-    def test_amfi_text_and_html_success_remain_usable(self):
-        with patch('alfred_ai.services.public_http.request', return_value=PublicResponse(b'<h2>Bank market news</h2>', 'text/html')):
-            self.assertEqual(len(self.portfolio._scrape_trending_sectors()), 1)
+    def test_unused_news_scraper_stays_removed(self):
+        # INV-04 removed it; it sent a browser User-Agent and its output was never shown.
+        self.assertFalse(hasattr(self.portfolio, '_scrape_trending_sectors'))

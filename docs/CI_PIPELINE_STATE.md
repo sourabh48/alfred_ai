@@ -5,8 +5,9 @@
 CI run 42179590852 at `164d394` failed all four backend shards in preflight (`migrations`): migration
 `apps/budgets/migrations/0003_savings_goal.py` was not in the reviewed source `b2f8936`. The owner approved the
 migration on 2026-11-06, so the backend step's `--reviewed-source` now names `164d394`. Any later migration or
-dependency change is refused again until reviewed. The earlier `1a36f53` shard-3 failure did not reproduce locally
-from a clean checkout (464 tests PASS); CI logs need GitHub sign-in.
+dependency change is refused again until reviewed. Run 42183546064 at `e990030` then passed shards 0, 2 and 3;
+shard 1 failed because `tests/test_remaining_public_http.py` still called the scraper INV-04 removed (the same
+cause as the earlier `1a36f53` shard-3 failure). Reproduced from a clean checkout and fixed in the test.
 
 ## RUNTIME-11 build pins — 2026-11-05
 
