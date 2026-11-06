@@ -67,6 +67,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_financial_source_discovery_survives_cloud_policy_outage_but_not_permission_loss":  7.656,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_financial_sources_page_selection_limit_exact_citations_mobile_and_privacy":  8.969,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_financial_sources_stale_selection_refresh_and_exact_older_loan_citation":  9.843,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_financial_zip_download_contains_owner_registers_with_masked_numbers":  5.219,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_general_private_document_upload_pdf_text_and_owner_originals":  12.375,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_hybrid_insights_local_sources_verified_save_and_fresh_settings":  8.89,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_inferred_loan_requires_explicit_confirmation_on_real_page":  7.671,
