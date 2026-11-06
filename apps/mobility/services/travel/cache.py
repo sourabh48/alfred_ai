@@ -144,17 +144,20 @@ def query(provider, parameters, *, force=False, cache_only=False):
         source_url=provider.source_url, request_parameters=parameters)
 
 
-def query_with_fallback(providers, parameters, *, force=False, cache_only=False):
-    attempts, stale = [], None
+def query_with_fallback(providers, parameters, *, force=False, cache_only=False, found=None):
+    """First current result; with `found`, a current result that answered nothing also moves on to the next provider."""
+    attempts, stale, empty = [], None, None
     for provider in providers:
         result = query(provider, parameters, force=force, cache_only=cache_only)
-        if result.success and not result.stale:
+        if result.success and not result.stale and (found is None or found(result)):
             result.fallback = attempts
             return result
-        if result.success and stale is None:
+        if result.success and not result.stale:
+            empty = empty or result
+        elif result.success and stale is None:
             stale = result
         attempts.append({"provider": result.provider, "status": result.status, "error": result.error})
-    result = stale or ProviderResult("none", providers[0].category if providers else "unknown", error="no_available_provider")
+    result = stale or empty or ProviderResult("none", providers[0].category if providers else "unknown", error="no_available_provider")
     result.fallback = attempts
     return result
 

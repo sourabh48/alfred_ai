@@ -49,3 +49,35 @@ class OpenMeteoGeocoding(Provider):
                 "region": str(item.get("admin1", "")), "country": str(item.get("country", "")),
                 "country_code": str(item.get("country_code", ""))})
         return {"locations": places, "ambiguous": len(places) > 1}
+
+
+class GooglePlaceSearch(OpenMeteoGeocoding):
+    """Paid fallback for place names Open-Meteo cannot find; key sent in a header, capped under Google's free use."""
+    name = "google_places"
+    source_url = "https://www.google.com/maps"
+    attribution = "Powered by Google"
+    ttl = timedelta(days=30)  # Google allows keeping latitude and longitude for up to 30 days
+    min_interval = 1
+    limits = {"minute": 5, "hour": 20, "day": 40, "month": 400}
+
+    def unavailable_reason(self):
+        return "" if os.getenv("TRAVEL_GOOGLE_MAPS_API_KEY") else "missing_TRAVEL_GOOGLE_MAPS_API_KEY"
+
+    def fetch(self, p):
+        name = public_place(p.get("name"))
+        if not name:
+            raise ProviderError("invalid_location")
+        body = {"textQuery": name, "pageSize": 5}
+        if p.get("country_code"):
+            body["regionCode"] = p["country_code"]
+        return request_json("POST", "https://places.googleapis.com/v1/places:searchText", json=body,
+            headers={"X-Goog-Api-Key": os.environ["TRAVEL_GOOGLE_MAPS_API_KEY"], "Content-Type": "application/json",
+                     "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location"})
+
+    def normalize(self, raw, p):
+        places = []
+        for item in (raw.get("places") or [])[:5]:
+            places.append({"id": str(item["id"])[:200], "name": str((item.get("displayName") or {}).get("text") or "")[:160],
+                "lat": number(item["location"]["latitude"], low=-90, high=90), "lon": number(item["location"]["longitude"], low=-180, high=180),
+                "region": str(item.get("formattedAddress") or "")[:200], "country": "", "country_code": ""})
+        return {"locations": places, "ambiguous": len(places) > 1}

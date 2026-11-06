@@ -367,6 +367,8 @@ class TravelPlannerTests(TestCase):
             run_research(run.id)
         self.assertTrue(search.called)
         for call in search.call_args_list:
+            if call.args[0][0].category not in ("web", "destinations"):
+                continue  # routing and place lookups carry coordinates and place names, checked in the provider tests
             query=str(call.args[1])
             for private in (self.user.username,"15000"):
                 self.assertNotIn(private,query)

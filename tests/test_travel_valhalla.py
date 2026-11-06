@@ -1,10 +1,13 @@
-"""Opt-in Valhalla routing with a real motorcycle profile (TREK idea, independently written)."""
+"""Free-first routing: opt-in Valhalla motorcycle profile (TREK idea), then ORS, then a capped Google fallback."""
 from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from apps.mobility.services.travel.providers.base import ProviderError
-from apps.mobility.services.travel.providers.routing import OpenRouteService, ValhallaRouting, decode_polyline6, routing_provider
+from apps.mobility.services.travel.cache import query_with_fallback
+from apps.mobility.services.travel.mapping import map_features
+from apps.mobility.services.travel.providers.geocoding import GooglePlaceSearch, OpenMeteoGeocoding
+from apps.mobility.services.travel.providers.routing import GoogleRoutes, OpenRouteService, ValhallaRouting, decode_polyline6, routing_chain
 
 URL = {"TRAVEL_VALHALLA_URL": "https://valhalla.example.test"}
 
@@ -76,9 +79,57 @@ class ValhallaRoutingTests(SimpleTestCase):
         car = provider.normalize({"trip": {"legs": [{"shape": _encode6([[1, 1], [2, 2]])}], "summary": {"length": 5, "time": 600}}}, {"mode": "car"})
         self.assertEqual((car["routes"][0]["profile"], car["routes"][0]["motorcycle_legal"]), ("auto", "UNKNOWN"))
 
-    def test_provider_choice(self):
-        cases = [({}, "ride", OpenRouteService), (URL, "ride", ValhallaRouting), (URL, "car", ValhallaRouting),
-                 ({**URL, "TRAVEL_ORS_API_KEY": "fixture"}, "car", OpenRouteService), ({**URL, "TRAVEL_ORS_API_KEY": "fixture"}, "motorcycle", ValhallaRouting)]
-        for env, mode, expected in cases:
-            with self.subTest(env=sorted(env), mode=mode), patch.dict("os.environ", env, clear=True):
-                self.assertIsInstance(routing_provider(mode), expected)
+    def test_free_routers_come_first_and_google_last(self):
+        self.assertEqual([p.name for p in routing_chain("ride")], ["valhalla", "openrouteservice", "google_routes"])
+        self.assertEqual([p.name for p in routing_chain("car")], ["openrouteservice", "valhalla", "google_routes"])
+
+
+GOOGLE = {"TRAVEL_GOOGLE_MAPS_API_KEY": "fixture-google-key"}
+
+
+class GoogleFallbackTests(TestCase):
+    @patch.dict("os.environ", GOOGLE)
+    @patch("apps.mobility.services.travel.providers.routing.request_json")
+    def test_two_wheeler_request_and_lineless_result(self, request):
+        provider = GoogleRoutes()
+        p = {"start": [77.59, 12.97], "end": [76.64, 12.3], "mode": "ride", "avoid_expressways": True}
+        provider.fetch(p)
+        body, headers = request.call_args.kwargs["json"], request.call_args.kwargs["headers"]
+        self.assertEqual((body["travelMode"], body["routeModifiers"]), ("TWO_WHEELER", {"avoidHighways": True, "avoidTolls": False}))
+        self.assertEqual(headers["X-Goog-Api-Key"], "fixture-google-key")
+        self.assertNotIn("key=", request.call_args.args[1])  # key never in the URL
+        route = provider.normalize({"routes": [{"distanceMeters": 142381, "duration": "12600s", "description": "NH275"}]}, p)["routes"][0]
+        self.assertEqual((route["distance_km"], route["duration_hours"], route["geometry"], route["profile"]), (142.4, 3.5, None, "google-two_wheeler"))
+        with self.assertRaisesMessage(ProviderError, "malformed_response"):
+            provider.normalize({"routes": [{"distanceMeters": 1, "duration": "soon"}]}, p)
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(GoogleRoutes().unavailable_reason(), "missing_TRAVEL_GOOGLE_MAPS_API_KEY")
+        features = map_features({"name": "X", "route_result": {"payload": {"routes": [route]}}})["features"]
+        self.assertFalse([f for f in features if f["properties"]["kind"] == "route"])  # nothing drawn on the OSM map
+
+    @patch.dict("os.environ", {**GOOGLE, "TRAVEL_ORS_API_KEY": "fixture-ors"}, clear=True)
+    def test_google_is_called_only_after_the_free_routers_fail(self):
+        p = {"start": [77.59, 12.97], "end": [76.64, 12.3], "mode": "car"}
+        google = {"routes": [{"distanceMeters": 1000, "duration": "60s"}]}, "a" * 64
+        with patch("apps.mobility.services.travel.providers.routing.request_json", side_effect=[ProviderError("upstream_unavailable"), google]) as request:
+            second = query_with_fallback(routing_chain("car"), {**p, "avoid_tolls": True})
+        self.assertEqual((second.provider, request.call_count), ("google_routes", 2))
+        self.assertEqual([a["provider"] for a in second.fallback], ["openrouteservice", "valhalla"])
+
+    @patch.dict("os.environ", {**GOOGLE, "TRAVEL_ORS_API_KEY": "fixture-ors"}, clear=True)
+    def test_google_is_not_called_when_a_free_router_answers(self):
+        ors = {"features": [{"geometry": {"type": "LineString", "coordinates": [[77.59, 12.97], [76.64, 12.3]]},
+                             "properties": {"summary": {"distance": 1000, "duration": 60}}}]}, "b" * 64
+        with patch("apps.mobility.services.travel.providers.routing.request_json", side_effect=[ors]) as request:
+            first = query_with_fallback(routing_chain("car"), {"start": [77.59, 12.97], "end": [76.64, 12.3], "mode": "car"})
+        self.assertEqual((first.provider, request.call_count), ("openrouteservice", 1))
+
+    @patch.dict("os.environ", {**GOOGLE, "TRAVEL_USE_MODE": "personal_noncommercial"}, clear=True)
+    def test_place_search_falls_back_to_google_when_open_meteo_finds_nothing(self):
+        found = {"places": [{"id": "abc", "displayName": {"text": "Kodachadri"}, "formattedAddress": "Karnataka, India",
+                             "location": {"latitude": 13.86, "longitude": 74.87}}]}, "c" * 64
+        with patch("apps.mobility.services.travel.providers.geocoding.request_json", side_effect=[({"results": []}, "d" * 64), found]) as request:
+            result = query_with_fallback([OpenMeteoGeocoding(), GooglePlaceSearch()], {"name": "Kodachadri"},
+                                         found=lambda r: bool(r.payload.get("locations")))
+        self.assertEqual((result.provider, result.payload["locations"][0]["lat"], request.call_count), ("google_places", 13.86, 2))
+        self.assertIn("X-Goog-Api-Key", request.call_args.kwargs["headers"])

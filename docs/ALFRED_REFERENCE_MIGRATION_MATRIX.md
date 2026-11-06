@@ -60,6 +60,13 @@ No before/after benchmark was run for M-W1, M-W2, M-I1, M-C1, M-C2 or M-R2: they
 baseline is "not available". Their evidence is the known-answer tests named above. Ranking, forecasting and
 recommendation changes (M-C3, M-I2, M-I3) must record thresholds here before evaluation.
 
+## Provider order (owner 2026-11-07: "keep free one main and paid as fallback")
+
+Routing: motorcycle trips try Valhalla, then openrouteservice, then Google Routes; other trips try openrouteservice, then
+Valhalla, then Google. Place lookup tries Open-Meteo, then Google Places only when Open-Meteo is unavailable or finds
+nothing. Google is capped in ALFRED at 40 calls a day and 400 a month per API, well under Google's free monthly use, and its
+routes carry no line because Google's terms forbid its content on a non-Google map. `tests/test_travel_valhalla.py` 9 PASS.
+
 ## Blocked items rechecked against the references (2026-11-07)
 
 | Earlier blocker | What the references offer | Result |

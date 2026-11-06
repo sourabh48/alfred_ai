@@ -127,6 +127,9 @@ selected quotes remain separate evidence and never replace estimated allowances.
 | --- | --- | --- | --- |
 | Geocoding | Open-Meteo / GeoNames | 90 days | Global place search; ambiguous names require selection |
 | Routing | openrouteservice; `TRAVEL_ORS_API_KEY` | 5 days | Car/walking, highway/toll avoidance; car routes do not verify motorcycle legality or closures |
+| Routing (motorcycle first) | Valhalla; `TRAVEL_VALHALLA_URL` (free FOSSGIS server `https://valhalla1.openstreetmap.de`: one request a second, identifying User-Agent) | 5 days | Motorcycle profile follows OpenStreetMap motorcycle access tags; reports whether motorway and toll avoidance was met |
+| Routing (paid fallback) | Google Routes; `TRAVEL_GOOGLE_MAPS_API_KEY` | 1 hour | Only after the free routers fail; two-wheeler mode; distance and time only, no line on the OpenStreetMap map (Google terms); app cap 40 a day, 400 a month |
+| Place lookup (paid fallback) | Google Places text search; same key | 30 days | Only when Open-Meteo finds nothing or is unavailable; app cap 40 a day, 400 a month |
 | Weather | Open-Meteo | 2 hours | Complete daily forecast within 16 days; official warnings unavailable |
 | POIs | Overpass; `TRAVEL_OVERPASS_URL` | 7 days | Authorized/self-hosted instance required; OSM tags do not confirm opening, permits or availability |
 | Permits | Dated official references | 6 hours near departure, otherwise 24 hours | No authorized live permit inventory API verified; opening remains unverified |

@@ -12,8 +12,17 @@ from .cache import query, query_with_fallback
 from .discovery import rank_places
 from .mapping import map_features
 from .providers.base import ProviderResult
-from .providers.geocoding import OpenMeteoGeocoding
-from .providers.routing import OpenRouteService, routing_provider
+from .providers.geocoding import GooglePlaceSearch, OpenMeteoGeocoding
+from .providers.routing import OpenRouteService, routing_chain
+
+
+def geocoders():
+    """Free Open-Meteo first; Google only when it finds nothing or is unavailable."""
+    return [OpenMeteoGeocoding(), GooglePlaceSearch()]
+
+
+def has_locations(result):
+    return bool(result.payload.get("locations"))
 from .providers.weather import OpenMeteoWeather, replan_proposals
 from .providers.places import OverpassPlaces
 from .providers.permits import PermitProvider
@@ -27,7 +36,7 @@ from .presentation import age_saved_facts
 def discover_destinations(user, state, preliminary):
     origin = CITIES.get(str(value(state,"origin","")).casefold())
     if not origin and value(state,"origin"):
-        located = query(OpenMeteoGeocoding(),{"name":value(state,"origin")})
+        located = query_with_fallback(geocoders(),{"name":value(state,"origin")},found=has_locations)
         matches = located.payload.get("locations",[])
         if len(matches) == 1:
             origin = (matches[0]["lat"],matches[0]["lon"])
@@ -70,7 +79,7 @@ def research_candidates(user, state, preliminary):
     if seed:
         locations = [seed]
     else:
-        result = query(OpenMeteoGeocoding(), {"name": requested}, force=value(state,"force_refresh",False))
+        result = query_with_fallback(geocoders(), {"name": requested}, force=value(state,"force_refresh",False), found=has_locations)
         locations = result.payload.get("locations", [])
     if not locations:
         locations = [{"name":requested,"lat":None,"lon":None}]
@@ -115,6 +124,9 @@ def enrich_candidate(user, state, destination):
     def fetch(provider, parameters):
         return query(provider, parameters, force=force and not cached_only(provider.category),
                      cache_only=cached_only(provider.category))
+    def fetch_any(providers, parameters, found=None):
+        category = providers[0].category
+        return query_with_fallback(providers, parameters, force=force and not cached_only(category), cache_only=cached_only(category), found=found)
     results = []
     for key in ("geocoding_result","discovery_result"):
         # An offline catalog place was not suggested by the guide, so the guide query is not its source.
@@ -127,7 +139,7 @@ def enrich_candidate(user, state, destination):
     origin = CITIES.get(str(value(state,"origin","")).casefold())
     d.pop("origin_geocoding_result", None)
     if not origin and value(state,"origin"):
-        geocoded = fetch(OpenMeteoGeocoding(),{"name":value(state,"origin")})
+        geocoded = fetch_any(geocoders(),{"name":value(state,"origin")},found=has_locations)
         results.append(geocoded)
         d["origin_geocoding_result"] = geocoded.as_dict()  # Its attribution is shown with the route sources.
         matches = geocoded.payload.get("locations",[])
@@ -144,10 +156,11 @@ def enrich_candidate(user, state, destination):
         route_parameters = {"start":[origin[1],origin[0]],"end":[d["lon"],d["lat"]],
             "mode":value(state,"transport_mode","mixed"),"avoid_expressways":value(state,"avoid_expressways",False),
             "avoid_tolls":value(state,"avoid_tolls",False),"preference":value(state,"route_preference","recommended")}
-        router = routing_provider(route_parameters["mode"])
-        route = fetch(router, route_parameters)
+        chain = routing_chain(route_parameters["mode"])
+        route = fetch_any(chain, route_parameters)
+        router = next((provider for provider in chain if provider.name == route.provider), chain[0])
         d["route_alternatives_note"] = "Alternative comparison unavailable; no additional route is established."
-        if route.success and not route.stale and route.payload["routes"][0]["distance_km"] <= 100:
+        if route.success and not route.stale and route.payload["routes"][0]["distance_km"] <= 100 and router.name != "google_routes":
             alternatives = fetch(router, {**route_parameters, "alternatives": True})
             if alternatives.success and not alternatives.stale:
                 route = alternatives
@@ -195,8 +208,8 @@ def enrich_candidate(user, state, destination):
         categories.append("restaurant")
     places = fetch(OverpassPlaces(),{"latitude":d["lat"],"longitude":d["lon"],"categories":categories}) if coords else ProviderResult("overpass","places",error="destination_coordinates_required")
     routes = d.get("route_result",{}).get("payload",{}).get("routes",[])
-    route_points = next((r for r in routes if r.get("route_id") == d.get("selected_route_id")),
-        routes[0] if routes and not d.get("route_choice_required") else {}).get("geometry",{}).get("coordinates",[])
+    route_points = (next((r for r in routes if r.get("route_id") == d.get("selected_route_id")),
+        routes[0] if routes and not d.get("route_choice_required") else {}).get("geometry") or {}).get("coordinates",[])
     if places.success:
         history = history_for(user)
         places.payload["places"] = rank_places(user,places.payload["places"],interests=value(state,"preferred_trip_style",[]),

@@ -569,7 +569,7 @@ class TravelProviderPolicyBoundaryTests(TestCase):
         from apps.mobility.services.travel_discovery import candidates_for
         owner = get_user_model().objects.create_user("origin-owner", password="x-Unused-12345")
         destination = candidates_for(owner, {"origin": fact("Bengaluru")}, destinations=[deepcopy(DESTINATIONS[0])])[0]
-        with patch("apps.mobility.services.travel.research.query", side_effect=fake_query):
+        with patch("apps.mobility.services.travel.research.query", side_effect=fake_query),                 patch("apps.mobility.services.travel.cache.query", side_effect=fake_query):
             d, _ = enrich_candidate(owner, {"origin": fact("Synthetic Origin")}, destination)
         self.assertIn("GeoNames", d["origin_geocoding_result"]["attribution"])
         origin = next(f for f in map_features(d)["features"] if f["properties"]["kind"] == "origin")

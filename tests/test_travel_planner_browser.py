@@ -68,6 +68,7 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
             ("apps.mobility.services.travel_research.dispatch", {"side_effect":run_research}),
             ("apps.mobility.services.travel.research.weather_result", {"side_effect":weather_fixture}),
             ("apps.mobility.services.travel.research.query", {"side_effect":route_fixture}),
+            ("apps.mobility.services.travel.cache.query", {"side_effect":route_fixture}),  # routing goes through the free-first fallback chain
             ("apps.mobility.services.travel.providers.base.request", {"side_effect":AssertionError("Browser tests must mock providers")}),
             ("apps.mobility.planner_views.map_configuration", {"return_value":{"provider":"openstreetmap","tile_url":"","attribution":"Fixture map","attribution_url":"https://www.openstreetmap.org/copyright"}}),
             ("apps.mobility.services.travel.providers.web.WikivoyageDestinations.fetch", {"return_value":({"query":{"pages":[
@@ -238,7 +239,7 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
                 source_url="https://openrouteservice.org/", retrieved_at=now.isoformat(), expires_at=(now+timedelta(days=1)).isoformat(),
                 payload=OpenRouteService().normalize({"features": features}, params))
 
-        with patch("apps.mobility.services.travel.research.query", side_effect=compared):
+        with patch("apps.mobility.services.travel.research.query", side_effect=compared), patch("apps.mobility.services.travel.cache.query", side_effect=compared):
             self.browser.get(self.live_server_url+"/mobility/")
             self.wait.until(lambda _: "destination is optional" in self.text("plannerMessages"))
             start, end = timezone.localdate()+timedelta(days=2), timezone.localdate()+timedelta(days=4)
