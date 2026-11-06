@@ -60,7 +60,8 @@ function renderTaxHero(data) {
     const notice = document.getElementById("taxPolicyNotice");
     const check = coverage.budget_check;
     const checked = check ? `Official Budget site last checked ${check.checked_at.slice(0, 10)}: latest Budget ${check.latest_budget_year}.` : "";
-    notice.textContent = [coverage.notice, coverage.filing_hint, checked].filter(Boolean).join(" ");
+    const filing = coverage.filing_year === policy.financial_year ? "" : coverage.filing_hint;
+    notice.textContent = [coverage.notice, filing, checked].filter(Boolean).join(" ");
     notice.hidden = !notice.textContent;
 }
 

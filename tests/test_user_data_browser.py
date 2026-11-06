@@ -3958,6 +3958,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: "AY 2026-27" in self.text("taxPolicyCopy"))
         self.wait.until(lambda _: "97,500" in self.text("taxAnnualValue"))
         self.assertIn("FY 2025-26", self.text("taxPolicyCopy"))
+        self.assertNotIn("Filing your return", self.text("taxPolicyNotice"))  # already on the filing year
         self.assertEqual(self.text("taxRegimeValue"), "NEW")
         self.assertEqual(self.browser.find_element(self.By.ID, "taxFinancialYear").get_attribute("value"), "2025-26")
         self.capture("tax-policy-2025-26")

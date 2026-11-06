@@ -208,6 +208,7 @@ class TaxYear202627Tests(SimpleTestCase):
         quiet = policy_coverage(date(2026, 11, 6))
         self.assertEqual((quiet["status"], quiet["notice"]), ("CURRENT", ""))
         self.assertIn("tax year 2025-26", quiet["filing_hint"])
+        self.assertEqual(quiet["filing_year"], "2025-26")
         self.assertEqual(policy_coverage(date(2027, 1, 31))["status"], "CURRENT")
         budget = policy_coverage(date(2027, 2, 1))
         self.assertEqual(budget["status"], "NEXT_BUDGET_UNVERIFIED")

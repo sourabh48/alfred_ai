@@ -201,7 +201,7 @@ def _date_coverage(today: date) -> dict:
         filing = (f"Filing your return for tax year {previous}? Choose {previous} under Financial Year so the "
                   "estimate uses that year's rules.")
     return {"current_tax_year": current, "latest_verified_year": latest, "supported_years": list(SUPPORTED_YEARS),
-            "status": status, "notice": notice, "filing_hint": filing}
+            "status": status, "notice": notice, "filing_hint": filing, "filing_year": previous if filing else ""}
 
 
 def get_policy(regime="old", *, financial_year=None, assessment_year=None) -> TaxPolicy:
