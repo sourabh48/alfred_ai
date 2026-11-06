@@ -65,16 +65,13 @@ def configured_profile():
         return None
 
 
-class R2MemoryProvider:
-    name = 'r2'
+class R2Bucket:
+    """One signed connection to the owner's R2 bucket; shared by memory sync and cloud backup (SYNC-11)."""
 
-    def __init__(self, owner, profile):
-        if not valid_id(owner, 64): raise PermissionError('Invalid cloud owner.')
-        self.owner = owner; self.profile = validate_profile({k: profile[k] for k in PROFILE_FIELDS}); self.checked = False
+    def __init__(self, profile):
+        self.profile = validate_profile({k: profile[k] for k in PROFILE_FIELDS})
         host = self.profile['account_id'] + ('.eu' if self.profile['jurisdiction'] else '') + '.r2.cloudflarestorage.com'
         self.base = f"https://{host}/{self.profile['bucket']}"
-        self.prefix = 'alfred-memory-v1/' + owner + '/'
-        self.etag = None
 
     def _send(self, method, key='', *, query=None, data=b'', headers=None, deadline, maximum=MAX_OBJECT, statuses=(200,)):
         remaining(deadline)
@@ -82,13 +79,24 @@ class R2MemoryProvider:
         headers = dict(headers or {})
         if method == 'PUT': headers['content-type'] = 'application/octet-stream'
         try:
-            return request(method, url, headers=signed_headers(method, url, data, self.profile, headers), data=data if method == 'PUT' else None,
+            return request(method, url, headers=signed_headers(method, url, data, self.profile, headers), data=data if method in ('PUT', 'POST') else None,
                 content_types=('application/octet-stream', 'application/xml', 'text/xml', 'application/json', ''),
                 accepted_statuses=statuses, max_bytes=maximum, deadline=deadline)
         except PublicHTTPError as error:  # codes are fixed words such as authorization_failed; never credentials
             raise SyncUnavailable(f'Cloud storage refused or failed the request ({error.code}); local data is retained.') from None
         except OSError:
             raise SyncUnavailable('Cloud storage is unreachable; local updates stay queued.') from None
+
+
+class R2MemoryProvider(R2Bucket):
+    name = 'r2'
+
+    def __init__(self, owner, profile):
+        if not valid_id(owner, 64): raise PermissionError('Invalid cloud owner.')
+        super().__init__(profile)
+        self.owner = owner; self.checked = False
+        self.prefix = 'alfred-memory-v1/' + owner + '/'
+        self.etag = None
 
     def _scope(self, owner, deadline):
         if owner != self.owner: raise PermissionError('Cloud access is owner-scoped.')

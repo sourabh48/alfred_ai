@@ -88,6 +88,7 @@
  "tests.test_memory_privacy": 5.7,
  "tests.test_memory_reasoning": 2.5,
  "tests.test_memory_r2": 3.0,
+ "tests.test_cloud_backup": 4.0,
  "tests.test_memory_sync": 9.0,
  "tests.test_memory_sync_runtime": 4.61,
  "tests.test_mobility_money": 45.97,
