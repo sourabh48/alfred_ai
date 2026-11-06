@@ -79,8 +79,8 @@ jobs:
         run: |
           $baseline = $env:BASELINE_SHA
           if ($baseline -match '^0+$') { $baseline = $env:GITHUB_SHA }
-          # Reviewed dependency/migration contents (owner approved budgets 0003, the AI-18 Piper dependency, mobility 0014 and investments 0006 at 9add134, 2026-11-06); later changes still fail closed.
-          python scripts/release_gate.py preflight --release-id "ci-$env:GITHUB_RUN_ID" --candidate $env:GITHUB_SHA --baseline $baseline --reviewed-source 9add1343fb5cf51b4e31258df77734393f7e02af --output artifacts/release-ci
+          # Reviewed dependency/migration contents (owner approved budgets 0003, the AI-18 Piper dependency, mobility 0014, investments 0006 and loans 0017 at 9900b2b, 2026-11-06); later changes still fail closed.
+          python scripts/release_gate.py preflight --release-id "ci-$env:GITHUB_RUN_ID" --candidate $env:GITHUB_SHA --baseline $baseline --reviewed-source 9900b2b3b10b57394162fd48c0ca35c7bc3a675d --output artifacts/release-ci
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/release_gate.py validate --output artifacts/release-ci --profile backend --shard-index ${{ matrix.part }} --shard-count 4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
