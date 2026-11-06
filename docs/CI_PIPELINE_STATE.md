@@ -8,6 +8,7 @@ migration on 2026-11-06, so the backend step's `--reviewed-source` now names `16
 dependency change is refused again until reviewed. Run 42183546064 at `e990030` then passed shards 0, 2 and 3;
 shard 1 failed because `tests/test_remaining_public_http.py` still called the scraper INV-04 removed (the same
 cause as the earlier `1a36f53` shard-3 failure). Reproduced from a clean checkout and fixed in the test.
+Run 42185812614 at `e8ef8f4`: CI_PASSED (Linux, four Windows backend shards, native, three Selenium shards).
 
 ## RUNTIME-11 build pins — 2026-11-05
 

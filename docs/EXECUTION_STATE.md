@@ -209,7 +209,10 @@
   "Confidence", and costs read as estimates. 44 backend + 3 Chrome PASS. Outcomes and a parts source remain.
 - OPENAI-02 stays approval-gated (OpenAI off); RUNTIME-12 needs signed-in GitHub access for protection settings.
 - FIN-06 (2026-11-06): INR savings goals on Budgets (migration budgets 0003). 5 backend + Chrome PASS. The owner
-  approved the migration; CI reviewed source re-pinned to 164d394 and the owner app restarted to apply it.
+  approved the migration; CI reviewed source re-pinned to 164d394 and the owner app restarted to apply it
+  (pre-migration DB copy in F:\ALFRED_BACKUPS\pre-fin06-migration-20261106, hash matched).
+- CI: e8ef8f4 run 42185812614 PASS on every job. The shard failures at 1a36f53/e990030 were a test still calling the
+  scraper INV-04 removed. Phase B worked through; next queue task AI-17 (phase D).
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 
