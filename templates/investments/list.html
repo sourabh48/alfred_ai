@@ -216,6 +216,18 @@
         <div><button class="btn btn-primary" type="submit">Save call</button></div>
     </form>
     <div id="researchDecisionList" class="data-stack mt-3"></div>
+    <form id="researchPacketForm" class="soft-grid mt-4" data-live-refresh-hold="true">
+        <h3 class="h6 mb-0">Evidence packet</h3>
+        <p class="page-section-copy mb-0">Before a call, see the dated case for and against a listed stock from Yahoo's annual statements and a year of prices. Screens are rules of thumb: there is no rating, target or order.</p>
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4"><label class="form-label" for="researchPacketSymbol">Exchange symbol</label>
+                <input class="form-control" id="researchPacketSymbol" name="symbol" maxlength="20" placeholder="e.g. INFY.NS" required></div>
+            <div class="col-md-5"><label class="form-label" for="researchPacketHolding">Your matching holding (optional)</label>
+                <select class="form-select" id="researchPacketHolding" name="holding"><option value="">None</option></select></div>
+            <div class="col-md-3"><button class="btn btn-outline-primary" type="submit">Build packet</button></div>
+        </div>
+        <div id="researchPacket" aria-live="polite"></div>
+    </form>
 </section>
 
 <section class="surface-card">
@@ -245,5 +257,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.7.0"></script>
+<script src="/static/js/investments.js?v=2.8.0"></script>
 {% endblock %}

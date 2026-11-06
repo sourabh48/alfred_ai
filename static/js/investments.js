@@ -83,6 +83,7 @@ function loadInvestmentDashboard() {
             renderInvestmentGrounding(summaryData.grounding || {});
             renderInvestmentWatchlist(summaryData.watchlist || {});
             renderInvestmentPositions(summaryData.positions || []);
+            fillPacketHoldings(summaryData.positions || []);
             renderInvestmentImports(importUploads || []);
             Alfred.clearPageAlert("investmentRoot");
         })
@@ -495,6 +496,51 @@ function initResearchJournal() {
     form.addEventListener("submit", submitResearchDecision);
     form.elements.instrument.addEventListener("change", () => loadResearchLessons(form.elements.instrument.value));
     loadResearchDecisions();
+    document.getElementById("researchPacketForm")?.addEventListener("submit", loadResearchPacket);
+}
+
+function fillPacketHoldings(items) {
+    const select = document.getElementById("researchPacketHolding");
+    if (!select) return;
+    const chosen = select.value;
+    select.replaceChildren(new Option("None", ""), ...items.map(item => new Option(item.asset_name, String(item.id))));
+    select.value = items.some(item => String(item.id) === chosen) ? chosen : "";
+}
+
+async function loadResearchPacket(event) {
+    event.preventDefault();
+    const form = event.currentTarget, target = document.getElementById("researchPacket");
+    const query = new URLSearchParams({ symbol: form.elements.symbol.value.trim() });
+    if (form.elements.holding.value) query.set("holding", form.elements.holding.value);
+    target.innerHTML = `<p class="muted small mb-0">Fetching dated public data…</p>`;
+    try {
+        target.innerHTML = researchPacketHtml(await Alfred.fetchJSON(`/api/investments/research/packet/?${query}`));
+    } catch (error) {
+        target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${Alfred.escapeHtml(error.message || "The packet could not be built.")}</div>`;
+    }
+}
+
+function researchPacketHtml(p) {
+    const e = Alfred.escapeHtml;
+    const points = (title, items, id) => `<div class="col-md-6" id="${id}"><p class="fw-semibold mb-1">${title}</p>${items.length
+        ? `<ul class="mb-0">${items.map(item => `<li>${e(item.point)} <span class="muted small">(${e(item.as_of)})</span></li>`).join("")}</ul>`
+        : `<p class="muted small mb-0">No screen points this way.</p>`}</div>`;
+    const list = items => `<ul class="mb-0">${items.map(item => `<li>${e(item)}</li>`).join("")}</ul>`;
+    const v = p.valuation || {};
+    const valuation = v.status === "estimated"
+        ? `Price-to-earnings ${e(String(v.price_to_earnings))} (earnings yield ${e(String(v.earnings_yield_pct))}%) as of ${e(v.as_of)}. ${e(v.basis)} ${e(v.uncertainty)}`
+        : `Unavailable: ${e(v.reason || "")}`;
+    return `<div class="mini-card" id="researchPacketResult">
+        <p class="metric-kicker mb-1">${e(p.symbol)} · statements to ${e(p.latest_period_end || "unknown")} · retrieved ${e((p.retrieved_at || "").slice(0, 10))}
+            · <a href="${Alfred.safeHref(p.source_url)}" target="_blank" rel="noopener">Source</a></p>
+        <div class="row g-3">${points("Case for", p.bullish || [], "researchPacketBull")}${points("Case against", p.bearish || [], "researchPacketBear")}</div>
+        <p class="mt-3 mb-1"><strong>Valuation:</strong> <span id="researchPacketValuation">${valuation}</span></p>
+        <p class="mb-1"><strong>Your portfolio:</strong> ${e(p.portfolio?.detail || "")}</p>
+        ${(p.thesis_changes || []).length ? `<p class="fw-semibold mt-2 mb-1">What would change the picture</p>${list(p.thesis_changes)}` : ""}
+        <p class="fw-semibold mt-2 mb-1">Missing evidence</p>${list(p.missing_evidence || [])}
+        <p class="fw-semibold mt-2 mb-1">Your options</p>${list(p.options || [])}
+        <p class="muted small mt-2 mb-0">${(p.limits || []).map(e).join(" ")}</p>
+    </div>`;
 }
 
 function researchPercent(value) {

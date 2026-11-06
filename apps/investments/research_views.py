@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from alfred_ai.services.api_parsing import TextJSONParser as JSONParser
+from alfred_ai.services import public_http
 from alfred_ai.services.currency import CURRENCY_CHOICES
 from .models import ResearchDecision
 from .services.research_journal import lessons, outcome
@@ -126,3 +127,28 @@ class ResearchLessonsView(APIView):
 
     def get(self, request):
         return Response(lessons(request.user, str(request.query_params.get("instrument") or "")[:120]))
+
+
+class ResearchPacketView(APIView):
+    """INVEST2-001: owner-requested evidence packet for one symbol; reads public data, writes nothing."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Sum
+        from .models import Investment
+        from .services.research_packet import research_packet
+
+        holding, total, raw = None, None, str(request.query_params.get("holding") or "")
+        if raw:
+            if not raw.isdigit() or len(raw) > 18:
+                return Response({"detail": "Choose one of your holdings."}, status=status.HTTP_400_BAD_REQUEST)
+            holding = get_object_or_404(Investment, pk=int(raw), user=request.user)
+            same = Investment.objects.filter(user=request.user)
+            same = same.in_rupee_totals() if holding.currency in (None, "INR") else same.filter(currency=holding.currency)
+            total = same.aggregate(total=Sum("current_value"))["total"] or None
+        try:
+            return Response(research_packet(request.query_params.get("symbol", ""), holding=holding, portfolio_total=total))
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except public_http.PublicHTTPError as exc:
+            return Response({"detail": f"Yahoo data is unavailable right now ({exc.code}). Try again later."}, status=status.HTTP_502_BAD_GATEWAY)

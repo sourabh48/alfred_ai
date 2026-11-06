@@ -6872,6 +6872,24 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(list(Investment.objects.filter(user=owner).values()), holdings)
         self.capture('investment-research-journal')
 
+    def test_research_packet_shows_dated_case_for_and_against_without_writing(self):
+        from unittest.mock import patch
+        from apps.investments.models import Investment, ResearchDecision
+        from tests.test_research_packet import RISING, _fund, _prices
+        owner = self.scenario['user']
+        holdings, calls = list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()
+        self.login()
+        with patch('apps.investments.services.research_packet.fetch_fundamentals', return_value=_fund(currency='USD')),                 patch('apps.investments.services.research_packet.fetch_prices', return_value=_prices(RISING)):
+            self.browser.get(self.live_server_url + '/investments/')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPacketSymbol'))
+            self.browser.find_element(self.By.ID, 'researchPacketSymbol').send_keys('synth.ns')
+            self.memory_click('#researchPacketForm button[type=submit]')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPacketResult'))
+        self.assertIn('Revenue grew 20.0%', self.text('researchPacketBull'))
+        self.assertIn('does not convert', self.text('researchPacketValuation'))
+        self.assertEqual((list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()), (holdings, calls))
+        self.capture('investment-research-packet')
+
     def test_loan_prepayment_what_if_reports_savings_and_cash_left_without_writing(self):
         from decimal import Decimal
         from django.utils import timezone

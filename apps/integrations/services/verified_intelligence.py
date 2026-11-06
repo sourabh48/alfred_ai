@@ -1400,7 +1400,8 @@ class VerifiedIntelligenceService:
             if observations[dates[-1]] is None:
                 raise ValueError("Latest Yahoo daily value is missing.")
             valid = [(stamp, observations[stamp]) for stamp in dates if observations[stamp] is not None]
-            return {"close": [value for _, value in valid], "timestamp": [stamp for stamp, _ in valid]}
+            return {"close": [value for _, value in valid], "timestamp": [stamp for stamp, _ in valid],
+                    "currency": str(result["meta"].get("currency") or "").upper()[:3] or None}
         except (KeyError, TypeError, AttributeError, IndexError, InvalidOperation, OverflowError, OSError) as exc:
             raise ValueError("Yahoo chart evidence is malformed.") from exc
 
