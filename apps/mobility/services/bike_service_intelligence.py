@@ -10,12 +10,18 @@ from statistics import mean
 from django.db.models import Count, Max, Q
 from django.utils import timezone
 
+from alfred_ai.services.currency import counts_in_rupees, rupee_amount
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.money import money_float
 from apps.expenses.services.financial_intelligence import _numeric_currency_payload
 from apps.ml_engine.inference_adapters.service_cost_predictor import service_cost_predictor, service_type_score, vehicle_type_score
 from apps.mobility.models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TripLog
 from .bike_catalog import build_maintenance_guidance, build_route_maintenance_guidance
+
+
+def _rupee(item, field="cost"):
+    """FIN-15: a record's amount for rupee totals; zero when recorded in another currency, never converted."""
+    return rupee_amount(getattr(item, field) or 0, getattr(item, "currency", None))
 
 
 SERVICE_RULES = [
@@ -244,9 +250,9 @@ class BikeServiceIntelligenceService:
         critical_issues = [item for item in open_issues if item.severity in {"high", "critical"}]
         latest_service = scoped_service_records[0] if scoped_service_records else None
         latest_condition = scoped_condition_snapshots[0] if scoped_condition_snapshots else None
-        total_service_cost = round(sum(item.cost or 0 for item in scoped_service_records), 2)
-        annual_service_cost = round(sum(item.cost or 0 for item in scoped_service_records if (today - item.service_date).days <= 365), 2)
-        trip_cost_total = round(sum(item.spend_amount or 0 for item in scoped_trip_logs), 2)
+        total_service_cost = round(sum(_rupee(item) for item in scoped_service_records), 2)
+        annual_service_cost = round(sum(_rupee(item) for item in scoped_service_records if (today - item.service_date).days <= 365), 2)
+        trip_cost_total = round(sum(_rupee(item, "spend_amount") for item in scoped_trip_logs), 2)
         trip_distance_total = round(sum(item.distance_km or 0 for item in scoped_trip_logs), 1)
         cost_per_km = money_float(Decimal(str(trip_cost_total)) / Decimal(str(trip_distance_total))) if trip_distance_total else 0
         projected_next_service_cost = round(self._routine_service_baseline(scoped_service_records, profile=primary_profile) + sum(self._issue_cost(issue, scoped_issues) for issue in open_issues[:3]), 2)
@@ -313,7 +319,7 @@ class BikeServiceIntelligenceService:
                 "mileage_gap_kmpl": mileage_gap,
                 "estimated_range_km": estimated_range,
                 "refill_count": len(scoped_refill_logs),
-                "fuel_cost_total": round(sum(item.total_cost or 0 for item in scoped_refill_logs), 2),
+                "fuel_cost_total": round(sum(_rupee(item, "total_cost") for item in scoped_refill_logs), 2),
                 "latest_condition_score": latest_condition.overall_score if latest_condition else 0,
                 "latest_condition_status": latest_condition.get_overall_status_display() if latest_condition else "No data",
             },
@@ -549,9 +555,9 @@ class BikeServiceIntelligenceService:
         return self._current_documents(documents)
 
     def _routine_service_baseline(self, service_records: list[BikeServiceRecord], *, profile=None) -> float:
-        routine_costs = [float(item.cost) for item in service_records if item.service_type == "routine" and item.cost]
+        routine_costs = [float(item.cost) for item in service_records if item.service_type == "routine" and _rupee(item)]
         heuristic = round(mean(routine_costs[-3:]), 2) if routine_costs else 1800.0
-        latest_record = next((item for item in service_records if item.cost), service_records[0] if service_records else None)
+        latest_record = next((item for item in service_records if _rupee(item)), service_records[0] if service_records else None)
         if latest_record is None:
             return heuristic
 
@@ -579,13 +585,13 @@ class BikeServiceIntelligenceService:
         return round(predicted, 2)
 
     def _issue_cost(self, issue: BikeIssueReport, issues: list[BikeIssueReport]) -> float:
-        if issue.projected_cost:
+        if issue.projected_cost and counts_in_rupees(issue.currency):
             return money_float(issue.projected_cost)
         rule = self._match_rule(issue.title, issue.symptom, issue.observation, issue.system)
         return self._blend_cost(rule["cost_range"], [item for item in issues if item.system == issue.system]) if rule else 800.0
 
     def _blend_cost(self, cost_range: tuple[int, int], history: list[BikeIssueReport]) -> float:
-        historical_costs = [float(item.actual_cost) for item in history if item.actual_cost]
+        historical_costs = [float(item.actual_cost) for item in history if _rupee(item, "actual_cost")]
         midpoint = (cost_range[0] + cost_range[1]) / 2
         if historical_costs:
             return round((mean(historical_costs[-3:]) * 0.65) + (midpoint * 0.35), 2)
@@ -681,7 +687,7 @@ class BikeServiceIntelligenceService:
     ) -> list[str]:
         observations = []
         if service_records:
-            observations.append(f"Total logged bike service spend is INR {sum(item.cost or 0 for item in service_records):,.0f}.")
+            observations.append(f"Total logged bike service spend is INR {sum(_rupee(item) for item in service_records):,.0f}.")
         if trip_cost_total:
             observations.append(f"Trip logs currently capture INR {trip_cost_total:,.0f} of ride spend at roughly INR {cost_per_km:,.2f} per km.")
         if refill_logs:
@@ -739,13 +745,13 @@ class BikeServiceIntelligenceService:
         return {
             "opening": opening,
             "talking_points": talking_points[:4],
-            "projected_total": round(sum(issue.projected_cost or 0 for issue in top_issues), 2),
+            "projected_total": round(sum(_rupee(issue, "projected_cost") for issue in top_issues), 2),
         }
 
     def _build_service_history_summary(self, service_records, documents, condition_snapshots, refill_logs) -> dict:
         imported_bills = sum(1 for item in service_records if item.source_mode in {"bill_import", "work_note"})
         manual_logs = sum(1 for item in service_records if item.source_mode == "manual")
-        average_cost = round(mean([item.cost for item in service_records if item.cost]), 2) if any(item.cost for item in service_records) else 0.0
+        average_cost = round(mean([item.cost for item in service_records if _rupee(item)]), 2) if any(_rupee(item) for item in service_records) else 0.0
         recurring_centers = [center for center, _ in Counter(item.service_center for item in service_records if item.service_center).most_common(2)]
         return {
             "total_service_logs": len(service_records),
@@ -990,7 +996,7 @@ class BikeServiceIntelligenceService:
                     "performance_effect": rule["performance_effect"],
                     "recommended_action": rule["recommended_action"],
                     "last_service_date": latest_part_service.service_date.isoformat() if latest_part_service else "",
-                    "last_service_cost": round(latest_part_service.cost or 0, 2) if latest_part_service else 0,
+                    "last_service_cost": round(_rupee(latest_part_service), 2) if latest_part_service else 0,
                     "service_count": len(matched_services),
                     "issue_count": len(matched_issues),
                     "days_since_service": days_since,
@@ -1038,16 +1044,16 @@ class BikeServiceIntelligenceService:
     def _build_charts(self, service_records, trip_logs, issues, condition_snapshots, refill_logs, expected_mileage, source_name, source_url) -> dict:
         service_chart = {
             "labels": [item.service_date.isoformat() for item in reversed(service_records[:8])],
-            "values": [round(item.cost or 0, 2) for item in reversed(service_records[:8])],
+            "values": [round(_rupee(item), 2) for item in reversed(service_records[:8])],
         }
 
         monthly = defaultdict(lambda: {"service": Decimal("0"), "trip": Decimal("0")})
         for item in service_records[:12]:
             key = (item.service_date.year, item.service_date.month)
-            monthly[key]["service"] += item.cost or 0
+            monthly[key]["service"] += _rupee(item)
         for item in trip_logs[:24]:
             key = (item.log_date.year, item.log_date.month)
-            monthly[key]["trip"] += item.spend_amount or 0
+            monthly[key]["trip"] += _rupee(item, "spend_amount")
         ordered_keys = sorted(monthly.keys())[-6:]
         month_labels = [datetime(year, month, 1).strftime("%b %Y") for year, month in ordered_keys]
         cost_mix = {
@@ -1144,6 +1150,8 @@ class BikeServiceIntelligenceService:
             "usage_pattern": getattr(primary_profile, "get_usage_pattern_display", lambda: "")(),
             "estimated_market_value": getattr(primary_profile, "estimated_market_value", 0),
             "monthly_income_support": getattr(primary_profile, "monthly_income_support", 0),
+            "value_currency": getattr(primary_profile, "value_currency", None),
+            "income_support_currency": getattr(primary_profile, "income_support_currency", None),
             "engine_cc": getattr(primary_profile, "engine_cc", None),
             "fuel_tank_capacity_l": getattr(primary_profile, "fuel_tank_capacity_l", None),
             "expected_mileage_kmpl": getattr(primary_profile, "expected_mileage_kmpl", None),
@@ -1180,7 +1188,7 @@ class BikeServiceIntelligenceService:
         current_documents = self._current_documents(documents)
         doc_counts = Counter(self._document_vehicle_key(document) for document in current_documents)
         for record in service_records:
-            service_costs[self._profile_key(record.bike_profile_id, record.vehicle_number, record.bike_name)] += record.cost or 0
+            service_costs[self._profile_key(record.bike_profile_id, record.vehicle_number, record.bike_name)] += _rupee(record)
 
         items = []
         for profile in bike_profiles:

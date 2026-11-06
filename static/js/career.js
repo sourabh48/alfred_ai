@@ -198,7 +198,7 @@ function renderCareerSnapshot(profile) {
         ["Role", profile.role || "Profile pending"],
         ["Experience", `${Alfred.formatNumber(profile.experience_years, 1)} years`],
         ["Skills", profile.skills || "No skills listed yet."],
-        ["Current income", Number(profile.last_salary) > 0 ? Alfred.formatCurrency(profile.last_salary) : "Not recorded"],
+        ["Current income", Number(profile.last_salary) > 0 ? Alfred.formatCurrency(profile.last_salary, profile.salary_currency || "INR") : "Not recorded"],
     ].map(([label, value]) => `
         <div class="data-row">
             <div class="data-label">${label}</div>
@@ -679,6 +679,7 @@ function hydrateCareerForm(profile) {
     form.experience_years.value = profile.experience_years ?? 0;
     form.skills.value = profile.skills || "";
     form.last_salary.value = profile.last_salary ?? 0;
+    form.salary_currency.value = profile.salary_currency || "";
 }
 
 function submitCareerProfile(event) {

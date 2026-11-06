@@ -524,6 +524,7 @@ def _apply_resume_profile(user, parsed) -> None:
             "experience_years": 0,
             "skills": "",
             "last_salary": getattr(user, "monthly_income", 0) or 0,
+            "salary_currency": getattr(user, "income_currency", None),  # FIN-15: the copied amount keeps its currency
         },
     )
     resume_intelligence.apply_to_profile(profile, parsed)
@@ -1826,8 +1827,8 @@ def _refresh_imported_service_records(document: BikeDocument, parsed, *, cost_ac
         record.save(update_fields=update_fields)
     if records:
         # An imported invoice's amount mirrors its posted log.
-        document.premium_amount = records[0].cost
-        document.save(update_fields=["premium_amount"])
+        document.premium_amount, document.currency = records[0].cost, records[0].currency
+        document.save(update_fields=["premium_amount", "currency"])
 
 
 def _review_km(value) -> int:

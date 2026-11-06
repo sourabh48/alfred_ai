@@ -10,7 +10,20 @@ from apps.expenses.money import NumericMoneySerializerField, money_float
 from .models import BikeConditionSnapshot, BikeDocument, BikeIssueReport, BikeProfile, BikeServiceRecord, FuelRefillLog, TravelPlan, TripLog, TripPhoto, TripVideo
 
 
-class BikeProfileSerializer(serializers.ModelSerializer):
+class BlankCurrencyIsNotRecorded:
+    """FIN-15: a blank currency means not recorded, never a guessed INR."""
+    CURRENCY_FIELDS = ("currency", "value_currency", "income_support_currency", "budget_currency")
+
+    def to_internal_value(self, data):
+        if isinstance(data, Mapping) and any(data.get(name) == "" for name in self.CURRENCY_FIELDS):
+            data = data.copy() if hasattr(data, "copy") else dict(data)
+            for name in self.CURRENCY_FIELDS:
+                if data.get(name) == "":
+                    data[name] = None
+        return super().to_internal_value(data)
+
+
+class BikeProfileSerializer(BlankCurrencyIsNotRecorded, serializers.ModelSerializer):
     estimated_market_value = NumericMoneySerializerField(required=False)
     monthly_income_support = NumericMoneySerializerField(required=False)
     verification_status_label = serializers.CharField(source="get_verification_status_display", read_only=True)
@@ -43,6 +56,8 @@ class BikeProfileSerializer(serializers.ModelSerializer):
             "usage_pattern_label",
             "estimated_market_value",
             "monthly_income_support",
+            "value_currency",
+            "income_support_currency",
             "catalog_key",
             "official_source_name",
             "official_source_url",
@@ -68,7 +83,7 @@ class BikeProfileSerializer(serializers.ModelSerializer):
         )
 
 
-class BikeServiceRecordSerializer(serializers.ModelSerializer):
+class BikeServiceRecordSerializer(BlankCurrencyIsNotRecorded, serializers.ModelSerializer):
     cost = NumericMoneySerializerField(required=False)
     service_type_label = serializers.CharField(source="get_service_type_display", read_only=True)
     source_mode_label = serializers.CharField(source="get_source_mode_display", read_only=True)
@@ -89,6 +104,7 @@ class BikeServiceRecordSerializer(serializers.ModelSerializer):
             "service_type",
             "service_type_label",
             "cost",
+            "currency",
             "service_center",
             "next_service_date",
             "next_service_km",
@@ -120,7 +136,7 @@ class BikeServiceRecordSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class FuelRefillLogSerializer(serializers.ModelSerializer):
+class FuelRefillLogSerializer(BlankCurrencyIsNotRecorded, serializers.ModelSerializer):
     total_cost = NumericMoneySerializerField(required=False)
     bike_profile_name = serializers.CharField(source="bike_profile.display_name", read_only=True)
     bike_profile = serializers.PrimaryKeyRelatedField(queryset=BikeProfile.objects.all(), allow_null=True, required=False)
@@ -141,6 +157,7 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
             "trip_meter_km",
             "fuel_liters",
             "total_cost",
+            "currency",
             "fuel_price_per_liter",
             "is_full_tank",
             "station_name",
@@ -204,7 +221,7 @@ class FuelRefillLogSerializer(serializers.ModelSerializer):
         return super().to_internal_value(normalized)
 
 
-class TravelPlanSerializer(serializers.ModelSerializer):
+class TravelPlanSerializer(BlankCurrencyIsNotRecorded, serializers.ModelSerializer):
     budget = NumericMoneySerializerField(required=False)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     transport_mode_label = serializers.CharField(source="get_transport_mode_display", read_only=True)
@@ -226,6 +243,7 @@ class TravelPlanSerializer(serializers.ModelSerializer):
             "start_date",
             "end_date",
             "budget",
+            "budget_currency",
             "transport_mode",
             "transport_mode_label",
             "status",
@@ -268,7 +286,7 @@ class TravelPlanSerializer(serializers.ModelSerializer):
         return getattr(obj, "photo_count", obj.photos.count())
 
 
-class TripLogSerializer(serializers.ModelSerializer):
+class TripLogSerializer(BlankCurrencyIsNotRecorded, serializers.ModelSerializer):
     spend_amount = NumericMoneySerializerField(required=False)
     travel_plan_title = serializers.CharField(source="travel_plan.title", read_only=True)
 
@@ -287,6 +305,7 @@ class TripLogSerializer(serializers.ModelSerializer):
             "longitude",
             "distance_km",
             "spend_amount",
+            "currency",
             "mood",
             "created_at",
         )
@@ -407,7 +426,7 @@ class TripPhotoSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class BikeIssueReportSerializer(serializers.ModelSerializer):
+class BikeIssueReportSerializer(BlankCurrencyIsNotRecorded, serializers.ModelSerializer):
     projected_cost = NumericMoneySerializerField(read_only=True)
     system_label = serializers.CharField(source="get_system_display", read_only=True)
     severity_label = serializers.CharField(source="get_severity_display", read_only=True)
@@ -450,6 +469,7 @@ class BikeIssueReportSerializer(serializers.ModelSerializer):
             "service_center_note",
             "projected_cost",
             "actual_cost",
+            "currency",
             "tags",
             "created_at",
             "updated_at",
@@ -497,7 +517,7 @@ class BikeIssueReportSerializer(serializers.ModelSerializer):
         return super().to_internal_value(normalized)
 
 
-class BikeDocumentSerializer(serializers.ModelSerializer):
+class BikeDocumentSerializer(BlankCurrencyIsNotRecorded, serializers.ModelSerializer):
     premium_amount = NumericMoneySerializerField(required=False)
     document_type_label = serializers.CharField(source="get_document_type_display", read_only=True)
     verification_status_label = serializers.CharField(source="get_verification_status_display", read_only=True)
@@ -522,6 +542,7 @@ class BikeDocumentSerializer(serializers.ModelSerializer):
             "issue_date",
             "expiry_date",
             "premium_amount",
+            "currency",
             "verification_status",
             "verification_status_label",
             "verification_notes",

@@ -112,7 +112,9 @@ function renderTravelPlans(items) {
     const target = document.getElementById("travelPlanList");
     Alfred.setHTMLIfChanged(target, items.length ? items.map(item => {
         const planLogs = mobilityState.logs.filter(log => log.travel_plan === item.id);
-        const spend = planLogs.reduce((sum, log) => sum + Number(log.spend_amount || 0), 0);
+        // FIN-15: only spend in the plan's own currency is added to it; nothing is converted.
+        const planCurrency = item.budget_currency || "INR";
+        const spend = planLogs.filter(log => (log.currency || "INR") === planCurrency).reduce((sum, log) => sum + Number(log.spend_amount || 0), 0);
         const distance = planLogs.reduce((sum, log) => sum + Number(log.distance_km || 0), 0);
         return `
             <div class="mini-card">
@@ -122,10 +124,10 @@ function renderTravelPlans(items) {
                         <div class="muted small">${Alfred.escapeHtml(item.destination)} | ${Alfred.formatDate(item.start_date)} to ${Alfred.formatDate(item.end_date)} | ${Alfred.escapeHtml(item.transport_mode_label)}</div>
                         ${item.vehicle_profile_name ? `<div class="muted small">Vehicle: ${Alfred.escapeHtml(item.vehicle_profile_name)}</div>` : ""}
                         <div class="muted small">${Alfred.formatNumber(item.duration_days, 0)} days | ${Alfred.formatNumber(item.log_count || 0, 0)} logs | ${Alfred.formatNumber(item.photo_count || 0, 0)} photos</div>
-                        <div class="muted small">Logged spend ${Alfred.formatCurrency(spend)} | distance ${Alfred.formatNumber(distance, 1)} km</div>
+                        <div class="muted small">Logged spend ${Alfred.formatCurrency(spend, planCurrency)} | distance ${Alfred.formatNumber(distance, 1)} km</div>
                     </div>
                     <div class="text-end">
-                        <strong>${Alfred.formatCurrency(item.budget)}</strong>
+                        <strong>${Alfred.formatCurrency(item.budget, item.budget_currency || "INR")}</strong>
                         <div class="mt-2"><button class="btn btn-sm btn-outline-primary" type="button" onclick="TravelPlanner.openPlan(${item.id})">Open plan</button> <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTravelPlan(${item.id})">Delete</button></div>
                     </div>
                 </div>
@@ -142,7 +144,7 @@ function renderTripLogs(items) {
                 <div>
                     <div class="fw-semibold">${Alfred.escapeHtml(item.title)}</div>
                     <div class="muted small">${Alfred.escapeHtml(item.travel_plan_title)} | ${Alfred.formatDate(item.log_date)} | ${Alfred.escapeHtml(item.location_name || "Unknown location")}</div>
-                    <div class="muted small">${Alfred.formatNumber(item.distance_km || 0, 1)} km | ${Alfred.formatCurrency(item.spend_amount || 0)} | ${Alfred.escapeHtml(item.mood || "No mood set")}</div>
+                    <div class="muted small">${Alfred.formatNumber(item.distance_km || 0, 1)} km | ${Alfred.formatCurrency(item.spend_amount || 0, item.currency || "INR")} | ${Alfred.escapeHtml(item.mood || "No mood set")}</div>
                     ${item.latitude !== null && item.longitude !== null ? `<div class="muted small">Coordinates ${Alfred.formatNumber(item.latitude, 4)}, ${Alfred.formatNumber(item.longitude, 4)}</div>` : ""}
                 </div>
                 <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTripLog(${item.id})">Delete</button>

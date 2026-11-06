@@ -40,6 +40,17 @@
                         <input id="budgetInflation" name="inflation_adjusted" type="number" step="0.01" class="form-control" required>
                     </div>
                     <div class="col-md-6">
+                        <label for="budgetCurrency" class="form-label">Plan currency</label>
+                        <select id="budgetCurrency" name="currency" class="form-select" aria-describedby="budgetCurrencyHelp">
+                            <option value="INR" selected>Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                            <option value="">Not recorded</option>
+                        </select>
+                        <div id="budgetCurrencyHelp" class="form-text">The plan is compared only with spending in the same currency (INR includes not recorded). Nothing is converted.</div>
+                    </div>
+                    <div class="col-md-6">
                         <label for="budgetSpent" class="form-label">Historical Spend Note</label>
                         <input id="budgetSpent" name="spent" type="number" step="0.01" class="form-control" value="0">
                         <div class="form-text">For your plan history only. Dashboard spending comes from transactions.</div>
@@ -102,15 +113,26 @@
 
 <section class="surface-card mt-4" id="savingsGoalsSection" aria-labelledby="savingsGoalsTitle">
     <h2 class="page-section-title" id="savingsGoalsTitle">Savings Goals</h2>
-    <p class="page-section-copy mb-3">Set a target in INR and update what you have saved. Progress is what you enter, not matched transactions; the monthly amount spreads what is left evenly until the target date.</p>
+    <p class="page-section-copy mb-3">Set a target in its currency and update what you have saved. Progress is what you enter, not matched transactions; the monthly amount spreads what is left evenly until the target date.</p>
     <form id="savingsGoalForm" class="row g-3 align-items-end mb-3">
         <div class="col-md-4">
             <label for="savingsGoalName" class="form-label">Goal</label>
             <input id="savingsGoalName" name="name" class="form-control" maxlength="120" placeholder="Emergency fund" required>
         </div>
         <div class="col-md-3">
-            <label for="savingsGoalTarget" class="form-label">Target (INR)</label>
+            <label for="savingsGoalTarget" class="form-label">Target</label>
             <input id="savingsGoalTarget" name="target_amount" type="number" min="0.01" step="0.01" class="form-control" required>
+        </div>
+        <div class="col-md-2">
+            <label for="savingsGoalCurrency" class="form-label">Currency</label>
+            <select id="savingsGoalCurrency" name="currency" class="form-select" aria-describedby="savingsGoalCurrencyHelp">
+                <option value="INR" selected>Indian rupee (INR)</option>
+                <option value="USD">US dollar (USD)</option>
+                <option value="EUR">Euro (EUR)</option>
+                <option value="GBP">Pound sterling (GBP)</option>
+                <option value="">Not recorded</option>
+            </select>
+            <div id="savingsGoalCurrencyHelp" class="visually-hidden">The goal amounts are in this currency; nothing is converted.</div>
         </div>
         <div class="col-md-2">
             <label for="savingsGoalSaved" class="form-label">Saved so far</label>
@@ -128,5 +150,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/budgets.js?v=2.2.0"></script>
+<script src="/static/js/budgets.js?v=2.3.0"></script>
 {% endblock %}

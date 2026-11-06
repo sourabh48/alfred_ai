@@ -128,7 +128,7 @@ class ExpenseForecasterService:
 
         # Fetch expense history
         start_date = timezone.localdate() - timedelta(days=lookback_days)
-        expenses = Expense.objects.filter(
+        expenses = Expense.objects.in_rupee_totals().filter(
             user=user,
             transaction_date__gte=start_date
         ).order_by('transaction_date').values(
@@ -322,7 +322,7 @@ class ExpenseForecasterService:
         last_7_days = []
         for i in range(7, 0, -1):
             date = timezone.localdate() - timedelta(days=i)
-            day_expense = Expense.objects.filter(
+            day_expense = Expense.objects.in_rupee_totals().filter(
                 user=user,
                 date=date
             ).aggregate(total=Sum('amount'))['total'] or 0
@@ -408,7 +408,7 @@ class ExpenseForecasterService:
                          timedelta(days=30*i))
             end_date = (start_date + timedelta(days=30))
 
-            monthly_total = Expense.objects.filter(
+            monthly_total = Expense.objects.in_rupee_totals().filter(
                 user=user,
                 transaction_date__gte=start_date,
                 transaction_date__lt=end_date
@@ -448,7 +448,7 @@ class ExpenseForecasterService:
 
         # Calculate average daily expense from last 30 days
         last_30_days = timezone.localdate() - timedelta(days=30)
-        avg_daily = Expense.objects.filter(
+        avg_daily = Expense.objects.in_rupee_totals().filter(
             user=user,
             transaction_date__gte=last_30_days
         ).aggregate(
@@ -477,7 +477,7 @@ class ExpenseForecasterService:
         """Fallback monthly prediction."""
         from apps.expenses.models import Expense
 
-        avg_monthly = Expense.objects.filter(
+        avg_monthly = Expense.objects.in_rupee_totals().filter(
             user=user
         ).aggregate(
             monthly_avg=Avg('amount')

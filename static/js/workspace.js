@@ -65,6 +65,19 @@ document.addEventListener("DOMContentLoaded", () => {
         const status = document.getElementById('bankAccountsStatus'), refresh = document.getElementById('bankAccountsRefresh');
         const previous = document.getElementById('bankAccountsPrevious'), next = document.getElementById('bankAccountsNext');
         let page = 1, generation = 0, active = true;
+        function currencyPicker(account) {
+            // FIN-15: confirm a not-recorded account currency once; the server refuses a change after postings.
+            const select = document.createElement('select'); select.className = 'form-select form-select-sm';
+            select.setAttribute('aria-label', `Currency of ${account.nickname || account.bank_name || 'this account'}`);
+            [['','Not recorded'],['INR','INR'],['USD','USD'],['EUR','EUR'],['GBP','GBP']].forEach(([value,label])=>select.append(new Option(label,value)));
+            select.addEventListener('change', async () => {
+                if (!select.value) return;
+                select.disabled = true;
+                try { await Alfred.fetchJSON(`/api/expenses/accounts/${account.id}/`,{method:'PATCH',body:JSON.stringify({currency:select.value})}); await loadAccounts(); status.textContent = `Account currency recorded. ${status.textContent}`; }
+                catch (error) { status.textContent = error.message; select.value = ''; select.disabled = false; }
+            });
+            return select;
+        }
         async function loadAccounts() {
             const ticket = ++generation; refresh.disabled = true; previous.disabled = true; next.disabled = true;
             bankBody.setAttribute('aria-busy','true'); status.textContent = 'Loading your recorded accounts.';
@@ -76,8 +89,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 accounts.forEach(account => {
                     const row = document.createElement('tr');
                     const reference = /^\*{4}\d{4}$/.test(account.masked_account_number) ? account.masked_account_number : 'Reference hidden';
-                    const balance = account.current_balance === null || account.current_balance === undefined ? 'Balance unavailable' : Alfred.formatCurrency(account.current_balance);
-                    [account.nickname || account.bank_name || 'Bank account',reference,account.account_type,balance,account.is_active?'Active':'Inactive'].forEach(value=>{const cell=document.createElement('td');cell.textContent=value;row.append(cell)});
+                    const balance = account.current_balance === null || account.current_balance === undefined ? 'Balance unavailable' : Alfred.formatCurrency(account.current_balance, account.currency || 'INR') + (account.currency && account.currency !== 'INR' ? ' · kept out of rupee totals' : '');
+                    [account.nickname || account.bank_name || 'Bank account',reference,account.account_type,balance,account.currency || currencyPicker(account),account.is_active?'Active':'Inactive'].forEach(value=>{const cell=document.createElement('td');cell.append(value);row.append(cell)});
                     bankBody.append(row);
                 });
                 status.textContent = accounts.length ? `${pagination.count ?? accounts.length} owned accounts · page ${page} · latest recorded balances, not live bank quotes` : 'No bank accounts recorded. Imported statements can create owned accounts.';

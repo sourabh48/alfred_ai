@@ -52,6 +52,14 @@
                     <div class="col-md-3">
                         <label class="form-label" for="settingsMonthlyIncome">Income</label>
                         <input id="settingsMonthlyIncome" name="monthly_income" type="number" min="0" step="0.01" class="form-control">
+                        <label class="form-label mt-2" for="settingsIncomeCurrency">Income currency</label>
+                        <select id="settingsIncomeCurrency" name="income_currency" class="form-select" aria-describedby="settingsCurrencyHelp">
+                            <option value="">Not recorded</option>
+                            <option value="INR">Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                        </select>
                         {% if income_conflict %}<div class="form-text text-warning" id="settingsIncomeConflict" role="status">{{ income_conflict.message }}</div>{% endif %}
                     </div>
                     <div class="col-md-3">
@@ -66,13 +74,30 @@
                     <div class="col-md-3">
                         <label class="form-label" for="settingsVariableIncome">Variable Income</label>
                         <input id="settingsVariableIncome" name="variable_income" type="number" min="0" step="0.01" class="form-control">
+                        <label class="form-label mt-2" for="settingsVariableIncomeCurrency">Variable income currency</label>
+                        <select id="settingsVariableIncomeCurrency" name="variable_income_currency" class="form-select" aria-describedby="settingsCurrencyHelp">
+                            <option value="">Not recorded</option>
+                            <option value="INR">Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                        </select>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" for="settingsRentOrEmi">Monthly Housing Cost</label>
                         <input id="settingsRentOrEmi" name="rent_or_emi" type="number" min="0" step="0.01" class="form-control">
                         <div class="form-text">Exclude EMIs already recorded under Loans; those are counted separately.</div>
+                        <label class="form-label mt-2" for="settingsRentCurrency">Housing cost currency</label>
+                        <select id="settingsRentCurrency" name="rent_currency" class="form-select" aria-describedby="settingsCurrencyHelp">
+                            <option value="">Not recorded</option>
+                            <option value="INR">Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                        </select>
                     </div>
                 </div>
+                <div id="settingsCurrencyHelp" class="form-text">Only INR (or not recorded) amounts count in rupee totals. Other currencies are kept but left out; nothing is converted.</div>
                 <div id="settingsProfileFeedback" class="d-none alert mb-0"></div>
                 <div>
                     <button class="btn btn-primary" type="submit">Save Profile</button>
@@ -134,7 +159,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/settings.js?v=1.4"></script>
+<script src="/static/js/settings.js?v=1.5"></script>
 <script src="/static/js/memory.js?v=5"></script>
 <link rel="stylesheet" href="/static/css/travel_planner.css?v=1">
 <script src="/static/js/travel_preferences.js?v=2"></script>

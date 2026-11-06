@@ -42,7 +42,7 @@ class LoanIntelligenceService:
         """
         if expenses is None:
             loan_expenses = list(
-                Expense.objects.filter(
+                Expense.objects.in_rupee_totals().filter(
                     user=user,
                     direction="debit",
                     classification="loan"
@@ -150,7 +150,7 @@ class LoanIntelligenceService:
             return None
 
         # Look for recurring payments (same merchant, similar amounts)
-        similar_expenses = Expense.objects.filter(
+        similar_expenses = Expense.objects.in_rupee_totals().filter(
             user=user,
             direction="debit",
             classification="loan",

@@ -15,7 +15,7 @@ from .simple_models import fit_linear_regression, mean_absolute_percentage_error
 
 def train_service_cost_model():
     records = list(
-        BikeServiceRecord.objects.select_related("bike_profile")
+        BikeServiceRecord.objects.in_rupee_totals().select_related("bike_profile")  # FIN-15: learn rupee costs only
         .filter(cost__gt=0)
         .order_by("bike_profile_id", "bike_name", "service_date", "id")
     )

@@ -8,6 +8,7 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from alfred_ai.services.currency import counts_in_rupees, currency_fingerprint
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.models import Expense
 from apps.expenses.money import money_float
@@ -91,6 +92,8 @@ def _budget_dashboard_revision(user) -> str:
             getattr(user, "monthly_income", ""),
             getattr(user, "monthly_income_basis", ""),
             getattr(user, "rent_or_emi", ""),
+            getattr(user, "income_currency", ""),
+            getattr(user, "rent_currency", ""),
             getattr(user, "city_type", ""),
         )
     )
@@ -103,6 +106,7 @@ def _budget_dashboard_revision(user) -> str:
             budget_meta["max_id"],
             budget_meta["total_budget"],
             budget_meta["total_spent"],
+            currency_fingerprint(Budget.objects.filter(user=user), Expense.objects.filter(user=user)),
             expense_meta["count"],
             expense_meta["max_id"],
             expense_meta["latest_date"],
@@ -120,14 +124,21 @@ def _build_budget_dashboard_payload(request) -> dict:
     start_of_month = today.replace(day=1)
     budgets = list(Budget.objects.filter(user=request.user).order_by("-id"))
     active_plan = current_budget_plan(request.user, today=today, budgets=budgets)
-    monthly_expenses = Expense.objects.filter(
+    # FIN-15: a plan compares only spend in its own currency; nothing is converted.
+    plan_currency = getattr(active_plan, "currency", None)
+    if counts_in_rupees(plan_currency):
+        compatible, housing = Expense.objects.in_rupee_totals(), request.user.rupee_rent_or_emi
+    else:
+        compatible = Expense.objects.filter(currency=plan_currency)
+        housing = request.user.rent_or_emi if request.user.rent_currency == plan_currency else Decimal("0")
+    monthly_expenses = compatible.filter(
         user=request.user,
         transaction_date__gte=start_of_month,
         transaction_date__lte=today,
         direction="debit",
     )
     spent_by_category = defaultdict(Decimal)
-    for expense, amount in variable_spend_rows(monthly_expenses, monthly_housing=request.user.rent_or_emi):
+    for expense, amount in variable_spend_rows(monthly_expenses, monthly_housing=housing):
         spent_by_category[expense.category] += amount
 
     unavailable_sections = []
@@ -186,6 +197,7 @@ def _build_budget_dashboard_payload(request) -> dict:
             "base_budget": money_float(budget.base_budget),
             "inflation_adjusted": money_float(budget.inflation_adjusted),
             "spent": money_float(budget.spent),
+            "currency": budget.currency,
         }
         for budget in budgets[:6]
     ]
@@ -193,6 +205,7 @@ def _build_budget_dashboard_payload(request) -> dict:
     return {
         "summary": {
             "month": today.strftime("%B %Y"),
+            "currency": plan_currency or "INR",
             "total_budget": money_float(plan_limit),
             "total_spent": money_float(total_spent),
             "total_remaining": money_float(total_remaining),
@@ -207,6 +220,7 @@ def _build_budget_dashboard_payload(request) -> dict:
             "base_budget": money_float(active_plan.base_budget),
             "inflation_adjusted": money_float(active_plan.inflation_adjusted),
             "spent": money_float(active_plan.spent),
+            "currency": active_plan.currency,
         } if active_plan else None,
         "budget_history": budget_history,
         "budgets": budget_data,

@@ -20,6 +20,7 @@ from rest_framework.views import APIView
 
 from alfred_ai.pagination import OptionalPageNumberPagination
 from alfred_ai.services import record_parser_learning
+from alfred_ai.services.currency import counts_in_rupees
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction, raw_upload_cleanup_enabled
 from .models import BankAccount, Expense, StatementUpload, mask_account_number
 from .money import money_float
@@ -314,7 +315,7 @@ class ExpenseListCreateView(ListCreateAPIView):
         sync_account_balance(expense.bank_account, expense.closing_balance)
 
 
-EXPENSE_EXPORT_COLUMNS = ("id", "transaction_date", "direction", "classification", "category", "amount",
+EXPENSE_EXPORT_COLUMNS = ("id", "transaction_date", "direction", "classification", "category", "amount", "currency",
                           "closing_balance", "merchant", "description", "external_reference", "source",
                           "bank_account_id", "statement_upload_id")
 MASKED_EXPORT_COLUMNS = {"account_number", "loan_account_number"}
@@ -363,7 +364,7 @@ class FinancialExportView(APIView):
         user = request.user
         tables = (
             ("bank-accounts.csv", BankAccount, ("id", "bank_name", "nickname", "account_number", "account_type",
-                                                "current_balance", "is_primary", "is_active", "last_synced_at", "created_at"), ("id",)),
+                                                "current_balance", "currency", "is_primary", "is_active", "last_synced_at", "created_at"), ("id",)),
             ("expenses.csv", Expense, EXPENSE_EXPORT_COLUMNS, ("-transaction_date", "-id")),
             ("loans.csv", Loan, ("id", "loan_type", "lender", "loan_account_number", "principal", "interest_rate", "emi",
                                  "tenure_months", "remaining_balance", "home_purchase_price", "home_down_payment",
@@ -374,7 +375,7 @@ class FinancialExportView(APIView):
             ("investments.csv", Investment, ("id", "asset_type", "asset_name", "institution", "account_number",
                                              "invested_amount", "monthly_sip", "current_value", "currency", "annual_return_rate",
                                              "risk_level", "notes", "created_at", "updated_at"), ("id",)),
-            ("budgets.csv", Budget, ("id", "month", "base_budget", "inflation_adjusted", "spent"), ("month", "id")),
+            ("budgets.csv", Budget, ("id", "month", "base_budget", "inflation_adjusted", "spent", "currency"), ("month", "id")),
         )
         archive = BytesIO()
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
@@ -430,8 +431,10 @@ class ExpenseTimelineView(APIView):
         visible_expenses = filtered_expenses[:limit]
 
         serializer = ExpenseSerializer(visible_expenses, many=True)
-        monthly_window = _build_monthly_window(expenses)
-        unwanted_expenses = _build_unwanted_expenses(expenses, monthly_window)
+        # Every transaction is listed; only rupee ones are added together (FIN-15, no conversion).
+        rupee_expenses = [expense for expense in expenses if counts_in_rupees(expense.currency)]
+        monthly_window = _build_monthly_window(rupee_expenses)
+        unwanted_expenses = _build_unwanted_expenses(rupee_expenses, monthly_window)
 
         grouped: dict[str, list[dict]] = defaultdict(list)
         summary = {
@@ -441,9 +444,10 @@ class ExpenseTimelineView(APIView):
             "unwanted_count": 0,
             "accounts_tracked": BankAccount.objects.filter(user=request.user, is_active=True).count(),
             "transaction_count": len(expenses),
+            "other_currency_transaction_count": len(expenses) - len(rupee_expenses),
         }
 
-        for expense in expenses:
+        for expense in rupee_expenses:
             add_expense_to_cashflow_bucket(summary, expense)
             if expense.direction == "debit" and expense.is_emotional:
                 summary["emotional_total"] += expense.amount
@@ -467,6 +471,7 @@ class ExpenseTimelineView(APIView):
                         Decimal(str(item["amount"]))
                         for item in items
                         if visible_treatments.get(item["id"]) and visible_treatments[item["id"]].counts_cashflow_outflow
+                        and counts_in_rupees(item.get("currency"))
                     ),
                 ),
             }
@@ -474,7 +479,7 @@ class ExpenseTimelineView(APIView):
         ]
 
         latest_upload = StatementUpload.objects.filter(user=request.user).first()
-        filtered_cashflow = rounded_cashflow_bucket(summarize_cashflow(filtered_expenses))
+        filtered_cashflow = rounded_cashflow_bucket(summarize_cashflow([e for e in filtered_expenses if counts_in_rupees(e.currency)]))
 
         return Response(
             {
@@ -518,7 +523,7 @@ class ExpenseChartView(APIView):
             granularity = "monthly"
 
         buckets: dict = defaultdict(empty_cashflow_bucket)
-        for expense in Expense.objects.filter(user=request.user).only(
+        for expense in Expense.objects.in_rupee_totals().filter(user=request.user).only(
             "amount",
             "classification",
             "category",

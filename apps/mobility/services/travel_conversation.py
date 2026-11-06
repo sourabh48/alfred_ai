@@ -524,7 +524,10 @@ def save_plan(session, draft=False):
     session.status = "draft" if draft else "planned"
     session.save()
     if not draft:
-        for key, val in {"typical_duration":plan.duration_days, "typical_spend":money_float(plan.budget), "preferred_transport":plan.transport_mode}.items():
+        learned = {"typical_duration":plan.duration_days, "typical_spend":money_float(plan.budget), "preferred_transport":plan.transport_mode}
+        if plan.budget_currency not in (None, "", "INR"):
+            learned.pop("typical_spend")  # FIN-15: learned spend stays rupee; nothing is converted
+        for key, val in learned.items():
             learn(session.user,key,val,f"Saved trip: {plan.title}",.5)
     say(session, "Draft saved. You can return to this conversation later." if draft else "Travel Plan saved with your itinerary, research and conversation. No retyping needed.")
     return plan

@@ -91,6 +91,8 @@ def _integration_dashboard_revision(user) -> str:
             getattr(user, "monthly_income", ""),
             getattr(user, "monthly_income_basis", ""),
             getattr(user, "rent_or_emi", ""),
+            getattr(user, "income_currency", ""),
+            getattr(user, "rent_currency", ""),
         )
     )
     return "|".join(

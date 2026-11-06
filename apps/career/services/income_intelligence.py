@@ -97,7 +97,7 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None, t
         or ""
     ).strip()
     credits = list(
-        Expense.objects.filter(user=user, direction="credit", transaction_date__lte=today)
+        Expense.objects.in_rupee_totals().filter(user=user, direction="credit", transaction_date__lte=today)
         .only(
             "id",
             "amount",
@@ -115,9 +115,10 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None, t
     current_salaries = _current_salary_candidates(salary_candidates, today)
     best_salary_signal = current_salaries[0] if current_salaries else None
 
-    profile_last_salary = float(getattr(profile, "last_salary", 0) or 0)
-    reported_value = float(getattr(user, "monthly_income", 0) or 0) or profile_last_salary
-    variable_income = float(getattr(user, "variable_income", 0) or 0)
+    # FIN-15: only rupee (or not recorded) amounts feed rupee income; nothing is converted.
+    profile_last_salary = float(getattr(profile, "rupee_last_salary", 0) or 0)
+    reported_value = float(getattr(user, "rupee_monthly_income", 0) or 0) or profile_last_salary
+    variable_income = float(getattr(user, "rupee_variable_income", 0) or 0)
     observed_salary = round(sum(item["monthly_amount"] for item in current_salaries), 2)
     reported_mode = _reported_income_mode(reported_value, user.monthly_income_basis)
     reported_monthly_equivalent = {

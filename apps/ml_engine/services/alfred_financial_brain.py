@@ -194,7 +194,7 @@ class AlfredFinancialBrain:
 
         thirty_days_ago = timezone.localdate() - timedelta(days=30)
 
-        total_expenses = Expense.objects.filter(
+        total_expenses = Expense.objects.in_rupee_totals().filter(
             user=user,
             direction="debit",
             transaction_date__gte=thirty_days_ago

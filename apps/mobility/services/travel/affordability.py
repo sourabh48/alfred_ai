@@ -37,8 +37,8 @@ def affordability_source(user):
     if not getattr(user, 'is_authenticated', False) or not user.pk:
         raise PermissionDenied('Owner authentication required.')
     user = get_user_model().objects.get(pk=user.pk)
-    expenses = list(Expense.objects.select_related('bank_account', 'statement_upload__bank_account').filter(user=user).order_by('transaction_date', 'id'))
-    accounts = list(BankAccount.objects.filter(user=user, is_active=True))
+    expenses = list(Expense.objects.in_rupee_totals().select_related('bank_account', 'statement_upload__bank_account').filter(user=user).order_by('transaction_date', 'id'))
+    accounts = list(BankAccount.objects.in_rupee_totals().filter(user=user, is_active=True))
     cash_accounts = [a for a in accounts if a.account_type not in ('credit', 'investment')]
     loans = list(Loan.objects.filter(user=user))
     baseline = resolve_canonical_financial_baseline(user, fresh=True, expenses=expenses)

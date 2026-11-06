@@ -1,4 +1,5 @@
 from django.conf import settings
+from alfred_ai.services.currency import CurrencyQuerySet, currency_field, rupee_amount
 from apps.expenses.money import ExpenseMoneyField
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -60,6 +61,9 @@ class BikeProfile(models.Model):
     usage_pattern = models.CharField(max_length=20, choices=USAGE_PATTERN_CHOICES, default="personal")
     estimated_market_value = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
     monthly_income_support = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
+    # FIN-15: each entered amount records its own currency; null is not recorded and counts as legacy INR.
+    value_currency = currency_field()
+    income_support_currency = currency_field()
     catalog_key = models.CharField(max_length=80, blank=True)
     official_source_name = models.CharField(max_length=120, blank=True)
     official_source_url = models.URLField(blank=True)
@@ -76,6 +80,14 @@ class BikeProfile(models.Model):
             models.Index(fields=["user", "display_name"]),
             models.Index(fields=["user", "vehicle_number"]),
         ]
+
+    @property
+    def rupee_market_value(self):
+        return rupee_amount(self.estimated_market_value or 0, self.value_currency)
+
+    @property
+    def rupee_income_support(self):
+        return rupee_amount(self.monthly_income_support or 0, self.income_support_currency)
 
     def __str__(self):
         return self.display_name
@@ -104,6 +116,8 @@ class BikeServiceRecord(models.Model):
     odometer_km = models.PositiveIntegerField(default=0)
     service_type = models.CharField(max_length=20, choices=SERVICE_TYPE_CHOICES, default="routine")
     cost = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
+    currency = currency_field()  # FIN-15: null is not recorded and counts as legacy INR
+    objects = CurrencyQuerySet.as_manager()
     service_center = models.CharField(max_length=160, blank=True)
     next_service_date = models.DateField(null=True, blank=True)
     next_service_km = models.PositiveIntegerField(null=True, blank=True)
@@ -136,6 +150,8 @@ class FuelRefillLog(models.Model):
     trip_meter_km = models.FloatField(default=0)
     fuel_liters = models.FloatField(default=0)
     total_cost = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
+    currency = currency_field()  # FIN-15: null is not recorded and counts as legacy INR
+    objects = CurrencyQuerySet.as_manager()
     is_full_tank = models.BooleanField(default=True)
     station_name = models.CharField(max_length=160, blank=True)
     notes = models.TextField(blank=True)
@@ -181,6 +197,7 @@ class TravelPlan(models.Model):
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
     budget = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
+    budget_currency = currency_field()  # FIN-15: the target denomination; costs in other currencies are never added to it
     transport_mode = models.CharField(max_length=20, choices=TRANSPORT_MODE_CHOICES, default="ride")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="planned")
     stay_details = models.CharField(max_length=200, blank=True)
@@ -356,6 +373,8 @@ class TripLog(models.Model):
     longitude = models.FloatField(null=True, blank=True)
     distance_km = models.FloatField(default=0)
     spend_amount = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
+    currency = currency_field()  # FIN-15: null is not recorded and counts as legacy INR
+    objects = CurrencyQuerySet.as_manager()
     mood = models.CharField(max_length=80, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -454,6 +473,8 @@ class BikeIssueReport(models.Model):
     service_center_note = models.TextField(blank=True)
     projected_cost = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
     actual_cost = ExpenseMoneyField(max_digits=14, decimal_places=2, null=True, blank=True)
+    currency = currency_field()  # FIN-15: null is not recorded and counts as legacy INR
+    objects = CurrencyQuerySet.as_manager()
     tags = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -503,6 +524,8 @@ class BikeDocument(models.Model):
     issue_date = models.DateField(null=True, blank=True)
     expiry_date = models.DateField(null=True, blank=True)
     premium_amount = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
+    currency = currency_field()  # FIN-15: null is not recorded and counts as legacy INR
+    objects = CurrencyQuerySet.as_manager()
     verification_status = models.CharField(max_length=20, choices=VERIFICATION_STATUS_CHOICES, default="incomplete")
     verification_notes = models.TextField(blank=True)
     document_file = models.FileField(upload_to="bike_documents/%Y/%m/", blank=True)

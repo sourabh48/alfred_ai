@@ -3,7 +3,7 @@ import pandas as pd
 
 def load_user_expense_history(user_id=None):
     """Load debit spending, retaining event dates and stable row ordering."""
-    qs = Expense.objects.filter(classification="expense", direction="debit", amount__gt=0).exclude(
+    qs = Expense.objects.in_rupee_totals().filter(classification="expense", direction="debit", amount__gt=0).exclude(
         category__in=["transfer", "income", "investment", "credit_card", "loan"]
     )
     if user_id:

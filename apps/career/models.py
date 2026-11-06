@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from alfred_ai.services.currency import currency_field, rupee_amount
 from apps.expenses.money import ExpenseMoneyField
 
 
@@ -9,6 +10,11 @@ class CareerProfile(models.Model):
     experience_years = models.FloatField()
     skills = models.TextField()
     last_salary = ExpenseMoneyField(max_digits=14, decimal_places=2, default=0)
+    salary_currency = currency_field()  # FIN-15: null is not recorded and counts as legacy INR
+
+    @property
+    def rupee_last_salary(self):
+        return rupee_amount(self.last_salary or 0, self.salary_currency)
 
     def __str__(self):
         return self.role

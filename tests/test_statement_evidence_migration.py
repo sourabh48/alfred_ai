@@ -14,6 +14,7 @@ from scripts.rehearse_money_migrations import copy_database, file_hash, read_dat
 class StatementEvidenceMigrationTests(TransactionTestCase):
     def test_forward_reverse_and_independent_restore_leave_financial_rows_unchanged(self):
         leaves=MigrationExecutor(connection).loader.graph.leaf_nodes()
+        leaves=[('expenses','0006_statement_transaction_evidence') if item[0]=='expenses' else item for item in leaves]  # rehearse 0006 itself
         baseline=[('expenses','0005_expense_bank_money_decimal') if item[0]=='expenses' else item for item in leaves]
         with TemporaryDirectory(prefix='alfred-source-rehearsal-synthetic-') as directory:
             root=Path(directory); source, candidate, restored=[root/name for name in ('source.sqlite3','candidate.sqlite3','restore.sqlite3')]

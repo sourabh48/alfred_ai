@@ -1,4 +1,8 @@
 """How rupee amounts are written. Recognising one never converts it to another currency."""
+import hashlib
+from decimal import Decimal
+
+from django.db import models
 
 # Use with re.IGNORECASE. The odd sign is the UTF-8 rupee sign misread as Windows-1252.
 INR_NAME = r"(?:INR\.?|RUPEES?|RS(?:\.?/-|\.)?)"
@@ -30,3 +34,38 @@ CURRENCY_CHOICES = [(code, f"{label} ({code})") for code, (label, _) in CURRENCI
 
 def currency_status(code) -> str:
     return "recorded" if code else "not_recorded"
+
+
+def counts_in_rupees(code) -> bool:
+    """Not recorded keeps the legacy INR convention; any other recorded code stays out of rupee maths."""
+    return not code or code == RUPEE
+
+
+def rupee_amount(amount, code):
+    """The amount for rupee calculations, or zero when it is recorded in another currency. Never converted."""
+    return amount if counts_in_rupees(code) else Decimal("0.00")
+
+
+def currency_fingerprint(*querysets, fields=("currency",)):
+    """Changes whenever a recorded currency changes, so cached totals rebuild. Only recorded rows are read."""
+    digest = hashlib.sha256()
+    for queryset in querysets:
+        for field in fields:
+            if field in {f.name for f in queryset.model._meta.fields}:
+                rows = queryset.exclude(**{f"{field}__isnull": True}).order_by("pk").values_list("pk", field)
+                digest.update(f"{queryset.model._meta.label}.{field}:{list(rows)}".encode())
+    return digest.hexdigest()[:16]
+
+
+def currency_field():
+    return models.CharField(max_length=3, choices=CURRENCY_CHOICES, null=True, blank=True, default=None)
+
+
+class CurrencyQuerySet(models.QuerySet):
+    """For models whose amounts share one `currency` column (FIN-15)."""
+
+    def in_rupee_totals(self):
+        return self.filter(models.Q(currency__isnull=True) | models.Q(currency=RUPEE))
+
+    def in_other_currencies(self):
+        return self.exclude(currency__isnull=True).exclude(currency=RUPEE)

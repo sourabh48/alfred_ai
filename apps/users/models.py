@@ -2,6 +2,8 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from alfred_ai.services.currency import currency_field, rupee_amount
+
 from .money import ProfileMoneyField
 
 
@@ -19,6 +21,10 @@ class User(AbstractUser):
     monthly_income_basis = models.CharField(max_length=12, choices=IncomeBasis.choices, default=IncomeBasis.MONTHLY)
     variable_income = ProfileMoneyField(max_digits=14, decimal_places=2, default=0)
     rent_or_emi = ProfileMoneyField(max_digits=14, decimal_places=2, default=0)
+    # FIN-15: each entered amount records its own currency; null is not recorded and counts as legacy INR.
+    income_currency = currency_field()
+    variable_income_currency = currency_field()
+    rent_currency = currency_field()
 
     city = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True)
@@ -31,17 +37,30 @@ class User(AbstractUser):
         return self.username
 
     @property
+    def rupee_monthly_income(self):
+        """Entered income for rupee totals; zero when it was recorded in another currency."""
+        return rupee_amount(Decimal(str(self.monthly_income or 0)), self.income_currency)
+
+    @property
+    def rupee_variable_income(self):
+        return rupee_amount(Decimal(str(self.variable_income or 0)), self.variable_income_currency)
+
+    @property
+    def rupee_rent_or_emi(self):
+        return rupee_amount(Decimal(str(self.rent_or_emi or 0)), self.rent_currency)
+
+    @property
     def confirmed_monthly_income(self):
-        """Entered income per month, or zero while its period is unconfirmed."""
-        amount = Decimal(str(self.monthly_income or 0))
+        """Entered rupee income per month, or zero while its period is unconfirmed."""
+        amount = self.rupee_monthly_income
         if self.monthly_income_basis == IncomeBasis.ANNUAL:
             return (amount / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         return amount if self.monthly_income_basis == IncomeBasis.MONTHLY else Decimal("0.00")
 
     @property
     def confirmed_annual_income(self):
-        """Entered income per year, or zero while its period is unconfirmed."""
-        amount = Decimal(str(self.monthly_income or 0))
+        """Entered rupee income per year, or zero while its period is unconfirmed."""
+        amount = self.rupee_monthly_income
         if self.monthly_income_basis == IncomeBasis.ANNUAL:
             return amount
         return amount * 12 if self.monthly_income_basis == IncomeBasis.MONTHLY else Decimal("0.00")

@@ -18,6 +18,7 @@ from apps.career.models import CareerProfile, CareerProfileMoneySnapshot
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.users.services import clear_user_fed_data
 from scripts.exercise_materialized_cache_traffic import _offline_fixture_patches
+from tests.fin15_schema import add_live_currency_columns
 from scripts.rehearse_money_migrations import copy_database, file_hash, read_database, table_digest
 
 
@@ -135,6 +136,7 @@ class CareerMoneyMigrationTests(TransactionTestCase):
 
     def test_cent_salary_baseline_has_zero_mismatches(self):
         self.old.get_model('career', 'CareerProfile').objects.filter(pk=self.row.pk).update(last_salary=10000.01)
+        add_live_currency_columns('career')  # the live baseline reads FIN-15 columns newer than this schema
         before = resolve_canonical_financial_baseline(get_user_model().objects.get(pk=self.owner.pk))
         self.upgrade(); cache.clear()
         self.assertEqual(before, resolve_canonical_financial_baseline(get_user_model().objects.get(pk=self.owner.pk)))
@@ -174,7 +176,8 @@ class CareerMoneyMigrationTests(TransactionTestCase):
                     self.assertEqual(table_digest(before[table]),table_digest(after[table]),table)
                 old, new = before['career_careerprofile'][0], after['career_careerprofile'][0]
                 self.assertEqual(Decimal(str(new['last_salary'])), Decimal('-1.01'))
-                self.assertEqual({k:v for k,v in old.items() if k!='last_salary'}, {k:v for k,v in new.items() if k!='last_salary'})
+                self.assertEqual({k:v for k,v in old.items() if k!='last_salary'}, {k:v for k,v in new.items() if k not in ('last_salary', 'salary_currency')})
+                self.assertIsNone(new['salary_currency'])  # FIN-15: expand-only, never backfilled
                 executor = MigrationExecutor(db); executor.migrate(self.old_targets); db.close()
                 reverse, _ = read_database(candidate)
                 self.assertEqual({k:table_digest(v) for k,v in before.items()}, {k:table_digest(v) for k,v in reverse.items()})

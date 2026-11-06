@@ -98,10 +98,28 @@
                     <div class="col-md-6">
                         <label class="form-label" for="bikeProfileMarketValue">Estimated Market Value</label>
                         <input id="bikeProfileMarketValue" name="estimated_market_value" type="number" step="0.01" class="form-control" placeholder="Optional market value">
+                        <label class="form-label mt-2" for="bikeProfileValueCurrency">Value currency</label>
+                        <select id="bikeProfileValueCurrency" name="value_currency" class="form-select">
+                            <option value="INR">Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                            <option value="" selected>Not recorded</option>
+                        </select>
+                        <div class="form-text">Only INR (or not recorded) counts in rupee totals; nothing is converted.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="bikeProfileIncomeSupport">Monthly Utility / Income Support</label>
                         <input id="bikeProfileIncomeSupport" name="monthly_income_support" type="number" step="0.01" class="form-control" placeholder="Optional monthly value supported by this vehicle">
+                        <label class="form-label mt-2" for="bikeProfileIncomeSupportCurrency">Support currency</label>
+                        <select id="bikeProfileIncomeSupportCurrency" name="income_support_currency" class="form-select">
+                            <option value="INR">Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                            <option value="" selected>Not recorded</option>
+                        </select>
+                        <div class="form-text">Only INR (or not recorded) counts in rupee totals; nothing is converted.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="bikeProfileEngineCc">Engine (cc)</label>
@@ -204,6 +222,15 @@
                     <div class="col-md-6">
                         <label class="form-label" for="bikeRefillTotalCost">Total Cost</label>
                         <input id="bikeRefillTotalCost" name="total_cost" type="number" step="0.01" class="form-control" value="0">
+                        <label class="form-label mt-2" for="bikeRefillCurrency">Currency</label>
+                        <select id="bikeRefillCurrency" name="currency" class="form-select">
+                            <option value="INR" selected>Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                            <option value="">Not recorded</option>
+                        </select>
+                        <div class="form-text">Only INR (or not recorded) counts in rupee totals; nothing is converted.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="bikeRefillStation">Station / Pump</label>
@@ -305,6 +332,15 @@
                     <div class="col-md-6">
                         <label class="form-label" for="bikeServiceCost">Cost</label>
                         <input id="bikeServiceCost" name="cost" type="number" step="0.01" class="form-control" value="0">
+                        <label class="form-label mt-2" for="bikeServiceCurrency">Currency</label>
+                        <select id="bikeServiceCurrency" name="currency" class="form-select">
+                            <option value="INR" selected>Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                            <option value="">Not recorded</option>
+                        </select>
+                        <div class="form-text">Only INR (or not recorded) counts in rupee totals; nothing is converted.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="bikeServiceCenter">Service Center</label>
@@ -398,6 +434,15 @@
                     <div class="col-md-4">
                         <label class="form-label" for="bikeIssueActualCost">Actual Cost</label>
                         <input id="bikeIssueActualCost" name="actual_cost" type="number" step="0.01" class="form-control" placeholder="Optional when resolved">
+                        <label class="form-label mt-2" for="bikeIssueCurrency">Cost currency</label>
+                        <select id="bikeIssueCurrency" name="currency" class="form-select">
+                            <option value="INR" selected>Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                            <option value="">Not recorded</option>
+                        </select>
+                        <div class="form-text">Only INR (or not recorded) counts in rupee totals; nothing is converted.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="bikeIssueSymptom">Fault Report</label>
@@ -673,5 +718,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/bike_service.js?v=3.9"></script>
+<script src="/static/js/bike_service.js?v=3.10"></script>
 {% endblock %}

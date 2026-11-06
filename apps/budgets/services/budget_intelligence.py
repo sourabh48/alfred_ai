@@ -143,13 +143,13 @@ class BudgetIntelligenceService:
 
         # Get current month spending
         baseline = resolve_canonical_financial_baseline(user)
-        expenses = Expense.objects.filter(
+        expenses = Expense.objects.in_rupee_totals().filter(
             user=user,
             transaction_date__gte=month_start,
             transaction_date__lte=today,
             direction="debit",
         )
-        rows = list(variable_spend_rows(expenses, monthly_housing=user.rent_or_emi))
+        rows = list(variable_spend_rows(expenses, monthly_housing=user.rupee_rent_or_emi))
         month_spending = sum((amount for _, amount in rows), Decimal("0"))
 
         # Get monthly budget from the canonical baseline so EMI burden is not double counted.
@@ -157,6 +157,8 @@ class BudgetIntelligenceService:
         income_evidenced = baseline.get("metric_states", {}).get("monthly_income", {}).get("status", "unavailable") != "unavailable"
         monthly_budget = disposable
         plan = current_budget_plan(user, today=today)
+        if plan is not None and plan.currency not in (None, "", "INR"):
+            plan = None  # FIN-15: this guide is rupee spend; a plan in another currency is never compared to it
         if plan is not None:
             monthly_budget = plan.inflation_adjusted
 
@@ -208,13 +210,13 @@ class BudgetIntelligenceService:
         if type(months_ahead) is not int or not 1 <= months_ahead <= 24:
             raise ValueError("Forecast horizon must be an integer from 1 to 24 months.")
         today = timezone.localdate()
-        expenses = list(Expense.objects.filter(user=user, transaction_date__lte=today))
+        expenses = list(Expense.objects.in_rupee_totals().filter(user=user, transaction_date__lte=today))
         baseline = resolve_canonical_financial_baseline(user, expenses=expenses, reference_date=today)
         monthly_income = Decimal(str(baseline.get("monthly_income", 0) or 0))
         fixed_obligations = Decimal(str(baseline.get("fixed_obligations", 0) or 0))
         income_known = baseline.get("metric_states", {}).get("monthly_income", {}).get("status", "unavailable") != "unavailable"
         by_month = defaultdict(Decimal)
-        for expense, amount in variable_spend_rows(expenses, monthly_housing=user.rent_or_emi):
+        for expense, amount in variable_spend_rows(expenses, monthly_housing=user.rupee_rent_or_emi):
             if expense.transaction_date < today.replace(day=1):
                 by_month[(expense.transaction_date.year, expense.transaction_date.month)] += amount
         history = sorted(by_month.items())[-12:]
@@ -295,10 +297,10 @@ class BudgetIntelligenceService:
         """Generate category-wise budget allocations."""
         category_budgets = {}
 
-        expenses = list(Expense.objects.filter(user=user, transaction_date__lte=timezone.localdate()))
+        expenses = list(Expense.objects.in_rupee_totals().filter(user=user, transaction_date__lte=timezone.localdate()))
         recent_months = sorted({(item.transaction_date.year, item.transaction_date.month) for item in expenses})[-3:]
         category_totals = defaultdict(Decimal)
-        for expense, amount in variable_spend_rows(expenses, monthly_housing=user.rent_or_emi):
+        for expense, amount in variable_spend_rows(expenses, monthly_housing=user.rupee_rent_or_emi):
             if (expense.transaction_date.year, expense.transaction_date.month) in recent_months:
                 category_totals[expense.category] += amount
 
@@ -307,7 +309,7 @@ class BudgetIntelligenceService:
                 continue
 
             historical_avg = category_totals[category] / len(recent_months) if recent_months else 0
-            if category == "rent" and user.rent_or_emi > 0 and historical_avg == 0:
+            if category == "rent" and user.rupee_rent_or_emi > 0 and historical_avg == 0:
                 continue
 
             # Blend historical data with ideal allocation

@@ -50,6 +50,9 @@ function renderSettingsProfile(profile = {}) {
         "monthly_income",
         "variable_income",
         "rent_or_emi",
+        "income_currency",
+        "variable_income_currency",
+        "rent_currency",
     ];
     form.elements.monthly_income_basis.value = profile.monthly_income_basis === "unconfirmed" ? "" : profile.monthly_income_basis ?? "";
     fields.forEach(field => {

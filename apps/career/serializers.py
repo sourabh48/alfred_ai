@@ -39,6 +39,9 @@ class CareerProfileSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ["user"]
 
+    def validate_salary_currency(self, value):
+        return value or None  # FIN-15: blank means not recorded, never a guessed INR
+
 
 class CareerResumeSerializer(serializers.ModelSerializer):
     parser_status_label = serializers.CharField(source="get_parser_status_display", read_only=True)

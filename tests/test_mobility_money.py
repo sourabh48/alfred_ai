@@ -19,6 +19,7 @@ from apps.expenses.services.financial_intelligence import resolve_canonical_fina
 from apps.mobility.models import MobilityMoneySnapshot, TravelPlanningSession
 from apps.users.services import clear_user_fed_data
 from scripts.exercise_materialized_cache_traffic import _offline_fixture_patches
+from tests.fin15_schema import add_live_currency_columns
 from scripts.rehearse_money_migrations import copy_database, file_hash, read_database, table_digest
 
 TODAY = date(2026, 10, 1)
@@ -89,7 +90,7 @@ class MobilityMoneyRuntimeTests(TestCase):
             payload = response.json()
             for field in FIELDS[name]:
                 if field != 'actual_cost': self.assertIsInstance(payload[field], (int, float))
-            self.assertNotIn('money_snapshots', payload); self.assertNotIn('currency', payload)
+            self.assertNotIn('money_snapshots', payload); self.assertEqual({payload[key] for key in payload if key.endswith('currency')}, {None})  # FIN-15: not recorded
             field = next(value for value in FIELDS[name] if value != 'projected_cost')
             for amount in ('NaN', 'Infinity', '-Infinity', '1000000000000', True, 'bad'):
                 result = self.client.patch(f'/api/mobility/{route}/{row.pk}/', json.dumps({field: amount}), content_type='application/json')
@@ -230,6 +231,7 @@ class MobilityMoneyMigrationTests(TransactionTestCase):
     def test_cent_history_canonical_baseline_has_zero_mismatches(self):
         for name, fields in FIELDS.items():
             self.old.get_model('mobility', name).objects.filter(pk=self.rows[name].pk).update(**{field: 12.34 for field in fields})
+        add_live_currency_columns('mobility')  # the live baseline reads FIN-15 columns newer than this schema
         before = resolve_canonical_financial_baseline(get_user_model().objects.get(pk=self.owner.pk))
         self.upgrade(); cache.clear()
         self.assertEqual(before, resolve_canonical_financial_baseline(get_user_model().objects.get(pk=self.owner.pk)))
@@ -268,7 +270,8 @@ class MobilityMoneyMigrationTests(TransactionTestCase):
                 db.settings_dict['NAME'] = str(candidate)
                 executor = MigrationExecutor(db)
                 self.assertEqual(sorted((migration.app_label, migration.name, reverse) for migration, reverse in executor.migration_plan(self.leaves)),
-                    [('career', '0005_career_salary_decimal', False), ('mobility', '0013_mobility_money_decimal', False), ('mobility', '0014_trip_video', False), ('users', '0003_user_money_decimal', False), ('users', '0004_user_monthly_income_basis', False)])
+                    [('career', '0005_career_salary_decimal', False), ('career', '0006_salary_currency', False), ('mobility', '0013_mobility_money_decimal', False), ('mobility', '0014_trip_video', False),
+                     ('mobility', '0015_vehicle_and_travel_currency', False), ('users', '0003_user_money_decimal', False), ('users', '0004_user_monthly_income_basis', False), ('users', '0005_income_currency', False)])
                 executor.migrate(self.leaves); db.close()
                 after, _ = read_database(candidate)
                 profile_fields = {'users_user': ('monthly_income', 'variable_income', 'rent_or_emi'),
@@ -282,12 +285,12 @@ class MobilityMoneyMigrationTests(TransactionTestCase):
                     for original in before[table]:
                         updated = current[original['id']]
                         self.assertEqual(table_digest([{k:v for k,v in original.items() if k not in fields}]),
-                                         table_digest([{k:v for k,v in updated.items() if k not in fields and k != 'monthly_income_basis'}]))
+                                         table_digest([{k:v for k,v in updated.items() if k not in fields and k != 'monthly_income_basis' and not k.endswith('currency')}]))
                         for field in fields:
                             self.assertEqual(Decimal(str(original[field])), Decimal(str(updated[field])))
                 for name, fields in FIELDS.items():
                     old, new = before['mobility_'+name.lower()][0], after['mobility_'+name.lower()][0]
-                    self.assertEqual({k:v for k,v in old.items() if k not in fields}, {k:v for k,v in new.items() if k not in fields})
+                    self.assertEqual({k:v for k,v in old.items() if k not in fields}, {k:v for k,v in new.items() if k not in fields and not k.endswith('currency')})
                     for field in fields:
                         self.assertEqual(None if new[field] is None else Decimal(str(new[field])), None if field == 'actual_cost' else Decimal('-1.01'))
                 executor = MigrationExecutor(db); executor.migrate(baseline_targets); db.close()

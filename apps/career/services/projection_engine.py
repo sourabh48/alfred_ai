@@ -143,11 +143,11 @@ def build_projection_inputs(user, profile, *, latest_resume=None, overrides: dic
         )
         or 0
     )
-    variable_income = float(overrides.get("variable_income", getattr(user, "variable_income", 0) or 0) or 0)
+    variable_income = float(overrides.get("variable_income", getattr(user, "rupee_variable_income", 0) or 0) or 0)
     return {
         "current_income": current_income,
         "variable_income": variable_income,
-        "rent_or_emi": float(overrides.get("rent_or_emi", getattr(user, "rent_or_emi", 0) or 0) or 0),
+        "rent_or_emi": float(overrides.get("rent_or_emi", getattr(user, "rupee_rent_or_emi", 0) or 0) or 0),
         "city": str(overrides.get("city", getattr(user, "city", "") or "") or ""),
         "experience_years": float(overrides.get("experience_years", profile.experience_years or 0) or 0),
         "skills": [str(item).strip() for item in skills if str(item).strip()],

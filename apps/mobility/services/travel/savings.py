@@ -21,7 +21,7 @@ def savings_source(user):
     baseline = resolve_canonical_financial_baseline(user, fresh=True)
     loans = [dict(id=l.pk, emi=str(l.emi), start=l.start_date.isoformat())
              for l in Loan.objects.filter(user=user, is_active=True, status='active', remaining_balance__gt=0).in_rupee_totals().order_by('pk')]
-    income_dates = [e.transaction_date.isoformat() for e in Expense.objects.filter(user=user)
+    income_dates = [e.transaction_date.isoformat() for e in Expense.objects.in_rupee_totals().filter(user=user)
                     if classify_cashflow(e).counts_income]
     source = dict(monthly_income=baseline.get('decimal_amounts', {}).get('monthly_income'),
                   income_state=baseline.get('metric_states', {}).get('monthly_income', {}),

@@ -241,7 +241,7 @@ def account_settings_view(request):
     profile = CareerProfile.objects.filter(user=request.user).first()
     return render(request, "settings/account.html", {
         "income_conflict": build_employment_income_signals(user=request.user, profile=profile)["income_conflict"],
-        "career_income": profile.last_salary if profile and not request.user.monthly_income else None,
+        "career_income": profile.rupee_last_salary if profile and not request.user.monthly_income else None,
     })
 
 

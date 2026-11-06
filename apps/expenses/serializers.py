@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from alfred_ai.services.currency import CURRENCY_CHOICES, currency_status
 from .models import BankAccount, Expense, StatementUpload
 from .money import NumericMoneySerializerField
 from .services.transaction_intelligence import hydrate_expense_data
@@ -7,6 +8,8 @@ from .services.transaction_intelligence import hydrate_expense_data
 
 class BankAccountSerializer(serializers.ModelSerializer):
     current_balance = NumericMoneySerializerField(allow_null=True, required=False)
+    currency = serializers.ChoiceField(choices=CURRENCY_CHOICES, required=False, allow_null=True, allow_blank=True)
+    currency_status = serializers.SerializerMethodField()
     masked_account_number = serializers.CharField(read_only=True)
     display_name = serializers.CharField(read_only=True)
 
@@ -23,12 +26,24 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "display_name",
             "account_type",
             "current_balance",
+            "currency",
+            "currency_status",
             "is_primary",
             "is_active",
             "last_synced_at",
             "created_at",
         )
         read_only_fields = ("user", "last_synced_at", "created_at")
+
+    def get_currency_status(self, obj):
+        return currency_status(obj.currency)
+
+    def validate_currency(self, value):
+        value = value or None  # blank means not recorded, never a guessed INR
+        recorded = getattr(self.instance, "currency", None)
+        if recorded and value != recorded and self.instance.expenses.exists():
+            raise serializers.ValidationError("This account already has transactions in its recorded currency; it cannot change.")
+        return value
 
     def validate_account_number(self, value):
         normalized = "".join(char for char in str(value) if char.isalnum())
@@ -85,6 +100,8 @@ class ExpenseSerializer(serializers.ModelSerializer):
     statement_upload_id = serializers.IntegerField(source="statement_upload.id", read_only=True)
     bank_account_id = serializers.IntegerField(source="bank_account.id", read_only=True)
     bank_account_display = serializers.CharField(source="bank_account.display_name", read_only=True)
+    currency = serializers.ChoiceField(choices=CURRENCY_CHOICES, required=False, allow_null=True, allow_blank=True)
+    currency_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Expense
@@ -97,6 +114,8 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "statement_upload",
             "statement_upload_id",
             "amount",
+            "currency",
+            "currency_status",
             "classification",
             "classification_label",
             "category",
@@ -121,6 +140,16 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "model_confidence",
         )
         read_only_fields = ("user", "statement_upload", "transaction_fingerprint", "timestamp")
+
+    def get_currency_status(self, obj):
+        return currency_status(obj.currency)
+
+    def validate_currency(self, value):
+        value = value or None
+        recorded = getattr(self.instance, "currency", None)
+        if recorded and value != recorded:  # a settlement denomination is part of the posted record
+            raise serializers.ValidationError("A recorded transaction currency cannot change.")
+        return value
 
     def validate(self, attrs):
         request = self.context.get("request")

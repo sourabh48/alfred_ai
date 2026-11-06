@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from alfred_ai.services.currency import CurrencyQuerySet, currency_field
 from .money import ExpenseMoneyField
 
 
@@ -29,10 +30,14 @@ class BankAccount(models.Model):
     account_number = models.CharField(max_length=64)
     account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPE_CHOICES, default="savings")
     current_balance = ExpenseMoneyField(max_digits=14, decimal_places=2, null=True, blank=True)
+    # Account denomination; null means not recorded and is never guessed (FIN-15). It prefills new postings only.
+    currency = currency_field()
     is_primary = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     last_synced_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = CurrencyQuerySet.as_manager()
 
     class Meta:
         ordering = ["bank_name", "account_number"]
@@ -166,6 +171,8 @@ class Expense(models.Model):
     transaction_fingerprint = models.CharField(max_length=64, blank=True, db_index=True)
     transaction_identity = models.JSONField(default=dict, blank=True)
     closing_balance = ExpenseMoneyField(max_digits=14, decimal_places=2, null=True, blank=True)
+    # Settlement denomination of amount and closing_balance; null means not recorded (FIN-15).
+    currency = currency_field()
     timestamp = models.DateTimeField(auto_now_add=True)
     counterparty = models.CharField(max_length=255, blank=True)
     company_name = models.CharField(max_length=255, blank=True)
@@ -174,6 +181,8 @@ class Expense(models.Model):
     # Alfred AI fields
     is_emotional = models.BooleanField(default=False)
     model_confidence = models.FloatField(default=0)
+
+    objects = CurrencyQuerySet.as_manager()
 
     class Meta:
         ordering = ["-transaction_date", "-id"]
@@ -185,6 +194,16 @@ class Expense(models.Model):
 
     def __str__(self):
         return f"{self.user.username} | {self.classification} | {self.category} | {self.amount}"
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            self.currency = posting_currency(self.currency, self.bank_account)
+        super().save(*args, **kwargs)
+
+
+def posting_currency(currency, bank_account):
+    """A new posting may take its account's recorded currency; history is never relabelled (FIN-15 C1)."""
+    return currency or getattr(bank_account, "currency", None) or None
 
 
 class StatementTransactionEvidence(models.Model):

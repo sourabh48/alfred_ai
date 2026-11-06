@@ -418,7 +418,7 @@ class LoanForeclosureService:
         anchor = min(reference_dates) if reference_dates else timezone.localdate()
         start_date = anchor - timedelta(days=RECONCILIATION_WINDOW_DAYS)
         end_date = max(reference_dates) + timedelta(days=RECONCILIATION_WINDOW_DAYS) if reference_dates else timezone.localdate() + timedelta(days=RECONCILIATION_WINDOW_DAYS)
-        return Expense.objects.filter(
+        return Expense.objects.in_rupee_totals().filter(
             user=loan.user,
             direction="debit",
             transaction_date__gte=start_date,

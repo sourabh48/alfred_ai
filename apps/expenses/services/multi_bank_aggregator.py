@@ -137,7 +137,7 @@ class MultiBankAggregatorService:
             month_start = timezone.localdate() - timedelta(days=30 * (i + 1))
             month_end = timezone.localdate() - timedelta(days=30 * i)
 
-            month_debits = Expense.objects.filter(
+            month_debits = Expense.objects.in_rupee_totals().filter(
                 user=user,
                 bank_account=account,
                 direction="debit",
@@ -145,7 +145,7 @@ class MultiBankAggregatorService:
                 transaction_date__lt=month_end
             ).aggregate(total=Sum("amount"))["total"] or 0
 
-            month_credits = Expense.objects.filter(
+            month_credits = Expense.objects.in_rupee_totals().filter(
                 user=user,
                 bank_account=account,
                 direction="credit",

@@ -454,7 +454,8 @@ class TravelFeedbackView(APIView):
         for tag in disliked:
             learn(request.user, tag, False, f"Trip feedback: {plan.title}", .9)
         learn(request.user, "typical_duration", plan.duration_days, f"Completed trip: {plan.title}", .65)
-        learn(request.user, "typical_spend", money_float(plan.budget), f"Completed trip budget: {plan.title}", .55)
+        if plan.budget_currency in (None, "", "INR"):  # FIN-15: learned spend stays rupee; nothing is converted
+            learn(request.user, "typical_spend", money_float(plan.budget), f"Completed trip budget: {plan.title}", .55)
         return Response({"saved": True})
 
 

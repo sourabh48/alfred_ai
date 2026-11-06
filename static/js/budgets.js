@@ -13,9 +13,13 @@ document.addEventListener("DOMContentLoaded", () => {
     Alfred.enableLiveRefresh("budget-live", loadBudgetDashboard, { rootId: "budgetRoot" });
 });
 
+let budgetCurrency = "INR";  // FIN-15: the active plan's currency; its spend is in the same currency
+const planMoney = value => Alfred.formatCurrency(value, budgetCurrency);
+
 function loadBudgetDashboard(options = {}) {
     return Alfred.fetchJSON("/api/budgets/dashboard/")
         .then(data => {
+            budgetCurrency = data.summary.currency || "INR";
             renderBudgetHero(data.summary, data.plan);
             renderBudgetSummary(data.summary, data.daily_affordability || {});
             renderBudgetForecast(data.forecast || [], data.forecast_evidence || {});
@@ -38,15 +42,15 @@ function loadBudgetDashboard(options = {}) {
 }
 
 function renderBudgetHero(summary, plan) {
-    document.getElementById("budgetPlanValue").textContent = Alfred.formatCurrency(summary.total_budget);
-    document.getElementById("budgetRemainingValue").textContent = Alfred.formatCurrency(summary.total_remaining);
+    document.getElementById("budgetPlanValue").textContent = planMoney(summary.total_budget);
+    document.getElementById("budgetRemainingValue").textContent = planMoney(summary.total_remaining);
     document.getElementById("budgetMonthLabel").textContent = plan ? `${plan.month} plan loaded` : summary.month;
 }
 
 function renderBudgetSummary(summary, affordability) {
     const cards = [
-        { title: "Flexible Budget", value: Alfred.formatCurrency(summary.total_budget), copy: summary.month },
-        { title: "Living Spend", value: Alfred.formatCurrency(summary.total_spent), copy: summary.percent_used == null ? "No positive budget for utilization" : `${Alfred.formatPercent(summary.percent_used)} of flexible budget used` },
+        { title: "Flexible Budget", value: planMoney(summary.total_budget), copy: budgetCurrency === "INR" ? summary.month : `${summary.month} | ${budgetCurrency} plan, ${budgetCurrency} spending only` },
+        { title: "Living Spend", value: planMoney(summary.total_spent), copy: summary.percent_used == null ? "No positive budget for utilization" : `${Alfred.formatPercent(summary.percent_used)} of flexible budget used` },
         { title: "Housing + Loan EMIs", value: Alfred.formatCurrency(summary.fixed_obligations), copy: "Reserved separately from flexible spending" },
         { title: "Daily Budget Guide", value: affordability.safe_daily_spend == null ? "Unavailable" : Alfred.formatCurrency(affordability.safe_daily_spend), copy: `${affordability.days_remaining || 0} days left, including today` },
     ];
@@ -147,9 +151,9 @@ function renderBudgetCategories(items) {
                 <div class="fw-semibold">${Alfred.escapeHtml(item.label)}</div>
                 <div class="muted small">Monthly average ${Alfred.formatCurrency(item.historical_avg)}</div>
             </td>
-            <td class="text-end">${Alfred.formatCurrency(item.limit)}</td>
-            <td class="text-end">${Alfred.formatCurrency(item.spent)}</td>
-            <td class="text-end ${item.remaining < 0 ? "text-danger" : ""}">${Alfred.formatCurrency(item.remaining)}</td>
+            <td class="text-end">${planMoney(item.limit)}</td>
+            <td class="text-end">${planMoney(item.spent)}</td>
+            <td class="text-end ${item.remaining < 0 ? "text-danger" : ""}">${planMoney(item.remaining)}</td>
             <td class="text-end"><span class="status-pill ${categoryTone(item.status)}">${item.percent_used == null ? "—" : Alfred.formatPercent(item.percent_used)}</span></td>
         </tr>
     `).join(""));
@@ -177,9 +181,9 @@ function renderBudgetHistory(items) {
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
                     <div class="fw-semibold">${Alfred.escapeHtml(item.month)}</div>
-                    <div class="muted small">Base ${Alfred.formatCurrency(item.base_budget)} • Adjusted ${Alfred.formatCurrency(item.inflation_adjusted)}</div>
+                    <div class="muted small">Base ${Alfred.formatCurrency(item.base_budget, item.currency || "INR")} • Adjusted ${Alfred.formatCurrency(item.inflation_adjusted, item.currency || "INR")}</div>
                 </div>
-                <strong>${Alfred.formatCurrency(item.spent)}</strong>
+                <strong>${Alfred.formatCurrency(item.spent, item.currency || "INR")}</strong>
             </div>
         </div>
     `).join(""));
@@ -196,6 +200,7 @@ function hydrateBudgetForm(plan, month) {
     form.base_budget.value = plan.base_budget;
     form.inflation_adjusted.value = plan.inflation_adjusted;
     form.spent.value = plan.spent;
+    form.currency.value = plan.currency || "";
 }
 
 function submitBudgetPlan(event) {
@@ -235,15 +240,16 @@ function renderSavingsGoals(goals) {
     }
     target.innerHTML = goals.map(goal => {
         const p = goal.progress || {};
+        const money = value => Alfred.formatCurrency(value, goal.currency || "INR");
         const plan = p.status === "reached" ? "Target reached."
-            : p.status === "overdue" ? `Target date passed with ${Alfred.formatCurrency(p.remaining)} left.`
-            : p.monthly_needed != null ? `${Alfred.formatCurrency(p.monthly_needed)} a month for ${p.months_left} month(s) reaches it.`
-            : `${Alfred.formatCurrency(p.remaining)} left. Add a target date to see a monthly amount.`;
+            : p.status === "overdue" ? `Target date passed with ${money(p.remaining)} left.`
+            : p.monthly_needed != null ? `${money(p.monthly_needed)} a month for ${p.months_left} month(s) reaches it.`
+            : `${money(p.remaining)} left. Add a target date to see a monthly amount.`;
         return `
         <div class="mini-card surface-card" data-goal-id="${goal.id}">
             <div class="d-flex justify-content-between flex-wrap gap-2">
                 <strong>${Alfred.escapeHtml(goal.name)}</strong>
-                <span class="muted small">${Alfred.formatCurrency(goal.saved_amount)} of ${Alfred.formatCurrency(goal.target_amount)}${goal.target_date ? ` by ${Alfred.formatDate(goal.target_date)}` : ""}</span>
+                <span class="muted small">${money(goal.saved_amount)} of ${money(goal.target_amount)}${goal.target_date ? ` by ${Alfred.formatDate(goal.target_date)}` : ""}</span>
             </div>
             <div class="progress my-2" role="progressbar" aria-label="${Alfred.escapeHtml(goal.name)} progress" aria-valuenow="${p.percent}" aria-valuemin="0" aria-valuemax="100">
                 <div class="progress-bar" style="width: ${Number(p.percent) || 0}%"></div>

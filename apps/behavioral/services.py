@@ -292,7 +292,7 @@ def _build_derived_pressure_series(user, *, windows: int = STRESS_WINDOWS) -> li
     # Same outflow rule as the canonical baseline: own transfers and unreviewed debits are not spending.
     expenses = [
         item
-        for item in Expense.objects.filter(
+        for item in Expense.objects.in_rupee_totals().filter(
             user=user,
             direction="debit",
             transaction_date__gte=today - timedelta(days=(windows * 7) + 6),

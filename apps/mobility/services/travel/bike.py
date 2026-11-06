@@ -10,7 +10,7 @@ def bike_context(bike, *, end_date=None, distance_km=None):
     warnings = []
     service = bike.service_records.filter(user=bike.user).first()
     snapshot = bike.condition_snapshots.filter(user=bike.user).first()
-    refill = bike.fuel_refill_logs.filter(user=bike.user, fuel_liters__gt=0, total_cost__gt=0).first()
+    refill = bike.fuel_refill_logs.in_rupee_totals().filter(user=bike.user, fuel_liters__gt=0, total_cost__gt=0).first()
     if service:
         due = service.next_service_date or (service.service_date+timedelta(days=bike.service_interval_days) if bike.service_interval_days else None)
         if due and due <= end:

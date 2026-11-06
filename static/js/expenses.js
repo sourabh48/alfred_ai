@@ -676,7 +676,7 @@ function renderTimeline(timeline, meta = {}) {
                     <td>${badge(item.classification_label, classificationTone(item.classification))}</td>
                     <td>${badge(item.category_label, "light text-dark border")}</td>
                     <td>${escapeHtml(item.payment_mode || "BANK")}</td>
-                    <td class="text-end fw-semibold ${amountClass}">${item.direction === "credit" ? "+" : "-"}${formatCurrency(item.amount)}</td>
+                    <td class="text-end fw-semibold ${amountClass}">${item.direction === "credit" ? "+" : "-"}${formatCurrency(item.amount, item.currency)}${item.currency && item.currency !== "INR" ? `<div class="small text-warning-emphasis fw-normal" data-expense-currency>Kept out of rupee totals</div>` : ""}</td>
                     <td>${escapeHtml(item.source_label)}</td>
                     <td class="text-muted small">${escapeHtml(item.description || item.raw_description || "")}</td>
                     <td class="text-end">
@@ -747,6 +747,7 @@ function submitExpenseForm(event) {
     const expenseId = payload.id;
     delete payload.id;
     payload.amount = Number(payload.amount);
+    if (!payload.currency) delete payload.currency;  // never clear a recorded code; the account may prefill a new one
 
     const method = expenseId ? "PATCH" : "POST";
     const url = expenseId ? `/api/expenses/${expenseId}/` : "/api/expenses/";
@@ -880,6 +881,7 @@ function openEditModal(id) {
     form.elements.classification.value = expense.classification;
     form.elements.category.value = expense.category;
     form.elements.amount.value = expense.amount;
+    form.elements.currency.value = expense.currency || "";
     form.elements.payment_mode.value = expense.payment_mode || "";
     form.elements.direction.value = expense.direction;
     form.elements.merchant.value = expense.merchant || "";
@@ -923,10 +925,10 @@ function badge(text, toneClass) {
     return `<span class="badge rounded-pill bg-${toneClass}">${escapeHtml(text)}</span>`;
 }
 
-function formatCurrency(value) {
+function formatCurrency(value, currency) {
     return new Intl.NumberFormat("en-IN", {
         style: "currency",
-        currency: "INR",
+        currency: currency || "INR",
         maximumFractionDigits: 2,
     }).format(Number(value || 0));
 }

@@ -40,6 +40,7 @@ def _get_profile(user):
             "experience_years": 0,
             "skills": "",
             "last_salary": getattr(user, "monthly_income", 0) or 0,
+            "salary_currency": getattr(user, "income_currency", None),  # FIN-15: the copied amount keeps its currency
         },
     )
     return profile
@@ -288,6 +289,7 @@ def _career_dashboard_revision(user, *, country: str = "", state: str = "") -> s
             getattr(profile, "experience_years", 0),
             getattr(profile, "skills", ""),
             getattr(profile, "last_salary", 0),
+            getattr(profile, "salary_currency", ""),
             resume_meta["count"], resume_meta["max_id"], resume_meta["max_updated"],
             analysis_meta["count"], analysis_meta["max_id"], analysis_meta["max_created"], analysis_meta["max_updated"],
             account_meta["count"], account_meta["max_id"], account_meta["max_synced"],

@@ -1,5 +1,7 @@
 from django.db import models
 from django.conf import settings
+from alfred_ai.services.currency import currency_field
+
 from .money import BudgetMoneyField
 
 class Budget(models.Model):
@@ -8,18 +10,20 @@ class Budget(models.Model):
     base_budget = BudgetMoneyField(max_digits=14, decimal_places=2)
     inflation_adjusted = BudgetMoneyField(max_digits=14, decimal_places=2)
     spent = BudgetMoneyField(max_digits=14, decimal_places=2, default=0)
+    currency = currency_field()  # FIN-15: one denomination per plan; null is not recorded and counts as legacy INR
 
     def __str__(self):
         return f"{self.user.username} - {self.month}"
 
 
 class SavingsGoal(models.Model):
-    """An owner-entered INR savings target; progress is what the owner reports, not linked transactions."""
+    """An owner-entered savings target in its recorded currency (null counts as legacy INR); progress is what the owner reports."""
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="savings_goals")
     name = models.CharField(max_length=120)
     target_amount = BudgetMoneyField(max_digits=14, decimal_places=2)
     saved_amount = BudgetMoneyField(max_digits=14, decimal_places=2, default=0)
     target_date = models.DateField(null=True, blank=True)
+    currency = currency_field()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

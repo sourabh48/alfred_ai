@@ -52,7 +52,7 @@ class BudgetMoneyRuntimeTests(TestCase):
         self.assertEqual((row.base_budget, row.inflation_adjusted, row.spent),
                          (Decimal('2.68'), Decimal('100000000000.01'), Decimal('0.00')))
         self.assertIsInstance(response.json()['base_budget'], float)
-        self.assertEqual(set(response.json()), {'id', 'user', 'month', *FIELDS})
+        self.assertEqual(set(response.json()), {'id', 'user', 'month', 'currency', *FIELDS})
         result = self.client.patch(f'/api/budgets/{row.pk}/', json.dumps({'spent': '0.005'}), content_type='application/json')
         self.assertEqual(result.status_code, 200)
         row.refresh_from_db()
@@ -125,4 +125,4 @@ class BudgetMoneyRuntimeTests(TestCase):
         self.assertEqual({key: result.json()['summary'][key] for key in ('total_budget', 'total_spent', 'total_remaining')},
                          {'total_budget': .30, 'total_spent': .30, 'total_remaining': 0})
         self.assertEqual(result.json()['plan']['inflation_adjusted'], .30)
-        self.assertNotIn('currency', result.json()['plan'])
+        self.assertIsNone(result.json()['plan']['currency'])  # FIN-15: not recorded, never a guessed INR

@@ -28,6 +28,10 @@ def train_salary_model() -> dict:
         return _skip("No user profiles exist yet.", sample_count=0)
 
     df = df.fillna({"monthly_income": 0, "variable_income": 0, "rent_or_emi": 0, "city": ""}).copy()
+    # FIN-15: learn from rupee (or not recorded) amounts only; other currencies are never converted.
+    for amount, code in (("monthly_income", "income_currency"), ("variable_income", "variable_income_currency"), ("rent_or_emi", "rent_currency")):
+        if code in df:
+            df[amount] = df[amount].where(df[code].fillna("INR") == "INR", 0)
     df = df[df["monthly_income_basis"] != "unconfirmed"].copy()
     df["monthly_income"] = df["monthly_income"].astype(float).where(df["monthly_income_basis"] != "annual", df["monthly_income"].astype(float) / 12)
     df = df[df["monthly_income"] > 0]

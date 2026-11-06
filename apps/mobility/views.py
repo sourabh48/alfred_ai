@@ -10,6 +10,7 @@ from rest_framework import status
 from rest_framework.exceptions import APIException
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.parsers import FormParser, MultiPartParser
+from alfred_ai.services.currency import rupee_amount
 from alfred_ai.services.api_parsing import TextJSONParser as JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -623,6 +624,7 @@ class BikeServiceImportView(APIView):
                     document_number=parsed.fields.get("document_number", ""),
                     issue_date=_parse_optional_date(service_payload.get("service_date")),
                     premium_amount=service_serializer.validated_data.get("cost", 0),
+                    currency=service_serializer.validated_data.get("currency"),
                     document_file=upload,
                     document_title=parsed.title,
                     parser_status=parsed.parser_status,
@@ -924,8 +926,9 @@ class MobilityDashboardView(APIView):
         today = timezone.localdate()
         upcoming_plans = [plan for plan in travel_plans if plan.status in active_trip_status | {"confirmed"} and plan.end_date and plan.end_date >= today]
         completed_plans = [plan for plan in travel_plans if plan.status == "completed"]
-        total_trip_budget = sum(plan.budget or 0 for plan in travel_plans)
-        total_trip_spend = sum(log.spend_amount or 0 for log in trip_logs)
+        # FIN-15: rupee totals only; budgets and spend in other currencies are never added in.
+        total_trip_budget = sum(rupee_amount(plan.budget or 0, plan.budget_currency) for plan in travel_plans)
+        total_trip_spend = sum(rupee_amount(log.spend_amount or 0, log.currency) for log in trip_logs)
         total_trip_distance = sum(log.distance_km or 0 for log in trip_logs)
 
         heatmap_points = []

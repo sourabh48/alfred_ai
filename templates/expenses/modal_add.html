@@ -48,8 +48,20 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label class="form-label">Amount (INR)</label>
-                        <input type="number" class="form-control" step="0.01" min="0.01" name="amount" required>
+                        <label class="form-label" for="expenseAmount">Amount</label>
+                        <input id="expenseAmount" type="number" class="form-control" step="0.01" min="0.01" name="amount" required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label" for="expenseCurrency">Currency</label>
+                        <select id="expenseCurrency" name="currency" class="form-select" aria-describedby="expenseCurrencyHelp">
+                            <option value="" selected>Account currency, or not recorded</option>
+                            <option value="INR">Indian rupee (INR)</option>
+                            <option value="USD">US dollar (USD)</option>
+                            <option value="EUR">Euro (EUR)</option>
+                            <option value="GBP">Pound sterling (GBP)</option>
+                        </select>
+                        <div id="expenseCurrencyHelp" class="form-text">Only INR (or not recorded) counts in rupee totals. Once recorded it cannot change; nothing is converted.</div>
                     </div>
 
                     <div class="col-md-4">

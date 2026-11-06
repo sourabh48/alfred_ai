@@ -366,8 +366,8 @@ def baseline_source(user):
             *(['Recent salary credits disagree with the confirmed income.'] if baseline.get('income_conflict') else [])],amounts={},metric_states={})
     for key in (*BASELINE_KEYS,'rent_burden'):
         state=baseline['metric_states'][key]
-        supported=(key=='rent_burden' or (key=='monthly_income' and baseline['income_source']=='reported_monthly_income'
-            and owner.monthly_income>0 and baseline['decimal_amounts']['monthly_income']==format(profile_money(owner.monthly_income),'.2f')))
+        supported=((key=='rent_burden' and owner.rupee_rent_or_emi==owner.rent_or_emi) or (key=='monthly_income' and baseline['income_source']=='reported_monthly_income'
+            and owner.rupee_monthly_income>0 and baseline['decimal_amounts']['monthly_income']==format(profile_money(owner.rupee_monthly_income),'.2f')))
         value=owner.rent_or_emi if key=='rent_burden' else baseline['decimal_amounts'].get(key)
         available=supported and state['status']!='unavailable'
         data['amounts'][key]=_amount(value if available else None,profile_money,state['status'],state['source'])
@@ -511,7 +511,7 @@ def record_source(user, kind, identity, *, selected_documents=None, source_catal
         if document_sources:
             data['limitations'].append('Field confirmation is the owner\'s attestation, not independent bank/broker authentication. Current register corrections take precedence; unconfirmed, unavailable or changed document evidence remains unverified.')
     data['amounts']={field:_amount(getattr(row,field),helper,data['verification'],f'{row._meta.label}.{field}') for field in fields}
-    if kind in ('investment','loan') and row.currency:
+    if getattr(row,'currency',None):  # any FIN-15 record with a recorded denomination
         for value in data['amounts'].values(): value.update(currency=row.currency,currency_status='recorded')
         data['limitations'][1]=f'Amounts are recorded in {row.currency}; no totals, currency conversion or live valuation are inferred.'
     if kind in ('loan','investment'):

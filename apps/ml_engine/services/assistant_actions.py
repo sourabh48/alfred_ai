@@ -62,6 +62,10 @@ def _rupees(value):
     return f"₹{value:,.2f}"
 
 
+def _money(value, currency):
+    return _rupees(value) if currency in (None, "", "INR") else f"{currency} {value:,.2f}"
+
+
 def propose(user, text, today=None):
     """Return a proposal dict, or None when the text is not one of the supported actions."""
     today = today or date.today()
@@ -85,7 +89,7 @@ def propose(user, text, today=None):
         saved = _amount(match, "saved")
         goal = goals[0]
         return {"action": "update_savings_goal", "fields": {"id": goal.pk, "saved_amount": str(saved)},
-                "summary": f"Set saved so far for \"{goal.name}\" from {_rupees(goal.saved_amount)} to {_rupees(saved)}."}
+                "summary": f"Set saved so far for \"{goal.name}\" from {_money(goal.saved_amount, goal.currency)} to {_money(saved, goal.currency)}."}
     return None
 
 

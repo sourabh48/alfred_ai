@@ -9,6 +9,7 @@ from statistics import mean, pstdev
 from django.db.models import Count, Max
 from django.utils import timezone
 
+from alfred_ai.services.currency import counts_in_rupees, currency_fingerprint, rupee_amount
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.loans.diagnostics import public_allocation, reconciliation_message
 from apps.expenses.models import BankAccount, Expense
@@ -89,7 +90,7 @@ def resolve_canonical_financial_baseline(user, *, fresh=False, expenses=None, re
 
 
 def _build_financial_intelligence_uncached(user) -> dict:
-    expenses = list(Expense.objects.filter(user=user).order_by("transaction_date", "id"))
+    expenses = list(Expense.objects.filter(user=user).in_rupee_totals().order_by("transaction_date", "id"))
     loans = list(Loan.objects.filter(user=user).in_rupee_totals().order_by("-start_date", "-id"))
     payment_rows = fetch_payment_history_rows(user=user) if loans else []
 
@@ -310,13 +311,14 @@ def _financial_revision(user) -> str:
     vehicle_meta = BikeProfile.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
     service_meta = BikeServiceRecord.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("service_date"))
     trip_meta = TripLog.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_date=Max("log_date"))
-    career_profile_meta = CareerProfile.objects.filter(user=user).aggregate(count=Count("id"), max_last_salary=Max("last_salary"))
+    career_profile_meta = CareerProfile.objects.filter(user=user).aggregate(count=Count("id"), max_last_salary=Max("last_salary"), salary_currency=Max("salary_currency"))
     career_resume_meta = CareerResume.objects.filter(user=user).aggregate(count=Count("id"), max_id=Max("id"), max_updated=Max("updated_at"))
     return "|".join(
         str(value or "")
         for value in [
             "expense-bank-money-v2-safe-loan-diagnostics",
             user.monthly_income, user.monthly_income_basis, user.variable_income, user.rent_or_emi, user.city,
+            user.income_currency, user.variable_income_currency, user.rent_currency,
             expense_meta["count"], expense_meta["max_id"], expense_meta["max_date"],
             loan_meta["count"], loan_meta["max_id"], loan_meta["max_updated"],
             payment_meta["count"], payment_meta["max_id"], payment_meta["max_date"], payment_meta["max_created"],
@@ -327,7 +329,10 @@ def _financial_revision(user) -> str:
             vehicle_meta["count"], vehicle_meta["max_id"], vehicle_meta["max_updated"],
             service_meta["count"], service_meta["max_id"], service_meta["max_date"],
             trip_meta["count"], trip_meta["max_id"], trip_meta["max_date"],
-            career_profile_meta["count"], career_profile_meta["max_last_salary"],
+            career_profile_meta["count"], career_profile_meta["max_last_salary"], career_profile_meta["salary_currency"],
+            currency_fingerprint(Expense.objects.filter(user=user), BankAccount.objects.filter(user=user), Investment.objects.filter(user=user),
+                                 BikeProfile.objects.filter(user=user), BikeServiceRecord.objects.filter(user=user), TripLog.objects.filter(user=user),
+                                 fields=("currency", "value_currency", "income_support_currency")),
             career_resume_meta["count"], career_resume_meta["max_id"], career_resume_meta["max_updated"],
         ]
     )
@@ -610,7 +615,7 @@ def _build_canonical_financial_baseline_uncached(
     from apps.career.models import CareerProfile, CareerResume
     from apps.career.services import build_employment_income_signals
 
-    expenses = list(expenses) if expenses is not None else list(Expense.objects.filter(user=user).order_by("transaction_date", "id"))
+    expenses = list(expenses) if expenses is not None else list(Expense.objects.filter(user=user).in_rupee_totals().order_by("transaction_date", "id"))
     loans = list(loans) if loans is not None else list(Loan.objects.filter(user=user).in_rupee_totals().order_by("-start_date", "-id"))
     payment_rows = list(payment_rows or [])
     if loans and not payment_rows:
@@ -629,7 +634,7 @@ def _build_canonical_financial_baseline_uncached(
     observed_average_monthly_inflow_amount = _decimal_average(bucket["income"] for bucket in recent_buckets)
     current_income_credits_amount = _current_income_credits_amount(expenses, income_as_of)
     variable_by_month = defaultdict(lambda: Decimal("0"))
-    for expense, amount in variable_spend_rows(expenses, monthly_housing=getattr(user, "rent_or_emi", 0)):
+    for expense, amount in variable_spend_rows(expenses, monthly_housing=getattr(user, "rupee_rent_or_emi", 0)):
         variable_by_month[(expense.transaction_date.year, expense.transaction_date.month)] += amount
     observed_average_monthly_variable_spend_amount = _decimal_average(
         variable_by_month[key] for key in recent_month_keys
@@ -646,7 +651,7 @@ def _build_canonical_financial_baseline_uncached(
 
     reported_income = income_signals.get("reported_income", {}) or {}
     salary_signal = income_signals.get("salary_credit_signal") or {}
-    profile_last_salary = _decimal_amount(getattr(profile, "last_salary", 0) or 0)
+    profile_last_salary = _decimal_amount(getattr(profile, "rupee_last_salary", 0) or 0)
     monthly_income_amount = _decimal_amount(income_signals.get("monthly_cash_income", 0) or 0)
     income_source = "not_evidenced"
     income_source_summary = income_signals.get("source_summary") or ""
@@ -673,7 +678,7 @@ def _build_canonical_financial_baseline_uncached(
         # An income confirmed per year stands, neither rounded through a month nor replaced by take-home credits.
         annual_income_amount = _decimal_amount(reported_income.get("value", 0)).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     supplemental_variable_income_amount = _decimal_amount(income_signals.get("variable_income", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
-    rent_burden_amount = _decimal_amount(getattr(user, "rent_or_emi", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    rent_burden_amount = _decimal_amount(getattr(user, "rupee_rent_or_emi", 0) or 0).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
 
     recurring_emi_burden_amount = Decimal("0")
     for loan in loans:
@@ -697,7 +702,7 @@ def _build_canonical_financial_baseline_uncached(
         else Decimal("0")
     )
 
-    accounts = list(BankAccount.objects.filter(user=user, is_active=True))
+    accounts = list(BankAccount.objects.filter(user=user, is_active=True).in_rupee_totals())
     liquid_cash_amount = sum(
         (
             max(_decimal_amount(account.current_balance or 0), Decimal("0"))
@@ -1219,10 +1224,11 @@ def _build_debt_trend(monthly_buckets: dict[tuple[int, int], dict]) -> dict:
 
 
 def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | None = None) -> dict:
-    accounts = list(BankAccount.objects.filter(user=user, is_active=True))
+    accounts = list(BankAccount.objects.filter(user=user, is_active=True).in_rupee_totals())
     investments = list(Investment.objects.filter(user=user).in_rupee_totals())
     other_currency_positions = Investment.objects.filter(user=user).count() - len(investments)
     other_currency_loans = Loan.objects.filter(user=user).count() - Loan.objects.filter(user=user).in_rupee_totals().count()
+    other_currency_accounts = BankAccount.objects.filter(user=user, is_active=True).in_other_currencies().count()
     vehicle_profiles = list(BikeProfile.objects.filter(user=user))
     vehicle_services = list(BikeServiceRecord.objects.filter(user=user).select_related("bike_profile"))
     trip_logs = list(TripLog.objects.filter(user=user).select_related("travel_plan", "travel_plan__vehicle_profile"))
@@ -1299,6 +1305,9 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     if other_currency_loans:
         summary = (f"{summary} {other_currency_loans} loan(s) recorded in another currency "
                    "are not included; there is no currency conversion.")
+    if other_currency_accounts:
+        summary = (f"{summary} {other_currency_accounts} bank account(s) recorded in another currency "
+                   "are not included; there is no currency conversion.")
 
     return {
         "total_assets": total_assets,
@@ -1315,6 +1324,7 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
         "vehicle_positions": vehicle_positions,
         "excluded_other_currency_investments": other_currency_positions,
         "excluded_other_currency_loans": other_currency_loans,
+        "excluded_other_currency_accounts": other_currency_accounts,
         "summary": summary,
     }
 
@@ -1358,18 +1368,21 @@ def _build_vehicle_positions(
 ) -> list[dict]:
     service_by_profile: dict[int | None, Decimal] = defaultdict(Decimal)
     for item in vehicle_services:
-        service_by_profile[item.bike_profile_id] += _decimal_amount(item.cost)
+        service_by_profile[item.bike_profile_id] += _decimal_amount(rupee_amount(item.cost, item.currency))
 
     trip_by_profile: dict[int | None, Decimal] = defaultdict(Decimal)
     for item in trip_logs:
         profile_id = getattr(item.travel_plan, "vehicle_profile_id", None)
-        trip_by_profile[profile_id] += _decimal_amount(item.spend_amount)
+        trip_by_profile[profile_id] += _decimal_amount(rupee_amount(item.spend_amount, item.currency))
 
     positions = []
     for profile in vehicle_profiles:
         recorded_cost = service_by_profile.get(profile.id, Decimal("0")) + trip_by_profile.get(profile.id, Decimal("0"))
-        market_value = _money_float(max(_decimal_amount(profile.estimated_market_value), Decimal("0")))
-        monthly_income_support = _decimal_amount(profile.monthly_income_support)
+        # FIN-15: rupee totals only; a value in another currency is listed, never converted.
+        market_value = _money_float(max(_decimal_amount(profile.rupee_market_value), Decimal("0")))
+        monthly_income_support = _decimal_amount(profile.rupee_income_support)
+        other_value = None if counts_in_rupees(profile.value_currency) else {
+            "currency": profile.value_currency, "estimated_market_value": _money_float(_decimal_amount(profile.estimated_market_value))}
 
         positions.append(
             {
@@ -1378,7 +1391,8 @@ def _build_vehicle_positions(
                 "bucket": "asset",
                 "recognized_value": market_value,
                 "estimated_market_value": round(market_value, 2),
-                "valuation_status": "user_estimate" if market_value > 0 else "no_positive_value_recorded",
+                "valuation_status": "other_currency_not_converted" if other_value else "user_estimate" if market_value > 0 else "no_positive_value_recorded",
+                "other_currency_value": other_value,
                 "monthly_income_support": _money_float(monthly_income_support),
                 "recorded_running_cost_total": _money_float(recorded_cost),
                 "running_cost_period": "all_recorded_history",

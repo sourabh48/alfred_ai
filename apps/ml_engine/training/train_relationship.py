@@ -42,8 +42,8 @@ def _row(item: RelationshipProfile) -> dict:
     return {
         "partner_financial_score": float(item.partner_financial_score or 0),
         "partner_savings_habits": float(item.partner_savings_habits or 0),
-        "user_savings_rate": max(0.0, min(100.0, 100.0 - float(getattr(item.user, "rent_or_emi", 0) or 0) / monthly_income * 100.0)) if monthly_income else 0.0,
-        "user_debt_pressure": min(100.0, (float(getattr(item.user, "rent_or_emi", 0) or 0) / monthly_income) * 100.0) if monthly_income else 0.0,
+        "user_savings_rate": max(0.0, min(100.0, 100.0 - float(item.user.rupee_rent_or_emi) / monthly_income * 100.0)) if monthly_income else 0.0,
+        "user_debt_pressure": min(100.0, (float(item.user.rupee_rent_or_emi) / monthly_income) * 100.0) if monthly_income else 0.0,
         "monthly_income_band": min(12.0, monthly_income / 25000.0),
         "target_score": float(item.compatibility_score or 0),
     }

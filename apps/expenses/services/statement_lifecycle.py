@@ -609,6 +609,7 @@ def _import_statement_transactions(*, user, upload: StatementUpload, bank_accoun
                 bank_account=bank_account,
                 statement_upload=upload,
                 amount=expense_money(item.amount),
+                currency=bank_account.currency if bank_account else None,  # bulk_create skips Expense.save
                 classification=enriched["classification"],
                 category=enriched["category"],
                 payment_mode=enriched["payment_mode"],

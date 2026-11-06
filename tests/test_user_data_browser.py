@@ -1620,6 +1620,35 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('loanSummaryCards').scrollIntoView({behavior:'instant',block:'center'});")
         self.capture('loan-other-currency')
 
+    def test_account_transaction_and_budget_currencies_stay_in_their_own_totals(self):
+        from decimal import Decimal
+        from django.utils import timezone
+        from apps.budgets.models import Budget
+        from apps.expenses.models import BankAccount, Expense
+        owner = self.scenario['user']
+        account = BankAccount.objects.create(user=owner, bank_name='Synthetic Dollar Bank', account_number='SYNUSD0001', current_balance=Decimal('5.00'))
+        Expense.objects.create(user=owner, amount=Decimal('42.50'), direction='debit', category='groceries', merchant='Synthetic Dollar Shop',
+                               transaction_date=timezone.localdate(), currency='USD')
+        self.login(); self.browser.get(self.live_server_url + '/expenses/')
+        self.wait.until(lambda _: 'Synthetic Dollar Shop' in self.text('timelineBody') and 'Synthetic Dollar Bank' in self.text('bankAccountsBody'))
+        self.assertIn('Kept out of rupee totals', self.text('timelineBody'))
+        self.assertIn('$42.50', self.text('timelineBody'))
+        self.browser.find_element(self.By.CSS_SELECTOR, f'select[aria-label="Currency of Synthetic Dollar Bank"]').send_keys('USD')
+        self.wait.until(lambda _: 'Account currency recorded.' in self.text('bankAccountsStatus') and self.active_requests == 0)
+        account.refresh_from_db()
+        self.assertEqual(account.currency, 'USD')
+        self.wait.until(lambda _: 'kept out of rupee totals' in self.text('bankAccountsBody'))
+        self.browser.get(self.live_server_url + '/budgets/')
+        self.wait.until(lambda _: self.active_requests == 0 and self.text('budgetPlanValue'))
+        for element, value in (('budgetBase', '300'), ('budgetInflation', '300')):
+            field = self.browser.find_element(self.By.ID, element); field.clear(); field.send_keys(value)
+        self.browser.find_element(self.By.ID, 'budgetCurrency').send_keys('US dollar (USD)')
+        self.memory_click('#budgetPlanForm button[type="submit"]')
+        self.wait.until(lambda _: '$300.00' in self.text('budgetPlanValue') and self.active_requests == 0)
+        self.assertEqual(Budget.objects.filter(user=owner).order_by('-id').first().currency, 'USD')
+        self.assertIn('$257.50', self.text('budgetRemainingValue'))  # only the USD transaction counts against a USD plan
+        self.capture('budget-other-currency')
+
     def test_private_trip_video_upload_play_and_delete(self):
         from apps.mobility.models import TravelPlan, TripVideo
         # Django's test-only public media handler must not bypass ALFRED's owner gate.

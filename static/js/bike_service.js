@@ -208,7 +208,7 @@ function renderBikeProfileList(items) {
                     <div class="fw-semibold">${Alfred.escapeHtml(item.display_name)} ${item.is_primary ? `<span class="muted small">primary</span>` : ""}${bikeState.editingProfileId === item.id ? ` <span class="muted small">editing</span>` : ""}</div>
                     <div class="muted small">${Alfred.escapeHtml(item.vehicle_type_label || "Vehicle")} | ${Alfred.escapeHtml(item.make || "Unknown make")} | ${Alfred.escapeHtml(item.bike_class || "Unknown class")} | ${Alfred.escapeHtml(item.verification_status_label || "Custom")}</div>
                     <div class="muted small">${item.vehicle_number ? Alfred.escapeHtml(item.vehicle_number) : "Vehicle number not saved"}${item.expected_mileage_kmpl ? ` | ${Alfred.formatNumber(item.expected_mileage_kmpl, 1)} kmpl` : ""}</div>
-                    <div class="muted small">${Alfred.escapeHtml(item.usage_pattern_label || "Personal / Lifestyle")}${item.estimated_market_value ? ` | ${Alfred.formatCurrency(item.estimated_market_value)}` : ""}</div>
+                    <div class="muted small">${Alfred.escapeHtml(item.usage_pattern_label || "Personal / Lifestyle")}${item.estimated_market_value ? ` | ${Alfred.formatCurrency(item.estimated_market_value, item.value_currency || "INR")}` : ""}</div>
                 </div>
                 <div class="list-actions">
                     <button class="btn btn-sm btn-outline-primary" type="button" onclick="editBikeProfile(${item.id})">Edit</button>
@@ -242,7 +242,7 @@ function renderBikeProfile(profile) {
         {
             label: "Usage",
             value: profile.usage_pattern_label || humanizeToken(profile.usage_pattern) || "Not set",
-            meta: profile.monthly_income_support ? `Utility support ${Alfred.formatCurrency(profile.monthly_income_support)}/month` : "No utility-income value linked",
+            meta: profile.monthly_income_support ? `Utility support ${Alfred.formatCurrency(profile.monthly_income_support, profile.income_support_currency || "INR")}/month` : "No utility-income value linked",
         },
         {
             label: "Fuel / Tank",
@@ -283,7 +283,7 @@ function renderBikeProfile(profile) {
         },
         {
             label: "Market Value",
-            value: profile.estimated_market_value ? Alfred.formatCurrency(profile.estimated_market_value) : "Not set",
+            value: profile.estimated_market_value ? Alfred.formatCurrency(profile.estimated_market_value, profile.value_currency || "INR") : "Not set",
             meta: profile.is_primary ? "Primary tracked vehicle" : "Secondary tracked vehicle",
         },
     ];
@@ -588,7 +588,7 @@ function renderBikeRefills(items) {
                     ${item.notes ? `<div class="muted small mt-2">${Alfred.escapeHtml(item.notes)}</div>` : ""}
                 </div>
                 <div class="text-end flex-shrink-0">
-                    <strong>${Alfred.formatCurrency(item.total_cost || 0)}</strong>
+                    <strong>${Alfred.formatCurrency(item.total_cost || 0, item.currency || "INR")}</strong>
                     <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeRefill(${item.id})">Delete</button></div>
                 </div>
             </div>
@@ -684,7 +684,7 @@ function renderBikeServiceLogs(items) {
                     ${item.notes ? `<div class="muted small mt-2">${Alfred.escapeHtml(item.notes)}</div>` : ""}
                 </div>
                 <div class="text-end flex-shrink-0">
-                    <strong>${item.parsed_payload?.cost_held_for_review ? "Cost awaiting review" : Alfred.formatCurrency(item.cost || 0)}</strong>
+                    <strong>${item.parsed_payload?.cost_held_for_review ? "Cost awaiting review" : Alfred.formatCurrency(item.cost || 0, item.currency || "INR")}</strong>
                     <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeServiceRecord(${item.id})">Delete</button></div>
                 </div>
             </div>
@@ -1025,6 +1025,8 @@ function populateBikeProfileForm(profile) {
     document.getElementById("bikeProfileUsagePattern").value = profile.usage_pattern || "personal";
     document.getElementById("bikeProfileMarketValue").value = valueOrEmpty(profile.estimated_market_value);
     document.getElementById("bikeProfileIncomeSupport").value = valueOrEmpty(profile.monthly_income_support);
+    document.getElementById("bikeProfileValueCurrency").value = profile.value_currency || "";
+    document.getElementById("bikeProfileIncomeSupportCurrency").value = profile.income_support_currency || "";
     document.getElementById("bikeProfileEngineCc").value = valueOrEmpty(profile.engine_cc);
     document.getElementById("bikeProfileFuelTank").value = valueOrEmpty(profile.fuel_tank_capacity_l);
     document.getElementById("bikeProfileMileage").value = valueOrEmpty(profile.expected_mileage_kmpl);

@@ -192,7 +192,7 @@ class FinancialRecommendationEngine:
 
         # Spending analysis (last 90 days)
         last_90_days = timezone.localdate() - timedelta(days=90)
-        expenses = Expense.objects.filter(
+        expenses = Expense.objects.in_rupee_totals().filter(
             user=user,
             direction='debit',
             transaction_date__gte=last_90_days,
