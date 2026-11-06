@@ -118,3 +118,70 @@ class PacketApiTests(TestCase):
         self.assertEqual(failed.status_code, 502)
         self.client.logout()
         self.assertIn(self._get(symbol="SYNTH").status_code, (401, 403))
+
+
+class FakeReasoner:
+    model = "fixture-local:1b"
+
+    def __init__(self, reply):
+        self.reply, self.payloads = reply, []
+
+    def reason(self, payload, *, max_output_tokens, deadline):
+        self.payloads.append(payload)
+        if isinstance(self.reply, Exception):
+            raise self.reply
+        return self.reply
+
+
+GOOD = ('Sure: {"objections":[{"point":"F1","why":"Growth may come from an acquisition rather than demand."},'
+        '{"point":"F9","why":"Not a real point."},{"point":"F2","why":"Margin could fall 5 points next year."}],'
+        '"overlooked":["Customer concentration","Revenue rose 20% only once"]}')
+
+
+class ChallengeTests(SimpleTestCase):
+    def test_only_real_points_without_numbers_survive(self):
+        from apps.investments.services.research_challenge import challenge_packet
+        reasoner = FakeReasoner(GOOD)
+        result = challenge_packet(build_packet("SYNTH.NS", _fund(), _prices(RISING)), reasoner=reasoner)
+        self.assertEqual([o["point_id"] for o in result["objections"]], ["F1"])
+        self.assertTrue(result["objections"][0]["point"].startswith("Revenue grew"))
+        self.assertEqual((result["overlooked"], result["dropped"]), (["Customer concentration"], 3))
+        sent = reasoner.payloads[0]
+        self.assertEqual(set(sent), {"task", "symbol", "points", "valuation", "already_missing"})  # no portfolio record
+        self.assertIn("leans for", sent["task"])
+
+    def test_only_the_challenge_waits_longer(self):
+        from apps.investments.services.research_challenge import SECONDS, local_reasoner
+        from apps.ml_engine.services.hybrid_intelligence import OllamaReasoner
+        self.assertEqual((local_reasoner().READ_SECONDS, OllamaReasoner().READ_SECONDS, SECONDS), (120, 30, 120))
+
+    def test_unusable_replies_and_empty_packets(self):
+        from apps.investments.services.research_challenge import challenge_packet
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        packet = build_packet("SYNTH.NS", _fund(), _prices(RISING))
+        for reply in ("no json here", '{"objections":[{"point":"F1","why":"It fell 30%"}]}', "[1, 2]"):
+            with self.subTest(reply), self.assertRaises(EmbeddingUnavailable):
+                challenge_packet(packet, reasoner=FakeReasoner(reply))
+        self.assertEqual(challenge_packet(build_packet("X", {}, {}), reasoner=FakeReasoner(GOOD))["status"], "nothing_to_challenge")
+
+
+class ChallengeApiTests(TestCase):
+    setUp = PacketApiTests.setUp
+    def _post(self, reply, **body):
+        with patch("apps.investments.services.research_packet.fetch_fundamentals", return_value=_fund()), \
+                patch("apps.investments.services.research_packet.fetch_prices", return_value=_prices(RISING)), \
+                patch("apps.investments.services.research_challenge.local_reasoner", return_value=FakeReasoner(reply)):
+            return self.client.post("/api/investments/research/packet/challenge/", body, content_type="application/json")
+
+    def test_challenge_rebuilds_the_packet_server_side(self):
+        response = self._post(GOOD, symbol="SYNTH.NS", holding=self.holding.pk, points={"F1": "injected"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["objections"][0]["point"][:12], "Revenue grew")
+        self.assertEqual(self._post(GOOD, symbol="SYNTH", holding=self.stranger.pk).status_code, 404)
+        self.assertEqual(self._post(GOOD, symbol="../x").status_code, 400)
+
+    def test_local_model_unavailable_is_reported(self):
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        response = self._post(EmbeddingUnavailable("down"), symbol="SYNTH.NS")
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("Ollama", response.json()["detail"])

@@ -6875,18 +6875,23 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def test_research_packet_shows_dated_case_for_and_against_without_writing(self):
         from unittest.mock import patch
         from apps.investments.models import Investment, ResearchDecision
-        from tests.test_research_packet import RISING, _fund, _prices
+        from tests.test_research_packet import GOOD, RISING, FakeReasoner, _fund, _prices
         owner = self.scenario['user']
         holdings, calls = list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()
         self.login()
-        with patch('apps.investments.services.research_packet.fetch_fundamentals', return_value=_fund(currency='USD')),                 patch('apps.investments.services.research_packet.fetch_prices', return_value=_prices(RISING)):
+        with patch('apps.investments.services.research_packet.fetch_fundamentals', return_value=_fund(currency='USD')),                 patch('apps.investments.services.research_packet.fetch_prices', return_value=_prices(RISING)), \
+                patch('apps.investments.services.research_challenge.local_reasoner', return_value=FakeReasoner(GOOD)):
             self.browser.get(self.live_server_url + '/investments/')
             self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPacketSymbol'))
             self.browser.find_element(self.By.ID, 'researchPacketSymbol').send_keys('synth.ns')
             self.memory_click('#researchPacketForm button[type=submit]')
             self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPacketResult'))
+            self.memory_click('#researchChallengeButton')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchChallengeResult'))
         self.assertIn('Revenue grew 20.0%', self.text('researchPacketBull'))
         self.assertIn('does not convert', self.text('researchPacketValuation'))
+        self.assertIn('acquisition rather than demand', self.text('researchChallenge'))
+        self.assertIn('3 reply item(s) were dropped', self.text('researchChallenge'))
         self.assertEqual((list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()), (holdings, calls))
         self.capture('investment-research-packet')
 

@@ -515,6 +515,7 @@ async function loadResearchPacket(event) {
     target.innerHTML = `<p class="muted small mb-0">Fetching dated public data…</p>`;
     try {
         target.innerHTML = researchPacketHtml(await Alfred.fetchJSON(`/api/investments/research/packet/?${query}`));
+        document.getElementById("researchChallengeButton").addEventListener("click", () => loadResearchChallenge(Object.fromEntries(query)));
     } catch (error) {
         target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${Alfred.escapeHtml(error.message || "The packet could not be built.")}</div>`;
     }
@@ -540,7 +541,28 @@ function researchPacketHtml(p) {
         <p class="fw-semibold mt-2 mb-1">Missing evidence</p>${list(p.missing_evidence || [])}
         <p class="fw-semibold mt-2 mb-1">Your options</p>${list(p.options || [])}
         <p class="muted small mt-2 mb-0">${(p.limits || []).map(e).join(" ")}</p>
+        <button type="button" class="btn btn-outline-secondary btn-sm mt-3" id="researchChallengeButton">Challenge it with the local model</button>
+        <div id="researchChallenge" class="mt-2" aria-live="polite"></div>
     </div>`;
+}
+
+async function loadResearchChallenge(params) {
+    const target = document.getElementById("researchChallenge"), button = document.getElementById("researchChallengeButton");
+    const e = Alfred.escapeHtml;
+    button.disabled = true;
+    target.innerHTML = `<p class="muted small mb-0">The local model is questioning the packet; on this PC it can take up to two minutes…</p>`;
+    try {
+        const c = await Alfred.fetchJSON("/api/investments/research/packet/challenge/", { method: "POST", body: JSON.stringify(params) });
+        if (c.status !== "challenged") { target.innerHTML = `<p class="muted small mb-0">${e(c.detail || "")}</p>`; return; }
+        target.innerHTML = `<div id="researchChallengeResult"><p class="fw-semibold mb-1">Sceptic's objections (${e(c.model)})</p>
+            ${c.objections.length ? `<ul class="mb-2">${c.objections.map(o => `<li><span class="muted">${e(o.point)}</span> — ${e(o.objection)}</li>`).join("")}</ul>` : ""}
+            ${c.overlooked.length ? `<p class="fw-semibold mb-1">Not covered by the packet</p><ul class="mb-2">${c.overlooked.map(item => `<li>${e(item)}</li>`).join("")}</ul>` : ""}
+            <p class="muted small mb-0">${c.dropped ? `${e(String(c.dropped))} reply item(s) were dropped for citing no packet point or stating a number. ` : ""}${c.limits.map(e).join(" ")}</p></div>`;
+    } catch (error) {
+        target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${e(error.message || "The challenge failed.")}</div>`;
+    } finally {
+        button.disabled = false;
+    }
 }
 
 function researchPercent(value) {

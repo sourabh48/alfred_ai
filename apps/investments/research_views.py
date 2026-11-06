@@ -129,26 +129,51 @@ class ResearchLessonsView(APIView):
         return Response(lessons(request.user, str(request.query_params.get("instrument") or "")[:120]))
 
 
+def _packet(user, params):
+    """(packet, None) or (None, error Response); the holding is always the owner's own."""
+    from django.db.models import Sum
+    from .models import Investment
+    from .services.research_packet import research_packet
+
+    holding, total, raw = None, None, str(params.get("holding") or "")
+    if raw:
+        if not raw.isdigit() or len(raw) > 18:
+            return None, Response({"detail": "Choose one of your holdings."}, status=status.HTTP_400_BAD_REQUEST)
+        holding = get_object_or_404(Investment, pk=int(raw), user=user)
+        same = Investment.objects.filter(user=user)
+        same = same.in_rupee_totals() if holding.currency in (None, "INR") else same.filter(currency=holding.currency)
+        total = same.aggregate(total=Sum("current_value"))["total"] or None
+    try:
+        return research_packet(str(params.get("symbol") or ""), holding=holding, portfolio_total=total), None
+    except ValueError as exc:
+        return None, Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    except public_http.PublicHTTPError as exc:
+        return None, Response({"detail": f"Yahoo data is unavailable right now ({exc.code}). Try again later."}, status=status.HTTP_502_BAD_GATEWAY)
+
+
 class ResearchPacketView(APIView):
     """INVEST2-001: owner-requested evidence packet for one symbol; reads public data, writes nothing."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from django.db.models import Sum
-        from .models import Investment
-        from .services.research_packet import research_packet
+        packet, error = _packet(request.user, request.query_params)
+        return error or Response(packet)
 
-        holding, total, raw = None, None, str(request.query_params.get("holding") or "")
-        if raw:
-            if not raw.isdigit() or len(raw) > 18:
-                return Response({"detail": "Choose one of your holdings."}, status=status.HTTP_400_BAD_REQUEST)
-            holding = get_object_or_404(Investment, pk=int(raw), user=request.user)
-            same = Investment.objects.filter(user=request.user)
-            same = same.in_rupee_totals() if holding.currency in (None, "INR") else same.filter(currency=holding.currency)
-            total = same.aggregate(total=Sum("current_value"))["total"] or None
+
+class ResearchChallengeView(APIView):
+    """INVEST2-001: the local model questions the packet the server rebuilds; client text is never forwarded."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from .services.research_challenge import challenge_packet
+
+        packet, error = _packet(request.user, request.data if isinstance(request.data, dict) else {})
+        if error:
+            return error
         try:
-            return Response(research_packet(request.query_params.get("symbol", ""), holding=holding, portfolio_total=total))
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        except public_http.PublicHTTPError as exc:
-            return Response({"detail": f"Yahoo data is unavailable right now ({exc.code}). Try again later."}, status=status.HTTP_502_BAD_GATEWAY)
+            return Response(challenge_packet(packet))
+        except (EmbeddingUnavailable, ValueError):
+            return Response({"detail": "The local model could not challenge this packet. Check that Ollama is running and try again."},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)

@@ -165,7 +165,7 @@
  "tests.test_career_applications": 4.0,
  "tests.test_goal_required_return": 3.0,
  "tests.test_research_journal": 13.0,
- "tests.test_research_packet": 4.0,
+ "tests.test_research_packet": 12.0,
  "tests.test_loan_prepayment": 2.0,
  "tests.test_travel_valhalla": 1.0
 }

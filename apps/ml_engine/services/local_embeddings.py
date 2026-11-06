@@ -24,9 +24,10 @@ def validate_vector(value):
 
 class OllamaEmbeddings:
     model = 'all-minilm:latest'
+    READ_SECONDS = 30  # per socket wait; an owner-started slow task may raise it on its own subclass
 
     def _request(self, method, path, payload=None, *, deadline=None):
-        timeout=30 if deadline is None else min(30,deadline-time.monotonic())
+        timeout=self.READ_SECONDS if deadline is None else min(self.READ_SECONDS,deadline-time.monotonic())
         if timeout<=0: raise EmbeddingUnavailable('Local inference deadline exceeded.')
         connection = HTTPConnection('127.0.0.1', 11434, timeout=timeout)
         try:
@@ -43,7 +44,7 @@ class OllamaEmbeddings:
                     left=deadline-time.monotonic()
                     if left<=0: raise EmbeddingUnavailable('Local inference deadline exceeded.')
                     sock=connection.sock or response.fp.raw._sock
-                    sock.settimeout(min(30,left))
+                    sock.settimeout(min(self.READ_SECONDS,left))
                     chunk=response.read1(min(8192,256*1024+1-len(raw)))
                     if not chunk: break
                     raw.extend(chunk)
