@@ -1,5 +1,13 @@
 # Development CI and integration pipeline
 
+## FIN-06 migration review — 2026-11-06
+
+CI run 42179590852 at `164d394` failed all four backend shards in preflight (`migrations`): migration
+`apps/budgets/migrations/0003_savings_goal.py` was not in the reviewed source `b2f8936`. The owner approved the
+migration on 2026-11-06, so the backend step's `--reviewed-source` now names `164d394`. Any later migration or
+dependency change is refused again until reviewed. The earlier `1a36f53` shard-3 failure did not reproduce locally
+from a clean checkout (464 tests PASS); CI logs need GitHub sign-in.
+
 ## RUNTIME-11 build pins — 2026-11-05
 
 State LOCAL_ACCEPTED on master, not pushed (push at phase end). `b2f8936` pins PyInstaller's dependencies in

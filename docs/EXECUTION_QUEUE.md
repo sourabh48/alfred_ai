@@ -22,7 +22,7 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 
 | Order | Phase | Task / module | Status | Value / effort | Prerequisites | Required acceptance | Readiness / blocker |
 | ---: | --- | --- | --- | --- | --- | --- | --- |
-| 1 | A | FIN-06 — Persisted savings goals and progress workflow | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: INR savings goals with Decimal progress implemented 2026-11-06; owner approval to apply migration budgets 0003 and an owner check remain |
+| 1 | A | FIN-06 — Persisted savings goals and progress workflow | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: INR savings goals with Decimal progress implemented 2026-11-06; owner approved migration budgets 0003; owner check in the app remains |
 | 2 | A | FIN-13 — Financial export and correction | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: owner account check PASS 2026-11-06; exact-HEAD CI and a fresh-package check remain, due with the phase B push |
 | 3 | A | LOAN-07 — Loan forecasting and cross-module liabilities | IMPLEMENTED_NOT_ACCEPTED | P2 / L | FIN-07 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: FIN-07 |
 | 4 | A | LOAN-08 — Broad real-document/lender acceptance | IMPLEMENTED_NOT_ACCEPTED | P2 / L | DOC-02 | B/P; U if affected; MONEY if changed | BLOCKED_EVIDENCE: independent lender/document acceptance corpus |
