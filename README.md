@@ -16,7 +16,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 
 IMPLEMENTED_NOT_ACCEPTED: 18 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 9 | COMPLETE_VERIFIED: 85
 
-PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
+PR/CI: master `e8ef8f4` CI_PASSED (run 42185812614: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 <!-- END STATUS DASHBOARD -->
@@ -34,8 +34,9 @@ a merge is not deployment authorization. No current production health is claimed
 ## Features and coordinated upgrades
 
 - **Finance and Wealth 2.0:** canonical income/expenses/loans/net worth, budgets,
-  reconciliation and source-grounded planning; expand goals, reserves, snapshots,
-  look-through and reviewable proposals. Preserve Decimal precision. Currency/FX/
+  INR savings goals, a financial ZIP export, tax-year 2026-27 rules with a daily
+  notice-only Budget check, reconciliation and source-grounded planning; expand
+  reserves, snapshots, look-through and reviewable proposals. Preserve Decimal precision. Currency/FX/
   valuation policy remains unapproved; never infer denomination from location.
 - **Career 2.0:** owned resume/JD/recruiter workflows, skill gaps, configurable
   Bengaluru/Java/Spring Boot/AWS search interests, job/application outcomes,
@@ -44,8 +45,10 @@ a merge is not deployment authorization. No current production health is claimed
   motorcycle/pillion budgets, maps and dated evidence. Expand routed detours,
   independently supported restrictions, organizers/reminders and exports. Car
   routing never proves motorcycle legality; links do not establish bookings/permits.
+  Stop distances are straight-line until an approved routing key enables road detours.
 - **Investment 2.0:** owned portfolios, imports, evidence and scenarios; expand
   fundamentals/valuation, risk challenge, watchlists and goal-aware research.
+  Portfolio guidance is rule-based general information, never age-based advice.
   Suggestions are uncertain; no automatic stock trading or unapproved market feed.
 - **Shared intelligence:** owner-isolated documents/citations, encrypted learning
   candidates and reviewed packs, local models, quality/readiness checks, bounded

@@ -14,6 +14,7 @@ ALFRED handles bank statements, credit reports, loan documents, resumes, and veh
 
 - Email OAuth access and refresh tokens are encrypted before database save.
 - Raw retention is an explicit runtime policy. `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=true` deletes the binary after extraction and records `raw_file_retention`; the native local vault may retain owned files when that switch is false. Historical copies require their own retention policy.
+- Deleting a document from Documents removes its record, the rows imported from it where ALFRED tracks that link, its search-index entry and its stored file once no other record uses that file. Backups made before the delete keep their own copy.
 - Parsed fields remain in the application database: SQLite for native Windows, or PostgreSQL for the optional Compose runtime. ALFRED uses these records for dashboards, review queues, learning memory, and calculations.
 - Client-side operational diagnostics strip browser route URLs and route paths before storage.
 - True "developers cannot ever see user data" requires operational controls and, for raw documents, client-side encryption or local-only extraction. Server-side OCR/parsing means the server sees the file briefly during extraction.
@@ -68,6 +69,7 @@ ALFRED keeps only the database records needed for product behavior:
 - investment holdings metadata
 - resume/JD structured fields and learning memory
 - vehicle document fields and service logs
+- savings goals (name, target, saved amount and optional date), removed by the owner's data reset
 - parser status, confidence, and `raw_file_retention` audit metadata
 
 ## Local Storage Controls

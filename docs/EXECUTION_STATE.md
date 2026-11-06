@@ -1,6 +1,17 @@
 # ALFRED execution state
 
-## Active checkpoint — CAREER-03, CAREER-06, TRAVEL-02 and TRAVEL-23 (2026-11-04)
+## Active checkpoint — phase B sprint, FIN-06 and green CI (2026-11-06)
+
+- HEAD on `master`; CI run 42185812614 PASS on every job at `e8ef8f4`. Per-task notes for FIN-16, FIN-17, INV-04,
+  DOC-07/09, CAREER-04/07, TRAVEL, BIKE, OPENAI-02, RUNTIME-12 and FIN-06 are at the end of the 2026-11-04 section below.
+- Phase B: every task is done or gated in `scripts/project_execution.py` GATES with its exact blocker. Owner checks in
+  the app remain for DOC-09, CAREER-07 and FIN-06 savings goals. FIN-06 migration budgets 0003 is applied to the owner
+  runtime; pre-migration copy at F:\ALFRED_BACKUPS\pre-fin06-migration-20261106 (hash matched).
+- CI reviewed source is pinned to `164d394`; any new migration or dependency fails backend preflight until the owner
+  reviews it and the pin moves.
+- NEXT TASK: AI-17 (phase D). Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row AI-17.
+
+## Previous checkpoint — CAREER-03, CAREER-06, TRAVEL-02 and TRAVEL-23 (2026-11-04)
 
 - Work on `master` after the 2026-11-04 consolidation. Owner direction: one module at a time, only finished work is pushed
   to master; the development branch stays local.

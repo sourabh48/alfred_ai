@@ -13,6 +13,7 @@ This document explains how ALFRED collects, validates, stores, and uses data acr
 - profile fields such as role, skills, salary, income, rent, and city
 - uploaded files such as resumes, bank statements, vehicle documents, service bills, and foreclosure or no-due documents
 - manual records such as expenses, loans, behavioral signals, family or dependent records, service logs, and risk snapshots
+- savings goals on the Budgets page: a name, an INR target, the amount saved so far and an optional target date
 - pasted links such as job postings
 - recruiter mails or pasted JDs, with optional attachment extraction in the career intake flow
 - support-ticket summaries from the reports page
@@ -25,6 +26,7 @@ This document explains how ALFRED collects, validates, stores, and uses data acr
 - job openings via Remotive
 - travel geocoding and place discovery via OpenStreetMap Nominatim
 - travel weather via Open-Meteo
+- a once-a-day check of the official Union Budget site (indiabudget.gov.in) for a newer Budget year; it only shows a notice and never changes tax rules
 
 These are stored through `VerifiedExternalInsight` records so ALFRED can keep source URLs, freshness windows, timestamps, and summaries.
 
@@ -110,7 +112,11 @@ Loan-specific note:
 - risk dashboards blend manual risk with finance, behavior, mobility, and external market context
 - mobility dashboards compute compliance, service cost, trip cost, maintenance recommendations, and part-impact guidance from service history plus issue history
 - support tickets are classified into severity, handler, and resolution route
-- credit dashboards distinguish internal estimates from official bureau pulls instead of treating internal heuristics as real CIBIL or bureau records
+- credit bureau reports are uploaded and reviewed in Documents; the separate credit score page was removed on 2026-11-06 and internal estimates are never labelled as CIBIL or bureau scores
+- the tax optimizer applies only tax-year rules checked against the enacted law (2025-26 and tax year 2026-27 under the Income-tax Act, 2025) and warns when a newer Budget is published
+- career opportunities show interview preparation prompts built only from the saved job match (no AI model or network call)
+- savings goals show progress and an even monthly amount to reach the target by its date; progress is what you enter, not matched transactions
+- portfolio guidance is rule-based general information; ALFRED records no age and gives no age-based advice
 
 ### Store For Reuse
 
