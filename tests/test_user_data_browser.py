@@ -2039,7 +2039,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.career.models import CareerJobAnalysis, CareerProfile
         owner=self.scenario['user']
         source={'job_snapshot':{'salary_min':1000000,'salary_max':1200000,'salary_period':'year','salary_currency':'INR'},
-            'private_raw':'SYNTHETIC-PRIVATE-RAW-NOT-A-SUMMARY'}
+            'private_raw':'SYNTHETIC-PRIVATE-RAW-NOT-A-SUMMARY',
+            'fit':{'matched_skills':['SQL','<img src=x onerror="window.__outcomeXss=1">'],'missing_skills':['Synthetic Airflow']}}
         row=CareerJobAnalysis.objects.create(user=owner,company='Synthetic Career Company',job_title='Synthetic analyst',
             location='Bengaluru, Karnataka, India',job_url='https://example.org/synthetic-owner-job',extracted_payload=source)
         newer=CareerJobAnalysis.objects.create(user=owner,company='Other owned company',job_title='Another opportunity',
@@ -2057,6 +2058,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#careerJobMatchPanel a[href^="javascript:"]'))
         Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(row.pk))
         self.wait.until(lambda _: self.browser.find_elements(self.By.ID,'careerOutcomeForm'))
+        prep=self.text('careerInterviewPrepPanel')
+        self.assertIn('Interview preparation',prep); self.assertIn('Synthetic Airflow',prep); self.assertIn('SQL',prep)
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'#careerInterviewPrepPanel img'))
         Select(self.browser.find_element(self.By.ID,'careerOutcomeDecision')).select_by_value('accepted')
         Select(self.browser.find_element(self.By.ID,'careerOutcomePeriod')).select_by_value('month')
         for identity,value in (('careerOutcomeDate','2026-09-01'),('careerOutcomeSalaryMin','110000.01'),

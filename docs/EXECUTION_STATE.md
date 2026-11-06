@@ -198,6 +198,10 @@
 - DOC-07 (2026-11-06): 111 document tests re-run PASS; OCR/longer originals and an independent quality corpus remain.
 - DOC-09 (2026-11-06): document delete now removes orphaned stored files after commit (shared private-file field list with
   the media view); prompt discloses backups keep copies. 118 tests PASS. Owner check on a synthetic document remains.
+- DOC module pushed to master at 1a36f53.
+- CAREER-04 (2026-11-06): manual intake accepted; automatic mailbox access stays approval-gated.
+- CAREER-07 (2026-11-06): Interview preparation panel from the saved job match (no model or network). 73 career backend
+  tests and the career-outcome Chrome test PASS. Owner check remains.
 
 ## Active checkpoint — RUNTIME-11 security branch candidate (2026-11-04)
 

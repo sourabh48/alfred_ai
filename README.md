@@ -14,7 +14,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 16 | PARTIALLY_IMPLEMENTED: 23 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 17 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 

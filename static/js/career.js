@@ -477,7 +477,25 @@ function loadCareerOpportunities(url = "/api/career/job-analyses/") {
     }).catch(error => showCareerFeedback("careerOutcomeListFeedback", error.message, "danger"));
 }
 
+function renderCareerInterviewPrep(item) {
+    const target = document.getElementById("careerInterviewPrepPanel");
+    const prep = item?.interview_prep;
+    if (!prep) { target.replaceChildren(); return; }
+    if (!prep.available) { target.innerHTML = `<p class="small muted" id="careerInterviewPrepUnavailable">${Alfred.escapeHtml(prep.reason)}</p>`; return; }
+    const list = (items, render) => items.length ? `<ul class="small mb-3">${items.map(render).join("")}</ul>` : `<p class="small muted">None from this match.</p>`;
+    const skill = entry => `<li><strong>${Alfred.escapeHtml(entry.skill)}</strong>: ${Alfred.escapeHtml(entry.prompt)}</li>`;
+    target.innerHTML = `
+        <details class="surface-card p-3 mb-3" id="careerInterviewPrep" open>
+            <summary class="fw-semibold">Interview preparation</summary>
+            <p class="small muted mt-2">${Alfred.escapeHtml(prep.basis)}</p>
+            <h4 class="h6">Show your matched skills</h4>${list(prep.prove, skill)}
+            <h4 class="h6">Prepare for gaps</h4>${list(prep.gaps, skill)}
+            <h4 class="h6">General practice</h4>${list(prep.general, text => `<li>${Alfred.escapeHtml(text)}</li>`)}
+        </details>`;
+}
+
 function renderCareerOutcomeForm(item) {
+    renderCareerInterviewPrep(item);
     const target = document.getElementById("careerOutcomeFormPanel");
     if (!item) { target.replaceChildren(); return; }
     const saved = item.outcome || {}, evidence = item.salary_evidence || {};

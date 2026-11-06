@@ -30,6 +30,8 @@ GATES = {
     'FIN-13': 'BLOCKED_EVIDENCE: owner account check PASS 2026-11-06; exact-HEAD CI and a fresh-package check remain, due with the phase B push',
     'DOC-07': 'BLOCKED_EVIDENCE: bounded whole-extraction Q&A accepted; 111 document tests re-run PASS 2026-11-06; OCR, longer originals and an independent quality corpus remain',
     'DOC-09': 'BLOCKED_EVIDENCE: delete now removes orphaned stored files 2026-11-06 (118 tests PASS); owner check with a synthetic document remains',
+    'CAREER-04': 'BLOCKED_APPROVAL: manual recruiter intake accepted; automatic mailbox access needs approved provider access and a reviewed integration',
+    'CAREER-07': 'BLOCKED_EVIDENCE: interview preparation panel from the saved job match 2026-11-06 (73 backend + Chrome PASS); owner check remains',
     'INV-04': 'BLOCKED_EVIDENCE: assumed-age advice removed and guidance labelled 2026-11-06; reviewed risk-evidence definition and owner check remain',
     'FIN-17': 'BLOCKED_EXTERNAL: owner dropped the score page 2026-11-06; report uploads stay in Documents; live bureau pulls need a bureau contract',
     'FIN-16': 'BLOCKED_EVIDENCE: tax year 2026-27 rules and the notice-only Budget check implemented; page check on the owner app PASS 2026-11-06; reviewed actual tax cases (income unverified) and exact-HEAD CI remain',

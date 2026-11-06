@@ -14,6 +14,7 @@
  "tests.test_career_api_errors": 5.42,
  "tests.test_career_discovery_acceptance": 7.87,
  "tests.test_career_income_signals": 3.7,
+ "tests.test_career_interview_prep": 0.22,
  "tests.test_career_job_http": 0.17,
  "tests.test_career_location_acceptance": 3.78,
  "tests.test_career_matching_acceptance": 2.98,

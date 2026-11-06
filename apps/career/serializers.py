@@ -7,10 +7,15 @@ from .models import CareerJobAnalysis, CareerProfile, CareerResume
 class CareerOpportunitySerializer(serializers.ModelSerializer):
     outcome = serializers.SerializerMethodField()
     salary_evidence = serializers.SerializerMethodField()
+    interview_prep = serializers.SerializerMethodField()
 
     class Meta:
         model = CareerJobAnalysis
-        fields = ('id','company','job_title','location','job_url','updated_at','outcome','salary_evidence')
+        fields = ('id','company','job_title','location','job_url','updated_at','outcome','salary_evidence','interview_prep')
+
+    def get_interview_prep(self, obj):
+        from .services.job_intelligence import job_intelligence
+        return job_intelligence.interview_prep(obj)
 
     def get_outcome(self, obj):
         payload = obj.extracted_payload if isinstance(obj.extracted_payload, dict) else {}

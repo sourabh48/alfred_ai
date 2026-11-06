@@ -1394,6 +1394,30 @@ class JobIntelligenceService:
             "fallback_to_global": fallback_to_global,
         }
 
+    def interview_prep(self, analysis) -> dict:
+        """Fixed prompts from the saved job match only; no model, network or hiring prediction."""
+        payload = analysis.extracted_payload if isinstance(analysis.extracted_payload, dict) else {}
+        fit = payload.get("fit") if isinstance(payload.get("fit"), dict) else {}
+        clean = lambda items: [item.strip() for item in items if isinstance(item, str) and item.strip()] if isinstance(items, list) else []
+        matched, missing = clean(fit.get("matched_skills"))[:5], clean(fit.get("missing_skills"))[:4]
+        if not (matched or missing):
+            return {"available": False, "reason": "Run a job match with a reviewed resume to get role-specific prompts."}
+        role = analysis.job_title or "this role"
+        return {
+            "available": True,
+            "role": role,
+            "company": analysis.company,
+            "basis": "Built from the saved job match terms. Practice prompts, not likely questions or a hiring prediction.",
+            "prove": [{"skill": skill, "prompt": f"Prepare one real example where you used {skill}: the situation, what you did, and a measurable result."} for skill in matched],
+            "gaps": [{"skill": skill, "prompt": f"Expect to be asked about {skill}. Say plainly what you know, the closest skill you have, and how you would learn it."} for skill in missing],
+            "general": [
+                f"Why do you want to work as {role}" + (f" at {analysis.company}?" if analysis.company else "?"),
+                "Walk through your most relevant recent project in two minutes.",
+                "Describe a time something went wrong at work and what you changed afterwards.",
+                "What questions will you ask them about the team, the work and how success is measured?",
+            ],
+        }
+
     def build_study_recommendations(self, profile, resume_payload: dict, latest_analysis=None, openings: list[dict] | None = None) -> dict:
         openings = openings or []
         role = (resume_payload.get("role") or getattr(profile, "role", "") or "").lower()

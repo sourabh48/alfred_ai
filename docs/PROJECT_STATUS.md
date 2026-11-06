@@ -787,7 +787,7 @@ owns deterministic selection. Sprint uses one canonical development branch and P
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 16 | PARTIALLY_IMPLEMENTED: 23 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 17 | PARTIALLY_IMPLEMENTED: 22 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 10 | COMPLETE_VERIFIED: 85
 
 PR/CI: Canonical development d5cc181/master c47fed9 unchanged. PR16/18 green at their existing heads; PR19 Selenium exceeded 30m and retry returned 403. Independent project reviews absent on all three. The local Yahoo/Discovery/Geography candidate passed 309 backend tests, 19 metadata tests, 3 Chrome workflows and 12 overlapping Axe audits, with source/history privacy zero findings; no canonical/GitHub merge, PR closure, Pages or deployment. Authenticated rules/protection inspected; no settings changed. Latest privacy receipt must match the final preparation HEAD.
 
@@ -800,7 +800,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 3 | 2 | 2 | 0 | 0 |
-| CAREER | 5 | 8 | 62.5 | 0 | 3 | 0 | 0 | 0 |
+| CAREER | 5 | 8 | 62.5 | 1 | 2 | 0 | 0 | 0 |
 | TRAVEL | 12 | 23 | 52.2 | 0 | 5 | 3 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
@@ -2798,6 +2798,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PASS for synthetic manual-equivalent JD/attachment intake, explicit owned resume selection, source references, abstention, error/retry, correction/reopen and ownership/CSRF. Desktop/390px captures inspected. This is not live-mail, real-account, predictive-quality or packaged acceptance.
 - Limitations/dependencies: Automatic mail access is not an accepted integrated workflow and remains off. Career Ops repository identity is unverified; repository-dependent conversion is deferred independently. The retired OAuth prototypes must not be revived.
 - Next: Preserve accepted manual source/correction/retry contracts. Automatic mailbox processing requires separately approved provider access, a reviewed integration and live acceptance; continue independent DOC/AI work meanwhile.
+- SCOPED_INSPECTION 2026-11-06: career backend tests re-run PASS (73, including the recruiter/evidence and matching suites). Manual intake stays the accepted path; no mailbox access was added.
 
 ### CAREER-05 — Application and opportunity outcome tracking
 
@@ -2826,14 +2827,15 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### CAREER-07 — Interview preparation
 
-**PARTIALLY_IMPLEMENTED** · Career · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Career · P2.
 
 - Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
 - APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
 - Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Study recommendations exist; no demonstrated interactive verified interview-coach workflow. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Confirm desired local coaching scope and reuse skill gaps.
+- SCOPED_IMPLEMENTATION 2026-11-06: choosing a saved opportunity in Career now shows an Interview preparation panel built only from that job match: one example prompt per matched skill (up to 5), one honest-gap prompt per missing skill (up to 4) and four general practice questions. No model, network or hiring prediction; it abstains when no job match is saved. `job_intelligence.interview_prep`, `interview_prep` on the opportunity list API, `renderCareerInterviewPrep` in career.js. [Tests](../tests/test_career_interview_prep.py): 73 career backend tests PASS; the career-outcome Chrome test PASS with the panel and escaped skill text, capture inspected.
+- Next: owner check in the app; mock-interview practice with answer feedback would need the local model and a reviewed scoring rubric.
 
 ### CAREER-08 — Predictive career forecasting and timing
 
