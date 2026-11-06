@@ -6835,3 +6835,75 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.execute_script("return !document.querySelector('.page-load-shell.is-loading')"))
         self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'), 391)
         self.capture('career-country-restrictions-390px')
+
+    def test_research_journal_saves_settles_and_recalls_a_lesson_without_touching_holdings(self):
+        from datetime import timedelta
+        from decimal import Decimal
+        from django.utils import timezone
+        from apps.investments.models import Investment, ResearchDecision
+        owner, today = self.scenario['user'], timezone.localdate()
+        ResearchDecision.objects.create(user=owner, instrument='SYNTH', rating='buy', thesis='Earlier call', lesson='Waited for results',
+            decided_on=today - timedelta(days=60), review_on=today - timedelta(days=30), settled_on=today - timedelta(days=29),
+            entry_price=Decimal('100'), exit_price=Decimal('90'))
+        holdings = list(Investment.objects.filter(user=owner).values())
+        self.login()
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: 'Settled' in self.text('researchDecisionList'))
+        form = '#researchDecisionForm '
+        self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=instrument]').send_keys('synth')
+        self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=thesis]').click()  # change event loads lessons
+        self.wait.until(lambda _: 'Waited for results' in self.text('researchLessons'))
+        review = self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=review_on]')
+        self.browser.execute_script("arguments[0].value = arguments[1]", review, today.isoformat())
+        self.browser.execute_script("arguments[0].value = arguments[1]", self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=decided_on]'),
+                                    (today - timedelta(days=10)).isoformat())
+        self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=entry_price]').send_keys('50')
+        self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=thesis]').send_keys('Synthetic thesis')
+        self.memory_click(form + 'button[type=submit]')
+        self.wait.until(lambda _: 'Call saved' in self.text('researchFeedback'))
+        created = ResearchDecision.objects.get(user=owner, thesis='Synthetic thesis')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, f'researchExit{created.pk}'))
+        self.browser.find_element(self.By.ID, f'researchExit{created.pk}').send_keys('55')
+        self.browser.find_element(self.By.ID, f'researchLesson{created.pk}').send_keys('Patience paid')
+        self.memory_click(f'[data-research-settle="{created.pk}"]')
+        self.wait.until(lambda _: '+10' in self.text(f'researchOutcome{created.pk}'))
+        created.refresh_from_db()
+        self.assertEqual((created.exit_price, created.lesson), (Decimal('55.0000'), 'Patience paid'))
+        self.assertEqual(list(Investment.objects.filter(user=owner).values()), holdings)
+        self.capture('investment-research-journal')
+
+    def test_loan_prepayment_what_if_reports_savings_and_cash_left_without_writing(self):
+        from decimal import Decimal
+        from django.utils import timezone
+        from apps.loans.models import Loan
+        loan = Loan.objects.create(user=self.scenario['user'], lender='Synthetic Bank', principal=Decimal('100000.00'),
+            remaining_balance=Decimal('100000.00'), emi=Decimal('8884.88'), interest_rate=12, tenure_months=12, start_date=timezone.localdate())
+        before = Loan.objects.values().get(pk=loan.pk)
+        self.login()
+        self.browser.get(self.live_server_url + '/loans/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, f'#loanPrepaymentLoan option[value="{loan.pk}"]'))
+        from selenium.webdriver.support.ui import Select
+        Select(self.browser.find_element(self.By.ID, 'loanPrepaymentLoan')).select_by_value(str(loan.pk))
+        self.browser.find_element(self.By.ID, 'loanPrepaymentAmount').send_keys('50000')
+        self.browser.find_element(self.By.ID, 'loanPrepaymentReturn').send_keys('0')
+        self.memory_click('#loanPrepaymentForm button[type=submit]')
+        self.wait.until(lambda _: 'Saves' in self.text('loanPrepaymentResult'))
+        self.assertIn('Prepaying comes out ahead', self.text('loanPrepaymentCompare'))
+        self.assertTrue(self.text('loanPrepaymentLiquidity'))
+        self.assertEqual(Loan.objects.values().get(pk=loan.pk), before)
+        self.capture('loan-prepayment-what-if')
+
+    def test_savings_goal_plan_shows_the_yearly_return_needed(self):
+        from datetime import timedelta
+        from decimal import Decimal
+        from django.utils import timezone
+        from apps.budgets.models import SavingsGoal
+        goal = SavingsGoal.objects.create(user=self.scenario['user'], name='Synthetic plan goal', target_amount=Decimal('110000.00'),
+            saved_amount=Decimal('100000.00'), target_date=timezone.localdate() + timedelta(days=400))
+        self.login()
+        self.browser.get(self.live_server_url + '/budgets/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, f'savingsGoalPlanAmount{goal.pk}'))
+        self.browser.find_element(self.By.ID, f'savingsGoalPlanAmount{goal.pk}').send_keys('0')
+        self.memory_click(f'[data-goal-plan="{goal.pk}"]')
+        self.wait.until(lambda _: '%' in self.text(f'savingsGoalPlanResult{goal.pk}'))
+        self.capture('savings-goal-required-return')

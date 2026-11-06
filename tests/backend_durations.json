@@ -161,5 +161,10 @@
  "tests.test_user_data_reset": 5.84,
  "tests.test_user_money": 39.84,
  "tests.test_windows_build_provenance": 2.11,
- "tests.test_yahoo_market_acceptance": 0.66
+ "tests.test_yahoo_market_acceptance": 0.66,
+ "tests.test_career_applications": 4.0,
+ "tests.test_goal_required_return": 3.0,
+ "tests.test_research_journal": 13.0,
+ "tests.test_loan_prepayment": 2.0,
+ "tests.test_travel_valhalla": 1.0
 }

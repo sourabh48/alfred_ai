@@ -6,6 +6,29 @@ The 143 requirements and their acceptance remain in PROJECT_STATUS; the 13
 extension IDs below are the existing requirements ledger, not 13 new baseline
 capabilities. Coordination rows add no requirements. Baseline75/143; extensions0/13.
 
+## Reference capability adoption plan (owner request 2026-11-07)
+
+Owner: "See the capabilities of reference projects and implement in ALFRED if it makes it smarter", then
+"Plan research then execute". Upstream pins are unchanged (UPSTREAM_REFERENCE_MATRIX). Research 2026-11-07 read
+career-ops `modes/{_shared,oferta,master-profile,pdf,tracker,contacto,followup}.md`, `templates/states.yml`;
+TradingAgents `graph/{setup,trading_graph,conditional_logic}.py`, `memory/{log,settlement,reflection}.py`,
+`agents/rating.py`, researchers/managers; Aurelio `backend/app/{planning,sizing,analytics,advisor,analyst_tools,
+composition}.py` (analytics/advisor/composition tails only summarized). No upstream code, assets or dependencies are
+copied or installed; behaviour is independently written in Python/Django.
+
+| Slice | Upstream idea | ALFRED change | Data/approval |
+| --- | --- | --- | --- |
+| A Career application stages and follow-ups (CAREER-05 extension, career-ops tracker/followup) | Stages Evaluated, Applied, Responded, Assessment, Interview, Offer, Rejected, Discarded, Hired; Applied follow-up after 7 days then every 7 days, at most 2, then cold; Responded/Assessment/Interview after 1 day then every 3 days; a follow-up counts only when the user confirms it was sent | Owner-set stage with dated history and confirmed follow-ups on each saved opportunity; due follow-ups listed; no sending | Existing JSON payload, no migration |
+| B Stale job matches after resume changes (CAREER2-001) | career-ops reuse / regenerate decision when the CV or JD changes | Each saved match compares the resume evidence it used with the current resume; changed skills, role or experience mark it stale with the exact delta; owned resume versions can be compared | Read-only, no migration |
+| C Goal required return (Aurelio planning) | Bisection for the yearly return that turns current savings plus a monthly contribution into the target by its date; bands Conservative <=4%, Moderate <=8%, Aggressive <=12%, else Unrealistic | Read-only Decimal calculator per savings goal for a contribution the owner types; same-currency only; a rough guide, not advice | Read-only, no writes |
+| D Investment research decision journal (INVEST2-002, TradingAgents memory/settlement/reflection) | Dated five-tier rating (Buy/Overweight/Hold/Underweight/Sell), pending until a holding window passes, then return vs benchmark and a lesson; recent lessons shown before new decisions | Owner-entered research decisions separate from holdings; owner-entered prices only (no fetched prices yet), settled return vs owner-entered benchmark; lessons written by the owner | New additive table: migration waits for owner approval |
+| E Loan prepayment what-if (Wealth planning; Aurelio sizing idea, standard amortization) | Lump-sum prepayment that keeps the EMI or the end date | Interest and months saved, prepaying versus investing followed to the original end month, cash runway from the canonical baseline | Read-only, no migration |
+| F Motorcycle road routing (TRAVEL-04/09; TREK default router) | Free FOSSGIS Valhalla server with a motorcycle profile and motorway avoidance | Opt-in `ValhallaRouting`, chosen for motorcycle trips, reporting which avoidances were met | Off until `TRAVEL_VALHALLA_URL` is set |
+
+Excluded now: TradingAgents LLM multi-agent engine (dependency conflict, paid/remote models), Aurelio fund
+look-through (no approved holdings source), automatic sending, applying, trading or money writes. Travel 2.0
+(TRAVEL2-001..005) is already implemented and waits for owner checks.
+
 ## Current checkpoint — D4 native-windows time-of-day repair (2026-10-31)
 
 626c5bc exact run40978060971 FAILED native-windows, so D4 is not green; root cause and repair are in

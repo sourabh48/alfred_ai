@@ -461,6 +461,7 @@ class TravelMigrationTests(TransactionTestCase):
             pk=plan.id
         finally:
             MigrationExecutor(connection).migrate([after])
+        MigrationExecutor(connection).migrate(leaves)  # the current model reads columns added after 0012
         restored=TravelPlan.objects.get(pk=pk)
         self.assertEqual(restored.destination,"Coorg")
         self.assertEqual(restored.notes,"Keep my notes")

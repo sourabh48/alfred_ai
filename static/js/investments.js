@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("uploadInvestmentPdfBtn").addEventListener("click", uploadInvestmentPdfs);
     loadInvestmentDashboard();
     initInvestmentReviewAlerts();
+    initResearchJournal();
     Alfred.enableLiveRefresh("investments-live", loadInvestmentDashboard, { rootId: "investmentRoot" });
 });
 
@@ -482,4 +483,130 @@ function titleCase(value) {
         .filter(Boolean)
         .map(token => token.charAt(0).toUpperCase() + token.slice(1))
         .join(" ");
+}
+
+const RESEARCH_RATING = { buy: "Buy", overweight: "Overweight", hold: "Hold", underweight: "Underweight", sell: "Sell" };
+const researchToday = () => new Date().toLocaleDateString("en-CA");
+
+function initResearchJournal() {
+    const form = document.getElementById("researchDecisionForm");
+    if (!form) return;
+    form.elements.decided_on.value = researchToday();
+    form.addEventListener("submit", submitResearchDecision);
+    form.elements.instrument.addEventListener("change", () => loadResearchLessons(form.elements.instrument.value));
+    loadResearchDecisions();
+}
+
+function researchPercent(value) {
+    return value == null ? "unavailable" : `${Number(value) > 0 ? "+" : ""}${value}%`;
+}
+
+function researchOutcomeText(item) {
+    const o = item.outcome || {};
+    if (o.status !== "settled") return `Pending until ${o.review_on}.`;
+    const versus = o.alpha_percent != null
+        ? `; ${item.benchmark} ${researchPercent(o.benchmark_return_percent)}, so ${researchPercent(o.alpha_percent)} against it`
+        : " (no benchmark)";
+    const verdict = { supported: "The move went the way of your call.", not_supported: "The move went against your call.", not_judged: "A Hold makes no directional call." }[o.direction] || "";
+    return `Settled ${item.settled_on}: ${researchPercent(o.return_percent)}${versus}. ${verdict}`;
+}
+
+function loadResearchLessons(instrument) {
+    const target = document.getElementById("researchLessons");
+    if (!instrument.trim()) { target.replaceChildren(); return; }
+    Alfred.fetchJSON(`/api/investments/research/lessons/?instrument=${encodeURIComponent(instrument.trim())}`).then(data => {
+        const row = item => `<li><strong>${Alfred.escapeHtml(item.instrument)}</strong> · ${Alfred.escapeHtml(RESEARCH_RATING[item.rating] || item.rating)} on ${Alfred.escapeHtml(item.decided_on)}: ${Alfred.escapeHtml(item.lesson)}</li>`;
+        const parts = [];
+        if (data.same_instrument.length) parts.push(`<p class="mb-1 fw-semibold">Your lessons on this instrument</p><ul class="mb-2">${data.same_instrument.map(row).join("")}</ul>`);
+        if (data.other_instruments.length) parts.push(`<p class="mb-1 fw-semibold">Recent lessons from other calls</p><ul class="mb-0">${data.other_instruments.map(row).join("")}</ul>`);
+        target.innerHTML = parts.length ? `<div class="mini-card" id="researchLessonsPanel">${parts.join("")}</div>` : "";
+    }).catch(() => target.replaceChildren());
+}
+
+function researchDecisionCard(item, today) {
+    const canSettle = item.outcome?.status === "pending" && item.review_on <= today;
+    const settled = item.outcome?.status === "settled";
+    const lessonField = `<div class="flex-grow-1"><label class="form-label small mb-1" for="researchLesson${item.id}">Lesson</label>
+        <input class="form-control form-control-sm" id="researchLesson${item.id}" maxlength="2000" value="${Alfred.escapeHtml(item.lesson || "")}"></div>`;
+    const settle = canSettle ? `
+        <div class="d-flex flex-wrap gap-2 align-items-end mt-2">
+            <div><label class="form-label small mb-1" for="researchExit${item.id}">Closing price you checked</label>
+                <input class="form-control form-control-sm" id="researchExit${item.id}" type="number" min="0.0001" step="0.0001"></div>
+            ${item.benchmark_entry != null ? `<div><label class="form-label small mb-1" for="researchBenchExit${item.id}">${Alfred.escapeHtml(item.benchmark)} closing level</label>
+                <input class="form-control form-control-sm" id="researchBenchExit${item.id}" type="number" min="0.0001" step="0.0001"></div>` : ""}
+            ${lessonField}
+            <button type="button" class="btn btn-outline-primary btn-sm" data-research-settle="${item.id}">Settle</button>
+        </div>` : settled ? `
+        <div class="d-flex flex-wrap gap-2 align-items-end mt-2">
+            ${lessonField}
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-research-lesson="${item.id}">Save lesson</button>
+        </div>` : "";
+    return `
+        <div class="mini-card" data-research-id="${item.id}">
+            <div class="d-flex justify-content-between flex-wrap gap-2">
+                <strong>${Alfred.escapeHtml(item.instrument)} · ${Alfred.escapeHtml(RESEARCH_RATING[item.rating] || item.rating)}</strong>
+                <span class="muted small">${Alfred.escapeHtml(item.decided_on)} at ${Alfred.escapeHtml(item.entry_price)}${item.currency ? ` ${Alfred.escapeHtml(item.currency)}` : ""}</span>
+            </div>
+            <p class="small mb-1">${Alfred.escapeHtml(item.thesis)}</p>
+            <p class="small mb-1" id="researchOutcome${item.id}">${Alfred.escapeHtml(researchOutcomeText(item))}</p>
+            ${settle}
+            <button type="button" class="btn btn-link btn-sm text-danger px-0" data-research-delete="${item.id}">Delete call</button>
+        </div>`;
+}
+
+function loadResearchDecisions() {
+    return Alfred.fetchJSON("/api/investments/research/").then(data => {
+        const items = Array.isArray(data) ? data : (data.results || []);
+        const target = document.getElementById("researchDecisionList");
+        if (!items.length) { target.innerHTML = `<div class="empty-state">No research calls yet.</div>`; return; }
+        const today = researchToday();
+        target.innerHTML = items.map(item => researchDecisionCard(item, today)).join("");
+        target.querySelectorAll("[data-research-settle]").forEach(button => button.addEventListener("click", () => settleResearchDecision(button.dataset.researchSettle)));
+        target.querySelectorAll("[data-research-lesson]").forEach(button => button.addEventListener("click", () => settleResearchDecision(button.dataset.researchLesson, true)));
+        target.querySelectorAll("[data-research-delete]").forEach(button => button.addEventListener("click", () => deleteResearchDecision(button.dataset.researchDelete)));
+    }).catch(error => showResearchFeedback(error.message, "danger"));
+}
+
+function showResearchFeedback(message, tone) {
+    const box = document.getElementById("researchFeedback");
+    box.className = `alert alert-${tone} mb-0`;
+    box.textContent = message;
+}
+
+function submitResearchDecision(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector("button[type=submit]");
+    const payload = Object.fromEntries(new FormData(form).entries());
+    if (!payload.benchmark_entry) delete payload.benchmark_entry;
+    button.disabled = true;
+    Alfred.fetchJSON("/api/investments/research/", { method: "POST", body: JSON.stringify(payload) })
+        .then(() => {
+            form.reset();
+            form.elements.decided_on.value = researchToday();
+            document.getElementById("researchLessons").replaceChildren();
+            showResearchFeedback("Call saved. Settle it on or after its review date.", "success");
+            return loadResearchDecisions();
+        })
+        .catch(error => showResearchFeedback(error.message, "danger"))
+        .finally(() => { button.disabled = false; });
+}
+
+function settleResearchDecision(id, lessonOnly = false) {
+    const payload = { lesson: document.getElementById(`researchLesson${id}`).value };
+    if (!lessonOnly) {
+        payload.exit_price = document.getElementById(`researchExit${id}`).value;
+        const bench = document.getElementById(`researchBenchExit${id}`);
+        if (bench) payload.benchmark_exit = bench.value;
+    }
+    Alfred.fetchJSON(`/api/investments/research/${id}/settle/`, { method: "POST", body: JSON.stringify(payload) })
+        .then(() => { showResearchFeedback(lessonOnly ? "Lesson saved." : "Call settled.", "success"); return loadResearchDecisions(); })
+        .catch(error => showResearchFeedback(error.message, "danger"));
+}
+
+function deleteResearchDecision(id) {
+    if (!window.confirm("Delete this research call? Your positions are not affected.")) return;
+    Alfred.fetchJSON(`/api/investments/research/${id}/`, { method: "DELETE" })
+        .then(() => { showResearchFeedback("Call deleted.", "success"); return loadResearchDecisions(); })
+        .catch(error => showResearchFeedback(error.message, "danger"));
 }

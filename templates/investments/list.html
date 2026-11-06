@@ -184,6 +184,40 @@
     </div>
 </section>
 
+<section class="surface-card mb-4" id="researchJournalSection" aria-labelledby="researchJournalTitle">
+    <h2 id="researchJournalTitle" class="page-section-title mb-1">Research journal</h2>
+    <p class="page-section-copy mb-3">Record a dated call on a stock or fund, review it later against the prices you check, and keep the lesson. Calls stay apart from your positions: nothing here buys, sells or changes a holding, and ALFRED fetches no prices for it.</p>
+    <form id="researchDecisionForm" class="soft-grid" data-live-refresh-hold="true">
+        <div class="row g-3">
+            <div class="col-md-4"><label class="form-label" for="researchInstrument">Instrument</label>
+                <input class="form-control" id="researchInstrument" name="instrument" maxlength="120" required></div>
+            <div class="col-md-4"><label class="form-label" for="researchRating">Your call</label>
+                <select class="form-select" id="researchRating" name="rating" required>
+                    <option value="buy">Buy</option><option value="overweight">Overweight</option><option value="hold" selected>Hold</option>
+                    <option value="underweight">Underweight</option><option value="sell">Sell</option></select></div>
+            <div class="col-md-4"><label class="form-label" for="researchCurrency">Price currency</label>
+                <select class="form-select" id="researchCurrency" name="currency"><option value="">Not recorded</option><option value="INR">INR</option>
+                    <option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select></div>
+            <div class="col-md-3"><label class="form-label" for="researchDecidedOn">Decision date</label>
+                <input class="form-control" id="researchDecidedOn" name="decided_on" type="date" required></div>
+            <div class="col-md-3"><label class="form-label" for="researchReviewOn">Review date</label>
+                <input class="form-control" id="researchReviewOn" name="review_on" type="date" required></div>
+            <div class="col-md-3"><label class="form-label" for="researchEntryPrice">Price you checked</label>
+                <input class="form-control" id="researchEntryPrice" name="entry_price" type="number" min="0.0001" step="0.0001" required></div>
+            <div class="col-md-3"><label class="form-label" for="researchBenchmark">Benchmark (optional)</label>
+                <input class="form-control" id="researchBenchmark" name="benchmark" maxlength="60" placeholder="e.g. NIFTY 50"></div>
+            <div class="col-md-3"><label class="form-label" for="researchBenchmarkEntry">Benchmark level</label>
+                <input class="form-control" id="researchBenchmarkEntry" name="benchmark_entry" type="number" min="0.0001" step="0.0001"></div>
+            <div class="col-md-9"><label class="form-label" for="researchThesis">Thesis</label>
+                <textarea class="form-control" id="researchThesis" name="thesis" maxlength="4000" rows="2" required></textarea></div>
+        </div>
+        <div id="researchLessons" class="small" aria-live="polite"></div>
+        <div id="researchFeedback" class="d-none alert mb-0" role="status" aria-live="polite"></div>
+        <div><button class="btn btn-primary" type="submit">Save call</button></div>
+    </form>
+    <div id="researchDecisionList" class="data-stack mt-3"></div>
+</section>
+
 <section class="surface-card">
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
@@ -211,5 +245,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.6.2"></script>
+<script src="/static/js/investments.js?v=2.7.0"></script>
 {% endblock %}

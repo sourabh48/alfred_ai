@@ -284,9 +284,28 @@
         </div>
     </div>
 </section>
+
+<section class="surface-card mt-4" id="loanPrepaymentSection" aria-labelledby="loanPrepaymentTitle">
+    <h2 id="loanPrepaymentTitle" class="page-section-title mb-1">Prepayment what-if</h2>
+    <p class="page-section-copy mb-3">See the interest and months a lump-sum prepayment saves, how much cash it leaves you, and whether investing the same money instead might do better. Nothing is paid or changed.</p>
+    <form id="loanPrepaymentForm" class="row g-3 align-items-end" data-live-refresh-hold="true">
+        <div class="col-md-3"><label class="form-label" for="loanPrepaymentLoan">Loan</label>
+            <select class="form-select" id="loanPrepaymentLoan" required></select></div>
+        <div class="col-md-3"><label class="form-label" for="loanPrepaymentAmount">Prepayment amount</label>
+            <input class="form-control" id="loanPrepaymentAmount" type="number" min="1" step="0.01" required></div>
+        <div class="col-md-3"><label class="form-label" for="loanPrepaymentMode">Then</label>
+            <select class="form-select" id="loanPrepaymentMode">
+                <option value="reduce_tenure">Keep the EMI, finish sooner</option>
+                <option value="reduce_emi">Keep the end date, lower the EMI</option></select></div>
+        <div class="col-md-2"><label class="form-label" for="loanPrepaymentReturn">Investing return % (optional)</label>
+            <input class="form-control" id="loanPrepaymentReturn" type="number" min="0" max="30" step="0.1"></div>
+        <div class="col-md-1"><button class="btn btn-primary w-100" type="submit">Check</button></div>
+    </form>
+    <div id="loanPrepaymentResult" class="mt-3" aria-live="polite"></div>
+</section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/loans.js?v=2.12.0"></script>
+<script src="/static/js/loans.js?v=2.13.0"></script>
 {% endblock %}

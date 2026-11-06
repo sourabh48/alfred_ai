@@ -784,3 +784,48 @@ def _build_networth_payload(user) -> dict:
             f"Debt-to-Asset ratio: {debt_to_asset_ratio:.1f}%"
         ]
     }
+
+
+def _json_money(value):
+    return {key: _json_money(item) for key, item in value.items()} if isinstance(value, dict) else (
+        float(value) if hasattr(value, "quantize") else value)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def loan_prepayment(request, pk):
+    """Read-only prepayment what-if for one active loan; nothing is written."""
+    from decimal import Decimal, InvalidOperation
+    from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+    from apps.loans.services.prepayment import liquidity_after, simulate
+
+    loan = Loan.objects.filter(pk=pk, user=request.user).first()
+    if loan is None:
+        return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+    if loan.current_status != "active":
+        return Response({"detail": "Prepayment what-ifs are for active loans only."}, status=status.HTTP_400_BAD_REQUEST)
+    if loan.remaining_balance is None:
+        return Response({"detail": "Record the outstanding balance first; it is never guessed from the original principal."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    try:
+        amount = loan_money(request.query_params.get("amount", ""))
+        raw_return = request.query_params.get("expected_return", "")
+        expected = Decimal(raw_return) if raw_return != "" else None
+        if expected is not None and not (expected.is_finite() and Decimal("0") <= expected <= Decimal("30")):
+            raise ValueError("Enter an expected yearly return between 0 and 30 percent.")
+        result = simulate(balance=loan.remaining_balance, emi=loan.emi, annual_rate=loan.interest_rate, amount=amount,
+                          mode=request.query_params.get("mode", "reduce_tenure"), expected_return=expected)
+    except (ValueError, InvalidOperation) as exc:
+        message = str(exc) if isinstance(exc, ValueError) and str(exc) else "Enter a valid amount."
+        return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+    if loan.currency in (None, "INR"):
+        liquidity = liquidity_after(resolve_canonical_financial_baseline(request.user), result["prepayment"])
+    else:
+        liquidity = {"status": "unknown", "detail": f"Bank balances are totalled in rupees; this loan is in {loan.currency}, with no conversion."}
+    result.update(loan_id=loan.pk, currency=loan.currency, annual_interest_rate=loan.interest_rate,
+                  outstanding_balance=loan.remaining_balance, liquidity=liquidity, assumptions=[
+                      "Interest is charged monthly on the reducing balance; your lender may accrue daily.",
+                      "Prepayment or foreclosure charges and tax effects are not included.",
+                      "The investing comparison assumes a steady yearly return, compounded monthly; real returns vary and can be negative.",
+                  ])
+    return Response(_json_money(result))

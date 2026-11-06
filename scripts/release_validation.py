@@ -16,8 +16,8 @@ from scripts import release_gate as release
 # This is the established M15 combined scope, plus the release engine's own tests.
 BACKEND = tuple("tests." + name for name in (
     "test_alfred_brain", "test_api_session_security", "test_assistant_actions", "test_auth_pages", "test_bank_statement_grounding", "test_bike_document_parser",
-    "test_budget_money", "test_budget_money_migration", "test_savings_goals", "test_canonical_evidence", "test_canonical_grounding", "test_closure_citations",
-    "test_career_api_errors", "test_career_job_http", "test_career_location_acceptance", "test_career_matching_acceptance", "test_career_recruiter_and_evidence", "test_career_discovery_acceptance", "test_career_interview_prep",
+    "test_budget_money", "test_budget_money_migration", "test_savings_goals", "test_goal_required_return", "test_canonical_evidence", "test_canonical_grounding", "test_closure_citations",
+    "test_career_api_errors", "test_career_job_http", "test_career_location_acceptance", "test_career_matching_acceptance", "test_career_recruiter_and_evidence", "test_career_discovery_acceptance", "test_career_interview_prep", "test_career_applications",
     "test_career_resume_upload", "test_career_money", "test_conversation_history", "test_document_center_and_statement_import",
     "test_document_corpus", "test_document_extraction", "test_document_full_context", "test_document_grounding_acceptance", "test_document_knowledge", "test_document_questions", "test_document_retry_integrity",
     "test_document_review_and_retry", "test_expense_corrections", "test_expense_export", "test_expense_money_identity", "test_expense_money_runtime", "test_experimental_retirement",
@@ -30,7 +30,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_loan_lifecycle_and_reports", "test_loan_money_field", "test_loan_money_runtime",
     "test_loan_related_money_runtime", "test_loan_verification", "test_loan_verification_api",
     "test_project_execution", "test_memory_checkpoint", "test_memory_cloud", "test_memory_learning", "test_knowledge_hub", "test_memory_privacy", "test_memory_platform",
-    "test_memory_reasoning", "test_gemini_development", "test_investment_review_alerts", "test_serving_readiness", "test_speech", "test_trip_videos", "test_investment_currency", "test_loan_currency", "test_banking_currency", "test_income_currency", "test_budget_currency", "test_mobility_currency", "test_native_daily_catch_up", "test_memory_evaluation", "test_memory_sync", "test_memory_sync_runtime", "test_memory_r2", "test_cloud_backup", "test_native_launcher", "test_retrieval_quality",
+    "test_memory_reasoning", "test_gemini_development", "test_investment_review_alerts", "test_research_journal", "test_loan_prepayment", "test_travel_valhalla", "test_serving_readiness", "test_speech", "test_trip_videos", "test_investment_currency", "test_loan_currency", "test_banking_currency", "test_income_currency", "test_budget_currency", "test_mobility_currency", "test_native_daily_catch_up", "test_memory_evaluation", "test_memory_sync", "test_memory_sync_runtime", "test_memory_r2", "test_cloud_backup", "test_native_launcher", "test_retrieval_quality",
     "test_mobility_money", "test_native_observation", "test_native_runtime", "test_native_probe_runner", "test_native_tray", "test_operational_hardening",
     "test_password_security", "test_persistent_memory", "test_profile_money_boundary",
     "test_private_storage", "test_source_storage", "test_private_media_profiles", "test_local_config", "test_time_zone_boundaries",

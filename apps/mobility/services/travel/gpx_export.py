@@ -121,7 +121,7 @@ def _route(itinerary, destination):
         checked, expiry = (parse_datetime(str(result.get(k) or '')) for k in ('retrieved_at', 'expires_at'))
         if (result.get('success') is not True or result.get('status') != 'ok' or result.get('stale')
                 or result.get('freshness') not in ('LIVE', 'RECENTLY_VERIFIED') or result.get('confidence') not in ('VERIFIED', 'LIKELY')
-                or result.get('provider') != 'openrouteservice' or result.get('category') != 'routing'
+                or result.get('provider') not in ('openrouteservice', 'valhalla') or result.get('category') != 'routing'
                 or not _link(result.get('source_url')) or not re.fullmatch('[0-9a-f]{64}', result.get('response_hash', ''))
                 or not checked or not expiry or not timezone.is_aware(checked) or not timezone.is_aware(expiry) or not checked <= now < expiry
                 or itinerary.get('route', {}).get('confidence') in ('UNKNOWN', 'ESTIMATED')):

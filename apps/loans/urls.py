@@ -8,6 +8,7 @@ from .views import (
     LoanSummaryView,
     import_loan_pdf,
     payoff_loan,
+    loan_prepayment,
     detect_loans_from_expenses,
     review_loan_payment,
     loan_metrics,
@@ -26,4 +27,5 @@ urlpatterns = [
     path("networth/", calculate_networth, name="calculate_networth"),
     path("<int:pk>/", LoanDetailView.as_view(), name="loan_detail"),
     path("<int:pk>/payoff/", payoff_loan, name="payoff_loan"),
+    path("<int:pk>/prepayment/", loan_prepayment, name="loan_prepayment"),
 ]

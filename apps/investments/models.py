@@ -110,3 +110,37 @@ class InvestmentDocumentEvidence(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=("document", "original_investment_id"), name="investment_source_record_once")]
+
+
+class ResearchDecision(models.Model):
+    """An owner's dated research call on an instrument, kept apart from owned holdings (INVEST2-002).
+
+    Mirrors the TradingAgents decision log (Apache-2.0, pin e8f5503e: memory/log.py, settlement.py, agents/rating.py),
+    independently written: a five-tier rating stays pending until its review date, then the owner records the closing
+    prices and a lesson. Prices are what the owner enters; nothing is fetched, traded or written to holdings.
+    """
+    RATINGS = [("buy", "Buy"), ("overweight", "Overweight"), ("hold", "Hold"), ("underweight", "Underweight"), ("sell", "Sell")]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="research_decisions")
+    instrument = models.CharField(max_length=120)
+    rating = models.CharField(max_length=12, choices=RATINGS)
+    thesis = models.TextField(max_length=4000)
+    decided_on = models.DateField()
+    review_on = models.DateField()
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, null=True, blank=True, default=None)
+    entry_price = models.DecimalField(max_digits=18, decimal_places=4)
+    benchmark = models.CharField(max_length=60, blank=True)
+    benchmark_entry = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    settled_on = models.DateField(null=True, blank=True)
+    exit_price = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    benchmark_exit = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    lesson = models.TextField(max_length=2000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-decided_on", "-id"]
+        indexes = [models.Index(fields=["user", "instrument", "decided_on"])]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.instrument} - {self.rating}"

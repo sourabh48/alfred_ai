@@ -377,12 +377,12 @@ class TravelProviderUsage(APIView):
     def get(self, request):
         from .services.travel.providers.geocoding import OpenMeteoGeocoding
         from .services.travel.providers.weather import OpenMeteoWeather
-        from .services.travel.providers.routing import OpenRouteService
+        from .services.travel.providers.routing import OpenRouteService, ValhallaRouting
         from .services.travel.providers.places import OverpassPlaces
         from .services.travel.providers.accommodation import DuffelAccommodation
         from .services.travel.providers.transport import DuffelFlights, IndianRailProvider
         from .services.travel.providers.web import BraveSearch, SearXNGSearch, WikivoyageSearch, WikivoyageDestinations
-        providers = [OpenMeteoGeocoding(),OpenMeteoWeather(),OpenRouteService(),OverpassPlaces(),
+        providers = [OpenMeteoGeocoding(),OpenMeteoWeather(),OpenRouteService(),ValhallaRouting(),OverpassPlaces(),
                      DuffelAccommodation(),DuffelFlights(),IndianRailProvider(),BraveSearch(),
                      SearXNGSearch(),WikivoyageSearch(),WikivoyageDestinations()]
         return Response({"usage":usage_summary(),"configuration":[{"provider":p.name,"category":p.category,

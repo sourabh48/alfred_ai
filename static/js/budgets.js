@@ -263,10 +263,43 @@ function renderSavingsGoals(goals) {
                 <button type="button" class="btn btn-outline-primary btn-sm" data-goal-save="${goal.id}">Update</button>
                 <button type="button" class="btn btn-outline-danger btn-sm" data-goal-delete="${goal.id}">Delete</button>
             </div>
+            ${p.status === "open" && p.months_left ? `
+            <div class="d-flex flex-wrap gap-2 align-items-end mt-2">
+                <div>
+                    <label class="form-label small mb-1" for="savingsGoalPlanAmount${goal.id}">If I save each month</label>
+                    <input class="form-control form-control-sm" id="savingsGoalPlanAmount${goal.id}" type="number" min="0" step="0.01">
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-plan="${goal.id}">Return needed</button>
+            </div>
+            <p class="small mt-2 mb-0" id="savingsGoalPlanResult${goal.id}" aria-live="polite"></p>` : ""}
         </div>`;
     }).join("");
     target.querySelectorAll("[data-goal-save]").forEach(button => button.addEventListener("click", () => updateSavingsGoal(button)));
     target.querySelectorAll("[data-goal-delete]").forEach(button => button.addEventListener("click", () => deleteSavingsGoal(button)));
+    target.querySelectorAll("[data-goal-plan]").forEach(button => button.addEventListener("click", () => planSavingsGoal(button)));
+}
+
+const GOAL_RETURN_BANDS = {
+    no_growth: "No growth needed: saving this much reaches the target on its own.",
+    conservative: "Conservative (up to 4% a year).",
+    moderate: "Moderate (up to 8% a year).",
+    aggressive: "Aggressive (up to 12% a year).",
+    unrealistic: "Unrealistic: above 12% a year. Save more each month or move the date.",
+};
+
+function planSavingsGoal(button) {
+    const id = button.dataset.goalPlan;
+    const amount = document.getElementById(`savingsGoalPlanAmount${id}`).value;
+    const result = document.getElementById(`savingsGoalPlanResult${id}`);
+    button.disabled = true;
+    Alfred.fetchJSON(`/api/budgets/goals/${id}/plan/?monthly_contribution=${encodeURIComponent(amount || "0")}`)
+        .then(data => {
+            const needed = data.required_annual_return_percent;
+            const lead = needed == null ? "Even 100% a month would not reach this target." : `Needs about ${needed}% a year.`;
+            result.textContent = `${lead} ${GOAL_RETURN_BANDS[data.band] || ""} ${data.assumptions.join(" ")}`;
+        })
+        .catch(error => { result.textContent = error.message; })
+        .finally(() => { button.disabled = false; });
 }
 
 function submitSavingsGoal(event) {

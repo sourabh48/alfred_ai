@@ -38,6 +38,34 @@ def goal_progress(target, saved, target_date, today):
     return {"remaining": remaining, "percent": percent, "months_left": months, "monthly_needed": monthly, "status": status}
 
 
+# Rough guide bands for a required yearly return, after Aurelio planning.py (MIT, pin 82104912); not advice.
+RETURN_BANDS = ((Decimal("4"), "conservative"), (Decimal("8"), "moderate"), (Decimal("12"), "aggressive"))
+
+
+def required_annual_return(saved, monthly, target, months):
+    """Yearly return, compounded monthly, that grows saved plus a month-end contribution into target.
+
+    Returns (percent, band): percent 0 when no growth is needed, None when even 100% a month is not enough.
+    """
+    saved, monthly, target = (Decimal(str(value)) for value in (saved, monthly, target))
+
+    def future(rate):
+        grown = saved * (1 + rate) ** months
+        return grown + (monthly * months if rate == 0 else monthly * ((1 + rate) ** months - 1) / rate)
+
+    if future(Decimal("0")) >= target:
+        return Decimal("0"), "no_growth"
+    low, high = Decimal("0"), Decimal("1")
+    if future(high) < target:
+        return None, "unrealistic"
+    for _ in range(100):
+        middle = (low + high) / 2
+        low, high = (middle, high) if future(middle) < target else (low, middle)
+    percent = (((1 + high) ** 12 - 1) * 100).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    band = next((name for limit, name in RETURN_BANDS if percent <= limit), "unrealistic")
+    return percent, band
+
+
 def budget_money(value):
     try:
         if value is None or isinstance(value, bool) or len(str(value)) > 128:

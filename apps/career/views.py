@@ -26,6 +26,7 @@ from apps.reports.services import operational_logging_service
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 from .serializers import CareerJobAnalysisSerializer, CareerOpportunitySerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
+from .services import application_tracker
 
 
 def _career_error_response(exc, message, *, field="detail", status_code=status.HTTP_400_BAD_REQUEST):
@@ -720,13 +721,79 @@ class CareerJobOutcomeView(APIView):
         return Response(
             {
                 "analysis": CareerJobAnalysisSerializer(analysis).data,
-                "opportunity": CareerOpportunitySerializer(analysis).data,
+                "opportunity": CareerOpportunitySerializer(analysis, context={"request": request}).data,
                 "opportunity_outcome": outcome,
                 "opportunity_outcome_learning": _career_outcome_learning_payload(request.user),
             }
         )
 
     patch = post
+
+
+class CareerApplicationView(APIView):
+    """Owner-set application stage or a follow-up the owner confirms was sent; ALFRED never sends anything."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        analysis = CareerJobAnalysis.objects.filter(user=request.user, id=pk).first()
+        if analysis is None:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not isinstance(request.data, dict) or not isinstance(analysis.extracted_payload, dict):
+            return Response({"detail": "Send a stage or a sent follow-up."}, status=status.HTTP_400_BAD_REQUEST)
+        conflict = {"detail": "This opportunity changed. Reload it before editing again."}
+        if "revision" in request.data and request.data["revision"] != CareerJobAnalysisSerializer(analysis).data["updated_at"]:
+            return Response(conflict, status=status.HTTP_409_CONFLICT)
+        change = {key: value for key, value in request.data.items() if key != "revision"}
+        try:
+            application = application_tracker.apply_change(analysis.extracted_payload.get("application"), change,
+                                                           today=timezone.localdate())
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        extracted_payload = {**analysis.extracted_payload, "application": application}
+        updated = CareerJobAnalysis.objects.filter(pk=analysis.pk, user=request.user, updated_at=analysis.updated_at,
+            extracted_payload=analysis.extracted_payload).update(extracted_payload=extracted_payload, updated_at=timezone.now())
+        if not updated:
+            return Response(conflict, status=status.HTTP_409_CONFLICT)
+        analysis.refresh_from_db()
+        return Response({"opportunity": CareerOpportunitySerializer(analysis, context={"request": request}).data})
+
+    patch = post
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def career_follow_ups(request):
+    """Follow-ups due or coming up across the owner's saved opportunities, earliest first."""
+    today = timezone.localdate()
+    rows = []
+    for analysis in CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300]:
+        payload = analysis.extracted_payload if isinstance(analysis.extracted_payload, dict) else {}
+        follow_up = application_tracker.follow_up_status(payload.get("application"), today=today)
+        if follow_up["status"] in {"due", "upcoming"}:
+            rows.append({"id": analysis.pk, "job_title": analysis.job_title, "company": analysis.company,
+                         "stage": payload["application"]["stage"], **follow_up})
+    rows.sort(key=lambda row: (row["due_on"], row["id"]))
+    return Response({"today": today.isoformat(), "due": [row for row in rows if row["status"] == "due"],
+                     "upcoming": [row for row in rows if row["status"] == "upcoming"][:20]})
+
+
+class CareerResumeCompareView(APIView):
+    """What changed between two of the owner's resumes: skills, role and experience."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        resumes = CareerResume.objects.filter(user=request.user)
+        try:
+            ids = [serializers.IntegerField(min_value=1, max_value=2**63 - 1).run_validation(request.query_params.get(key))
+                   for key in ("from", "to")]
+        except serializers.ValidationError:
+            return Response({"detail": "Choose two saved resumes to compare."}, status=status.HTTP_400_BAD_REQUEST)
+        older, newer = (get_object_or_404(resumes, pk=item) for item in ids)
+        describe = lambda item: {"id": item.pk, "file_name": item.file_name, "uploaded_at": item.created_at,
+                                 "parser_status": item.parser_status}
+        return Response({"from": describe(older), "to": describe(newer),
+                         **application_tracker.compare_resumes(older.extracted_payload or {}, newer.extracted_payload or {})})
 
 
 class CareerProjectionSimulationView(APIView):

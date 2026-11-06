@@ -2,6 +2,9 @@ from datetime import timedelta
 from hashlib import sha256
 import json
 import os
+from urllib.parse import urlsplit
+
+from alfred_ai.services.public_http import normalized_link
 
 from .base import Provider, ProviderError, number, request_json
 
@@ -75,3 +78,111 @@ class OpenRouteService(Provider):
             geometry = json.dumps(route["geometry"], sort_keys=True)
             distinct.setdefault(geometry, route)
         return {"routes": list(distinct.values())}
+
+
+def decode_polyline6(encoded):
+    """Valhalla's encoded shape (Google polyline algorithm, 1e6 precision) as [lon, lat] points."""
+    points, index, lat, lon = [], 0, 0, 0
+    while index < len(encoded):
+        deltas = []
+        for _ in range(2):
+            shift = result = 0
+            while True:
+                if index >= len(encoded):
+                    raise ProviderError("malformed_response")
+                byte = ord(encoded[index]) - 63
+                index += 1
+                result |= (byte & 0x1F) << shift
+                shift += 5
+                if byte < 0x20:
+                    break
+            deltas.append(~(result >> 1) if result & 1 else result >> 1)
+        lat, lon = lat + deltas[0], lon + deltas[1]
+        points.append(_coordinate([lon / 1e6, lat / 1e6]))
+    return points
+
+
+class ValhallaRouting(Provider):
+    """Road-network routing with a real motorcycle profile (idea from TREK pin d4da05bb, independently written).
+
+    Off until the owner sets TRAVEL_VALHALLA_URL, because each request sends the trip's start and end points to that
+    server. The FOSSGIS public server (https://valhalla1.openstreetmap.de) allows light personal use: one request a
+    second with an identifying User-Agent.
+    """
+    name = "valhalla"
+    category = "routing"
+    source_url = "https://www.openstreetmap.org/copyright"
+    attribution = "Routing by Valhalla | Data © OpenStreetMap contributors, ODbL"
+    ttl = timedelta(days=5)
+    min_interval = 1
+    limits = {"minute": 10, "hour": 60, "day": 200, "month": 2000}
+    allowed_parameters = OpenRouteService.allowed_parameters
+    COSTING = {"motorcycle": "motorcycle", "ride": "motorcycle", "car": "auto", "roadtrip": "auto", "walking": "pedestrian"}
+
+    @property
+    def cache_partition(self):
+        return sha256(os.getenv("TRAVEL_VALHALLA_URL", "").encode()).hexdigest()
+
+    def unavailable_reason(self):
+        endpoint = os.getenv("TRAVEL_VALHALLA_URL", "")
+        if not endpoint:
+            return "missing_TRAVEL_VALHALLA_URL"
+        safe = normalized_link(endpoint)
+        return "" if safe and not urlsplit(safe).fragment and not urlsplit(safe).query else "invalid_TRAVEL_VALHALLA_URL"
+
+    def fetch(self, p):
+        costing = self.COSTING.get(p.get("mode", "car"))
+        if costing is None:
+            raise ProviderError("transport_profile_unsupported")
+        if p.get("preference", "recommended") not in {"recommended", "fastest", "shortest"}:
+            raise ProviderError("unsupported_route_preference")
+        if type(p.get("alternatives", False)) is not bool:
+            raise ProviderError("unsupported_route_alternatives")
+        start, end = (_coordinate(point) for point in (p["start"], p["end"]))
+        options = {}
+        if costing != "pedestrian":
+            # 0 asks Valhalla to avoid motorways/trunk roads and tolls where any other road exists; it is not a ban.
+            options = {"use_highways": 0.0 if p.get("avoid_expressways") else 0.5, "use_tolls": 0.0 if p.get("avoid_tolls") else 0.5}
+            if p.get("preference") == "shortest":
+                options["shortest"] = True
+        body = {"locations": [{"lon": start[0], "lat": start[1]}, {"lon": end[0], "lat": end[1]}], "costing": costing,
+                "costing_options": {costing: options}, "units": "kilometers", "directions_type": "none"}
+        if p.get("alternatives"):
+            body["alternates"] = 2
+        return request_json("POST", os.environ["TRAVEL_VALHALLA_URL"].rstrip("/") + "/route", json=body,
+            headers={"User-Agent": "ALFRED-travel/1.2 (+https://github.com/sourabh48/alfred_ai)", "Content-Type": "application/json"})
+
+    def normalize(self, raw, p):
+        costing = self.COSTING.get(p.get("mode", "car"))
+        trips = [raw.get("trip")] + [item.get("trip") for item in raw.get("alternates") or [] if isinstance(item, dict)]
+        routes = []
+        for trip in [trip for trip in trips if isinstance(trip, dict)][:3]:
+            coords = [point for leg in trip.get("legs") or [] for point in decode_polyline6(str(leg.get("shape") or ""))]
+            if len(coords) < 2:
+                raise ProviderError("malformed_response")
+            summary = trip.get("summary") or {}
+            avoided = {"expressways": not summary.get("has_highway"), "tolls": not summary.get("has_toll")}
+            route = {"distance_km": round(number(summary["length"], low=0), 1), "duration_hours": round(number(summary["time"], low=0) / 3600, 2),
+                "geometry": {"type": "LineString", "coordinates": coords}, "extras": {}, "ascent_m": None, "descent_m": None, "profile": costing,
+                # Valhalla's motorcycle profile follows OpenStreetMap access tags (motorcycle=no and similar); tags can be missing or old.
+                "motorcycle_legal": "OSM_ACCESS_TAGS" if costing == "motorcycle" else "UNKNOWN", "closures": "UNKNOWN", "traffic": "UNKNOWN",
+                "constraints_requested": {"avoid_expressways": bool(p.get("avoid_expressways")), "avoid_tolls": bool(p.get("avoid_tolls"))},
+                "constraints_met": {name: avoided[name] for name, asked in (("expressways", p.get("avoid_expressways")), ("tolls", p.get("avoid_tolls"))) if asked},
+                "note": ("Motorcycle route on mapped roads that allow motorcycles in OpenStreetMap; check signs, closures and road condition before riding."
+                         if costing == "motorcycle" else "Road route; closures, traffic and motorcycle legality are unverified.")}
+            routes.append(route)
+        if not routes:
+            raise ProviderError("no_route")
+        distinct = {}
+        for route in routes:
+            route["route_id"] = sha256(json.dumps(route, sort_keys=True, allow_nan=False).encode()).hexdigest()
+            distinct.setdefault(json.dumps(route["geometry"], sort_keys=True), route)
+        return {"routes": list(distinct.values())}
+
+
+def routing_provider(mode):
+    """Valhalla when configured for motorcycles (it has a real motorcycle profile), else the configured one, else ORS."""
+    valhalla, ors = ValhallaRouting(), OpenRouteService()
+    if not valhalla.unavailable_reason() and (mode in {"motorcycle", "ride"} or ors.unavailable_reason()):
+        return valhalla
+    return ors

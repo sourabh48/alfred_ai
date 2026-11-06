@@ -13,7 +13,7 @@ from .discovery import rank_places
 from .mapping import map_features
 from .providers.base import ProviderResult
 from .providers.geocoding import OpenMeteoGeocoding
-from .providers.routing import OpenRouteService
+from .providers.routing import OpenRouteService, routing_provider
 from .providers.weather import OpenMeteoWeather, replan_proposals
 from .providers.places import OverpassPlaces
 from .providers.permits import PermitProvider
@@ -144,10 +144,11 @@ def enrich_candidate(user, state, destination):
         route_parameters = {"start":[origin[1],origin[0]],"end":[d["lon"],d["lat"]],
             "mode":value(state,"transport_mode","mixed"),"avoid_expressways":value(state,"avoid_expressways",False),
             "avoid_tolls":value(state,"avoid_tolls",False),"preference":value(state,"route_preference","recommended")}
-        route = fetch(OpenRouteService(), route_parameters)
+        router = routing_provider(route_parameters["mode"])
+        route = fetch(router, route_parameters)
         d["route_alternatives_note"] = "Alternative comparison unavailable; no additional route is established."
         if route.success and not route.stale and route.payload["routes"][0]["distance_km"] <= 100:
-            alternatives = fetch(OpenRouteService(), {**route_parameters, "alternatives": True})
+            alternatives = fetch(router, {**route_parameters, "alternatives": True})
             if alternatives.success and not alternatives.stale:
                 route = alternatives
                 d["route_alternatives_note"] = "Up to three distinct provider geometries; fewer may exist. Scenic quality, road access and current traffic are unverified."

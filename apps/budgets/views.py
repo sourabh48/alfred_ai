@@ -5,7 +5,10 @@ from django.db.models import Count, Max, Sum
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes as perm_classes
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from django.shortcuts import get_object_or_404
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from alfred_ai.services.currency import counts_in_rupees, currency_fingerprint
@@ -15,7 +18,7 @@ from apps.expenses.money import money_float
 from apps.expenses.services.cashflow_treatment import variable_spend_rows
 
 from .models import Budget, SavingsGoal
-from .money import allocate_budget
+from .money import allocate_budget, budget_money, goal_progress, required_annual_return
 from .serializers import BudgetSerializer, SavingsGoalSerializer
 
 
@@ -37,6 +40,32 @@ class SavingsGoalDetailView(RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return SavingsGoal.objects.filter(user=self.request.user)
+
+
+class SavingsGoalPlanView(APIView):
+    """Read-only: the yearly return a goal needs if the owner saves a given amount each month. Nothing is saved."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        goal = get_object_or_404(SavingsGoal, pk=pk, user=request.user)
+        try:
+            monthly = budget_money(request.query_params.get("monthly_contribution"))
+        except ValueError as exc:
+            return Response({"detail": f"Monthly amount: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
+        progress = goal_progress(goal.target_amount, goal.saved_amount, goal.target_date, timezone.localdate())
+        if progress["status"] == "reached":
+            return Response({"detail": "This goal is already reached."}, status=status.HTTP_400_BAD_REQUEST)
+        if not progress["months_left"]:
+            return Response({"detail": "Give the goal a target date that is still ahead."}, status=status.HTTP_400_BAD_REQUEST)
+        percent, band = required_annual_return(goal.saved_amount, monthly, goal.target_amount, progress["months_left"])
+        return Response({
+            "goal_id": goal.pk, "currency": goal.currency or "INR", "monthly_contribution": money_float(monthly),
+            "months_left": progress["months_left"], "no_growth_monthly_needed": money_float(progress["monthly_needed"]),
+            "required_annual_return_percent": float(percent) if percent is not None else None, "band": band,
+            "assumptions": ["The monthly amount is in the goal's currency and is saved at the end of each month.",
+                            "Growth is compounded monthly at one steady rate; real returns vary and can be negative.",
+                            "Bands are a rough guide (up to 4% conservative, 8% moderate, 12% aggressive), not advice."],
+        })
 
 
 class BudgetListCreateView(ListCreateAPIView):

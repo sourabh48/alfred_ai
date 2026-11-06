@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("loanCancelButton").addEventListener("click", resetLoanForm);
     document.getElementById("loanImportBtn").addEventListener("click", importLoanPdf);
     document.getElementById("loanDetectBtn").addEventListener("click", detectLoansFromExpenses);
+    document.getElementById("loanPrepaymentForm").addEventListener("submit", submitLoanPrepayment);
     resetLoanForm();
     resetLoanConsolidationForm();
     resetForeclosureForm();
@@ -166,6 +167,7 @@ function renderLoanChart(chart) {
 
 function renderLoanTable(loans) {
     loanIndex = new Map();
+    renderPrepaymentLoans(loans);
     const target = document.getElementById("loanTableBody");
     const activeIds = new Set(loans.filter(item => item.is_active && item.verification_status === "confirmed").map(item => item.id));
     selectedLoanIds.forEach(id => {
@@ -746,3 +748,42 @@ window.editLoan = editLoan;
 window.deleteLoan = deleteLoan;
 window.toggleLoanSelection = toggleLoanSelection;
 window.prepareForeclosure = prepareForeclosure;
+
+function renderPrepaymentLoans(loans) {
+    const select = document.getElementById("loanPrepaymentLoan");
+    if (!select) return;
+    const chosen = select.value;
+    const open = loans.filter(item => item.status === "active" && item.remaining_balance != null);
+    select.innerHTML = open.length
+        ? open.map(item => `<option value="${item.id}">${Alfred.escapeHtml(item.loan_type_label || formatLoanType(item.loan_type))}${item.lender ? ` · ${Alfred.escapeHtml(item.lender)}` : ""}</option>`).join("")
+        : `<option value="">No active loan with a recorded balance</option>`;
+    if (open.some(item => String(item.id) === chosen)) select.value = chosen;
+}
+
+function submitLoanPrepayment(event) {
+    event.preventDefault();
+    const target = document.getElementById("loanPrepaymentResult");
+    const loanId = document.getElementById("loanPrepaymentLoan").value;
+    if (!loanId) return;
+    const params = new URLSearchParams({ amount: document.getElementById("loanPrepaymentAmount").value, mode: document.getElementById("loanPrepaymentMode").value });
+    const expected = document.getElementById("loanPrepaymentReturn").value;
+    if (expected !== "") params.set("expected_return", expected);
+    Alfred.fetchJSON(`/api/loans/${loanId}/prepayment/?${params}`).then(data => {
+        const money = value => Alfred.formatCurrency(value, data.currency || "INR");
+        const after = data.mode === "closes_loan"
+            ? "This closes the loan."
+            : `${data.after.months} months left at ${money(data.after.emi)} a month (now ${data.baseline.months} at ${money(data.baseline.emi)}).`;
+        const compare = data.versus_investing ? `<p class="mb-1" id="loanPrepaymentCompare">${{
+            prepay: "Prepaying comes out ahead", invest: "Investing comes out ahead", equal: "Both come out the same" }[data.versus_investing.better]}
+            by about ${money(data.versus_investing.difference)} at the end of the original ${data.versus_investing.horizon_months} months,
+            if investing earned ${Alfred.escapeHtml(String(data.versus_investing.expected_annual_return_percent))}% a year.</p>` : "";
+        const tone = { short: "danger", thin: "warning", kept: "success" }[data.liquidity.status] || "secondary";
+        Alfred.setHTML(target, `
+            <div class="mini-card" id="loanPrepaymentSummary">
+                <p class="mb-1"><strong>Saves ${money(data.interest_saved)} in interest${data.months_saved ? ` and ${data.months_saved} months` : ""}.</strong> ${after}</p>
+                ${compare}
+                <p class="mb-1 text-${tone}-emphasis" id="loanPrepaymentLiquidity">${Alfred.escapeHtml(data.liquidity.detail)}</p>
+                <ul class="small muted mb-0">${data.assumptions.map(item => `<li>${Alfred.escapeHtml(item)}</li>`).join("")}</ul>
+            </div>`);
+    }).catch(error => Alfred.setHTML(target, `<div class="alert alert-danger mb-0" role="alert">${Alfred.escapeHtml(error.message)}</div>`));
+}

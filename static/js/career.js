@@ -474,7 +474,66 @@ function loadCareerOpportunities(url = "/api/career/job-analyses/") {
             button.onclick = target ? () => loadCareerOpportunities(target) : null;
         }
         renderCareerOutcomeForm(null);
+        loadCareerFollowUps();
     }).catch(error => showCareerFeedback("careerOutcomeListFeedback", error.message, "danger"));
+}
+
+const CAREER_STAGES = ["evaluated", "applied", "responded", "assessment", "interview", "offer", "rejected", "discarded", "hired"];
+const careerStageLabel = stage => stage ? stage.charAt(0).toUpperCase() + stage.slice(1) : "No stage set";
+
+function loadCareerFollowUps() {
+    const target = document.getElementById("careerFollowUps");
+    return Alfred.fetchJSON("/api/career/follow-ups/").then(data => {
+        const row = item => `<li>${Alfred.escapeHtml(item.job_title || "Role")} · ${Alfred.escapeHtml(item.company || "Company not recorded")} · ${Alfred.escapeHtml(careerStageLabel(item.stage))} · ${Alfred.escapeHtml(item.due_on)}</li>`;
+        target.innerHTML = data.due.length
+            ? `<div class="alert alert-warning small mb-0" id="careerFollowUpsDue"><strong>Follow-ups due (${data.due.length})</strong><ul class="mb-0">${data.due.map(row).join("")}</ul>
+               <div class="mt-1">ALFRED does not send anything. Mark a follow-up as sent only after you send it yourself.</div></div>`
+            : (data.upcoming.length ? `<p class="small muted mb-0" id="careerFollowUpsNone">No follow-ups due today. Next: ${Alfred.escapeHtml(data.upcoming[0].due_on)}.</p>` : "");
+    }).catch(() => { target.replaceChildren(); });
+}
+
+function renderCareerApplication(item) {
+    const target = document.getElementById("careerApplicationPanel");
+    if (!item) { target.replaceChildren(); return; }
+    const app = item.application || {}, follow = app.follow_up || {}, fresh = item.match_freshness || {};
+    const history = (app.history || []).map(step => `<li>${Alfred.escapeHtml(careerStageLabel(step.stage))} on ${Alfred.escapeHtml(step.on)}</li>`).join("");
+    const sent = (app.follow_ups || []).map(step => `<li>Follow-up sent on ${Alfred.escapeHtml(step.on)} (${Alfred.escapeHtml(careerStageLabel(step.stage))})</li>`).join("");
+    const skills = (label, list) => list?.length ? `<div>${label}: ${Alfred.escapeHtml(list.join(", "))}</div>` : "";
+    const freshness = fresh.status === "stale"
+        ? `<div class="alert alert-warning small" id="careerMatchStale"><strong>This match used an older resume.</strong> ${Alfred.escapeHtml((fresh.reasons || []).join(" "))}
+             ${skills("Skills added since", fresh.added_skills)}${skills("Skills removed since", fresh.removed_skills)}Run the job match again before relying on its fit.</div>`
+        : (fresh.status === "current" ? `<p class="small muted" id="careerMatchCurrent">This match uses your current resume.</p>` : "");
+    target.innerHTML = `
+        <div class="surface-card p-3 mb-3" id="careerApplication">
+            <h4 class="h6">Application progress</h4>
+            ${freshness}
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5"><label class="form-label small" for="careerApplicationStage">Stage</label>
+                    <select class="form-select form-select-sm" id="careerApplicationStage">${CAREER_STAGES.map(stage => `<option value="${stage}">${careerStageLabel(stage)}</option>`).join("")}</select></div>
+                <div class="col-md-4"><label class="form-label small" for="careerApplicationDate">Date</label>
+                    <input class="form-control form-control-sm" id="careerApplicationDate" type="date"></div>
+                <div class="col-md-3"><button class="btn btn-outline-primary btn-sm w-100" type="button" id="careerApplicationSave">Save stage</button></div>
+            </div>
+            <p class="small mt-2 mb-1" id="careerApplicationFollowUp">Current stage: <strong>${Alfred.escapeHtml(careerStageLabel(app.stage))}</strong>. ${Alfred.escapeHtml(follow.detail || "")}</p>
+            ${["due", "upcoming"].includes(follow.status) ? `<button class="btn btn-outline-secondary btn-sm" type="button" id="careerFollowUpSent">I sent a follow-up today</button>` : ""}
+            ${history || sent ? `<details class="small mt-2"><summary>History</summary><ul class="mb-0">${history}${sent}</ul></details>` : ""}
+            <div id="careerApplicationFeedback" class="d-none alert mt-2 mb-0" role="status" aria-live="polite"></div>
+        </div>`;
+    if (app.stage) document.getElementById("careerApplicationStage").value = app.stage;
+    const send = change => Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/application/`, {method: "POST", body: JSON.stringify({...change, revision: item.updated_at})})
+        .then(data => {
+            const index = careerOpportunities.findIndex(row => row.id === item.id);
+            if (index >= 0) careerOpportunities[index] = data.opportunity;
+            renderCareerOutcomeForm(data.opportunity);
+            showCareerFeedback("careerApplicationFeedback", "Saved.", "success");
+            loadCareerFollowUps();
+        })
+        .catch(error => showCareerFeedback("careerApplicationFeedback", error.message, "danger"));
+    document.getElementById("careerApplicationSave").addEventListener("click", () => {
+        const on = document.getElementById("careerApplicationDate").value;
+        send({stage: document.getElementById("careerApplicationStage").value, ...(on ? {on} : {})});
+    });
+    document.getElementById("careerFollowUpSent")?.addEventListener("click", () => send({follow_up_sent: true}));
 }
 
 function renderCareerInterviewPrep(item) {
@@ -495,6 +554,7 @@ function renderCareerInterviewPrep(item) {
 }
 
 function renderCareerOutcomeForm(item) {
+    renderCareerApplication(item);
     renderCareerInterviewPrep(item);
     const target = document.getElementById("careerOutcomeFormPanel");
     if (!item) { target.replaceChildren(); return; }

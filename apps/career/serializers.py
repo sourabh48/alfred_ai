@@ -2,16 +2,33 @@ from rest_framework import serializers
 from apps.users.money import ProfileMoneySerializerField
 from apps.expenses.money import NumericMoneySerializerField
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
+from .services import application_tracker
 
 
 class CareerOpportunitySerializer(serializers.ModelSerializer):
     outcome = serializers.SerializerMethodField()
     salary_evidence = serializers.SerializerMethodField()
     interview_prep = serializers.SerializerMethodField()
+    application = serializers.SerializerMethodField()
+    match_freshness = serializers.SerializerMethodField()
 
     class Meta:
         model = CareerJobAnalysis
-        fields = ('id','company','job_title','location','job_url','updated_at','outcome','salary_evidence','interview_prep')
+        fields = ('id','company','job_title','location','job_url','updated_at','outcome','salary_evidence','interview_prep',
+                  'application','match_freshness')
+
+    def get_application(self, obj):
+        from django.utils import timezone
+        payload = obj.extracted_payload if isinstance(obj.extracted_payload, dict) else {}
+        record = application_tracker._clean(payload.get('application'))
+        return {**record, 'follow_up': application_tracker.follow_up_status(record, today=timezone.localdate())}
+
+    def get_match_freshness(self, obj):
+        # The list shares one context, so the owner's current resume is read once per page.
+        if 'current_resume_evidence' not in self.context:
+            request = self.context.get('request')
+            self.context['current_resume_evidence'] = application_tracker.current_resume_evidence(request.user) if request else None
+        return application_tracker.match_freshness(obj.extracted_payload, self.context['current_resume_evidence'])
 
     def get_interview_prep(self, obj):
         from .services.job_intelligence import job_intelligence
