@@ -486,13 +486,19 @@ function titleCase(value) {
         .join(" ");
 }
 
-const RESEARCH_RATING = { buy: "Buy", overweight: "Overweight", hold: "Hold", underweight: "Underweight", sell: "Sell" };
+const RESEARCH_RATING = { buy: "Buy", overweight: "Own more", hold: "Hold", underweight: "Own less", sell: "Sell" };
 const researchToday = () => new Date().toLocaleDateString("en-CA");
+const researchInThreeMonths = () => { const d = new Date(); d.setMonth(d.getMonth() + 3); return d.toLocaleDateString("en-CA"); };
+
+function resetResearchDates(form) {
+    form.elements.decided_on.value = researchToday();
+    form.elements.review_on.value = researchInThreeMonths();
+}
 
 function initResearchJournal() {
     const form = document.getElementById("researchDecisionForm");
     if (!form) return;
-    form.elements.decided_on.value = researchToday();
+    resetResearchDates(form);
     form.addEventListener("submit", submitResearchDecision);
     form.elements.instrument.addEventListener("change", () => loadResearchLessons(form.elements.instrument.value));
     loadResearchDecisions();
@@ -514,7 +520,9 @@ async function loadResearchPacket(event) {
     if (form.elements.holding.value) query.set("holding", form.elements.holding.value);
     target.innerHTML = `<p class="muted small mb-0">Fetching dated public data…</p>`;
     try {
-        target.innerHTML = researchPacketHtml(await Alfred.fetchJSON(`/api/investments/research/packet/?${query}`));
+        const packet = await Alfred.fetchJSON(`/api/investments/research/packet/?${query}`);
+        target.innerHTML = researchPacketHtml(packet);
+        prefillResearchView(packet);
         document.getElementById("researchChallengeButton").addEventListener("click", () => loadResearchChallenge(Object.fromEntries(query)));
     } catch (error) {
         target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${Alfred.escapeHtml(error.message || "The packet could not be built.")}</div>`;
@@ -525,7 +533,7 @@ function researchPacketHtml(p) {
     const e = Alfred.escapeHtml;
     const points = (title, items, id) => `<div class="col-md-6" id="${id}"><p class="fw-semibold mb-1">${title}</p>${items.length
         ? `<ul class="mb-0">${items.map(item => `<li>${e(item.point)} <span class="muted small">(${e(item.as_of)})</span></li>`).join("")}</ul>`
-        : `<p class="muted small mb-0">No screen points this way.</p>`}</div>`;
+        : `<p class="muted small mb-0">None found.</p>`}</div>`;
     const list = items => `<ul class="mb-0">${items.map(item => `<li>${e(item)}</li>`).join("")}</ul>`;
     const v = p.valuation || {};
     const valuation = v.status === "estimated"
@@ -534,27 +542,37 @@ function researchPacketHtml(p) {
     return `<div class="mini-card" id="researchPacketResult">
         <p class="metric-kicker mb-1">${e(p.symbol)} · statements to ${e(p.latest_period_end || "unknown")} · retrieved ${e((p.retrieved_at || "").slice(0, 10))}
             · <a href="${Alfred.safeHref(p.source_url)}" target="_blank" rel="noopener">Source</a></p>
-        <div class="row g-3">${points("Case for", p.bullish || [], "researchPacketBull")}${points("Case against", p.bearish || [], "researchPacketBear")}</div>
-        <p class="mt-3 mb-1"><strong>Valuation:</strong> <span id="researchPacketValuation">${valuation}</span></p>
-        <p class="mb-1"><strong>Your portfolio:</strong> ${e(p.portfolio?.detail || "")}</p>
-        ${(p.thesis_changes || []).length ? `<p class="fw-semibold mt-2 mb-1">What would change the picture</p>${list(p.thesis_changes)}` : ""}
-        <p class="fw-semibold mt-2 mb-1">Missing evidence</p>${list(p.missing_evidence || [])}
-        <p class="fw-semibold mt-2 mb-1">Your options</p>${list(p.options || [])}
+        <div class="row g-3">${points("Good signs", p.bullish || [], "researchPacketBull")}${points("Warning signs", p.bearish || [], "researchPacketBear")}</div>
+        <p class="mt-3 mb-1"><strong>Is the price high?</strong> <span id="researchPacketValuation">${valuation}</span></p>
+        <p class="mb-1"><strong>Your money in it:</strong> ${e(p.portfolio?.detail || "")}</p>
+        ${(p.thesis_changes || []).length ? `<p class="fw-semibold mt-2 mb-1">What to watch for</p>${list(p.thesis_changes)}` : ""}
+        <p class="fw-semibold mt-2 mb-1">Not checked here</p>${list(p.missing_evidence || [])}
+        <p class="fw-semibold mt-2 mb-1">What you can do</p>${list(p.options || [])}
         <p class="muted small mt-2 mb-0">${(p.limits || []).map(e).join(" ")}</p>
-        <button type="button" class="btn btn-outline-secondary btn-sm mt-3" id="researchChallengeButton">Challenge it with the local model</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm mt-3" id="researchChallengeButton">Get a second opinion (local AI)</button>
         <div id="researchChallenge" class="mt-2" aria-live="polite"></div>
     </div>`;
+}
+
+function prefillResearchView(packet) {
+    const form = document.getElementById("researchDecisionForm");
+    if (!form || form.elements.instrument.value.trim()) return;
+    form.elements.instrument.value = packet.symbol;
+    const price = packet.metrics?.price;
+    if (price && !form.elements.entry_price.value) form.elements.entry_price.value = price.last_close;
+    if ([...form.elements.currency.options].some(option => option.value && option.value === packet.price_currency)) form.elements.currency.value = packet.price_currency;
+    loadResearchLessons(packet.symbol);
 }
 
 async function loadResearchChallenge(params) {
     const target = document.getElementById("researchChallenge"), button = document.getElementById("researchChallengeButton");
     const e = Alfred.escapeHtml;
     button.disabled = true;
-    target.innerHTML = `<p class="muted small mb-0">The local model is questioning the packet; on this PC it can take up to two minutes…</p>`;
+    target.innerHTML = `<p class="muted small mb-0">Your local AI is looking for reasons to doubt this; on this PC it can take up to two minutes…</p>`;
     try {
         const c = await Alfred.fetchJSON("/api/investments/research/packet/challenge/", { method: "POST", body: JSON.stringify(params) });
         if (c.status !== "challenged") { target.innerHTML = `<p class="muted small mb-0">${e(c.detail || "")}</p>`; return; }
-        target.innerHTML = `<div id="researchChallengeResult"><p class="fw-semibold mb-1">Sceptic's objections (${e(c.model)})</p>
+        target.innerHTML = `<div id="researchChallengeResult"><p class="fw-semibold mb-1">Second opinion: reasons to doubt (${e(c.model)})</p>
             ${c.objections.length ? `<ul class="mb-2">${c.objections.map(o => `<li><span class="muted">${e(o.point)}</span> — ${e(o.objection)}</li>`).join("")}</ul>` : ""}
             ${c.overlooked.length ? `<p class="fw-semibold mb-1">Not covered by the packet</p><ul class="mb-2">${c.overlooked.map(item => `<li>${e(item)}</li>`).join("")}</ul>` : ""}
             <p class="muted small mb-0">${c.dropped ? `${e(String(c.dropped))} reply item(s) were dropped for citing no packet point or stating a number. ` : ""}${c.limits.map(e).join(" ")}</p></div>`;
@@ -571,12 +589,12 @@ function researchPercent(value) {
 
 function researchOutcomeText(item) {
     const o = item.outcome || {};
-    if (o.status !== "settled") return `Pending until ${o.review_on}.`;
+    if (o.status !== "settled") return `Waiting until ${o.review_on}, then enter the price to see if you were right.`;
     const versus = o.alpha_percent != null
-        ? `; ${item.benchmark} ${researchPercent(o.benchmark_return_percent)}, so ${researchPercent(o.alpha_percent)} against it`
-        : " (no benchmark)";
-    const verdict = { supported: "The move went the way of your call.", not_supported: "The move went against your call.", not_judged: "A Hold makes no directional call." }[o.direction] || "";
-    return `Settled ${item.settled_on}: ${researchPercent(o.return_percent)}${versus}. ${verdict}`;
+        ? ` ${item.benchmark} moved ${researchPercent(o.benchmark_return_percent)}, so you did ${researchPercent(o.alpha_percent)} against the market.`
+        : "";
+    const verdict = { supported: "You were right.", not_supported: "You were wrong this time.", not_judged: "Hold has no direction to judge." }[o.direction] || "";
+    return `Checked ${item.settled_on}: the price moved ${researchPercent(o.return_percent)}.${versus} ${verdict}`;
 }
 
 function loadResearchLessons(instrument) {
@@ -585,8 +603,8 @@ function loadResearchLessons(instrument) {
     Alfred.fetchJSON(`/api/investments/research/lessons/?instrument=${encodeURIComponent(instrument.trim())}`).then(data => {
         const row = item => `<li><strong>${Alfred.escapeHtml(item.instrument)}</strong> · ${Alfred.escapeHtml(RESEARCH_RATING[item.rating] || item.rating)} on ${Alfred.escapeHtml(item.decided_on)}: ${Alfred.escapeHtml(item.lesson)}</li>`;
         const parts = [];
-        if (data.same_instrument.length) parts.push(`<p class="mb-1 fw-semibold">Your lessons on this instrument</p><ul class="mb-2">${data.same_instrument.map(row).join("")}</ul>`);
-        if (data.other_instruments.length) parts.push(`<p class="mb-1 fw-semibold">Recent lessons from other calls</p><ul class="mb-0">${data.other_instruments.map(row).join("")}</ul>`);
+        if (data.same_instrument.length) parts.push(`<p class="mb-1 fw-semibold">What you learned about this one before</p><ul class="mb-2">${data.same_instrument.map(row).join("")}</ul>`);
+        if (data.other_instruments.length) parts.push(`<p class="mb-1 fw-semibold">Lessons from your other views</p><ul class="mb-0">${data.other_instruments.map(row).join("")}</ul>`);
         target.innerHTML = parts.length ? `<div class="mini-card" id="researchLessonsPanel">${parts.join("")}</div>` : "";
     }).catch(() => target.replaceChildren());
 }
@@ -594,16 +612,16 @@ function loadResearchLessons(instrument) {
 function researchDecisionCard(item, today) {
     const canSettle = item.outcome?.status === "pending" && item.review_on <= today;
     const settled = item.outcome?.status === "settled";
-    const lessonField = `<div class="flex-grow-1"><label class="form-label small mb-1" for="researchLesson${item.id}">Lesson</label>
+    const lessonField = `<div class="flex-grow-1"><label class="form-label small mb-1" for="researchLesson${item.id}">What did you learn?</label>
         <input class="form-control form-control-sm" id="researchLesson${item.id}" maxlength="2000" value="${Alfred.escapeHtml(item.lesson || "")}"></div>`;
     const settle = canSettle ? `
         <div class="d-flex flex-wrap gap-2 align-items-end mt-2">
-            <div><label class="form-label small mb-1" for="researchExit${item.id}">Closing price you checked</label>
+            <div><label class="form-label small mb-1" for="researchExit${item.id}">Price now</label>
                 <input class="form-control form-control-sm" id="researchExit${item.id}" type="number" min="0.0001" step="0.0001"></div>
-            ${item.benchmark_entry != null ? `<div><label class="form-label small mb-1" for="researchBenchExit${item.id}">${Alfred.escapeHtml(item.benchmark)} closing level</label>
+            ${item.benchmark_entry != null ? `<div><label class="form-label small mb-1" for="researchBenchExit${item.id}">${Alfred.escapeHtml(item.benchmark)} level now</label>
                 <input class="form-control form-control-sm" id="researchBenchExit${item.id}" type="number" min="0.0001" step="0.0001"></div>` : ""}
             ${lessonField}
-            <button type="button" class="btn btn-outline-primary btn-sm" data-research-settle="${item.id}">Settle</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" data-research-settle="${item.id}">See if I was right</button>
         </div>` : settled ? `
         <div class="d-flex flex-wrap gap-2 align-items-end mt-2">
             ${lessonField}
@@ -618,7 +636,7 @@ function researchDecisionCard(item, today) {
             <p class="small mb-1">${Alfred.escapeHtml(item.thesis)}</p>
             <p class="small mb-1" id="researchOutcome${item.id}">${Alfred.escapeHtml(researchOutcomeText(item))}</p>
             ${settle}
-            <button type="button" class="btn btn-link btn-sm text-danger px-0" data-research-delete="${item.id}">Delete call</button>
+            <button type="button" class="btn btn-link btn-sm text-danger px-0" data-research-delete="${item.id}">Delete</button>
         </div>`;
 }
 
@@ -626,7 +644,7 @@ function loadResearchDecisions() {
     return Alfred.fetchJSON("/api/investments/research/").then(data => {
         const items = Array.isArray(data) ? data : (data.results || []);
         const target = document.getElementById("researchDecisionList");
-        if (!items.length) { target.innerHTML = `<div class="empty-state">No research calls yet.</div>`; return; }
+        if (!items.length) { target.innerHTML = `<div class="empty-state">No views saved yet. Look up a stock or write down your first view above.</div>`; return; }
         const today = researchToday();
         target.innerHTML = items.map(item => researchDecisionCard(item, today)).join("");
         target.querySelectorAll("[data-research-settle]").forEach(button => button.addEventListener("click", () => settleResearchDecision(button.dataset.researchSettle)));
@@ -651,9 +669,9 @@ function submitResearchDecision(event) {
     Alfred.fetchJSON("/api/investments/research/", { method: "POST", body: JSON.stringify(payload) })
         .then(() => {
             form.reset();
-            form.elements.decided_on.value = researchToday();
+            resetResearchDates(form);
             document.getElementById("researchLessons").replaceChildren();
-            showResearchFeedback("Call saved. Settle it on or after its review date.", "success");
+            showResearchFeedback(`View saved. Come back on ${payload.review_on} to see if you were right.`, "success");
             return loadResearchDecisions();
         })
         .catch(error => showResearchFeedback(error.message, "danger"))
@@ -668,13 +686,13 @@ function settleResearchDecision(id, lessonOnly = false) {
         if (bench) payload.benchmark_exit = bench.value;
     }
     Alfred.fetchJSON(`/api/investments/research/${id}/settle/`, { method: "POST", body: JSON.stringify(payload) })
-        .then(() => { showResearchFeedback(lessonOnly ? "Lesson saved." : "Call settled.", "success"); return loadResearchDecisions(); })
+        .then(() => { showResearchFeedback(lessonOnly ? "Lesson saved." : "Checked. Your result is below.", "success"); return loadResearchDecisions(); })
         .catch(error => showResearchFeedback(error.message, "danger"));
 }
 
 function deleteResearchDecision(id) {
-    if (!window.confirm("Delete this research call? Your positions are not affected.")) return;
+    if (!window.confirm("Delete this view? Your holdings are not affected.")) return;
     Alfred.fetchJSON(`/api/investments/research/${id}/`, { method: "DELETE" })
-        .then(() => { showResearchFeedback("Call deleted.", "success"); return loadResearchDecisions(); })
+        .then(() => { showResearchFeedback("View deleted.", "success"); return loadResearchDecisions(); })
         .catch(error => showResearchFeedback(error.message, "danger"));
 }

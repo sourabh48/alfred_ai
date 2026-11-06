@@ -205,7 +205,7 @@ def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None,
             "latest_period_end": latest_period.isoformat() if latest_period else None,
             "metrics": metrics, "bullish": bullish, "bearish": bearish, "valuation": valuation, "portfolio": portfolio,
             "thesis_changes": changes, "missing_evidence": missing,
-            "options": ["Take no action.", "Record a dated call in the research journal and review it later.",
+            "options": ["Do nothing for now.", "Write down your view in step 2 and check it later.",
                         f"Look again after the next annual results{f', around {review}' if review else ''}."],
             "limits": ["Screens are rules of thumb, not forecasts; there is no rating or price target.",
                        "Yahoo data is not independently verified and may be revised.", "Nothing is bought, sold or changed."]}

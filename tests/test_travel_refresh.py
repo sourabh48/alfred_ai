@@ -61,6 +61,10 @@ class TravelSelectiveRefreshTests(TestCase):
             p = patch("apps.mobility.services.travel.research." + factory, return_value=self.providers[category])
             p.start()
             self.addCleanup(p.stop)
+        # Routing goes through the free-first chain; here it is the one fixture router.
+        p = patch("apps.mobility.services.travel.research.routing_chain", return_value=[self.providers["routing"]])
+        p.start()
+        self.addCleanup(p.stop)
         for target in ("apps.mobility.services.travel_research.dispatch",):
             p = patch(target)
             p.start()

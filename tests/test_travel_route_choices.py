@@ -28,6 +28,10 @@ def route_fixture(*, distance=80):
         source_url="https://openrouteservice.org/", retrieved_at=now.isoformat(), expires_at=(now+timedelta(days=1)).isoformat(), payload=payload)
 
 
+def _alternative_requests(query):
+    return [c for c in query.call_args_list if c.args[0].category == "routing" and c.args[1].get("alternatives")]
+
+
 class TravelRouteChoiceTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("route-owner", password="Test12345!", city="Bengaluru")
@@ -81,9 +85,10 @@ class TravelRouteChoiceTests(TestCase):
                 if provider.category == "routing":
                     return comparison if parameters.get("alternatives") else self.result
                 return ProviderResult(provider.name, provider.category)
-            with patch("apps.mobility.services.travel.research.query", side_effect=fetch) as query:
+            # One mock for both names: routing's base request goes through the fallback chain in cache.py.
+            with patch("apps.mobility.services.travel.research.query", side_effect=fetch) as query,                     patch("apps.mobility.services.travel.cache.query", new=query):
                 candidate, _ = enrich_candidate(self.user, self.session.state, self.candidate)
-                self.assertEqual(len([c for c in query.call_args_list if c.args[0].category == "routing"]), 2)
+                self.assertEqual(len(_alternative_requests(query)), 1)
             return candidate
         accepted = run(self.result)
         self.assertEqual(len(accepted["route_result"]["payload"]["routes"]), 2)
@@ -94,9 +99,9 @@ class TravelRouteChoiceTests(TestCase):
     def test_long_or_stale_route_never_requests_alternatives(self):
         for source in (route_fixture(distance=101), ProviderResult(**(self.result.as_dict() | {"stale": True}))):
             with self.subTest(source=source.stale), patch("apps.mobility.services.travel.research.query",
-                    side_effect=lambda provider, params, **kw: source if provider.category == "routing" else ProviderResult(provider.name, provider.category)) as query:
+                    side_effect=lambda provider, params, **kw: source if provider.category == "routing" else ProviderResult(provider.name, provider.category)) as query,                     patch("apps.mobility.services.travel.cache.query", new=query):
                 enrich_candidate(self.user, self.session.state, self.candidate)
-                self.assertEqual(len([c for c in query.call_args_list if c.args[0].category == "routing"]), 1)
+                self.assertEqual(_alternative_requests(query), [])
 
     def test_explicit_choice_rebuilds_draft_budget_geometry_and_save_reopen(self):
         before_evidence = TravelResearchEvidence.objects.count()
@@ -129,7 +134,7 @@ class TravelRouteChoiceTests(TestCase):
             self.candidate.update(selected_route_id=self.result.payload["routes"][1]["route_id"], route_choice_confirmed=True)
             response = route_fixture(distance=81) if changed else self.result
             with self.subTest(changed=changed), patch("apps.mobility.services.travel.research.query",
-                    side_effect=lambda provider, params, **kw: response if provider.category == "routing" else ProviderResult(provider.name, provider.category)):
+                    side_effect=lambda provider, params, **kw: response if provider.category == "routing" else ProviderResult(provider.name, provider.category)) as query,                     patch("apps.mobility.services.travel.cache.query", new=query):
                 candidate, _ = enrich_candidate(self.user, self.session.state, self.candidate)
                 if changed:
                     self.assertTrue(candidate["route_choice_required"])

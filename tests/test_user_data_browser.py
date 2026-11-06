@@ -6848,7 +6848,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         holdings = list(Investment.objects.filter(user=owner).values())
         self.login()
         self.browser.get(self.live_server_url + '/investments/')
-        self.wait.until(lambda _: 'Settled' in self.text('researchDecisionList'))
+        self.wait.until(lambda _: 'Checked' in self.text('researchDecisionList'))
         form = '#researchDecisionForm '
         self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=instrument]').send_keys('synth')
         self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=thesis]').click()  # change event loads lessons
@@ -6860,7 +6860,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=entry_price]').send_keys('50')
         self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=thesis]').send_keys('Synthetic thesis')
         self.memory_click(form + 'button[type=submit]')
-        self.wait.until(lambda _: 'Call saved' in self.text('researchFeedback'))
+        self.wait.until(lambda _: 'View saved' in self.text('researchFeedback'))
         created = ResearchDecision.objects.get(user=owner, thesis='Synthetic thesis')
         self.wait.until(lambda _: self.browser.find_elements(self.By.ID, f'researchExit{created.pk}'))
         self.browser.find_element(self.By.ID, f'researchExit{created.pk}').send_keys('55')
@@ -6892,6 +6892,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('does not convert', self.text('researchPacketValuation'))
         self.assertIn('acquisition rather than demand', self.text('researchChallenge'))
         self.assertIn('3 reply item(s) were dropped', self.text('researchChallenge'))
+        # Step 2 starts from the looked-up stock, so a beginner only adds a view and a reason
+        values = self.browser.execute_script("const f = document.getElementById('researchDecisionForm'); return [f.instrument.value, f.entry_price.value, f.review_on.value > f.decided_on.value]")
+        self.assertEqual(values, ['SYNTH.NS', '224.5', True])
         self.assertEqual((list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()), (holdings, calls))
         self.capture('investment-research-packet')
 
