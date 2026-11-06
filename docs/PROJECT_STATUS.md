@@ -2413,6 +2413,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Synthetic S3 server only; no real account acceptance.
 - Limitations/dependencies: AWS endpoint/account ownership restrictions; not arbitrary Azure/Drive/S3-compatible endpoint support. IAM/account unselected. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: AWS is permanently withdrawn, not a deliverable. Non-AWS replacement adapter remains unimplemented; R2 is a candidate, not approved/configured/live-tested.
+- Owner decision 2026-11-06: cloud sync approved. Build an S3-compatible non-AWS adapter with client-side encryption; test against a synthetic local server only. Live use waits for a free-tier account and keys the owner creates and enters in `config/local.env`; no paid plan.
 
 ### SYNC-03 — Startup/periodic/bounded shutdown sync
 
@@ -2512,6 +2513,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Memory sync does not synchronize canonical Django databases/media/config or raw SQLite/WAL. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Keep approved application backup tooling separate from memory protocol.
+- Owner decision 2026-11-06: cloud backup approved. Upload only an encrypted backup archive through the SYNC-02 adapter; the key never leaves the PC and needs an independent recovery copy before first upload. Local backups stay as they are.
 
 ### TRAVEL-01 — Conversational discovery and saved preferences
 
@@ -2671,6 +2673,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Link-outs exist; no live bus booking/inventory adapter is demonstrated. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Confirm approved provider before building live integration.
+- Owner decision 2026-11-06: owner left the choice to Claude; kept deferred. Indian bus inventory needs a partner contract (no free official source) and live booking stays off, so links to verified bus websites remain.
 
 ### TRAVEL-15 — Live permits and road closure confirmation
 
@@ -3750,6 +3753,13 @@ AST-only graph update completed successfully. No external scan/API used.
 
 Review baseline: `feb650834deb782f0b3f813d4c9231b911eb5255`, isolated worktree
 F:/ALFRED_DEV/post-audit. **REVIEW COMPLETE; CONTRACT NOT APPROVED; SCHEMA BLOCKED.**
+
+**Owner decision 2026-11-06:** the owner left the choice to Claude, which approved the recommended
+package: C1 ownership, C2 unknown stays null, C3/C7 grouped and incomplete totals with numeric
+fields kept during the transition, C4 initial set INR/USD/EUR/GBP at two decimals, C8/C10
+expand-only nullable metadata migrations with no backfill or default INR. C5/C6 stay deferred:
+**FX is disabled** and no reporting currency is chosen. Each migration still passes the CI
+reviewed-source pin with owner approval before it reaches the owner runtime. FIN-15 is eligible.
 Budget/User/Career/Mobility conversions are complete and not reopened. No runtime,
 schema, migration, provider or historical value changes are authorized by this
 review. The recommendations below are proposals, not approved defaults in code.
