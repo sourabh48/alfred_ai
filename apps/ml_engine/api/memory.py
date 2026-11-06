@@ -125,7 +125,7 @@ class MemoryRetrieveAPI(MemoryAPI):
 class MemorySyncAPI(MemoryAPI):
     def get(self,request):
         store=memory_store(); kind=configured_provider()
-        available=kind=='mock' and bool(settings.ALFRED_MEMORY_SYNC_MOCK_DIR)
+        available=bool(kind)
         return Response({'provider':kind or 'disabled','available':bool(available),
             'status':MemorySynchronizer(store,None).status(request.user)})
 

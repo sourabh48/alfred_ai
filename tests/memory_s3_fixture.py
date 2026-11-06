@@ -17,6 +17,7 @@ import base64
 import re
 from urllib.parse import quote, urlencode, parse_qsl
 from xml.etree import ElementTree as ET
+from apps.ml_engine.services.memory_r2 import signed_headers  # one shared Signature V4 implementation
 from apps.ml_engine.services.memory_sync import MAX_HEAD, MAX_OBJECT, SyncConflict, SyncUnavailable, encoded, remaining, valid_id
 
 
@@ -75,25 +76,6 @@ class SignedS3Fixture:
             if key.endswith('/head') and self.lose_ack_once:
                 self.lose_ack_once=False; raise OSError('SYNTHETIC-LOST-ACK')
             return PublicResponse(b'','',200,{'ETag':etag})
-
-
-def signed_headers(method,url,data,profile,headers=None,*,now=None):
-    """AWS Signature V4, tested against AWS's published GET example."""
-    parts=urlsplit(url); now=now or datetime.now(timezone.utc)
-    stamp=now.strftime('%Y%m%dT%H%M%SZ'); date=stamp[:8]
-    outgoing={k.lower():' '.join(str(v).split()) for k,v in (headers or {}).items()}
-    outgoing.update(host=parts.hostname,**{'x-amz-date':stamp,'x-amz-content-sha256':sha256(data).hexdigest()})
-    if profile.get('session_token'): outgoing['x-amz-security-token']=profile['session_token']
-    names=';'.join(sorted(outgoing)); canonical_headers=''.join(k+':'+outgoing[k]+'\n' for k in sorted(outgoing))
-    query='&'.join(quote(k,safe='-_.~')+'='+quote(v,safe='-_.~') for k,v in sorted(parse_qsl(parts.query,keep_blank_values=True)))
-    canonical='\n'.join((method,parts.path or '/',query,canonical_headers,names,outgoing['x-amz-content-sha256']))
-    scope='/'.join((date,profile['region'],'s3','aws4_request'))
-    message='\n'.join(('AWS4-HMAC-SHA256',stamp,scope,sha256(canonical.encode()).hexdigest()))
-    key=('AWS4'+profile['secret_key']).encode()
-    for component in (date,profile['region'],'s3','aws4_request'): key=hmac.new(key,component.encode(),'sha256').digest()
-    signature=hmac.new(key,message.encode(),'sha256').hexdigest()
-    outgoing['Authorization']=f"AWS4-HMAC-SHA256 Credential={profile['access_key']}/{scope}, SignedHeaders={names}, Signature={signature}"
-    return outgoing
 
 
 def validate_profile(profile):

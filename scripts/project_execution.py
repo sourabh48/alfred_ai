@@ -47,6 +47,7 @@ GATES = {
     'TRAVEL-20': 'BLOCKED_EVIDENCE: private trip videos implemented 2026-11-06; owner approved and applied migration mobility 0014; owner check in the app remains',
     'AI-18': 'BLOCKED_EVIDENCE: offline Speak (Whisper base) and Read aloud (Piper VCTK) implemented 2026-11-06 with owner-approved downloads; owner check remains',
     'AI-17': 'BLOCKED_EVIDENCE: propose-then-confirm savings-goal actions implemented 2026-11-06 (owner decision); owner check remains',
+    'SYNC-02': 'BLOCKED_EXTERNAL: Cloudflare R2 encrypted adapter built 2026-11-06, tested against a synthetic signed server only; owner creates a free R2 bucket and bucket-scoped token in config/local.env, then a live sync check',
     'TRAVEL-14': 'BLOCKED_APPROVAL: owner left the choice to Claude 2026-11-06; kept deferred because no free official bus inventory source exists and live booking stays off; links to verified bus websites remain',
     'INV-04': 'BLOCKED_EVIDENCE: assumed-age advice removed and guidance labelled 2026-11-06; reviewed risk-evidence definition and owner check remain',
     'FIN-17': 'BLOCKED_EXTERNAL: owner dropped the score page 2026-11-06; report uploads stay in Documents; live bureau pulls need a bureau contract',

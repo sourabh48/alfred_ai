@@ -14,7 +14,7 @@ Counts describe accepted scopes, not universal accuracy or production readiness.
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 23 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 5 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 24 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 4 | COMPLETE_VERIFIED: 85
 
 PR/CI: master `99b8e8f` CI_PASSED (run 42194736278: Linux, four Windows backend shards, native, three Selenium shards); `84b61ac` and `0ef41f8` CI_PENDING. PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 

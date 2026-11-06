@@ -21,7 +21,8 @@
   owner check in the app, evidence or an external party.
 - OWNER DECISIONS 2026-11-06: COUNCIL-01 auto-training agreed (owner presses Approve Auto-Training in the app); FIN-CURRENCY contract approved with FX disabled; cloud sync and cloud backup (SYNC-02, SYNC-11) approved, free tier, client-side encryption, owner creates the account; TRAVEL-14 kept deferred.
 - FIN-15 2026-11-06: investments currency slice pushed at 1f8a4b4 (CI pin 9add134); owner approved migration investments 0006, applied to the owner runtime after a verified backup (F:/ALFRED_BACKUPS/pre-fin15-migration-20261106, sha256 3ce0383d...). CI at 07508ed fully PASS (run 42212401563). CI at 1f8a4b4 (run 42212764355): everything PASS except browser shard 2; that shard passes locally 57/57 and shard 0 54/54, and CI logs need GitHub sign-in, so it is unexplained, possibly flaky; check the next HEAD's run.
-- NEXT TASK: FIN-15 owner check, then remaining FIN-15 domains or SYNC-02/SYNC-11 as the owner chooses. Owner checks (AI-17, AI-18, TRAVEL-20, FIN-06, DOC-09, CAREER-07) remain. Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row FIN-15.
+- SYNC-02 2026-11-06: Cloudflare R2 encrypted sync adapter built and tested against a synthetic signed server (tests/test_memory_r2.py, 6 PASS; related suites 339 PASS). Off by default. BLOCKED_EXTERNAL: the owner creates a free R2 bucket and bucket-scoped token, fills the ALFRED_MEMORY_R2_* keys in config/local.env, then a live sync check.
+- NEXT TASK: SYNC-11 encrypted cloud backup through the R2 adapter (owner approved), FIN-15 owner check, or remaining FIN-15 domains, as the owner chooses. Owner checks (AI-17, AI-18, TRAVEL-20, FIN-06, DOC-09, CAREER-07) remain. Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row FIN-15.
 
 ## Previous checkpoint — CAREER-03, CAREER-06, TRAVEL-02 and TRAVEL-23 (2026-11-04)
 

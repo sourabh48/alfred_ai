@@ -796,7 +796,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 23 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 5 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 24 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 4 | COMPLETE_VERIFIED: 85
 
 PR/CI: master `99b8e8f` CI_PASSED (run 42194736278: Linux, four Windows backend shards, native, three Selenium shards); `84b61ac` and `0ef41f8` CI_PENDING. PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
 
@@ -815,7 +815,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
-| SYNC | 7 | 11 | 63.6 | 0 | 0 | 2 | 2 | 0 |
+| SYNC | 7 | 11 | 63.6 | 0 | 1 | 1 | 2 | 0 |
 | RUNTIME | 7 | 16 | 43.8 | 6 | 1 | 0 | 2 | 0 |
 <!-- END STATUS DASHBOARD -->
 
@@ -2406,15 +2406,16 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### SYNC-02 — Non-AWS encrypted object adapter (AWS withdrawn)
 
-**NOT_IMPLEMENTED** · Encrypted intelligence synchronization · P2.
+**PARTIALLY_IMPLEMENTED** · Encrypted intelligence synchronization · P2.
 
-- Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
+- Source: [apps/ml_engine/services/memory_r2.py](../apps/ml_engine/services/memory_r2.py), [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
 - APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
 - Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Synthetic S3 server only; no real account acceptance.
 - Limitations/dependencies: AWS endpoint/account ownership restrictions; not arbitrary Azure/Drive/S3-compatible endpoint support. IAM/account unselected. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: AWS is permanently withdrawn, not a deliverable. Non-AWS replacement adapter remains unimplemented; R2 is a candidate, not approved/configured/live-tested.
 - Owner decision 2026-11-06: cloud sync approved. Build an S3-compatible non-AWS adapter with client-side encryption; test against a synthetic local server only. Live use waits for a free-tier account and keys the owner creates and enters in `config/local.env`; no paid plan.
+- 2026-11-06 implementation: Cloudflare R2 provider `R2MemoryProvider` (S3 Signature V4, region `auto`, endpoint built only from the account id, conditional writes for immutable snapshots and the head compare-and-swap). Active only with `ALFRED_MEMORY_SYNC_PROVIDER=r2`, `ALFRED_MEMORY_CLOUD_AUTHORIZED=true` and a valid R2 profile; off by default. [tests/test_memory_r2.py](../tests/test_memory_r2.py) (6 tests, synthetic signed server): only ciphertext is stored, a second store restores, refusals and outages keep local data and leak no secret, head races conflict, pruning stays owner-scoped. Related suites 339 PASS locally. Not live-tested: no R2 account exists yet.
 
 ### SYNC-03 — Startup/periodic/bounded shutdown sync
 

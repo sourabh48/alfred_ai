@@ -526,8 +526,14 @@ ALFRED_MEMORY_SYNC_PROVIDER = env('ALFRED_MEMORY_SYNC_PROVIDER', default='')
 ALFRED_KNOWLEDGE_GIT_AUTHORIZED = env.bool('ALFRED_KNOWLEDGE_GIT_AUTHORIZED', default=False)
 ALFRED_KNOWLEDGE_GIT_REMOTE = env('ALFRED_KNOWLEDGE_GIT_REMOTE', default='')
 ALFRED_KNOWLEDGE_GIT_TOKEN = env('ALFRED_KNOWLEDGE_GIT_TOKEN', default='')
-# Retained neutral activation flag; it cannot reactivate the removed AWS provider.
+# Owner activation flag for cloud sync (SYNC-02, Cloudflare R2 only); it cannot reactivate the removed AWS provider.
 ALFRED_MEMORY_CLOUD_AUTHORIZED = env.bool('ALFRED_MEMORY_CLOUD_AUTHORIZED', default=False)
+# R2 bucket and API token the owner creates; keep them only in the untracked config/local.env.
+ALFRED_MEMORY_R2_ACCOUNT_ID = env('ALFRED_MEMORY_R2_ACCOUNT_ID', default='')
+ALFRED_MEMORY_R2_BUCKET = env('ALFRED_MEMORY_R2_BUCKET', default='')
+ALFRED_MEMORY_R2_ACCESS_KEY = env('ALFRED_MEMORY_R2_ACCESS_KEY', default='')
+ALFRED_MEMORY_R2_SECRET_KEY = env('ALFRED_MEMORY_R2_SECRET_KEY', default='')
+ALFRED_MEMORY_R2_JURISDICTION = env('ALFRED_MEMORY_R2_JURISDICTION', default='')
 ALFRED_MEMORY_MOCK_REASONING = env.bool('ALFRED_MEMORY_MOCK_REASONING', default=False)
 ALFRED_GEMINI_DEV_ENABLED = env.bool('ALFRED_GEMINI_DEV_ENABLED', default=False)
 ALFRED_MEMORY_REASONING_DAILY_TOKENS = env.int('ALFRED_MEMORY_REASONING_DAILY_TOKENS', default=4096)
