@@ -5275,7 +5275,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             if steps:ActionChains(self.browser).send_keys(*([Keys.TAB]*steps)).perform()
             for _ in range(400):
                 if self.browser.switch_to.active_element==target:break
-                self.browser.switch_to.active_element.send_keys(Keys.TAB)
+                ActionChains(self.browser).send_keys(Keys.TAB).perform()  # page-level Tab: element send_keys on a file input means a file path
             self.assertEqual(self.browser.switch_to.active_element,target,selector)
             return target
         focus_checks=[]

@@ -115,6 +115,7 @@ def main() -> int:
     )
     output_lines: list[str] = []
     assert process.stdout is not None
+    sys.stdout.reconfigure(errors="replace")  # a cp1252 console must not end the run on Selenium key glyphs
     for line in process.stdout:
         output_lines.append(line)
         print(line, end="", flush=True)
