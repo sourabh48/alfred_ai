@@ -16,7 +16,10 @@
 - AI-18 real spoken check fixed three defects (84b61ac). TRAVEL-20 private trip videos (d8a51e3): owner approved
   migration mobility 0014, CI re-pinned (0ef41f8), runtime copied to F:\ALFRED_BACKUPS\pre-travel20-migration-20261106
   and migrated. CI for 84b61ac and 0ef41f8 pending at checkpoint.
-- NEXT TASK: COUNCIL-01 per the queue. Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row AI-17.
+- COUNCIL-01 re-inspected 2026-11-06: no defect, 71 PASS; held-out outcomes wait for the owner's in-app
+  Approve Auto-Training. The queue now has no eligible task: every remaining item waits on an owner approval,
+  owner check in the app, evidence or an external party.
+- NEXT TASK: none eligible; owner checks (AI-17, AI-18, TRAVEL-20, FIN-06, DOC-09, CAREER-07) and approvals unblock work. Resume: `git status -sb; git log -3 --oneline`, then read docs/EXECUTION_QUEUE.md row AI-17.
 
 ## Previous checkpoint — CAREER-03, CAREER-06, TRAVEL-02 and TRAVEL-23 (2026-11-04)
 

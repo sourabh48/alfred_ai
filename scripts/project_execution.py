@@ -42,6 +42,7 @@ GATES = {
     'OPENAI-02': 'BLOCKED_APPROVAL: OpenAI stays off; pinned model retires 2027-01-14; replacement choice waits for approval to enable',
     'RUNTIME-12': 'BLOCKED_EXTERNAL: CI runs on each master push and is read via the public API; branch protection needs signed-in GitHub access',
     'FIN-06': 'BLOCKED_EVIDENCE: INR savings goals with Decimal progress implemented 2026-11-06; owner approved migration budgets 0003; owner check in the app remains',
+    'COUNCIL-01': 'BLOCKED_APPROVAL: routing re-inspected 2026-11-06 (71 PASS, 1 host-only skip); held-out outcomes need the owner to approve local auto-training in the app',
     'TRAVEL-20': 'BLOCKED_EVIDENCE: private trip videos implemented 2026-11-06; owner approved and applied migration mobility 0014; owner check in the app remains',
     'AI-18': 'BLOCKED_EVIDENCE: offline Speak (Whisper base) and Read aloud (Piper VCTK) implemented 2026-11-06 with owner-approved downloads; owner check remains',
     'AI-17': 'BLOCKED_EVIDENCE: propose-then-confirm savings-goal actions implemented 2026-11-06 (owner decision); owner check remains',
