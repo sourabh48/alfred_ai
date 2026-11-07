@@ -1468,7 +1468,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         store.restore_owner(owner)
         self.assertNotIn(first,{r['id'] for r in store.list_memories(owner)})
         self.assertIn(second,{r['id'] for r in store.list_memories(owner)})
-        self.assertIn('OpenAI disabled',self.text('memoryReasoningStatus'))
+        self.assertIn('OpenAI off: no key saved',self.text('memoryReasoningStatus'))
         self.assertIn('Billing measurements are unavailable',self.text('memoryReasoningUsage'))
         self.browser.execute_script("document.getElementById('privateMemoryPanel').scrollIntoView({block:'start',behavior:'instant'})")
         self.capture('ui-b-memory-search-review-revocation')
