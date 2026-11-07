@@ -28,6 +28,8 @@ class User(AbstractUser):
 
     city = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True)
+    # Display only: totals in other currencies are shown approximately in this one. Null follows country, then browser locale.
+    display_currency = models.CharField(max_length=3, null=True, blank=True, default=None)
     ml_training_consent_granted = models.BooleanField(default=False)
     ml_training_consent_given_at = models.DateTimeField(null=True, blank=True)
 

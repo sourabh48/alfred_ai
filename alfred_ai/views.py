@@ -26,6 +26,7 @@ from apps.reports.services import operational_logging_service
 from apps.users.forms import AlfredSignUpForm
 from .services.document_review import apply_correction, build_review_queue, delete_document, retry_review_item
 from .project_details import project_details_payload
+from .services.exchange_rates import DISPLAY_CURRENCIES
 
 LOGGER = logging.getLogger("alfred.health")
 CLIENT_ROUTE_PAYLOAD_KEYS = {
@@ -242,6 +243,7 @@ def account_settings_view(request):
     return render(request, "settings/account.html", {
         "income_conflict": build_employment_income_signals(user=request.user, profile=profile)["income_conflict"],
         "career_income": profile.rupee_last_salary if profile and not request.user.monthly_income else None,
+        "display_currencies": DISPLAY_CURRENCIES,
     })
 
 

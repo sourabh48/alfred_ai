@@ -325,6 +325,17 @@ function formatCurrency(value, currency = "INR") {
     }).format(Number(value || 0));
 }
 
+// Display only: a converted figure from the server, in the viewer's locale. Records keep their own currency.
+function formatApproximate(block, field) {
+    if (!block || block[field] == null || !block.currency) return "";
+    return `≈ ${new Intl.NumberFormat(undefined, { style: "currency", currency: block.currency, maximumFractionDigits: 2 }).format(Number(block[field]))}`;
+}
+
+function approximateNote(display) {
+    if (!display || !display.rate_date) return "No exchange rate is stored yet, so nothing is converted.";
+    return `Approximate, using the ECB reference rate of ${display.rate_date}${display.stale ? " (over a week old)" : ""}. Your records keep their own currency.`;
+}
+
 function formatRecordedMoney(value) {
     if (!value || value.evidence_status === "unavailable") return "Financial evidence unavailable";
     const parts = typeof value.amount === "string" && value.amount.match(/^(-?)(0|[1-9]\d{0,30})\.(\d{2})$/);
@@ -1308,6 +1319,8 @@ window.Alfred = {
     fetchJSON,
     uploadJSON,
     formatCurrency,
+    formatApproximate,
+    approximateNote,
     formatPercent,
     formatDate,
     formatDateTime,

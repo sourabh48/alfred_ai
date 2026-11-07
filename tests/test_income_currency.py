@@ -82,7 +82,7 @@ class IncomeCurrencyMigrationTests(TransactionTestCase):
                 MigrationExecutor(db).migrate(leaves)
                 db.close()
                 after = read_database(candidate)[0]
-                for table, columns in (("users_user", ("income_currency", "variable_income_currency", "rent_currency")),
+                for table, columns in (("users_user", ("income_currency", "variable_income_currency", "rent_currency", "display_currency")),
                                        ("career_careerprofile", ("salary_currency",))):
                     for column in columns:
                         self.assertEqual([row.pop(column) for row in after[table]], [None], column)

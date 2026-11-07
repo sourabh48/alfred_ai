@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from alfred_ai.services.currency import CURRENCY_CHOICES
+from alfred_ai.services.exchange_rates import DISPLAY_CURRENCIES, display_currency
 
 from .models import IncomeBasis, User
 from .money import ProfileMoneySerializerField
@@ -17,6 +18,8 @@ class UserSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
     city = serializers.CharField(required=False, allow_blank=True, max_length=100)
     country = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    display_currency = serializers.ChoiceField(choices=DISPLAY_CURRENCIES, required=False, allow_null=True, allow_blank=True)
+    display_currency_in_use = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -35,15 +38,22 @@ class UserSerializer(serializers.ModelSerializer):
             "rent_currency",
             "city",
             "country",
+            "display_currency",
+            "display_currency_in_use",
             "created_at",
         ]
         read_only_fields = ["id", "username", "created_at"]
 
     def validate(self, attrs):
-        for name in ("income_currency", "variable_income_currency", "rent_currency"):
+        for name in ("income_currency", "variable_income_currency", "rent_currency", "display_currency"):
             if name in attrs:
                 attrs[name] = attrs[name] or None  # blank means not recorded, never a guessed INR
         return attrs
+
+    def get_display_currency_in_use(self, user):
+        request = self.context.get("request")
+        code, basis = display_currency(user, request.META.get("HTTP_ACCEPT_LANGUAGE", "") if request else "")
+        return {"currency": code, "basis": basis}
 
     def validate_monthly_income_basis(self, value):
         if value == IncomeBasis.UNCONFIRMED:

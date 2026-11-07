@@ -25,6 +25,7 @@ function loadMobilityDashboard() {
     return Alfred.fetchJSON("/api/mobility/dashboard/")
         .then(data => {
             mobilityState.plans = data.travel_plans || [];
+            mobilityState.display = data.display_currency || {};
             mobilityState.logs = data.trip_logs || [];
             mobilityState.photos = data.trip_photos || [];
             mobilityState.profiles = data.bike_profiles || [];
@@ -128,6 +129,7 @@ function renderTravelPlans(items) {
                     </div>
                     <div class="text-end">
                         <strong>${Alfred.formatCurrency(item.budget, item.budget_currency || "INR")}</strong>
+                        ${item.approximate && item.budget ? `<div class="muted small" title="${Alfred.escapeHtml(Alfred.approximateNote(mobilityState.display))}">${Alfred.escapeHtml(Alfred.formatApproximate(item.approximate, "budget"))} approx.</div>` : ""}
                         <div class="mt-2"><button class="btn btn-sm btn-outline-primary" type="button" onclick="TravelPlanner.openPlan(${item.id})">Open plan</button> <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTravelPlan(${item.id})">Delete</button></div>
                     </div>
                 </div>

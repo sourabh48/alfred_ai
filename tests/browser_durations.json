@@ -54,6 +54,8 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_private_trip_video_upload_play_and_delete":  7.297,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_investment_in_another_currency_stays_out_of_rupee_totals":  10.153,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_loan_in_another_currency_stays_out_of_rupee_totals":  10.153,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_display_currency_choice_shows_approximate_totals_and_keeps_records":  9.0,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_own_openai_key_is_saved_from_settings_never_shown_and_removable":  8.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_account_transaction_and_budget_currencies_stay_in_their_own_totals":  14.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_cashflow_forecast_observations_errors_and_unknown_state_are_visible":  10.859,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_changed_retrieval_source_blocks_frozen_holdout_before_model":  5.25,

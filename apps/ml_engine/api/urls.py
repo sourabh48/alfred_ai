@@ -6,7 +6,7 @@ from .investment_evidence import InvestmentEvidenceAPI
 from .loan_evidence import LoanEvidenceAPI
 from .financial_evidence import FinancialEvidenceAPI, FinancialSourcePageAPI, ClosureEvidenceAPI, DocumentRecordPageAPI, DocumentKnowledgeSearchAPI
 from .views import AlfredExplainAPI, AlfredPersonalInsightsAPI, EmotionalSpendAPI, MLRuntimeControlAPI, MLRuntimeStatusAPI
-from .memory import MemoryCollectionAPI, MemoryDetailAPI, MemoryRetentionAPI, MemoryResetAPI, MemoryRestoreAPI, MemoryRetrieveAPI, MemorySyncAPI, MemoryReasoningAPI, MemoryLearningAPI
+from .memory import MemoryCollectionAPI, MemoryDetailAPI, MemoryRetentionAPI, MemoryResetAPI, MemoryRestoreAPI, MemoryRetrieveAPI, MemorySyncAPI, MemoryReasoningAPI, MemoryReasoningKeyAPI, MemoryLearningAPI
 from .memory import KnowledgeHubAPI
 from .conversations import ConversationPolicyAPI, ConversationCollectionAPI, ConversationDetailAPI, ConversationClearAPI
 from .document_corpus import DocumentCorpusAPI, DocumentCorpusSearchAPI, DocumentCorpusDetailAPI, DocumentCorpusUploadAPI, DocumentCorpusOriginalAPI, DocumentCorpusQuestionAPI
@@ -40,6 +40,7 @@ urlpatterns = [
     path("memories/retrieve/", MemoryRetrieveAPI.as_view()),
     path("memories/sync/", MemorySyncAPI.as_view()),
     path("memories/reason/", MemoryReasoningAPI.as_view()),
+    path("memories/reason/key/", MemoryReasoningKeyAPI.as_view()),
     path("memories/learning/", MemoryLearningAPI.as_view()),
     path("memories/hub/", KnowledgeHubAPI.as_view()),
     path("memories/<str:identity>/", MemoryDetailAPI.as_view()),

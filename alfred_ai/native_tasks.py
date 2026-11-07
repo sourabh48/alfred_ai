@@ -65,6 +65,13 @@ def native_intelligence_refresh():
     return refresh_verified_external_intelligence(batch_size=75)
 
 
+@db_periodic_task(crontab(minute="5"))
+def native_exchange_rate_refresh():
+    # Fetches only when the stored ECB table is older than 12 hours; pages read the stored copy.
+    from apps.integrations.services import verified_intelligence
+    return verified_intelligence.exchange_rates().evidence.get("status")
+
+
 @db_periodic_task(crontab(minute="*"))
 def native_private_memory_sync():
     from django.core.management import call_command

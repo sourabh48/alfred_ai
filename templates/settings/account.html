@@ -97,7 +97,17 @@
                         </select>
                     </div>
                 </div>
-                <div id="settingsCurrencyHelp" class="form-text">Only INR (or not recorded) amounts count in rupee totals. Other currencies are kept but left out; nothing is converted.</div>
+                <div id="settingsCurrencyHelp" class="form-text">Only INR (or not recorded) amounts count in rupee totals. Other currencies are kept as entered.</div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="settingsDisplayCurrency">Show approximate totals in</label>
+                        <select id="settingsDisplayCurrency" name="display_currency" class="form-select" aria-describedby="settingsDisplayCurrencyHelp">
+                            <option value="">Automatic (country, then browser language)</option>
+                            {% for code in display_currencies %}<option value="{{ code }}">{{ code }}</option>{% endfor %}
+                        </select>
+                        <div id="settingsDisplayCurrencyHelp" class="form-text">Amounts in other currencies are shown as an approximate figure in this currency, using the European Central Bank's daily reference rate. Your records never change. <span id="settingsDisplayCurrencyInUse"></span></div>
+                    </div>
+                </div>
                 <div id="settingsProfileFeedback" class="d-none alert mb-0"></div>
                 <div>
                     <button class="btn btn-primary" type="submit">Save Profile</button>
@@ -159,8 +169,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/settings.js?v=1.5"></script>
-<script src="/static/js/memory.js?v=5"></script>
+<script src="/static/js/settings.js?v=1.6"></script>
+<script src="/static/js/memory.js?v=6"></script>
 <link rel="stylesheet" href="/static/css/travel_planner.css?v=1">
 <script src="/static/js/travel_preferences.js?v=2"></script>
 {% endblock %}

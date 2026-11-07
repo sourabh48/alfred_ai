@@ -443,6 +443,42 @@ class VerifiedIntelligenceService:
             force=force,
         )
 
+    FX_SOURCE_URL = "https://api.frankfurter.dev/v1/latest?base=EUR"
+
+    def exchange_rates(self, *, force: bool = False) -> InsightResult:
+        """ECB reference rates through Frankfurter; no user data is sent. A failed refresh keeps the last table."""
+        return self._use_or_refresh(
+            scope="fx",
+            cache_key="ecb-daily",
+            title="ECB reference exchange rates",
+            source_name="European Central Bank via Frankfurter",
+            source_url=self.FX_SOURCE_URL,
+            ttl=timedelta(hours=12),
+            fetcher=self._fetch_exchange_rates,
+            force=force,
+        )
+
+    def _fetch_exchange_rates(self) -> tuple[dict, str, str]:
+        from time import monotonic
+        payload = public_http.request("GET", self.FX_SOURCE_URL, headers={"User-Agent": self.USER_AGENT},
+                                      max_bytes=100_000, deadline=monotonic() + 8).json()
+        if not isinstance(payload, dict) or payload.get("base") != "EUR" or not isinstance(payload.get("rates"), dict):
+            raise ValueError("Exchange rate table has no EUR base.")
+        rate_date = date.fromisoformat(str(payload.get("date", "")))
+        if rate_date > timezone.localdate() + timedelta(days=1):
+            raise ValueError("Exchange rate table is dated in the future.")
+        rates = {"EUR": "1"}
+        for code, value in payload["rates"].items():
+            amount = Decimal(str(value)) if isinstance(value, (int, float, str)) and not isinstance(value, bool) else None
+            if not (isinstance(code, str) and re.fullmatch(r"[A-Z]{3}", code) and amount is not None and amount.is_finite() and amount > 0):
+                raise ValueError("Exchange rate table has an invalid rate.")
+            rates[code] = format(amount, "f")
+        if "INR" not in rates:
+            raise ValueError("Exchange rate table has no INR rate.")
+        return ({"base": "EUR", "date": rate_date.isoformat(), "rates": rates},
+                f"ECB reference rates for {rate_date.isoformat()} ({len(rates)} currencies).",
+                "Reference rates for display only; recorded amounts keep their own currency.")
+
     def market_snapshot(self, stale_hours: int = 12, *, force: bool = False) -> InsightResult:
         def fetch():
             payload, summary, notes = self._fetch_market_snapshot()
@@ -1145,6 +1181,8 @@ class VerifiedIntelligenceService:
             if record.scope == "macro" and record.cache_key.startswith("world-bank:"):
                 indicator = record.cache_key.split(":", 1)[1]
                 return self._run_refresh_adapter(record, lambda: self.world_bank_indicator(indicator, record.title, force=True))
+            if record.scope == "fx" and record.cache_key == "ecb-daily":
+                return self._run_refresh_adapter(record, lambda: self.exchange_rates(force=True))
             if record.scope == "market" and record.cache_key == "india-equity-volatility":
                 return self._run_refresh_adapter(record, lambda: self.market_snapshot(force=True))
             if record.scope == "travel":

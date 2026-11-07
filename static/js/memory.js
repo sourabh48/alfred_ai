@@ -224,7 +224,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const stamp = value => value ? new Date(value*1000).toLocaleString() : "Not recorded";
         document.getElementById("memorySyncDetails").textContent = `${sync.provider === 'mock' ? 'Synthetic provider only. ' : ''}Sync ${sync.status.enabled ? 'enabled' : 'disabled'}. Last successful sync: ${stamp(sync.status.last_success_at)}. Retry after: ${stamp(sync.status.retry_at)}. Deletion propagation follows this encrypted queue; historical backups retain their original copies.`;
         document.getElementById("memorySyncRecover").hidden = !sync.available || !sync.status.enabled || !sync.status.conflict;
-        document.getElementById("memoryReasoningStatus").textContent = !reasoning.real_provider_enabled ? "OpenAI disabled. Ollama-first local reasoning; synthetic test access, when configured, is not real OpenAI." : reasoning.provider_available ? "Approved OpenAI available; explicit public consent and budgets apply." : "OpenAI not connected. Local reasoning remains available.";
+        document.getElementById("memoryReasoningStatus").textContent = !reasoning.key_saved ? "OpenAI off: no key saved. Answers use the local model." : reasoning.policy.enabled ? "OpenAI on with your key for public questions; consent and daily limits apply." : "Key saved. Tick the opt-in below and save to turn OpenAI on.";
+        document.getElementById("memoryReasoningKeyStatus").textContent = reasoning.key_saved ? `Key saved (ends ${reasoning.key_hint}).` : "No key saved.";
+        document.getElementById("memoryReasoningKeyRemove").hidden = !reasoning.key_saved;
         document.getElementById("memoryReasoningUsage").textContent = `UTC day ${reasoning.usage.day}: ${reasoning.usage.reserved_tokens} tokens reserved; USD ${(reasoning.usage.reserved_microusd/1000000).toFixed(6)} conservatively reserved. Billing measurements are unavailable; these reservations enforce caps.`;
         document.getElementById("memoryReasoningEnabled").checked = reasoning.policy.enabled;
         document.getElementById("memoryReasoningTokens").value = reasoning.policy.daily_tokens;
@@ -419,14 +421,23 @@ document.addEventListener("DOMContentLoaded", () => {
         try { const result=await Alfred.fetchJSON("/api/ai/memories/reset/",{method:"POST",body:JSON.stringify({confirm:true,ids})}); await refresh(); message(`${result.deleted} selected memories deleted; encrypted deletion propagation follows the configured sync queue.`); }
         catch (error) { message(error.message); selectedReset.disabled = false; }
     });
-    async function cloudAction(path, payload, text) {
+    async function cloudAction(path, payload, text, method) {
         const ticket = generation;
         try {
-            await Alfred.fetchJSON(`/api/ai/memories/${path}/`, {method: path === "reason" ? "PUT" : "POST", body: JSON.stringify(payload)});
+            await Alfred.fetchJSON(`/api/ai/memories/${path}/`, {method: method || (path === "reason" ? "PUT" : "POST"), ...(payload ? {body: JSON.stringify(payload)} : {})});
             await refreshPrivacy();
             if (active && ticket === generation) document.getElementById("memoryCloudFeedback").textContent = text;
         } catch (error) { if (active && ticket === generation) document.getElementById("memoryCloudFeedback").textContent = error.message; }
     }
+    document.getElementById("memoryReasoningKeyForm").addEventListener("submit", async event => {
+        event.preventDefault();
+        const input = document.getElementById("memoryReasoningKey");
+        await cloudAction("reason/key", {key: input.value.trim()}, "Key saved. Tick the opt-in and save to turn OpenAI on.");
+        input.value = "";
+    });
+    document.getElementById("memoryReasoningKeyRemove").addEventListener("click", () => {
+        if (window.confirm("Remove your OpenAI key? OpenAI is switched off until you add a key again.")) cloudAction("reason/key", null, "Key removed. OpenAI is off.", "DELETE");
+    });
     document.getElementById("memorySyncForm").addEventListener("submit", event => {
         event.preventDefault();
         const enabled = document.getElementById("memorySyncEnabled").checked;

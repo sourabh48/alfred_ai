@@ -10,7 +10,7 @@ from django.core.management import call_command, CommandError
 from django.test import TestCase, override_settings, Client
 
 from alfred_ai.services.public_http import PublicResponse
-from apps.ml_engine.services.memory_reasoning import OpenAIReasoner, MODEL, ReasoningBudgetExceeded, configure_reasoning, reason_with_memory, reasoning_provider
+from apps.ml_engine.services.memory_reasoning import OpenAIReasoner, MODEL, ReasoningBudgetExceeded, configure_reasoning, reason_with_memory, reasoning_provider, remove_key
 from apps.ml_engine.services.memory_sync import SyncUnavailable
 from apps.ml_engine.services.persistent_memory import MemoryStore, _owner
 from tests.test_persistent_memory import SyntheticEmbeddings
@@ -45,11 +45,29 @@ class MemoryReasoningTests(TestCase):
     def reason(self,user=None,**kwargs):
         return reason_with_memory(self.store,user or self.alice,'mountain',consent=True,query_sensitivity='public',provider=self.provider,**kwargs)
 
-    def test_default_disable_and_stale_price_review_prevent_calls(self):
-        for change in ({'ALFRED_MEMORY_OPENAI_AUTHORIZED':False},{'ALFRED_MEMORY_OPENAI_PRICING_DATE':''},{'ALFRED_MEMORY_OPENAI_PRICING_DATE':'2000-01-01'}):
-            with override_settings(**change):
-                self.assertIsNone(reasoning_provider(self.store,self.alice))
-                with self.assertRaises(PermissionError): self.reason()
+    def test_no_key_or_no_opt_in_prevents_calls(self):
+        self.assertIsNone(reasoning_provider(self.store,self.bob))  # no key saved
+        configure_reasoning(self.store,self.alice,enabled=False,daily_tokens=4096,daily_microusd=10000)
+        with self.assertRaises(PermissionError): self.reason()  # key saved, opt-in off
+        remove_key(self.store,self.alice)
+        self.assertIsNone(reasoning_provider(self.store,self.alice))
+        self.http.assert_not_called()
+
+    def test_settings_key_api_saves_encrypted_never_returns_it_and_remove_turns_off(self):
+        client=Client(enforce_csrf_checks=True); url='/api/ai/memories/reason/key/'
+        client.force_login(self.bob); client.get('/settings/'); csrf=client.cookies['csrftoken'].value
+        self.assertEqual(client.post(url,{'key':KEY},content_type='application/json').status_code,403)  # CSRF
+        self.assertEqual(client.post(url,{'key':'not-a-key'},content_type='application/json',HTTP_X_CSRFTOKEN=csrf).status_code,400)
+        self.assertEqual(client.post(url,{'key':KEY,'owner':self.alice.pk},content_type='application/json',HTTP_X_CSRFTOKEN=csrf).status_code,400)
+        saved=client.post(url,{'key':KEY},content_type='application/json',HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(saved.json(),{'key_saved':True,'key_hint':'…9001','policy_enabled':False})
+        self.assertNotIn(KEY,saved.content.decode()+client.get('/api/ai/memories/reason/').content.decode())
+        self.assertNotIn(KEY.encode(),(self.store.directory/'verified.sqlite3').read_bytes())
+        self.assertIsInstance(reasoning_provider(self.store,self.bob),OpenAIReasoner)
+        configure_reasoning(self.store,self.bob,enabled=True,consent=True,daily_tokens=4096,daily_microusd=10000)
+        self.assertEqual(client.delete(url,HTTP_X_CSRFTOKEN=csrf).json(),{'key_saved':False,'key_hint':'','policy_enabled':False})
+        self.assertIsNone(reasoning_provider(self.store,self.bob))
+        self.assertIsInstance(reasoning_provider(self.store,self.alice),OpenAIReasoner)  # other owners untouched
         self.http.assert_not_called()
 
     def test_request_is_fixed_bounded_stateless_and_strips_private_provenance(self):
@@ -130,7 +148,7 @@ class MemoryReasoningTests(TestCase):
         with patch('apps.ml_engine.management.commands.configure_memory_reasoning.sys.stdin.isatty',return_value=True),patch('apps.ml_engine.management.commands.configure_memory_reasoning.getpass',return_value=KEY):
             output=StringIO(); call_command('configure_memory_reasoning',user=self.alice.pk,stdout=output)
         self.assertNotIn(KEY,output.getvalue()); self.assertNotIn(KEY.encode(),(self.store.directory/'verified.sqlite3').read_bytes())
-        with self.assertRaises(SyncUnavailable): reasoning_provider(self.store,self.bob)
+        self.assertIsNone(reasoning_provider(self.store,self.bob))
         with patch('apps.ml_engine.management.commands.configure_memory_reasoning.sys.stdin.isatty',return_value=False),self.assertRaises(CommandError):
             call_command('configure_memory_reasoning',user=self.alice.pk,stdout=StringIO())
         self.http.assert_not_called()

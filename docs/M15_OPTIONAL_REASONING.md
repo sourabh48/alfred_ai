@@ -1,5 +1,7 @@
 # M15 optional public-context cloud reasoning
 
+**Owner decision 2026-11-07 (supersedes the operator gate below):** "if user have one then he can enable it from settings by adding the keys". Settings › AI Memory has a password field for the owner's own OpenAI key (POST/DELETE `/api/ai/memories/reason/key/`, session + CSRF, owner-scoped). The key is encrypted in the private vault and never returned; only its last four characters are shown. Saving a key is the authorization: `ALFRED_MEMORY_OPENAI_AUTHORIZED` and the daily price-review date no longer gate calls. The owner opt-in, per-question public consent, the privacy filter and the daily token and USD caps still apply; removing the key also turns the opt-in off. The pinned model is still gpt-4.1-mini-2025-04-14 (OpenAI lists removal on 2027-01-14).
+
 **Current adapter/lifecycle — 2026-10-15:** Public-query-only adapter source is deployed, but real paid access remains OFF and has no live acceptance. Official docs list pinned gpt-4.1-mini-2025-04-14 as deprecated with 2027-01-14 removal; pricing currently still matches code ($0.40/$1.60 per million). A model/rate decision and explicit bounded approval are required before enabling. store:false is not zero retention. Dated slice tests below are historical. [Current provider register](ALFRED_EXTERNAL_INTEGRATIONS.md).
 
 2026-10-11, isolated source/synthetic HTTP fixtures only. Real paid OpenAI calls:

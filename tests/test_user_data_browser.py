@@ -717,6 +717,26 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'memoryEvaluationExpected').find_elements(self.By.TAG_NAME,'option'))==4)
         return store,owner,identities
 
+    def test_own_openai_key_is_saved_from_settings_never_shown_and_removable(self):
+        from unittest.mock import patch as mock_patch
+        from tests.test_memory_reasoning import KEY
+        store, owner, _ = self.memory_evaluation_fixture()
+        http = self.enterContext(mock_patch('apps.ml_engine.services.memory_reasoning.request', side_effect=AssertionError('No OpenAI call')))
+        self.wait.until(lambda _: 'no key saved' in self.text('memoryReasoningStatus'))
+        self.assertIn('No key saved', self.text('memoryReasoningKeyStatus'))
+        self.browser.find_element(self.By.ID, 'memoryReasoningKey').send_keys(KEY)
+        self.memory_click('#memoryReasoningKeyForm button[type="submit"]')
+        self.wait.until(lambda _: 'Key saved (ends …9001)' in self.text('memoryReasoningKeyStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID, 'memoryReasoningKey').get_property('value'), '')
+        self.assertIn('Tick the opt-in', self.text('memoryReasoningStatus'))
+        self.assertNotIn(KEY, self.browser.page_source)
+        self.browser.execute_script("document.getElementById('memoryReasoningKeyForm').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture('own-openai-key-saved')
+        self.browser.execute_script('window.confirm = () => true;')
+        self.memory_click('#memoryReasoningKeyRemove')
+        self.wait.until(lambda _: 'No key saved' in self.text('memoryReasoningKeyStatus'))
+        http.assert_not_called()
+
     def test_memory_evaluation_edits_queued_cases_without_duplicates_or_lost_drafts(self):
         from selenium.webdriver.support.ui import Select
         self.memory_evaluation_fixture()
@@ -1597,6 +1617,26 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Currency: USD' in self.text('investmentPositionsBody'))
         self.browser.execute_script("document.getElementById('investmentSummaryCards').scrollIntoView({behavior:'instant',block:'center'});")
         self.capture('investment-other-currency')
+
+    def test_display_currency_choice_shows_approximate_totals_and_keeps_records(self):
+        from tests.test_exchange_rates import store_table
+        from apps.investments.models import Investment
+        store_table()
+        before = list(Investment.objects.filter(user=self.scenario['user']).values_list('currency', 'current_value'))
+        self.login(); self.browser.get(self.live_server_url + '/settings/')
+        self.wait.until(lambda _: self.text('settingsProfileStatus') == 'Synced')
+        self.browser.find_element(self.By.ID, 'settingsDisplayCurrency').send_keys('USD')
+        self.memory_click('#accountProfileForm button[type=submit]')
+        self.wait.until(lambda _: 'Profile saved' in self.text('settingsProfileFeedback'))
+        self.assertIn('Now using USD (your choice).', self.text('settingsDisplayCurrencyHelp'))
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: 'ALL HOLDINGS IN USD' in self.text('investmentSummaryCards').upper() and self.active_requests == 0)
+        cards = self.text('investmentSummaryCards')
+        self.assertIn('≈ $', cards)
+        self.assertIn('ECB reference rate of', cards)
+        self.assertEqual(list(Investment.objects.filter(user=self.scenario['user']).values_list('currency', 'current_value')), before)
+        self.browser.execute_script("document.getElementById('investmentSummaryCards').scrollIntoView({behavior:'instant',block:'center'});")
+        self.capture('display-currency-approximate')
 
     def test_loan_in_another_currency_stays_out_of_rupee_totals(self):
         from apps.loans.models import Loan

@@ -125,9 +125,14 @@ function renderInvestmentSummary(data) {
         ...(summary.other_currencies || []).map(group => ({
             title: `${Alfred.escapeHtml(group.currency)} positions`,
             value: Alfred.formatCurrency(group.total_value, group.currency),
-            copy: `${group.positions} position(s), invested ${Alfred.formatCurrency(group.total_invested, group.currency)}. Kept out of rupee totals; nothing is converted.`,
+            copy: `${group.positions} position(s), invested ${Alfred.formatCurrency(group.total_invested, group.currency)}. Kept out of rupee totals.${group.approximate ? ` ${Alfred.formatApproximate(group.approximate, "total_value")} in your currency.` : ""} ${Alfred.approximateNote(summary.display_currency)}`,
         })),
     ];
+    const display = summary.display_currency || {};
+    if (display.totals?.total_value != null) {
+        cards.push({ title: `All holdings in ${Alfred.escapeHtml(display.currency)}`, value: Alfred.formatApproximate({ currency: display.currency, total_value: display.totals.total_value }, "total_value"),
+            copy: Alfred.approximateNote(display) });
+    }
 
     Alfred.setHTML(document.getElementById("investmentSummaryCards"), cards.map(card => `
         <article class="metric-card">

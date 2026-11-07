@@ -53,6 +53,7 @@ function renderSettingsProfile(profile = {}) {
         "income_currency",
         "variable_income_currency",
         "rent_currency",
+        "display_currency",
     ];
     form.elements.monthly_income_basis.value = profile.monthly_income_basis === "unconfirmed" ? "" : profile.monthly_income_basis ?? "";
     fields.forEach(field => {
@@ -60,6 +61,9 @@ function renderSettingsProfile(profile = {}) {
             form.elements[field].value = profile[field] ?? "";
         }
     });
+    const inUse = profile.display_currency_in_use || {};
+    const why = { chosen: "your choice", country: "your country", language: "your browser language", default: "the default" }[inUse.basis] || "";
+    Alfred.setTextIfChanged("settingsDisplayCurrencyInUse", inUse.currency ? `Now using ${inUse.currency} (${why}).` : "");
     Alfred.setTextIfChanged("settingsUsername", profile.username || "");
     Alfred.setTextIfChanged("settingsProfileStatus", "Synced");
 }

@@ -49,6 +49,11 @@ class UserProfileApiTests(TestCase):
                 "rent_or_emi",
                 "city",
                 "country",
+                "income_currency",
+                "variable_income_currency",
+                "rent_currency",
+                "display_currency",
+                "display_currency_in_use",
                 "created_at",
             },
         )

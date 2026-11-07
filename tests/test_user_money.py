@@ -92,7 +92,7 @@ class UserMoneyMigrationTests(TransactionTestCase):
         group = self.old.get_model('auth', 'Group').objects.create(name='synthetic-owner-role')
         self.owner.groups.add(group)
         # The live model has fields newer than this historical schema.
-        self.client.force_login(get_user_model().objects.defer('monthly_income_basis', 'income_currency', 'variable_income_currency', 'rent_currency').get(pk=self.owner.pk))
+        self.client.force_login(get_user_model().objects.defer('monthly_income_basis', 'income_currency', 'variable_income_currency', 'rent_currency', 'display_currency').get(pk=self.owner.pk))
         key = self.client.session.session_key
         before = self.old.get_model('users', 'User').objects.values().get(pk=self.owner.pk)
         apps = self.upgrade()
@@ -157,7 +157,7 @@ class UserMoneyMigrationTests(TransactionTestCase):
     def test_cent_history_financial_baseline_has_zero_mismatches(self):
         self.old.get_model('users', 'User').objects.filter(pk=self.owner.pk).update(monthly_income=10000.01, variable_income=200.02, rent_or_emi=1000.03)
         # The live model has fields newer than this historical schema.
-        old_owner = get_user_model().objects.defer('monthly_income_basis', 'income_currency', 'variable_income_currency', 'rent_currency').get(pk=self.owner.pk)
+        old_owner = get_user_model().objects.defer('monthly_income_basis', 'income_currency', 'variable_income_currency', 'rent_currency', 'display_currency').get(pk=self.owner.pk)
         old_owner.monthly_income_basis = 'monthly'
         old_owner.income_currency = old_owner.variable_income_currency = old_owner.rent_currency = None
         before = resolve_canonical_financial_baseline(old_owner)

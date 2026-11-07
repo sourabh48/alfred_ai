@@ -11,6 +11,7 @@ from rest_framework.exceptions import APIException
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.parsers import FormParser, MultiPartParser
 from alfred_ai.services.currency import rupee_amount
+from alfred_ai.services.exchange_rates import approximate
 from alfred_ai.services.api_parsing import TextJSONParser as JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -882,6 +883,9 @@ class MobilityDashboardView(APIView):
             ttl_seconds=45,
             builder=lambda: _numeric_currency_payload(self._build_payload(request)),
         )
+        # Display only: each plan budget in another currency gets an approximate figure in the viewer's currency.
+        payload["travel_plans"], payload["display_currency"] = approximate(
+            request, payload.get("travel_plans") or [], ("budget",), currency_key="budget_currency")
         return Response(payload)
 
     def _revision(self, user) -> str:

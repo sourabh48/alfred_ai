@@ -8,17 +8,17 @@ class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        serializer = UserSerializer(request.user)
+        serializer = UserSerializer(request.user, context={"request": request})
         return Response(serializer.data)
 
     def patch(self, request):
-        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        serializer = UserSerializer(request.user, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
     def put(self, request):
-        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        serializer = UserSerializer(request.user, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -33,7 +33,7 @@ class UserDataResetView(APIView):
         except Exception as exc:
             from alfred_ai.services.api_errors import safe_error_response
             return safe_error_response(exc, 'Account reset could not finish. Please try again.', logger_name=__name__, status_code=503)
-        serializer = UserSerializer(request.user)
+        serializer = UserSerializer(request.user, context={"request": request})
         return Response(
             {
                 "detail": "Your Alfred data, uploaded documents, and cached dashboard payloads have been cleared. Your account stays active, and you can start fresh with new data.",

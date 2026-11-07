@@ -18,8 +18,8 @@ INR_AMOUNT = (
 )
 
 # FIN-15 registry (owner-approved contract, 2026-11-06). A record carries one of these ISO 4217
-# codes or null ("not recorded"); unknown is never guessed or backfilled. There is no FX:
-# amounts in different currencies are grouped, never added together.
+# codes or null ("not recorded"); unknown is never guessed or backfilled. Calculations never use FX;
+# amounts in different currencies are grouped, never added together (display-only approximations: exchange_rates).
 REGISTRY_VERSION = "fin15-v1"
 RUPEE = "INR"
 # code -> (label, ISO minor unit); every unit fits the existing 14,2 money storage.

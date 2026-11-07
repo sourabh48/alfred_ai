@@ -19,6 +19,7 @@ from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extracti
 from apps.reports.services import operational_logging_service
 from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 from alfred_ai.services.currency import RUPEE
+from alfred_ai.services.exchange_rates import approximate
 from .services.portfolio_intelligence import portfolio_intelligence_service
 from .models import Investment, InvestmentImportDocument
 from .money import investment_money, investment_total_float
@@ -78,6 +79,12 @@ class InvestmentSummaryView(APIView):
             if len(evidence) < 3 or not freshness["proof_complete"]:
                 payload["watchlist"] = {**watchlist, "available": False, "items": [], "freshness": freshness,
                     "summary": "Watchlist unavailable: cached source evidence expired. Recorded holdings are unchanged."}
+        # Display only, after the cache: the viewer's currency and today's rate are not part of the stored totals.
+        summary = payload["summary"]
+        groups = summary.get("other_currencies") or []
+        summary["other_currencies"], summary["display_currency"] = approximate(
+            request, groups, ("total_value", "total_invested", "monthly_sip"),
+            {"total_value": [(summary["total_value"], RUPEE)] + [(group["total_value"], group["currency"]) for group in groups]})
         return Response(payload)
 
 

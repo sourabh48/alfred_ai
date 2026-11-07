@@ -16,6 +16,8 @@ from django.db.models import Count, Max, Sum
 from datetime import date
 
 from alfred_ai.services.materialized_cache import materialize_payload
+from alfred_ai.services.currency import RUPEE
+from alfred_ai.services.exchange_rates import approximate
 from alfred_ai.services.calculation_risk import calculation_risk_snapshot
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
 from alfred_ai.services.api_errors import safe_error_details, safe_error_response
@@ -212,6 +214,12 @@ class LoanSummaryView(APIView):
         except Exception as exc:
             return safe_error_response(exc, "Loan summary is temporarily unavailable. Please retry.",
                                        logger_name=__name__, field="error", status_code=500)
+        # Display only, after the cache: converted figures never reach the stored loan totals.
+        summary = payload["summary"]
+        groups = summary.get("other_currencies") or []
+        summary["other_currencies"], summary["display_currency"] = approximate(
+            request, groups, ("outstanding", "monthly_emi"),
+            {"outstanding": [(summary.get("manual_total_outstanding") or 0, RUPEE)] + [(group["outstanding"], group["currency"]) for group in groups]})
         return Response(payload)
 
 

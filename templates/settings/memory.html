@@ -98,9 +98,18 @@
     <h3 class="h5 mt-4">Optional Public Cloud Reasoning</h3>
     <p id="memoryReasoningStatus" role="status">Checking local reasoning policy.</p>
     <p id="memoryReasoningUsage" class="small text-muted"></p>
+    <form id="memoryReasoningKeyForm" class="mb-3" data-live-refresh-hold="true" autocomplete="off">
+        <label for="memoryReasoningKey" class="form-label">Your OpenAI API key (optional)</label>
+        <div class="d-flex gap-2 flex-wrap">
+            <input id="memoryReasoningKey" class="form-control" style="max-width:28rem" type="password" autocomplete="off" spellcheck="false" maxlength="520" placeholder="sk-..." aria-describedby="memoryReasoningKeyHelp" required>
+            <button class="btn btn-outline-primary" type="submit">Save key</button>
+            <button id="memoryReasoningKeyRemove" class="btn btn-outline-danger" type="button" hidden>Remove key</button>
+        </div>
+        <div id="memoryReasoningKeyHelp" class="form-text">Use your own key from platform.openai.com; OpenAI bills you for what you use. It is stored encrypted on this PC and never shown again. <span id="memoryReasoningKeyStatus">No key saved.</span></div>
+    </form>
     <form id="memoryReasoningForm" data-live-refresh-hold="true">
         <label class="d-block mb-2"><input id="memoryReasoningEnabled" type="checkbox"> Opt in to approved cloud reasoning for public questions. Leave unchecked for local-only answers.</label>
-        <p class="small text-muted">Saving this preference does not activate OpenAI. Real access needs separate operator authorization and each cloud question needs consent. Personal and sensitive questions stay local.</p>
+        <p class="small text-muted">OpenAI is used only with a saved key and this box ticked, and each cloud question still asks for consent. Personal and sensitive questions always stay local. The daily limits below cap what can be spent.</p>
         <label for="memoryReasoningTokens" class="form-label">Daily token limit</label>
         <input id="memoryReasoningTokens" class="form-control mb-2" type="number" min="1" max="65536" required>
         <label for="memoryReasoningDollars" class="form-label">Daily spending limit (USD)</label>
