@@ -1,5 +1,24 @@
 # Development CI and integration pipeline
 
+## ALFRED_USABILITY_INTEGRATION — 2026-11-09
+
+Local source commits cba5b53 and4019ee2 are now recorded; no push or new CI run.
+USE-02 statement preview/confirmation is IMPLEMENTING on the same preparation
+branch, with synthetic regression validation underway. Active source/state and
+single-writer handoff are in docs/ai_progress. Master, installation and publishing
+remain untouched; no 3.0 branch is authorized before 2.0 acceptance.
+
+Bounded LOCAL_ACCEPTED on preparation branch `work/usability-integration`, source/base
+`a9947bc88d8e96255949c0652892c2cb7d9ab2da` plus scoped working changes.
+See the separate usability ledger and EXECUTION_STATE for exact local evidence.
+No CI dispatched, no source push/PR/master integration, no reused green claim.
+Historical CI PASS at c730360 does not validate this new diff. Native source,
+real local synthetic-model acceptance PASS. Local commit attempt failed because
+Git author identity is unset; owner identity selection pending. HEAD unchanged;
+17-file first slice staged, remaining chat/checkpoint changes unstaged. Existing
+operator installation remains untouched. Required release,
+owner and independent acceptance gates remain open.
+
 ## TRAVEL-20 migration review — 2026-11-06
 
 The owner approved migration `apps/mobility/migrations/0014_trip_video.py` (new empty `TripVideo` table) on

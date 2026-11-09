@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "active_agent": "Codex",
+  "handoff_status": "CODEX_ACTIVE",
+  "workspace": "F:/ALFRED/alfred_ai",
+  "single_writer": true,
+  "branch": "work/usability-integration",
+  "recorded_at_head": "4019ee2bc7431cfbc29b051397c774b7c06b228d",
+  "active_task_id": "USE-02/statement-preview-confirmation",
+  "canonical_checkpoint": "docs/EXECUTION_STATE.md",
+  "requirement_inventory": "docs/PROJECT_STATUS.md",
+  "files_changed": ["docs/ai_progress/MASTER_ROADMAP.md", "docs/ai_progress/EXECUTION_BOARD.md", "docs/ai_progress/HANDOFF.md", "docs/ai_progress/STATE.json", "docs/ai_progress/TEST_EVIDENCE.md", "docs/ai_progress/KNOWN_ISSUES.md", "docs/ai_progress/DECISIONS.md", "docs/ai_progress/FINAL_REVIEW_CHECKLIST.md"],
+  "completed_steps": ["Recovered prior scope and staging", "Committed diagnostics/source hub at cba5b53", "Committed bounded local conversation context at 4019ee2"],
+  "remaining_steps": ["Implement reviewed statement import including retry paths", "Run focused backend/privacy/Chrome checks", "Review and commit bounded scope", "Continue authorized 2.0 tasks"],
+  "test_evidence": "docs/ai_progress/TEST_EVIDENCE.md",
+  "ci_run_ids": [],
+  "ci_status": "NOT_RUN_FOR_CURRENT_LOCAL_COMMITS",
+  "pending_migrations_added_by_this_scope": [],
+  "blockers": ["Owner installation and real-account acceptance pending", "Independent release review pending", "MCP application server/source not selected"],
+  "approvals_pending": ["Owner installation replacement/deployment", "Required canonical integration/release gates", "3.0 branch and release prerequisite"],
+  "preserve_unrelated_dirty_paths": ["alfred_ai/services/materialized_cache.py"],
+  "next_exact_instruction": "Read apps/expenses/services/statement_lifecycle.py and all apply_parsed_statement_upload callers; implement a persisted owner-scoped preview and explicit revision-bound confirmation before canonical writes, with synthetic tests."
+}

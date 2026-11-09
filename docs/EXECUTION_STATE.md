@@ -1,6 +1,47 @@
 # ALFRED execution state
 
-## Active checkpoint — phase B sprint, FIN-06 and green CI (2026-11-06)
+## Active checkpoint — ALFRED_USABILITY_INTEGRATION (2026-11-09)
+
+- CODEX-FIRST SPRINT active. Sole writer Codex; do not start Claude in this worktree
+  concurrently. Continuity: [STATE](ai_progress/STATE.json), [handoff](ai_progress/HANDOFF.md).
+- Source commits closed locally: diagnostics cba5b53; context 4019ee2 (actual source
+  HEAD 4019ee2bc7431cfbc29b051397c774b7c06b228d). Existing author recovered from
+  repository history via command-scoped identity; no global config/push changes.
+- Active USE-02/statement-preview-confirmation IMPLEMENTING: shared staging,
+  source retention, owner/revision/dependency-bound confirmation and editable UI.
+  Six initial synthetic tests PASS. Affected compatibility/browser tests pending;
+  source dirty work is intentional. Preserve unrelated materialized_cache.py.
+- Next exact action: inspect artifacts/usability-20261109/statement-affected.log,
+  repair contract-specific assertions and run real Chrome review-before-write.
+  No owner DB/migration/install action. No Claude agent launched or final-review claim.
+
+- Owner selected usability integration explicitly; separate ledger:
+  [ALFRED_USABILITY_INTEGRATION](ALFRED_USABILITY_INTEGRATION.md). No baseline
+  requirement or extension is newly accepted (85/143; 0/13).
+- Branch `work/usability-integration`, base `a9947bc88d8e96255949c0652892c2cb7d9ab2da`.
+  Preserve the pre-existing materialized_cache.py edit and all personal runtimes.
+- Implemented bounded diagnostics/data-source pages, strict native heartbeat
+  validation and encrypted-history local general-chat continuity. Local tests:
+  30 backend boundary + 35 reasoning/history PASS; three Chrome workflows PASS.
+  Actual local models answer synthetic prompts with GPU allocation observed.
+- Owner runtime identity verified read-only; no server was running at selection.
+  No owner database writes, migrations, key regeneration, install replacement,
+  pushes, cloud/MCP connection or publication. Graphify AST update completed after
+  an initial application-control failure (13880 nodes, 39397 edges final refresh).
+- Native source drill 19/19 PASS; opt-in real local conversation acceptance 1 PASS.
+  115 distinct backend cases PASS across overlapping suites, three Chrome journeys
+  PASS. CI accounting initially failed on missing new-module timings, repaired;
+  all29 release validation tests PASS. Tracker check, schema drift, JS/diff PASS.
+- Historical initial commit blocker (resolved by the Codex-first sprint above): Git had no author name/email.
+ 17 diagnostics/source-center files staged; chat/checkpoint changes unstaged.
+ HEAD remains a9947bc. Do not mix the existing cache edit into either slice.
+  Inspect artifacts/usability-20261109 before resuming. Finish author selection,
+  local source commits and checkpoint. Then implement USE-02 statement preview /
+  confirmation: statement_lifecycle currently writes transactions/account balance
+  before a separate review. Cover background/retry callers, then USE-03 streaming;
+  MCP server/source choice pending.
+
+## Previous checkpoint — phase B sprint, FIN-06 and green CI (2026-11-06)
 
 - HEAD on `master`; CI run 42185812614 PASS on every job at `e8ef8f4`. Per-task notes for FIN-16, FIN-17, INV-04,
   DOC-07/09, CAREER-04/07, TRAVEL, BIKE, OPENAI-02, RUNTIME-12 and FIN-06 are at the end of the 2026-11-04 section below.
