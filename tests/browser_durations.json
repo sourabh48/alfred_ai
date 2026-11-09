@@ -10,6 +10,8 @@
                          ],
     "duration_semantics":  "Per-test setup+body+teardown;class/browser/database overhead separate;not an after-runtime prediction",
     "durations":  {
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_diagnostics_explicit_inference_retry_mobile_and_accessibility": 8.625,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_data_sources_owned_counts_and_navigation": 5.141,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_research_journal_saves_settles_and_recalls_a_lesson_without_touching_holdings":  8.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_research_packet_shows_dated_case_for_and_against_without_writing":  6.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_loan_prepayment_what_if_reports_savings_and_cash_left_without_writing":  8.0,

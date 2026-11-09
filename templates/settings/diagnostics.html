@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Application diagnostics - ALFRED{% endblock %}
+{% block content %}
+<section class="alfred-hero mb-4">
+    <h1 class="alfred-hero-title">Application diagnostics</h1>
+    <p class="alfred-hero-copy">Check what is working and how to recover safely. Your personal records and keys are preserved.</p>
+    <a href="{% url 'diagnostics' %}" class="btn btn-outline-secondary">Refresh checks</a>
+    <a href="{% url 'account_settings' %}" class="btn btn-outline-secondary">Settings</a>
+</section>
+{% if not native_runtime %}<p class="alert alert-warning" role="status">This web server was started outside the Windows native launcher. Worker and scheduler readiness require the selected native instance.</p>{% endif %}
+{% if database_path %}<p class="text-break">Selected database: <code>{{ database_path }}</code></p>{% endif %}
+<section aria-label="Runtime checks" class="row g-3 mb-4">
+{% for item in checks %}
+    <div class="col-12 col-xl-6"><article class="surface-card h-100">
+        <h2 class="h5">{{ item.label }}</h2>
+        <p class="fw-semibold">{{ item.state_label }}</p>
+        <p>{{ item.detail }}</p>
+        {% if item.manual_task %}<p class="mb-0"><strong>Next step:</strong> {{ item.manual_task }}</p>{% endif %}
+    </article></div>
+{% endfor %}
+</section>
+<section class="surface-card" aria-labelledby="localInferenceTitle">
+    <h2 class="h4" id="localInferenceTitle">Local AI inference</h2>
+    <p>Chat model: <code>{{ chat_model }}</code>. Embeddings: <code>all-minilm:latest</code>.</p>
+    <p>Unverified until tested. This test sends a fixed synthetic sample to Ollama on this computer. It uses no personal data or cloud API. Allow up to 30 seconds; a model may stay loaded for five idle minutes.</p>
+    <form method="post">{% csrf_token %}<button class="btn btn-primary" type="submit">Test local AI now</button></form>
+    {% if diagnostic_error %}<p class="alert alert-warning mt-3" role="status">{{ diagnostic_error }}</p>{% endif %}
+    {% if inference %}<div class="mt-3" role="status">
+    {% for item in inference %}
+        <article class="border-top py-3">
+            <h3 class="h5">{{ item.label }}: {{ item.state|title }}</h3>
+            <p>{{ item.detail }}</p>
+            <dl class="row mb-0">
+                <dt class="col-sm-5">Elapsed</dt><dd class="col-sm-7">{{ item.elapsed_seconds }} seconds</dd>
+                {% if item.first_token_seconds != None %}<dt class="col-sm-5">First content token</dt><dd class="col-sm-7">{{ item.first_token_seconds }} seconds</dd>{% endif %}
+                {% if item.load_seconds != None %}<dt class="col-sm-5">Model load</dt><dd class="col-sm-7">{{ item.load_seconds }} seconds</dd>{% endif %}
+                {% if item.output_tokens_per_second != None %}<dt class="col-sm-5">Output speed</dt><dd class="col-sm-7">{{ item.output_tokens_per_second }} tokens/second</dd>{% endif %}
+                <dt class="col-sm-5">Acceleration</dt><dd class="col-sm-7">{{ item.acceleration|default:"Unverified" }}</dd>
+                {% if item.size != None %}<dt class="col-sm-5">Loaded model allocation</dt><dd class="col-sm-7">{{ item.size|filesizeformat }} total; {{ item.size_vram|filesizeformat }} in GPU memory</dd>{% endif %}
+            </dl>
+        </article>
+    {% endfor %}</div>{% endif %}
+</section>
+{% endblock %}

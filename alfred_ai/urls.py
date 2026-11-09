@@ -4,6 +4,8 @@ from django.urls import path, include
 from django.contrib.auth.views import LoginView, LogoutView
 from django.views.generic import RedirectView
 from .native_views import private_media
+from .diagnostics_views import diagnostics_view
+from .data_sources_views import data_sources_view
 from .views import statement_evidence_view
 from .views import investment_evidence_view
 from .views import loan_import_evidence_view
@@ -61,6 +63,7 @@ urlpatterns = [
 
     path("dashboard/", dashboard_view, name="dashboard"),
     path("documents/", documents_view, name="documents"),
+    path("data-sources/", data_sources_view, name="data_sources"),
     path('documents/statements/<int:document_id>/transactions/<int:transaction_id>/', statement_evidence_view, name='statement_evidence'),
     path('documents/loan-closures/<int:document_id>/', loan_closure_evidence_view, name='loan_closure_evidence'),
     path('documents/investments/<int:document_id>/records/<int:identity>/', investment_evidence_view, name='investment_evidence'),
@@ -75,6 +78,7 @@ urlpatterns = [
     path("api/session/data-version/", data_version_api_view, name="data_version_api"),
     path("api/operational/logs/client/", client_operational_log_api_view, name="client_operational_log_api"),
     path("settings/", account_settings_view, name="account_settings"),
+    path("settings/diagnostics/", diagnostics_view, name="diagnostics"),
     path("project-details/", project_details_view, name="project_details"),
     path("project-details/career-outcomes/", project_details_career_outcome_view, name="project_details_career_outcome"),
     path("api/project-details/", project_details_api_view, name="project_details_api"),

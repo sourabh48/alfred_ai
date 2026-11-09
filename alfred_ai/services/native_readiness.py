@@ -1,11 +1,21 @@
 """Runtime checks appropriate to the local Windows application."""
 import os
 import time
+from math import isfinite
 from uuid import uuid4
 
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
+
+
+def native_heartbeat_ready(heartbeat, maximum_age):
+    instance = os.environ.get("ALFRED_NATIVE_INSTANCE")
+    if not instance or not isinstance(heartbeat, dict) or heartbeat.get("instance") != instance:
+        return False
+    stamp = heartbeat.get("time")
+    return (type(stamp) in (int, float) and isfinite(stamp)
+            and 0 <= time.time() - stamp < maximum_age)
 
 
 def native_readiness_snapshot():
@@ -44,10 +54,9 @@ def native_readiness_snapshot():
         pass  # Worker/queue health below still determines readiness.
     for key, label, heartbeat, age, detail in (
         ("worker", "Background processing", worker, 15, "Document processing runs separately from the web pages."),
-        ("scheduler", "Scheduled jobs", scheduler, 150, "Automatic retries and scheduled updates are enabled."),
+        ("scheduler", "Scheduled jobs", scheduler, 150, "A current scheduler heartbeat confirms automatic retries and scheduled updates."),
     ):
-        valid = isinstance(heartbeat, dict) and heartbeat.get("instance") == os.environ.get("ALFRED_NATIVE_INSTANCE")
-        ready = valid and time.time() - heartbeat.get("time", 0) < age
+        ready = native_heartbeat_ready(heartbeat, age)
         action = "Allow a minute after startup; restart ALFRED if this persists."
         if key == "worker" and review_count:
             ready = False
@@ -55,7 +64,7 @@ def native_readiness_snapshot():
             action = "Run ALFRED.exe jobs to inspect interrupted work; check partial changes before using retry-job."
         check(key, label, ready, detail, action)
     check("local_security", "Local access", not settings.DEBUG and len(settings.SECRET_KEY) >= 50,
-          "The server accepts connections from this computer only. Sign in to access your data.",
+          "Debug mode is off and a signing key is configured. Sign in to access your data.",
           "Start ALFRED using its native launcher.")
     ready_checks = [item for item in checks if item["ready"]]
     blocked = [item for item in checks if not item["ready"]]

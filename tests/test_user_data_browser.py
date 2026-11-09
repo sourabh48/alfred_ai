@@ -153,6 +153,52 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
         self.wait.until(click_when_uncovered)
 
+    def test_diagnostics_explicit_inference_retry_mobile_and_accessibility(self):
+        from selenium.webdriver.common.keys import Keys
+        self.login()
+        with patch('alfred_ai.diagnostics_views.benchmark_local_ai', return_value=[{
+                'label': 'Local chat', 'state': 'error', 'detail': 'Synthetic local model outage.', 'elapsed_seconds': .1}]) as probe:
+            self.browser.get(self.live_server_url + '/settings/diagnostics/')
+            self.wait.until(lambda _: 'Unverified until tested' in self.browser.find_element(self.By.TAG_NAME, 'body').text)
+            probe.assert_not_called()
+            self.browser.find_element(self.By.CSS_SELECTOR, 'main form button').send_keys(Keys.ENTER)
+            self.wait.until(lambda _: 'Synthetic local model outage.' in self.browser.find_element(self.By.TAG_NAME, 'body').text)
+            self.settle_page()
+            probe.assert_called_once_with()
+            self.browser.find_element(self.By.CSS_SELECTOR, 'main form button').send_keys(Keys.ENTER)
+            self.wait.until(lambda _: 'Wait one minute and retry' in self.browser.find_element(self.By.TAG_NAME, 'body').text)
+            self.settle_page()
+            probe.assert_called_once_with()
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=width, height=1100, deviceScaleFactor=1, mobile=False))
+            for theme in ('light', 'dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width, theme=theme, **audit))
+                (self.artifacts/'diagnostics-accessibility.json').write_text(json.dumps(findings, indent=2), encoding='utf-8')
+                self.assertEqual(audit['violations'], [])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'diagnostics-{width}-{theme}.png'))
+
+    def test_data_sources_owned_counts_and_navigation(self):
+        self.login()
+        self.browser.get(self.live_server_url + '/data-sources/')
+        self.wait.until(lambda _: 'module groups contain saved data' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.assertIn('not a verification score', self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        links = self.browser.find_elements(self.By.CSS_SELECTOR, 'main a')
+        for path in ('/expenses/', '/loans/', '/budgets/', '/investments/', '/career/', '/mobility/', '/documents/', '/settings/diagnostics/'):
+            self.assertTrue(any(link.get_attribute('href') == self.live_server_url + path for link in links), path)
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+        (self.artifacts/'data-sources-accessibility.json').write_text(json.dumps(audit, indent=2), encoding='utf-8')
+        self.assertEqual(audit['violations'], [])
+        self.browser.save_screenshot(str(self.artifacts/'data-sources.png'))
+
     def test_user_decimal_profile_save_and_reload_keeps_exact_owned_cents(self):
         from decimal import Decimal
         self.login()

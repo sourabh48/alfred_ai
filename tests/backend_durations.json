@@ -1,4 +1,6 @@
 {
+ "tests.test_data_sources": 0.11,
+ "tests.test_local_diagnostics": 0.16,
  "tests.test_alfred_brain": 4.2,
  "tests.test_api_session_security": 17.95,
  "tests.test_assistant_actions": 0.37,

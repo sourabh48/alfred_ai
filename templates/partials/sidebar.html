@@ -10,6 +10,7 @@
             <ul class="nav flex-column alfred-nav-list">
                 <li class="nav-item"><a class="nav-link {% if request.path == '/' or request.path == '/dashboard/' %}active{% endif %}" href="/">Dashboard</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/ai/insights/' %}active{% endif %}" href="/ai/insights/">AI Assistant</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.path == '/data-sources/' %}active{% endif %}" href="/data-sources/">Data Sources</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/expenses/' %}active{% endif %}" href="/expenses/">Expenses</a></li>
                 <li class="nav-item"><a class="nav-link" href="/expenses/#bankAccountsPanel">Banking</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/budgets/' %}active{% endif %}" href="/budgets/">Budgets</a></li>
@@ -20,6 +21,7 @@
                 <li class="nav-item"><a class="nav-link {% if request.path == '/documents/' %}active{% endif %}" href="/documents/">Documents</a></li>
                 <li class="nav-item"><a class="nav-link" href="/settings/#privateMemoryPanel">AI Memory</a></li>
                 <li class="nav-item"><a class="nav-link {% if request.path == '/settings/' %}active{% endif %}" href="/settings/">Settings</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.path == '/settings/diagnostics/' %}active{% endif %}" href="/settings/diagnostics/">Diagnostics</a></li>
             </ul>
         </div>
 

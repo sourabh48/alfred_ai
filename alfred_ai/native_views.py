@@ -1,6 +1,5 @@
 """Native runtime health and private upload downloads."""
 import os
-import time
 from pathlib import Path
 
 from django.apps import apps
@@ -11,6 +10,7 @@ from django.core.cache import cache
 from django.db import connection
 
 from alfred_ai.services.upload_privacy import PRIVATE_FILE_FIELDS
+from alfred_ai.services.native_readiness import native_heartbeat_ready
 
 
 def native_health(request):
@@ -18,10 +18,7 @@ def native_health(request):
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
         heartbeat = cache.get("native:worker-heartbeat", {})
-        ready = (
-            heartbeat.get("instance") == os.environ.get("ALFRED_NATIVE_INSTANCE")
-            and time.time() - heartbeat.get("time", 0) < 15
-        )
+        ready = native_heartbeat_ready(heartbeat, 15)
     except Exception:
         ready = False
     response = JsonResponse({

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Data Sources - ALFRED{% endblock %}
+{% block content %}
+<section class="alfred-hero mb-4">
+    <h1 class="alfred-hero-title">Data Sources</h1>
+    <p class="alfred-hero-copy">Bring your existing information into ALFRED using its local entry and import screens.</p>
+    <p><strong>{{ populated }} of {{ total }} module groups contain saved data.</strong> Saved data and parsed files still need your review; this is not a verification score.</p>
+    <a class="btn btn-outline-secondary" href="{% url 'data_sources' %}">Refresh source status</a>
+</section>
+<section class="surface-card mb-4" aria-labelledby="gettingStartedTitle">
+    <h2 class="h4" id="gettingStartedTitle">Get started</h2>
+    <ol>
+        <li><a href="{% url 'diagnostics' %}">Check application health and test local AI</a>.</li>
+        <li>Open a source below to enter information or import an existing file.</li>
+        <li><a href="{% url 'documents' %}">Review extracted fields, confidence and failed imports in Documents</a>. Correct unresolved values before relying on them.</li>
+        <li><a href="{% url 'ai_insights' %}">Ask the AI Assistant</a> using your selected evidence.</li>
+    </ol>
+    <p class="mb-0">Direct bank connections and MCP providers are not configured here. Local file imports do not require a bank API subscription.</p>
+</section>
+<p class="alert alert-warning" role="status">The current bank-statement importer saves parsed transactions and updates the account balance when you choose Import. A separate preview-and-confirm step is not available yet.</p>
+<section class="row g-3 mb-4" aria-label="Your data sources">
+{% for source in sources %}
+    <div class="col-12 col-xl-6"><article class="surface-card h-100">
+        <h2 class="h4">{{ source.label }}</h2>
+        <p class="fw-semibold">{{ source.state }}</p>
+        {% for record in source.records %}<p class="mb-1">{{ record.label }}: {{ record.count }}</p>{% endfor %}
+        {% if source.label == 'Travel' %}<p>Custom learned preferences: {{ source.preferences_saved|yesno:"Saved,Not recorded" }}. Set your home city in <a href="/settings/">Settings</a>; review trip preferences in Travel.</p>{% endif %}
+        {% if source.imports %}
+        <dl class="row mt-3">
+            <dt class="col-sm-7">Uploaded files</dt><dd class="col-sm-5">{{ source.imports.total }}</dd>
+            <dt class="col-sm-7">Parsed files (not verified)</dt><dd class="col-sm-5">{{ source.imports.parsed }}</dd>
+            <dt class="col-sm-7">Pending or awaiting review</dt><dd class="col-sm-5">{{ source.imports.awaiting_review }}</dd>
+            <dt class="col-sm-7">Failed files</dt><dd class="col-sm-5">{{ source.imports.failed }}</dd>
+            <dt class="col-sm-7">Last parsed file update</dt><dd class="col-sm-5">{{ source.imports.last_parsed|default:"Not recorded" }}</dd>
+        </dl>
+        {% endif %}
+        <p class="small">{{ source.provenance }} Counts cover only your account. Record acceptance and rejection totals are not inferred from parser status. Freshness of balances and public evidence must be checked in the source screen.</p>
+        {% for label, url in source.links %}<a class="btn btn-outline-primary mb-2" href="{{ url }}">{{ label }}</a> {% endfor %}
+        {% if source.imports %}<a href="/documents/" class="btn btn-outline-secondary mb-2">Review, retry or remove files</a>{% endif %}
+    </article></div>
+{% endfor %}
+</section>
+<section class="surface-card" aria-labelledby="knowledgeSourcesTitle">
+    <h2 class="h4" id="knowledgeSourcesTitle">Personal knowledge and permissions</h2>
+    <p>Document and memory readiness is unverified here. Open their local controls to inspect retained sources, citations and consent. Conversation statements become permanent facts only after your explicit review.</p>
+    <a class="btn btn-outline-primary" href="/documents/">Documents and extracted knowledge</a>
+    <a class="btn btn-outline-primary" href="/settings/#privateMemoryPanel">Memory, privacy and retention</a>
+    <p class="mt-3 mb-0">Import, correction and deletion use each module's existing permission and confirmation controls. Deleting a source may affect its linked evidence; review the module's explanation first.</p>
+</section>
+{% endblock %}
