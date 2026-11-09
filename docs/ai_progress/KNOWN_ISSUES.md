@@ -1,7 +1,13 @@
 # Known issues and gates
 
-- **USE-02 active:** bank statements create canonical transactions/account balance
-  before a distinct reviewed confirmation. Shared apply and retry paths require repair.
+- **USE-02 bounded repair accepted locally:** bank statements now stage previews
+  before canonical writes, including retries. Source0f35605 and evidence are indexed.
+  Other module imports still require their own preview/confirmation work; next is loans.
+- Statement limits: 2000 rows /8 MiB structured extraction,100 rows/page,24-hour
+  extraction lifetime,30-minute confirmation token. Edited previews are protected
+  from retry overwrite; re-upload the retained original for an expired edited draft.
+- Statement confirmation does not approve automatic loan postings or closures.
+  Those require separately reviewed domain actions. No second money engine introduced.
 - Source-center hub is partial onboarding: saved/parser counts are not verification;
   knowledge readiness and complete confirmation/correction journeys remain.
 - Conversation continuity is bounded general local dialogue only. Streaming,

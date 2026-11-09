@@ -1,6 +1,34 @@
 # ALFRED execution state
 
-## Active checkpoint — ALFRED_USABILITY_INTEGRATION (2026-11-09)
+## Active checkpoint — CODEX_TO_CLAUDE_READY (2026-11-09)
+
+- Codex-first sprint continuation; Codex stops writing after this checkpoint.
+  Claude has not been launched. Read [handoff](ai_progress/HANDOFF.md) and
+  [STATE](ai_progress/STATE.json); claim the single-writer role before continuing.
+- Branch work/usability-integration; validated implementation source
+  0f3560557d6178c07f07dfeb05c4a975646c3e7b. Source commits cba5b53/4019ee2/0f35605
+  and continuity2e42c33 are local only. No push, PR, master merge or deployment.
+- USE-02 statement review LOCAL_ACCEPTED: initial extraction and every retry are
+  preview-only. Owner edits, source/dependency binding, expiry, atomic posting,
+  idempotent receipt, stale/race rejection and preserved original evidence are tested.
+  Existing canonical Decimal/fingerprint logic reused; no separate loan postings.
+- Final157 backend PASS, zero failures/skips; actual Chrome full import journey
+  and four full-page Axe audits PASS; current-source native19 PASS, run d828ff2e92.
+  Earlier failed contract runs retained. Exact-source clean-worktree preflight PASS
+  for source/privacy/dependencies/migrations only; full release remains BLOCKED.
+- Retain clean validation worktree F:/ALFRED_DEV/usability-source-check-0f35605,
+  detached at0f35605. Main worktree's pre-existing materialized_cache.py edit is
+  preserved and excluded. No owner data/config/key/schema/install changes.
+- No new migrations/dependencies; migration drift/JS syntax PASS; graph AST updated.
+  Baseline remains85/143, extensions0/13; no full USE scope or3.0 acceptance.
+- NEXT EXACT ACTION: verify Git/status and STATE.json; read the handoff, then trace
+  loan PDF import/retry/posting paths in apps/loans before implementing the next
+  USE-02 preview/confirmation slice with existing Decimal services and synthetic
+  data. Do not repeat accepted statement work unless new changes/failures justify it.
+- Pending: current-source CI, independent review, remaining usability/import/chat/
+  tool/action scopes, packaging/owner/clean-PC acceptance, release and3.0 gates.
+
+## Previous usability checkpoint — ALFRED_USABILITY_INTEGRATION (2026-11-09)
 
 - CODEX-FIRST SPRINT active. Sole writer Codex; do not start Claude in this worktree
   concurrently. Continuity: [STATE](ai_progress/STATE.json), [handoff](ai_progress/HANDOFF.md).

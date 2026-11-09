@@ -16,10 +16,14 @@ information; command-scoped existing repository author identity closed this
 checkpoint without global config changes. Diagnostics/source-center source is
 `cba5b53`; bounded conversation source is `4019ee2`. Both are local only.
 
-Current scope: USE-02/statement-preview-confirmation, IMPLEMENTING. Extraction and
-retry now stage owned review data; server-bound confirmation and an editable Django
-review page are under test. Initial six synthetic security/posting tests PASS;
-affected regression suites and browser acceptance are still being reconciled.
+Current bounded scope: USE-02/statement-preview-confirmation, LOCAL_ACCEPTED at
+0f3560557d6178c07f07dfeb05c4a975646c3e7b. Shared extraction/retry stage owned previews;
+revision/account-bound confirmation posts through existing canonical services.
+Original sources, corrections, duplicate identity and cent rounding are retained.
+157 backend cases, actual Chrome review/correction/confirmation/reopen, four Axe
+audits and native19 PASS. Clean-source privacy/dependency/migration preflight PASS;
+release promotion remains BLOCKED. Exact scope/evidence/failures are in
+[TEST_EVIDENCE](ai_progress/TEST_EVIDENCE.md). Next scope: loan-document review.
 Continuity index: [ai_progress](ai_progress/MASTER_ROADMAP.md).
 
 | Scope | State | Implemented slice / remaining acceptance |
@@ -134,7 +138,7 @@ created. These are synthetic accounts, not owner or packaged-install acceptance.
 ## Resume
 
 Inspect Git and local receipts before repeating any verified work. Close the
-commit-author selection and source checkpoint; then finish USE-01/02
-journeys (start with statement preview/confirmation) before expanding streaming/tools/actions. MCP connection choice is
+single-writer handoff and source checkpoint; then finish USE-01/02
+journeys (next loan preview/confirmation) before expanding streaming/tools/actions. MCP connection choice is
 pending. Owner installation, private-history availability/retention choices,
 real-account actions, external permissions and release approval remain explicit.
