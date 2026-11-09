@@ -2,7 +2,7 @@
 
 - **USE-02 bounded repair accepted locally:** bank statements now stage previews
   before canonical writes, including retries. Source0f35605 and evidence are indexed.
-  Other module imports still require their own preview/confirmation work; next is loans.
+  Loan review is also accepted locally at88c1df8; other modules still need their own confirmation work. Next is investments.
 - Statement limits: 2000 rows /8 MiB structured extraction,100 rows/page,24-hour
   extraction lifetime,30-minute confirmation token. Edited previews are protected
   from retry overwrite; re-upload the retained original for an expired edited draft.
@@ -24,3 +24,11 @@
 Resolved checkpoint blocker: repository author identity recovered from existing
 Git history; command-scoped identity used for local commits. No global Git config
 or remote publication changed.
+
+- Loan review limits:100 rows/2 MiB structured extraction,10 per page,24-hour
+  draft/30-minute token. Edited drafts cannot be overwritten by retry; re-upload
+  the retained original if an edited draft expires. No balance overwrite/closure
+  or currency inference; unsupported/missing terms require owner correction.
+- Four loan Axe audits have no automated violations, but gradient contrast remains
+  manually unverified. Source package, real owner acceptance and independent review
+  are still outstanding. No current installer was built or replaced in this slice.

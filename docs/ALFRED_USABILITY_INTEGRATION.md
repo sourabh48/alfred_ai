@@ -16,14 +16,16 @@ information; command-scoped existing repository author identity closed this
 checkpoint without global config changes. Diagnostics/source-center source is
 `cba5b53`; bounded conversation source is `4019ee2`. Both are local only.
 
-Current bounded scope: USE-02/statement-preview-confirmation, LOCAL_ACCEPTED at
-0f3560557d6178c07f07dfeb05c4a975646c3e7b. Shared extraction/retry stage owned previews;
-revision/account-bound confirmation posts through existing canonical services.
-Original sources, corrections, duplicate identity and cent rounding are retained.
-157 backend cases, actual Chrome review/correction/confirmation/reopen, four Axe
-audits and native19 PASS. Clean-source privacy/dependency/migration preflight PASS;
-release promotion remains BLOCKED. Exact scope/evidence/failures are in
-[TEST_EVIDENCE](ai_progress/TEST_EVIDENCE.md). Next scope: loan-document review.
+Current bounded loan scope: LOCAL_ACCEPTED at
+`88c1df826aa14fc56247678cabaa175356d62882`. Upload/retry stage editable owned
+previews. Explicit signed confirmation creates via canonical LoanSerializer/Decimal
+services; existing matches link without changing any loan fields. Sources, originals,
+corrections, duplicate identity and receipts are retained.215 backend,2 Chrome,
+native22 PASS; four Axe audits show zero automated violations, with gradient contrast
+manual review pending. Clean source/privacy/dependency/migration preflight PASS;
+release remains BLOCKED. No baseline counts changed or owner data was modified.
+Previous statement acceptance0f35605 is retained. Next selected scope: investment
+preview/confirmation. Exact files, failures and evidence: [TEST_EVIDENCE](ai_progress/TEST_EVIDENCE.md).
 Continuity index: [ai_progress](ai_progress/MASTER_ROADMAP.md).
 
 | Scope | State | Implemented slice / remaining acceptance |

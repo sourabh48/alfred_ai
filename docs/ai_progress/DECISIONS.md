@@ -24,3 +24,15 @@ stop-after-one-task selection for this active execution; safety gates remain.
   owner, packaged or parent capability acceptance.
 - Host GitHub/IDE/browser capabilities may assist development. ALFRED application
   MCP connections require explicit source/permissions and never imply free data.
+
+- 2026-11-10: actual continuation agent is Codex, not Claude. Exact expected branch/
+  HEAD and sole dirty cache file verified; no concurrent CLI writer found or launched.
+- Loan extraction/retry stages existing JSON, not new schema. Canonical LoanSerializer
+  and loan_money validate confirmed new loans. Existing loans only receive source
+  links, never document-driven field updates. Source-identity correction edits the
+  draft; confirmed source deletion preserves canonical loans. No balance/date/tenure/
+  currency guesses. Canonical monetary math and currency/valuation policy unchanged.
+- Explicitly retain reviewed loan sources despite extraction cleanup settings.
+  Single-use signed confirmation binds source bytes, candidate revision and current
+  relevant loans; atomic compare-and-swap protects SQLite replay/concurrency. No new
+  financial engine/dependencies/migrations. This is local source acceptance only.

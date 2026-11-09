@@ -235,4 +235,3 @@ class LoanConcurrentConfirmationTests(TransactionTestCase):
         self.assertEqual(Loan.objects.count(), 1)
         self.assertEqual(list(Loan.objects.values()), before)
         self.assertFalse(LoanPaymentHistory.objects.exists())
-

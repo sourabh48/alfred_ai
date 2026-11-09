@@ -40,3 +40,33 @@ or 3.0 acceptance. Earlier receipts do not validate a packaged release.
 GitHub MCP commit-workflow lookup for a9947bc returned no pull-request-triggered
 runs (that endpoint's documented filter). Current source commits are local only;
 no new CI run was dispatched. Historical c730360 CI is separate exact-source evidence.
+
+## Loan review ? source88c1df826aa14fc56247678cabaa175356d62882
+
+- Final consolidated215 backend PASS, zero failures/skips,206.670 s:
+  `artifacts/loan-review-20261110/backend-final.log`. Focused13 PASS separately;
+  measured7.076 s added to the established backend duration inventory.
+- Two real Chrome journeys PASS,67.571 s suite: upload/preview/edit/confirm/reopen/
+  refreshed register/Documents; safe parser failure and duplicate real PDF reimport.
+  `browser.json`/`browser-final.log`. Runner records checkout8926e42 plus dirty scope;
+  `loan-source-manifest.json` pins all28 tested source file hashes committed at88c1df8.
+- Four light/dark1440/390 full-page Axe audits: zero violations, each retains one
+  incomplete color-contrast rule for existing gradient surfaces. This is not full
+  accessibility acceptance. Sanitized screenshot/guide committed.
+- Native Windows22 PASS, run a47e15d1a9: `native.json`, `native-second.log`.
+  Real PDF/HTTP owner boundary; concurrent confirmations both200, only one loan;
+  idempotent receipt after restart; worker/cache/scheduler/retry/restart and private
+  synthetic backup/independent restore. Source runtime only, no installed package.
+- Clean exact-source source/privacy/dependency/migration preflight PASS:
+  `clean-source-preflight-final/release.json`; promotion remains BLOCKED. Earlier
+  attempt ran before worktree checkout completed and failed candidate_worktree_dirty;
+  no waiver. Validation uses retained clean detached worktree usability-loan-check-88c1df8.
+- Initial174 backend run:10 failures/3 errors (old posting/cleanup contracts and
+  Decimal JSON draft persistence); corrected108 run: one old response assertion.
+  Failed browser receipts retained (Decimal serialization, missing review link,
+  duplicate hidden navigation selector, and one mistyped test selector). Final2 PASS.
+- No new migrations; drift check reports no changes. JS syntax PASS; Graphify AST
+  updated14001 nodes/39946 edges. Initial diff check warned about one terminal blank
+  line in the new test; checkpoint normalizes it without changing test behavior.
+- Only synthetic isolated data used. Existing owner runtime, secrets, models,
+  backups and cache edit preserved. Source acceptance is not 2.0 release acceptance.

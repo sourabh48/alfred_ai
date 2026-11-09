@@ -1,5 +1,36 @@
 # ALFRED execution state
 
+## Current usability checkpoint ? 2026-11-10
+
+- Sole active writer: **Codex**, executing the owner's continuation; no Claude agent
+  or independent audit was launched. Branch `work/usability-integration`.
+- Loan source HEAD `88c1df826aa14fc56247678cabaa175356d62882`, based on handoff
+  `8926e4209bb63abe64b12c4a58bea4e6fe1bed84`. All 29 prior statement hashes matched.
+- USE-02 loan-document preview/confirmation LOCAL_ACCEPTED / COMMITTED_LOCAL.
+  Upload and retry stage drafts; explicit owner confirmation uses canonical
+  LoanSerializer/Decimal services. Existing matches link without changing fields.
+  Source hashes, payload/loan revision binding, expiry, replay and concurrent retries
+  are enforced. Correcting source identity cannot edit a canonical loan.
+- 215 backend PASS (206.670 s, zero failures/skips); 2 actual Chrome journeys PASS;
+  four full-page light/dark desktop/mobile Axe audits show zero automated violations
+  (gradient contrast manual review remains). Native22 PASS, run a47e15d1a9, including
+  actual PDF HTTP import, concurrent confirmations, worker/scheduler recovery,
+  restart and independent synthetic backup/restore. Exact file hashes and receipts:
+  `artifacts/loan-review-20261110/`; see ai_progress/TEST_EVIDENCE.md.
+- Clean-source preflight PASS for source/dependency/migration/privacy at88c1df8;
+  release promotion remains BLOCKED. Clean validation worktree retained at
+  `F:/ALFRED_DEV/usability-loan-check-88c1df8`. No push, PR, merge or deployment.
+- Owner runtime/data/config/keys/models/backups/install unchanged. No new schema
+  or dependencies; migration drift and JS syntax checks PASS. Unrelated cache edit
+  preserved: SHA25641C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9.
+- Baseline85/143, extensions0/13 unchanged. Parent USE-02 remains partial.
+- NEXT AUTHORIZED: USE-02 investment-document preview/confirmation. Trace existing
+  import/retry/correction services and use canonical money validation; do not repeat
+  accepted loan or bank work. Continue the owner's scoped usability sprint.
+- Outstanding gates: exact-head CI, independent/manual accessibility review, current
+  package/upgrade/owner acceptance, complete2.0 and required3.0 approvals.
+
+
 ## Active checkpoint — CODEX_TO_CLAUDE_READY (2026-11-09)
 
 - Codex-first sprint continuation; Codex stops writing after this checkpoint.
