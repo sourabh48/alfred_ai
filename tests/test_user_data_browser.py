@@ -185,6 +185,59 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
                 self.browser.save_screenshot(str(self.artifacts/f'diagnostics-{width}-{theme}.png'))
 
+    def test_statement_upload_review_correction_confirm_and_reopen(self):
+        from decimal import Decimal
+        from apps.expenses.models import BankAccount, Expense, StatementUpload
+        from tests.test_statement_metadata_security import statement_pdf
+        self.login()
+        owner = self.scenario['user']
+        before = Expense.objects.filter(user=owner).count()
+        account_count = BankAccount.objects.filter(user=owner).count()
+        source = self.artifacts/'synthetic-reviewed-statement.pdf'
+        source.write_bytes(statement_pdf('HDFC BANK', 'MR SYNTHETIC OWNER', 'Account No: 999888777666',
+            'Statement From: 01/09/2026 To: 30/09/2026',
+            '01/09/26 UPI SYNTHETIC SHOP REF1234567890 01/09/26 125.50 874.50'))
+        self.browser.get(self.live_server_url+'/expenses/')
+        self.browser.find_element(self.By.ID, 'statementFile').send_keys(str(source.resolve()))
+        self.memory_click('#uploadStatementBtn')
+        self.wait.until(lambda _: StatementUpload.objects.filter(user=owner, file_name=source.name).exists())
+        upload = StatementUpload.objects.get(user=owner, file_name=source.name)
+        self.assertEqual(Expense.objects.filter(user=owner).count(), before)
+        self.assertEqual(BankAccount.objects.filter(user=owner).count(), account_count)
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, f'a[href="/expenses/uploads/{upload.pk}/review/"]'))
+        self.memory_click(f'a[href="/expenses/uploads/{upload.pk}/review/"]')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'reviewAmount0'))
+        amount = self.browser.find_element(self.By.ID, 'reviewAmount0')
+        amount.clear(); amount.send_keys('120.25')
+        self.memory_click('button[value="save"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="revision"]').get_attribute('value') == '1')
+        self.assertEqual(Expense.objects.filter(user=owner).count(), before)
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=width, height=1100, deviceScaleFactor=1, mobile=False))
+            for theme in ('light', 'dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+                self.browser.execute_async_script('requestAnimationFrame(()=>requestAnimationFrame(arguments[0]))')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width, theme=theme, **audit))
+                (self.artifacts/'statement-review-accessibility.json').write_text(json.dumps(findings, indent=2), encoding='utf-8')
+                self.assertEqual(audit['violations'], [])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'statement-review-{width}-{theme}.png'))
+        self.memory_click('input[name="reviewed"]')
+        self.memory_click('button[value="confirm"]')
+        self.wait.until(lambda _: 'This preview was confirmed' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.assertEqual(Expense.objects.filter(user=owner).count(), before+1)
+        self.assertEqual(Expense.objects.get(statement_upload=upload).amount, Decimal('120.25'))
+        self.browser.refresh()
+        self.wait.until(lambda _: 'This preview was confirmed' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.assertEqual(Expense.objects.filter(user=owner).count(), before+1)
+        self.assertTrue(Path(upload.original_file.path).is_file())
+        self.browser.save_screenshot(str(self.artifacts/'statement-review-confirmed.png'))
+
     def test_data_sources_owned_counts_and_navigation(self):
         self.login()
         self.browser.get(self.live_server_url + '/data-sources/')

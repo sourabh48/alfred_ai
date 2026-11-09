@@ -189,7 +189,7 @@ class UploadPrivacyRetentionTests(TestCase):
                 self.assertFalse(getattr(instance, field_name))
                 self.assertTrue(instance.extracted_payload["raw_file_retention"]["deleted"])
 
-    def test_statement_upload_endpoint_deletes_raw_file_and_skips_background_retry_when_enabled(self):
+    def test_statement_review_retains_original_despite_legacy_extraction_cleanup_setting(self):
         statement = SimpleUploadedFile("statement.pdf", b"%PDF-1.4 fake", content_type="application/pdf")
         parsed_statement = StatementParseResult(
             bank_name="Privacy Bank",
@@ -215,10 +215,10 @@ class UploadPrivacyRetentionTests(TestCase):
         payload = response.json()
         upload = StatementUpload.objects.get(user=self.user)
 
-        self.assertTrue(payload["raw_file_retention"]["deleted"])
-        self.assertFalse(upload.original_file)
+        self.assertFalse(payload["raw_file_retention"]["deleted"])
+        self.assertTrue(upload.original_file)
         self.assertEqual(
             upload.extracted_payload["background_retry"]["state"],
-            "not_queued_raw_file_deleted",
+            "queued",
         )
-        self.assertTrue(upload.extracted_payload["raw_file_retention"]["deleted"])
+        self.assertTrue(Path(upload.original_file.path).exists())

@@ -426,6 +426,7 @@ function renderStatementUploads(items) {
                 ${item.extracted_payload?.background_retry?.state ? `<div class="small mt-2">Background retry: ${Alfred.escapeHtml(item.extracted_payload.background_retry.state)}</div>` : ""}
                 ${item.parser_notes ? `<div class="small mt-2">${Alfred.escapeHtml(item.parser_notes)}</div>` : ""}
                 <div class="list-actions mt-3">
+                    ${item.extracted_payload?.import_review ? `<a class="btn btn-sm btn-outline-primary" href="/expenses/uploads/${Number(item.id)}/review/">Review extracted rows</a>` : ""}
                     <button class="btn btn-sm btn-outline-primary" type="button" onclick="retryReviewItem('statement_document', ${item.id})">Retry</button>
                     <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('statement_document', ${item.id})">Delete</button>
                 </div>
@@ -866,7 +867,7 @@ function summarizeStatementBatch(results) {
         extras.push(`${Alfred.formatNumber(skippedCount, 0)} duplicates skipped`);
     }
     if (metadataOnly) {
-        extras.push(`${metadataOnly} retained as metadata-only upload${metadataOnly === 1 ? "" : "s"}`);
+        extras.push(`${metadataOnly} awaiting review; open Review extracted rows before confirming transactions`);
     }
     if (partialImports) {
         extras.push(`${partialImports} partial OCR import${partialImports === 1 ? "" : "s"} still deepening in background`);

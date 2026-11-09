@@ -218,9 +218,12 @@ class StatementEvidenceTests(TestCase):
 
     def test_provenance_failure_rolls_back_the_complete_import(self):
         from apps.expenses.services.statement_lifecycle import apply_parsed_statement_upload
+        from apps.expenses.services.statement_review import confirm_statement, statement_preview
         from django.db.utils import OperationalError
+        upload = apply_parsed_statement_upload(user=self.owner,parsed=parsed_fixture(reference='NEW-REFERENCE'),statement_kind='bank_statement').upload
+        token = statement_preview(upload)['token']
         before=[list(model.objects.values()) for model in (Expense,BankAccount,StatementUpload,StatementTransactionEvidence)]
         with patch('apps.expenses.services.statement_evidence.StatementTransactionEvidence.objects.bulk_create',side_effect=OperationalError('Synthetic receipt failure')):
             with self.assertRaises(OperationalError):
-                apply_parsed_statement_upload(user=self.owner,parsed=parsed_fixture(reference='NEW-REFERENCE'),statement_kind='bank_statement')
+                confirm_statement(upload, token=token)
         self.assertEqual([list(model.objects.values()) for model in (Expense,BankAccount,StatementUpload,StatementTransactionEvidence)],before)

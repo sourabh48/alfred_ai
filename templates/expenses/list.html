@@ -38,7 +38,7 @@
                 <div class="small text-muted" id="lastUploadMeta">Email-based expense capture can plug into the same classifier later.</div>
             </div>
             <div class="col-lg-2 d-grid">
-                <button id="uploadStatementBtn" class="btn btn-dark" type="button">Import statements</button>
+                <button id="uploadStatementBtn" class="btn btn-dark" type="button">Extract for review</button>
             </div>
         </div>
         <div id="statementUploadStatus" class="mt-3"></div>
@@ -216,6 +216,6 @@
     <div class="d-flex gap-2"><button id="bankAccountsPrevious" class="btn btn-outline-secondary" type="button" disabled>Previous page</button><button id="bankAccountsNext" class="btn btn-outline-secondary" type="button" disabled>Next page</button></div>
 </section>
 {% include "expenses/modal_add.html" %}
-<script src="/static/js/expenses.js?v=3.7.0"></script>
+<script src="/static/js/expenses.js?v=3.8.0"></script>
 </div>
 {% endblock %}

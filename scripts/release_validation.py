@@ -35,7 +35,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_password_security", "test_persistent_memory", "test_profile_money_boundary",
     "test_private_storage", "test_source_storage", "test_private_media_profiles", "test_local_config", "test_time_zone_boundaries",
     "test_platform_hardening.EmailConnectionTokenSecurityTests", "test_remaining_public_http",
-    "test_retention_release_boundary", "test_statement_columns", "test_statement_evidence", "test_statement_metadata_security", "test_statement_evidence_migration", "test_token_rotation",
+    "test_retention_release_boundary", "test_statement_columns", "test_statement_evidence", "test_statement_review", "test_statement_metadata_security", "test_statement_evidence_migration", "test_token_rotation",
     "test_travel_http", "test_travel_retention", "test_travel_refresh", "test_travel_candidate_pool", "test_travel_multistop", "test_travel_itinerary_editor", "test_travel_documents", "test_travel_packing", "test_travel_reminders", "test_travel_pdf_export", "test_travel_gpx_export", "test_travel_ics_export", "test_travel_export_integration", "test_travel_affordability", "test_travel_affordability_ui", "test_travel_savings", "test_travel_financial_reconciliation", "test_travel_end_to_end", "test_travel_security", "test_travel_restrictions", "test_travel_route_choices", "test_upload_limits", "test_upload_privacy_retention", "test_user_data_reset", "test_user_money",
     "test_local_stack_ops", "test_production_readiness_contracts",
     "test_release_gate", "test_release_validation", "test_release_recovery", "test_private_recovery_verifier",

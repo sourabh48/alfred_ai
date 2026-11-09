@@ -1,4 +1,5 @@
 from django.urls import path
+from .statement_review_views import StatementPreviewView, StatementConfirmView
 
 from .views import (
     BankAccountDetailView,
@@ -28,6 +29,8 @@ urlpatterns = [
     path("uploads/", StatementUploadListView.as_view()),
     path("uploads/<int:pk>/", StatementUploadDetailView.as_view()),
     path("uploads/<int:pk>/retry/", StatementUploadRetryView.as_view()),
+    path("uploads/<int:pk>/preview/", StatementPreviewView.as_view()),
+    path("uploads/<int:pk>/confirm/", StatementConfirmView.as_view()),
     path("import-statement/", ExpenseStatementImportView.as_view()),
     path("<int:pk>/", ExpenseDetailView.as_view()),
 ]

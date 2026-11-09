@@ -47,3 +47,12 @@ class DataSourcesTests(TestCase):
         self.assertNotContains(response, 'SYNTHETIC-PRIVATE-FILENAME')
         self.assertIn('no-store', response['Cache-Control'])
         self.assertEqual(self.client.post('/data-sources/').status_code, 405)
+
+    def test_parsed_financial_preview_is_awaiting_review_without_populating_finance(self):
+        StatementUpload.objects.create(user=self.owner, file_name='synthetic-pending.pdf', parser_status='parsed',
+            extracted_payload={'import_review': {'state': 'pending'}})
+        snapshot = data_sources_snapshot(self.owner)
+        finance = snapshot['sources'][0]
+        self.assertFalse(finance['has_data'])
+        self.assertEqual(finance['state'], 'Review needed')
+        self.assertEqual(finance['imports']['awaiting_review'], 1)

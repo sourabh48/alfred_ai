@@ -442,6 +442,7 @@ function renderStatementUploads(items) {
                     <div class="muted small">${escapeHtml(item.bank_name || item.institution_name || "Unknown institution")} ${item.account_number ? `| ${escapeHtml(maskAccount(item.account_number))}` : ""}</div>
                     <div class="muted small">${escapeHtml(`${item.statement_start || "?"} to ${item.statement_end || "?"}`)} | ${escapeHtml(summary)}</div>
                     ${item.parser_notes ? `<div class="small mt-1">${escapeHtml(item.parser_notes)}</div>` : ""}
+                    ${item.extracted_payload?.import_review ? `<a class="btn btn-outline-primary btn-sm mt-2" href="/expenses/uploads/${Number(item.id)}/review/">Review extracted rows</a>` : ""}
                 </div>
             </div>
         `;
@@ -840,7 +841,7 @@ function summarizeStatementBatch(results) {
         extras.push(`${Alfred.formatNumber(skippedCount, 0)} duplicates skipped`);
     }
     if (metadataOnly) {
-        extras.push(`${metadataOnly} retained as metadata-only upload${metadataOnly === 1 ? "" : "s"}`);
+        extras.push(`${metadataOnly} awaiting review; open Review extracted rows before confirming any transactions`);
     }
     if (partialImports) {
         extras.push(`${partialImports} partial OCR import${partialImports === 1 ? "" : "s"} still deepening in background`);

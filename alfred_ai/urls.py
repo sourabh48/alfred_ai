@@ -6,6 +6,7 @@ from django.views.generic import RedirectView
 from .native_views import private_media
 from .diagnostics_views import diagnostics_view
 from .data_sources_views import data_sources_view
+from .statement_review_views import statement_review_view
 from .views import statement_evidence_view
 from .views import investment_evidence_view
 from .views import loan_import_evidence_view
@@ -64,6 +65,7 @@ urlpatterns = [
     path("dashboard/", dashboard_view, name="dashboard"),
     path("documents/", documents_view, name="documents"),
     path("data-sources/", data_sources_view, name="data_sources"),
+    path("expenses/uploads/<int:pk>/review/", statement_review_view, name="statement_review"),
     path('documents/statements/<int:document_id>/transactions/<int:transaction_id>/', statement_evidence_view, name='statement_evidence'),
     path('documents/loan-closures/<int:document_id>/', loan_closure_evidence_view, name='loan_closure_evidence'),
     path('documents/investments/<int:document_id>/records/<int:identity>/', investment_evidence_view, name='investment_evidence'),

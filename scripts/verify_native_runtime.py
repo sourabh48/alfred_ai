@@ -241,6 +241,12 @@ def main():
                               data={"statement_kind": "bank_statement"},
                               files={"statement": ("checked-columns.pdf", statement, "application/pdf")}, timeout=90)
         assert response.status_code == 201, (response.status_code, response.text[:500])
+        review_id = response.json()['upload']['id']
+        preview = other.get(base + f'/api/expenses/uploads/{review_id}/preview/', timeout=30).json()
+        assert response.json()['imported_count'] == 0
+        confirmation = other.post(base + f'/api/expenses/uploads/{review_id}/confirm/',
+            headers={'X-CSRFToken': other.cookies['csrftoken']}, json={'confirm': True, 'token': preview['token']}, timeout=90)
+        assert confirmation.status_code == 200, confirmation.status_code
         rows = other.get(base + "/api/expenses/", timeout=30).json()
         rows = rows if isinstance(rows, list) else rows["results"]
         actual = sorted((row["transaction_date"], float(row["amount"]), row["direction"]) for row in rows)

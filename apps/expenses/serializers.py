@@ -53,6 +53,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
 
 
 class StatementUploadSerializer(serializers.ModelSerializer):
+    extracted_payload = serializers.SerializerMethodField()
     bank_account_id = serializers.IntegerField(source="bank_account.id", read_only=True)
     parser_status_label = serializers.CharField(source="get_parser_status_display", read_only=True)
     parser_notes = serializers.SerializerMethodField()
@@ -85,6 +86,13 @@ class StatementUploadSerializer(serializers.ModelSerializer):
     def get_parser_notes(self, obj):
         payload = obj.extracted_payload or {}
         return payload.get("parser_notes", "")
+
+    def get_extracted_payload(self, obj):
+        payload = dict(obj.extracted_payload or {})
+        if isinstance(payload.get('import_review'), dict):
+            payload['import_review'] = {key: value for key, value in payload['import_review'].items()
+                                        if key in ('id', 'state', 'revision', 'expires_at', 'confirmed_at', 'receipt')}
+        return payload
 
     def get_has_transactions(self, obj):
         return bool(obj.imported_count)

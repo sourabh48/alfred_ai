@@ -59,15 +59,15 @@ class StatementUploadCleanupTests(TestCase):
         self.upload("spoof.pdf", b"%PDF-1.4 synthetic spoof", result=result)
         self.assert_kept(first)
 
-    def test_identical_reupload_replaces_the_earlier_one_and_is_logged(self):
+    def test_identical_reupload_keeps_both_sources_for_review(self):
         first = self.upload("statement.pdf", b"%PDF-1.4 synthetic same")
         first_id, first_path = first.id, first.original_file.path
         second = self.upload("statement-again.pdf", b"%PDF-1.4 synthetic same")
-        self.assertFalse(StatementUpload.objects.filter(pk=first_id).exists())
-        self.assertFalse(Path(first_path).exists())
-        log = OperationalLog.objects.get(event_type="redundant_upload_removed")
-        self.assertEqual(log.document_id, second.id)
-        self.assertEqual(log.payload["removed_upload_id"], first_id)
+        self.assertTrue(StatementUpload.objects.filter(pk=first_id).exists())
+        self.assertTrue(Path(first_path).exists())
+        self.assert_kept(second)
+        self.assertEqual(StatementUpload.objects.count(), 2)
+        self.assertFalse(OperationalLog.objects.filter(event_type="redundant_upload_removed").exists())
 
     def test_identical_file_of_another_owner_is_untouched(self):
         other = get_user_model().objects.create_user(username="cleanup_other", password="Pass12345!")

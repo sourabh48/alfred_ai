@@ -34,10 +34,12 @@ def data_sources_snapshot(user):
             if document_model:
                 source['imports'] = document_model.objects.filter(user=user).aggregate(
                     total=Count('pk'), parsed=Count('pk', filter=Q(parser_status='parsed')),
-                    awaiting_review=Count('pk', filter=Q(parser_status__in=['pending', 'needs_review'])),
+                    awaiting_review=Count('pk', filter=Q(parser_status__in=['pending', 'needs_review'])
+                        | Q(extracted_payload__import_review__state='pending')),
                     failed=Count('pk', filter=Q(parser_status='failed')),
                     last_parsed=Max(timestamp, filter=Q(parser_status='parsed')))
-                source['has_data'] = source['has_data'] or source['imports']['parsed'] > 0
+                if label == 'Career':
+                    source['has_data'] = source['has_data'] or source['imports']['parsed'] > 0
             if label == 'Travel':
                 preferences = TravelPreferenceProfile.objects.filter(user=user).values_list('preferences', flat=True).first()
                 source['preferences_saved'] = bool(preferences)

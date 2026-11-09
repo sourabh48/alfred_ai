@@ -17,7 +17,7 @@
     </ol>
     <p class="mb-0">Direct bank connections and MCP providers are not configured here. Local file imports do not require a bank API subscription.</p>
 </section>
-<p class="alert alert-warning" role="status">The current bank-statement importer saves parsed transactions and updates the account balance when you choose Import. A separate preview-and-confirm step is not available yet.</p>
+<p class="alert alert-info" role="status">Bank statements are extracted for review first. Open Review extracted rows in Expenses, correct the preview and explicitly confirm before transactions or account balances change.</p>
 <section class="row g-3 mb-4" aria-label="Your data sources">
 {% for source in sources %}
     <div class="col-12 col-xl-6"><article class="surface-card h-100">

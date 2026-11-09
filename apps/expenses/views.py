@@ -595,7 +595,7 @@ class ExpenseStatementImportView(APIView):
                 statement_file=statement_file,
             )
         except ValueError:
-            return Response({"detail": "Statement currency is invalid or outside the supported range."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Extracted amounts are invalid or the statement exceeds supported review limits."}, status=status.HTTP_400_BAD_REQUEST)
         upload = result.upload
         bank_account = result.bank_account
         record_parser_learning(
@@ -621,112 +621,19 @@ class ExpenseStatementImportView(APIView):
             confidence=parsed.confidence,
         )
         if not parsed.transactions or parsed.preview_only:
-            if raw_upload_cleanup_enabled():
-                payload = dict(upload.extracted_payload or {})
-                payload["background_retry"] = {
-                    "state": "not_queued_raw_file_deleted",
-                    "reason": "raw upload deletion policy prevents background retry from retaining the source document",
-                    "updated_at": timezone.now().isoformat(),
-                }
-                upload.extracted_payload = payload
-                upload.save(update_fields=["extracted_payload"])
-            else:
-                queue_statement_retry(upload, reason="partial_ocr_preview_parse" if parsed.preview_only else "initial_low_confidence_parse")
-                _dispatch_statement_retry(upload.id, 8)
-        raw_file_retention = purge_uploaded_file_after_extraction(
-            upload,
-            "original_file",
-            reason="statement_import_extraction_complete",
-        )
+            queue_statement_retry(upload, reason="partial_ocr_preview_parse" if parsed.preview_only else "initial_low_confidence_parse")
+            _dispatch_statement_retry(upload.id, 8)
+        # A review must retain its original source; extraction alone is not consent to post or delete it.
+        raw_file_retention = {"deleted": False, "reason": "retained_for_owner_review"}
 
-        if not parsed.transactions:
-            detail = f"Uploaded {statement_file.name}. Alfred classified it as {statement_kind.replace('_', ' ')} but could not confidently extract transactions yet."
-            if parsed.parser_status == "failed":
-                detail = (
-                    f"Uploaded {statement_file.name}. Alfred could not read this PDF cleanly, "
-                    + (
-                        "so the raw file was deleted after the extraction attempt; re-upload a clearer copy if review needs the original."
-                        if raw_file_retention.get("deleted")
-                        else "so the file was stored for review and queued for a deeper background retry instead of crashing the import."
-                    )
-                )
-            return Response(
-                {
-                    "detail": detail,
-                    "imported_count": 0,
-                    "skipped_count": 0,
-                    "loan_detection": result.loan_detection,
-                    "account": BankAccountSerializer(bank_account).data if bank_account else None,
-                    "upload": StatementUploadSerializer(upload).data,
-                    "raw_file_retention": raw_file_retention,
-                    "parser_notes": parsed.parser_notes,
-                    "summary": {
-                        "expense_total": 0.0,
-                        "loan_total": 0.0,
-                        "other_total": 0.0,
-                        "income_total": 0.0,
-                        "transaction_count": 0,
-                    },
-                },
-                status=status.HTTP_201_CREATED,
-            )
-
-        if parsed.preview_only:
-            processed_pages = max(int(parsed.processed_page_count or 0), 1)
-            total_pages = max(int(parsed.total_page_count or processed_pages), processed_pages)
-            return Response(
-                {
-                    "detail": (
-                        f"Imported {result.new_import_count} OCR-preview transactions from {statement_file.name}. "
-                        f"Alfred populated data from the first {processed_pages} of {total_pages} repaired page(s) "
-                        + (
-                            "and deleted the raw file after extraction; re-upload is needed for deeper parsing."
-                            if raw_file_retention.get("deleted")
-                            else "and queued deeper background parsing for the remaining pages."
-                        )
-                    ),
-                    "imported_count": result.new_import_count,
-                    "skipped_count": result.skipped_count,
-                    "loan_detection": {
-                        "detected_loans": result.loan_detection["detected_loans"],
-                        "updated_loans": result.loan_detection["updated_loans"],
-                        "new_payments": result.loan_detection["new_payments"],
-                        "review_payments": result.loan_detection["review_payments"],
-                    },
-                    "account": BankAccountSerializer(bank_account).data if bank_account else None,
-                    "upload": StatementUploadSerializer(upload).data,
-                    "raw_file_retention": raw_file_retention,
-                    "summary": {
-                        key: money_float(value) if isinstance(value, (float, Decimal)) else value
-                        for key, value in result.summary.items()
-                    },
-                    "parser_notes": parsed.parser_notes,
-                },
-                status=status.HTTP_201_CREATED,
-            )
-
-        return Response(
-            {
-                "detail": f"Imported {result.new_import_count} transactions from {statement_file.name}.",
-                "imported_count": result.new_import_count,
-                "skipped_count": result.skipped_count,
-                "loan_detection": {
-                    "detected_loans": result.loan_detection["detected_loans"],
-                    "updated_loans": result.loan_detection["updated_loans"],
-                    "new_payments": result.loan_detection["new_payments"],
-                    "review_payments": result.loan_detection["review_payments"],
-                },
-                "account": BankAccountSerializer(bank_account).data if bank_account else None,
-                "upload": StatementUploadSerializer(upload).data,
-                "raw_file_retention": raw_file_retention,
-                "summary": {
-                    key: money_float(value) if isinstance(value, (float, Decimal)) else value
-                    for key, value in result.summary.items()
-                },
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
+        return Response({
+            "detail": "Statement extracted for review. No account, transaction, balance or loan was changed.",
+            "imported_count": 0, "skipped_count": 0, "account": None,
+            "upload": StatementUploadSerializer(upload).data, "raw_file_retention": raw_file_retention,
+            "parser_notes": parsed.parser_notes,
+            "review_url": f"/api/expenses/uploads/{upload.pk}/preview/",
+            "loan_detection": result.loan_detection,
+        }, status=status.HTTP_201_CREATED)
 
 class StatementUploadRetryView(APIView):
     permission_classes = [IsAuthenticated]
@@ -736,7 +643,11 @@ class StatementUploadRetryView(APIView):
         if upload is None:
             return Response({"detail": "Statement upload not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        result = retry_statement_upload(upload, ocr_page_limit=int(request.data.get("ocr_page_limit") or 8))
+        from .services.statement_review import StatementReviewConflict
+        try:
+            result = retry_statement_upload(upload, ocr_page_limit=int(request.data.get("ocr_page_limit") or 8))
+        except StatementReviewConflict:
+            return Response({"detail": "The preview changed. Your edited preview is preserved; review it before retrying."}, status=409)
         if result is None:
             return Response({"detail": "This upload no longer has a source file to retry."}, status=status.HTTP_400_BAD_REQUEST)
 

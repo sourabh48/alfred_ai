@@ -32,6 +32,16 @@ class DocumentCenterAndStatementImportTests(TestCase):
         self.client = Client()
         self.client.force_login(self.user)
 
+    def confirm_preview(self, response):
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()['imported_count'], 0)
+        identity = response.json()['upload']['id']
+        preview = self.client.get(f'/api/expenses/uploads/{identity}/preview/').json()
+        confirmation = self.client.post(f'/api/expenses/uploads/{identity}/confirm/',
+            {'confirm': True, 'token': preview['token']}, content_type='application/json')
+        self.assertEqual(confirmation.status_code, 200, confirmation.content)
+        return confirmation
+
     def test_documents_page_renders_for_authenticated_user(self):
         response = self.client.get("/documents/")
         self.assertEqual(response.status_code, 200)
@@ -74,17 +84,16 @@ class DocumentCenterAndStatementImportTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         payload = response.json()
-        self.assertIn("could not confidently extract transactions yet", payload["detail"])
+        self.assertIn("extracted for review", payload["detail"])
         self.assertEqual(payload["upload"]["parser_status"], "needs_review")
         self.assertEqual(payload["upload"]["source"], "credit_card_statement")
 
         upload = StatementUpload.objects.get()
-        account = BankAccount.objects.get()
+        self.assertFalse(BankAccount.objects.exists())
         self.assertEqual(upload.source, "credit_card_statement")
         self.assertEqual(upload.parser_status, "needs_review")
         self.assertAlmostEqual(upload.parse_confidence, 0.61)
-        self.assertEqual(upload.bank_account_id, account.id)
-        self.assertEqual(account.account_type, "credit")
+        self.assertIsNone(upload.bank_account_id)
         self.assertEqual(upload.extracted_payload["loan_hints"]["loan_type"], "credit_card")
 
     def test_malformed_statement_pdf_is_stored_for_review_instead_of_crashing(self):
@@ -109,7 +118,7 @@ class DocumentCenterAndStatementImportTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         payload = response.json()
-        self.assertIn("stored for review", payload["detail"])
+        self.assertIn("extracted for review", payload["detail"])
         self.assertEqual(payload["imported_count"], 0)
         self.assertEqual(payload["upload"]["parser_status"], "failed")
         self.assertIn("PDF reader", payload["parser_notes"])
@@ -411,8 +420,9 @@ class DocumentCenterAndStatementImportTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         payload = response.json()
-        self.assertEqual(payload["imported_count"], 1)
-        self.assertIn("OCR-preview transactions", payload["detail"])
+        self.assertEqual(payload["imported_count"], 0)
+        self.assertFalse(Expense.objects.exists())
+        self.assertEqual(self.confirm_preview(response).json()['imported_count'], 1)
         upload = StatementUpload.objects.get(file_name="hdfc-preview.pdf")
         self.assertEqual(upload.parser_status, "needs_review")
         self.assertEqual(upload.imported_count, 1)
@@ -420,7 +430,7 @@ class DocumentCenterAndStatementImportTests(TestCase):
         self.assertEqual(upload.extracted_payload["ocr_progress"]["processed_pages"], 2)
         self.assertEqual(upload.extracted_payload["ocr_progress"]["total_pages"], 123)
 
-    def test_statement_import_still_succeeds_when_follow_up_loan_detection_hits_locked_database(self):
+    def test_statement_confirmation_does_not_approve_separate_loan_postings(self):
         parsed = StatementParseResult(
             bank_name="HDFC Bank",
             account_holder="Doc User",
@@ -456,12 +466,15 @@ class DocumentCenterAndStatementImportTests(TestCase):
         with patch("apps.expenses.views.parse_bank_statement", return_value=parsed), patch(
             "apps.expenses.services.statement_lifecycle.loan_intelligence_service.detect_loan_payments",
             side_effect=OperationalError("database is locked"),
-        ):
+        ) as detection:
             response = self.client.post("/api/expenses/import-statement/", data={"statement": statement_file})
+
+            self.assertEqual(self.confirm_preview(response).json()['imported_count'], 1)
+            detection.assert_not_called()
 
         self.assertEqual(response.status_code, 201)
         payload = response.json()
-        self.assertEqual(payload["imported_count"], 1)
+        self.assertEqual(payload["imported_count"], 0)
         self.assertEqual(payload["loan_detection"]["new_payments"], 0)
         self.assertTrue(StatementUpload.objects.filter(file_name="locked-follow-up.pdf", imported_count=1).exists())
 
@@ -608,9 +621,10 @@ class DocumentCenterAndStatementImportTests(TestCase):
 
         self.assertEqual(first_response.status_code, 201)
         self.assertEqual(second_response.status_code, 201)
-        self.assertEqual(first_response.json()["imported_count"], 1)
-        self.assertEqual(second_response.json()["imported_count"], 1)
-        self.assertEqual(second_response.json()["skipped_count"], 1)
+        self.assertEqual(self.confirm_preview(first_response).json()["imported_count"], 1)
+        second_confirmation = self.confirm_preview(second_response).json()
+        self.assertEqual(second_confirmation["imported_count"], 1)
+        self.assertEqual(second_confirmation["skipped_count"], 1)
         self.assertTrue(
             StatementUpload.objects.filter(file_name="hdfc-overlap-2.pdf", imported_count=1).exists()
         )

@@ -60,6 +60,12 @@ class StatementLifecycleResult:
 
 
 def apply_parsed_statement_upload(*, user, parsed: StatementParseResult, statement_kind: str, statement_file=None, existing_upload: StatementUpload | None = None) -> StatementLifecycleResult:
+    from .statement_review import stage_statement
+    return stage_statement(user=user, parsed=parsed, statement_kind=statement_kind,
+                           statement_file=statement_file, existing_upload=existing_upload)
+
+
+def _post_reviewed_statement_upload(*, user, parsed: StatementParseResult, statement_kind: str, existing_upload: StatementUpload) -> StatementLifecycleResult:
     _validate_transaction_money(parsed)
     # Retries re-apply saved corrections, so check here rather than only at parsing.
     parsed.bank_name = clean_statement_text(parsed.bank_name)
@@ -77,7 +83,7 @@ def apply_parsed_statement_upload(*, user, parsed: StatementParseResult, stateme
         )
         upload = _save_upload_metadata(
             user=user,
-            statement_file=statement_file,
+            statement_file=None,
             parsed=parsed,
             statement_kind=statement_kind,
             bank_account=bank_account,
@@ -92,7 +98,7 @@ def apply_parsed_statement_upload(*, user, parsed: StatementParseResult, stateme
         sync_account_balance(bank_account, latest_closing)
         upload.imported_count = Expense.objects.filter(statement_upload=upload).count()
         upload.save(update_fields=["imported_count"])
-        _cleanup_redundant_statement_uploads(upload)
+        # Keep the reviewed upload and receipt even when every row is a duplicate.
     created_expenses = list(Expense.objects.filter(statement_upload=upload).order_by("transaction_date", "id"))
     loan_detection = {
         "detected_loans": 0,
@@ -102,7 +108,8 @@ def apply_parsed_statement_upload(*, user, parsed: StatementParseResult, stateme
     }
     foreclosure_resolutions: list = []
 
-    if created_expenses:
+    if created_expenses and not (upload.extracted_payload or {}).get("import_review"):
+        # Statement confirmation does not approve separate loan postings or closures.
         try:
             loan_detection = loan_intelligence_service.detect_loan_payments(user, expenses=created_expenses)
         except OperationalError:
@@ -187,17 +194,22 @@ def queue_statement_retry(upload: StatementUpload, *, reason: str = "") -> State
 
 @parser_budget
 def retry_statement_upload(upload: StatementUpload, *, ocr_page_limit: int = 8) -> StatementLifecycleResult | None:
+    from .statement_review import StatementReviewConflict
     if not upload.original_file:
         return None
 
     payload = dict(upload.extracted_payload or {})
+    review = payload.get('import_review', {})
+    if review.get('state') == 'pending' and review.get('revision', 0):
+        raise StatementReviewConflict('The edited preview is preserved. Finish reviewing it before retrying.')
     retry_state = dict(payload.get("background_retry") or {})
     retry_state["state"] = "running"
     retry_state["last_attempt_at"] = timezone.now().isoformat()
     retry_state["retry_count"] = int(retry_state.get("retry_count") or 0) + 1
     payload["background_retry"] = retry_state
+    if not StatementUpload.objects.filter(pk=upload.pk, user=upload.user, extracted_payload=upload.extracted_payload).update(extracted_payload=payload):
+        raise StatementReviewConflict('The preview changed before retrying.')
     upload.extracted_payload = payload
-    upload.save(update_fields=["extracted_payload"])
 
     upload.original_file.open("rb")
     try:
@@ -237,8 +249,9 @@ def retry_statement_upload(upload: StatementUpload, *, ocr_page_limit: int = 8) 
     else:
         refreshed_retry_state["state"] = "queued"
     refreshed_payload["background_retry"] = refreshed_retry_state
+    if not StatementUpload.objects.filter(pk=result.upload.pk, extracted_payload=result.upload.extracted_payload).update(extracted_payload=refreshed_payload):
+        raise StatementReviewConflict('The preview changed after parsing.')
     result.upload.extracted_payload = refreshed_payload
-    result.upload.save(update_fields=["extracted_payload"])
     record_parser_learning(
         user=upload.user,
         scope="statement_document",
@@ -252,7 +265,7 @@ def retry_statement_upload(upload: StatementUpload, *, ocr_page_limit: int = 8) 
         accepted_fields=list((refreshed_payload.get("accepted_corrections") or {}).keys()),
         resolution=refreshed_retry_state.get("resolution", ""),
     )
-    if not result.new_import_count and int(result.upload.imported_count or 0) == 0:
+    if not parsed.transactions and int(result.upload.imported_count or 0) == 0:
         _create_statement_retry_ticket_if_needed(
             upload=result.upload,
             retry_state=refreshed_retry_state,

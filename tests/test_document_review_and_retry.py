@@ -107,7 +107,7 @@ class DocumentReviewAndRetryTests(TestCase):
             OperationalLog.objects.filter(
                 user=self.user,
                 scope="statement_document",
-                event_type="metadata_only_import",
+                event_type="statement_preview_prepared",
             ).exists()
         )
 

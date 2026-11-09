@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Review statement - ALFRED{% endblock %}
+{% block content %}
+<section class="alfred-hero mb-4">
+    <h1 class="alfred-hero-title">Review statement</h1>
+    <p class="alfred-hero-copy">{{ upload.file_name }} — extracted values remain unverified until you review their source.</p>
+    <a href="/expenses/" class="btn btn-outline-secondary">Back to Expenses</a>
+    <a href="/documents/" class="btn btn-outline-secondary">Documents and retry</a>
+    {% if upload.original_file %}<a href="{{ upload.original_file.url }}" class="btn btn-outline-primary">Open original source</a>{% endif %}
+</section>
+{% if review_error %}<p class="alert alert-warning" role="alert">{{ review_error }}</p>{% endif %}
+{% if preview %}
+<section class="surface-card mb-4">
+    <h2 class="h4">{{ preview.state|title }}</h2>
+    {% if preview.state == 'confirmed' %}<p role="status">This preview was confirmed. Reopening or repeating its confirmation does not import it twice.</p>{% else %}<p>No canonical financial records have been written from this preview.</p>{% endif %}
+    <p>Parser confidence: {% widthratio preview.confidence 1 100 %}%. {{ preview.parser_notes }}</p>
+    {% if preview.partial %}<p class="alert alert-warning">Partial extraction: only the extracted pages are shown. Retry the original for remaining pages; a retry requires a new review.</p>{% endif %}
+    {% if preview.expired %}<p class="alert alert-warning">This extraction's confirmation has expired. {% if preview.revision %}Keep this edited preview, open the original source and upload it again to prepare a fresh preview.{% else %}Retry the original source to prepare a new preview.{% endif %}</p>{% endif %}
+    <p>{{ preview.row_count }} extracted rows; {{ preview.duplicate_count }} duplicates to skip; {{ preview.new_count }} new rows. Duplicate checks use the existing account-scoped identity rules.</p>
+    <p>Existing account balance: {% if preview.existing_account %}{{ preview.existing_account.current_balance|default_if_none:"Unknown" }} ({{ preview.existing_account.currency|default:"currency not recorded" }}){% else %}New account or unresolved account{% endif %}.
+        Proposed recorded closing balance: {{ preview.proposed_closing_balance|default_if_none:"Not supplied" }}. Confirm the source date and denomination; no conversion or bank authentication is performed.</p>
+    <p>Confirming adds new transactions and records the supplied account closing balance. Separate loan postings and closures are not approved by this confirmation. Original extraction and corrections remain with the retained source.</p>
+</section>
+<form method="post" class="surface-card" data-live-refresh-hold="true">
+    {% csrf_token %}<input type="hidden" name="revision" value="{{ preview.revision }}">
+    <input type="hidden" name="page" value="{{ preview.page }}"><input type="hidden" name="token" value="{{ preview.token|default:'' }}">
+    <label for="statementReviewAccount" class="form-label">Account number from this statement</label>
+    <input id="statementReviewAccount" name="account_number" class="form-control mb-3" maxlength="64" value="{{ preview.account_number }}" required {% if preview.state == 'confirmed' %}readonly{% endif %}>
+    <p>Page {{ preview.page }} of {{ preview.pages }}. Save corrections on each page before moving to another page. Original extracted values are shown under each row.</p>
+    <div class="table-responsive" role="region" aria-label="Statement rows" tabindex="0">
+    <table class="table"><thead><tr><th scope="col">Source and duplicate status</th><th scope="col">Date</th><th scope="col">Amount</th><th scope="col">Direction</th><th scope="col">Closing balance</th></tr></thead><tbody>
+    {% for row in preview.rows %}<tr>
+        <th scope="row">Row {{ row.index|add:1 }}: {% if row.duplicate %}Duplicate — will be skipped{% else %}New{% endif %}<br>{{ row.raw_description|truncatechars:180 }}
+            <div class="small fw-normal">Original: {{ row.original.transaction_date }}, {{ row.original.amount }}, {{ row.original.direction }}, closing {{ row.original.closing_balance|default_if_none:"Unknown" }}</div></th>
+        <td><label class="visually-hidden" for="reviewDate{{ row.index }}">Date, row {{ row.index|add:1 }}</label><input id="reviewDate{{ row.index }}" name="row-{{ row.index }}-transaction_date" type="date" class="form-control" value="{{ row.transaction_date }}" required></td>
+        <td><label class="visually-hidden" for="reviewAmount{{ row.index }}">Amount, row {{ row.index|add:1 }}</label><input id="reviewAmount{{ row.index }}" name="row-{{ row.index }}-amount" type="number" min="0.01" step="0.01" class="form-control" value="{{ row.amount }}" required></td>
+        <td><label class="visually-hidden" for="reviewDirection{{ row.index }}">Direction, row {{ row.index|add:1 }}</label><select id="reviewDirection{{ row.index }}" name="row-{{ row.index }}-direction" class="form-select"><option value="debit" {% if row.direction == 'debit' %}selected{% endif %}>Debit</option><option value="credit" {% if row.direction == 'credit' %}selected{% endif %}>Credit</option></select></td>
+        <td><label class="visually-hidden" for="reviewClosing{{ row.index }}">Closing balance, row {{ row.index|add:1 }}</label><input id="reviewClosing{{ row.index }}" name="row-{{ row.index }}-closing_balance" type="number" step="0.01" class="form-control" value="{{ row.closing_balance|default_if_none:'' }}"></td>
+    </tr>{% empty %}<tr><td colspan="5">No supported transactions extracted. Retry the source; no balances will be guessed.</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% if preview.state == 'pending' %}<button type="submit" name="action" value="save" class="btn btn-outline-primary">Save corrections and review again</button>
+    <label class="d-block my-3"><input name="reviewed" type="checkbox" value="yes"> I reviewed all pages against the source and approve the displayed new transactions and account closing balance.</label>
+    <button type="submit" name="action" value="confirm" class="btn btn-primary" {% if not preview.can_confirm %}disabled{% endif %}>Confirm reviewed import</button>{% endif %}
+    <nav aria-label="Preview pages" class="mt-3">{% if preview.page > 1 %}<a href="?page={{ preview.page|add:-1 }}" class="btn btn-outline-secondary">Previous rows</a>{% endif %}
+        {% if preview.page < preview.pages %}<a href="?page={{ preview.page|add:1 }}" class="btn btn-outline-secondary">Next rows</a>{% endif %}</nav>
+</form>
+{% endif %}
+{% endblock %}
