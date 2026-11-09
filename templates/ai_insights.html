@@ -27,8 +27,8 @@
     </details>
     <details id="conversationHistoryPanel" class="conversation-evidence mb-3">
         <summary>Private conversation history · <span id="conversationHistoryStatus">Checking local policy</span></summary>
-        <p class="small mt-2">Off unless you opt in. Saved transcripts are encrypted on this device and never synchronized or sent to cloud reasoning. They are AI hypotheses, separate from verified memories. New answers use current sources, not old transcripts.</p>
-        <p class="small">The key depends on this Windows profile; device-loss recovery is not verified. Deletion clears current history, but older backups may retain copies. Changing a source or memory does not rewrite saved conversations.</p>
+        <p class="small mt-2">Off unless you opt in. Saved transcripts are encrypted on this device and never synchronized or sent to cloud reasoning. They are AI hypotheses, separate from verified memories. Factual grounding uses current sources; recent local dialogue can supply follow-up context.</p>
+        <p class="small">With local history enabled, general chat can use up to three recent turns for follow-up context. Dialogue stays unverified and is never sent to cloud reasoning. Source-specific financial questions use current evidence. The key depends on this Windows profile; device-loss recovery is not verified. Deletion clears current history, but older backups may retain copies. Changing a source or memory does not rewrite saved conversations.</p>
         <form id="conversationHistoryForm" data-live-refresh-hold="true">
             <label for="conversationHistoryDays" class="form-label">Maximum age from conversation creation</label>
             <input id="conversationHistoryDays" type="number" class="form-control mb-2" min="1" max="30" step="1" value="7" required disabled>
@@ -187,5 +187,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
-<script src="/static/js/intelligence.js?v=16"></script>
+<script src="/static/js/intelligence.js?v=17"></script>
 {% endblock %}

@@ -63,6 +63,40 @@ class ConversationHistoryTests(TestCase):
         for days in (None, True, 0, 31, '7', 1.5):
             with self.subTest(days=days), self.assertRaises(ValueError): self.enable(days=days)
         self.assertTrue(self.enable()['enabled'])
+
+    def test_followup_context_is_owned_bounded_revision_bound_and_survives_reopen(self):
+        record = self.create()
+        generation = None
+        for index in range(4):
+            question = dict(query=f'Synthetic question {index}', scope='general', document_id=None)
+            request_id = uuid4().hex
+            generation, _ = self.history.prepare(self.alice, record['id'], index, request_id, question)
+            self.history.append(self.alice, record['id'], index, request_id, question, self.result, generation)
+        reopened = ConversationHistory(MemoryStore(settings.ALFRED_MEMORY_DIR))
+        context = reopened.context(self.alice, record['id'], 4, generation)
+        self.assertEqual(len(context), 6)
+        self.assertEqual(context[0], {'role': 'user', 'content': 'Synthetic question 1'})
+        self.assertNotIn('sources', str(context))
+        self.enable(self.bob)
+        with self.assertRaises(ConversationConflict): reopened.context(self.bob, record['id'], 4, generation)
+        with self.assertRaises(ConversationConflict): reopened.context(self.alice, record['id'], 3, generation)
+        self.history.configure(self.alice, enabled=False)
+        with self.assertRaises(ConversationPermission): reopened.context(self.alice, record['id'], 4, generation)
+
+    def test_api_followup_passes_local_dialogue_without_promoting_memories(self):
+        record = self.create()
+        local = Mock()
+        local.reason.return_value = 'Synthetic local answer.'
+        with patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local):
+            first = self.post(self.turn(record, query='Suggest a quiet hobby'))
+            self.assertEqual(first.status_code, 200)
+            record['revision'] = first.json()['conversation']['revision']
+            second = self.post(self.turn(record, query='Explain your suggestion further'))
+            self.assertEqual(second.status_code, 200)
+        payload = local.reason.call_args.args[0]
+        self.assertEqual(payload['history'][0]['content'], 'Suggest a quiet hobby')
+        self.assertEqual(second.json()['conversation_context_turns'], 1)
+        self.assertEqual(self.store.list_memories(self.alice), [])
         self.assertFalse(self.history.policy(self.bob)['enabled'])
 
     def test_atomic_local_answer_numeric_guard_and_replay_idempotence(self):

@@ -197,6 +197,24 @@ class ConversationHistory:
                 raise ConversationConflict('Conversation changed or reached its turn limit.')
         return policy['generation'], None
 
+    def context(self, user, identity, revision, generation):
+        owner = _owner(user)
+        with self.store._transaction() as db:
+            policy = self._enabled(db, owner); self._expire(db, owner)
+            record = self._get(db, owner, identity)
+            if record is None or record['revision'] != revision or policy['generation'] != generation:
+                raise ConversationConflict('Conversation or consent changed before inference.')
+            turns = record['turns'][-3:]
+        context = []
+        for turn in turns:
+            if turn.get('scope') != 'general' or turn.get('narrative_withheld'):
+                continue
+            if not isinstance(turn.get('query'), str) or not isinstance(turn.get('answer'), str):
+                raise RuntimeError('Private conversation verification failed.')
+            context.extend([{'role': role, 'content': text.encode()[:768].decode('utf-8', errors='ignore')}
+                            for role, text in (('user', turn['query']), ('assistant', turn['answer']))])
+        return context
+
     def append(self, user, identity, revision, request_id, question, result, generation):
         owner = _owner(user)
         if (result.get('provider') != 'ollama' or result.get('classification') != 'ai_generated_hypothesis'

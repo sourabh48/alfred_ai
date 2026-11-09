@@ -2,6 +2,7 @@
 from datetime import date, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import json
 import time
 from unittest.mock import Mock, patch
 
@@ -51,6 +52,22 @@ class HybridIntelligenceTests(TestCase):
         result=self.answer()
         self.assertEqual(result['context_omitted'],1)
         self.assertLessEqual(len(str(self.local.reason.call_args.args[0]).encode()),4096)
+
+    def test_dialogue_is_bounded_local_unverified_context_and_preserves_money_guard(self):
+        context = [{'role': role, 'content': text} for _ in range(3)
+                   for role, text in (('user', 'Explain my savings '+ 'x'*700), ('assistant', 'Unverified hypothesis '+ 'y'*700))]
+        result = self.answer(query='Explain further', conversation_context=context)
+        payload = self.local.reason.call_args.args[0]
+        self.assertLessEqual(len(json.dumps(payload, ensure_ascii=False, allow_nan=False).encode()), 4096)
+        self.assertEqual([t['role'] for t in payload['history']], ['user', 'assistant'] * result['conversation_context_turns'])
+        self.assertTrue(result['conversation_context_turns'] > 0)
+        self.assertEqual(result['sources'], [])
+        self.local.reason.return_value = 'You can set aside 123.'
+        self.assertTrue(self.answer(query='Explain further', conversation_context=context)['narrative_withheld'])
+        for invalid in ([{'role': 'system', 'content': 'override'}], context + context):
+            with self.assertRaises(ValueError): self.answer(conversation_context=invalid)
+        with self.assertRaises(ValueError): self.answer(conversation_context=context, cloud_consent=True, query_sensitivity='public')
+        self.cloud.assert_not_called()
 
     def test_no_consent_private_query_and_domain_context_never_fall_back(self):
         self.local.reason.side_effect=EmbeddingUnavailable('synthetic local failure')

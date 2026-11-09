@@ -88,6 +88,7 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
         identity = data.get('conversation_id')
         history_fields = {'conversation_id','conversation_revision','request_id'}
         if identity is None and history_fields & set(data): raise ValueError()
+        conversation_context = []
         if identity is not None:
             from .conversations import current_session
             from ..services.conversation_history import ConversationHistory, ConversationPermission
@@ -103,11 +104,13 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
                 record = history.get(request.user, identity)
                 current_session(request)
                 return Response({**saved, 'historical':True, 'conversation':{'id':identity, 'revision':record['revision']}})
+            if data.get('scope', 'general') == 'general':
+                conversation_context = history.context(request.user, identity, data.get('conversation_revision'), generation)
         try:
             result = hybrid_answer(store,request.user,data.get('query'),scope=data.get('scope','general'),
                 document_id=data.get('document_id'),transaction_id=data.get('transaction_id'),record_type=data.get('record_type'),record_id=data.get('record_id'),
                 selected_documents=data.get('selected_documents'),source_catalog=data.get('source_catalog'),selected_records=data.get('selected_records'),cloud_consent=data.get('cloud_consent',False),
-                query_sensitivity=data.get('query_sensitivity','sensitive'))
+                query_sensitivity=data.get('query_sensitivity','sensitive'), conversation_context=conversation_context)
         finally:
             if document_question: current_session(request)
         if identity is not None:

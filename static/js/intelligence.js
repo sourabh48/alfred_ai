@@ -608,6 +608,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (result.conversation) conversation.revision = result.conversation.revision;
             renderTurn(payload, result, ticket, Boolean(result.historical));
             feedback.textContent = result.retrieval_error?.detail || "Answer ready. Review the sources before acting.";
+            if (result.conversation_context_turns) feedback.textContent += ` Used ${result.conversation_context_turns} recent local turn(s) as unverified follow-up context.`;
             if (result.narrative_withheld) feedback.textContent = `Unsupported model figures were withheld. Only source-card amounts are shown. ${result.retrieval_error?.detail || ''}`;
             if (result.provider === "local_evidence") {
                 if (["owner_confirmed_transaction_date", "owner_confirmed_transaction_classification", "owner_confirmed_statement_period", "owner_confirmed_transaction_direction"].includes(result.grounding)) {
