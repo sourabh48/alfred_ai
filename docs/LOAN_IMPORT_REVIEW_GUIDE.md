@@ -31,7 +31,7 @@ renews the token. **Documents → Retry** prepares a new extraction for an unedi
 draft; it cannot post loans or overwrite saved corrections. For expired edited
 drafts, retain the corrections and upload the original again. Original files are
 retained even when automatic extraction cleanup is enabled. Removing a reviewed
-source does not delete its canonical loan.
+source, including a legacy upload, does not delete its canonical loan.
 
 The bounded workflow supports 100 loan rows, 10 rows per page and 2 MiB of
 structured extraction, subject to existing upload limits. Supported currencies

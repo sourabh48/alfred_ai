@@ -169,6 +169,18 @@ class LoanImportReviewTests(TestCase):
         self.assertEqual(list(Loan.objects.values()), before)
         doc.refresh_from_db(); self.assertEqual(doc.extracted_payload['import_review']['state'], 'pending')
 
+    def test_removing_legacy_source_preserves_confirmed_canonical_loan(self):
+        existing = Loan.objects.create(user=self.owner, lender='Synthetic Legacy Lender',
+            principal='20000', remaining_balance='17000', emi='900', interest_rate=11,
+            tenure_months=48, start_date=date(2024, 1, 1), currency='INR', verification_status='confirmed')
+        document = LoanImportDocument.objects.create(user=self.owner, file_name='synthetic-legacy.pdf',
+            uploaded_file=SimpleUploadedFile('synthetic-legacy.pdf', b'%PDF synthetic legacy source'))
+        document.linked_loans.add(existing)
+        before = list(Loan.objects.values())
+        delete_document(self.owner, scope='loan_document', document_id=document.pk)
+        self.assertFalse(LoanImportDocument.objects.filter(pk=document.pk).exists())
+        self.assertEqual(list(Loan.objects.values()), before)
+
     def test_real_pdf_extraction_is_decimal_and_missing_terms_are_not_invented(self):
         source = statement_pdf('HDFC PERSONAL LOAN', 'Loan Account Number: SYNTHETIC-01',
             'Principal Amount: 10000.015', 'Outstanding Amount: 8000.005', 'EMI Amount: 500.005',

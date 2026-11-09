@@ -1012,7 +1012,10 @@ function retryReviewItem(scope, id) {
 }
 
 function deleteDocumentCenterItem(scope, id) {
-    if (!window.confirm("Delete this document, its stored file and the data derived directly from it where ALFRED can track that linkage? Backups made before now keep their own copy.")) {
+    const message = scope === "loan_document"
+        ? "Delete this loan source and its extracted evidence? Canonical loans, balances and payments will be preserved. Backups keep their own copy."
+        : "Delete this document, its stored file and the data derived directly from it where ALFRED can track that linkage? Backups made before now keep their own copy.";
+    if (!window.confirm(message)) {
         return;
     }
     setDocumentCenterBusy(true);

@@ -297,6 +297,30 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Loan review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
         self.assertTrue(Path(document.uploaded_file.path).is_file())
 
+    def test_legacy_loan_source_removal_preserves_the_canonical_record(self):
+        from datetime import date
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.loans.models import Loan, LoanImportDocument
+        self.login()
+        owner = self.scenario['user']
+        loan = Loan.objects.create(user=owner, lender='Synthetic Legacy Source Lender', principal='20000',
+            remaining_balance='17000', emi='900', interest_rate=11, tenure_months=48,
+            start_date=date(2024, 1, 1), currency='INR', verification_status='confirmed')
+        document = LoanImportDocument.objects.create(user=owner, file_name='synthetic-legacy-source.pdf',
+            uploaded_file=SimpleUploadedFile('synthetic-legacy-source.pdf', b'%PDF synthetic legacy source'))
+        document.linked_loans.add(loan)
+        before = Loan.objects.values().get(pk=loan.pk)
+        self.browser.get(self.live_server_url+'/documents/')
+        selector = f'#documentLoanList button[onclick="deleteDocumentCenterItem(\'loan_document\', {document.pk})"]'
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, selector))
+        self.memory_click(selector)
+        self.wait.until(lambda _: self.browser.switch_to.alert)
+        prompt = self.browser.switch_to.alert
+        self.assertIn('Canonical loans, balances and payments will be preserved', prompt.text)
+        prompt.accept()
+        self.wait.until(lambda _: not LoanImportDocument.objects.filter(pk=document.pk).exists())
+        self.assertEqual(Loan.objects.values().get(pk=loan.pk), before)
+
     def test_data_sources_owned_counts_and_navigation(self):
         self.login()
         self.browser.get(self.live_server_url + '/data-sources/')

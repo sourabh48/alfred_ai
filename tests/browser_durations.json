@@ -10,6 +10,7 @@
                          ],
     "duration_semantics":  "Per-test setup+body+teardown;class/browser/database overhead separate;not an after-runtime prediction",
     "durations":  {
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_legacy_loan_source_removal_preserves_the_canonical_record": 11.765,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_loan_upload_review_correction_confirmation_and_reopen": 12.141,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_statement_upload_review_correction_confirm_and_reopen": 14.109,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_diagnostics_explicit_inference_retry_mobile_and_accessibility": 8.625,

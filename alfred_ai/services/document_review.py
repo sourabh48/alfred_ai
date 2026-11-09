@@ -662,22 +662,15 @@ def _delete_document_rows(user, *, scope: str, document_id: int) -> None:
     if scope == "loan_document":
         document = LoanImportDocument.objects.get(user=user, pk=document_id)
         file_name = document.file_name
-        reviewed_import = bool((document.extracted_payload or {}).get('import_review'))
         linked_loans = list(document.linked_loans.all())
         document.delete()
-        for loan in linked_loans:
-            if reviewed_import:
-                continue
-            if loan.source_documents.exists() or loan.payment_history.exists() or loan.closure_documents.exists():
-                continue
-            loan.delete()
         _log_document_event(
             user=user,
             module="loans",
             scope=scope,
             event_type="delete_document",
             severity="info",
-            message="Deleted a loan document and cleaned up orphan loan rows where safe.",
+            message="Deleted a loan document; canonical loan records were preserved.",
             document_id=document_id,
             file_name=file_name,
             payload={"linked_loans": len(linked_loans)},
@@ -1438,17 +1431,6 @@ def _retry_recruiter_document(user, document_id: int) -> dict:
             },
         )
     return serialized
-
-
-def _delete_orphan_loans(previous_loans: list[Loan], current_loans: list[Loan]) -> None:
-    current_ids = {loan.id for loan in current_loans}
-    for loan in previous_loans:
-        if loan.id in current_ids:
-            continue
-        loan.refresh_from_db()
-        if loan.source_documents.exists() or loan.payment_history.exists() or loan.closure_documents.exists():
-            continue
-        loan.delete()
 
 
 def _upsert_retry_investments(
