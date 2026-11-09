@@ -32,3 +32,8 @@ or remote publication changed.
 - Four loan Axe audits have no automated violations, but gradient contrast remains
   manually unverified. Source package, real owner acceptance and independent review
   are still outstanding. No current installer was built or replaced in this slice.
+
+- Fixed atc2d1517: removing legacy loan sources no longer deletes canonical loans.
+  Investment upload/retry/correction still contain automatic holding writes; next
+  selected scope is their review/confirmation. This is source tracing, not accepted
+  investment usability. Investment source removal also needs preservation review.

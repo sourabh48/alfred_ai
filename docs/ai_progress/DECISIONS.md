@@ -36,3 +36,10 @@ stop-after-one-task selection for this active execution; safety gates remain.
   Single-use signed confirmation binds source bytes, candidate revision and current
   relevant loans; atomic compare-and-swap protects SQLite replay/concurrency. No new
   financial engine/dependencies/migrations. This is local source acceptance only.
+
+- Consequential data-preservation follow-up took priority after investment tracing:
+  reproduced legacy source removal deleting a confirmed loan; fixed the shared path
+  to retain all canonical loans and updated the actual UI confirmation. Independent
+  loan deletion remains in the existing loan controls. Sourcec2d1517 accepted locally.
+- Context handoff remains Codex?Claude even though the owner's continuation prompt
+  called the agent Claude: Codex executed and no automatic transfer was attempted.

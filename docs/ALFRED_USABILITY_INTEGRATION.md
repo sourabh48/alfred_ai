@@ -24,7 +24,8 @@ corrections, duplicate identity and receipts are retained.215 backend,2 Chrome,
 native22 PASS; four Axe audits show zero automated violations, with gradient contrast
 manual review pending. Clean source/privacy/dependency/migration preflight PASS;
 release remains BLOCKED. No baseline counts changed or owner data was modified.
-Previous statement acceptance0f35605 is retained. Next selected scope: investment
+Follow-upc2d1517 preserves loans after legacy source removal (86 backend/1 Chrome
+PASS; clean-source preflight PASS). Previous statement acceptance0f35605 is retained. Next selected scope: investment
 preview/confirmation. Exact files, failures and evidence: [TEST_EVIDENCE](ai_progress/TEST_EVIDENCE.md).
 Continuity index: [ai_progress](ai_progress/MASTER_ROADMAP.md).
 

@@ -70,3 +70,20 @@ no new CI run was dispatched. Historical c730360 CI is separate exact-source evi
   line in the new test; checkpoint normalizes it without changing test behavior.
 - Only synthetic isolated data used. Existing owner runtime, secrets, models,
   backups and cache edit preserved. Source acceptance is not 2.0 release acceptance.
+
+## Legacy source preservation follow-up ? c2d1517a364d385c7605ac346d3de86a35734326
+
+- New synthetic regression FAIL before fix: `legacy-deletion-before.log`. It
+  reproduced deletion of a confirmed canonical loan after removing its only old source.
+-86 affected backend PASS,85.872 s, zero failures/skips: `legacy-deletion-after.log`.
+  These overlap the215-case loan suite; do not sum them as new coverage.
+-1 real Chrome deletion journey PASS,17.593 s suite: `legacy-browser.json`/log.
+  Actual confirmation prompt checked; canonical loan unchanged after source removal.
+- Seven changed files pinned in `legacy-source-manifest.json`; source commitc2d1517.
+  Historical browser checkout2350cad plus the hashed dirty scope identifies the run.
+- Clean source/privacy/dependency/migration preflight PASS atc2d1517:
+  `preservation-preflight/release.json`. Broader native22/215 backend evidence remains
+  pinned to88c1df8; no claim of new full exact-head CI, package or native rerun.
+- Graphify AST refreshed after removal; JS syntax/diff/tracker checks PASS.
+  No new dependencies/schema/runtime changes. Guide and deletion prompt describe
+  preserved canonical loans. All evidence files under artifacts/loan-review-20261110.

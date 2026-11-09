@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "active_agent": "Codex",
-  "handoff_status": "CODEX_ACTIVE_CONTINUATION",
+  "active_agent": null,
+  "handoff_status": "CODEX_TO_CLAUDE_READY",
   "workspace": "F:/ALFRED/alfred_ai",
-  "single_writer": true,
+  "single_writer": false,
   "branch": "work/usability-integration",
-  "recorded_at_head": "88c1df826aa14fc56247678cabaa175356d62882",
+  "recorded_at_head": "c2d1517a364d385c7605ac346d3de86a35734326",
   "active_task_id": "USE-02/investment-document-preview-confirmation",
   "canonical_checkpoint": "docs/EXECUTION_STATE.md",
   "requirement_inventory": "docs/PROJECT_STATUS.md",
@@ -19,7 +19,16 @@
     "apps/loans/services/loan_pdf_parser.py",
     "apps/loans/urls.py",
     "apps/loans/views.py",
+    "docs/ALFRED_USABILITY_INTEGRATION.md",
+    "docs/CI_PIPELINE_STATE.md",
+    "docs/EXECUTION_STATE.md",
     "docs/LOAN_IMPORT_REVIEW_GUIDE.md",
+    "docs/ai_progress/DECISIONS.md",
+    "docs/ai_progress/EXECUTION_BOARD.md",
+    "docs/ai_progress/HANDOFF.md",
+    "docs/ai_progress/KNOWN_ISSUES.md",
+    "docs/ai_progress/STATE.json",
+    "docs/ai_progress/TEST_EVIDENCE.md",
     "docs/images/usability/loan-review.png",
     "scripts/release_validation.py",
     "scripts/verify_native_runtime.py",
@@ -45,12 +54,13 @@
     "Committed owner-reviewed loan imports without canonical posting on upload/retry",
     "215 backend PASS; 2 real Chrome journeys PASS; four Axe audits with zero violations and manual gradient contrast review pending",
     "22 native Windows checks PASS including concurrent HTTP confirmation, restart and backup/restore",
-    "No migration drift; clean source/dependency/migration/privacy preflight PASS"
+    "No migration drift; clean source/dependency/migration/privacy preflight PASS",
+    "Additional legacy-source deletion regression failed before fix; 86 affected backend and one actual Chrome deletion journey PASS after fix at c2d1517; clean source preflight PASS"
   ],
   "remaining_steps": [
-    "Trace existing investment extraction, correction, posting and retry callers",
-    "Implement the next bounded review/confirmation slice using canonical investment money services",
-    "Retain release, owner and independent acceptance gates"
+    "Implement investment review using the recorded pure parser/posting/retry trace",
+    "Complete remaining authorized 2.0 scopes with canonical source/evidence controls",
+    "Retain owner/package/independent/CI and 3.0 release prerequisites"
   ],
   "test_evidence": "docs/ai_progress/TEST_EVIDENCE.md",
   "ci_run_ids": [],
@@ -69,10 +79,10 @@
   "preserve_unrelated_dirty_paths": [
     "alfred_ai/services/materialized_cache.py"
   ],
-  "next_exact_instruction": "Resume USE-02 investment-document-preview-confirmation: run a scoped Graphify query, inspect apps/investments import/retry/correction callers and tests, preserve accepted loan/statement behavior, then implement an owner preview before canonical writes using existing money services. No runtime data changes or migrations.",
+  "next_exact_instruction": "Verify actual branch/HEAD/status and that the previous writer stopped; claim the sole writer role. Resume USE-02 investment-document-preview-confirmation. Graphify and source trace identify parse_portfolio_document as the pure extractor; parse_portfolio_pdf, shared retry and correction currently post holdings. Reuse canonical investment_money/InvestmentSerializer, existing source evidence and owned JSON drafts, then implement full preview/edit/explicit confirmation plus stale/replay/concurrency/UI acceptance. Preserve bank and loan slices; no owner runtime edits or migrations.",
   "last_active_agent": "Codex",
-  "implementation_source_head": "88c1df826aa14fc56247678cabaa175356d62882",
-  "checkpoint_at": "2026-11-09T20:42:58.152499+00:00",
+  "implementation_source_head": "c2d1517a364d385c7605ac346d3de86a35734326",
+  "checkpoint_at": "2026-11-09T20:54:02.443329+00:00",
   "active_task_state": "SELECTED",
   "next_task_id": "USE-02/investment-document-preview-confirmation",
   "clean_validation_worktree": "F:/ALFRED_DEV/usability-loan-check-88c1df8",
@@ -91,7 +101,7 @@
     "docs/ai_progress/TEST_EVIDENCE.md"
   ],
   "checkpoint_commit_resolution": "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-  "release_preflight_source_head": "88c1df826aa14fc56247678cabaa175356d62882",
+  "release_preflight_source_head": "c2d1517a364d385c7605ac346d3de86a35734326",
   "release_preflight_status": "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
   "identity_note": "Executing agent is Codex; no Claude launch or independent audit is claimed."
 }

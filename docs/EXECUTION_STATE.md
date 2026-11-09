@@ -1,5 +1,24 @@
 # ALFRED execution state
 
+## Final continuation checkpoint ? 2026-11-10
+
+- CODEX_TO_CLAUDE_READY. Last executing agent Codex; no Claude launch/independent
+  audit. Codex stops after checkpoint. Branch work/usability-integration; source
+  HEADc2d1517a364d385c7605ac346d3de86a35734326. Resolve checkpoint HEAD through
+  `git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+- Loan slice88c1df8:215 backend,2 Chrome, native22 PASS. Follow-upc2d1517:
+  legacy source deletion preserves canonical loans; failing-before regression,
+  86 affected backend and1 real Chrome PASS. Four earlier Axe audits have zero
+  violations but manual gradient contrast remains. Distinct evidence, no summed reruns.
+- Source/privacy/dependency/migration preflight PASS atc2d1517; release promotion
+  BLOCKED. No CI/push/PR/master/package/runtime change. Owner data/keys/cache preserved.
+- Selected next: investment review. Existing pure parser and current canonical-write
+  callers traced in HANDOFF; no investment implementation changes yet. Claim one
+  writer, use canonical services and continue the approved sprint. No3.0 approval.
+- Baseline85/143/extensions0/13 unchanged. All receipts, changed paths, exact source,
+  pending gates and next instruction are in docs/ai_progress/STATE.json and HANDOFF.
+
+
 ## Current usability checkpoint ? 2026-11-10
 
 - Sole active writer: **Codex**, executing the owner's continuation; no Claude agent
