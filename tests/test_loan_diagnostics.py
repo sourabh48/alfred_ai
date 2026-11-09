@@ -149,25 +149,17 @@ class LoanDiagnosticTests(TestCase):
             self.assert_private_absent(response.json())
         self.assertEqual(LoanImportDocument.objects.count(), 0)
 
-    def test_cleanup_failure_preserves_document_and_logs_safe_reference(self):
+    def test_review_source_is_retained_even_when_automatic_cleanup_is_configured(self):
         from django.core.files.storage import default_storage
         with override_settings(ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION=True), patch(
-            "apps.loans.views.loan_pdf_parser.parse_document", return_value=PARSED), patch.object(
-            default_storage, "delete", side_effect=OSError(PRIVATE)), self.assertLogs("alfred_ai.services.upload_privacy", level="ERROR") as logs:
-            response = self.client.post("/api/loans/import-pdf/", {"file": self.file()})
-        self.assertEqual(response.status_code, 201)
-        data = response.json()
-        metadata = data["raw_file_retention"]
-        self.assertFalse(metadata["deleted"])
-        self.assertEqual(logs.records[0].error_id, metadata["error_id"])
-        self.assertEqual(logs.records[0].exception_type, "OSError")
-        self.assert_private_absent(data)
-        self.assert_private_absent(" ".join(logs.output))
-        document = LoanImportDocument.objects.get()
-        self.assertTrue(Path(document.uploaded_file.path).exists())
-        self.assert_private_absent(document.extracted_payload)
-        self.assertNotIn("storage_name", document.extracted_payload["raw_file_retention"])
-        self.assertNotIn("file_name", document.extracted_payload["raw_file_retention"])
+            'apps.loans.views.loan_pdf_parser.parse_document',return_value=PARSED), patch.object(
+            default_storage,'delete',side_effect=OSError(PRIVATE)) as deletion:
+            response=self.client.post('/api/loans/import-pdf/',{'file':self.file()})
+        self.assertEqual(response.status_code,201)
+        self.assertEqual(response.json()['raw_file_retention'],{'deleted':False,'enabled':False})
+        deletion.assert_not_called()
+        document=LoanImportDocument.objects.get(); self.assertTrue(Path(document.uploaded_file.path).exists())
+        self.assert_private_absent(response.json())
 
     def test_historical_import_payloads_filtered_on_all_public_routes_without_rewriting(self):
         payload = {"error": PRIVATE, "parser_notes": PRIVATE, "warnings": [PRIVATE], "unknown": {"error": PRIVATE},
@@ -216,22 +208,22 @@ class LoanDiagnosticTests(TestCase):
             with self.subTest(payload_type=type(payload).__name__):
                 self.assert_private_absent(public_payload(payload))
 
-    def test_successful_import_deduplicates_and_keeps_normal_loan_contract(self):
-        for attempt in (1, 2):
-            with patch("apps.loans.views.loan_pdf_parser.parse_document", return_value={**PARSED, "parser_notes": PRIVATE,
-                       "payload": {"error": PRIVATE, "raw_text_excerpt": PRIVATE}}):
-                response = self.client.post("/api/loans/import-pdf/", {"file": self.file()})
-            self.assertEqual(response.status_code, 201)
-            data = response.json()
-            self.assertTrue(data["success"])
-            self.assertEqual(data["upload"]["parser_status"], "parsed")
-            self.assertEqual(data["loans"][0]["loan_account_number"], "TESTLOAN42")
-            self.assertEqual(data["loans"][0]["remaining_balance"], 500.0)
-            self.assertTrue(data["upload"]["file_url"])
-            self.assert_private_absent(data)
-            self.assertEqual(Loan.objects.count(), 1)
-            self.assertEqual(LoanImportDocument.objects.count(), attempt)
-            self.assert_private_absent(LoanImportDocument.objects.latest("id").extracted_payload)
+    def test_successful_review_confirmation_deduplicates_and_keeps_diagnostics_private(self):
+        from apps.loans.services.import_review import loan_preview,confirm_loan_review
+        parsed={**PARSED,'loans':[{**PARSED['loans'][0],'currency':'INR'}],'parser_notes':PRIVATE}
+        for attempt in (1,2):
+            with patch('apps.loans.views.loan_pdf_parser.parse_document',return_value=parsed):
+                response=self.client.post('/api/loans/import-pdf/',{'file':self.file()})
+            self.assertEqual(response.status_code,201)
+            data=response.json(); self.assertTrue(data['success'])
+            self.assertEqual(data['upload']['parser_status'],'needs_review'); self.assertEqual(data['loans'],[])
+            self.assertEqual(Loan.objects.count(),attempt-1)
+            self.assertTrue(data['upload']['file_url']); self.assert_private_absent(data)
+            document=LoanImportDocument.objects.latest('id')
+            confirm_loan_review(document,token=loan_preview(document)['token'])
+            self.assertEqual(Loan.objects.count(),1); self.assertEqual(Loan.objects.get().remaining_balance,500)
+            self.assertEqual(LoanImportDocument.objects.count(),attempt)
+            self.assert_private_absent(document.extracted_payload)
 
     def test_successful_real_parsers_do_not_persist_ocr_or_extraction_notes_as_diagnostics(self):
         from apps.loans.services.loan_pdf_parser import loan_pdf_parser

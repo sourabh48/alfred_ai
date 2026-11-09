@@ -326,6 +326,12 @@ class LoanImportDocumentSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        data["summary"] = import_message(instance.parser_status)
+        data['summary'] = import_message(instance.parser_status)
+        review = (instance.extracted_payload or {}).get('import_review')
+        if isinstance(review, dict):
+            data['review_url'] = f'/loans/import-uploads/{instance.pk}/review/'
+            data['review_state'] = review.get('state')
+            data['summary'] = ('Loan review confirmed; existing records were preserved.' if review.get('state') == 'confirmed'
+                               else 'Extraction awaiting owner review; no financial posting.')
         data["extracted_payload"] = public_payload(instance.extracted_payload)
         return data

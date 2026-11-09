@@ -10,6 +10,7 @@
                          ],
     "duration_semantics":  "Per-test setup+body+teardown;class/browser/database overhead separate;not an after-runtime prediction",
     "durations":  {
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_loan_upload_review_correction_confirmation_and_reopen": 12.141,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_statement_upload_review_correction_confirm_and_reopen": 14.109,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_diagnostics_explicit_inference_retry_mobile_and_accessibility": 8.625,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_data_sources_owned_counts_and_navigation": 5.141,
@@ -97,7 +98,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_investment_pdf_upload_keeps_accounts_receipts_and_reimport_identity":  26.828,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_investment_projection_starts_with_recorded_value_on_real_page":  5.344,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_investment_watchlist_research_freshness_outage_and_recovery_preserve_holdings":  8.719,
-                      "tests.test_user_data_browser.UserDataBrowserTests.test_loan_diagnostics_are_safe_then_real_pdf_import_and_reimport_work":  38.125,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_loan_diagnostics_are_safe_then_real_pdf_import_and_reimport_work": 51.532,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_loan_field_confirmation_revocation_correction_and_stale_mobile_source":  8.031,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_loan_grounded_answer_opens_owner_confirmed_field_citation":  7.75,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_loan_payment_reference_opens_bank_review_and_tracks_revocation":  11.109,

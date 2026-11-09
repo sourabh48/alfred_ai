@@ -402,6 +402,9 @@ def document_review_retry_api_view(request):
     except ObjectDoesNotExist:
         return JsonResponse({"error": "Document not found."}, status=404)
     except Exception as exc:
+        from apps.loans.services.import_review import LoanReviewConflict
+        if isinstance(exc, LoanReviewConflict):
+            return JsonResponse({"error": "The loan review changed or contains saved corrections. Open the current review before retrying."}, status=409)
         if payload.get("scope") not in {"loan_document", "loan_closure_document"}:
             raise
         from .services.api_errors import safe_error_details

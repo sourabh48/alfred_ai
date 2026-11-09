@@ -293,6 +293,7 @@ function renderLoanImportHistory(items) {
                 <div class="muted small">${Alfred.escapeHtml(formatLoanType(item.document_type || "other"))} | ${(Number(item.parse_confidence || 0) * 100).toFixed(0)}% | ${Alfred.formatDateTime(item.created_at)}</div>
                 <div class="muted small mt-2">${Alfred.escapeHtml(item.parser_status_label || item.parser_status || "Unknown")} | ${Alfred.escapeHtml(linkedSummary)}</div>
                 <div class="muted small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
+                ${item.review_state ? `<a class="btn btn-sm btn-outline-primary mt-3" href="/loans/import-uploads/${Number(item.id)}/review/">${item.review_state === "confirmed" ? "View confirmed review" : "Review extracted loans"}</a>` : ""}
             </div>
         `;
     }).join(""));

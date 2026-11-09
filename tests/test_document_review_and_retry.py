@@ -1475,9 +1475,13 @@ class DocumentReviewAndRetryTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         upload.refresh_from_db()
-        self.assertEqual(upload.parser_status, "parsed")
-        self.assertEqual(upload.linked_loans.count(), 1)
-        self.assertTrue(Loan.objects.filter(user=self.user, loan_account_number="AXIS-PL-001").exists())
+        self.assertEqual(upload.parser_status, "needs_review")
+        self.assertEqual(upload.linked_loans.count(), 0)
+        self.assertFalse(Loan.objects.filter(user=self.user, loan_account_number="AXIS-PL-001").exists())
+        from apps.loans.services.import_review import loan_preview, edit_loan_review, confirm_loan_review
+        upload=edit_loan_review(upload,revision=0,edits=[dict(index=0,currency='INR')])
+        confirm_loan_review(upload,token=loan_preview(upload)['token'])
+        self.assertTrue(Loan.objects.filter(user=self.user,loan_account_number='AXIS-PL-001').exists())
         self.assertTrue(
             OperationalLog.objects.filter(
                 user=self.user,

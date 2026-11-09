@@ -149,10 +149,10 @@
                             <input id="loanPdfFile" type="file" class="form-control" accept=".pdf,application/pdf" multiple>
                         </div>
                         <div class="d-flex flex-wrap gap-2">
-                            <button id="loanImportBtn" class="btn btn-primary" type="button">Import Loan PDFs</button>
+                            <button id="loanImportBtn" class="btn btn-primary" type="button">Extract Loan PDFs for Review</button>
                             <button id="loanDetectBtn" class="btn btn-soft-primary" type="button">Detect From Expenses</button>
                         </div>
-                        <div id="loanImportStatus" class="empty-state">Import a lender statement or repayment schedule PDF to auto-fill the manual loan book.</div>
+                        <div id="loanImportStatus" class="empty-state">Extract a lender statement or repayment schedule, review its terms, then explicitly confirm. Uploading does not change the loan book.</div>
                         <div id="loanImportHistory" class="data-stack"></div>
                     </div>
                 </div>
@@ -307,5 +307,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/loans.js?v=2.14.0"></script>
+<script src="/static/js/loans.js?v=2.15.0"></script>
 {% endblock %}

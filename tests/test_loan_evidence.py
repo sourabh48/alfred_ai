@@ -104,18 +104,19 @@ class LoanEvidenceTests(TestCase):
         self.assertEqual(self.confirm().status_code,200)
 
     def test_document_identity_correction_retry_and_reimport_preserve_first_original(self):
+        from apps.loans.services.import_review import LoanReviewConflict
         self.confirm(); original=deepcopy(LoanDocumentEvidence.objects.get().source_values)
+        before=list(Loan.objects.values())
         apply_correction(self.owner,scope='loan_document',document_id=self.document.pk,corrections={'lender':'SYNTHETIC-CORRECTED'})
-        self.assertEqual(self.current()['fields']['emi']['verification'],'needs_owner_review')
-        raw=dict(self.raw,emi='1.23')
-        with patch('alfred_ai.services.document_review.loan_pdf_parser.parse_document',return_value={
-            'loans':[raw],'document_type':'loan_statement','confidence':.9,'extracted_text':'SYNTHETIC-RETRY'}):
-            retry_review_item(self.owner,scope='loan_document',document_id=self.document.pk)
-        self.loan.refresh_from_db()
-        self.assertEqual(self.loan.lender,'SYNTHETIC-CORRECTED')
-        self.assertEqual(self.current()['fields']['emi']['current'],'1.23')
+        self.assertNotEqual(self.current()['fields']['emi']['verification'],'owner_confirmed')
+        with patch('alfred_ai.services.document_review.loan_pdf_parser.parse_document') as parser:
+            with self.assertRaises(LoanReviewConflict):
+                retry_review_item(self.owner,scope='loan_document',document_id=self.document.pk)
+            parser.assert_not_called()
+        self.assertEqual(list(Loan.objects.values()),before)
+        self.assertEqual(self.current()['fields']['emi']['current'],'100.01')
         self.assertEqual(LoanDocumentEvidence.objects.get().source_values,original)
-        service.capture_import(self.document,[self.loan],extraction=[raw])
+        service.capture_import(self.document,[self.loan],extraction=[dict(self.raw,emi='1.23')])
         self.assertEqual(LoanDocumentEvidence.objects.get().source_values,original)
 
     def test_changed_missing_partial_and_unlinked_sources_reject_stale_confirmation(self):
@@ -176,28 +177,33 @@ class LoanEvidenceTests(TestCase):
 
     def test_new_upload_records_parser_precision_only_after_bounded_extraction(self):
         from alfred_ai.services.upload_limits import begin_upload_writes
-        baseline=len(connection.atomic_blocks); raw=dict(self.raw,loan_account_number='SYNTHETIC-NEW',emi='2.675')
+        baseline=len(connection.atomic_blocks); raw=dict(self.raw,loan_account_number='SYNTHETIC-NEW',emi='2.675',currency='INR')
         def parsed(*args,**kwargs):
             self.assertEqual(len(connection.atomic_blocks),baseline); begin_upload_writes()
             return dict(loans=[raw],confidence=.9,document_type='loan_statement',extracted_text='SYNTHETIC')
         with patch('apps.loans.views.loan_pdf_parser.parse_document',side_effect=parsed):
             response=self.client.post('/api/loans/import-pdf/',{'file':SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC')})
         self.assertEqual(response.status_code,201)
+        self.assertFalse(Loan.objects.filter(loan_account_number='SYNTHETIC-NEW').exists())
+        from apps.loans.services.import_review import loan_preview, confirm_loan_review
+        document=LoanImportDocument.objects.get(pk=response.json()['upload']['id'])
+        confirm_loan_review(document,token=loan_preview(document)['token'])
         row=Loan.objects.get(loan_account_number='SYNTHETIC-NEW'); proof=LoanDocumentEvidence.objects.get(loan=row)
         self.assertEqual(str(row.emi),'2.68'); self.assertEqual(proof.source_values['emi'],'2.675')
         self.assertEqual(proof.reviewed_fields,{})
 
     def test_failed_receipt_capture_rolls_back_import_without_disclosing_exception(self):
-        from alfred_ai.services.upload_limits import begin_upload_writes
-        raw=dict(self.raw,loan_account_number='SYNTHETIC-ROLLBACK')
-        def parsed(*args,**kwargs):
-            begin_upload_writes()
-            return dict(loans=[raw],confidence=.9,document_type='loan_statement')
+        from apps.loans.services.import_review import stage_loan_document, loan_preview
         before=list(Loan.objects.values())
-        with patch('apps.loans.views.loan_pdf_parser.parse_document',side_effect=parsed),patch.object(service,'capture_import',side_effect=RuntimeError('SYNTHETIC-PRIVATE-ERROR')):
-            response=self.client.post('/api/loans/import-pdf/',{'file':SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC')})
+        document=stage_loan_document(user=self.owner,parsed=dict(loans=[dict(self.raw,
+            loan_account_number='SYNTHETIC-ROLLBACK',currency='INR')],confidence=.9,document_type='loan_statement'),
+            upload_file=SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC'))
+        with patch('apps.loans.services.import_review.capture_import',side_effect=RuntimeError('SYNTHETIC-PRIVATE-ERROR')):
+            response=self.client.post(f'/api/loans/import-uploads/{document.pk}/confirm/',
+                dict(confirm=True,token=loan_preview(document)['token']),content_type='application/json')
         self.assertEqual(response.status_code,500); self.assertNotIn('SYNTHETIC-PRIVATE-ERROR',response.content.decode())
-        self.assertEqual(list(Loan.objects.values()),before); self.assertEqual(LoanImportDocument.objects.count(),1)
+        self.assertEqual(list(Loan.objects.values()),before); self.assertEqual(LoanImportDocument.objects.count(),2)
+        document.refresh_from_db(); self.assertEqual(document.extracted_payload['import_review']['state'],'pending')
 
     def test_source_limits_and_operational_failures_are_safe(self):
         citation=self.current()['citation_url']

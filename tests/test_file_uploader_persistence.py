@@ -75,7 +75,7 @@ class FileUploaderPersistenceTests(TestCase):
 
         self.assertEqual(loan_response.status_code, 201)
         self.assertEqual(LoanImportDocument.objects.filter(user=self.user).count(), 1)
-        self.assertEqual(Loan.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(Loan.objects.filter(user=self.user).count(), 0)
 
     def test_loan_upload_is_saved_for_review_when_no_structured_loan_rows_exist(self):
         loan_pdf = SimpleUploadedFile("loan-book.pdf", b"%PDF-1.4 fake", content_type="application/pdf")

@@ -455,6 +455,7 @@ function renderLoanUploads(items) {
                 <div class="small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
                 <div class="list-actions mt-3">
                     <button class="btn btn-sm btn-outline-primary" type="button" onclick="retryReviewItem('loan_document', ${item.id})">Retry</button>
+                    ${item.review_state ? `<a class="btn btn-sm btn-outline-primary" href="/loans/import-uploads/${Number(item.id)}/review/">${item.review_state === "confirmed" ? "View confirmed review" : "Review extracted loans"}</a>` : ""}
                     <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('loan_document', ${item.id})">Delete</button>
                 </div>
             </div>

@@ -238,6 +238,65 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(Path(upload.original_file.path).is_file())
         self.browser.save_screenshot(str(self.artifacts/'statement-review-confirmed.png'))
 
+    def test_loan_upload_review_correction_confirmation_and_reopen(self):
+        from decimal import Decimal
+        from selenium.webdriver.common.keys import Keys
+        from apps.loans.models import Loan, LoanImportDocument
+        from tests.test_statement_metadata_security import statement_pdf
+        self.login()
+        owner = self.scenario['user']
+        before = Loan.objects.filter(user=owner).count()
+        source = self.artifacts/'synthetic-reviewed-loan.pdf'
+        source.write_bytes(statement_pdf('HDFC PERSONAL LOAN', 'Loan Account No: SYNTHETICREVIEW42',
+            'Principal Amount: 10000.015', 'Outstanding Balance: 8000.005', 'EMI: 500.005',
+            'ROI: 10.5%', 'Tenure: 24 Months', 'Start Date: 01/01/2025', 'Currency: INR'))
+        self.browser.get(self.live_server_url+'/loans/')
+        self.browser.find_element(self.By.ID, 'loanPdfFile').send_keys(str(source.resolve()))
+        self.memory_click('#loanImportBtn')
+        self.wait.until(lambda _: LoanImportDocument.objects.filter(user=owner, file_name=source.name).exists())
+        document = LoanImportDocument.objects.get(user=owner, file_name=source.name)
+        self.assertEqual(Loan.objects.filter(user=owner).count(), before)
+        link = f'a[href="/loans/import-uploads/{document.pk}/review/"]'
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, link))
+        self.memory_click(link)
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'loanReview0-emi'))
+        emi = self.browser.find_element(self.By.ID, 'loanReview0-emi')
+        emi.clear(); emi.send_keys('450.25')
+        self.memory_click('button[value="save"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="revision"]').get_attribute('value') == '1')
+        self.assertEqual(Loan.objects.filter(user=owner).count(), before)
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=width, height=1100, deviceScaleFactor=1, mobile=False))
+            for theme in ('light', 'dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+                self.browser.execute_async_script('requestAnimationFrame(()=>requestAnimationFrame(arguments[0]))')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width, theme=theme, **audit))
+                (self.artifacts/'loan-review-accessibility.json').write_text(json.dumps(findings, indent=2), encoding='utf-8')
+                self.assertEqual(audit['violations'], [], findings[-1])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'loan-review-{width}-{theme}.png'))
+        self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="reviewed"]').send_keys(Keys.SPACE)
+        self.memory_click('button[value="confirm"]')
+        self.wait.until(lambda _: 'Loan review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        loan = Loan.objects.get(user=owner, loan_account_number='SYNTHETICREVIEW42')
+        self.assertEqual((loan.principal, loan.emi, loan.remaining_balance), (Decimal('10000.02'), Decimal('450.25'), Decimal('8000.01')))
+        self.browser.refresh()
+        self.wait.until(lambda _: 'Loan review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.assertEqual(Loan.objects.filter(user=owner).count(), before+1)
+        self.browser.save_screenshot(str(self.artifacts/'loan-review-confirmed.png'))
+        self.memory_click('main a[href="/loans/"]')
+        self.wait.until(lambda _: 'SYNTHETICREVIEW42' in self.text('loanTableBody'))
+        self.browser.get(self.live_server_url+'/documents/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, link))
+        self.memory_click(link)
+        self.wait.until(lambda _: 'Loan review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.assertTrue(Path(document.uploaded_file.path).is_file())
+
     def test_data_sources_owned_counts_and_navigation(self):
         self.login()
         self.browser.get(self.live_server_url + '/data-sources/')
@@ -4104,7 +4163,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         with fitz.open() as pdf:
             page = pdf.new_page()
             page.insert_text((40, 40), "HDFC PERSONAL LOAN\nLoan Number TESTM14F42\nLoan Amount 1000.00\n"
-                             "EMI Amount 100.00\nOutstanding Amount 500.00\nTenure 10 months")
+                             "EMI Amount 100.00\nOutstanding Amount 500.00\nTenure 10 months\nROI: 10%\nStart Date: 01/01/2025\nCurrency: INR")
             file.write_bytes(pdf.tobytes())
         owner = get_user_model().objects.get(username="acceptance_demo")
         marker = r"C:\synthetic-private\loan.pdf; fake-token-M14F-browser; OCR PRIVATE LOAN"
@@ -4132,6 +4191,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.browser.find_element(self.By.ID, "loanImportBtn").click()
             WebDriverWait(self.browser, settings.ALFRED_UPLOAD_PARSER_SECONDS + 10).until(
                 lambda _: self.browser.find_element(self.By.ID, "loanImportBtn").is_enabled())
+            upload = LoanImportDocument.objects.filter(user=owner, file_name=file.name).latest('pk')
+            self.assertEqual(upload.parser_status, 'needs_review')
+            self.assertEqual(Loan.objects.filter(user=owner, loan_account_number='TESTM14F42').count(), attempt-1)
+            self.browser.get(self.live_server_url+f'/loans/import-uploads/{upload.pk}/review/')
+            self.memory_click('input[name="reviewed"]')
+            self.memory_click('button[value="confirm"]')
+            self.wait.until(lambda _: 'Loan review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
             self.assertEqual(LoanImportDocument.objects.filter(file_name=file.name, parser_status="parsed").count(), attempt)
             rows = list(Loan.objects.filter(user=owner, loan_account_number="TESTM14F42").values_list("pk", "principal", "remaining_balance", "emi"))
             self.assertEqual(len(rows), 1)
@@ -4139,6 +4205,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 expected = rows
             else:
                 self.assertEqual(rows, expected)
+            self.browser.get(self.live_server_url+'/loans/')
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'loanImportBtn').is_enabled())
         self.capture("loan-real-pdf-reimport")
         self.browser.get(self.live_server_url + "/documents/")
         self.wait.until(lambda _: "historical-loan.pdf" in self.browser.find_element(self.By.TAG_NAME, "body").text)

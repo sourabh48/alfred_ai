@@ -253,6 +253,42 @@ def main():
         assert actual == [("2026-03-31", 250.0, "credit"), ("2026-04-01", 12.0, "credit")], actual
         passed("pdf_deposit_columns_and_transaction_dates_over_http", {"checked_rows": 2})
 
+        # Loan upload must remain a draft until exact owner review; use the real PDF parser.
+        from concurrent.futures import ThreadPoolExecutor
+        from tests.test_statement_metadata_security import statement_pdf
+        loan_source = statement_pdf('HDFC PERSONAL LOAN', 'Loan Account No: SYNTHETICNATIVE42',
+            'Principal Amount: 10000.015', 'Outstanding Balance: 8000.005', 'EMI: 500.005',
+            'ROI: 10.5%', 'Tenure: 24 Months', 'Start Date: 01/01/2025', 'Currency: INR')
+        response = other.post(base + '/api/loans/import-pdf/',
+            headers={'X-CSRFToken': other.cookies['csrftoken']},
+            files={'file': ('synthetic-native-loan.pdf', loan_source, 'application/pdf')}, timeout=90)
+        assert response.status_code == 201 and response.json()['loans'] == [], response.status_code
+        loan_document_id = response.json()['upload']['id']
+        loan_review_url = base + f'/api/loans/import-uploads/{loan_document_id}/preview/'
+        loan_confirm_url = base + f'/api/loans/import-uploads/{loan_document_id}/confirm/'
+        preview = other.get(loan_review_url, timeout=30).json()
+        assert preview['can_confirm'] and preview['state'] == 'pending', preview['state']
+        assert session.get(loan_review_url, timeout=30).status_code == 404
+        from apps.loans.models import Loan
+        assert not Loan.objects.filter(user=stranger).exists()
+        passed('loan_pdf_preview_no_posting_and_owner_boundary')
+        loan_confirm_payload = {'confirm': True, 'token': preview['token']}
+        cookies = other.cookies.get_dict()
+
+        def confirm_loan(_):
+            return requests.post(loan_confirm_url, cookies=cookies,
+                headers={'X-CSRFToken': cookies['csrftoken']}, json=loan_confirm_payload, timeout=90)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            responses = list(pool.map(confirm_loan, range(2)))
+        assert all(item.status_code in (200, 409) for item in responses), [item.status_code for item in responses]
+        confirmation = confirm_loan(None)
+        assert confirmation.status_code == 200, confirmation.status_code
+        loan = Loan.objects.get(user=stranger, loan_account_number='SYNTHETICNATIVE42')
+        assert (loan.principal, loan.emi, loan.remaining_balance) == (Decimal('10000.02'), Decimal('500.01'), Decimal('8000.01'))
+        assert Loan.objects.filter(user=stranger).count() == 1
+        passed('loan_review_concurrent_confirmation_and_replay', [item.status_code for item in responses])
+
         probe = native_runtime_probe(run)
         result = probe.get(blocking=True, timeout=30)
         assert result["worker_pid"] != os.getpid() and result["attempts"] == 1
@@ -349,6 +385,10 @@ def main():
         assert all(restored_summary[key] == summary[key] for key in expected)
         assert session.get(file_url, timeout=10).content == owner.content
         passed("queued_job_and_account_persist_after_restart")
+        assert other.get(loan_review_url, timeout=30).json()['state'] == 'confirmed'
+        assert confirm_loan(None).json()['replayed']
+        assert Loan.objects.filter(user=stranger).count() == 1
+        passed('confirmed_loan_and_receipt_persist_after_restart')
         if args.memory:
             from scripts.verify_memory_acceptance import after_restart
             after_restart(base, session, data, memory_state, passed)

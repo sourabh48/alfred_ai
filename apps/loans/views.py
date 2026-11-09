@@ -34,7 +34,7 @@ from apps.loans.services.payment_review import review_loan_payment_match, serial
 from apps.reports.services import reporting_service
 
 from .models import Loan, LoanClosureDocument, LoanImportDocument, LoanPaymentHistory
-from .money import LOAN_MONEY_FIELDS, loan_money, loan_money_float
+from .money import loan_money, loan_money_float
 from .serializers import LoanClosureDocumentSerializer, LoanImportDocumentSerializer, LoanSerializer
 from .diagnostics import LOAN_PROCESSING_ERROR, LOAN_ERROR_CODE, import_message, public_retention, public_allocation, reconciliation_message
 
@@ -151,30 +151,8 @@ def _loan_import_summary(parsed: dict, created_loans: list[Loan]) -> str:
 
 
 def _create_loan_import_document(*, request, upload_file, parsed: dict, created_loans: list[Loan]):
-    upload_file.seek(0)
-    document = LoanImportDocument.objects.create(
-        user=request.user,
-        uploaded_file=upload_file,
-        file_name=upload_file.name,
-        document_type=(parsed.get("document_type") or "")[:40],
-        parser_status=_loan_import_parser_status(parsed),
-        parse_confidence=float(parsed.get("confidence") or 0),
-        extracted_text=parsed.get("extracted_text") or "",
-        extracted_payload=_json_safe(
-            {
-                "document_type": parsed.get("document_type") or "",
-                "confidence": float(parsed.get("confidence") or 0),
-                "loans": parsed.get("loans") or [],
-            }
-        ),
-        summary=_loan_import_summary(parsed, created_loans),
-    )
-    if created_loans:
-        document.linked_loans.set(created_loans)
-        from .services.document_evidence import capture_import
-        capture_import(document, created_loans, extraction=parsed.get('loans'))
-    return document
-
+    from .services.import_review import stage_loan_document
+    return stage_loan_document(user=request.user, parsed=parsed, upload_file=upload_file)
 
 def _closure_parser_status(parsed: dict) -> str:
     return str(parsed.get("parser_status") or ("parsed" if parsed.get("payload", {}).get("matched_keyword") else "needs_review"))
@@ -351,90 +329,13 @@ def import_loan_pdf(request):
         processing_stage = "parser"
         parsed = loan_pdf_parser.parse_document(pdf_file, user=request.user, filename=pdf_file.name)
         processing_stage = "persistence"
-        loans_data = parsed["loans"]
 
-        with transaction.atomic():
-            created_loans = []
-            for loan_data in loans_data:
-                loan_data = {
-                    key: loan_money(value) if key in LOAN_MONEY_FIELDS and value is not None else value
-                    for key, value in loan_data.items()
-                }
-                loan_account_number = (loan_data.get("loan_account_number") or "").strip()
-                lender = (loan_data.get("lender") or "").strip()
-                principal = loan_data.get("principal", 0)
-
-                existing = None
-                if loan_account_number:
-                    existing = Loan.objects.filter(
-                        user=request.user,
-                        loan_account_number=loan_account_number,
-                    ).first()
-                elif lender and principal:
-                    existing = Loan.objects.filter(
-                        user=request.user,
-                        lender__iexact=lender,
-                        principal=principal,
-                    ).first()
-
-                if existing:
-                    for key, value in loan_data.items():
-                        if value:
-                            setattr(existing, key, value)
-                    existing.save()
-                    created_loans.append(existing)
-                else:
-                    loan = Loan.objects.create(
-                        user=request.user,
-                        **loan_data
-                    )
-                    created_loans.append(loan)
-
-            upload_record = _create_loan_import_document(
-                request=request,
-                upload_file=pdf_file,
-                parsed=parsed,
-                created_loans=created_loans,
-            )
-            record_parser_learning(
-                user=request.user,
-                scope="loan_document",
-                filename=pdf_file.name,
-                detected_type=parsed.get("document_type") or "other",
-                text=parsed.get("extracted_text") or "",
-                field_names=sorted({key for loan in loans_data for key, value in loan.items() if value not in ("", None, 0)}),
-                parser_status=upload_record.parser_status,
-                confidence=parsed.get("confidence") or 0,
-            )
-            if not created_loans or upload_record.parser_status != "parsed":
-                operational_logging_service.log(
-                    user=request.user,
-                    module="loans",
-                    category="document",
-                    scope="loan_document",
-                    event_type="loan_document_needs_review",
-                    severity="warning",
-                    document_id=upload_record.id,
-                    file_name="",
-                    message="Loan document upload was saved, but Alfred could not populate fully trusted structured loan rows yet.",
-                    payload={
-                        "parser_status": upload_record.parser_status,
-                        "parse_confidence": upload_record.parse_confidence,
-                        "document_type": upload_record.document_type,
-                        "linked_loans": len(created_loans),
-                        },
-                    )
-
-            raw_file_retention = purge_uploaded_file_after_extraction(
-                upload_record,
-                "uploaded_file",
-                reason="loan_document_extraction_complete",
-                metadata_filter=public_retention,
-            )
-
+        upload_record = _create_loan_import_document(request=request, upload_file=pdf_file, parsed=parsed, created_loans=[])
+        created_loans = []
+        raw_file_retention = {'deleted': False, 'enabled': False}
         return Response({
             "success": True,
-            "message": import_message(upload_record.parser_status),
+            "message": "Loan extraction saved for review. No canonical loan records were changed.",
             "document_type": parsed["document_type"],
             "parse_confidence": parsed["confidence"],
             "loans": LoanSerializer(created_loans, many=True).data,
@@ -466,7 +367,7 @@ def import_loan_pdf(request):
                     )
                     upload_record.parser_status = "failed"
                     upload_record.summary = import_message("failed")
-                    upload_record.extracted_payload = diagnostic
+                    upload_record.extracted_payload.update(diagnostic)
                     upload_record.save(update_fields=["parser_status", "summary", "extracted_payload"])
                     operational_logging_service.log(
                         user=request.user,
@@ -480,12 +381,7 @@ def import_loan_pdf(request):
                         message="Loan document upload hit a parser failure and was kept for review.",
                         payload=diagnostic,
                     )
-                    raw_file_retention = purge_uploaded_file_after_extraction(
-                        upload_record,
-                        "uploaded_file",
-                        reason="loan_document_parser_failure_cleanup",
-                        metadata_filter=public_retention,
-                    )
+                    raw_file_retention = {'deleted': False, 'enabled': False}
                 return Response(
                     {
                         "success": False,

@@ -662,9 +662,12 @@ def _delete_document_rows(user, *, scope: str, document_id: int) -> None:
     if scope == "loan_document":
         document = LoanImportDocument.objects.get(user=user, pk=document_id)
         file_name = document.file_name
+        reviewed_import = bool((document.extracted_payload or {}).get('import_review'))
         linked_loans = list(document.linked_loans.all())
         document.delete()
         for loan in linked_loans:
+            if reviewed_import:
+                continue
             if loan.source_documents.exists() or loan.payment_history.exists() or loan.closure_documents.exists():
                 continue
             loan.delete()
@@ -847,120 +850,41 @@ def _retry_statement_document(user, document_id: int) -> dict:
 
 
 def _retry_loan_document(user, document_id: int) -> dict:
-    document = LoanImportDocument.objects.prefetch_related("linked_loans").get(user=user, pk=document_id)
-    from apps.loans.services.document_evidence import capture_import
-    from copy import deepcopy
-    capture_import(document, list(document.linked_loans.all()))
-    unavailable = _retry_source_unavailable(document, "uploaded_file", _serialize_loan)
+    from apps.loans.services.import_review import stage_loan_document, LoanReviewConflict
+    document = LoanImportDocument.objects.get(user=user, pk=document_id)
+    review = (document.extracted_payload or {}).get('import_review', {})
+    if review.get('state') == 'pending' and review.get('revision', 0):
+        raise LoanReviewConflict('The edited loan preview is preserved. Review it before retrying.')
+    unavailable = _retry_source_unavailable(document, 'uploaded_file', _serialize_loan)
     if unavailable is not None:
         return unavailable
-    payload, retry_state = _begin_retry_payload(document.extracted_payload)
-    document.extracted_payload = payload
-    document.save(update_fields=["extracted_payload"])
-
-    document.uploaded_file.open("rb")
+    document.uploaded_file.open('rb')
     try:
         parsed = loan_pdf_parser.parse_document(document.uploaded_file, user=user, filename=document.file_name)
     finally:
         document.uploaded_file.close()
-
-    original_extraction = deepcopy(parsed.get('loans') or [])
-    accepted = _saved_corrections(payload, ("document_type", "lender", "loan_type", "loan_account_number"))
-    if accepted.get("document_type"):
-        parsed["document_type"] = accepted["document_type"]
-    parsed["loans"] = _correct_retry_primary(
-        parsed.get("loans") or [], payload, "loans",
-        {key: value for key, value in accepted.items() if key != "document_type"},
-    )
-    created_loans = _upsert_retry_loans(user, parsed.get("loans") or [])
-    existing_payload = dict(document.extracted_payload or {})
-    updated_payload = _merge_non_empty_payload(
-        existing_payload,
-        {
-            "document_type": parsed.get("document_type") or "",
-            "confidence": float(parsed.get("confidence") or 0),
-            "loans": parsed.get("loans") or [],
-        },
-    )
-    retry_resolution = "loan_rows_updated" if created_loans else "still_needs_review"
-    updated_payload = _retry_payload(
-        updated_payload,
-        state="resolved" if created_loans else "needs_review",
-        reason="manual_review_retry",
-        resolution=retry_resolution,
-        retry_count=retry_state["retry_count"],
-    )
-    existing_status = document.parser_status
-    new_status = "parsed" if created_loans else ("needs_review" if parsed.get("extracted_text") or parsed.get("document_type") not in {"", "other"} else "failed")
-    document.document_type = _prefer_value(parsed.get("document_type"), document.document_type)
-    document.parse_confidence = max(float(document.parse_confidence or 0), float(parsed.get("confidence") or 0))
-    document.parser_status = _best_status(existing_status, new_status)
-    document.extracted_text = _prefer_value(parsed.get("extracted_text"), document.extracted_text)
-    document.extracted_payload = updated_payload
-    if created_loans:
-        previous_loans = list(document.linked_loans.all())
-        linked_count = len({loan.pk for loan in [*previous_loans, *created_loans]})
-        document.summary = f"{linked_count} loan record(s) are now linked to this document after retry."
-        document.save(update_fields=["document_type", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary"])
-        document.linked_loans.add(*created_loans)
-        capture_import(document, created_loans, extraction=original_extraction)
-    else:
-        document.summary = document.summary or "Retry completed, but Alfred still needs review to map structured loan rows."
-        document.save(update_fields=["document_type", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary"])
-    record_parser_learning(
-        user=user,
-        scope="loan_document",
-        filename=document.file_name,
-        detected_type=document.document_type or "other",
-        text=document.extracted_text or "",
-        field_names=sorted({key for loan in (parsed.get("loans") or []) for key, value in loan.items() if value not in ("", None, 0)}),
-        parser_status=document.parser_status,
-        confidence=document.parse_confidence,
-        from_retry=True,
-        accepted_fields=list((document.extracted_payload or {}).get("accepted_corrections", {}).keys()),
-        resolution=retry_resolution,
-    )
-    serialized = _serialize_loan(document)
-    _log_document_event(
-        user=user,
-        module="loans",
-        scope="loan_document",
-        event_type="retry_document",
-        severity="info" if created_loans else "warning",
-        message=(
-            "Retried a loan document and refreshed the linked loan records."
-            if created_loans
-            else "Retried a loan document, but Alfred still could not populate structured loan rows."
-        ),
-        document_id=document_id,
-        file_name=document.file_name,
-        payload={
-            "parser_status": document.parser_status,
-            "parse_confidence": document.parse_confidence,
-            "linked_loans": len(created_loans),
-        },
-    )
-    if not created_loans:
-        _create_retry_ticket_if_needed(
-            user=user,
-            scope="loan_document",
-            document_id=document_id,
-            file_name=document.file_name,
-            retry_count=int(retry_state["retry_count"]),
-            parser_status=document.parser_status,
-            parse_confidence=float(document.parse_confidence or 0),
-            summary=(
-                f"Loan document retry {retry_state['retry_count']} still could not populate structured loan rows. "
-                f"Detected type is {document.document_type or 'unknown'}."
-            ),
-            unresolved_reason="no_structured_loan_rows",
-            payload={
-                "document_type": document.document_type or "",
-                "linked_loans": len(created_loans),
-            },
-        )
-    return serialized
-
+    with transaction.atomic():
+        document = stage_loan_document(user=user, parsed=parsed, existing=document)
+        _, retry_state = _begin_retry_payload(document.extracted_payload)
+        document.extracted_payload = _retry_payload(document.extracted_payload, state='needs_review',
+            reason='manual_review_retry', resolution='preview_prepared', retry_count=retry_state['retry_count'])
+        document.save(update_fields=['extracted_payload'])
+        record_parser_learning(user=user, scope='loan_document', filename=document.file_name,
+            detected_type=document.document_type or 'other', text=document.extracted_text,
+            field_names=sorted({key for row in parsed.get('loans') or [] for key in row}),
+            parser_status=document.parser_status, confidence=document.parse_confidence,
+            from_retry=True, resolution='preview_prepared')
+        _log_document_event(user=user, module='loans', scope='loan_document', event_type='retry_document',
+            severity='info', document_id=document_id, file_name='',
+            message='Loan extraction retried for owner review; no canonical changes.',
+            payload={'parser_status': document.parser_status})
+        if not parsed.get('loans'):
+            _create_retry_ticket_if_needed(user=user, scope='loan_document', document_id=document_id,
+                file_name=document.file_name, retry_count=retry_state['retry_count'],
+                parser_status=document.parser_status, parse_confidence=document.parse_confidence,
+                summary='Loan extraction still needs owner review after retry.',
+                unresolved_reason='no_structured_loan_rows', payload={'document_type': document.document_type})
+    return _serialize_loan(document)
 
 def _retry_loan_closure_document(user, document_id: int) -> dict:
     document = LoanClosureDocument.objects.select_related("loan").get(loan__user=user, pk=document_id)
@@ -1514,33 +1438,6 @@ def _retry_recruiter_document(user, document_id: int) -> dict:
             },
         )
     return serialized
-
-
-def _upsert_retry_loans(user, loans_data: list[dict]) -> list[Loan]:
-    created_loans: list[Loan] = []
-    if not loans_data:
-        return created_loans
-    with transaction.atomic():
-        for loan_data in loans_data:
-            loan_account_number = (loan_data.get("loan_account_number") or "").strip()
-            lender = (loan_data.get("lender") or "").strip()
-            principal = loan_data.get("principal", 0)
-
-            existing = None
-            if loan_account_number:
-                existing = Loan.objects.filter(user=user, loan_account_number=loan_account_number).first()
-            elif lender and principal:
-                existing = Loan.objects.filter(user=user, lender__iexact=lender, principal=principal).first()
-
-            if existing:
-                for key, value in loan_data.items():
-                    if value not in ("", None, 0):
-                        setattr(existing, key, value)
-                existing.save()
-                created_loans.append(existing)
-            else:
-                created_loans.append(Loan.objects.create(user=user, **loan_data))
-    return created_loans
 
 
 def _delete_orphan_loans(previous_loans: list[Loan], current_loans: list[Loan]) -> None:
@@ -2459,48 +2356,27 @@ def _apply_statement_correction(user, document_id: int, corrections: dict) -> di
 
 @transaction.atomic
 def _apply_loan_correction(user, document_id: int, corrections: dict) -> dict:
+    from apps.loans.services.import_review import stage_loan_document, edit_loan_review
     document = LoanImportDocument.objects.get(user=user, pk=document_id)
-    from apps.loans.services.document_evidence import capture_import
-    capture_import(document, list(document.linked_loans.all()))
-    payload = dict(document.extracted_payload or {})
-    accepted = dict(payload.get("accepted_corrections") or {})
+    review = (document.extracted_payload or {}).get('import_review', {})
+    if review.get('state') != 'pending':
+        document = stage_loan_document(user=user, existing=document, parsed={
+            'document_type': document.document_type, 'confidence': document.parse_confidence,
+            'extracted_text': document.extracted_text, 'loans': (document.extracted_payload or {}).get('loans', [])})
+        review = document.extracted_payload['import_review']
+    fields = {key: value for key, value in corrections.items() if key in ('lender', 'loan_type', 'loan_account_number')}
+    document = edit_loan_review(document, revision=review['revision'], edits=[dict(index=0, **fields)])
+    accepted = dict(document.extracted_payload.get('accepted_corrections') or {})
     accepted.update(corrections)
-    payload["accepted_corrections"] = accepted
-    payload = _mark_review_queue_resolved(payload)
-    document.document_type = corrections.get("document_type", document.document_type)
-    linked_loans = list(document.linked_loans.all())
-    primary_item = dict((payload.get("loans") or [{}])[0])
-    payload.setdefault("review_primary_source", dict(primary_item))
-    primary_loan = next((loan for loan in linked_loans if (
-        primary_item.get("loan_account_number") and loan.loan_account_number == primary_item["loan_account_number"]
-    )), None)
-    if primary_loan is None and len(linked_loans) == 1:
-        primary_loan = linked_loans[0]
-    corrected_fields = _saved_corrections(payload, ("lender", "loan_type", "loan_account_number"))
-    if primary_loan is not None:
-        loan = primary_loan
-        for key, value in corrected_fields.items():
-            setattr(loan, key, value)
-        if corrected_fields:
-            loan.save(update_fields=list(corrected_fields))
-    if primary_item or corrected_fields:
-        payload["loans"] = [{**primary_item, **corrected_fields}, *(payload.get("loans") or [])[1:]]
-    document.parse_confidence = max(document.parse_confidence, 0.7 if len(accepted) >= 3 else 0.58)
-    document.parser_status = "parsed" if document.linked_loans.exists() else "needs_review"
-    document.extracted_payload = payload
-    document.summary = document.summary or "User correction accepted for this loan document."
-    document.save(update_fields=["document_type", "parse_confidence", "parser_status", "extracted_payload", "summary"])
-    record_parser_correction(
-        user=user,
-        scope="loan_document",
-        filename=document.file_name,
-        detected_type=document.document_type or "loan_document",
-        text=document.extracted_text,
-        field_names=[key for key, value in accepted.items() if value],
-        confidence=document.parse_confidence,
-    )
+    document.extracted_payload['accepted_corrections'] = accepted
+    document.save(update_fields=['extracted_payload'])
+    if 'document_type' in corrections:
+        document.document_type = corrections['document_type']
+        document.save(update_fields=['document_type'])
+    record_parser_correction(user=user, scope='loan_document', filename=document.file_name,
+        detected_type=document.document_type or 'loan_document', text=document.extracted_text,
+        field_names=list(corrections), confidence=document.parse_confidence)
     return _serialize_loan(document)
-
 
 @transaction.atomic
 def _apply_loan_closure_correction(user, document_id: int, corrections: dict) -> dict:

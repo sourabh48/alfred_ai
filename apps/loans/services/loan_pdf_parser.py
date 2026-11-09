@@ -3,14 +3,14 @@ Loan Book PDF Parser
 Parses loan statements and loan books from banks and NBFCs.
 """
 import re
+from decimal import Decimal
 from datetime import datetime
 from typing import List, Dict, BinaryIO
-
-from django.utils import timezone
 
 from alfred_ai.services import apply_parser_learning, extract_document_text
 from alfred_ai.services.currency import INR_LABEL_TOKEN
 from alfred_ai.services.upload_limits import document_source
+from ..money import loan_money
 
 
 class LoanPDFParser:
@@ -124,14 +124,14 @@ class LoanPDFParser:
 
         # Split by loan sections (common patterns)
         loan_sections = re.split(
-            r"(?:LOAN\s+(?:NO|NUMBER|DETAILS)|ACCOUNT\s+(?:NO|NUMBER))\s*[:.]?\s*\d+",
+            r"(?=(?:LOAN\s+(?:NO|NUMBER|DETAILS)|ACCOUNT\s+(?:NO|NUMBER))\s*[:.]?\s*[A-Z0-9])",
             text,
             flags=re.IGNORECASE
         )
 
         for section in loan_sections[1:]:  # Skip first split (header)
             loan = self._extract_loan_details(section)
-            if loan and loan.get('principal', 0) > 0:
+            if loan and (loan.get('principal') is not None or loan.get('loan_account_number')):
                 loans.append(loan)
 
         return loans
@@ -166,16 +166,13 @@ class LoanPDFParser:
             "tenure_months": self._extract_tenure(text),
             "remaining_balance": self._extract_outstanding(text),
             "start_date": self._extract_start_date(text),
+            "currency": None,
         }
-
-        # Auto-calculate missing values
-        if loan['remaining_balance'] is None and loan['principal']:
-            loan['remaining_balance'] = loan['principal']
-
-        if loan['tenure_months'] is None and loan['principal'] and loan['emi']:
-            # Rough estimate
-            loan['tenure_months'] = int(loan['principal'] / loan['emi'])
-
+        currency = re.search(r'\bCURRENCY\s*[:=]\s*([A-Z]{3})\b', text, re.I)
+        if currency:
+            loan['currency'] = currency.group(1).upper()
+        loan['field_status'] = {key: 'missing' if value in (None, '', 'Unknown Lender') else 'extracted'
+                                for key, value in loan.items()}
         return loan
 
     def _extract_lender(self, text: str) -> str:
@@ -202,7 +199,7 @@ class LoanPDFParser:
     def _extract_account_number(self, text: str) -> str:
         """Extract loan account number."""
         patterns = [
-            r"(?:LOAN|ACCOUNT)\s+(?:NO|NUMBER|ID)\s*[:.]?\s*([A-Z0-9]{6,20})",
+            r"(?:LOAN|ACCOUNT)\s+(?:NO|NUMBER|ID)\s*[:.]?\s*([A-Z0-9-]{6,40})",
             r"(?:AGREEMENT|CONTRACT)\s+(?:NO|NUMBER)\s*[:.]?\s*([A-Z0-9]{6,20})",
         ]
 
@@ -213,22 +210,22 @@ class LoanPDFParser:
 
         return ""
 
-    def _extract_principal(self, text: str) -> float:
+    def _extract_principal(self, text: str) -> Decimal | None:
         """Extract principal/loan amount."""
         patterns = [
-            rf"(?:PRINCIPAL|LOAN)\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
-            rf"SANCTIONED\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
-            rf"DISBURSED\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
+            rf"(?:PRINCIPAL|LOAN)\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
+            rf"SANCTIONED\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
+            rf"DISBURSED\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
         ]
 
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return float(match.group(1).replace(',', ''))
+                return loan_money(match.group(1).replace(',', ''))
 
-        return 0.0
+        return None
 
-    def _extract_interest_rate(self, text: str) -> float:
+    def _extract_interest_rate(self, text: str) -> float | None:
         """Extract interest rate."""
         patterns = [
             r"(?:INTEREST|RATE)\s+(?:RATE|%)\s*[:.]?\s*([0-9.]+)\s*%",
@@ -241,23 +238,23 @@ class LoanPDFParser:
             if match:
                 return float(match.group(1))
 
-        return 0.0
+        return None
 
-    def _extract_emi(self, text: str) -> float:
+    def _extract_emi(self, text: str) -> Decimal | None:
         """Extract EMI amount."""
         patterns = [
-            rf"EMI\s+(?:AMOUNT|AMT)?\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
-            rf"(?:MONTHLY|INSTALLMENT)\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
+            rf"EMI\s*(?:AMOUNT|AMT)?\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
+            rf"(?:MONTHLY|INSTALLMENT)\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
         ]
 
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return float(match.group(1).replace(',', ''))
+                return loan_money(match.group(1).replace(',', ''))
 
-        return 0.0
+        return None
 
-    def _extract_tenure(self, text: str) -> int:
+    def _extract_tenure(self, text: str) -> int | None:
         """Extract loan tenure in months."""
         patterns = [
             r"(?:TENURE|PERIOD)\s*[:.]?\s*([0-9]+)\s+(?:MONTHS|MOS)",
@@ -274,23 +271,23 @@ class LoanPDFParser:
         if match:
             return int(match.group(1)) * 12
 
-        return 0
+        return None
 
-    def _extract_outstanding(self, text: str) -> float:
+    def _extract_outstanding(self, text: str) -> Decimal | None:
         """Extract outstanding/remaining balance."""
         patterns = [
-            rf"(?:OUTSTANDING|BALANCE)\s+(?:AMOUNT|AMT|PRINCIPAL)?\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
-            rf"(?:REMAINING|CURRENT)\s+(?:BALANCE|PRINCIPAL)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d{{2}})?)",
+            rf"(?:OUTSTANDING|BALANCE)\s*(?:AMOUNT|AMT|PRINCIPAL|BALANCE)?\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
+            rf"(?:REMAINING|CURRENT)\s+(?:BALANCE|PRINCIPAL)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
         ]
 
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return float(match.group(1).replace(',', ''))
+                return loan_money(match.group(1).replace(',', ''))
 
         return None
 
-    def _extract_start_date(self, text: str) -> str:
+    def _extract_start_date(self, text: str) -> str | None:
         """Extract loan start date."""
         patterns = [
             r"(?:START|DISBURSEMENT|SANCTION)\s+DATE\s*[:.]?\s*([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4})",
@@ -312,8 +309,7 @@ class LoanPDFParser:
                 except Exception:
                     pass
 
-        # Default to current date if not found
-        return timezone.localdate().isoformat()
+        return None
 
 
 # Singleton instance

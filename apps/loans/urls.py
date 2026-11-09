@@ -1,4 +1,5 @@
 from django.urls import path
+from .import_review_views import LoanImportReviewAPI, LoanImportConfirmAPI
 
 from .views import (
     LoanDetailView,
@@ -19,6 +20,8 @@ urlpatterns = [
     path("", LoanListCreateView.as_view(), name="loan_list_create"),
     path("summary/", LoanSummaryView.as_view(), name="loan_summary"),
     path("import-uploads/", LoanImportDocumentListView.as_view(), name="loan_import_uploads"),
+    path("import-uploads/<int:pk>/preview/", LoanImportReviewAPI.as_view()),
+    path("import-uploads/<int:pk>/confirm/", LoanImportConfirmAPI.as_view()),
     path("import-pdf/", import_loan_pdf, name="import_loan_pdf"),
     path("consolidate/", LoanConsolidationView.as_view(), name="loan_consolidate"),
     path("detect-from-expenses/", detect_loans_from_expenses, name="detect_loans"),

@@ -120,26 +120,20 @@ class DocumentRetryIntegrityTests(TestCase):
         self.assertEqual(profile.skills, "Java, Spring Boot")
 
     def test_partial_loan_retry_keeps_other_links_and_accepted_identity(self):
-        primary = self._loan()
-        secondary = self._loan("LOAN-2")
-        document = LoanImportDocument.objects.create(
-            user=self.user, uploaded_file=self._file(), file_name="loans.pdf",
-            extracted_payload={"loans": [{"lender": primary.lender, "loan_account_number": "LOAN-1"}]},
-        )
+        primary=self._loan(); secondary=self._loan('LOAN-2')
+        document=LoanImportDocument.objects.create(user=self.user,uploaded_file=self._file(),file_name='loans.pdf',
+            extracted_payload={'loans':[{'lender':primary.lender,'loan_account_number':'LOAN-1'}]})
         document.linked_loans.add(primary)
-        self._post("resolve", "loan_document", document, corrections={"lender": "Verified Bank", "loan_account_number": "VERIFIED-1"})
+        before=list(Loan.objects.values())
+        self._post('resolve','loan_document',document,corrections={'lender':'Verified Bank','loan_account_number':'VERIFIED-1'})
         document.linked_loans.add(secondary)
-        with patch("alfred_ai.services.document_review.loan_pdf_parser.parse_document", return_value={
-            "document_type": "loan_statement", "confidence": 0.8, "extracted_text": "Retry evidence",
-            "loans": [{"lender": "Wrong Bank", "loan_account_number": "OCR-ERROR", "principal": 100000}],
-        }):
-            self._post("retry", "loan_document", document)
-        primary.refresh_from_db()
-        self.assertEqual(primary.lender, "Verified Bank")
-        self.assertEqual(primary.loan_account_number, "VERIFIED-1")
-        self.assertEqual(set(document.linked_loans.values_list("pk", flat=True)), {primary.pk, secondary.pk})
-        self.assertEqual(Loan.objects.filter(user=self.user).count(), 2)
-        self.assertTrue(document.summary.startswith("2 loan record"))
+        with patch('alfred_ai.services.document_review.loan_pdf_parser.parse_document') as parser:
+            response=self.client.post('/api/documents/review-queue/retry/',dict(scope='loan_document',id=document.pk),content_type='application/json')
+            self.assertEqual(response.status_code,409); parser.assert_not_called()
+        self.assertEqual(list(Loan.objects.values()),before)
+        self.assertEqual(set(document.linked_loans.values_list('pk',flat=True)),{primary.pk,secondary.pk})
+        document.refresh_from_db()
+        self.assertEqual(document.extracted_payload['import_review']['candidate'][0]['loan_account_number'],'VERIFIED-1')
 
     def test_partial_investment_retry_preserves_unextracted_fields_and_accounts(self):
         primary = Investment.objects.create(
@@ -225,37 +219,20 @@ class DocumentRetryIntegrityTests(TestCase):
         self.assertEqual(record.service_center, "Verified Workshop")
         self.assertEqual(record.service_date, date(2026, 3, 20))
 
-    def test_loan_retry_targets_reviewed_row_when_extraction_reorders_or_omits_it(self):
-        for omit_primary in (False, True):
-            with self.subTest(omit_primary=omit_primary):
-                primary = self._loan(f"PRIMARY-{omit_primary}")
-                secondary = self._loan(f"SECONDARY-{omit_primary}")
-                primary_data = {"lender": primary.lender, "loan_account_number": primary.loan_account_number, "principal": 100000}
-                secondary_data = {"lender": secondary.lender, "loan_account_number": secondary.loan_account_number, "principal": 250000}
-                document = LoanImportDocument.objects.create(
-                    user=self.user, uploaded_file=self._file(), file_name="loans.pdf",
-                    extracted_payload={"loans": [primary_data, secondary_data]},
-                )
-                document.linked_loans.add(primary, secondary)
-                self._post("resolve", "loan_document", document, corrections={
-                    "lender": "Verified Bank", "loan_account_number": f"VERIFIED-{omit_primary}",
-                })
-                primary.refresh_from_db()
-                self.assertEqual(primary.loan_account_number, f"VERIFIED-{omit_primary}")
-                rows = [secondary_data] if omit_primary else [secondary_data, primary_data]
-                with patch("alfred_ai.services.document_review.loan_pdf_parser.parse_document", return_value={
-                    "document_type": "loan_statement", "confidence": 0.8, "loans": rows,
-                }):
-                    self._post("retry", "loan_document", document)
-                primary.refresh_from_db()
-                secondary.refresh_from_db()
-                self.assertEqual(primary.principal, 100000)
-                self.assertEqual(primary.lender, "Verified Bank")
-                self.assertEqual(secondary.principal, 250000)
-                self.assertEqual(secondary.loan_account_number, secondary_data["loan_account_number"])
-                self.assertEqual(secondary.lender, "Example Bank")
-                self.assertEqual(document.extracted_payload["loans"][0]["loan_account_number"], primary.loan_account_number)
-                self.assertEqual(set(document.linked_loans.values_list("pk", flat=True)), {primary.pk, secondary.pk})
+    def test_loan_retry_preserves_edited_draft_and_never_retargets_canonical_rows(self):
+        primary=self._loan('PRIMARY-1'); secondary=self._loan('SECONDARY-1')
+        rows=[dict(lender=item.lender,loan_account_number=item.loan_account_number,principal=str(item.principal)) for item in (primary,secondary)]
+        document=LoanImportDocument.objects.create(user=self.user,uploaded_file=self._file(),file_name='loans.pdf',extracted_payload={'loans':rows})
+        document.linked_loans.add(primary,secondary); before=list(Loan.objects.values())
+        self._post('resolve','loan_document',document,corrections={'lender':'Verified Bank','loan_account_number':'VERIFIED-1'})
+        with patch('alfred_ai.services.document_review.loan_pdf_parser.parse_document') as parser:
+            response=self.client.post('/api/documents/review-queue/retry/',dict(scope='loan_document',id=document.pk),content_type='application/json')
+            self.assertEqual(response.status_code,409); parser.assert_not_called()
+        document.refresh_from_db(); review=document.extracted_payload['import_review']
+        self.assertEqual(review['original'],rows)
+        self.assertEqual(review['candidate'][0]['loan_account_number'],'VERIFIED-1')
+        self.assertEqual(review['candidate'][1]['loan_account_number'],'SECONDARY-1')
+        self.assertEqual(list(Loan.objects.values()),before)
 
     def test_investment_retry_targets_reviewed_row_when_extraction_reorders_or_omits_it(self):
         for omit_primary in (False, True):
