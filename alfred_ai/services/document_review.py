@@ -700,17 +700,13 @@ def _delete_document_rows(user, *, scope: str, document_id: int) -> None:
         file_name = document.file_name
         linked_investments = list(document.linked_investments.all())
         document.delete()
-        for investment in linked_investments:
-            if investment.source_documents.exists():
-                continue
-            investment.delete()
         _log_document_event(
             user=user,
             module="investments",
             scope=scope,
             event_type="delete_document",
             severity="info",
-            message="Deleted an investment import document and cleaned up orphan imported holdings where safe.",
+            message="Deleted an investment source; canonical holdings were preserved.",
             document_id=document_id,
             file_name=file_name,
             payload={"linked_investments": len(linked_investments)},
@@ -982,110 +978,36 @@ def _retry_loan_closure_document(user, document_id: int) -> dict:
 
 
 def _retry_investment_document(user, document_id: int) -> dict:
-    document = InvestmentImportDocument.objects.prefetch_related("linked_investments").get(user=user, pk=document_id)
-    from apps.investments.services.document_evidence import capture_import
-    from copy import deepcopy
-    capture_import(document, list(document.linked_investments.all()))
-    unavailable = _retry_source_unavailable(document, "uploaded_file", _serialize_investment)
-    if unavailable is not None:
-        return unavailable
-    payload, retry_state = _begin_retry_payload(document.extracted_payload)
-    document.extracted_payload = payload
-    document.save(update_fields=["extracted_payload"])
-
-    document.uploaded_file.open("rb")
+    from apps.investments.services.import_review import stage_investment_document, InvestmentReviewConflict
+    document = InvestmentImportDocument.objects.get(user=user, pk=document_id)
+    review = (document.extracted_payload or {}).get('import_review', {})
+    if review.get('state') == 'pending' and review.get('revision', 0):
+        raise InvestmentReviewConflict('The edited investment draft is preserved. Open its review.')
+    unavailable = _retry_source_unavailable(document, 'uploaded_file', _serialize_investment)
+    if unavailable is not None: return unavailable
+    document.uploaded_file.open('rb')
     try:
         parsed = portfolio_intelligence_service.parse_portfolio_document(document.uploaded_file, user=user, filename=document.file_name)
     finally:
         document.uploaded_file.close()
-
-    original_extraction = deepcopy(parsed.get('investments') or [])
-    accepted = _saved_corrections(payload, ("broker_name", "asset_name", "asset_type", "account_number", "invested_amount", "current_value"))
-    if accepted.get("broker_name"):
-        parsed["broker"] = accepted["broker_name"]
-    if parsed.get("investments"):
-        row_corrections = {key: value for key, value in accepted.items() if key != "broker_name"}
-        if "broker_name" in accepted:
-            row_corrections["institution"] = accepted["broker_name"]
-        parsed["investments"] = _correct_retry_primary(parsed["investments"], payload, "investments", row_corrections)
-        parsed.setdefault("payload", {})["investments"] = parsed["investments"]
-    created_investments = _upsert_retry_investments(
-        user, parsed.get("investments") or [], preserve_existing=True, primary_corrections=accepted,
-    )
-    updated_payload = _merge_non_empty_payload(document.extracted_payload, parsed.get("payload") or {})
-    retry_resolution = "investment_rows_updated" if created_investments else "still_needs_review"
-    updated_payload = _retry_payload(
-        updated_payload,
-        state="resolved" if created_investments else "needs_review",
-        reason="manual_review_retry",
-        resolution=retry_resolution,
-        retry_count=retry_state["retry_count"],
-    )
-    previous_investments = list(document.linked_investments.all())
-    linked_count = len({item.pk for item in [*previous_investments, *created_investments]})
-    document.broker_name = _prefer_value(parsed.get("broker"), document.broker_name)
-    document.parse_confidence = max(float(document.parse_confidence or 0), float(parsed.get("confidence") or 0))
-    document.parser_status = _best_status(document.parser_status, parsed.get("parser_status") or "needs_review")
-    document.extracted_text = _prefer_value(parsed.get("extracted_text"), document.extracted_text)
-    document.extracted_payload = updated_payload
-    document.summary = (
-        f"{linked_count} investment record(s) are now linked to this document after retry."
-        if created_investments
-        else (document.summary or "Retry completed, but Alfred still needs review to map structured investment rows.")
-    )
-    document.save(update_fields=["broker_name", "parse_confidence", "parser_status", "extracted_text", "extracted_payload", "summary", "updated_at"])
-    if created_investments:
-        document.linked_investments.add(*created_investments)
-        capture_import(document, created_investments, extraction=original_extraction)
-    record_parser_learning(
-        user=user,
-        scope="investment_document",
-        filename=document.file_name,
-        detected_type=(document.broker_name or "portfolio_statement").lower().replace(" ", "_"),
-        text=document.extracted_text or "",
-        field_names=sorted({key for item in (parsed.get("payload", {}).get("investments") or []) for key, value in item.items() if value not in ("", None, 0)}),
-        parser_status=document.parser_status,
-        confidence=document.parse_confidence,
-        from_retry=True,
-        accepted_fields=list((document.extracted_payload or {}).get("accepted_corrections", {}).keys()),
-        resolution=retry_resolution,
-    )
-    serialized = _serialize_investment(document)
-    _log_document_event(
-        user=user,
-        module="investments",
-        scope="investment_document",
-        event_type="retry_document",
-        severity="info" if created_investments else "warning",
-        message=(
-            "Retried an investment document and refreshed the linked holdings."
-            if created_investments
-            else "Retried an investment document, but Alfred still could not populate structured holdings."
-        ),
-        document_id=document_id,
-        file_name=document.file_name,
-        payload={
-            "parser_status": document.parser_status,
-            "parse_confidence": document.parse_confidence,
-            "linked_investments": len(created_investments),
-        },
-    )
-    if not created_investments:
-        _create_retry_ticket_if_needed(
-            user=user,
-            scope="investment_document",
-            document_id=document_id,
-            file_name=document.file_name,
-            retry_count=int(retry_state["retry_count"]),
-            parser_status=document.parser_status,
-            parse_confidence=float(document.parse_confidence or 0),
-            summary=(
-                f"Investment document retry {retry_state['retry_count']} still could not populate structured holdings. Broker is {document.broker_name or 'unknown'}."
-            ),
-            unresolved_reason="no_structured_investment_rows",
-            payload={"broker_name": document.broker_name or "", "linked_investments": len(created_investments)},
-        )
-    return serialized
+    with transaction.atomic():
+        document = stage_investment_document(user=user, parsed=parsed, existing=document)
+        _, retry_state = _begin_retry_payload(document.extracted_payload)
+        document.extracted_payload = _retry_payload(document.extracted_payload, state='needs_review', reason='manual_review_retry',
+            resolution='preview_prepared', retry_count=retry_state['retry_count'])
+        document.save(update_fields=['extracted_payload'])
+        record_parser_learning(user=user, scope='investment_document', filename=document.file_name,
+            detected_type='portfolio_statement', text=document.extracted_text, field_names=list(parsed.get('payload', {})),
+            parser_status=document.parser_status, confidence=document.parse_confidence, from_retry=True, resolution='preview_prepared')
+        _log_document_event(user=user, module='investments', scope='investment_document', event_type='retry_document',
+            severity='info', document_id=document_id, file_name='', message='Investment extraction retried; no canonical changes.',
+            payload={'parser_status': document.parser_status})
+        if not parsed.get('investments'):
+            _create_retry_ticket_if_needed(user=user, scope='investment_document', document_id=document_id,
+                file_name=document.file_name, retry_count=retry_state['retry_count'], parser_status=document.parser_status,
+                parse_confidence=document.parse_confidence, summary='Investment extraction still needs review.',
+                unresolved_reason='no_structured_investment_rows', payload={})
+    return _serialize_investment(document)
 
 
 def _retry_vehicle_document(user, document_id: int) -> dict:
@@ -2425,95 +2347,23 @@ def _apply_loan_closure_correction(user, document_id: int, corrections: dict) ->
 
 @transaction.atomic
 def _apply_investment_correction(user, document_id: int, corrections: dict) -> dict:
-    for field in INVESTMENT_MONEY_FIELDS:
-        if field in corrections and corrections[field] in (None, ""):
-            raise ValueError("Investment currency corrections require a finite amount.")
-    document = InvestmentImportDocument.objects.prefetch_related("linked_investments").get(user=user, pk=document_id)
-    from apps.investments.services.document_evidence import capture_import
-    from apps.investments.models import InvestmentDocumentEvidence
-    capture_import(document, list(document.linked_investments.all()))
-    payload = dict(document.extracted_payload or {})
-    accepted = dict(payload.get("accepted_corrections") or {})
-    accepted.update(corrections)
-    payload["accepted_corrections"] = accepted
-    payload = _mark_review_queue_resolved(payload)
-
-    previous_investments = list(document.linked_investments.all())
-    primary_item = dict(((payload.get("investments") or [{}])[0]) if payload.get("investments") else {})
-    payload.setdefault("review_primary_source", dict(primary_item))
-    previous_primary = next((item for item in previous_investments if (
-        item.asset_name == primary_item.get("asset_name")
-        and item.account_number == (primary_item.get("account_number") or "")
-        and item.institution == (primary_item.get("institution", document.broker_name) or "")
-    )), None) if primary_item else (previous_investments[0] if previous_investments else None)
-    if previous_primary:
-        primary_item = {
-            **{field: (investment_total_float(getattr(previous_primary, field)) if field in INVESTMENT_MONEY_FIELDS else getattr(previous_primary, field)) for field in (
-                "asset_name", "asset_type", "institution", "account_number", "invested_amount",
-                "current_value", "monthly_sip", "annual_return_rate", "risk_level", "notes",
-            )},
-            **primary_item,
-        }
-    if corrections.get("asset_name"):
-        primary_item["asset_name"] = str(corrections["asset_name"]).strip()
-    if corrections.get("asset_type"):
-        primary_item["asset_type"] = str(corrections["asset_type"]).strip()
-    if corrections.get("account_number"):
-        primary_item["account_number"] = str(corrections["account_number"]).strip()
-    invested_amount = investment_money(corrections["invested_amount"]) if "invested_amount" in corrections else None
-    if invested_amount is not None:
-        primary_item["invested_amount"] = investment_total_float(invested_amount)
-    current_value = investment_money(corrections["current_value"]) if "current_value" in corrections else None
-    if current_value is not None:
-        primary_item["current_value"] = investment_total_float(current_value)
-    if "monthly_sip" in corrections:
-        primary_item["monthly_sip"] = investment_total_float(investment_money(corrections["monthly_sip"]))
-    if corrections.get("broker_name"):
-        document.broker_name = str(corrections["broker_name"]).strip()
-        payload["broker_name"] = document.broker_name
-        primary_item["institution"] = document.broker_name
-    # An explicitly blank institution is unknown, not the parser's broker label.
-    if document.broker_name and "institution" not in primary_item:
-        primary_item["institution"] = document.broker_name
-    if primary_item:
-        remaining_items = list(payload.get("investments") or [])[1:]
-        payload["investments"] = [primary_item, *remaining_items]
-
-    updated_primary = _upsert_retry_investments(user, [primary_item] if primary_item.get("asset_name") else [])
-    linked = [*updated_primary, *[item for item in previous_investments if item != previous_primary and item not in updated_primary]]
-    original_values = InvestmentDocumentEvidence.objects.filter(document=document, investment=previous_primary).first() if previous_primary else None
-    capture_import(document, updated_primary, originals={item.pk:original_values.source_values for item in updated_primary} if original_values else None)
-    document.extracted_payload = payload
-    document.parse_confidence = max(document.parse_confidence, 0.8 if linked else 0.63)
-    document.parser_status = "parsed" if linked else "needs_review"
-    document.summary = (
-        f"{len(linked)} investment record(s) are now linked to this document after user correction."
-        if linked
-        else (document.summary or "User correction accepted, but Alfred still needs more portfolio detail.")
-    )
-    document.save(
-        update_fields=[
-            "broker_name",
-            "extracted_payload",
-            "parse_confidence",
-            "parser_status",
-            "summary",
-            "updated_at",
-        ]
-    )
-    if linked:
-        document.linked_investments.set(linked)
-        _delete_orphan_investments(previous_investments, linked)
-    record_parser_correction(
-        user=user,
-        scope="investment_document",
-        filename=document.file_name,
-        detected_type=(document.broker_name or "portfolio_statement").lower().replace(" ", "_"),
-        text=document.extracted_text,
-        field_names=[key for key, value in accepted.items() if value not in ("", None, [])],
-        confidence=document.parse_confidence,
-        resolution="accepted_correction_linked_holdings" if linked else "accepted_correction_reviewed",
-    )
+    from apps.investments.services.import_review import stage_investment_document, edit_investment_review, FIELDS
+    document = InvestmentImportDocument.objects.get(user=user, pk=document_id)
+    review = (document.extracted_payload or {}).get('import_review', {})
+    if review.get('state') != 'pending':
+        document = stage_investment_document(user=user, existing=document, parsed=dict(broker=document.broker_name,
+            confidence=document.parse_confidence, extracted_text=document.extracted_text,
+            investments=(document.extracted_payload or {}).get('investments', [])))
+        review = document.extracted_payload['import_review']
+    fields = {key: value for key, value in corrections.items() if key in FIELDS}
+    if 'broker_name' in corrections: fields['institution'] = corrections['broker_name']
+    document = edit_investment_review(document, revision=review['revision'], edits=[dict(index=0, **fields)])
+    accepted = dict(document.extracted_payload.get('accepted_corrections') or {})
+    accepted.update(corrections); document.extracted_payload['accepted_corrections'] = accepted
+    if 'broker_name' in corrections: document.broker_name = corrections['broker_name']
+    document.save(update_fields=['extracted_payload', 'broker_name', 'updated_at'])
+    record_parser_correction(user=user, scope='investment_document', filename=document.file_name,
+        detected_type='portfolio_statement', text=document.extracted_text, field_names=list(corrections), confidence=document.parse_confidence)
     return _serialize_investment(document)
 
 

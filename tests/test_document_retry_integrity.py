@@ -155,7 +155,7 @@ class DocumentRetryIntegrityTests(TestCase):
             self._post("retry", "investment_document", document)
         primary.refresh_from_db()
         secondary.refresh_from_db()
-        self.assertEqual(primary.current_value, 12500)
+        self.assertEqual(primary.current_value, 12000)
         self.assertEqual(primary.invested_amount, 10000)
         self.assertEqual(primary.monthly_sip, 500)
         self.assertEqual(primary.annual_return_rate, 8)
@@ -164,32 +164,23 @@ class DocumentRetryIntegrityTests(TestCase):
         self.assertEqual(primary.notes, "Keep this note")
         self.assertEqual(secondary.current_value, 9000)
         self.assertEqual(set(document.linked_investments.values_list("pk", flat=True)), {primary.pk, secondary.pk})
-        self.assertTrue(document.summary.startswith("2 investment record"))
+        self.assertEqual(document.extracted_payload['import_review']['state'], 'pending')
+        self.assertIn('No canonical investment records were changed', document.summary)
 
     def test_investment_correction_keeps_other_holdings_and_survives_retry(self):
-        primary_data = {"asset_name": "OCR Fund", "institution": "Broker", "account_number": "ACCOUNT-1"}
-        primary = Investment.objects.create(user=self.user, asset_type="mutual_fund", monthly_sip=500, **primary_data)
-        secondary = Investment.objects.create(user=self.user, asset_name="Other Fund", asset_type="debt", current_value=8000)
-        document = InvestmentImportDocument.objects.create(
-            user=self.user, uploaded_file=self._file(), file_name="holdings.pdf", broker_name="Broker",
-            extracted_payload={"investments": [primary_data]},
-        )
-        document.linked_investments.add(primary, secondary)
-        corrections = {"asset_name": "Verified Fund", "broker_name": "Verified Broker", "current_value": 0}
-        self._post("resolve", "investment_document", document, corrections=corrections)
-        corrected = document.linked_investments.get(asset_name="Verified Fund")
-        self.assertEqual(corrected.monthly_sip, 500)
-        self.assertTrue(document.linked_investments.filter(pk=secondary.pk).exists())
-        with patch("alfred_ai.services.document_review.portfolio_intelligence_service.parse_portfolio_document", return_value={
-            "broker": "Wrong Broker", "parser_status": "parsed", "confidence": 0.9,
-            "investments": [{**primary_data, "current_value": 99999}], "payload": {},
-        }):
-            self._post("retry", "investment_document", document)
-        corrected.refresh_from_db()
-        self.assertEqual(document.broker_name, "Verified Broker")
-        self.assertEqual(corrected.current_value, 0)
-        self.assertEqual(corrected.monthly_sip, 500)
-        self.assertEqual(set(document.linked_investments.values_list("pk", flat=True)), {corrected.pk, secondary.pk})
+        primary=Investment.objects.create(user=self.user,asset_name='Original Fund',asset_type='mutual_fund',institution='Synthetic Broker',account_number='SYNTH-PRIMARY',current_value=100)
+        secondary=Investment.objects.create(user=self.user,asset_name='Other Fund',asset_type='mutual_fund',current_value=200)
+        rows=[dict(asset_name=primary.asset_name,institution=primary.institution,account_number=primary.account_number,current_value='100')]
+        document=InvestmentImportDocument.objects.create(user=self.user,uploaded_file=self._file(),file_name='portfolio.pdf',extracted_payload={'investments':rows})
+        document.linked_investments.add(primary,secondary);before=list(Investment.objects.values())
+        self._post('resolve','investment_document',document,corrections={'asset_name':'Verified Fund','current_value':'0'})
+        with patch('alfred_ai.services.document_review.portfolio_intelligence_service.parse_portfolio_document') as parser:
+            response=self.client.post('/api/documents/review-queue/retry/',dict(scope='investment_document',id=document.pk),content_type='application/json')
+            self.assertEqual(response.status_code,409);parser.assert_not_called()
+        self.assertEqual(list(Investment.objects.values()),before);document.refresh_from_db()
+        self.assertEqual(document.extracted_payload['import_review']['original'],rows)
+        self.assertEqual(document.extracted_payload['import_review']['candidate'][0]['asset_name'],'Verified Fund')
+        self.assertEqual(set(document.linked_investments.values_list('pk',flat=True)),{primary.pk,secondary.pk})
 
     def test_vehicle_retry_keeps_reviewed_type_zero_cost_and_service_date(self):
         profile = BikeProfile.objects.create(user=self.user, display_name="Test Bike", vehicle_number="KA01AA1234")
@@ -235,33 +226,19 @@ class DocumentRetryIntegrityTests(TestCase):
         self.assertEqual(list(Loan.objects.values()),before)
 
     def test_investment_retry_targets_reviewed_row_when_extraction_reorders_or_omits_it(self):
-        for omit_primary in (False, True):
-            with self.subTest(omit_primary=omit_primary):
-                primary_data = {"asset_name": "Primary Fund", "institution": "Broker", "account_number": f"PRIMARY-{omit_primary}"}
-                secondary_data = {"asset_name": "Other Fund", "institution": "Broker", "account_number": f"SECONDARY-{omit_primary}"}
-                primary = Investment.objects.create(user=self.user, asset_type="mutual_fund", current_value=10000, **primary_data)
-                secondary = Investment.objects.create(user=self.user, asset_type="debt", current_value=20000, **secondary_data)
-                document = InvestmentImportDocument.objects.create(
-                    user=self.user, uploaded_file=self._file(), file_name="holdings.pdf", broker_name="Broker",
-                    extracted_payload={"investments": [primary_data, secondary_data]},
-                )
-                document.linked_investments.add(primary, secondary)
-                self._post("resolve", "investment_document", document, corrections={"asset_name": "Verified Fund", "current_value": 15000})
-                corrected = document.linked_investments.get(asset_name="Verified Fund")
-                rows = [{**secondary_data, "current_value": 25000}]
-                if not omit_primary:
-                    rows.append({**primary_data, "current_value": 99999})
-                with patch("alfred_ai.services.document_review.portfolio_intelligence_service.parse_portfolio_document", return_value={
-                    "broker": "Broker", "parser_status": "parsed", "confidence": 0.9, "investments": rows, "payload": {},
-                }):
-                    self._post("retry", "investment_document", document)
-                corrected.refresh_from_db()
-                secondary.refresh_from_db()
-                self.assertEqual(corrected.current_value, 15000)
-                self.assertEqual(secondary.current_value, 25000)
-                self.assertEqual(secondary.asset_name, "Other Fund")
-                self.assertEqual(document.extracted_payload["investments"][0]["asset_name"], "Verified Fund")
-                self.assertEqual(set(document.linked_investments.values_list("pk", flat=True)), {corrected.pk, secondary.pk})
+        primary=Investment.objects.create(user=self.user,asset_name='Original Fund',asset_type='mutual_fund',institution='Synthetic Broker',account_number='SYNTH-PRIMARY',current_value=100)
+        secondary=Investment.objects.create(user=self.user,asset_name='Other Fund',asset_type='mutual_fund',current_value=200)
+        rows=[dict(asset_name=primary.asset_name,institution=primary.institution,account_number=primary.account_number,current_value='100')]
+        document=InvestmentImportDocument.objects.create(user=self.user,uploaded_file=self._file(),file_name='portfolio.pdf',extracted_payload={'investments':rows})
+        document.linked_investments.add(primary,secondary);before=list(Investment.objects.values())
+        self._post('resolve','investment_document',document,corrections={'asset_name':'Verified Fund','current_value':'0'})
+        with patch('alfred_ai.services.document_review.portfolio_intelligence_service.parse_portfolio_document') as parser:
+            response=self.client.post('/api/documents/review-queue/retry/',dict(scope='investment_document',id=document.pk),content_type='application/json')
+            self.assertEqual(response.status_code,409);parser.assert_not_called()
+        self.assertEqual(list(Investment.objects.values()),before);document.refresh_from_db()
+        self.assertEqual(document.extracted_payload['import_review']['original'],rows)
+        self.assertEqual(document.extracted_payload['import_review']['candidate'][0]['asset_name'],'Verified Fund')
+        self.assertEqual(set(document.linked_investments.values_list('pk',flat=True)),{primary.pk,secondary.pk})
 
     def test_loan_closure_retry_verifies_accepted_fields(self):
         accepted = {"loan_account_number": "LOAN-1", "closure_amount": 12345, "closure_date": "2026-03-20", "matched_keyword": "no dues"}

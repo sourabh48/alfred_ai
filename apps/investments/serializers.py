@@ -106,3 +106,12 @@ class InvestmentImportDocumentSerializer(serializers.ModelSerializer):
         if request is not None:
             return request.build_absolute_uri(obj.uploaded_file.url)
         return obj.uploaded_file.url
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        review = (instance.extracted_payload or {}).get('import_review')
+        if isinstance(review, dict):
+            data['review_state'] = review.get('state')
+            data['review_url'] = f'/investments/import-uploads/{instance.pk}/review/'
+            data['extracted_payload'] = {'review_state': review.get('state')}
+        return data

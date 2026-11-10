@@ -80,11 +80,13 @@ class InvestmentMoneyRuntimeTests(TestCase):
         self.assertEqual(row.current_value, 0)
 
     def test_pdf_persistence_is_atomic_for_invalid_holdings(self):
-        parsed = {"investments": [{"asset_name": "Valid", "current_value": "2.675"}, {"asset_name": "Invalid", "current_value": "Infinity"}]}
-        with patch.object(portfolio_intelligence_service, "parse_portfolio_document", return_value=parsed):
-            with self.assertRaises(ValueError):
-                portfolio_intelligence_service.parse_portfolio_pdf(None, self.user)
+        from apps.investments.services.import_review import investment_preview
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        parsed={'investments':[{'asset_name':'Valid','current_value':'2.675'},{'asset_name':'Invalid','current_value':'Infinity'}]}
+        with patch.object(portfolio_intelligence_service,'parse_portfolio_document',return_value=parsed):
+            result=portfolio_intelligence_service.parse_portfolio_pdf(SimpleUploadedFile('synthetic.pdf',b'%PDF synthetic'),self.user)
         self.assertFalse(Investment.objects.filter(user=self.user).exists())
+        document=InvestmentImportDocument.objects.get(pk=result['upload_id']);self.assertFalse(investment_preview(document)['can_confirm'])
 
     def test_correction_json_preserves_raw_evidence_and_rejects_invalid_atomically(self):
         row = Investment.objects.create(user=self.user, asset_name="Holding", asset_type="cash", current_value=20)
@@ -94,7 +96,8 @@ class InvestmentMoneyRuntimeTests(TestCase):
             _apply_investment_correction(self.user, doc.pk, {"current_value": "2.675"})
         doc.refresh_from_db()
         self.assertEqual(doc.extracted_payload["raw"], "2.675 evidence")
-        self.assertEqual(doc.extracted_payload["investments"][0]["current_value"], 2.68)
+        self.assertEqual(doc.extracted_payload["import_review"]["candidate"][0]["current_value"], "2.68")
+        row.refresh_from_db();self.assertEqual(row.current_value,20)
         before = doc.extracted_payload
         with self.assertRaises(ValueError):
             _apply_investment_correction(self.user, doc.pk, {"broker_name": "Changed", "current_value": "NaN"})

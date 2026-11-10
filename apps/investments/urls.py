@@ -1,4 +1,5 @@
 from django.urls import path
+from .import_review_views import InvestmentImportReviewAPI, InvestmentImportConfirmAPI
 from .alert_views import InvestmentReviewAlertView
 from .research_views import ResearchDecisionDetailView, ResearchDecisionListCreateView, ResearchDecisionSettleView, ResearchLessonsView, ResearchChallengeView, ResearchPacketView
 from .views import (
@@ -22,6 +23,8 @@ urlpatterns = [
     path("", InvestmentListCreateView.as_view()),
     path("summary/", InvestmentSummaryView.as_view()),
     path("import-uploads/", InvestmentImportDocumentListView.as_view()),
+    path("import-uploads/<int:pk>/preview/", InvestmentImportReviewAPI.as_view()),
+    path("import-uploads/<int:pk>/confirm/", InvestmentImportConfirmAPI.as_view()),
     path("import-pdf/", import_investment_pdf),
     path("allocation/", InvestmentAllocationView.as_view()),
     path("growth/", InvestmentGrowthView.as_view()),

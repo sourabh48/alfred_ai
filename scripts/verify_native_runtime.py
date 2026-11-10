@@ -289,6 +289,33 @@ def main():
         assert Loan.objects.filter(user=stranger).count() == 1
         passed('loan_review_concurrent_confirmation_and_replay', [item.status_code for item in responses])
 
+        from tests.test_investment_import_acceptance import portfolio_pdf
+        from apps.investments.models import Investment
+        response = other.post(base + '/api/investments/import-pdf/',
+            headers={'X-CSRFToken': other.cookies['csrftoken']}, files={'file': ('synthetic-native-portfolio.pdf',
+                portfolio_pdf([('SYNTHETICNATIVE42', '10000.015', '11000.005')]), 'application/pdf')}, timeout=90)
+        assert response.status_code == 201 and response.json()['investments'] == [], response.status_code
+        investment_document_id = response.json()['upload']['id']
+        investment_review_url = base + f'/api/investments/import-uploads/{investment_document_id}/preview/'
+        investment_confirm_url = base + f'/api/investments/import-uploads/{investment_document_id}/confirm/'
+        preview = other.get(investment_review_url, timeout=30).json()
+        assert not Investment.objects.filter(user=stranger).exists()
+        assert not preview['can_confirm']
+        assert session.get(investment_review_url, timeout=30).status_code == 404
+        values = {key: preview['rows'][0][key] for key in ('asset_type', 'invested_amount', 'current_value', 'annual_return_rate')}
+        correction = other.patch(investment_review_url, headers={'X-CSRFToken': other.cookies['csrftoken']},
+            json={'revision': preview['revision'], 'edits': [dict(index=0, **values, monthly_sip='0', currency='INR')]}, timeout=30)
+        assert correction.status_code == 200, correction.status_code
+        preview = other.get(investment_review_url, timeout=30).json()
+        investment_confirmation = {'confirm': True, 'token': preview['token']}
+        response = other.post(investment_confirm_url, headers={'X-CSRFToken': other.cookies['csrftoken']}, json=investment_confirmation, timeout=30)
+        assert response.status_code == 200, response.status_code
+        holding = Investment.objects.get(user=stranger)
+        assert (holding.invested_amount, holding.current_value) == (Decimal('10000.02'), Decimal('11000.01'))
+        assert other.post(investment_confirm_url, headers={'X-CSRFToken': other.cookies['csrftoken']},
+            json=investment_confirmation, timeout=30).json()['replayed']
+        passed('investment_pdf_review_edit_confirmation_and_replay_over_http')
+
         probe = native_runtime_probe(run)
         result = probe.get(blocking=True, timeout=30)
         assert result["worker_pid"] != os.getpid() and result["attempts"] == 1
@@ -389,6 +416,9 @@ def main():
         assert confirm_loan(None).json()['replayed']
         assert Loan.objects.filter(user=stranger).count() == 1
         passed('confirmed_loan_and_receipt_persist_after_restart')
+        assert other.get(investment_review_url, timeout=30).json()['state'] == 'confirmed'
+        assert Investment.objects.filter(user=stranger).count() == 1
+        passed('confirmed_investment_and_review_persist_after_restart')
         if args.memory:
             from scripts.verify_memory_acceptance import after_restart
             after_restart(base, session, data, memory_state, passed)

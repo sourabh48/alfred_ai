@@ -92,43 +92,16 @@ class PortfolioIntelligenceService:
         Parse investment portfolio from PDF (broker statements, mutual fund statements).
         Supports multiple formats from Groww, Zerodha, etc.
         """
+        from .import_review import stage_investment_document
+        from django.core.files.base import File
         parsed = self.parse_portfolio_document(pdf_file, user=user, filename=filename)
-        investments_created = []
-        investments_updated = []
-        if parsed.get("parser_status") == "failed":
-            return {
-                "success": False,
-                "error": parsed.get("parser_notes") or "Portfolio document could not be parsed.",
-                "created": 0,
-                "updated": 0,
-                "parser_status": parsed.get("parser_status"),
-                "confidence": parsed.get("confidence", 0),
-                "broker": parsed.get("broker", ""),
-                "summary": parsed.get("summary", ""),
-                "extracted_text": parsed.get("extracted_text", ""),
-                "payload": parsed.get("payload", {}),
-            }
-
-        with transaction.atomic():
-            for inv_data in parsed.get("investments", []):
-                investment, created = self._create_or_update_investment(user, inv_data)
-                if created:
-                    investments_created.append(investment)
-                else:
-                    investments_updated.append(investment)
-
-        return {
-            "success": True,
-            "created": len(investments_created),
-            "updated": len(investments_updated),
-            "investments": investments_created + investments_updated,
-            "parser_status": parsed.get("parser_status"),
-            "confidence": parsed.get("confidence", 0),
-            "broker": parsed.get("broker", ""),
-            "summary": parsed.get("summary", ""),
-            "extracted_text": parsed.get("extracted_text", ""),
-            "payload": parsed.get("payload", {}),
-        }
+        if not isinstance(pdf_file, File):
+            pdf_file = File(pdf_file, name=filename or getattr(pdf_file, 'name', 'portfolio.pdf'))
+        document = stage_investment_document(user=user, parsed=parsed, upload_file=pdf_file)
+        return dict(success=True, created=0, updated=0, investments=[], upload_id=document.pk,
+            review_url=f'/investments/import-uploads/{document.pk}/review/', parser_status=document.parser_status,
+            confidence=document.parse_confidence, broker=document.broker_name, summary=document.summary,
+            extracted_text=document.extracted_text, payload=document.extracted_payload)
 
     def parse_portfolio_document(self, pdf_file: BinaryIO, *, user, filename: str = "") -> Dict[str, any]:
         raw_bytes = document_source(pdf_file)
@@ -152,6 +125,12 @@ class PortfolioIntelligenceService:
             else:
                 parsed_investments = self._parse_generic_statement(full_text, broker=broker)
 
+        for item in parsed_investments:
+            labelled = bool(layout_review and layout_review.get('status') == 'parsed')
+            item['field_status'] = {field: 'extracted' if labelled else 'estimated'
+                                    for field in ('invested_amount', 'current_value')}
+            item['field_status'].update(asset_type='estimated', annual_return_rate='estimated')
+        # Currency stays unresolved unless the owner explicitly enters it in the review.
         account_number = self._extract_account_hint(full_text)
         if layout_review is not None:
             accounts = {item["account_number"] for item in parsed_investments}
@@ -297,6 +276,7 @@ class PortfolioIntelligenceService:
                             "confidence": result.get("confidence", 0),
                             "created": result.get("created", 0),
                             "updated": result.get("updated", 0),
+                            "review_url": result.get("review_url", ""),
                         }
                     )
                     if not result.get("success"):
@@ -1199,7 +1179,7 @@ class PortfolioIntelligenceService:
             normalized = " ".join(line.split())
             if not normalized or len(normalized) < 6:
                 continue
-            numeric_values = [float(item.replace(",", "")) for item in re.findall(r"\b\d[\d,]*(?:\.\d{1,2})?\b", normalized)]
+            numeric_values = [item.replace(",", "") for item in re.findall(r"(?<![\w.])[-+]?\d[\d,]*(?:\.\d+)?(?![\w.])", normalized)]
             asset_name = self._extract_asset_name(normalized)
             if not asset_name:
                 continue
@@ -1211,7 +1191,7 @@ class PortfolioIntelligenceService:
                 current_value = numeric_values[-1]
             elif len(numeric_values) == 1:
                 current_value = numeric_values[0]
-            key = (asset_name.lower(), asset_type, self._extract_account_hint(normalized), round(current_value, 2), round(invested_amount, 2))
+            key = (asset_name.lower(), asset_type, self._extract_account_hint(normalized), investment_money(current_value), investment_money(invested_amount))
             if key in seen:
                 continue
             seen.add(key)

@@ -157,6 +157,8 @@ class InvestmentLayoutAcceptanceTests(TestCase):
             response = self.upload()
             self.assertEqual(response.status_code, 201, response.content)
             document = InvestmentImportDocument.objects.get(pk=response.json()["upload"]["id"])
+            from tests.investment_review_fixture import confirm_fixture
+            confirm_fixture(self.user,document);document.refresh_from_db()
             self.assertEqual(document.parser_status, "parsed", document.extracted_text)
             rows = list(document.linked_investments.order_by("asset_name"))
             self.assertEqual(len(rows), 2, document.extracted_text)
@@ -184,24 +186,16 @@ class InvestmentLayoutAcceptanceTests(TestCase):
         self.assertEqual(foreign.current_value, Decimal("42.00"))
 
     def test_real_whitespace_pdf_rounding_correction_retry_and_original_evidence(self):
-        response = self.upload(ZERODHA_TABLE)
-        self.assertEqual(response.status_code, 201, response.content)
-        document = InvestmentImportDocument.objects.get(pk=response.json()["upload"]["id"])
-        rows = list(document.linked_investments.order_by("account_number"))
-        self.assertEqual(len(rows), 2, document.extracted_payload)
-        self.assertEqual([r.current_value for r in rows], [Decimal("3.08")] * 2)
-        row = rows[0]
-        for action, extra in (("resolve", {"corrections": {"current_value": "0", "invested_amount": "2.675"}}), ("retry", {})):
-            result = self.client.post(f"/api/documents/review-queue/{action}/", {
-                "scope": "investment_document", "id": document.pk, **extra}, content_type="application/json")
-            self.assertEqual(result.status_code, 200, result.content)
-        row.refresh_from_db(); rows[1].refresh_from_db(); document.refresh_from_db()
-        self.assertEqual(row.current_value, Decimal("0.00"))
-        self.assertEqual(row.invested_amount, Decimal("2.68"))
-        self.assertEqual(rows[1].current_value, Decimal("3.08"))
-        self.assertEqual(document.linked_investments.count(), 2)
-        self.assertIn("3.075", document.extracted_text)
-        self.assertEqual(evidence(self.user, document.pk, row.pk)["fields"]["current_value"]["original"], "3.075")
+        from tests.investment_review_fixture import confirm_fixture
+        response=self.upload(ZERODHA_TABLE);document=InvestmentImportDocument.objects.get(pk=response.json()['upload']['id'])
+        self.assertFalse(document.linked_investments.exists())
+        result=self.client.post('/api/documents/review-queue/resolve/',dict(scope='investment_document',id=document.pk,
+            corrections={'current_value':'0','invested_amount':'2.675'}),content_type='application/json')
+        self.assertEqual(result.status_code,200);document.refresh_from_db();confirm_fixture(self.user,document)
+        rows=list(document.linked_investments.order_by('account_number'));self.assertEqual(len(rows),2)
+        self.assertEqual(rows[0].current_value,0);self.assertEqual(rows[0].invested_amount,Decimal('2.68'))
+        self.assertEqual(rows[1].current_value,Decimal('3.08'))
+        self.assertEqual(evidence(self.user,document.pk,rows[0].pk)['fields']['current_value']['original'],'3.075')
 
     def test_unsafe_upload_does_not_overwrite_existing_holding_and_can_be_reviewed(self):
         existing = Investment.objects.create(user=self.user, asset_name="Synthetic Alpha Fund", asset_type="mutual_fund",
@@ -220,9 +214,14 @@ class InvestmentLayoutAcceptanceTests(TestCase):
                 "account_number": "SYNTH-A", "invested_amount": "100.25", "current_value": "110.20"}},
             content_type="application/json")
         self.assertEqual(result.status_code, 200, result.content)
+        from apps.investments.services.import_review import edit_investment_review,investment_preview,confirm_investment_review
+        document.refresh_from_db()
+        document=edit_investment_review(document,revision=document.extracted_payload['import_review']['revision'],
+            edits=[dict(index=0,action='link',target_id=existing.pk)])
+        confirm_investment_review(document,token=investment_preview(document)['token'])
         row = document.linked_investments.get()
         self.assertEqual(row.pk, existing.pk)
-        self.assertEqual(row.current_value, Decimal("110.20"))
+        self.assertEqual(row.current_value, Decimal("42.00"))
         document.refresh_from_db()
         self.assertIn("11O.20", document.extracted_text)
         self.assertIsNone(evidence(self.user, document.pk, row.pk)["fields"]["current_value"]["original"])

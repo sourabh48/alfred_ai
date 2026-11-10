@@ -1,4 +1,5 @@
 {
+ "tests.test_investment_review": 16.863,
  "tests.test_loan_import_review": 7.076,
  "tests.test_statement_review": 1.45,
  "tests.test_data_sources": 0.11,

@@ -37,14 +37,14 @@
     <div class="col-xl-5">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Import Portfolio PDF</h2>
-            <p class="page-section-copy mb-3">Upload broker holdings, mutual fund statements, or portfolio PDFs. Alfred will extract positions and update matching holdings when it can verify them.</p>
+            <p class="page-section-copy mb-3">Extract a portfolio PDF, review its values and currency, then explicitly confirm. Uploading does not change holdings.</p>
             <div class="row g-3 align-items-end mb-4">
                 <div class="col-lg-8">
                     <label class="form-label" for="investmentPdfFiles">Portfolio PDFs</label>
                     <input id="investmentPdfFiles" type="file" class="form-control" accept=".pdf,application/pdf" multiple>
                 </div>
                 <div class="col-lg-4 d-grid">
-                    <button id="uploadInvestmentPdfBtn" class="btn btn-dark" type="button">Import PDFs</button>
+                    <button id="uploadInvestmentPdfBtn" class="btn btn-dark" type="button">Extract for Review</button>
                 </div>
             </div>
             <div id="investmentImportStatus" class="mb-4"></div>
@@ -288,5 +288,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.11.0"></script>
+<script src="/static/js/investments.js?v=2.12.0"></script>
 {% endblock %}

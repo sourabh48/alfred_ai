@@ -1243,9 +1243,9 @@ class DocumentReviewAndRetryTests(TestCase):
         self.assertEqual(closure.verification_status, "verified")
         self.assertEqual(closure.parser_status, "parsed")
         self.assertEqual(closure.closure_amount, 84500)
-        self.assertEqual(investment_doc.parser_status, "parsed")
+        self.assertEqual(investment_doc.parser_status, "needs_review")
         self.assertEqual(investment_doc.broker_name, "Groww")
-        self.assertTrue(investment_doc.linked_investments.filter(asset_name="Axis Bluechip Fund").exists())
+        self.assertFalse(investment_doc.linked_investments.filter(asset_name="Axis Bluechip Fund").exists())
         self.assertEqual(resume.parser_status, "parsed")
         self.assertEqual(resume.extracted_payload["skills"], ["Java", "Spring Boot", "SQL"])
         self.assertEqual(recruiter.parser_status, "parsed")
@@ -1666,10 +1666,10 @@ class DocumentReviewAndRetryTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         document.refresh_from_db()
-        self.assertEqual(document.parser_status, "parsed")
-        self.assertEqual(document.linked_investments.count(), 1)
-        investment = Investment.objects.get(user=self.user, asset_name="Axis Bluechip Fund")
-        self.assertEqual(investment.current_value, 56200)
+        self.assertEqual(document.parser_status, "needs_review")
+        self.assertEqual(document.linked_investments.count(), 0)
+        self.assertFalse(Investment.objects.filter(user=self.user,asset_name="Axis Bluechip Fund").exists())
+        self.assertEqual(document.extracted_payload["import_review"]["candidate"][0]["current_value"],"56200.00")
 
     def test_retry_endpoint_supports_investment_documents(self):
         document = InvestmentImportDocument.objects.create(
@@ -1728,8 +1728,11 @@ class DocumentReviewAndRetryTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         document.refresh_from_db()
-        self.assertEqual(document.parser_status, "parsed")
-        self.assertEqual(document.linked_investments.count(), 1)
+        self.assertEqual(document.parser_status, "needs_review")
+        self.assertEqual(document.linked_investments.count(), 0)
+        from tests.investment_review_fixture import confirm_fixture
+        confirm_fixture(self.user,document)
+        self.assertEqual(document.linked_investments.count(),1)
         self.assertTrue(
             OperationalLog.objects.filter(
                 user=self.user,

@@ -591,6 +591,7 @@ function renderReviewQueue(items) {
                     </div>
                     <div class="list-actions">
                         <button class="btn btn-sm btn-outline-primary" type="button" onclick="retryReviewItem('${item.scope}', ${item.id})">Retry</button>
+                        ${item.scope === "investment_document" ? `<a class="btn btn-sm btn-outline-primary" href="/investments/import-uploads/${Number(item.id)}/review/">Review extracted holdings</a>` : ""}
                         <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('${item.scope}', ${item.id})">Delete</button>
                     </div>
                 </div>
@@ -1012,8 +1013,8 @@ function retryReviewItem(scope, id) {
 }
 
 function deleteDocumentCenterItem(scope, id) {
-    const message = scope === "loan_document"
-        ? "Delete this loan source and its extracted evidence? Canonical loans, balances and payments will be preserved. Backups keep their own copy."
+    const message = ["loan_document", "investment_document"].includes(scope)
+        ? (scope === "loan_document" ? "Delete this loan source and its extracted evidence? Canonical loans, balances and payments will be preserved. Backups keep their own copy." : "Delete this investment source and its evidence? Canonical holdings will be preserved. Backups keep their own copy.")
         : "Delete this document, its stored file and the data derived directly from it where ALFRED can track that linkage? Backups made before now keep their own copy.";
     if (!window.confirm(message)) {
         return;

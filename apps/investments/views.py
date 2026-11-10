@@ -10,13 +10,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
-from django.db import transaction
 from django.utils import timezone
 
 from alfred_ai.services.materialized_cache import materialize_payload
-from alfred_ai.services import record_parser_learning
-from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction
-from apps.reports.services import operational_logging_service
 from apps.integrations.services.verified_intelligence import freshness_snapshot, proof_contract_payload
 from alfred_ai.services.currency import RUPEE
 from alfred_ai.services.exchange_rates import approximate
@@ -295,26 +291,6 @@ def _project_position_money(*, current_value, monthly_sip, annual_return_rate, m
     return value
 
 
-def _investment_import_parser_status(parsed: dict) -> str:
-    investments = parsed.get("investments") or []
-    confidence = float(parsed.get("confidence") or 0)
-    text = (parsed.get("extracted_text") or "").strip()
-    if investments:
-        return "parsed"
-    if text or confidence >= 0.2:
-        return "needs_review"
-    return "failed"
-
-
-def _investment_import_summary(parsed: dict, linked_investments: list[Investment]) -> str:
-    broker = parsed.get("broker") or "investment"
-    if linked_investments:
-        return f"{len(linked_investments)} investment record(s) were created or updated from the {broker} document."
-    if parsed.get("extracted_text"):
-        return f"The {broker} portfolio document was saved, but Alfred could not extract enough structured holdings yet."
-    return "The uploaded investment document was saved for review because Alfred could not recover enough readable portfolio data."
-
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
@@ -322,71 +298,25 @@ def import_investment_pdf(request):
     upload = request.FILES.get("file")
     if not upload:
         return Response({"error": "Upload an investment PDF or statement first."}, status=status.HTTP_400_BAD_REQUEST)
+    if not upload.name.lower().endswith('.pdf'):
+        return Response({'detail': 'Choose a PDF investment source.'}, status=400)
 
+    from alfred_ai.services.api_errors import safe_error_details
+    from alfred_ai.services.upload_limits import UploadLimitExceeded, UploadFormatError, UploadStorageUnavailable, UploadProtectionUnavailable
+    from .services.import_review import stage_investment_document
     try:
         parsed = portfolio_intelligence_service.parse_portfolio_pdf(upload, request.user, filename=upload.name)
-    except ValueError:
-        return Response({"error": "Investment document contains an invalid currency amount."}, status=status.HTTP_400_BAD_REQUEST)
-    linked_investments = list(parsed.get("investments") or [])
-
-    with transaction.atomic():
-        upload.seek(0)
-        document = InvestmentImportDocument.objects.create(
-            user=request.user,
-            uploaded_file=upload,
-            file_name=upload.name,
-            broker_name=(parsed.get("broker") or "")[:120],
-            parser_status=_investment_import_parser_status(parsed),
-            parse_confidence=float(parsed.get("confidence") or 0),
-            extracted_text=parsed.get("extracted_text") or "",
-            extracted_payload=parsed.get("payload") or {},
-            summary=_investment_import_summary(parsed, linked_investments),
-        )
-        if linked_investments:
-            document.linked_investments.set(linked_investments)
-            from .services.document_evidence import capture_import
-            capture_import(document, linked_investments, extraction=(parsed.get('payload') or {}).get('investments') or [])
-        record_parser_learning(
-            user=request.user,
-            scope="investment_document",
-            filename=upload.name,
-            detected_type=(parsed.get("broker") or "portfolio_statement").lower().replace(" ", "_"),
-            text=parsed.get("extracted_text") or "",
-            field_names=sorted({key for item in (parsed.get("payload", {}).get("investments") or []) for key, value in item.items() if value not in ("", None, 0)}),
-            parser_status=document.parser_status,
-            confidence=document.parse_confidence,
-        )
-        if document.parser_status != "parsed":
-            operational_logging_service.log(
-                user=request.user,
-                module="investments",
-                category="document",
-                scope="investment_document",
-                event_type="investment_document_needs_review",
-                severity="warning",
-                document_id=document.id,
-                file_name=document.file_name,
-                message="Investment document upload was saved, but Alfred could not populate fully trusted structured holdings yet.",
-                payload={
-                    "parser_status": document.parser_status,
-                    "parse_confidence": document.parse_confidence,
-                    "broker_name": document.broker_name,
-                    "linked_investments": len(linked_investments),
-                },
-            )
-
-    raw_file_retention = purge_uploaded_file_after_extraction(
-        document,
-        "uploaded_file",
-        reason="investment_document_extraction_complete",
-    )
-    return Response(
-        {
-            "success": True,
-            "message": document.summary,
-            "investments": InvestmentSerializer(linked_investments, many=True).data,
-            "upload": InvestmentImportDocumentSerializer(document, context={"request": request}).data,
-            "raw_file_retention": raw_file_retention,
-        },
-        status=status.HTTP_201_CREATED,
-    )
+        document = InvestmentImportDocument.objects.get(pk=parsed['upload_id'], user=request.user)
+    except (UploadLimitExceeded, UploadFormatError, UploadStorageUnavailable, UploadProtectionUnavailable) as exc:
+        return Response(safe_error_details(exc, type(exc).default_detail, logger_name=__name__), status=exc.status_code)
+    except Exception as exc:
+        diagnostic = safe_error_details(exc, 'Investment extraction could not complete. The source is retained for review.', logger_name=__name__)
+        try:
+            document = stage_investment_document(user=request.user, parsed={}, upload_file=upload)
+            document.extracted_payload.update(error_code='investment_extraction_failed', error_id=diagnostic['error_id'])
+            document.save(update_fields=['extracted_payload'])
+        except Exception as persistence_error:
+            return Response(safe_error_details(persistence_error, 'The source could not be saved. Keep the original and retry.', logger_name=__name__), status=500)
+    return Response(dict(success=True, message=document.summary, investments=[],
+        upload=InvestmentImportDocumentSerializer(document, context={'request': request}).data,
+        raw_file_retention={'deleted': False, 'enabled': False}), status=201)

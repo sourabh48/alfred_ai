@@ -86,24 +86,21 @@ class InvestmentEvidenceTests(TestCase):
         self.assertFalse(Path(settings.ALFRED_MEMORY_DIR).exists())
 
     def test_correction_uses_existing_workflow_current_precedence_and_immutable_parser_values(self):
-        self.confirm()
-        original=deepcopy(InvestmentDocumentEvidence.objects.get().source_values)
+        original=deepcopy(InvestmentDocumentEvidence.objects.get().source_values);before=list(Investment.objects.values())
         apply_correction(self.owner,scope='investment_document',document_id=self.document.pk,corrections={'current_value':'3456.78'})
-        result=self.current()['fields']['current_value']
-        self.assertEqual(result['current'],'3456.78'); self.assertEqual(result['original'],'2345.6700')
-        self.assertEqual(result['verification'],'needs_owner_review')
+        self.assertEqual(list(Investment.objects.values()),before)
+        self.assertEqual(self.current()['fields']['current_value']['original'],'2345.6700')
         self.assertEqual(InvestmentDocumentEvidence.objects.get().source_values,original)
-        self.assertEqual(self.confirm().json()['fields']['current_value']['verification'],'owner_confirmed')
+        self.document.refresh_from_db();self.assertEqual(self.document.extracted_payload['import_review']['candidate'][0]['current_value'],'3456.78')
 
     def test_retry_preserves_first_original_and_existing_accepted_correction(self):
+        from apps.investments.services.import_review import InvestmentReviewConflict
+        original=deepcopy(InvestmentDocumentEvidence.objects.get().source_values);before=list(Investment.objects.values())
         apply_correction(self.owner,scope='investment_document',document_id=self.document.pk,corrections={'current_value':'3456.78'})
-        self.confirm(); raw=deepcopy(self.raw); raw['current_value']='1.23'
-        parsed=dict(investments=[raw],payload={'investments':[raw]},broker='',confidence=.9,parser_status='parsed',extracted_text='SYNTHETIC-RETRY')
-        with patch('alfred_ai.services.document_review.portfolio_intelligence_service.parse_portfolio_document',return_value=parsed):
-            retry_review_item(self.owner,scope='investment_document',document_id=self.document.pk)
-        result=self.current()['fields']['current_value']
-        self.assertEqual(result['current'],'3456.78'); self.assertEqual(result['original'],'2345.6700')
-        self.assertEqual(result['verification'],'needs_owner_review')
+        with patch('alfred_ai.services.document_review.portfolio_intelligence_service.parse_portfolio_document') as parser:
+            with self.assertRaises(InvestmentReviewConflict):retry_review_item(self.owner,scope='investment_document',document_id=self.document.pk)
+            parser.assert_not_called()
+        self.assertEqual(list(Investment.objects.values()),before);self.assertEqual(InvestmentDocumentEvidence.objects.get().source_values,original)
 
     def test_record_edit_source_replacement_and_partial_parse_invalidate_receipts(self):
         self.confirm(); stale=self.current()['revision']
@@ -179,31 +176,21 @@ class InvestmentEvidenceTests(TestCase):
         self.assertEqual(InvestmentDocumentEvidence.objects.get().reviewed_fields,{})
 
     def test_renamed_holding_retains_original_field_evidence_without_inheriting_confirmation(self):
-        self.confirm()
-        apply_correction(self.owner,scope='investment_document',document_id=self.document.pk,
-            corrections={'asset_name':'SYNTHETIC-RENAMED-HOLDING','current_value':'3456.78'})
-        replacement=self.document.linked_investments.get(asset_name='SYNTHETIC-RENAMED-HOLDING')
-        detail=service.evidence(self.owner,self.document.pk,replacement.pk)
-        self.assertEqual(detail['fields']['current_value']['original'],'2345.6700')
-        self.assertEqual(detail['fields']['current_value']['current'],'3456.78')
-        self.assertEqual(detail['fields']['current_value']['verification'],'needs_owner_review')
-        self.assertTrue(InvestmentDocumentEvidence.objects.filter(source_values__current_value='2345.6700').exists())
+        before=list(Investment.objects.values());original=deepcopy(InvestmentDocumentEvidence.objects.get().source_values)
+        apply_correction(self.owner,scope='investment_document',document_id=self.document.pk,corrections={'asset_name':'SYNTHETIC-RENAMED-HOLDING'})
+        self.assertEqual(list(Investment.objects.values()),before);self.assertEqual(InvestmentDocumentEvidence.objects.get().source_values,original)
+        self.document.refresh_from_db();self.assertEqual(self.document.extracted_payload['import_review']['candidate'][0]['asset_name'],'SYNTHETIC-RENAMED-HOLDING')
 
     def test_failed_receipt_capture_rolls_back_new_imported_financial_records(self):
-        from alfred_ai.services.upload_limits import begin_upload_writes
-        baseline=len(connection.atomic_blocks)
-        def parsed(*args,**kwargs):
-            self.assertEqual(len(connection.atomic_blocks),baseline)
-            begin_upload_writes()  # Existing parser opens the write scope only after heavy extraction.
-            return dict(investments=[{'asset_name':'SYNTHETIC-ATOMIC-IMPORT','asset_type':'equity'}],payload={'investments':[]})
+        from apps.investments.services.import_review import stage_investment_document,investment_preview
+        from tests.investment_review_fixture import confirm_fixture
+        raw=dict(asset_name='SYNTHETIC-ATOMIC-IMPORT',asset_type='equity',current_value='2.675')
+        document=stage_investment_document(user=self.owner,parsed={'investments':[raw]},upload_file=SimpleUploadedFile('synthetic.pdf',b'%PDF synthetic'))
         before=list(Investment.objects.values())
-        with patch('apps.investments.views.portfolio_intelligence_service.parse_portfolio_document',side_effect=parsed), \
-                patch.object(service,'capture_import',side_effect=RuntimeError('synthetic-metadata-failure')):
-            response=self.client.post('/api/investments/import-pdf/',{'file':SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC',content_type='application/pdf')})
-        self.assertEqual(response.status_code,500); self.assertTrue(response.json()['error_id'])
-        self.assertNotIn('synthetic-metadata-failure',response.content.decode())
-        self.assertEqual(list(Investment.objects.values()),before)
-        self.assertEqual(InvestmentImportDocument.objects.count(),1)
+        with patch('apps.investments.services.import_review.capture_import',side_effect=RuntimeError('synthetic-metadata-failure')):
+            with self.assertRaises(RuntimeError):confirm_fixture(self.owner,document)
+        self.assertEqual(list(Investment.objects.values()),before);document.refresh_from_db()
+        self.assertEqual(document.extracted_payload['import_review']['state'],'pending')
 
     def test_new_upload_captures_exact_parser_value_without_automatic_confirmation(self):
         from alfred_ai.services.upload_limits import begin_upload_writes
@@ -216,6 +203,9 @@ class InvestmentEvidenceTests(TestCase):
         with patch('apps.investments.views.portfolio_intelligence_service.parse_portfolio_document',side_effect=parsed):
             response=self.client.post('/api/investments/import-pdf/',{'file':SimpleUploadedFile('synthetic.pdf',b'%PDF-SYNTHETIC',content_type='application/pdf')})
         self.assertEqual(response.status_code,201)
+        self.assertFalse(Investment.objects.filter(asset_name=raw['asset_name']).exists())
+        from tests.investment_review_fixture import confirm_fixture
+        document=InvestmentImportDocument.objects.get(pk=response.json()['upload']['id']);confirm_fixture(self.owner,document)
         row=Investment.objects.get(asset_name=raw['asset_name'])
         proof=InvestmentDocumentEvidence.objects.get(investment=row)
         self.assertEqual(str(row.current_value),'2.68'); self.assertEqual(proof.source_values['current_value'],'2.675')

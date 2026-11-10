@@ -321,6 +321,66 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: not LoanImportDocument.objects.filter(pk=document.pk).exists())
         self.assertEqual(Loan.objects.values().get(pk=loan.pk), before)
 
+    def test_investment_upload_review_correction_confirmation_and_reopen(self):
+        from decimal import Decimal
+        from selenium.webdriver.common.keys import Keys
+        from apps.investments.models import Investment, InvestmentImportDocument
+        from selenium.webdriver.support.ui import Select
+        from tests.test_investment_import_acceptance import portfolio_pdf
+        self.login()
+        owner = self.scenario['user']
+        before = Investment.objects.filter(user=owner).count()
+        source = self.artifacts/'synthetic-reviewed-investment.pdf'
+        source.write_bytes(portfolio_pdf([('SYNTHETICREVIEW42', '10000.015', '11000.005')]))
+        self.browser.get(self.live_server_url+'/investments/')
+        self.browser.find_element(self.By.ID, 'investmentPdfFiles').send_keys(str(source.resolve()))
+        self.memory_click('#uploadInvestmentPdfBtn')
+        self.wait.until(lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=source.name).exists())
+        document = InvestmentImportDocument.objects.get(user=owner, file_name=source.name)
+        self.assertEqual(Investment.objects.filter(user=owner).count(), before)
+        link = f'a[href="/investments/import-uploads/{document.pk}/review/"]'
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, link))
+        self.memory_click(link)
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'investmentReview0-current_value'))
+        value = self.browser.find_element(self.By.ID, 'investmentReview0-current_value')
+        value.clear(); value.send_keys('120.25')
+        Select(self.browser.find_element(self.By.ID, 'investmentReview0-currency')).select_by_value('INR')
+        self.browser.find_element(self.By.ID, 'investmentReview0-monthly_sip').send_keys('0')
+        self.memory_click('button[value="save"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="revision"]').get_attribute('value') == '1')
+        self.assertEqual(Investment.objects.filter(user=owner).count(), before)
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=width, height=1100, deviceScaleFactor=1, mobile=False))
+            for theme in ('light', 'dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+                self.browser.execute_async_script('requestAnimationFrame(()=>requestAnimationFrame(arguments[0]))')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width, theme=theme, **audit))
+                (self.artifacts/'investment-review-accessibility.json').write_text(json.dumps(findings, indent=2), encoding='utf-8')
+                self.assertEqual(audit['violations'], [], findings[-1])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'investment-review-{width}-{theme}.png'))
+        self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="reviewed"]').send_keys(Keys.SPACE)
+        self.memory_click('button[value="confirm"]')
+        self.wait.until(lambda _: 'Investment review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        investment = Investment.objects.get(user=owner, account_number='SYNTHETICREVIEW42')
+        self.assertEqual((investment.invested_amount, investment.current_value, investment.monthly_sip),
+            (Decimal('10000.02'), Decimal('120.25'), Decimal('0.00')))
+        self.browser.refresh()
+        self.wait.until(lambda _: 'Investment review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.assertEqual(Investment.objects.filter(user=owner).count(), before+1)
+        self.browser.save_screenshot(str(self.artifacts/'investment-review-confirmed.png'))
+        self.memory_click('main a[href="/investments/"]')
+        self.wait.until(lambda _: '120.25' in self.text('investmentPositionsBody'))
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, link))
+        self.memory_click(link)
+        self.wait.until(lambda _: 'Investment review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.assertTrue(Path(document.uploaded_file.path).is_file())
+
     def test_data_sources_owned_counts_and_navigation(self):
         self.login()
         self.browser.get(self.live_server_url + '/data-sources/')

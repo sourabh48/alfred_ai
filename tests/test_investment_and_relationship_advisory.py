@@ -235,56 +235,18 @@ class InvestmentAndRelationshipAdvisoryTests(TestCase):
         self.assertEqual(summary["down_payment_total"], 500000.0)
         self.assertEqual(summary["property_acquisition_cost_total"], 4650000.0)
 
-    def test_investment_pdf_import_creates_upload_and_linked_holdings(self):
-        imported_investment = Investment.objects.create(
-            user=self.user,
-            asset_type="mutual_fund",
-            asset_name="Axis Bluechip Fund",
-            institution="Groww",
-            account_number="FOLIO12345",
-            invested_amount=50000,
-            current_value=56200,
-            annual_return_rate=11.2,
-        )
-        report = SimpleUploadedFile("portfolio.pdf", b"%PDF-1.4 fake", content_type="application/pdf")
-
-        with patch(
-            "apps.investments.views.portfolio_intelligence_service.parse_portfolio_pdf",
-            return_value={
-                "success": True,
-                "created": 1,
-                "updated": 0,
-                "investments": [imported_investment],
-                "parser_status": "parsed",
-                "confidence": 0.88,
-                "broker": "Groww",
-                "summary": "1 investment position was extracted from the Groww document.",
-                "extracted_text": "Groww holdings statement",
-                "payload": {
-                    "broker_name": "Groww",
-                    "account_number": "FOLIO12345",
-                    "investments": [
-                        {
-                            "asset_type": "mutual_fund",
-                            "asset_name": "Axis Bluechip Fund",
-                            "institution": "Groww",
-                            "account_number": "FOLIO12345",
-                            "invested_amount": 50000,
-                            "current_value": 56200,
-                        }
-                    ],
-                },
-            },
-        ):
-            response = self.client.post("/api/investments/import-pdf/", data={"file": report})
-
-        self.assertEqual(response.status_code, 201)
-        payload = response.json()
-        self.assertEqual(payload["upload"]["parser_status"], "parsed")
-        self.assertEqual(payload["upload"]["broker_name"], "Groww")
-        self.assertEqual(len(payload["investments"]), 1)
-        self.assertEqual(payload["investments"][0]["asset_name"], "Axis Bluechip Fund")
-        self.assertEqual(payload["upload"]["linked_investments"][0]["asset_name"], "Axis Bluechip Fund")
+    def test_investment_pdf_import_stages_review_without_overwriting_holdings(self):
+        from tests.test_investment_review import extraction
+        from apps.investments.models import InvestmentImportDocument
+        from tests.investment_review_fixture import confirm_fixture
+        before=list(Investment.objects.values())
+        with patch('apps.investments.views.portfolio_intelligence_service.parse_portfolio_document',return_value=extraction()):
+            response=self.client.post('/api/investments/import-pdf/',dict(file=SimpleUploadedFile('synthetic.pdf',b'%PDF synthetic')))
+        self.assertEqual(response.status_code,201)
+        payload=response.json();self.assertEqual(payload['upload']['parser_status'],'needs_review')
+        self.assertEqual(payload['investments'],[]);self.assertEqual(list(Investment.objects.values()),before)
+        document=InvestmentImportDocument.objects.get(pk=payload['upload']['id']);confirm_fixture(self.user,document)
+        self.assertEqual(document.linked_investments.count(),1)
 
     def test_investment_summary_exposes_short_horizon_watchlist_with_proof(self):
         cache.clear()

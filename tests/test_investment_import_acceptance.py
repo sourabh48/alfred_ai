@@ -35,11 +35,15 @@ class InvestmentImportAcceptanceTests(TestCase):
         self.client.force_login(self.user)
         self.rows = [("SYNTH-A", "100.25", "110.20"), ("SYNTH-B", "200.50", "220.40")]
 
-    def upload(self, rows=None, client=None):
-        return (client or self.client).post("/api/investments/import-pdf/", {
+    def upload(self, rows=None, client=None, confirm=True):
+        response = (client or self.client).post("/api/investments/import-pdf/", {
             "file": SimpleUploadedFile("synthetic-portfolio.pdf", portfolio_pdf(self.rows if rows is None else rows),
                 content_type="application/pdf"),
         })
+        if confirm and response.status_code == 201:
+            from tests.investment_review_fixture import confirm_response
+            confirm_response(client or self.client, response)
+        return response
 
     def test_equal_holdings_in_different_accounts_are_not_deduplicated(self):
         rows = [("SYNTH-A", "100.25", "110.20"), ("SYNTH-B", "100.25", "110.20")]
@@ -72,22 +76,21 @@ class InvestmentImportAcceptanceTests(TestCase):
         owned["SYNTH-A"].refresh_from_db()
         owned["SYNTH-B"].refresh_from_db()
         legacy.refresh_from_db(); foreign.refresh_from_db()
-        self.assertEqual(owned["SYNTH-A"].current_value, Decimal("120.10"))
+        self.assertEqual(owned["SYNTH-A"].current_value, Decimal("110.20"))
         self.assertEqual(owned["SYNTH-B"].current_value, Decimal("220.40"))
         self.assertEqual(legacy.current_value, Decimal("9.99"))
         self.assertEqual(foreign.current_value, Decimal("42.00"))
-        self.assertEqual(evidence(self.user, document.pk, owned["SYNTH-A"].pk)["fields"]["current_value"]["original"], "110.2")
+        self.assertEqual(evidence(self.user, document.pk, owned["SYNTH-A"].pk)["fields"]["current_value"]["original"], "110.20")
 
     def test_receipt_failure_rolls_back_register_and_retry_succeeds(self):
-        self.client.raise_request_exception = False
-        with patch("apps.investments.services.document_evidence.capture_import", side_effect=RuntimeError("synthetic receipt failure")):
-            response = self.upload()
-        self.assertEqual(response.status_code, 500)
-        self.assertFalse(Investment.objects.filter(user=self.user).exists())
-        self.assertFalse(InvestmentImportDocument.objects.filter(user=self.user).exists())
-        self.assertFalse(InvestmentDocumentEvidence.objects.exists())
-        self.assertEqual(self.upload().status_code, 201)
-        self.assertEqual(Investment.objects.filter(user=self.user).count(), 2)
+        from apps.investments.services.import_review import investment_preview
+        response=self.upload(confirm=False);document=InvestmentImportDocument.objects.get(pk=response.json()['upload']['id'])
+        from tests.investment_review_fixture import confirm_fixture
+        with patch('apps.investments.services.import_review.capture_import',side_effect=RuntimeError('synthetic receipt failure')):
+            with self.assertRaises(RuntimeError): confirm_fixture(self.user,document)
+        self.assertFalse(Investment.objects.filter(user=self.user).exists());self.assertFalse(InvestmentDocumentEvidence.objects.exists())
+        document.refresh_from_db();self.assertEqual(document.extracted_payload['import_review']['state'],'pending')
+        confirm_fixture(self.user,document);self.assertEqual(Investment.objects.filter(user=self.user).count(),2)
 
     def test_source_receipts_require_exact_account_identity(self):
         row = Investment.objects.create(user=self.user, asset_name=ASSET, asset_type="cash", account_number="SYNTH-A")
@@ -117,25 +120,15 @@ class InvestmentImportAcceptanceTests(TestCase):
         self.assertEqual(InvestmentImportDocument.objects.count(), 1)
 
     def test_corrected_zero_and_decimal_cents_survive_actual_pdf_retry(self):
-        response = self.upload(self.rows[:1])
-        self.assertEqual(response.status_code, 201, response.content)
-        document = InvestmentImportDocument.objects.get(pk=response.json()["upload"]["id"])
-        row = document.linked_investments.get()
-        original_text = document.extracted_text
-        correction = self.client.post("/api/documents/review-queue/resolve/", {
-            "scope": "investment_document", "id": document.pk,
-            "corrections": {"invested_amount": "2.675", "current_value": "0"},
-        }, content_type="application/json")
-        self.assertEqual(correction.status_code, 200, correction.content)
-        document.refresh_from_db()
-        self.assertEqual(document.linked_investments.get().pk, row.pk)
-        retry = self.client.post("/api/documents/review-queue/retry/", {
-            "scope": "investment_document", "id": document.pk,
-        }, content_type="application/json")
-        self.assertEqual(retry.status_code, 200, retry.content)
-        row.refresh_from_db(); document.refresh_from_db()
-        self.assertEqual(row.invested_amount, Decimal("2.68"))
-        self.assertEqual(row.current_value, Decimal("0.00"))
-        self.assertEqual(document.linked_investments.get().pk, row.pk)
-        self.assertEqual(document.extracted_text, original_text)
-        self.assertEqual(evidence(self.user, document.pk, row.pk)["fields"]["current_value"]["original"], "110.2")
+        from tests.investment_review_fixture import confirm_fixture
+        response=self.upload(self.rows[:1],confirm=False);document=InvestmentImportDocument.objects.get(pk=response.json()['upload']['id'])
+        original_text=document.extracted_text
+        correction=self.client.post('/api/documents/review-queue/resolve/',dict(scope='investment_document',id=document.pk,
+            corrections={'invested_amount':'2.675','current_value':'0'}),content_type='application/json')
+        self.assertEqual(correction.status_code,200);self.assertFalse(Investment.objects.filter(user=self.user).exists())
+        document.refresh_from_db();confirm_fixture(self.user,document)
+        row=document.linked_investments.get();self.assertEqual(row.invested_amount,Decimal('2.68'));self.assertEqual(row.current_value,0)
+        retry=self.client.post('/api/documents/review-queue/retry/',dict(scope='investment_document',id=document.pk),content_type='application/json')
+        self.assertEqual(retry.status_code,200);row.refresh_from_db();document.refresh_from_db()
+        self.assertEqual(row.current_value,0);self.assertEqual(document.extracted_text,original_text)
+        self.assertEqual(evidence(self.user,document.pk,row.pk)['fields']['current_value']['original'],'110.20')

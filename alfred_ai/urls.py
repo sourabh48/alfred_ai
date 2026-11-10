@@ -8,6 +8,7 @@ from .diagnostics_views import diagnostics_view
 from .data_sources_views import data_sources_view
 from .statement_review_views import statement_review_view
 from apps.loans.import_review_views import loan_import_review_view
+from apps.investments.import_review_views import investment_import_review_view
 from .views import statement_evidence_view
 from .views import investment_evidence_view
 from .views import loan_import_evidence_view
@@ -68,6 +69,7 @@ urlpatterns = [
     path("data-sources/", data_sources_view, name="data_sources"),
     path("expenses/uploads/<int:pk>/review/", statement_review_view, name="statement_review"),
     path("loans/import-uploads/<int:pk>/review/", loan_import_review_view, name="loan_import_review"),
+    path("investments/import-uploads/<int:pk>/review/", investment_import_review_view, name="investment_import_review"),
     path('documents/statements/<int:document_id>/transactions/<int:transaction_id>/', statement_evidence_view, name='statement_evidence'),
     path('documents/loan-closures/<int:document_id>/', loan_closure_evidence_view, name='loan_closure_evidence'),
     path('documents/investments/<int:document_id>/records/<int:identity>/', investment_evidence_view, name='investment_evidence'),

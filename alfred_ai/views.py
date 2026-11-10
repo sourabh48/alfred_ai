@@ -403,14 +403,15 @@ def document_review_retry_api_view(request):
         return JsonResponse({"error": "Document not found."}, status=404)
     except Exception as exc:
         from apps.loans.services.import_review import LoanReviewConflict
-        if isinstance(exc, LoanReviewConflict):
-            return JsonResponse({"error": "The loan review changed or contains saved corrections. Open the current review before retrying."}, status=409)
-        if payload.get("scope") not in {"loan_document", "loan_closure_document"}:
+        from apps.investments.services.import_review import InvestmentReviewConflict
+        if isinstance(exc, (LoanReviewConflict, InvestmentReviewConflict)):
+            return JsonResponse({"error": "The review changed or contains saved corrections. Open the current review before retrying."}, status=409)
+        if payload.get("scope") not in {"loan_document", "loan_closure_document", "investment_document"}:
             raise
         from .services.api_errors import safe_error_details
         from .services.upload_limits import UploadLimitExceeded, UploadFormatError, UploadStorageUnavailable, UploadProtectionUnavailable
         resource_error = isinstance(exc, (UploadLimitExceeded, UploadFormatError, UploadStorageUnavailable, UploadProtectionUnavailable))
-        message = type(exc).default_detail if resource_error else "Loan document retry could not be completed. Please retry."
+        message = type(exc).default_detail if resource_error else "Document retry could not be completed. Please retry."
         return JsonResponse(safe_error_details(exc, message, logger_name=__name__, field="error"),
                             status=exc.status_code if resource_error else 500)
     return JsonResponse({"item": item}, encoder=DjangoJSONEncoder)
